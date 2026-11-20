@@ -111,6 +111,85 @@ fn decode_hex(value: u8) -> Option<u8> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EvidenceDigest256([u8; 32]);
+
+impl EvidenceDigest256 {
+    pub const UNKNOWN: Self = Self([0; 32]);
+
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    pub const fn is_known(self) -> bool {
+        self.0 != [0; 32]
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IdentificationMethodV1 {
+    RandomizedControlledTrial,
+    QuasiExperimental,
+    Observational,
+    Unknown,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CausalIdentificationV1 {
+    pub method: IdentificationMethodV1,
+    pub design_digest: EvidenceDigest256,
+    pub estimand_digest: EvidenceDigest256,
+    pub propensity_min_bps: u16,
+    pub propensity_max_bps: u16,
+    pub max_standardized_mean_difference_micros: u32,
+    pub interference_controlled: bool,
+}
+
+impl CausalIdentificationV1 {
+    pub const UNKNOWN: Self = Self {
+        method: IdentificationMethodV1::Unknown,
+        design_digest: EvidenceDigest256::UNKNOWN,
+        estimand_digest: EvidenceDigest256::UNKNOWN,
+        propensity_min_bps: 0,
+        propensity_max_bps: 10_000,
+        max_standardized_mean_difference_micros: u32::MAX,
+        interference_controlled: false,
+    };
+
+    pub const fn new(
+        method: IdentificationMethodV1,
+        design_digest: EvidenceDigest256,
+        estimand_digest: EvidenceDigest256,
+        propensity_min_bps: u16,
+        propensity_max_bps: u16,
+        max_standardized_mean_difference_micros: u32,
+        interference_controlled: bool,
+    ) -> Self {
+        Self {
+            method,
+            design_digest,
+            estimand_digest,
+            propensity_min_bps,
+            propensity_max_bps,
+            max_standardized_mean_difference_micros,
+            interference_controlled,
+        }
+    }
+
+    /// Only independently verified randomized designs qualify in this tranche.
+    /// Quasi-experimental strategies need method-specific assumptions first.
+    pub fn qualifies_for_transfer(self) -> bool {
+        self.method == IdentificationMethodV1::RandomizedControlledTrial
+            && self.design_digest.is_known()
+            && self.estimand_digest.is_known()
+            && self.propensity_min_bps >= 500
+            && self.propensity_min_bps <= self.propensity_max_bps
+            && self.propensity_max_bps <= 9_500
+            && self.max_standardized_mean_difference_micros <= 100_000
+            && self.interference_controlled
+    }
+}
+
 // Candidate-visible experience. No future labels or evaluator-only utility fields.
 #[derive(Clone, Copy, Debug)]
 pub struct Experience {
@@ -125,6 +204,7 @@ pub struct Experience {
     pub observed_utility: f64,
     /// Claimed absolute measurement-error bound in normalized utility units.
     pub measurement_error_bound: f64,
+    pub causal_identification: CausalIdentificationV1,
     pub intervention: bool,
     pub prediction_pre_registered: bool,
     pub outcome_reconciled: bool,
@@ -280,6 +360,7 @@ pub fn is_qualified(item: &Experience, query: Query) -> bool {
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
         && (0.0..=1.0).contains(&item.measurement_error_bound)
+        && item.causal_identification.qualifies_for_transfer()
         && item.intervention
         && item.prediction_pre_registered
         && item.outcome_reconciled
@@ -570,6 +651,22 @@ mod tests {
         SourceRootDigest::from_bytes(bytes)
     }
 
+    fn fixture_causal_identification(seed: u32) -> CausalIdentificationV1 {
+        let mut design = [0_u8; 32];
+        let mut estimand = [0_u8; 32];
+        design[..4].copy_from_slice(&seed.to_be_bytes());
+        estimand[..4].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
+        CausalIdentificationV1::new(
+            IdentificationMethodV1::RandomizedControlledTrial,
+            EvidenceDigest256::from_bytes(design),
+            EvidenceDigest256::from_bytes(estimand),
+            5_000,
+            5_000,
+            50_000,
+            true,
+        )
+    }
+
     fn sample(
         id: u32,
         family: u16,
@@ -586,6 +683,7 @@ mod tests {
             action,
             observed_utility: utility,
             measurement_error_bound: 0.02,
+            causal_identification: fixture_causal_identification(id),
             intervention: true,
             prediction_pre_registered: true,
             outcome_reconciled: true,
@@ -996,6 +1094,44 @@ mod tests {
 
         assert!(!is_qualified(&item, query));
         assert!(!is_transfer_qualified(&item, query));
+    }
+
+    #[test]
+    fn observational_evidence_is_retained_but_not_causally_qualified() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let mut item = sample(70, 10, Action::A, 0.99, scope);
+        item.causal_identification.method = IdentificationMethodV1::Observational;
+        assert!(!is_qualified(&item, Query { scope }));
+        assert!(!is_transfer_qualified(&item, Query { scope }));
+    }
+
+    #[test]
+    fn randomized_design_requires_overlap_balance_and_interference_controls() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let mut no_overlap = sample(71, 11, Action::A, 0.99, scope);
+        no_overlap.causal_identification.propensity_min_bps = 100;
+        assert!(!is_qualified(&no_overlap, Query { scope }));
+
+        let mut imbalance = sample(72, 12, Action::A, 0.99, scope);
+        imbalance
+            .causal_identification
+            .max_standardized_mean_difference_micros = 150_000;
+        assert!(!is_qualified(&imbalance, Query { scope }));
+
+        let mut interference = sample(73, 13, Action::A, 0.99, scope);
+        interference.causal_identification.interference_controlled = false;
+        assert!(!is_qualified(&interference, Query { scope }));
+
+        let mut unknown_estimand = sample(74, 14, Action::A, 0.99, scope);
+        unknown_estimand.causal_identification.estimand_digest =
+            EvidenceDigest256::UNKNOWN;
+        assert!(!is_qualified(&unknown_estimand, Query { scope }));
     }
 
     #[test]

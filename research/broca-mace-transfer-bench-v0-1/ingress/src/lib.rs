@@ -12,7 +12,9 @@ pub mod providers;
 
 use std::collections::BTreeMap;
 
-use broca_mace_policy::{Action, Experience, Scope, SourceRootDigest};
+use broca_mace_policy::{
+    Action, CausalIdentificationV1, Experience, Scope, SourceRootDigest,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AsKnownQuery {
@@ -119,6 +121,8 @@ pub struct VerifiedCausalAssessment {
     pub prediction_pre_registered: bool,
     pub confounders_controlled: bool,
     pub delayed_horizon_complete: bool,
+    /// Method, design and estimand metadata covered by assessment_digest.
+    pub identification: CausalIdentificationV1,
     pub assessment_digest: String,
 }
 
@@ -220,6 +224,7 @@ pub struct EvidenceReceiptBundle {
     pub calibration_method_id: String,
     pub calibration_revision: String,
     pub causal_assessment_digest: String,
+    pub causal_identification: CausalIdentificationV1,
     pub outcome_success: bool,
     /// Stored as bits so the complete receipt bundle remains exactly comparable.
     pub outcome_observed_utility_bits: u64,
@@ -457,6 +462,7 @@ pub fn ingest_as_known(
             action: raw.action,
             observed_utility: outcome.observed_utility,
             measurement_error_bound: measurement.absolute_error_bound,
+            causal_identification: causal.identification,
             intervention: causal.intervention_confirmed,
             prediction_pre_registered: causal.prediction_pre_registered,
             outcome_reconciled: outcome.reconciled,
@@ -492,6 +498,7 @@ pub fn ingest_as_known(
             calibration_method_id: measurement.method_id,
             calibration_revision: measurement.calibration_revision,
             causal_assessment_digest: causal.assessment_digest,
+            causal_identification: causal.identification,
             outcome_success: outcome.success,
             outcome_observed_utility_bits: outcome.observed_utility.to_bits(),
             outcome_utility_unit: outcome.utility_unit,
@@ -535,6 +542,7 @@ pub struct ConsolidationEvidenceRefV1 {
     source_root_id: u32,
     source_root_digest: SourceRootDigest,
     source_trust_status: SourceTrustStatus,
+    causal_identification: CausalIdentificationV1,
     intervention: bool,
     prediction_pre_registered: bool,
     outcome_reconciled: bool,
@@ -562,6 +570,7 @@ impl ConsolidationEvidenceRefV1 {
             action: self.action,
             observed_utility: self.observed_utility,
             measurement_error_bound: self.measurement_error_bound,
+            causal_identification: self.causal_identification,
             intervention: self.intervention,
             prediction_pre_registered: self.prediction_pre_registered,
             outcome_reconciled: self.outcome_reconciled,
@@ -695,6 +704,7 @@ impl ConsolidationEvidencePackV1 {
             .copied()
             .filter(|event| {
                 event.outcome_success
+                    && event.causal_identification.qualifies_for_transfer()
                     && event.intervention
                     && event.prediction_pre_registered
                     && event.outcome_reconciled
@@ -766,6 +776,7 @@ impl ConsolidationEvidencePackV1 {
             .copied()
             .filter(|event| {
                 event.outcome_success
+                    && event.causal_identification.qualifies_for_transfer()
                     && event.intervention
                     && event.prediction_pre_registered
                     && event.outcome_reconciled
@@ -845,6 +856,7 @@ impl ConsolidationEvidencePackV1 {
                 && event.source_family != 0
                 && event.source_root_digest.is_known()
                 && event.outcome_success
+                && event.causal_identification.qualifies_for_transfer()
                 && event.intervention
                 && event.prediction_pre_registered
                 && event.outcome_reconciled
@@ -1014,6 +1026,7 @@ pub fn build_consolidation_evidence_pack(
             source_root_id: experience.source_root_id,
             source_root_digest: experience.source_root_digest,
             source_trust_status: item.receipts.source_trust_status,
+            causal_identification: experience.causal_identification,
             intervention: experience.intervention,
             prediction_pre_registered: experience.prediction_pre_registered,
             outcome_reconciled: experience.outcome_reconciled,
@@ -1108,6 +1121,24 @@ mod tests {
     }
 
     #[derive(Clone)]
+    fn test_evidence_digest(seed: u32) -> broca_mace_policy::EvidenceDigest256 {
+        let mut bytes = [0_u8; 32];
+        bytes[..4].copy_from_slice(&seed.to_be_bytes());
+        broca_mace_policy::EvidenceDigest256::from_bytes(bytes)
+    }
+
+    fn test_causal_identification() -> CausalIdentificationV1 {
+        CausalIdentificationV1::new(
+            broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,
+            test_evidence_digest(1),
+            test_evidence_digest(2),
+            5_000,
+            5_000,
+            50_000,
+            true,
+        )
+    }
+
     struct TestVerifier {
         root_id: u32,
         root_digest: SourceRootDigest,
@@ -1120,6 +1151,7 @@ mod tests {
         verified_outcome_by_event: BTreeMap<u32, f64>,
         intervention: bool,
         delayed_complete: bool,
+        causal_identification: CausalIdentificationV1,
         retracted_at_ms: Option<i64>,
         superseded_at_ms: Option<i64>,
         successor_event_id: u32,
@@ -1158,6 +1190,7 @@ mod tests {
                 verified_outcome_by_event: BTreeMap::new(),
                 intervention: true,
                 delayed_complete: true,
+                causal_identification: test_causal_identification(),
                 retracted_at_ms: None,
                 superseded_at_ms: None,
                 successor_event_id: 43,
@@ -1308,6 +1341,7 @@ mod tests {
                 prediction_pre_registered: true,
                 confounders_controlled: true,
                 delayed_horizon_complete: self.delayed_complete,
+                identification: self.causal_identification,
                 assessment_digest: "2".repeat(64),
             })
         }
@@ -1392,6 +1426,31 @@ mod tests {
 
     fn query(valid_at_ms: i64, known_at_ms: i64) -> AsKnownQuery {
         AsKnownQuery { valid_at_ms, known_at_ms }
+    }
+
+    #[test]
+    fn observational_assessment_is_preserved_but_not_causally_qualified() {
+        let identification = CausalIdentificationV1::new(
+            broca_mace_policy::IdentificationMethodV1::Observational,
+            test_evidence_digest(10),
+            test_evidence_digest(11),
+            0,
+            10_000,
+            500_000,
+            false,
+        );
+        let verifier = TestVerifier {
+            causal_identification: identification,
+            ..TestVerifier::default()
+        };
+        let admitted = ingest_as_known(&raw(), query(180, 250), &verifier)
+            .expect("an observational record remains valid as an observation");
+        assert_eq!(admitted.experience().causal_identification, identification);
+        assert_eq!(admitted.receipts().causal_identification, identification);
+        assert!(!broca_mace_policy::is_qualified(
+            admitted.experience(),
+            broca_mace_policy::Query { scope: scope() }
+        ));
     }
 
     #[test]

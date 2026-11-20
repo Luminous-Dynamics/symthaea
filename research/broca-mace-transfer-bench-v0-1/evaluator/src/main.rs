@@ -54,6 +54,24 @@ fn fixture_root_digest(seed: u32) -> broca_mace_policy::SourceRootDigest {
     broca_mace_policy::SourceRootDigest::from_bytes(bytes)
 }
 
+fn fixture_causal_identification(
+    seed: u32,
+) -> broca_mace_policy::CausalIdentificationV1 {
+    let mut design = [0_u8; 32];
+    let mut estimand = [0_u8; 32];
+    design[..4].copy_from_slice(&seed.to_be_bytes());
+    estimand[..4].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
+    broca_mace_policy::CausalIdentificationV1::new(
+        broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,
+        broca_mace_policy::EvidenceDigest256::from_bytes(design),
+        broca_mace_policy::EvidenceDigest256::from_bytes(estimand),
+        5_000,
+        5_000,
+        50_000,
+        true,
+    )
+}
+
 fn experience(
     event_id: u32,
     source_family: u16,
@@ -70,6 +88,7 @@ fn experience(
         action,
         observed_utility,
         measurement_error_bound: 0.02,
+        causal_identification: fixture_causal_identification(event_id),
         intervention: true,
         prediction_pre_registered: true,
         outcome_reconciled: true,

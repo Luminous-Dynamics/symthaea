@@ -18,6 +18,24 @@ use broca_mace_ingress::{
 use broca_mace_policy::{decide, Action, Experience, Objective, Policy, Query, Regime, Scope};
 
 #[derive(Default)]
+fn fixture_causal_identification(
+    seed: u32,
+) -> broca_mace_policy::CausalIdentificationV1 {
+    let mut design = [0_u8; 32];
+    let mut estimand = [0_u8; 32];
+    design[..4].copy_from_slice(&seed.to_be_bytes());
+    estimand[..4].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
+    broca_mace_policy::CausalIdentificationV1::new(
+        broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,
+        broca_mace_policy::EvidenceDigest256::from_bytes(design),
+        broca_mace_policy::EvidenceDigest256::from_bytes(estimand),
+        5_000,
+        5_000,
+        50_000,
+        true,
+    )
+}
+
 struct FixtureVerifier {
     retracted_event_ids: BTreeSet<u32>,
     outcome_overrides: BTreeMap<u32, f64>,
@@ -100,6 +118,7 @@ impl EvidenceVerifier for FixtureVerifier {
             prediction_pre_registered: true,
             confounders_controlled: true,
             delayed_horizon_complete: true,
+            identification: fixture_causal_identification(event_id),
             assessment_digest: "2".repeat(64),
         })
     }
