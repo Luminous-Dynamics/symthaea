@@ -50,7 +50,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 500,
       "reaction_energy_ev_per_atom": -0.039,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-02",
@@ -59,7 +59,7 @@
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 430,
       "reaction_energy_ev_per_atom": -0.015,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-03",
@@ -68,7 +68,7 @@
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 420,
       "reaction_energy_ev_per_atom": 0,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-04",
@@ -77,7 +77,7 @@
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 400,
       "reaction_energy_ev_per_atom": -0.016,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-05",
@@ -86,7 +86,7 @@
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 350,
       "reaction_energy_ev_per_atom": -0.045,
-      "screen_heating_temperature_source_value": 300
+      "screen_heating_temperature_c": 300
     },
     {
       "reference_id": "S8-06",
@@ -95,7 +95,7 @@
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 390,
       "reaction_energy_ev_per_atom": -0.026,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-07",
@@ -104,7 +104,7 @@
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 230,
       "reaction_energy_ev_per_atom": -0.071,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-08",
@@ -113,7 +113,7 @@
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 410,
       "reaction_energy_ev_per_atom": -0.011,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-09",
@@ -122,7 +122,7 @@
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 590,
       "reaction_energy_ev_per_atom": -0.016,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-10",
@@ -131,7 +131,7 @@
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 480,
       "reaction_energy_ev_per_atom": -0.037,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-11",
@@ -140,7 +140,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 450,
       "reaction_energy_ev_per_atom": -0.069,
-      "screen_heating_temperature_source_value": 200
+      "screen_heating_temperature_c": 200
     },
     {
       "reference_id": "S8-12",
@@ -149,7 +149,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 450,
       "reaction_energy_ev_per_atom": 0,
-      "screen_heating_temperature_source_value": 200
+      "screen_heating_temperature_c": 200
     },
     {
       "reference_id": "S8-13",
@@ -158,7 +158,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 430,
       "reaction_energy_ev_per_atom": -0.028,
-      "screen_heating_temperature_source_value": 200
+      "screen_heating_temperature_c": 200
     },
     {
       "reference_id": "S8-14",
@@ -167,7 +167,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 400,
       "reaction_energy_ev_per_atom": -0.063,
-      "screen_heating_temperature_source_value": 200
+      "screen_heating_temperature_c": 200
     },
     {
       "reference_id": "S8-15",
@@ -176,7 +176,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 204,
       "reaction_energy_ev_per_atom": -0.115,
-      "screen_heating_temperature_source_value": 200
+      "screen_heating_temperature_c": 200
     },
     {
       "reference_id": "S8-16",
@@ -185,7 +185,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 360,
       "reaction_energy_ev_per_atom": -0.043,
-      "screen_heating_temperature_source_value": 200
+      "screen_heating_temperature_c": 200
     },
     {
       "reference_id": "S8-17",
@@ -194,7 +194,7 @@
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 360,
       "reaction_energy_ev_per_atom": 0,
-      "screen_heating_temperature_source_value": 500
+      "screen_heating_temperature_c": 500
     },
     {
       "reference_id": "S8-18",
@@ -203,7 +203,7 @@
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 340,
       "reaction_energy_ev_per_atom": 0,
-      "screen_heating_temperature_source_value": 500
+      "screen_heating_temperature_c": 500
     },
     {
       "reference_id": "S8-19",
@@ -212,7 +212,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 470,
       "reaction_energy_ev_per_atom": -0.042,
-      "screen_heating_temperature_source_value": 300
+      "screen_heating_temperature_c": 300
     },
     {
       "reference_id": "S8-20",
@@ -221,7 +221,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 560,
       "reaction_energy_ev_per_atom": -0.015,
-      "screen_heating_temperature_source_value": 500
+      "screen_heating_temperature_c": 500
     },
     {
       "reference_id": "S8-21",
@@ -230,7 +230,7 @@
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 310,
       "reaction_energy_ev_per_atom": -0.054,
-      "screen_heating_temperature_source_value": 500
+      "screen_heating_temperature_c": 500
     },
     {
       "reference_id": "S8-22",
@@ -239,7 +239,7 @@
       "screen_outcome": "partially_reacted",
       "in_situ_onset_c": 200,
       "reaction_energy_ev_per_atom": -0.09,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-23",
@@ -248,7 +248,7 @@
       "screen_outcome": "completely_reacted",
       "in_situ_onset_c": 180,
       "reaction_energy_ev_per_atom": -0.093,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-24",
@@ -257,7 +257,7 @@
       "screen_outcome": "unreacted",
       "in_situ_onset_c": 560,
       "reaction_energy_ev_per_atom": -0.043,
-      "screen_heating_temperature_source_value": null
+      "screen_heating_temperature_c": null
     },
     {
       "reference_id": "S8-25",
@@ -266,7 +266,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 700,
       "reaction_energy_ev_per_atom": -0.087,
-      "screen_heating_temperature_source_value": 400
+      "screen_heating_temperature_c": 400
     },
     {
       "reference_id": "S8-26",
@@ -275,7 +275,7 @@
       "screen_outcome": "transformed",
       "in_situ_onset_c": 380,
       "reaction_energy_ev_per_atom": -0.149,
-      "screen_heating_temperature_source_value": 200
+      "screen_heating_temperature_c": 200
     }
   ],
   "audit": {
@@ -283,7 +283,7 @@
     "unique_screen_sample_id_count": 26,
     "unmatched_pairs": 0,
     "duplicate_pair_keys": 0,
-    "warning": "Screen-row setpoint/outcome and in-situ measured onset are distinct observations. A one-temperature screen outcome is a censored bound, not an exact onset value. The upstream SynthesisData schema does not declare a unit for heating_temperature; retain the source numeric value until units are confirmed."
+    "warning": "Screen heating-temperature setpoints are in °C per the original Precursor Genome paper's SampleEntry field definition. The upstream JSON/Pydantic schema omits units, so this unit binding is sourced from arXiv:2607.09903v1, not inferred from the field name."
   },
   "claim_ceiling": "A leakage exclusion manifest derived from published pair identities and the pinned public Precursor Genome ledger. It is not the full PG-LIT source dataset or a model training script."
 }
