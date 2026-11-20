@@ -137,7 +137,9 @@ impl fmt::Display for MeasureError {
             Self::NonFiniteWeight { particle } => {
                 write!(f, "particle {particle} has a non-finite weight")
             }
-            Self::NonFiniteOutput => write!(f, "phase-space diagnostic produced a non-finite value"),
+            Self::NonFiniteOutput => {
+                write!(f, "phase-space diagnostic produced a non-finite value")
+            }
         }
     }
 }
