@@ -51,7 +51,7 @@ The final `acoustic_observation_status` is pass, fail or abstain. It is not the 
 
 ## Adversarial tests authored
 
-Ten Rust tests are authored:
+Eleven Rust tests are authored:
 1. Correct -6 dB target envelope and unchanged protected windows pass.
 2. No-op candidate fails the requested -6 dB target.
 3. Protected-window attenuation fails preservation.
@@ -62,6 +62,7 @@ Ten Rust tests are authored:
 8. Target/protected window overlap is rejected.
 9. Isolated-stem scope without an explicit identity is rejected.
 10. Receipt tampering is detected.
+11. Integer PCM16 input is decoded and its target/protected gain windows are measured.
 
 Synthetic fixture hashes are sentinels and do not refer to real WAV media. The authored tests have **not** been compiled or executed: this environment has no local Cargo/rustc/rustfmt, and the branch has no passing exact-head Rust qualification yet.
 
