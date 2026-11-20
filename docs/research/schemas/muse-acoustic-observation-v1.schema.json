@@ -311,20 +311,24 @@
                 "minimum": 1
               },
               "source_rms_dbfs": {
-                "type": [
-                  "number",
-                  "null"
-                ],
-                "minimum": -120,
-                "maximum": 24
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
               },
               "candidate_rms_dbfs": {
-                "type": [
-                  "number",
-                  "null"
-                ],
-                "minimum": -120,
-                "maximum": 24
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
               },
               "expected_gain_db": {
                 "type": [
@@ -336,19 +340,29 @@
               },
               "observed_gain_db": {
                 "type": [
-                  "number",
+                  "array",
                   "null"
                 ],
-                "minimum": -144,
-                "maximum": 144
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -324,
+                  "maximum": 324
+                }
               },
               "absolute_error_db": {
                 "type": [
-                  "number",
+                  "array",
                   "null"
                 ],
-                "minimum": 0,
-                "maximum": 168
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 420
+                }
               },
               "passed": {
                 "type": [
