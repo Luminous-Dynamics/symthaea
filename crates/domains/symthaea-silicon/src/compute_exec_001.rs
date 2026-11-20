@@ -1986,6 +1986,130 @@ mod tests {
     }
 
     #[test]
+    fn hamming_output_bytes_are_checked_against_exact_distance_and_oracle() {
+        let (_, mut command, mut completion, _, _) = setup();
+        let contract_sha = expected_contract_sha256("hdc.hamming.exact.v1").unwrap().to_owned();
+        command.operation_id = "hdc.hamming.exact.v1".into();
+        command.semantic_contract = SemanticContract {
+            contract_id: expected_contract_id("hdc.hamming.exact.v1").unwrap().into(),
+            contract_version: "1.0.0".into(),
+            contract_sha256: contract_sha.clone(),
+        };
+        command.parameters = CommandParameters::default();
+        command.buffers = vec![
+            BufferDescriptor {
+                role: "input_a".into(),
+                handle_id: "input-a".into(),
+                generation: "1".into(),
+                offset_bytes: "0".into(),
+                length_bytes: "2048".into(),
+                access: "read".into(),
+            },
+            BufferDescriptor {
+                role: "input_b".into(),
+                handle_id: "input-b".into(),
+                generation: "1".into(),
+                offset_bytes: "0".into(),
+                length_bytes: "2048".into(),
+                access: "read".into(),
+            },
+            BufferDescriptor {
+                role: "result".into(),
+                handle_id: "hamming-result".into(),
+                generation: "1".into(),
+                offset_bytes: "0".into(),
+                length_bytes: "2".into(),
+                access: "write".into(),
+            },
+        ];
+        let output = 9u16.to_le_bytes();
+        completion.operation_id = command.operation_id.clone();
+        completion.semantic_contract_sha256 = contract_sha;
+        completion.result = Some(CompletionResult {
+            output_sha256: format!("{:x}", Sha256::digest(output)),
+            winner_stable_id: None,
+            hamming_distance_bits: Some(9),
+            result_record_bytes: None,
+        });
+        completion.output_buffer = Some(OutputBufferRef {
+            role: "result".into(),
+            handle_id: "hamming-result".into(),
+            generation: "1".into(),
+            offset_bytes: "0".into(),
+            length_bytes: "2".into(),
+        });
+
+        let verified = verify_exact_output_bytes(&command, &completion, &output, &output).unwrap();
+        assert_eq!(verified.operation_id(), "hdc.hamming.exact.v1");
+        assert_eq!(verified.output_bytes(), 2);
+    }
+
+    #[test]
+    fn xor_output_bytes_require_exact_independent_oracle_match() {
+        let (_, mut command, mut completion, _, _) = setup();
+        let contract_sha = expected_contract_sha256("hdc.bind_xor.exact.v1").unwrap().to_owned();
+        command.operation_id = "hdc.bind_xor.exact.v1".into();
+        command.semantic_contract = SemanticContract {
+            contract_id: expected_contract_id("hdc.bind_xor.exact.v1").unwrap().into(),
+            contract_version: "1.0.0".into(),
+            contract_sha256: contract_sha.clone(),
+        };
+        command.parameters = CommandParameters::default();
+        command.buffers = vec![
+            BufferDescriptor {
+                role: "input_a".into(),
+                handle_id: "xor-input-a".into(),
+                generation: "1".into(),
+                offset_bytes: "0".into(),
+                length_bytes: "2048".into(),
+                access: "read".into(),
+            },
+            BufferDescriptor {
+                role: "input_b".into(),
+                handle_id: "xor-input-b".into(),
+                generation: "1".into(),
+                offset_bytes: "0".into(),
+                length_bytes: "2048".into(),
+                access: "read".into(),
+            },
+            BufferDescriptor {
+                role: "output".into(),
+                handle_id: "xor-output".into(),
+                generation: "1".into(),
+                offset_bytes: "0".into(),
+                length_bytes: "2048".into(),
+                access: "write".into(),
+            },
+        ];
+        let output = vec![0xA5u8; VECTOR_BYTES as usize];
+        completion.operation_id = command.operation_id.clone();
+        completion.semantic_contract_sha256 = contract_sha;
+        completion.result = Some(CompletionResult {
+            output_sha256: format!("{:x}", Sha256::digest(&output)),
+            winner_stable_id: None,
+            hamming_distance_bits: None,
+            result_record_bytes: None,
+        });
+        completion.output_buffer = Some(OutputBufferRef {
+            role: "output".into(),
+            handle_id: "xor-output".into(),
+            generation: "1".into(),
+            offset_bytes: "0".into(),
+            length_bytes: VECTOR_BYTES.to_string(),
+        });
+
+        assert!(verify_exact_output_bytes(&command, &completion, &output, &output).is_ok());
+        let mut wrong_oracle = output.clone();
+        wrong_oracle[0] ^= 1;
+        assert_eq!(
+            verify_exact_output_bytes(&command, &completion, &output, &wrong_oracle)
+                .unwrap_err()
+                .code,
+            "OUTPUT_ORACLE_MISMATCH"
+        );
+    }
+
+    #[test]
     fn reset_preserves_verification_gate_for_completed_unverified_output() {
         let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
