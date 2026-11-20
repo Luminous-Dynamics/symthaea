@@ -32,7 +32,17 @@
       "operator_learning_neopic_arxiv_v1_nufft": "0230db29af90d143ccfe8dfd2e0eb28496139ccb",
       "paper_scripts_neopic_arxiv_v1": "dea39090f5ad1c9efd8c3435ed0d19ecb058dec4"
     },
-    "tag_resolution_status": "annotated_tags_resolved_to_immutable_commit_shas_2026-11-20"
+    "tag_resolution_status": "annotated_tags_resolved_to_immutable_commit_shas_2026-11-20",
+    "variational_fourier_prior_art": {
+      "paper": "On Variational Fourier Particle Methods",
+      "doi": "10.1007/s10915-024-02708-w",
+      "published": "2024-11-02",
+      "distinct_methods": [
+        "gridless_GEMPIF_PIF",
+        "grid_based_Fourier_GEMPIC"
+      ],
+      "caveat": "their fully discrete and semi-discrete conservation statements differ; pin the chosen method, field-space truncation, projection, filter and time integrator"
+    }
   },
   "method": {
     "family": "nonuniform_fourier_neural_operator_on_empirical_particle_measure",
@@ -95,9 +105,10 @@
     "source_NEOPIC_NUFNO",
     "source_grid_FNO",
     "source_LRC_FNO",
-    "variational_Fourier_particle_method",
-    "CIC_PIC",
+    "variational_PIF_GEMPIF_gridless",
+    "Fourier_GEMPIC_grid_DFT_variational",
     "PIF_NUFFT",
+    "CIC_PIC",
     "Barnes_Hut",
     "direct_sum_small_particle_known_answer"
   ],
