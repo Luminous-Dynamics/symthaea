@@ -688,7 +688,7 @@ mod tests {
         let mut candidate_samples = source_samples.clone();
         source_samples[100..400].fill(0.0);
         candidate_samples[100..400].fill(0.0);
-        let source = wav(&source_samples, 1_000);
+        let source = wav(&source_samples, 8_000);
         let candidate = wav(&candidate_samples, 8_000);
         let result = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap();
         assert_eq!(result["target"]["status"], "abstain");
@@ -730,7 +730,7 @@ mod tests {
             *sample *= gain;
         }
         candidate_samples[500] = 1.0;
-        let source = wav(&source_samples, 1_000);
+        let source = wav(&source_samples, 8_000);
         let candidate = wav(&candidate_samples, 8_000);
         let mut case = contract();
         case.maximum_candidate_clipped_sample_fraction = 0.0;
