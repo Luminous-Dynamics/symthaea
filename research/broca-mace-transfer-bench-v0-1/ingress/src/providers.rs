@@ -295,7 +295,7 @@ fn provider_capture_closure_digest(
     claim: &ProviderCaptureClosureClaimV1,
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"mace:provider-capture-closure:v1\\0");
+    hasher.update(b"mace:provider-capture-closure:v1\0");
     append_manifest_field(&mut hasher, claim.provider.as_str());
     append_manifest_field(&mut hasher, &claim.session_id);
     append_manifest_field(&mut hasher, &claim.run_id);
@@ -1351,7 +1351,7 @@ mod tests {
                 json!({"id": "evt-2", "type": "session.status_idle"}),
             ),
         ]
-        .join("\\n");
+        .join("\n");
         let batch = normalize_capture_jsonl(
             Provider::AnthropicManagedAgents,
             "closure-session",
@@ -1392,7 +1392,7 @@ mod tests {
                 json!({"id": "evt-2", "type": "session.status_idle"}),
             ),
         ]
-        .join("\\n");
+        .join("\n");
         let batch = normalize_capture_jsonl(
             Provider::AnthropicManagedAgents,
             "closure-session",
@@ -1476,7 +1476,7 @@ mod tests {
                 json!({"id": "evt-2", "type": "session.status_idle"}),
             ),
         ]
-        .join("\\n");
+        .join("\n");
         let batch = normalize_capture_jsonl(
             Provider::AnthropicManagedAgents,
             "closure-session",
@@ -1515,7 +1515,7 @@ mod tests {
                 json!({"id": "evt-2", "type": "session.status_idle"}),
             ),
         ]
-        .join("\\n");
+        .join("\n");
         let batch = normalize_capture_jsonl(
             Provider::AnthropicManagedAgents,
             "closure-session",
