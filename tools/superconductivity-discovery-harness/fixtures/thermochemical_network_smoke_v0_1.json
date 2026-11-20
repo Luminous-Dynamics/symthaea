@@ -1,0 +1,234 @@
+{
+  "contract": "SC-THERMOCHEMICAL-NETWORK-0.1",
+  "network_id": "synthetic_balanced_target_competitor_network_001",
+  "fixture_only": true,
+  "conditions": {
+    "conditions_id": "network_conditions_001",
+    "temperature_k": 820,
+    "pressure_gpa": 0.002,
+    "atmosphere": "synthetic declared atmosphere",
+    "chemical_potential_context": "synthetic common μ-reference context"
+  },
+  "reference_extent_basis_id": "one_mole_precursor_ab_basis",
+  "reference_extent_unit": "eV_per_mole_precursor_ab",
+  "balance_tolerance": 1e-9,
+  "cycle_closure_tolerance_eV": 0.05,
+  "species": [
+    {
+      "species_id": "precursor_ab",
+      "formula_as_declared": "A2B",
+      "elemental_composition": {
+        "A": 2,
+        "B": 1
+      },
+      "charge": 0
+    },
+    {
+      "species_id": "element_c",
+      "formula_as_declared": "C",
+      "elemental_composition": {
+        "C": 1
+      },
+      "charge": 0
+    },
+    {
+      "species_id": "intermediate_abc",
+      "formula_as_declared": "A2BC",
+      "elemental_composition": {
+        "A": 2,
+        "B": 1,
+        "C": 1
+      },
+      "charge": 0
+    },
+    {
+      "species_id": "target_abc2",
+      "formula_as_declared": "A2BC2",
+      "elemental_composition": {
+        "A": 2,
+        "B": 1,
+        "C": 2
+      },
+      "charge": 0
+    },
+    {
+      "species_id": "competitor_abc2",
+      "formula_as_declared": "A2BC2",
+      "elemental_composition": {
+        "A": 2,
+        "B": 1,
+        "C": 2
+      },
+      "charge": 0
+    }
+  ],
+  "reactions": [
+    {
+      "reaction_id": "r1_form_intermediate",
+      "role": "target_route_step",
+      "conditions_id": "network_conditions_001",
+      "extent_basis_id": "one_mole_precursor_ab_basis",
+      "extent_unit": "eV_per_mole_precursor_ab",
+      "stoichiometric_terms": [
+        {
+          "species_id": "precursor_ab",
+          "coefficient": -1
+        },
+        {
+          "species_id": "element_c",
+          "coefficient": -1
+        },
+        {
+          "species_id": "intermediate_abc",
+          "coefficient": 1
+        }
+      ],
+      "delta_g_interval_eV": {
+        "lower": -0.55,
+        "upper": -0.45
+      },
+      "activation_barrier_interval_eV": {
+        "lower": 0.2,
+        "upper": 0.3
+      },
+      "source_class": "synthetic_fixture"
+    },
+    {
+      "reaction_id": "r2_form_target",
+      "role": "target_route_step",
+      "conditions_id": "network_conditions_001",
+      "extent_basis_id": "one_mole_precursor_ab_basis",
+      "extent_unit": "eV_per_mole_precursor_ab",
+      "stoichiometric_terms": [
+        {
+          "species_id": "intermediate_abc",
+          "coefficient": -1
+        },
+        {
+          "species_id": "element_c",
+          "coefficient": -1
+        },
+        {
+          "species_id": "target_abc2",
+          "coefficient": 1
+        }
+      ],
+      "delta_g_interval_eV": {
+        "lower": -0.35,
+        "upper": -0.25
+      },
+      "activation_barrier_interval_eV": {
+        "lower": 0.9,
+        "upper": 1.2
+      },
+      "source_class": "synthetic_fixture"
+    },
+    {
+      "reaction_id": "r3_direct_competitor",
+      "role": "competing_route_step",
+      "conditions_id": "network_conditions_001",
+      "extent_basis_id": "one_mole_precursor_ab_basis",
+      "extent_unit": "eV_per_mole_precursor_ab",
+      "stoichiometric_terms": [
+        {
+          "species_id": "precursor_ab",
+          "coefficient": -1
+        },
+        {
+          "species_id": "element_c",
+          "coefficient": -2
+        },
+        {
+          "species_id": "competitor_abc2",
+          "coefficient": 1
+        }
+      ],
+      "delta_g_interval_eV": {
+        "lower": -0.75,
+        "upper": -0.6
+      },
+      "activation_barrier_interval_eV": {
+        "lower": 0.4,
+        "upper": 0.5
+      },
+      "source_class": "synthetic_fixture"
+    },
+    {
+      "reaction_id": "r4_polymorph_conversion",
+      "role": "polymorph_conversion",
+      "conditions_id": "network_conditions_001",
+      "extent_basis_id": "one_mole_precursor_ab_basis",
+      "extent_unit": "eV_per_mole_precursor_ab",
+      "stoichiometric_terms": [
+        {
+          "species_id": "target_abc2",
+          "coefficient": -1
+        },
+        {
+          "species_id": "competitor_abc2",
+          "coefficient": 1
+        }
+      ],
+      "delta_g_interval_eV": {
+        "lower": -0.05,
+        "upper": 0.1
+      },
+      "activation_barrier_interval_eV": {
+        "lower": 0.1,
+        "upper": 0.2
+      },
+      "source_class": "synthetic_fixture"
+    }
+  ],
+  "paths": [
+    {
+      "path_id": "target_two_step",
+      "path_role": "target",
+      "input_species_ids": [
+        "precursor_ab",
+        "element_c"
+      ],
+      "target_species_id": "target_abc2",
+      "reaction_ids": [
+        "r1_form_intermediate",
+        "r2_form_target"
+      ]
+    },
+    {
+      "path_id": "competitor_direct",
+      "path_role": "competing",
+      "input_species_ids": [
+        "precursor_ab",
+        "element_c"
+      ],
+      "target_species_id": "competitor_abc2",
+      "reaction_ids": [
+        "r3_direct_competitor"
+      ]
+    }
+  ],
+  "cycles": [
+    {
+      "cycle_id": "target_route_to_competitor_route",
+      "terms": [
+        {
+          "reaction_id": "r1_form_intermediate",
+          "orientation": 1
+        },
+        {
+          "reaction_id": "r2_form_target",
+          "orientation": 1
+        },
+        {
+          "reaction_id": "r4_polymorph_conversion",
+          "orientation": 1
+        },
+        {
+          "reaction_id": "r3_direct_competitor",
+          "orientation": -1
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic stoichiometric and thermodynamic network audit only; no real synthesis route, DFT calculation, superconducting phase or laboratory authorization is established."
+}
