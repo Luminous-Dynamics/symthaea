@@ -105,6 +105,7 @@ pub enum AudioEventObservationIssueV1 {
     ReceiptInputBindingMismatch,
     ReceiptNoteCoverageMismatch,
     ReceiptEventMismatch { ordinal: usize },
+    ObservationReplayMismatch { track_index: u16 },
     UnknownTrackIndex { track_index: u16 },
     EmptyTrackNotes { track_index: u16 },
     InputTooLarge,
@@ -1088,6 +1089,30 @@ pub fn validate_audio_stem_event_observation_v1(
     issues
 }
 
+/// Replay a track-scoped observation from the exact WAV and MIDI inputs.
+///
+/// The structural validator above intentionally checks commitments and wire
+/// consistency only. Since its SHA-256 receipt is unkeyed, callers must use
+/// this replay API when relying on the spectral measurements as evidence: it
+/// independently reruns the FFT observer and requires exact receipt equality.
+pub fn replay_audio_stem_event_observation_v1(
+    receipt: &AudioStemEventObservationReceiptV1,
+    wav_bytes: &[u8],
+    midi: &MidiPerformanceArtifactV1,
+    track_index: u16,
+) -> Vec<AudioEventObservationIssueV1> {
+    let validation_issues =
+        validate_audio_stem_event_observation_v1(receipt, wav_bytes, midi, track_index);
+    if !validation_issues.is_empty() {
+        return validation_issues;
+    }
+    match observe_rendered_audio_stem_events_v1(wav_bytes, midi, track_index) {
+        Ok(recomputed) if recomputed == *receipt => Vec::new(),
+        Ok(_) => vec![AudioEventObservationIssueV1::ObservationReplayMismatch { track_index }],
+        Err(issues) => issues,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1381,6 +1406,29 @@ mod tests {
             AudioEventObservationStatusV1::NoMeasurableSpectralEnergy
         );
         assert!(receipt.note_observations[0].harmonic_salience_db.is_none());
+    }
+
+    #[test]
+    fn replay_verifier_rejects_resealed_but_fabricated_spectral_measurements() {
+        let midi = midi_artifact(69, 1_920);
+        let wav = sine_wav(440.0, 1.0);
+        let mut receipt = observe_rendered_audio_stem_events_v1(&wav, &midi, 1).unwrap();
+
+        assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1).is_empty());
+        assert!(replay_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1).is_empty());
+
+        // The receipt commitment is public and unkeyed. A caller can change a
+        // finite salience value and recompute it; structural validation alone
+        // cannot detect that the measurement was fabricated.
+        receipt.note_observations[0].fundamental_salience_db =
+            Some(receipt.note_observations[0].fundamental_salience_db.unwrap() + 12.0);
+        receipt.receipt_sha256 = audio_stem_event_observation_commitment_v1(&receipt).unwrap();
+
+        assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1).is_empty());
+        assert_eq!(
+            replay_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1),
+            vec![AudioEventObservationIssueV1::ObservationReplayMismatch { track_index: 1 }]
+        );
     }
 
     #[test]
