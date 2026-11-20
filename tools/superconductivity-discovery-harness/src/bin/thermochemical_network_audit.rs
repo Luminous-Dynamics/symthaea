@@ -730,6 +730,13 @@ mod tests {
     }
 
     #[test]
+    fn charge_imbalance_is_rejected_even_when_element_counts_close() {
+        let (schema, fixture) = inputs_for("thermochemical_network_unbalanced_charge_v0_1.json");
+        let error = Network::from_bytes(&schema, &fixture).unwrap_err();
+        assert!(error.contains("charge residual=-1"));
+    }
+
+    #[test]
     fn thermodynamic_cycle_excluding_zero_is_reported_as_inconsistent() {
         let (schema, fixture) = inputs_for("thermochemical_network_cycle_inconsistent_v0_1.json");
         let receipt = audit(&schema, &fixture).unwrap();
