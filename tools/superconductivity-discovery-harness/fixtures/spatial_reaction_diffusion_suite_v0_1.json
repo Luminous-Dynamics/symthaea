@@ -1,0 +1,34 @@
+{
+  "contract": "SC-SPATIAL-REACTION-DIFFUSION-SUITE-0.1",
+  "suite_id": "superconductivity_spatial_reaction_diffusion_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json",
+  "fixtures": [
+    {
+      "benchmark_id": "synthetic_1d_cross_diffusion_target_competitor_reference_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_smoke_v0_1.json",
+      "expected": [
+        "conservative_a_and_b_mass_balance",
+        "positive_and_negative_cross_diffusion_comparison",
+        "short_long_hold_dynamics",
+        "thickness_sensitivity",
+        "diagonal_baseline"
+      ]
+    },
+    {
+      "benchmark_id": "adversarial_non_positive_definite_spatial_transport_matrix_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_non_psd_v0_1.json",
+      "expected": [
+        "reject_non_positive_definite_transport"
+      ]
+    },
+    {
+      "benchmark_id": "adversarial_unstable_explicit_time_step_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_unstable_step_v0_1.json",
+      "expected": [
+        "reject_time_step_above_stability_limit"
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic one-dimensional reaction-diffusion reference only; no measured transport coefficient, phase yield, superconducting material or laboratory procedure is established."
+}
