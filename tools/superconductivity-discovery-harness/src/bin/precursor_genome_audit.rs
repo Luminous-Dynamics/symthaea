@@ -115,6 +115,9 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
     if nonempty_string(&manifest, "claim_ceiling")? != CLAIM_CEILING {
         return Err("source manifest has an unsupported claim ceiling".to_owned());
     }
+    if nonempty_string(&ledger, "repository_name")? != "Precursor_Genome_Alpha" {
+        return Err("source ledger repository_name does not match the pinned Precursor Genome release".to_owned());
+    }
 
     let actual_blob_sha1 = git_blob_sha1(ledger_bytes);
     let expected_blob_sha1 = nonempty_string(&manifest, "ledger_git_blob_sha1")?;
@@ -130,6 +133,7 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         .ok_or("source manifest expected_profile is missing")?;
 
     let mut sample_ids = HashSet::new();
+    let mut all_sample_ids = Vec::with_capacity(samples.len());
     let mut precursor_formulas = HashSet::new();
     let mut precursor_pairs = HashSet::new();
     let mut category_counts: BTreeMap<String, usize> = BTreeMap::new();
@@ -161,6 +165,7 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         if !sample_ids.insert(sample_id.clone()) {
             return Err(format!("duplicate sample_id {sample_id}"));
         }
+        all_sample_ids.push(sample_id.clone());
 
         let precursors = sample.get("precursors").and_then(Value::as_array)
             .ok_or_else(|| format!("sample {sample_id} is missing its precursor array"))?;
@@ -341,6 +346,7 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         "ledger_git_blob_sha1": actual_blob_sha1,
         "ledger_sha256": sha256_hex(ledger_bytes),
         "manifest_sha256": sha256_hex(manifest_bytes),
+        "manifest_schema_sha256": sha256_hex(schema_bytes),
         "counts": {
             "samples": samples.len(),
             "unique_sample_ids": sample_ids.len(),
@@ -358,7 +364,7 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
             "active_refinement_acceptance": expected_acceptance
         },
         "cohorts": {
-            "all_samples": sample_ids.iter().cloned().collect::<Vec<_>>(),
+            "all_samples": all_sample_ids,
             "classified": category_ids.iter().filter(|(category, _)| category.as_str() != "unclassified")
                 .flat_map(|(_, ids)| ids.iter().cloned()).collect::<Vec<_>>(),
             "classified_temperature_no_physical_failure": classified_temperature_no_failure,
