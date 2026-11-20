@@ -171,3 +171,47 @@ Measurement scope is now required on every observation assertion. An observed Tc
 Observation events may carry a source.external_catalog object when extraction_method is database_import. It preserves library_id, external_record_id, API version, dataset version, snapshot ID, retrieval time, ETag, X-Data-Version and parent paper/material/sample/state/result IDs.
 
 The Rust observation auditor now requires those fields on database imports, checks X-Data-Version against the declared dataset version, and verifies imported parent material/sample/state/result IDs against the event. A synthetic SCLib-shaped example and negative controls are included. No real external dataset has been downloaded or mirrored.
+
+
+## Reaction thermodynamic selectivity and phase-evidence contract
+
+The discovery protocol harness now has a separate \`sc_reaction_selectivity_audit\` binary and the versioned schema \`data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json\`. Its fixture is \`tools/superconductivity-discovery-harness/fixtures/reaction_selectivity_smoke_v0_1.json\`.
+
+This audit is intentionally downstream of the synthesis protocol/execution record. It does **not** define or execute reaction procedures. It checks whether a declared target reaction is thermodynamically distinguished from competing routes under a common conditions and normalization basis, and whether any reported phase outcome is supported by characterization evidence.
+
+### Four quantities that must not be collapsed
+
+1. **Hull distance** — a structural thermodynamic screening diagnostic for a candidate phase against its competing phases. It is not a reaction-route selectivity calculation and does not guarantee that the phase forms.
+2. **Reaction Gibbs free-energy intervals** — target and competing reaction intervals must share the same declared temperature/pressure/chemical-potential context, standard state, reaction normalization basis and basis unit. A target route is called robustly favored only when its upper bound plus a declared selectivity margin is below every competing route's lower bound. A competing route is robustly preferred only when at least one competitor's upper bound plus margin is below the target lower bound. Overlap or insufficient interval separation returns an indeterminate status.
+3. **Kinetic activation barrier interval** — reported independently against a fixture/user-declared threshold. This is a separate model diagnostic, not folded into Gibbs free energy or hull distance. The threshold is not a universal material constant.
+4. **Observed phase outcome** — a separate evidence state: target phase observed; target phase not detected under stated conditions; or unknown/not reported. A non-detection must carry the method, condition binding, source locator, raw-data digest and positive phase-fraction detection limit. Unknown must not be recoded as failure.
+
+All reactions in a case must declare verified balance and match the common basis before a thermodynamic selectivity conclusion is admitted. Unverified balance causes explicit abstention. Reaction equations and product phase identities remain visible in the receipt.
+
+### Frozen adversarial controls
+
+The fixture contains four abstract synthetic cases:
+- a low-hull target whose competing reaction is nevertheless robustly more favorable and whose declared target barrier exceeds the threshold;
+- a positive-hull (metastable-screened) target route with a robust reaction selectivity margin and a barrier below the declared threshold, but no reported characterization outcome;
+- overlapping target/competitor reaction intervals and an ambiguous barrier interval, with outcome unknown;
+- a robustly selected target reaction with a characterized multiphase product, preserving both target and competing phase fractions.
+
+These cases test the separation of concepts, not a real chemical system, precursor combination, synthesis recipe or superconducting material. The free-energy intervals, hull ranges, barriers, thresholds and phase fractions are invented fixture values.
+
+### Required baselines and next research
+
+This auditor is a deterministic finite-interval evidence contract, not a learned synthesizability model. The next benchmark should compare:
+- hull-distance-only screening;
+- reaction-selectivity-only ranking;
+- kinetic-barrier-only ranking;
+- a calibrated joint phase-ensemble model with separately reported thermodynamic and kinetic channels;
+- a source-grounded structure-to-protocol predictor;
+- prospective route-level evidence from the same frozen specimen and protocol cohort.
+
+The 2026 Schlesinger et al. study evaluates synthesis-prediction scores against both energy above hull and thermodynamic selectivity of enumerated synthesis reactions; it reports that models generally overpredict synthesis likelihood, while some scores correlate with these thermodynamic heuristics. This supports maintaining reaction selectivity as an independent diagnostic, but does not justify treating thermodynamic selection as observed synthesis. https://doi.org/10.1039/D6MH00209A
+
+Lambard's 2026 synthesis-first perspective calls for machine-readable protocols, inverse-design of reaction pathways and closed-loop optimisation, while explicitly noting that an executable protocol is not a guarantee of successful target synthesis. https://doi.org/10.1088/2515-7639/ae6e72
+
+### Claim ceiling
+
+Passing the audit validates interval comparability, declared reaction-balance status, model classifications and outcome-evidence semantics for the synthetic fixture. It does not prove reaction feasibility, predict an actual reaction rate, establish a realized phase, establish superconductivity, recommend a laboratory route or authorize any experiment.
