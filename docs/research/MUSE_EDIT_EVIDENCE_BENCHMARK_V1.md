@@ -157,6 +157,14 @@ Reproduce published metrics before claiming improvement. Baseline groups should 
 
 For comparisons, freeze identical source cases, target definitions, renderer set, output length, candidate count, inference budget and evaluator versions. Compare Best-of-1/2/4/8 under equal compute budgets, not merely the best of a larger sample against one-shot baselines. Report latency, GPU/CPU time, memory and render cost alongside quality.
 
+### SMEBench replication boundaries
+
+SMEBench's held-out synthetic test split contains 3,600 balanced cases (300 per operation); its separate SME-Real complement contains 416 test cases from 107 multitrack recordings. Its 17-participant listener study yielded 236 trials: mean instruction alignment was 3.99/5, and Legato, Remove_Instrument and Swap_Drums did not reliably exceed the midpoint. These operations remain reportable but should not be hidden inside a headline perceptual aggregate.
+
+Two design consequences follow. First, MUSE must preregister per-operation perceptibility eligibility and report both symbolic-target correctness and listener recognition; a correct MIDI transformation can still be an inaudible or poorly perceived edit. Second, SMEBench implements crescendo/decrescendo with audio-domain gain envelopes because changing MIDI velocity alone gave poor perceptual results. MUSE's initial velocity-scale evaluator is therefore a symbolic correctness slice, **not** a matched reproduction of SMEBench's audio-domain dynamics operation.
+
+SMEBench also demonstrates evaluator ranking reversals: under caption conditioning, CLAP-Text favored MusicGen while paired-target audio metrics favored SteerMusic; under instruction conditioning, CLAP-Text favored VCI while target metrics favored ZETA. Baseline reports must preserve separate source-preservation, target-agreement and text-compatibility axes rather than collapsing them into one reward score.
+
 ### Prospective engineering targets (not current results)
 
 | Metric | Deterministic symbolic slice | Rendered/real-audio slice |
