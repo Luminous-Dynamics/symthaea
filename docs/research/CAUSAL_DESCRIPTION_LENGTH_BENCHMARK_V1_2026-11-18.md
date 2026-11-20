@@ -427,7 +427,8 @@ ARC-AGI-2 explicitly adds efficiency measurement to its abstract reasoning evalu
 ### Workstream A — independent Rust codec laboratory
 
 Create a small standalone Rust workspace, outside Symthaea's live cognitive-loop dependencies, with:
-- a predictor trait that returns integer symbol frequencies;
+- a public `BytePredictor` trait / `ByteCdf` interface that returns an integer cumulative-frequency table for the next byte and updates only from observed/decoded symbols;
+- a shared entropy coder that can accept built-in order-0/order-1 models or caller-supplied predictors through the same interface;
 - a deterministic range coder or rANS implementation;
 - adaptive order-0 and order-1 reference predictors;
 - a framed format with version, source length, and checksum;
