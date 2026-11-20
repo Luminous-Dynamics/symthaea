@@ -64,7 +64,7 @@ impl BundleStatusV1 {
         if gates.iter().any(|status| *status == GateStatusV1::Fail) {
             Self::Fail
         } else if gates.iter().any(|status| {
-            matches!(status, GateStatusV1::Abstain | GateStatusV1::NotRun)
+            matches!(*status, GateStatusV1::Abstain | GateStatusV1::NotRun)
         }) {
             Self::Abstain
         } else {
@@ -100,7 +100,6 @@ pub struct BundleArtifactsV1 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ComponentBaseV1 {
     pub status: GateStatusV1,
     pub receipt_sha256: Option<String>,
@@ -109,7 +108,6 @@ pub struct ComponentBaseV1 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SymbolicComponentV1 {
     #[serde(flatten)]
     pub base: ComponentBaseV1,
@@ -119,7 +117,6 @@ pub struct SymbolicComponentV1 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct RenderComponentV1 {
     #[serde(flatten)]
     pub base: ComponentBaseV1,
@@ -131,7 +128,6 @@ pub struct RenderComponentV1 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct AcousticComponentV1 {
     #[serde(flatten)]
     pub base: ComponentBaseV1,
@@ -141,7 +137,6 @@ pub struct AcousticComponentV1 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ScoreAudioComponentV1 {
     #[serde(flatten)]
     pub base: ComponentBaseV1,
@@ -150,7 +145,6 @@ pub struct ScoreAudioComponentV1 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct HumanComponentV1 {
     #[serde(flatten)]
     pub base: ComponentBaseV1,
@@ -465,7 +459,7 @@ fn declared_components_valid(manifest: &BundleManifestV1) -> Result<(), String> 
     let failed = components.iter().filter(|status| **status == GateStatusV1::Fail).count() as u8;
     let abstained = components
         .iter()
-        .filter(|status| matches!(status, GateStatusV1::Abstain | GateStatusV1::NotRun))
+        .filter(|status| matches!(**status, GateStatusV1::Abstain | GateStatusV1::NotRun))
         .count() as u8;
     if manifest.outcome.required_gate_count != 5
         || manifest.outcome.passed_gate_count != passed
