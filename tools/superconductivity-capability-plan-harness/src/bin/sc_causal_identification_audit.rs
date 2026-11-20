@@ -59,6 +59,7 @@ struct Instance {
     schema_sha256: String,
     fixture_sha256: String,
     target_outcome: String,
+    treatment_receipt_semantics: String,
     samples: Vec<Sample>,
     cohorts: Vec<Cohort>,
     truth: Vec<PotentialOutcome>,
@@ -100,6 +101,7 @@ impl Instance {
         }
         let id = field_text(&fixture, "instance_id")?.to_owned();
         let target_outcome = field_text(&fixture, "target_outcome")?.to_owned();
+        let treatment_receipt_semantics = field_text(&fixture, "treatment_receipt_semantics")?.to_owned();
 
         let sample_rows = fixture.get("samples").and_then(Value::as_array)
             .ok_or_else(|| "samples must be an array".to_owned())?;
@@ -195,6 +197,7 @@ impl Instance {
             schema_sha256: format!("{:x}", Sha256::digest(schema_bytes)),
             fixture_sha256: format!("{:x}", Sha256::digest(fixture_bytes)),
             target_outcome,
+            treatment_receipt_semantics,
             samples,
             cohorts,
             truth,
@@ -577,6 +580,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         "instance_id":instance.id,
         "target_outcome":instance.target_outcome,
         "estimand":"finite_population_average_treatment_effect",
+        "treatment_receipt_semantics":instance.treatment_receipt_semantics,
         "sample_count":instance.samples.len(),
         "cohort_count":instance.cohorts.len(),
         "finite_population_ground_truth_ate":truth,
@@ -708,6 +712,37 @@ mod tests{
             .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
         assert_eq!(randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_treated"],1.0);
         assert_eq!(randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_control"],0.0);
+    }
+
+    #[test]
+    fn assigned_treatment_with_partial_delivery_remains_in_the_itt_arm() {
+        let (schema,fixture)=inputs();
+        let receipt=audit(&schema,&fixture).unwrap();
+        let randomized=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
+        assert_eq!(
+            randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_treated"],
+            0.9333333333333332
+        );
+        assert_eq!(
+            receipt["treatment_receipt_semantics"],
+            "Primary estimand is intention-to-treat under assignment policy. Delivered dose is separately recorded for compliance auditing; v0.1 does not estimate a dose-response effect."
+        );
+        // The assigned-treated unit with a 0.6 dose is still counted as treated.
+        assert_eq!(randomized["assignment_counts"]["treated"],6);
+    }
+
+    #[test]
+    fn poor_propensity_overlap_causes_weighted_estimators_to_abstain() {
+        let (schema,fixture)=inputs();
+        let mut value:Value=serde_json::from_slice(&fixture).unwrap();
+        value["cohorts"][1]["records"][0]["assignment_probability"]=json!(0.99);
+        let receipt=audit(&schema,&serde_json::to_vec(&value).unwrap()).unwrap();
+        let historical=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="historical_targeting").unwrap();
+        assert!(historical["horvitz_thompson_known_propensity"]["estimate"]["estimate"].is_null());
+        assert!(historical["hajek_normalized_inverse_propensity"]["estimate"]["estimate"].is_null());
+        assert!(historical["horvitz_thompson_known_propensity"]["estimate"]["abstention_reason"].as_str().is_some());
     }
 
 }
