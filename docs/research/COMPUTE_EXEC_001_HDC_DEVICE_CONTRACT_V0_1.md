@@ -219,7 +219,7 @@ Cache behavior must be explicit per hardware profile: coherent, explicit flush/i
 
 A new device initialization/reset creates a new 128-bit device epoch. Commands carry that epoch and a strictly increasing sequence number. Completions from an earlier epoch are rejected even if their command ID matches.
 
-The pure Rust host state machine reserves every referenced handle atomically before the driver is called. It enforces strictly increasing sequence numbers per epoch, bounded in-flight commands and unique command IDs. A timeout, failed/cancelled device command or ambiguous outcome blocks **all new submissions in that device epoch**, not only reuse of the affected buffers. A new epoch must be established through reset/reconciliation before dispatch resumes. It does not perform MMIO, map DMA, pin memory, flush caches or establish physical quiescence.
+The pure Rust host state machine reserves every referenced handle atomically before the driver is called. It enforces strictly increasing sequence numbers per epoch, bounded in-flight commands and unique command IDs. A timeout, failed/cancelled device command or ambiguous outcome blocks **all new submissions in that device epoch**, not only reuse of the affected buffers. Recovery has two independent gates: (1) establish a distinct new device epoch through externally completed reset/reinitialization; and (2) obtain independent confirmation that the old DMA context is quiescent. New dispatch remains blocked until both gates are satisfied, regardless of whether the quarantined buffers themselves have already been individually released. It does not perform MMIO, map DMA, pin memory, flush caches or establish physical quiescence.
 
 The host-side execution state is:
 
@@ -232,7 +232,7 @@ Failure paths are distinct:
 - Device failure, cancellation, timeout or **OUTCOME_UNKNOWN**: buffers enter quarantine because protocol v0.1 carries no independent DMA-quiescence assertion.
 - Reset: invalidate all prior-epoch commands, quarantine outstanding buffers, reinitialize the device and reconcile before reuse.
 
-Quarantined buffers are released only after an explicit confirm_dma_quiescent(old_epoch) call from a driver/platform layer that has independently established the old DMA context cannot write again. That confirmation releases eligible buffers but does not by itself unblock dispatch. The host must first record the externally completed reset/reinitialization with a distinct device epoch. Calling either pure state-machine method is not itself proof of physical quiescence or successful reset.
+Quarantined buffers are released only after an explicit confirm_dma_quiescent(old_epoch) call from a driver/platform layer that has independently established the old DMA context cannot write again. A confirmation received before reset releases eligible buffers but does not resume dispatch; a reset received before confirmation rotates the epoch but also does not resume dispatch. Only after both events are recorded does the ledger admit new commands. Calling either pure state-machine method is not itself proof of physical quiescence or successful reset.
 
 A timeout is not proof that a command did not execute. Do not blindly resubmit a command into the same output range. Exact HDC operations are mathematically pure, but concurrent DMA writes, buffer reuse and command duplication can still corrupt memory. A replay is permitted only after the previous DMA context is quiescent and the input/output generations are reconciled.
 
