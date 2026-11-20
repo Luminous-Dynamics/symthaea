@@ -517,6 +517,7 @@ std::vector<std::uint8_t> encode_one_series_columnar(const std::vector<Record>& 
     for (std::size_t field = 0U; field < kFields; ++field) {
         std::vector<std::uint8_t> present(bitmap_bytes, 0U);
         std::vector<std::uint8_t> changed(bitmap_bytes, 0U);
+        std::vector<std::uint8_t> values;
         bool previous_present = false;
         std::uint64_t previous_value = 0U;
 
@@ -530,12 +531,13 @@ std::vector<std::uint8_t> encode_one_series_columnar(const std::vector<Record>& 
                 present[row / 8U] |= static_cast<std::uint8_t>(1U << (row & 7U));
             if (is_changed)
                 changed[row / 8U] |= static_cast<std::uint8_t>(1U << (row & 7U));
-            if (is_changed && is_present) put_u64(value, out);
+            if (is_changed && is_present) put_u64(value, values);
             previous_present = is_present;
             previous_value = value;
         }
         out.insert(out.end(), present.begin(), present.end());
         out.insert(out.end(), changed.begin(), changed.end());
+        out.insert(out.end(), values.begin(), values.end());
     }
     return out;
 }
