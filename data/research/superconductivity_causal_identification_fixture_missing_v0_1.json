@@ -215,7 +215,63 @@
           "outcome_observed": true,
           "observed_outcome": -2
         }
-      ]
+      ],
+      "allocation_design": {
+        "randomization_unit": "specimen",
+        "allocation_algorithm": "blocked_complete_randomization_fixed_counts",
+        "blocking_variable": "batch_id",
+        "randomization_seed": 20261120,
+        "assignment_receipt": [
+          {
+            "sample_id": "batch_high_s1",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_high_s4",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s1",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_low_s2",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s4",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s1",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_mid_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s3",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s4",
+            "treatment_assigned": false
+          }
+        ]
+      }
     },
     {
       "cohort_id": "historical_targeting",
@@ -341,7 +397,63 @@
           "outcome_observed": true,
           "observed_outcome": -2
         }
-      ]
+      ],
+      "allocation_design": {
+        "randomization_unit": "specimen",
+        "allocation_algorithm": "historical_targeting_policy",
+        "blocking_variable": "batch_id",
+        "randomization_seed": null,
+        "assignment_receipt": [
+          {
+            "sample_id": "batch_high_s1",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s3",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_high_s4",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s1",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s2",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_low_s4",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s1",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_mid_s2",
+            "treatment_assigned": true
+          },
+          {
+            "sample_id": "batch_mid_s3",
+            "treatment_assigned": false
+          },
+          {
+            "sample_id": "batch_mid_s4",
+            "treatment_assigned": true
+          }
+        ]
+      }
     }
   ],
   "ground_truth": [
