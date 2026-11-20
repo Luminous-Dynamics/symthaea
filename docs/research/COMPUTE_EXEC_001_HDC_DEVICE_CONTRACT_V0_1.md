@@ -82,7 +82,7 @@ The host must obtain a capability manifest before dispatch. It binds:
 - backend and execution class (software reference, simulator, synthesis estimate, FPGA hardware, ASIC hardware);
 - implementation artifact identity and hardware profile digest where available;
 - admitted operation IDs and representation IDs;
-- maximum transfer size, required alignment and in-flight command bound;
+- maximum aggregate command payload, required alignment and in-flight command bound;
 - DMA isolation profile;
 - cache-coherency behavior;
 - the evidence stage and provenance references supporting those declarations.
@@ -105,7 +105,7 @@ A command binds:
 
 **Raw host pointers, process virtual addresses and unconstrained physical addresses are forbidden.** The host driver resolves opaque handles inside a registered DMA domain. Offset and length arithmetic must use checked operations before any mapping or device submission.
 
-The schema defines buffer descriptors generically. The host semantic validator must enforce operation-specific role/length rules:
+The schema defines buffer descriptors generically. The host semantic validator must enforce operation-specific role/length/access rules and checked range arithmetic:
 
 | Operation | Required buffers | Required size rules |
 |---|---|---|
@@ -115,11 +115,15 @@ The schema defines buffer descriptors generically. The host semantic validator m
 
 Top-1's 16-byte result record is little-endian: winner stable ID (u64), Hamming distance (u16), then six reserved zero bytes. The host rejects non-zero reserved bytes. Candidate IDs are stable application IDs, not array positions.
 
+For all operations, max_transfer_bytes is interpreted as the checked aggregate length of every buffer in one command. Offset alignment is enforced independently of payload length, allowing the exact 2-byte Hamming-distance result while retaining an 8-byte-aligned start address. The validator requires all input buffers to be readable and the operation's output buffer to be writable; output/input range overlap is rejected.
+
 ### 4.3 Completion record
 
-The device completion binds the command ID, device ID, epoch and sequence. A successful completion includes a bounded result object and output digest where the transport supports it. The host must verify that the completion refers to the current registered output generation and expected output range.
+The device completion binds the command ID, device ID, epoch and sequence. A successful completion must also echo an output_buffer object containing the exact output role, opaque handle ID, generation, offset and length from the submitted command. The host compares every field before returning ownership or accepting the result. A matching command ID alone is insufficient.
 
-A completion digest is an integrity aid, not a digital signature or proof of correct computation. Qualification runs compare the device output to an independently generated software oracle. Physical authenticity requires a separately qualified trust chain.
+A successful completion includes a bounded result object and output digest. A digest is an integrity aid, not a digital signature or proof of correct computation. Qualification runs must hash the actual returned bytes and compare them with an independently generated software oracle. Physical authenticity requires a separately qualified trust chain.
+
+The pure host validator defines the operation contract IDs for semantic version 1.0.0 as symthaea.binaryhv.bind-xor-exact, symthaea.binaryhv.hamming-exact and symthaea.binaryhv.top1-exact.
 
 ## 5. DMA, memory ownership and isolation
 
@@ -152,16 +156,20 @@ Cache behavior must be explicit per hardware profile: coherent, explicit flush/i
 
 A new device initialization/reset creates a new 128-bit device epoch. Commands carry that epoch and a strictly increasing sequence number. Completions from an earlier epoch are rejected even if their command ID matches.
 
+The pure Rust host state machine reserves every referenced handle atomically before the driver is called. It enforces strictly increasing sequence numbers per epoch, bounded in-flight commands and unique command IDs. It does not perform MMIO, map DMA, pin memory, flush caches or establish physical quiescence.
+
 The host-side execution state is:
 
-**Prepared → Registered → Submitted → Accepted → Completed**
+**Host-owned → Validated → Device-owned → Completed**
 
 Failure paths are distinct:
 
-- Rejected before acceptance: no device execution is admitted.
-- Device failure with confirmed quiescence: command failed; buffers may be reclaimed after driver confirmation.
-- Host timeout/device disappearance without confirmed cancellation: **OUTCOME_UNKNOWN**.
+- Rejected before execution: the device guarantees it did not acquire DMA ownership; the host may reclaim the buffers.
+- Successful completion: only the exact command/epoch/sequence and echoed output handle/generation/range return the buffers to host ownership.
+- Device failure, cancellation, timeout or **OUTCOME_UNKNOWN**: buffers enter quarantine because protocol v0.1 carries no independent DMA-quiescence assertion.
 - Reset: invalidate all prior-epoch commands, quarantine outstanding buffers, reinitialize the device and reconcile before reuse.
+
+Quarantined buffers are released only after an explicit confirm_dma_quiescent(old_epoch) call from a driver/platform layer that has independently established the old DMA context cannot write again. Calling this pure state-machine method is not itself proof of quiescence.
 
 A timeout is not proof that a command did not execute. Do not blindly resubmit a command into the same output range. Exact HDC operations are mathematically pure, but concurrent DMA writes, buffer reuse and command duplication can still corrupt memory. A replay is permitted only after the previous DMA context is quiescent and the input/output generations are reconciled.
 
@@ -224,7 +232,7 @@ Negative controls:
 - partial output and malformed reserved bytes;
 - device loss with uncertain DMA quiescence.
 
-Acceptance requires invalid descriptors to be rejected before DMA, no stale completion accepted, no mutation outside registered output ranges, and no buffer reuse before quiescence.
+Acceptance requires invalid descriptors to be rejected before DMA, no stale or mismatched-output completion accepted, no mutation outside registered output ranges, and no buffer reuse before quiescence. Include completion output-handle/generation/range substitution, output/input overlap, duplicate roles, non-canonical decimal u64 strings, and u64 overflow as negative controls.
 
 ### Functional parity
 
@@ -268,7 +276,7 @@ The first PR implements only the machine-readable contract and fixtures. No driv
 ## 12. Proposed PR sequence
 
 A. Protocol schemas, capability manifest, examples and negative-case catalogue.  
-B. Pure host-side validator and deterministic state-machine tests; no MMIO/DMA.  
+B. Pure host-side validator, operation-specific range/permission checks, output-binding echo and deterministic state-machine tests; no MMIO/DMA.  
 C. Simulator adapter and command/completion differential tests.  
 D. Exact FPGA adapter on the #10901 board profile with declared isolation/coherency.  
 E. End-to-end benchmark and receipt integration with #6968/#7864.
