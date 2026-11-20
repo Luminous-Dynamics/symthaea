@@ -1,0 +1,163 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "plasma-phase-space-measure-diagnostics-v0.1",
+  "status": "diagnostic-contract-not-yet-physically-validated",
+  "physics_lane": "collisionless-electrostatic-1d1v-periodic-x-unbounded-v",
+  "coordinate_contract": {
+    "position": {
+      "coordinate": "x",
+      "domain_length_symbol": "L",
+      "boundary": "periodic",
+      "normalization": "x_wrapped = rem_euclid(x, L); x_unit = x_wrapped / L",
+      "units": "declared per physical task; identical for candidate and reference"
+    },
+    "velocity": {
+      "coordinate": "v",
+      "boundary": "unbounded",
+      "reference_symbol": "v_ref",
+      "scale_symbol": "v_scale",
+      "normalization": "v_unit = (v - v_ref) / v_scale",
+      "units": "declared per physical task; identical for candidate and reference"
+    },
+    "particle_weight": {
+      "meaning": "effective signed empirical-measure weight",
+      "signed_weights_supported": true,
+      "normalization": "total_variation = sum(abs(weight))"
+    }
+  },
+  "characteristic_signature": {
+    "definition": "mu_hat(k, eta) = sum_i w_i * exp(i * (2*pi*k*x_i/L + eta*(v_i-v_ref)/v_scale))",
+    "spatial_mode": "non-negative integer k",
+    "velocity_frequency": "dimensionless real eta",
+    "required_mode": {
+      "position_mode": 0,
+      "velocity_frequency": 0,
+      "importance": 2
+    },
+    "modes": [
+      {
+        "position_mode": 0,
+        "velocity_frequency": 0,
+        "importance": 2
+      },
+      {
+        "position_mode": 1,
+        "velocity_frequency": 0,
+        "importance": 1
+      },
+      {
+        "position_mode": 2,
+        "velocity_frequency": 0,
+        "importance": 1
+      },
+      {
+        "position_mode": 0,
+        "velocity_frequency": 1,
+        "importance": 1
+      },
+      {
+        "position_mode": 0,
+        "velocity_frequency": 2,
+        "importance": 1
+      },
+      {
+        "position_mode": 1,
+        "velocity_frequency": 1,
+        "importance": 1
+      },
+      {
+        "position_mode": 2,
+        "velocity_frequency": -1,
+        "importance": 1
+      }
+    ],
+    "importance_constraint": "finite and strictly positive",
+    "finite_feature_aliasing_warning": "Distinct measures can share a finite characteristic signature."
+  },
+  "comparison": {
+    "normalization": "max(total_variation(candidate), total_variation(reference)); use 1 when both are zero",
+    "primary_metric": "sqrt(sum(mode_importance * (abs(candidate_coefficient-reference_coefficient)/normalization)^2) / sum(mode_importance))",
+    "required_secondary_metrics": [
+      "max_mode_relative_error",
+      "net_weight_relative_error",
+      "total_variation_relative_error",
+      "per_mode_absolute_and_relative_error",
+      "candidate_particle_count",
+      "reference_particle_count"
+    ],
+    "particle_count_role": "metadata-only; not part of the distance",
+    "exact_representation_equivalence_target": "relative error <= 1e-12 for deterministic f64 permutation, periodic representative, and co-located split/merge fixtures"
+  },
+  "provenance_requirements": {
+    "each_comparison_must_bind": [
+      "physics_lane_id",
+      "initial_condition_cohort_sha256",
+      "reference_state_sha256",
+      "candidate_state_sha256",
+      "reference_solver_source_sha256",
+      "candidate_solver_source_sha256",
+      "reference_build_sha256",
+      "candidate_build_sha256",
+      "metric_source_sha256",
+      "metric_configuration_sha256",
+      "species_and_weight_convention",
+      "time_step_index",
+      "physical_time"
+    ],
+    "train_test_split": "split by independent trajectories and seeds; never by randomly partitioning correlated snapshots alone"
+  },
+  "required_negative_controls": [
+    "same position marginal but changed velocity-position pairing",
+    "same positions and velocities but changed total signed weight",
+    "changed phase-space support",
+    "missing DC mode",
+    "non-finite particle fields",
+    "invalid coordinate scales",
+    "finite feature set aliasing example documented as a known limitation"
+  ],
+  "reporting_rules": {
+    "report_alongside": [
+      "field_error",
+      "rollout_or_trajectory_error",
+      "instability_growth_and_saturation",
+      "particle_noise_spectrum",
+      "applicable_mass_momentum_energy_diagnostics",
+      "applicable_gauss_and_charge_continuity_residuals",
+      "positivity_or_realizability",
+      "mesh_and_time_step_convergence"
+    ],
+    "prohibited_claims": [
+      "complete metric on probability measures",
+      "Wasserstein distance",
+      "proof of distribution equality",
+      "solver correctness certificate",
+      "standalone acceptance gate for learned field proposals",
+      "SOTA superiority without matched independent experiments"
+    ]
+  },
+  "implementation": {
+    "crate": "crates/tools/plasma-phase-space-measure",
+    "complexity": "O(N_particles * N_modes) arithmetic and O(N_modes) output storage",
+    "implementation_status": "source-authored; Rust compile/test/Clippy not yet independently observed"
+  },
+  "references": [
+    {
+      "name": "NEOPIC: A Neural Operator Framework for Particle-based Kinetic Plasma Simulations",
+      "year": 2026,
+      "url": "https://arxiv.org/abs/2610.40528",
+      "relevance": "empirical-measure neural operator and representation-equivalence motivation"
+    },
+    {
+      "name": "Structure preservation using discrete gradients in the Vlasov-Poisson-Landau system",
+      "year": 2026,
+      "doi": "10.1016/j.jcp.2026.114749",
+      "relevance": "distribution evolution must be reported with applicable conserved and dissipative structure"
+    },
+    {
+      "name": "Intrinsic local Gauss's law preserving PIC method",
+      "year": 2026,
+      "doi": "10.1016/j.cpc.2026.110296",
+      "relevance": "distinct Vlasov-Ampere physical lane and local Gauss invariant"
+    }
+  ]
+}
