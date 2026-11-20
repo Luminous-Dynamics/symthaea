@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
-    EmbodimentIngestError, EmbodimentSnapshot,
+    EmbodimentIngestError, EmbodimentSnapshot, SpeechOutputState,
 };
 
 /// Current serialized trace schema.
@@ -83,11 +83,13 @@ impl EmbodimentTrace {
 
         let mut activity_changes = 0usize;
         let mut completed_activity_intervals = 0usize;
-        let mut speaking_intervals_completed = 0usize;
-        let mut speaking_duration_ns = 0u128;
+        let mut speech_output_transitions = 0usize;
+        let mut completed_playback_intervals = 0usize;
+        let mut playback_duration_ns = 0u128;
         let mut viseme_event_count = 0usize;
         let mut uncertainty_observation_count = 0usize;
         let mut previous_activity: Option<(EmbodimentActivity, u64)> = None;
+        let mut previous_playback: Option<(SpeechOutputState, u64)> = None;
 
         for event in &self.events {
             let activity_update = match &event.kind {
@@ -100,20 +102,40 @@ impl EmbodimentTrace {
                 if let Some((previous, started_at)) = previous_activity {
                     if previous != activity {
                         activity_changes = activity_changes.saturating_add(1);
-                        let duration = event.monotonic_ns.saturating_sub(started_at);
+                        let _duration = event.monotonic_ns.saturating_sub(started_at);
                         completed_activity_intervals =
                             completed_activity_intervals.saturating_add(1);
-                        if previous == EmbodimentActivity::Speaking {
-                            speaking_intervals_completed =
-                                speaking_intervals_completed.saturating_add(1);
-                            speaking_duration_ns =
-                                speaking_duration_ns.saturating_add(u128::from(duration));
-                        }
                         previous_activity = Some((activity, event.monotonic_ns));
                     }
                 } else {
                     activity_changes = activity_changes.saturating_add(1);
                     previous_activity = Some((activity, event.monotonic_ns));
+                }
+            }
+
+            let playback_update = match &event.kind {
+                EmbodimentEventKind::SpeechOutputChanged { state } => Some(Some(*state)),
+                EmbodimentEventKind::Reset => Some(None),
+                _ => None,
+            };
+
+            if let Some(next_state) = playback_update {
+                if let Some((previous, started_at)) = previous_playback {
+                    if Some(previous) != next_state {
+                        speech_output_transitions = speech_output_transitions.saturating_add(1);
+                        if previous == SpeechOutputState::Playing {
+                            completed_playback_intervals =
+                                completed_playback_intervals.saturating_add(1);
+                            let duration = event.monotonic_ns.saturating_sub(started_at);
+                            playback_duration_ns =
+                                playback_duration_ns.saturating_add(u128::from(duration));
+                        }
+                        previous_playback =
+                            next_state.map(|state| (state, event.monotonic_ns));
+                    }
+                } else if let Some(state) = next_state {
+                    speech_output_transitions = speech_output_transitions.saturating_add(1);
+                    previous_playback = Some((state, event.monotonic_ns));
                 }
             }
 
@@ -134,8 +156,9 @@ impl EmbodimentTrace {
             event_count: self.events.len(),
             activity_changes,
             completed_activity_intervals,
-            speaking_intervals_completed,
-            speaking_duration_ns,
+            speech_output_transitions,
+            completed_playback_intervals,
+            playback_duration_ns,
             viseme_event_count,
             uncertainty_observation_count,
             open_activity: previous_activity.map(|(activity, started_at_ns)| {
@@ -143,6 +166,11 @@ impl EmbodimentTrace {
                     activity,
                     started_at_ns,
                 }
+            }),
+            open_playback: previous_playback.and_then(|(state, started_at_ns)| {
+                (state == SpeechOutputState::Playing).then_some(OpenPlaybackInterval {
+                    started_at_ns,
+                })
             }),
             final_snapshot,
         })
@@ -172,6 +200,12 @@ pub struct OpenActivityInterval {
     pub started_at_ns: u64,
 }
 
+/// An audio playback interval still open at the end of a trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenPlaybackInterval {
+    pub started_at_ns: u64,
+}
+
 /// Stable summary suitable for benchmark output and trace comparison.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EmbodimentTraceSummary {
@@ -179,11 +213,13 @@ pub struct EmbodimentTraceSummary {
     pub event_count: usize,
     pub activity_changes: usize,
     pub completed_activity_intervals: usize,
-    pub speaking_intervals_completed: usize,
-    pub speaking_duration_ns: u128,
+    pub speech_output_transitions: usize,
+    pub completed_playback_intervals: usize,
+    pub playback_duration_ns: u128,
     pub viseme_event_count: usize,
     pub uncertainty_observation_count: usize,
     pub open_activity: Option<OpenActivityInterval>,
+    pub open_playback: Option<OpenPlaybackInterval>,
     pub final_snapshot: EmbodimentSnapshot,
 }
 
@@ -294,8 +330,8 @@ mod tests {
         assert_eq!(summary.event_count, 6);
         assert_eq!(summary.activity_changes, 2);
         assert_eq!(summary.completed_activity_intervals, 1);
-        assert_eq!(summary.speaking_intervals_completed, 1);
-        assert_eq!(summary.speaking_duration_ns, 2_000_000);
+        assert_eq!(summary.completed_playback_intervals, 1);
+        assert_eq!(summary.playback_duration_ns, 2_000_000);
         assert_eq!(summary.viseme_event_count, 2);
         assert_eq!(summary.uncertainty_observation_count, 1);
         assert_eq!(
