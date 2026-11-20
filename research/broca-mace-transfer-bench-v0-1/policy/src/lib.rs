@@ -1103,10 +1103,16 @@ mod tests {
             regime: Regime::Baseline,
             objective: Objective::Quality,
         };
-        let mut item = sample(70, 10, Action::A, 0.99, scope);
-        item.causal_identification.method = IdentificationMethodV1::Observational;
-        assert!(!is_qualified(&item, Query { scope }));
-        assert!(!is_transfer_qualified(&item, Query { scope }));
+        for method in [
+            IdentificationMethodV1::Observational,
+            IdentificationMethodV1::QuasiExperimental,
+            IdentificationMethodV1::Unknown,
+        ] {
+            let mut item = sample(70, 10, Action::A, 0.99, scope);
+            item.causal_identification.method = method;
+            assert!(!is_qualified(&item, Query { scope }));
+            assert!(!is_transfer_qualified(&item, Query { scope }));
+        }
     }
 
     #[test]

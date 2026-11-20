@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use broca_mace_policy::{
     decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
     Policy, ProbeRequest, Query, Regime, Scope, NORMALIZED_UTILITY_SCALE,
+    IdentificationMethodV1,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -150,6 +151,22 @@ fn cases() -> Vec<Scenario> {
 
     let identified = valid_pair(baseline_quality, 1, 0.92, 0.38);
 
+    let mut observational_decoy = valid_pair(baseline_quality, 190, 0.96, 0.65);
+    for item in observational_decoy
+        .iter_mut()
+        .filter(|item| item.action == Action::A)
+    {
+        item.causal_identification.method = IdentificationMethodV1::Observational;
+    }
+
+    let mut quasi_decoy = valid_pair(baseline_quality, 194, 0.94, 0.62);
+    for item in quasi_decoy
+        .iter_mut()
+        .filter(|item| item.action == Action::A)
+    {
+        item.causal_identification.method = IdentificationMethodV1::QuasiExperimental;
+    }
+
     let mut confounded = valid_pair(baseline_quality, 10, 0.88, 0.42);
     for item in &mut confounded {
         item.intervention = false;
@@ -231,6 +248,24 @@ fn cases() -> Vec<Scenario> {
             0.0,
             Some(Action::A),
             false,
+        ),
+        scenario(
+            "observational_high_reward_causal_decoy",
+            observational_decoy,
+            Query { scope: baseline_quality },
+            0.10,
+            0.90,
+            None,
+            true,
+        ),
+        scenario(
+            "unsupported_quasi_experimental_decoy",
+            quasi_decoy,
+            Query { scope: baseline_quality },
+            0.10,
+            0.90,
+            None,
+            true,
         ),
         scenario(
             "confounded_association_decoy",

@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use broca_mace_policy::{
     decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
     Policy, ProbeRequest, Query, Regime, Scope, NORMALIZED_UTILITY_SCALE,
+    IdentificationMethodV1,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -161,7 +162,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 17);
+    let mut cases = Vec::with_capacity(clusters as usize * 19);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -192,6 +193,48 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             b,
             Some(causal),
             false,
+        ));
+
+        let mut observational = pair(
+            baseline,
+            id + 300,
+            family + 20,
+            0.96,
+            0.65,
+        );
+        for item in observational.iter_mut().filter(|item| item.action == Action::A) {
+            item.causal_identification.method = IdentificationMethodV1::Observational;
+        }
+        cases.push(case(
+            cluster,
+            "observational_high_reward_decoy",
+            observational,
+            baseline,
+            0.10,
+            0.90,
+            None,
+            true,
+        ));
+
+        let mut quasi = pair(
+            baseline,
+            id + 310,
+            family + 24,
+            0.94,
+            0.62,
+        );
+        for item in quasi.iter_mut().filter(|item| item.action == Action::A) {
+            item.causal_identification.method = IdentificationMethodV1::QuasiExperimental;
+        }
+        cases.push(case(
+            cluster,
+            "unsupported_quasi_experimental",
+            quasi,
+            baseline,
+            0.10,
+            0.90,
+            None,
+            true,
         ));
 
         let mut confounded = pair(baseline, id + 10, family + 4, 0.92, 0.34);
@@ -921,6 +964,29 @@ mod tests {
     }
 
     #[test]
+    fn high_reward_observational_and_quasi_experimental_claims_do_not_transfer() {
+        let cases = generated_worlds(1);
+        for family_name in [
+            "observational_high_reward_decoy",
+            "unsupported_quasi_experimental",
+        ] {
+            let item = cases
+                .iter()
+                .find(|case| case.family == family_name)
+                .unwrap();
+            let frequency = decide(Policy::FrequencyOnly, &item.memory, item.query);
+            let causal = decide(Policy::CausalQualified, &item.memory, item.query);
+            let transport = decide(Policy::InvariantTransport, &item.memory, item.query);
+
+            assert_eq!(frequency.action, Some(Action::A));
+            assert_eq!(causal.action, None);
+            assert_eq!(transport.action, None);
+            assert!(causal.evidence_ids.is_empty());
+            assert!(transport.evidence_ids.is_empty());
+        }
+    }
+
+    #[test]
     fn generated_common_cause_root_attack_is_rejected() {
         let cases = generated_worlds(1);
         let item = cases
@@ -952,12 +1018,12 @@ mod tests {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 136);
+        assert_eq!(first.len(), 152);
         assert_eq!(first[0].cluster, 1);
-        assert_eq!(first[17].cluster, 2);
+        assert_eq!(first[19].cluster, 2);
         assert_ne!(
             first[0].memory[0].source_family,
-            first[17].memory[0].source_family
+            first[19].memory[0].source_family
         );
     }
 
@@ -979,7 +1045,7 @@ mod tests {
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 272);
+        assert_eq!(score.count, 304);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);
