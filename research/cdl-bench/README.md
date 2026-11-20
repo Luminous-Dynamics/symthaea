@@ -594,23 +594,36 @@ bash scripts/research/cdl_rabbit_branch_mapper_reference.sh
 
 The C++ runner uses a default block size of 1,000 symbols (Rabbit's paper default), checks exact flag round-trips including 100 randomized streams, and reports flag-only bits against fixed two-bit flags and an offline same-block fixed-or-dynamic oracle. These are synthetic flag costs only, not end-to-end Rabbit/ACTF or CDL compression results. See the research note for the ablation numbers and limitations.
 
-## Order-preserving per-series partitioned telemetry reference
+## Per-series telemetry layouts: PRN1 row-state and PCL1 field-columnar
 
-The C++20 research frame at `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp` prototypes a hybrid event/column layout:
+The C++20 reference at `research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp` now compares two exact-lossless per-series child layouts.
 
-- A stable dictionary of entity/series keys and one state-delta/heartbeat child stream per key.
-- **Mode 0:** strictly increasing unique timestamps are restored with deterministic k-way merge; no order schedule.
-- **Mode 1:** nondecreasing timestamps with duplicates use tie-group key-order templates. A bounded 16-entry move-to-front dictionary reuses recurring tie orders; new orders are stored literally. The decoder checks per-key multiplicities for every tie group.
-- **Mode 2:** timestamp regressions use the full bit-packed key-ID schedule to restore exact arrival order.
-- The outer frame includes schema, counts, child lengths, order-mode metadata and CRC32.
+**PRN1 row-state layout** uses a stable dictionary of entity/series keys and one state-delta/heartbeat child stream per key. It restores global order through:
+- Mode 0: strict unique timestamps, deterministic k-way merge, no order schedule.
+- Mode 1: nondecreasing duplicate timestamps, tie-group order templates with a bounded 16-entry move-to-front dictionary.
+- Mode 2: timestamp regressions, full bit-packed key-ID schedule for exact arrival-order replay.
+Mode-1 uses a heap frontier and verifies per-key tie multiplicity, including multiple same-series rows at a timestamp.
 
-Run from the repository root:
+**PCL1 field-columnar layout** is a second candidate for strictly increasing unique timestamps. For each series it stores timestamp deltas plus separate per-field presence bitmaps, changed bitmaps and contiguous exact-u64 value lanes. The decoder merges child streams to restore global order. It currently uses a fixed eight-field schema, one outer CRC, and Zstd on the full frame. It does not yet integrate Pco or ALP.
+
+Run both layout ablations from the repository root:
 
 ```sh
 bash scripts/research/cdl_partitioned_telemetry_reference.sh
 ```
 
-The partition runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror` and tests empty input, four 65,536-record timestamp-merge fixtures, duplicate-time tie templates, alternating templates, same-series multi-row ties, out-of-order full-schedule fallback, 100 randomized interleaved round-trips and malformed frames. The integrated three-mode frame was compiled locally with GCC 14.2 and passed these tests. Mode-1 decoding uses a min-heap merge frontier and sparse per-key tie multiplicity counts, avoiding a full scan over all keys for every timestamp group.
+The runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Wno-misleading-indentation -Werror`, runs PRN1 plus PCL1 exact-round-trip tests, tests 1/8/64/1,024/4,096 keys, and malformed frames. It then compares equally framed raw, global state-delta, PRN1 and PCL1 outputs with the same Zstd level and verifies exact decompression.
+
+Selected synthetic Zstd 1.5.7 level-19 results (bytes; 65,536 records / 64 interleaved keys):
+
+| Workload | Global state-delta | PRN1 row-state | PCL1 field-columnar |
+|---|---:|---:|---:|
+| Sparse | 85,931 | 61,864 | 59,042 |
+| Bursty | 224,396 | 204,921 | 188,405 |
+| Mostly idle | 5,577 | 4,784 | 5,692 |
+| Noisy | 2,316,397 | 2,252,910 | 2,042,284 |
+
+PCL1 is 4.56%, 8.06% and 9.35% smaller than PRN1 for sparse, bursty and noisy workloads, respectively, but 18.98% larger on mostly idle. The row-state heartbeat representation wins on idle data. This is evidence for adaptive layout selection, not a universal PCL1 win. The full byte tables, tests and evidence limitations are in `docs/research/CDL_TYPED_TELEMETRY_JOINT_SEGMENTATION_V1_2026-11-19.md`.
 
 The tie-schedule primitive is separately reproducible:
 
@@ -618,9 +631,9 @@ The tie-schedule primitive is separately reproducible:
 bash scripts/research/cdl_tie_group_order_template_reference.sh
 ```
 
-Its standalone reference compiled locally with strict GCC 14.2 warnings and passed 1,000 randomized tie-group round-trips plus five malformed-input checks. It reduced the schedule from 192 to 67 bytes for 64 repeated groups of eight keys, and from 160 to 36 bytes for 20 alternating groups of 16 keys. This validates the schedule subgrammar only, not the integrated PRN1 mode-1 decoder.
+Its independent reference passed 1,000 randomized tie-group round-trips and five malformed-input checks. It reduced the schedule from 192 to 67 bytes for 64 repeated groups of eight keys, and from 160 to 36 bytes for 20 alternating groups of 16 keys. This tests the schedule subgrammar separately from the full PRN1 frame.
 
-Full-frame synthetic results and caveats are recorded in `docs/research/CDL_TYPED_TELEMETRY_JOINT_SEGMENTATION_V1_2026-11-19.md`. The current prototype remains an independent C++ research frame, not the Rust CDL codec or a production telemetry result. It uses a fixed eight-lane schema and synthetic keys, materializes the input, and has not yet measured bounded-memory streaming, throughput, RSS, random access, indexes, checkpoint recovery or schema-name costs.
+**Evidence boundary:** all these results are independent synthetic C++ transform+Zstd diagnostics, not Rust CDL, not production data, and not ALP/Pco/tparquet comparisons. Neither layout has yet been measured for bounded-memory streaming, throughput, RSS, random access, indexes or checkpoint recovery. PRN1 supports tie/regression fallback; the current PCL1 prototype intentionally rejects duplicate or out-of-order global timestamps. Issue #12956 tracks field-columnar lane codecs and adaptive selection; #12935 tracks bounded-memory streaming and seekability.
 
 ## Industry benchmark tracks
 
