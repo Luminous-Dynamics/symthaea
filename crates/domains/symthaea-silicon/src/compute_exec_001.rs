@@ -1662,7 +1662,7 @@ mod tests {
 
     #[test]
     fn unknown_outcome_blocks_the_device_epoch_until_reset() {
-        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        let (mut capabilities, command, mut completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
         completion.status = "outcome_unknown".into();
         completion.error_code = Some("OUTCOME_UNKNOWN".into());
@@ -1690,6 +1690,18 @@ mod tests {
             registry.ownership("fixture-result", 1),
             Some(BufferOwnership::Quarantined { .. })
         ));
+
+        let error = ledger.submit(&next, &capabilities, &mut registry).unwrap_err();
+        assert_eq!(error.code, "DEVICE_EPOCH_REQUIRES_RECONCILIATION");
+
+        assert_eq!(
+            ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
+            4
+        );
+        capabilities.device_epoch = "ffeeddccbbaa99887766554433221100".into();
+        next.device_epoch = capabilities.device_epoch.clone();
+        next.sequence = "1".into();
+        ledger.submit(&next, &capabilities, &mut registry).unwrap();
     }
 
     #[test]
@@ -1709,6 +1721,27 @@ mod tests {
             .accept_completion(&completion, &capabilities, &mut registry)
             .unwrap_err();
         assert_eq!(error.code, "STALE_OR_FOREIGN_COMPLETION");
+    }
+
+    #[test]
+    fn reset_with_inflight_work_requires_old_epoch_quiescence_before_new_dispatch() {
+        let (mut capabilities, mut command, _, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        ledger
+            .reset("ffeeddccbbaa99887766554433221100", &mut registry)
+            .unwrap();
+
+        command.device_epoch = "ffeeddccbbaa99887766554433221100".into();
+        command.sequence = "1".into();
+        capabilities.device_epoch = command.device_epoch.clone();
+        let error = ledger.submit(&command, &capabilities, &mut registry).unwrap_err();
+        assert_eq!(error.code, "DEVICE_EPOCH_REQUIRES_RECONCILIATION");
+
+        assert_eq!(
+            ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
+            4
+        );
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
     }
 
     #[test]
