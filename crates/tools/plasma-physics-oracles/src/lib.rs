@@ -4,7 +4,7 @@
 //! plasma solvers. Their equations and discrete conventions are documented in
 //! the package README.
 
-#[forbid(unsafe_code)]
+#![forbid(unsafe_code)]
 
 pub mod coordinate_audit;
 
