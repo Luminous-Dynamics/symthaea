@@ -114,3 +114,24 @@ The `correction_policy` module routes a field proposal to one of four states:
 - remain unresolved when fallback is unavailable.
 
 The initial implementation only accepts the pinned periodic 1D finite-difference Poisson operator identity. It verifies the certificate's operator identity, spectral gap, finite values and internally consistent residual-derived bounds before allowing acceptance. This is routing logic only; it does not implement the correction solver or provide a tamper-proof signed receipt. The integrating solver must persist immutable source/config/certificate/execution digests and re-evaluate the certificate after every correction.
+
+## 6. Weighted particle-measure field known answers
+
+The base variational oracle stores effective macro-particle charge in
+`Particle1d::charge`; any macro-particle weight must already be included.
+The new `periodic_fourier_field_at_probes` evaluates the truncated Fourier
+electric field at arbitrary periodic probe positions from that weighted
+particle measure.
+
+Because the field is linear in source charge, the oracle should be invariant
+(up to floating-point summation order) when a weighted source is split into
+co-located fragments whose charges sum to the original, or when the particle
+records are permuted. A negative control changes the total represented charge
+and must change the field. Another test verifies that multiplying the probe
+field by the probe charge matches the existing variational force.
+
+This is a small-N Fourier reference with an explicitly omitted zero mode. It
+does not prove that production solvers or the current NEOPIC implementation
+support arbitrary particle weights, and it does not settle how a split/merge
+operation must treat self-energy in the particle-particle energy functional.
+See [issue #12991](https://github.com/Luminous-Dynamics/symthaea/issues/12991).
