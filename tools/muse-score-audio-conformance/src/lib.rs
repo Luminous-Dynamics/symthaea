@@ -958,6 +958,41 @@ mod tests {
     }
 
     #[test]
+    fn unknown_result_field_is_rejected_even_when_resealed() {
+        let score = score(60, Duration::quarter());
+        let mut result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(60, 8_000, 16_000), 16_000),
+            &contract(),
+        ).unwrap();
+        result["future_policy_override"] = json!(true);
+        result["receipt_sha256"] = Value::Null;
+        let digest = domain_digest(RECEIPT_DOMAIN_V1, &canonical_json_bytes(&result).unwrap());
+        result["receipt_sha256"] = Value::String(digest);
+        let error = verify_score_audio_conformance_seal(&result).unwrap_err();
+        assert!(error.contains("score-audio result field set mismatch"));
+    }
+
+    #[test]
+    fn declared_pass_is_rejected_when_any_event_abstains() {
+        let score = score(60, Duration::eighth());
+        let mut contract = contract();
+        contract.minimum_signal_rms_dbfs = -10.0;
+        let mut result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(60, 4_000, 16_000), 16_000),
+            &contract,
+        ).unwrap();
+        result["outcome"]["score_audio_status"] = json!("pass");
+        result["outcome"]["reasons"] = json!([]);
+        result["receipt_sha256"] = Value::Null;
+        let digest = domain_digest(RECEIPT_DOMAIN_V1, &canonical_json_bytes(&result).unwrap());
+        result["receipt_sha256"] = Value::String(digest);
+        let error = verify_score_audio_conformance_seal(&result).unwrap_err();
+        assert!(error.contains("outcome status does not match"));
+    }
+
+    #[test]
     fn score_digest_is_the_typed_score_serde_digest() {
         let score = score(60, Duration::quarter());
         let result = evaluate_score_audio_conformance_v1(&serde_json::to_vec(&score).unwrap(), &wav(&sine(60,8_000,16_000),16_000), &contract()).unwrap();
