@@ -66,14 +66,6 @@ struct Case {
     outcome_status: String,
     characterization: Option<Characterization>,
 }
-#[derive(Clone, Debug)]
-struct Instance {
-    suite_id: String,
-    schema_sha256: String,
-    fixture_sha256: String,
-    cases: Vec<Case>,
-}
-
 fn text_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value.get(key).and_then(Value::as_str).filter(|s| !s.trim().is_empty())
         .ok_or_else(|| format!("missing or empty string field {key}"))
