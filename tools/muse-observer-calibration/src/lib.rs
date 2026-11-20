@@ -770,10 +770,10 @@ mod tests {
             event_present: present,
             negative_family: (!present).then_some("octave_or_missing_fundamental".into()),
             reference_kind: ReferenceKindV1::SyntheticKnownAnswer,
-            source_audio_sha256: digest(split_base + group_number),
-            source_midi_sha256: digest(40_000 + split_base + group_number),
-            observation_receipt_sha256: digest(50_000 + index),
-            reference_receipt_sha256: digest(60_000 + split_base + group_number),
+            source_audio_sha256: digest(100_000 + split_base + group_number),
+            source_midi_sha256: digest(200_000 + split_base + group_number),
+            observation_receipt_sha256: digest(300_000 + index),
+            reference_receipt_sha256: digest(400_000 + split_base + group_number),
         }
     }
 
