@@ -450,3 +450,12 @@ The next credible experiment must:
 6. include a blinded external evaluator and publish all split digests and run manifests.
 
 No MACE salience SOTA result is claimed from the current synthetic positive control.
+
+
+### Verified provider capture closure (MACE v0.11)
+
+A capture digest binds the bytes that were supplied; it does **not** prove that the export is complete. The provider adapter now has a separate `ProviderCaptureClosureClaimV1` / `ProviderCaptureClosureVerifierV1` boundary. It checks the page-cursor chain, terminal-page marker, per-page digests, total raw event records, de-duplicated unique event count, duplicate count, run/session/provider identity and exact capture digest. A trusted verifier must then authenticate the export-closure receipt before yielding a `VerifiedProviderTraceBatchV1`.
+
+The older `bind_provider_run_manifest` remains an internal-consistency binder only. It does not produce the verified-complete wrapper. The new type has private fields and can be obtained only through the closure-verification function.
+
+The current verifier is a deterministic test seam, not a production OpenAI/Anthropic export signer or Mycelix receipt verifier. Where a provider API does not expose a signed export-completeness receipt, deployment must use an independently controlled collector/receipt authority or explicitly classify the capture as partial. A self-declared terminal-page flag is not proof by itself.

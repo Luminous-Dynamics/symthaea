@@ -186,6 +186,273 @@ pub struct BoundProviderTraceBatchV1 {
     pub batch: ProviderTraceBatch,
 }
 
+
+/// One provider page in a paginated session export. Cursor values are stored
+/// only as digests; raw cursors may contain capability-like tokens.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderCapturePageV1 {
+    pub page_index: u32,
+    pub request_cursor_sha256: String,
+    pub next_cursor_sha256: Option<String>,
+    pub page_sha256: String,
+    pub raw_event_count: usize,
+}
+
+/// Caller/collector claim that every page in one provider export was captured.
+/// This claim is not trusted until a ProviderCaptureClosureVerifierV1 accepts it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderCaptureClosureClaimV1 {
+    pub provider: Provider,
+    pub session_id: String,
+    pub run_id: String,
+    pub source_capture_sha256: String,
+    pub pages: Vec<ProviderCapturePageV1>,
+    pub expected_unique_event_count: usize,
+    pub expected_duplicate_event_count: usize,
+    pub terminal_page_confirmed: bool,
+    pub export_receipt_id: String,
+    pub export_receipt_sha256: String,
+    pub verifier_profile_id: String,
+}
+
+/// A production verifier must authenticate the provider/collector receipt and
+/// validate the export request, cursor chain, terminal page and page digests.
+/// Returning true is a trust decision; test doubles are not production trust.
+pub trait ProviderCaptureClosureVerifierV1 {
+    fn verify_export_closure(
+        &self,
+        claim: &ProviderCaptureClosureClaimV1,
+        closure_sha256: &str,
+    ) -> bool;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProviderCaptureClosureReject {
+    Manifest(ProviderRunManifestReject),
+    ProviderMismatch,
+    SessionMismatch,
+    RunMismatch,
+    CaptureDigestMismatch,
+    EmptyPageChain,
+    InvalidPageIndex { expected: u32, actual: u32 },
+    InvalidCursorDigest { page_index: u32 },
+    InvalidPageDigest { page_index: u32 },
+    RepeatedRequestCursor { page_index: u32 },
+    CursorChainMismatch { page_index: u32 },
+    MissingTerminalPage,
+    TerminalCursorNotClosed,
+    EventCountOverflow,
+    UniqueEventCountMismatch,
+    DuplicateEventCountMismatch,
+    TotalEventCountMismatch,
+    InvalidExportReceipt,
+    UnverifiedExportReceipt,
+}
+
+/// A trace binding that has passed both internal manifest consistency and an
+/// injected provider/collector export-closure verifier. Its fields are private
+/// so callers cannot relabel a merely bound trace as complete.
+#[derive(Clone, Debug)]
+pub struct VerifiedProviderTraceBatchV1 {
+    bound: BoundProviderTraceBatchV1,
+    closure_sha256: String,
+    unique_event_count: usize,
+    duplicate_event_count: usize,
+    page_count: usize,
+}
+
+impl VerifiedProviderTraceBatchV1 {
+    pub fn batch(&self) -> &ProviderTraceBatch {
+        &self.bound.batch
+    }
+
+    pub fn manifest(&self) -> &ProviderRunManifestV1 {
+        &self.bound.manifest
+    }
+
+    pub fn manifest_sha256(&self) -> &str {
+        &self.bound.manifest_sha256
+    }
+
+    pub fn closure_sha256(&self) -> &str {
+        &self.closure_sha256
+    }
+
+    pub fn unique_event_count(&self) -> usize {
+        self.unique_event_count
+    }
+
+    pub fn duplicate_event_count(&self) -> usize {
+        self.duplicate_event_count
+    }
+
+    pub fn page_count(&self) -> usize {
+        self.page_count
+    }
+}
+
+fn provider_capture_closure_digest(
+    claim: &ProviderCaptureClosureClaimV1,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"mace:provider-capture-closure:v1\\0");
+    append_manifest_field(&mut hasher, claim.provider.as_str());
+    append_manifest_field(&mut hasher, &claim.session_id);
+    append_manifest_field(&mut hasher, &claim.run_id);
+    append_manifest_field(&mut hasher, &claim.source_capture_sha256);
+    append_manifest_field(
+        &mut hasher,
+        &claim.expected_unique_event_count.to_string(),
+    );
+    append_manifest_field(
+        &mut hasher,
+        &claim.expected_duplicate_event_count.to_string(),
+    );
+    append_manifest_field(
+        &mut hasher,
+        if claim.terminal_page_confirmed { "true" } else { "false" },
+    );
+    append_manifest_field(&mut hasher, &claim.export_receipt_id);
+    append_manifest_field(&mut hasher, &claim.export_receipt_sha256);
+    append_manifest_field(&mut hasher, &claim.verifier_profile_id);
+    append_manifest_field(&mut hasher, &claim.pages.len().to_string());
+    for page in &claim.pages {
+        append_manifest_field(&mut hasher, &page.page_index.to_string());
+        append_manifest_field(&mut hasher, &page.request_cursor_sha256);
+        append_manifest_field(
+            &mut hasher,
+            page.next_cursor_sha256.as_deref().unwrap_or("<terminal>"),
+        );
+        append_manifest_field(&mut hasher, &page.page_sha256);
+        append_manifest_field(&mut hasher, &page.raw_event_count.to_string());
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Promote an internally bound trace only after its complete export chain has
+/// been verified. The existing bind_provider_run_manifest remains a weaker
+/// internal-consistency operation and does not imply capture completeness.
+pub fn bind_verified_provider_trace_batch(
+    batch: &ProviderTraceBatch,
+    manifest: ProviderRunManifestV1,
+    claim: ProviderCaptureClosureClaimV1,
+    verifier: &impl ProviderCaptureClosureVerifierV1,
+) -> Result<VerifiedProviderTraceBatchV1, ProviderCaptureClosureReject> {
+    let bound = bind_provider_run_manifest(batch, manifest)
+        .map_err(ProviderCaptureClosureReject::Manifest)?;
+
+    if claim.provider != batch.provider {
+        return Err(ProviderCaptureClosureReject::ProviderMismatch);
+    }
+    if claim.session_id != batch.session_id {
+        return Err(ProviderCaptureClosureReject::SessionMismatch);
+    }
+    if claim.run_id != bound.manifest.run_id {
+        return Err(ProviderCaptureClosureReject::RunMismatch);
+    }
+    if claim.source_capture_sha256 != batch.source_capture_sha256 {
+        return Err(ProviderCaptureClosureReject::CaptureDigestMismatch);
+    }
+    if claim.pages.is_empty() {
+        return Err(ProviderCaptureClosureReject::EmptyPageChain);
+    }
+    if !claim.terminal_page_confirmed {
+        return Err(ProviderCaptureClosureReject::MissingTerminalPage);
+    }
+    if claim.export_receipt_id.trim().is_empty()
+        || claim.verifier_profile_id.trim().is_empty()
+        || !is_lower_sha256(&claim.export_receipt_sha256)
+    {
+        return Err(ProviderCaptureClosureReject::InvalidExportReceipt);
+    }
+
+    let mut request_cursors = std::collections::BTreeSet::new();
+    let mut raw_event_count = 0usize;
+    for (index, page) in claim.pages.iter().enumerate() {
+        let expected_index = u32::try_from(index)
+            .map_err(|_| ProviderCaptureClosureReject::EventCountOverflow)?;
+        if page.page_index != expected_index {
+            return Err(ProviderCaptureClosureReject::InvalidPageIndex {
+                expected: expected_index,
+                actual: page.page_index,
+            });
+        }
+        if !is_lower_sha256(&page.request_cursor_sha256)
+            || page
+                .next_cursor_sha256
+                .as_deref()
+                .is_some_and(|cursor| !is_lower_sha256(cursor))
+        {
+            return Err(ProviderCaptureClosureReject::InvalidCursorDigest {
+                page_index: page.page_index,
+            });
+        }
+        if !is_lower_sha256(&page.page_sha256) || page.raw_event_count == 0 {
+            return Err(ProviderCaptureClosureReject::InvalidPageDigest {
+                page_index: page.page_index,
+            });
+        }
+        if !request_cursors.insert(page.request_cursor_sha256.clone()) {
+            return Err(ProviderCaptureClosureReject::RepeatedRequestCursor {
+                page_index: page.page_index,
+            });
+        }
+        raw_event_count = raw_event_count
+            .checked_add(page.raw_event_count)
+            .ok_or(ProviderCaptureClosureReject::EventCountOverflow)?;
+
+        match (page.next_cursor_sha256.as_deref(), claim.pages.get(index + 1)) {
+            (Some(next), Some(next_page)) if next == next_page.request_cursor_sha256 => {}
+            (Some(_), Some(_)) | (None, Some(_)) => {
+                return Err(ProviderCaptureClosureReject::CursorChainMismatch {
+                    page_index: page.page_index,
+                });
+            }
+            (Some(_), None) => {
+                return Err(ProviderCaptureClosureReject::TerminalCursorNotClosed);
+            }
+            (None, None) => {}
+        }
+    }
+
+    let last_page = claim.pages.last().ok_or(ProviderCaptureClosureReject::EmptyPageChain)?;
+    if last_page.next_cursor_sha256.is_some() {
+        return Err(ProviderCaptureClosureReject::TerminalCursorNotClosed);
+    }
+    if claim.expected_unique_event_count != batch.events.len() {
+        return Err(ProviderCaptureClosureReject::UniqueEventCountMismatch);
+    }
+    if claim.expected_duplicate_event_count != batch.duplicate_event_count {
+        return Err(ProviderCaptureClosureReject::DuplicateEventCountMismatch);
+    }
+    let expected_total = batch
+        .events
+        .len()
+        .checked_add(batch.duplicate_event_count)
+        .ok_or(ProviderCaptureClosureReject::EventCountOverflow)?;
+    if raw_event_count != expected_total {
+        return Err(ProviderCaptureClosureReject::TotalEventCountMismatch);
+    }
+
+    let closure_sha256 = provider_capture_closure_digest(&claim);
+    if !verifier.verify_export_closure(&claim, &closure_sha256) {
+        return Err(ProviderCaptureClosureReject::UnverifiedExportReceipt);
+    }
+
+    Ok(VerifiedProviderTraceBatchV1 {
+        bound,
+        closure_sha256,
+        unique_event_count: batch.events.len(),
+        duplicate_event_count: batch.duplicate_event_count,
+        page_count: claim.pages.len(),
+    })
+}
+
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -1016,4 +1283,318 @@ mod tests {
         assert!(normalized.contains("\"outcome_authority\":false"));
         assert!(normalized.contains("\"candidate_evidence\":false"));
     }
+
+    struct AcceptingExportClosure;
+
+    impl ProviderCaptureClosureVerifierV1 for AcceptingExportClosure {
+        fn verify_export_closure(
+            &self,
+            claim: &ProviderCaptureClosureClaimV1,
+            closure_sha256: &str,
+        ) -> bool {
+            claim.export_receipt_id == "signed-export-receipt"
+                && claim.verifier_profile_id == "mycelix-test-profile-v1"
+                && is_lower_sha256(closure_sha256)
+        }
+    }
+
+    struct RejectingExportClosure;
+
+    impl ProviderCaptureClosureVerifierV1 for RejectingExportClosure {
+        fn verify_export_closure(
+            &self,
+            _claim: &ProviderCaptureClosureClaimV1,
+            _closure_sha256: &str,
+        ) -> bool {
+            false
+        }
+    }
+
+    fn closure_claim_fixture(
+        batch: &ProviderTraceBatch,
+        manifest: &ProviderRunManifestV1,
+    ) -> ProviderCaptureClosureClaimV1 {
+        ProviderCaptureClosureClaimV1 {
+            provider: batch.provider,
+            session_id: batch.session_id.clone(),
+            run_id: manifest.run_id.clone(),
+            source_capture_sha256: batch.source_capture_sha256.clone(),
+            pages: vec![ProviderCapturePageV1 {
+                page_index: 0,
+                request_cursor_sha256: "1".repeat(64),
+                next_cursor_sha256: None,
+                page_sha256: "2".repeat(64),
+                raw_event_count: batch.events.len() + batch.duplicate_event_count,
+            }],
+            expected_unique_event_count: batch.events.len(),
+            expected_duplicate_event_count: batch.duplicate_event_count,
+            terminal_page_confirmed: true,
+            export_receipt_id: "signed-export-receipt".into(),
+            export_receipt_sha256: "3".repeat(64),
+            verifier_profile_id: "mycelix-test-profile-v1".into(),
+        }
+    }
+
+    #[test]
+    fn capture_closure_requires_terminal_page_counts_and_external_verification() {
+        let input = [
+            envelope(
+                "closure-session",
+                1,
+                100,
+                json!({"id": "evt-1", "type": "agent.message"}),
+            ),
+            envelope(
+                "closure-session",
+                2,
+                110,
+                json!({"id": "evt-2", "type": "session.status_idle"}),
+            ),
+        ]
+        .join("\\n");
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "closure-session",
+            &input,
+        )
+        .unwrap();
+        let manifest = provider_manifest_fixture(&batch);
+        let claim = closure_claim_fixture(&batch, &manifest);
+        let verified = bind_verified_provider_trace_batch(
+            &batch,
+            manifest,
+            claim,
+            &AcceptingExportClosure,
+        )
+        .unwrap();
+
+        assert_eq!(verified.unique_event_count(), 2);
+        assert_eq!(verified.duplicate_event_count(), 0);
+        assert_eq!(verified.page_count(), 1);
+        assert!(is_lower_sha256(verified.closure_sha256()));
+        assert_eq!(verified.batch().events.len(), 2);
+    }
+
+    #[test]
+    fn capture_closure_accepts_verified_multi_page_overlap_and_deduplication() {
+        let duplicate_event = json!({
+            "id": "evt-1",
+            "type": "agent.message",
+            "content": "hello"
+        });
+        let input = [
+            envelope("closure-session", 1, 100, duplicate_event.clone()),
+            envelope("closure-session", 1, 100, duplicate_event),
+            envelope(
+                "closure-session",
+                2,
+                110,
+                json!({"id": "evt-2", "type": "session.status_idle"}),
+            ),
+        ]
+        .join("\\n");
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "closure-session",
+            &input,
+        )
+        .unwrap();
+        let manifest = provider_manifest_fixture(&batch);
+        let mut claim = closure_claim_fixture(&batch, &manifest);
+        claim.pages = vec![
+            ProviderCapturePageV1 {
+                page_index: 0,
+                request_cursor_sha256: "1".repeat(64),
+                next_cursor_sha256: Some("2".repeat(64)),
+                page_sha256: "4".repeat(64),
+                raw_event_count: 2,
+            },
+            ProviderCapturePageV1 {
+                page_index: 1,
+                request_cursor_sha256: "2".repeat(64),
+                next_cursor_sha256: None,
+                page_sha256: "5".repeat(64),
+                raw_event_count: 1,
+            },
+        ];
+        let verified = bind_verified_provider_trace_batch(
+            &batch,
+            manifest,
+            claim,
+            &AcceptingExportClosure,
+        )
+        .unwrap();
+
+        assert_eq!(verified.unique_event_count(), 2);
+        assert_eq!(verified.duplicate_event_count(), 1);
+        assert_eq!(verified.page_count(), 2);
+    }
+
+    #[test]
+    fn capture_closure_rejects_missing_terminal_page() {
+        let input = envelope(
+            "closure-session",
+            1,
+            100,
+            json!({"id": "evt-1", "type": "agent.message"}),
+        );
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "closure-session",
+            &input,
+        )
+        .unwrap();
+        let manifest = provider_manifest_fixture(&batch);
+        let mut claim = closure_claim_fixture(&batch, &manifest);
+        claim.terminal_page_confirmed = false;
+
+        assert_eq!(
+            bind_verified_provider_trace_batch(
+                &batch,
+                manifest,
+                claim,
+                &AcceptingExportClosure,
+            )
+            .unwrap_err(),
+            ProviderCaptureClosureReject::MissingTerminalPage
+        );
+    }
+
+    #[test]
+    fn capture_closure_rejects_truncated_event_count() {
+        let input = [
+            envelope(
+                "closure-session",
+                1,
+                100,
+                json!({"id": "evt-1", "type": "agent.message"}),
+            ),
+            envelope(
+                "closure-session",
+                2,
+                110,
+                json!({"id": "evt-2", "type": "session.status_idle"}),
+            ),
+        ]
+        .join("\\n");
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "closure-session",
+            &input,
+        )
+        .unwrap();
+        let manifest = provider_manifest_fixture(&batch);
+        let mut claim = closure_claim_fixture(&batch, &manifest);
+        claim.expected_unique_event_count = 1;
+
+        assert_eq!(
+            bind_verified_provider_trace_batch(
+                &batch,
+                manifest,
+                claim,
+                &AcceptingExportClosure,
+            )
+            .unwrap_err(),
+            ProviderCaptureClosureReject::UniqueEventCountMismatch
+        );
+    }
+
+    #[test]
+    fn capture_closure_rejects_broken_or_repeated_page_cursors() {
+        let input = [
+            envelope(
+                "closure-session",
+                1,
+                100,
+                json!({"id": "evt-1", "type": "agent.message"}),
+            ),
+            envelope(
+                "closure-session",
+                2,
+                110,
+                json!({"id": "evt-2", "type": "session.status_idle"}),
+            ),
+        ]
+        .join("\\n");
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "closure-session",
+            &input,
+        )
+        .unwrap();
+        let manifest = provider_manifest_fixture(&batch);
+        let mut claim = closure_claim_fixture(&batch, &manifest);
+        claim.pages = vec![
+            ProviderCapturePageV1 {
+                page_index: 0,
+                request_cursor_sha256: "1".repeat(64),
+                next_cursor_sha256: Some("2".repeat(64)),
+                page_sha256: "4".repeat(64),
+                raw_event_count: 1,
+            },
+            ProviderCapturePageV1 {
+                page_index: 1,
+                request_cursor_sha256: "3".repeat(64),
+                next_cursor_sha256: None,
+                page_sha256: "5".repeat(64),
+                raw_event_count: 1,
+            },
+        ];
+        assert_eq!(
+            bind_verified_provider_trace_batch(
+                &batch,
+                manifest.clone(),
+                claim.clone(),
+                &AcceptingExportClosure,
+            )
+            .unwrap_err(),
+            ProviderCaptureClosureReject::CursorChainMismatch { page_index: 0 }
+        );
+
+        claim.pages[1].request_cursor_sha256 = claim.pages[0]
+            .request_cursor_sha256
+            .clone();
+        claim.pages[0].next_cursor_sha256 =
+            Some(claim.pages[1].request_cursor_sha256.clone());
+        assert_eq!(
+            bind_verified_provider_trace_batch(
+                &batch,
+                manifest,
+                claim,
+                &AcceptingExportClosure,
+            )
+            .unwrap_err(),
+            ProviderCaptureClosureReject::RepeatedRequestCursor { page_index: 1 }
+        );
+    }
+
+    #[test]
+    fn capture_closure_requires_export_receipt_verifier_acceptance() {
+        let input = envelope(
+            "closure-session",
+            1,
+            100,
+            json!({"id": "evt-1", "type": "agent.message"}),
+        );
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "closure-session",
+            &input,
+        )
+        .unwrap();
+        let manifest = provider_manifest_fixture(&batch);
+        let claim = closure_claim_fixture(&batch, &manifest);
+
+        assert_eq!(
+            bind_verified_provider_trace_batch(
+                &batch,
+                manifest,
+                claim,
+                &RejectingExportClosure,
+            )
+            .unwrap_err(),
+            ProviderCaptureClosureReject::UnverifiedExportReceipt
+        );
+    }
+
 }

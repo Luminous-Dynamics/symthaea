@@ -274,3 +274,27 @@ This enables two attribution experiments:
 2. **Different model, same harness:** freeze harness, sandbox, tool schema, memory policy and task environment; vary only the model release.
 
 Bind the initial memory-state digest and separately record each memory write/retrieval digest so a result can be replayed without treating provider-managed memory as canonical.
+
+
+## 11. Capture completeness and terminal-page qualification
+
+A capture SHA-256 proves byte identity, not completeness. A truncated provider export can still have a valid digest and a self-consistent run manifest. The ingress adapter now separates:
+
+- **Bound manifest:** `bind_provider_run_manifest` checks internal provider/session/capture/config/time consistency only.
+- **Verified complete capture:** `bind_verified_provider_trace_batch` additionally requires a page-closure claim and an injected `ProviderCaptureClosureVerifierV1`.
+
+The claim binds provider/session/run identity, exact source-capture digest, ordered page indices, request/next-cursor digest chain, per-page digests, raw record count, unique event count, duplicate count, terminal-page confirmation, export receipt ID/digest and verifier profile. It rejects missing terminal pages, broken or repeated cursor chains, event-count mismatch and unverified export receipts. The resulting `VerifiedProviderTraceBatchV1` has private fields and exposes only read-only accessors.
+
+The closure verifier is a trust boundary. A production implementation must authenticate an independent provider or collector receipt and verify that all pages in the requested export were traversed to a terminal cursor, without replaying or skipping a page. A test double returning `true` is not production proof. Where providers do not expose signed export closure, preserve the capture as partial or obtain a receipt from an independently controlled collector; never upgrade a caller assertion into completeness.
+
+### New regression controls
+
+- complete single-page export accepted only after verifier approval;
+- complete two-page export with overlap deduplicates correctly;
+- missing terminal page rejected;
+- claimed unique event count differing from normalized trace rejected;
+- broken cursor linkage and repeated cursor rejected;
+- untrusted export receipt rejected;
+- old run-manifest binding remains explicitly weaker and cannot be described as a verified-complete capture.
+
+These are authored source tests; they have not been executed in a Rust runner in this environment.
