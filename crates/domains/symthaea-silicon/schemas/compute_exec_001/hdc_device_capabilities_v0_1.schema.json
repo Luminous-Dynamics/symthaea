@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-silicon/schemas/compute_exec_001/hdc_device_capabilities_v0_1.schema.json",
+  "title": "Luminous HDC device capability manifest v0.1",
+  "description": "Capability declaration bound to a backend/device profile. A manifest is not attestation; physical capability claims require independent board and artifact evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "device_id",
+    "device_epoch",
+    "backend",
+    "execution_class",
+    "supported_operations",
+    "supported_representations",
+    "max_transfer_bytes",
+    "required_alignment_bytes",
+    "max_inflight_commands",
+    "dma_isolation",
+    "cache_coherency",
+    "implementation_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.hdc-device-capabilities"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "device_epoch": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "backend": {
+      "enum": [
+        "cpu_reference",
+        "cpu_simd",
+        "vulkan",
+        "webgpu",
+        "fpga",
+        "asic"
+      ]
+    },
+    "execution_class": {
+      "enum": [
+        "software_reference",
+        "software_accelerator",
+        "rtl_simulation",
+        "synthesis_estimate",
+        "fpga_hardware",
+        "asic_hardware"
+      ]
+    },
+    "supported_operations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "hdc.bind_xor.exact.v1",
+          "hdc.hamming.exact.v1",
+          "hdc.top1.exact.v1"
+        ]
+      }
+    },
+    "supported_representations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "const": "luminous.binaryhv.bipolar.16384.v1"
+      }
+    },
+    "max_transfer_bytes": {
+      "type": "integer",
+      "minimum": 2048,
+      "maximum": 18446744073709552000
+    },
+    "required_alignment_bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1048576
+    },
+    "max_inflight_commands": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "dma_isolation": {
+      "enum": [
+        "iommu_domain",
+        "dedicated_bounded_pool",
+        "none"
+      ]
+    },
+    "cache_coherency": {
+      "enum": [
+        "coherent",
+        "explicit_flush_invalidate",
+        "unknown"
+      ]
+    },
+    "implementation_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hardware_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "firmware_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "bitstream_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hardware_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manufacturer",
+        "board_model",
+        "board_revision",
+        "fpga_part"
+      ],
+      "properties": {
+        "manufacturer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "board_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "board_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fpga_part": {
+          "type": "string",
+          "minLength": 1
+        },
+        "som_ordering_code": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "qualification_ref": {
+      "type": "string",
+      "maxLength": 512
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "execution_class": {
+            "enum": [
+              "fpga_hardware",
+              "asic_hardware"
+            ]
+          }
+        },
+        "required": [
+          "execution_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "hardware_profile_sha256",
+          "firmware_sha256",
+          "hardware_identity"
+        ],
+        "properties": {
+          "dma_isolation": {
+            "enum": [
+              "iommu_domain",
+              "dedicated_bounded_pool"
+            ]
+          },
+          "cache_coherency": {
+            "enum": [
+              "coherent",
+              "explicit_flush_invalidate"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "execution_class": {
+            "enum": [
+              "software_reference",
+              "software_accelerator",
+              "rtl_simulation",
+              "synthesis_estimate"
+            ]
+          }
+        },
+        "required": [
+          "execution_class"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "hardware_identity"
+          ]
+        }
+      }
+    }
+  ]
+}
