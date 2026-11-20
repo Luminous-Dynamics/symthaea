@@ -1707,8 +1707,6 @@ pub fn parse_decimal_u64(
 mod tests {
     use super::*;
 
-    use sha2::{Digest, Sha256};
-
     const SEMANTIC_CONTRACT_DOCUMENT: &str =
         include_str!("../../../../docs/research/COMPUTE_EXEC_001_HDC_DEVICE_CONTRACT_V0_1.md");
 
@@ -1921,15 +1919,14 @@ mod tests {
         );
         assert!(matches!(
             registry.ownership("fixture-result", 1),
-            Some(BufferOwnership::OutputUnverified { .. })
+            Some(BufferOwnership::Quarantined { .. })
         ));
         assert_eq!(
             ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
-            0
+            4
         );
         assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
     }
-
     #[test]
     fn output_verification_rejects_digest_and_oracle_mismatches() {
         let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
@@ -1990,7 +1987,7 @@ mod tests {
 
     #[test]
     fn reset_preserves_verification_gate_for_completed_unverified_output() {
-        let (capabilities, command, completion, mut registry, mut ledger) = setup();
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
         ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap();
         assert!(matches!(
@@ -2003,14 +2000,21 @@ mod tests {
             .unwrap();
         assert!(matches!(
             registry.ownership("fixture-result", 1),
-            Some(BufferOwnership::Quarantined { .. })
+            Some(BufferOwnership::OutputUnverified { .. })
         ));
-        assert_eq!(
-            ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
-            4
-        );
-    }
 
+        let mut output = vec![0u8; RESULT_RECORD_BYTES as usize];
+        let winner_id = completion.result.as_ref().unwrap().winner_stable_id
+            .as_ref().unwrap().parse::<u64>().unwrap();
+        let distance = completion.result.as_ref().unwrap().hamming_distance_bits.unwrap() as u16;
+        output[0..8].copy_from_slice(&winner_id.to_le_bytes());
+        output[8..10].copy_from_slice(&distance.to_le_bytes());
+        completion.result.as_mut().unwrap().output_sha256 =
+            format!("{:x}", Sha256::digest(&output));
+        let proof = verify_exact_output_bytes(&command, &completion, &output, &output).unwrap();
+        ledger.confirm_output_verified(&proof, &mut registry).unwrap();
+        assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
+    }
     #[test]
     fn timeout_quarantines_buffers_and_blocks_same_epoch_submissions() {
         let (capabilities, command, _, mut registry, mut ledger) = setup();
