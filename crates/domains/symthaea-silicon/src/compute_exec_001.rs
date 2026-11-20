@@ -362,7 +362,6 @@ impl ExecutionLedger {
         capabilities: &DeviceCapabilities,
         registry: &mut BufferRegistry,
     ) -> ValidationResult<()> {
-        validate_command(command, capabilities, registry)?;
         let sequence = parse_decimal_u64(&command.sequence, false, "sequence")?;
 
         if self.device_id != command.device_id || self.device_id != capabilities.device_id {
@@ -400,6 +399,7 @@ impl ExecutionLedger {
             ));
         }
 
+        validate_command(command, capabilities, registry)?;
         let keys = collect_buffer_keys(&command.buffers)?;
         for key in &keys {
             let entry = registry.entry(key)?;
@@ -1171,10 +1171,13 @@ fn validate_success_result(
         ));
     }
 
-    if let (Some(expected_profile), Some(actual_profile)) = (
-        capabilities.hardware_profile_sha256.as_deref(),
-        completion.device_profile_sha256.as_deref(),
-    ) {
+    if let Some(expected_profile) = capabilities.hardware_profile_sha256.as_deref() {
+        let actual_profile = completion.device_profile_sha256.as_deref().ok_or_else(|| {
+            ValidationError::new(
+                "MISSING_COMPLETION_PROFILE",
+                "physical completion must identify the admitted hardware profile",
+            )
+        })?;
         if expected_profile != actual_profile {
             return Err(ValidationError::new(
                 "DEVICE_PROFILE_MISMATCH",
