@@ -34,6 +34,7 @@ struct PhaseObservation {
 #[derive(Clone, Debug)]
 struct Characterization {
     sample_id: String,
+    execution_run_id: String,
     method: String,
     conditions_id: String,
     source_locator: String,
@@ -159,6 +160,7 @@ fn parse_characterization(value: &Value) -> Result<Option<Characterization>, Str
     }
     Ok(Some(Characterization {
         sample_id: text_field(&evidence_value, "sample_id")?.to_owned(),
+        execution_run_id: text_field(&evidence_value, "execution_run_id")?.to_owned(),
         method: text_field(&evidence_value, "method")?.to_owned(),
         conditions_id: text_field(&evidence_value, "conditions_id")?.to_owned(),
         source_locator: text_field(&evidence_value, "source_locator")?.to_owned(),
@@ -256,11 +258,11 @@ fn validate_observation(case: &Case) -> Result<(), String> {
         "target_phase_observed" => {
             let evidence = case.characterization.as_ref()
                 .ok_or_else(|| format!("{} target observed requires characterization evidence", case.id))?;
-            if evidence.conditions_id != case.conditions_id {
-                return Err(format!("{} observation conditions do not match synthesis conditions", case.id));
-            }
             let phase = evidence.phases.iter().find(|p| p.phase_id == case.target.product_phase_id)
                 .ok_or_else(|| format!("{} target phase observed status lacks target phase in characterized phases", case.id))?;
+            if !matches!(phase.identity_status.as_str(), "refined" | "identified") {
+                return Err(format!("{} target phase observation is not identified/refined", case.id));
+            }
             if phase.fraction < evidence.detection_limit {
                 return Err(format!("{} target phase fraction is below the declared detection limit", case.id));
             }
@@ -268,9 +270,6 @@ fn validate_observation(case: &Case) -> Result<(), String> {
         "target_phase_not_detected_under_conditions" => {
             let evidence = case.characterization.as_ref()
                 .ok_or_else(|| format!("{} non-detection requires characterization evidence and a detection limit", case.id))?;
-            if evidence.conditions_id != case.conditions_id {
-                return Err(format!("{} non-detection conditions do not match synthesis conditions", case.id));
-            }
             if evidence.phases.iter().any(|p| p.phase_id == case.target.product_phase_id) {
                 return Err(format!("{} non-detection cannot include the target phase in realized_phases", case.id));
             }
@@ -339,8 +338,9 @@ fn case_receipt(case: &Case) -> Value {
     let kinetics = kinetic_assessment(case);
     let observed = case.characterization.as_ref().map(|evidence| json!({
         "sample_id": evidence.sample_id,
+        "execution_run_id": evidence.execution_run_id,
         "method": evidence.method,
-        "conditions_id": evidence.conditions_id,
+        "characterization_conditions_id": evidence.conditions_id,
         "source_locator": evidence.source_locator,
         "raw_data_sha256": evidence.raw_data_sha256,
         "detection_limit_phase_fraction": evidence.detection_limit,
@@ -550,6 +550,8 @@ mod tests {
         assert_eq!(case["observed_target_phase_status"], "target_phase_observed");
         assert_eq!(case["characterization_evidence"]["realized_phases"].as_array().unwrap().len(), 2);
         assert_eq!(case["characterization_evidence"]["detection_limit_phase_fraction"], 0.01);
+        assert_eq!(case["characterization_evidence"]["execution_run_id"], "run_selective_multiphase_target_observed");
+        assert_ne!(case["characterization_evidence"]["characterization_conditions_id"], case["conditions"]["conditions_id"]);
     }
 
     #[test]
@@ -606,4 +608,21 @@ mod tests {
         data["cases"][0]["competing_reactions"][0]["basis_unit"] = json!("eV_per_atom");
         assert!(audit(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
     }
+    #[test]
+    fn tentative_target_phase_identity_is_not_promoted_to_observed() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["cases"][3]["characterization_evidence"]["realized_phases"][0]["identity_status"] = json!("tentative");
+        assert!(audit(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
+    }
+
+    #[test]
+    fn characterization_conditions_are_distinct_from_reaction_conditions() {
+        let result = receipt();
+        let case = result["cases"].as_array().unwrap().iter()
+            .find(|c| c["case_id"] == "low_hull_wrong_reaction_route").unwrap();
+        assert_ne!(case["conditions"]["conditions_id"], case["characterization_evidence"]["characterization_conditions_id"]);
+        assert_eq!(case["characterization_evidence"]["execution_run_id"], "run_low_hull_wrong_reaction_route");
+    }
+
 }
