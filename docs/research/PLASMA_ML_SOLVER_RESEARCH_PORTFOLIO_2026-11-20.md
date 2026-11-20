@@ -23,7 +23,7 @@ The portfolio is deliberately split by physics. Each lane has a separate equatio
 
 - Issue: [#12923](https://github.com/Luminous-Dynamics/symthaea/issues/12923); reproduction protocol in [PR #12926](https://github.com/Luminous-Dynamics/symthaea/pull/12926).
 - Question: improve off-diagonal pressure, pressure-strain and solver-applied pressure force without sacrificing tensor admissibility or coupled stability.
-- Required baselines: source FCNN, pointwise MLP, CGL and symbolic/aniso comparator.
+- Required baselines: source FNO, LINN, TCNN, SNB, applicable local transport and solver-corrected hybrid; reproduce each on its own source task before matched common-task comparison.
 - Shared Symtropy diagnostics: [#6240](https://github.com/Luminous-Dynamics/symtropy/issues/6240) and [#6274](https://github.com/Luminous-Dynamics/symtropy/issues/6274).
 - Critical data gap: the paper's train/validation split requires B2–B6, while its public data statement identifies A/B1 test sets. Reproduction remains blocked until the full legal source set is admitted.
 - Kinetic-ion / learned-electron hybrid is a separate validation lane, not an inherited result.
@@ -32,7 +32,7 @@ The portfolio is deliberately split by physics. Each lane has a separate equatio
 
 - Issue: [#12938](https://github.com/Luminous-Dynamics/symthaea/issues/12938); protocol in [PR #12940](https://github.com/Luminous-Dynamics/symthaea/pull/12940).
 - Source: Luo et al., *PRX Intelligence* 1, 013017 (2026), DOI 10.1103/9l4n-mnz6.
-- Question: does the PIC-trained FNO heat-flux-divergence operator remain accurate in an implicit electron-energy solver on finer meshes and longer horizons, against SNB?
+- Question: how do source FNO, LINN time-varying theory-informed kernels, TCNN time-embedded heat-transport models and SNB compare in a matched implicit electron-energy solver on finer meshes and longer horizons?
 - Reproduction is blocked pending author code/data/weight and record-level rights admission.
 - Do not compare ICF heat-flux scores directly with magnetosheath pressure-tensor scores or electrostatic Landau-damping metrics.
 
