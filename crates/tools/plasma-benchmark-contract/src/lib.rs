@@ -85,7 +85,8 @@ pub struct SolverIdentity {
 pub struct DataProvenance {
     pub split_id: String,
     pub split_role: SplitRole,
-    pub test_data_sha256: String,
+    pub test_dataset_manifest_sha256: String,
+    pub test_initial_state_sha256: String,
     pub training_data_sha256: Option<String>,
     pub checkpoint_sha256: Option<String>,
     /// Per-case training initial-state digests; checked against the test case.
@@ -256,7 +257,8 @@ pub fn validate_run(run: &RunManifest) -> Vec<Finding> {
             "configuration_sha256",
             run.solver.configuration_sha256.as_str(),
         ),
-        ("test_data_sha256", run.data.test_data_sha256.as_str()),
+        ("test_dataset_manifest_sha256", run.data.test_dataset_manifest_sha256.as_str()),
+        ("test_initial_state_sha256", run.data.test_initial_state_sha256.as_str()),
         (
             "execution_receipt_sha256",
             run.receipts.execution_receipt_sha256.as_str(),
@@ -281,10 +283,10 @@ pub fn validate_run(run: &RunManifest) -> Vec<Finding> {
         });
     }
 
-    if run.data.test_data_sha256 != run.task.initial_state_sha256 {
+    if run.data.test_initial_state_sha256 != run.task.initial_state_sha256 {
         findings.push(Finding {
             code: "test_data_identity_mismatch",
-            detail: "test_data_sha256 must equal the task initial_state_sha256".to_owned(),
+            detail: "test_initial_state_sha256 must equal the task initial_state_sha256".to_owned(),
         });
     }
     if run.data.split_role != SplitRole::Test {
@@ -594,7 +596,8 @@ mod tests {
             data: DataProvenance {
                 split_id: "heldout-test-2026-01".to_owned(),
                 split_role: SplitRole::Test,
-                test_data_sha256: DIGEST_B.to_owned(),
+                test_dataset_manifest_sha256: DIGEST_A.to_owned(),
+                test_initial_state_sha256: DIGEST_B.to_owned(),
                 training_data_sha256: None,
                 checkpoint_sha256: None,
                 training_initial_state_sha256: vec![DIGEST_A.to_owned()],
@@ -644,7 +647,7 @@ mod tests {
         right.task.boundary_condition_id = "open".to_owned();
         right.task.normalization_sha256 = DIGEST_B.to_owned();
         right.task.initial_state_sha256 = DIGEST_A.to_owned();
-        right.data.test_data_sha256 = DIGEST_A.to_owned();
+        right.data.test_initial_state_sha256 = DIGEST_A.to_owned();
         let report = compare_runs(&left, &right, ComparisonPurpose::Accuracy);
         assert!(!report.eligible);
         assert!(has_code(&report.findings, "boundary_mismatch"));
