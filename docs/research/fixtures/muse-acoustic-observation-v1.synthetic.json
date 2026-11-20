@@ -20,8 +20,8 @@
     "frame_count": 960000,
     "source_sample_format": "pcm_integer",
     "source_bits_per_sample": 24,
-    "candidate_sample_format": "ieee_float",
-    "candidate_bits_per_sample": 32,
+    "candidate_sample_format": "pcm_integer",
+    "candidate_bits_per_sample": 24,
     "source_clipped_sample_fraction": 0,
     "candidate_clipped_sample_fraction": 0.00001
   },
