@@ -341,7 +341,7 @@ impl EmbodimentController {
                 validate_speech_transition(self.snapshot.current_speech_output(), *state)?;
             }
             EmbodimentEventKind::Reset => {
-                validate_runtime_provenance("reset", event.provenance)?;
+                validate_runtime_event_provenance("reset", event.provenance)?;
             }
             EmbodimentEventKind::ClearTransient => {
                 validate_runtime_event_provenance("clear transient", event.provenance)?;
@@ -967,6 +967,33 @@ mod tests {
         assert_eq!(controller.snapshot().last_event_sequence, None);
     }
 
+
+
+    #[test]
+    fn derived_signal_cannot_reset_the_authoritative_runtime_state() {
+        let mut controller = EmbodimentController::new();
+        controller
+            .ingest(event(
+                1,
+                10,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Predicting,
+                },
+            ))
+            .unwrap();
+        let before = controller.snapshot().clone();
+
+        let mut reset = event(2, 20, EmbodimentEventKind::Reset);
+        reset.provenance = SignalProvenance::RuntimeDerived;
+        assert!(matches!(
+            controller.ingest(reset),
+            Err(EmbodimentIngestError::SignalProvenanceNotAllowed {
+                field: "reset",
+                provenance: SignalProvenance::RuntimeDerived
+            })
+        ));
+        assert_eq!(*controller.snapshot(), before);
+    }
 
     #[test]
     fn renderer_local_reset_cannot_manufacture_idle_runtime_state() {
