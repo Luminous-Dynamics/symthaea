@@ -130,8 +130,10 @@ records are permuted. A negative control changes the total represented charge
 and must change the field. Another test verifies that multiplying the probe
 field by the probe charge matches the existing variational force.
 
-This is a small-N Fourier reference with an explicitly omitted zero mode. It
-does not prove that production solvers or the current NEOPIC implementation
-support arbitrary particle weights, and it does not settle how a split/merge
-operation must treat self-energy in the particle-particle energy functional.
+This is a small-N Fourier reference. Omitting the zero Fourier mode is equivalent
+to removing the spatially uniform mean charge (a uniform neutralizing-background
+convention); that background contributes no field. It does not prove that
+production solvers or the current NEOPIC implementation support arbitrary
+particle weights, and it does not settle how a split/merge operation must treat
+self-energy in the particle-particle energy functional.
 See [issue #12991](https://github.com/Luminous-Dynamics/symthaea/issues/12991).
