@@ -306,7 +306,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "currency",
+        "measurement_basis",
         "cpu_core_hours",
         "gpu_hours",
         "wall_seconds",
@@ -314,9 +314,6 @@
         "data_volume_bytes"
       ],
       "properties": {
-        "currency": {
-          "const": "compute_units"
-        },
         "cpu_core_hours": {
           "type": "number",
           "minimum": 0
@@ -339,6 +336,9 @@
         },
         "cost_estimator_revision": {
           "type": "string"
+        },
+        "measurement_basis": {
+          "const": "raw_resource_units"
         }
       }
     },
