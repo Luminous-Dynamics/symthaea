@@ -1137,6 +1137,8 @@ mod tests {
         unsealed["receipt_sha256"] = Value::String(digest);
         let report = verify_evidence_bundle_v1(&serde_json::to_vec(&unsealed).unwrap(), EvidenceInputsV1::default()).unwrap();
         assert_eq!(report.verified_status, BundleStatusV1::Fail);
+        assert_eq!(report.components.symbolic_edit.declared_status, GateStatusV1::Pass);
+        assert_eq!(report.components.symbolic_edit.verified_status, GateStatusV1::Fail);
     }
 
     #[test]
@@ -1161,6 +1163,13 @@ mod tests {
         object["receipt_sha256"] = Value::String(digest);
         let report = verify_evidence_bundle_v1(&serde_json::to_vec(&object).unwrap(), EvidenceInputsV1::default()).unwrap();
         assert_eq!(report.verified_status, BundleStatusV1::Fail);
+    }
+
+    #[test]
+    fn hard_binding_failure_preserves_producer_declared_status() {
+        let report = hard_binding(GateStatusV1::Pass, "cross-case binding mismatch");
+        assert_eq!(report.declared_status, GateStatusV1::Pass);
+        assert_eq!(report.verified_status, GateStatusV1::Fail);
     }
 
     #[test]
