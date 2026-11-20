@@ -103,3 +103,14 @@ actual-versus-certified potential and field errors, zero-mode reporting, and
 invalid-input negative controls. This is a mathematical certificate for the
 specified discrete operator, not a claim that a neural solver is already using
 it. See [issue #12992](https://github.com/Luminous-Dynamics/symthaea/issues/12992).
+
+## 5. Fail-closed correction routing
+
+The `correction_policy` module routes a field proposal to one of four states:
+
+- accept only when the field L2 error certificate meets the declared tolerance;
+- spend a trusted correction step when a certificate is missing or its bound is too large and budget remains;
+- use the trusted full-solver fallback when the certificate is invalid or correction budget is exhausted;
+- remain unresolved when fallback is unavailable.
+
+The initial implementation only accepts the pinned periodic 1D finite-difference Poisson operator identity. It verifies the certificate's operator identity, spectral gap, finite values and internally consistent residual-derived bounds before allowing acceptance. This is routing logic only; it does not implement the correction solver or provide a tamper-proof signed receipt. The integrating solver must persist immutable source/config/certificate/execution digests and re-evaluate the certificate after every correction.
