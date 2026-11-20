@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/schemas/muse-gain-envelope-contract-v1.schema.json",
+  "$id": "https://luminousdynamics.io/schemas/muse-gain-envelope-contract-v1.schema.json",
   "title": "MUSE Gain Envelope Contract v1",
   "description": "Fixed-timeline WAV-domain gain-envelope observation contract. Target and protected windows are sample-frame ranges.",
   "type": "object",
@@ -47,7 +47,8 @@
     },
     "frame_count": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 1,
+      "maximum": 32000000
     },
     "minimum_source_rms_dbfs": {
       "type": "number",
