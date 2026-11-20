@@ -71,6 +71,7 @@ pub fn decide_correction(
             CorrectionDecision {
                 action: CorrectionAction::AcceptCertifiedProposal,
                 reason: CorrectionReason::BoundWithinTolerance,
+                trusted_fallback_available,
             }
         }
         Some(_) if correction_steps_remaining > 0 => CorrectionDecision {
