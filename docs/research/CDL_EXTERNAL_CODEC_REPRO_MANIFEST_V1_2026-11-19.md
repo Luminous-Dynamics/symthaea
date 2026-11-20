@@ -147,48 +147,6 @@ The script pins the Arrow-rs ALP implementation revision in its Cargo manifest a
 
 **Execution status at this audit:** repository scripts, dependency revision and corpus digest were inspected and pinned. The 6.7 GiB archive was not downloaded, and no ALP benchmark was built or run here because the environment lacks Rust/Cargo. No ALP reproduction result is claimed.
 
-## 3. Reproduction helper
-
-The repository includes:
-
-`scripts/research/cdl_external_codec_repro.sh`
-
-It never clones, fetches or checks out external repositories. Provide already checked-out source trees at the exact pinned commits:
-
-```sh
-DEXOR_DIR=/path/to/DeXOR \
-TERSETS_DIR=/path/to/TerseTS \
-bash scripts/research/cdl_external_codec_repro.sh
-```
-
-Both environment variables are optional; unset paths are explicitly skipped. Output defaults to `target/cdl-external` and can be changed with `CDL_EXTERNAL_OUT`.
-
-The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires Zig and a C compiler. If a required toolchain is unavailable, the script fails closed rather than substituting another version.
-
-## 5. Matched benchmark rules
-
-1. The same ordered f64 bit patterns and chunk boundaries go to every method.
-2. All exact-lossless methods must reconstruct every u64 bit pattern, including NaN payloads, signed zero, infinities and subnormals. Reject a method/result if even one bit differs.
-3. Compare each method's actual compressed payload/frame size as exposed by that implementation. If a format includes a method byte, checksum or dictionary, count it. If the implementation's result omits a decoder dictionary or shared model, report both payload-only and total deployment costs.
-4. Keep DeXOR's own dataset-oriented CSV run separate from the CDL synthetic fixtures; then add a paired common-corpus run only where input parsing and all method constraints match.
-5. The DeXOR repository's `Overall` CSV files must be hash-recorded; no silent reformatting or numeric parse/re-serialization before comparison.
-6. Report per-file ratios, geometric mean, compression/decompression throughput, peak memory, CPU cycles or time, and random-access/chunk constraints.
-7. Publish all negative results and method restrictions, especially restricted decimal precision and unsupported precision/types.
-8. Do not call TerseTS a production benchmark. Its upstream README marks it beta; label the harness accordingly.
-9. No results are considered reproduced until artifact commit, toolchain version, input hashes, parameters, commands and bitwise verification logs are attached.
-
-## 6. Current execution status
-
-The repository and artifact inspection is complete. The external helper passes `bash -n` and its unset-environment dry run correctly reports DeXOR/TerseTS as skipped; the TerseTS C gate passes `cc -std=c11 -O2 -Wall -Wextra -Werror -fsyntax-only` against the inspected API header shape. The current environment has Java 21.0.12.1 and C/C++ compilers, but does not have Maven, Zig or Rust/cargo. The ALP benchmark's 6.7 GiB CWI archive has not been downloaded. Therefore:
-- DeXOR has **not** been built or run.
-- TerseTS has **not** been built or run.
-- The upstream Arrow/Parquet ALP benchmark has **not** been built or run.
-- No external codec comparison numbers are claimed.
-- The setup script is authored and pinned, but its runtime workflow remains pending an environment with the required toolchains.
-
-This distinction is intentional: source inspection and a pinned runner are reproducibility infrastructure, not reproduction evidence.
-
-
 ## 4. tparquet: end-to-end Pco/PCODEC + Zstd + ALP storage benchmark
 
 The tparquet benchmark is now a mandatory storage comparator because it measures complete Parquet files on public market-data previews and selects PCODEC/Pco or Zstd per numeric column. Pin the ALP-inclusive result snapshot:
@@ -243,3 +201,46 @@ Reproduction URLs:
 - Scaling efficiency: https://open-telemetry.github.io/otel-arrow/benchmarks/nightly/scaling-efficiency/
 
 **CDL benchmark target, not current achievement:** match 100k records/sec per core in a comparable normal-load scenario, then target >0.90 scaling efficiency to 16 cores. Include pass-through and transformed-path tests, and report dropped records (must be zero for lossless transport), CPU, RAM and bytes on wire.
+## 6. Reproduction helper
+
+The repository includes:
+
+`scripts/research/cdl_external_codec_repro.sh`
+
+It never clones, fetches or checks out external repositories. Provide already checked-out source trees at the exact pinned commits:
+
+```sh
+DEXOR_DIR=/path/to/DeXOR \
+TERSETS_DIR=/path/to/TerseTS \
+TPARQUET_DIR=/path/to/tparquet \
+bash scripts/research/cdl_external_codec_repro.sh
+```
+
+All three environment variables are optional; unset paths are explicitly skipped. Setting `TPARQUET_DIR` requires the exact ALP-inclusive commit, Rust/Cargo, uv and make; it runs upstream `make bench`, downloads roughly 1.2 GB of public previews, and copies the Markdown/JSON report, result hashes, host/toolchain metadata and dataset hashes. The helper never clones or updates that checkout. Output defaults to `target/cdl-external` and can be changed with `CDL_EXTERNAL_OUT`.
+
+The DeXOR CSV workflow requires Java 8 and Maven. The TerseTS workflow requires Zig and a C compiler. If a required toolchain is unavailable, the script fails closed rather than substituting another version.
+
+## 7. Matched benchmark rules
+
+1. The same ordered f64 bit patterns and chunk boundaries go to every method.
+2. All exact-lossless methods must reconstruct every u64 bit pattern, including NaN payloads, signed zero, infinities and subnormals. Reject a method/result if even one bit differs.
+3. Compare each method's actual compressed payload/frame size as exposed by that implementation. If a format includes a method byte, checksum or dictionary, count it. If the implementation's result omits a decoder dictionary or shared model, report both payload-only and total deployment costs.
+4. Keep DeXOR's own dataset-oriented CSV run separate from the CDL synthetic fixtures; then add a paired common-corpus run only where input parsing and all method constraints match.
+5. The DeXOR repository's `Overall` CSV files must be hash-recorded; no silent reformatting or numeric parse/re-serialization before comparison.
+6. Report per-file ratios, geometric mean, compression/decompression throughput, peak memory, CPU cycles or time, and random-access/chunk constraints.
+7. Publish all negative results and method restrictions, especially restricted decimal precision and unsupported precision/types.
+8. Do not call TerseTS a production benchmark. Its upstream README marks it beta; label the harness accordingly.
+9. No results are considered reproduced until artifact commit, toolchain version, input hashes, parameters, commands and bitwise verification logs are attached.
+
+## 8. Current execution status
+
+The repository and artifact inspection is complete. The external helper passes `bash -n` and its unset-environment dry run correctly reports DeXOR/TerseTS as skipped; the TerseTS C gate passes `cc -std=c11 -O2 -Wall -Wextra -Werror -fsyntax-only` against the inspected API header shape. The current environment has Java 21.0.12.1 and C/C++ compilers, but does not have Maven, Zig or Rust/cargo. The ALP benchmark's 6.7 GiB CWI archive has not been downloaded. Therefore:
+- DeXOR has **not** been built or run.
+- TerseTS has **not** been built or run.
+- The upstream Arrow/Parquet ALP benchmark has **not** been built or run.
+- No external codec comparison numbers are claimed.
+- The setup script is authored and pinned, but its runtime workflow remains pending an environment with the required toolchains.
+
+This distinction is intentional: source inspection and a pinned runner are reproducibility infrastructure, not reproduction evidence.
+
+
