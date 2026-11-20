@@ -203,6 +203,12 @@
       "unit": "core_minute",
       "capacity": 50,
       "semantics": "Allocated CPU core-minutes for route assessment."
+    },
+    {
+      "resource_id": "pressure_cell_A_time",
+      "unit": "minute",
+      "capacity": 45,
+      "semantics": "Available booked pressure-cell time on facility A; queue wait and decompression/thermal-cycle schedule are not represented."
     }
   ],
   "outcome_labels": [
@@ -709,6 +715,11 @@
           "resource_id": "specimen_A_mass",
           "unit": "mg",
           "quantity": 2
+        },
+        {
+          "resource_id": "pressure_cell_A_time",
+          "unit": "minute",
+          "quantity": 60
         }
       ],
       "outcome_likelihoods": [
