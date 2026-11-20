@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-silicon/schemas/compute_exec_001/hdc_device_completion_v0_1.schema.json",
   "title": "Luminous HDC device completion v0.1",
-  "description": "Device-reported completion shape. The host must match command ID, device epoch, sequence, and the exact successful output handle, generation and byte range. A digest is not a signature or correctness proof. Sequence and stable item IDs are decimal strings in JSON to preserve exact u64 values.",
+  "description": "Device-reported completion shape. The host must match command ID, device epoch, sequence, operation and implementation identity, plus the exact successful output handle, generation and byte range. A digest is not a signature or correctness proof. Sequence and stable item IDs are decimal strings in JSON to preserve exact u64 values.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,9 @@
     "device_id",
     "device_epoch",
     "sequence",
-    "status"
+    "status",
+    "operation_id",
+    "implementation_sha256"
   ],
   "properties": {
     "schema": {
@@ -121,6 +123,16 @@
           "pattern": "^[1-9][0-9]{0,19}$"
         }
       }
+    },
+    "operation_id": {
+      "enum": [
+        "hdc.bind_xor.exact.v1",
+        "hdc.hamming.exact.v1",
+        "hdc.top1.exact.v1"
+      ]
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "allOf": [
