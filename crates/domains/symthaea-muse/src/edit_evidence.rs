@@ -168,6 +168,17 @@ fn exact_equal(a: &ScoreNote, b: &ScoreNote) -> bool {
     non_velocity_equal(a, b) && a.velocity.to_bits() == b.velocity.to_bits()
 }
 
+fn non_pitch_equal(a: &ScoreNote, b: &ScoreNote) -> bool {
+    a.part == b.part
+        && a.velocity.to_bits() == b.velocity.to_bits()
+        && a.onset == b.onset
+        && a.duration == b.duration
+        && a.role == b.role
+        && a.emphasis == b.emphasis
+        && a.section_intensity.to_bits() == b.section_intensity.to_bits()
+}
+
+
 fn score_metadata_equal(a: &Score, b: &Score) -> bool {
     a.key == b.key
         && a.tempo_bpm.to_bits() == b.tempo_bpm.to_bits()
@@ -245,7 +256,7 @@ pub fn evaluate_velocity_case(
     let case_digest = case_sha256(&case)?;
     let instruction = required(&case, "instruction", "case")?;
     let operation = string_field(instruction, "operation_family", "instruction")?;
-    if operation != "velocity" {
+    if !matches!(operation.as_str(), "velocity" | "pitch") {
         return Err(format!("abstain: operation family {operation} is not implemented"));
     }
 
@@ -278,11 +289,25 @@ pub fn evaluate_velocity_case(
     }
 
     let params = required(edit, "parameters", "edit_contract")?;
-    let scale_num = integer_field(params, "scale_numerator", "parameters")?;
-    let scale_den = integer_field(params, "scale_denominator", "parameters")?;
-    if scale_num <= 0 || scale_den <= 0 || scale_num == scale_den {
-        return Err("velocity scale must be positive and different from 1".into());
-    }
+    let velocity_scale = if operation == "velocity" {
+        let numerator = integer_field(params, "scale_numerator", "parameters")?;
+        let denominator = integer_field(params, "scale_denominator", "parameters")?;
+        if numerator <= 0 || denominator <= 0 || numerator == denominator {
+            return Err("velocity scale must be positive and different from 1".into());
+        }
+        Some((numerator, denominator))
+    } else {
+        None
+    };
+    let pitch_shift = if operation == "pitch" {
+        let semitones = integer_field(params, "semitones", "parameters")?;
+        if !(-127..=127).contains(&semitones) || semitones == 0 {
+            return Err("pitch edit semitone shift must be non-zero and in -127..=127".into());
+        }
+        Some(semitones)
+    } else {
+        None
+    };
     let evaluation = required(&case, "evaluation", "case")?;
     let tolerances = required(evaluation, "tolerances", "evaluation")?;
     let velocity_tolerance = required(tolerances, "velocity_0_to_127", "tolerances")?
@@ -369,13 +394,27 @@ pub fn evaluate_velocity_case(
 
         if in_target {
             target_expected += 1;
-            let expected_velocity = source_note.velocity * scale_num as f32 / scale_den as f32;
-            let velocity_ok = source_note.velocity.is_finite()
-                && candidate_note.velocity.is_finite()
-                && expected_velocity.is_finite()
-                && (0.0..=1.0).contains(&expected_velocity)
-                && (candidate_note.velocity - expected_velocity).abs() <= velocity_tolerance;
-            if non_velocity_equal(source_note, candidate_note) && velocity_ok {
+            let operation_ok = match operation.as_str() {
+                "velocity" => {
+                    let (numerator, denominator) = velocity_scale.expect("velocity scale validated");
+                    let expected_velocity = source_note.velocity * numerator as f32 / denominator as f32;
+                    source_note.velocity.is_finite()
+                        && candidate_note.velocity.is_finite()
+                        && expected_velocity.is_finite()
+                        && (0.0..=1.0).contains(&expected_velocity)
+                        && (candidate_note.velocity - expected_velocity).abs() <= velocity_tolerance
+                        && non_velocity_equal(source_note, candidate_note)
+                }
+                "pitch" => {
+                    let semitones = pitch_shift.expect("pitch shift validated");
+                    let expected_midi = source_note.pitch.midi() as i32 + semitones as i32;
+                    (0..=127).contains(&expected_midi)
+                        && candidate_note.pitch == Pitch::from_midi(expected_midi as u8)
+                        && non_pitch_equal(source_note, candidate_note)
+                }
+                _ => false,
+            };
+            if operation_ok {
                 target_correct += 1;
             } else {
                 edit_pass = false;
@@ -406,7 +445,9 @@ pub fn evaluate_velocity_case(
     for request in requested_targets {
         let id = request.as_str().ok_or("target metric IDs must be strings")?;
         target_metrics.push(match id {
-            "exact_event_accuracy" | "velocity_accuracy" => metric(id, target_correct, target_expected, 1.0, false),
+            "exact_event_accuracy" => metric(id, target_correct, target_expected, 1.0, false),
+            "velocity_accuracy" if operation == "velocity" => metric(id, target_correct, target_expected, 1.0, false),
+            "pitch_accuracy" if operation == "pitch" => metric(id, target_correct, target_expected, 1.0, false),
             "instruction_rubric_pass" => continue,
             _ => unavailable_metric(id),
         });
@@ -494,8 +535,8 @@ pub fn evaluate_velocity_case(
         "schema": RESULT_SCHEMA,
         "case_id": case_id,
         "system": {
-            "system_id": "muse-symbolic-velocity-evaluator",
-            "version": "0.1.0",
+            "system_id": "muse-symbolic-edit-evaluator",
+            "version": "0.2.0",
             "track": "symbolic_editor",
             "compute_budget_ms": started.elapsed().as_millis(),
             "candidate_budget": 1
@@ -575,6 +616,14 @@ mod tests {
         value.push(note(10, 0, if candidate { 0.8 * 8.0 / 9.0 } else { 0.8 }));
         value.push(note(10, 1, if candidate { 0.7 * 8.0 / 9.0 } else { 0.7 }));
         value.push(note(20, 0, 0.5));
+        value
+    }
+
+    fn pitch_edited_score() -> Score {
+        let mut value = score(false);
+        for note in value.notes.iter_mut().take(2) {
+            note.pitch = note.pitch.transpose(2);
+        }
         value
     }
 
@@ -757,6 +806,44 @@ mod tests {
         ).unwrap();
         assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
         assert!(!result["outcome"]["preservation_pass"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn exact_pitch_transposition_passes_symbolic_gates() {
+        let source = score(false);
+        let candidate = pitch_edited_score();
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("pitch");
+        case["instruction"]["text"] = json!("Raise part 10 by two semitones.");
+        case["edit_contract"]["parameters"] = json!({"semitones": 2});
+        case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "pitch_accuracy"]);
+        let result = evaluate_velocity_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(result["outcome"]["target_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["preservation_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["correspondence_pass"].as_bool().unwrap());
+        assert!(!result["outcome"]["strict_sample_exact_match"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn pitch_edit_in_wrong_direction_fails_target_gate() {
+        let source = score(false);
+        let candidate = pitch_edited_score();
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("pitch");
+        case["edit_contract"]["parameters"] = json!({"semitones": -2});
+        case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "pitch_accuracy"]);
+        let result = evaluate_velocity_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
     }
 
     #[test]
