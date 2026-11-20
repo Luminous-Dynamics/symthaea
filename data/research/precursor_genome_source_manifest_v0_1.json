@@ -37,7 +37,7 @@
     "active_refinement_acceptance": {
       "accepted": 1005,
       "rejected": 11,
-      "missing": 19
+      "missing": 14
     },
     "classified_with_temperature_and_no_physical_failure": 956,
     "cohort_temperature_and_accepted_quality_1_or_2": 944
