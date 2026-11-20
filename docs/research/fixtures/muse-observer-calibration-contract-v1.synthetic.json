@@ -1,0 +1,9 @@
+{
+  "schema": "muse-observer-calibration-contract-v1",
+  "feature_id": "fundamental_salience_db",
+  "minimum_fit_examples_per_class": 5,
+  "minimum_threshold_examples_per_class": 5,
+  "minimum_held_out_examples_per_class": 5,
+  "maximum_false_support_rate": 0.01,
+  "ece_bins": 10
+}
