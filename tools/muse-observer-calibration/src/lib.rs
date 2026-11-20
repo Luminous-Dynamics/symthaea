@@ -22,6 +22,7 @@ pub const CALIBRATOR_VERSION_V1: &str = "0.1.0";
 pub const MAX_DATASET_OBSERVATIONS_V1: usize = 2_000_000;
 const DATASET_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-dataset-v1";
 const BUNDLE_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-bundle-v1";
+const MAX_BOOTSTRAP_SCORING_ROWS_V1: usize = 100_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -655,8 +656,6 @@ fn held_out_metrics(
     let true_support = supported.iter().filter(|row| row.event_present).count() as u64;
     let false_support = supported.len() as u64 - true_support;
     let measured_negatives = measured.iter().filter(|row| !row.event_present).count() as u64;
-    let raw_scores = probs.clone();
-
     HeldOutMetricsV1 {
         held_out_dataset_sha256: held_out_dataset_sha256.into(),
         cluster_bootstrap: ClusterBootstrapMetricsV1::default(),
@@ -667,8 +666,8 @@ fn held_out_metrics(
         negative_examples: negative_total,
         brier_score,
         expected_calibration_error: ece,
-        roc_auc: roc_auc(&labels, &raw_scores),
-        average_precision: average_precision(&labels, &raw_scores),
+        roc_auc: roc_auc(&labels, &probs),
+        average_precision: average_precision(&labels, &probs),
         supported_examples: supported.len() as u64,
         abstained_examples: total - supported.len() as u64,
         true_support_count: true_support,
@@ -743,6 +742,14 @@ fn cluster_bootstrap_metrics(
         ));
     }
     let cluster_rows = clusters.into_values().collect::<Vec<_>>();
+    let largest_cluster = cluster_rows.iter().map(Vec::len).max().unwrap_or(0);
+    let worst_case_resampled_rows = largest_cluster
+        .checked_mul(cluster_rows.len())
+        .and_then(|per_replicate| per_replicate.checked_mul(contract.bootstrap_replicates as usize))
+        .unwrap_or(usize::MAX);
+    if worst_case_resampled_rows > MAX_BOOTSTRAP_SCORING_ROWS_V1 {
+        return Err("requested cluster bootstrap exceeds the bounded scoring-work budget".into());
+    }
     let seed_material = format!("{}:{}", dataset_sha256, contract.bootstrap_seed);
     let seed_digest = domain_digest(BUNDLE_DOMAIN_V1, seed_material.as_bytes());
     let seed = u64::from_str_radix(&seed_digest[..16], 16)
