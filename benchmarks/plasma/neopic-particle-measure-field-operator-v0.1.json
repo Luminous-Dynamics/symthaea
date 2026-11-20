@@ -14,7 +14,11 @@
     "paper_scripts_repository": "https://github.com/NEOPIC-framework/neopic-paper-scripts",
     "paper_scripts_tag": "neopic-arxiv-v1",
     "separate_neopic_repository": "https://github.com/srikrrish/NEOPIC",
-    "tag_commit_shas": "pending_resolution",
+    "tag_commit_shas": {
+      "operator_learning_neopic_arxiv_v1": "2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431",
+      "operator_learning_neopic_arxiv_v1_nufft": "1222226acab272b8d78ba541cb67c1e877669785",
+      "paper_scripts_neopic_arxiv_v1": "2ee358abed5c782213d6d35c1194568da26ed8f1"
+    },
     "default_branch_licenses": {
       "operator_learning": "MIT",
       "neopic_paper_scripts": "MIT",
@@ -22,7 +26,13 @@
     },
     "training_data": "not_in_repository_author_request_required",
     "trained_models": "not_in_repository_author_request_required",
-    "reference_hdf5": "not_in_repository_author_request_required"
+    "reference_hdf5": "not_in_repository_author_request_required",
+    "tag_object_shas": {
+      "operator_learning_neopic_arxiv_v1": "8e872e5fa520843a9c9db4a68d43036a66355c19",
+      "operator_learning_neopic_arxiv_v1_nufft": "0230db29af90d143ccfe8dfd2e0eb28496139ccb",
+      "paper_scripts_neopic_arxiv_v1": "dea39090f5ad1c9efd8c3435ed0d19ecb058dec4"
+    },
+    "tag_resolution_status": "annotated_tags_resolved_to_immutable_commit_shas_2026-11-20"
   },
   "method": {
     "family": "nonuniform_fourier_neural_operator_on_empirical_particle_measure",
@@ -33,13 +43,26 @@
     "exact_energy_conservation": false
   },
   "source_reported_metrics": {
-    "weak_landau_2d2v_particle_counts": [50000,100000,200000,400000,800000,1600000],
-    "teacher_forced_diagonal_field_error": [0.0023,0.00073],
+    "weak_landau_2d2v_particle_counts": [
+      50000,
+      100000,
+      200000,
+      400000,
+      800000,
+      1600000
+    ],
+    "teacher_forced_diagonal_field_error": [
+      0.0023,
+      0.00073
+    ],
     "teacher_forced_fit_exponent": -0.39,
-    "in_loop_diagonal_field_error": [0.0067,0.0015],
+    "in_loop_diagonal_field_error": [
+      0.0067,
+      0.0015
+    ],
     "in_loop_fit_exponent": -0.54,
     "example_800k_train_50k_inference_teacher_forced_error": 0.0076,
-    "example_800k_train_50k_error_ratio_to_diagonal": 10.0,
+    "example_800k_train_50k_error_ratio_to_diagonal": 10,
     "example_800k_train_50k_error_ratio_to_50k_trained": 3.4,
     "three_d_five_app_weak_landau_rate": -0.179,
     "three_d_barnes_hut_weak_landau_rate": -0.191,
@@ -62,6 +85,7 @@
     "source_NEOPIC_NUFNO",
     "source_grid_FNO",
     "source_LRC_FNO",
+    "variational_Fourier_particle_method",
     "CIC_PIC",
     "PIF_NUFFT",
     "Barnes_Hut",
@@ -85,6 +109,24 @@
     "benchmark_tournament": false,
     "SOTA_superiority": false,
     "integration_in_symthaea": false,
-    "plasma_control_validation": false
-  }
+    "plasma_control_validation": false,
+    "variational_fourier_method_is_prior_art": true
+  },
+  "related_solver_lanes": [
+    {
+      "method": "local_Gauss_preserving_electrostatic_Vlasov_Ampere_PIC",
+      "scope": "electrostatic_Vlasov_Ampere_only",
+      "comparison_rule": "separate_geometry_equation_and_metric_matched_cohort"
+    },
+    {
+      "method": "semi_implicit_energy_conserving_electrostatic_PIC",
+      "scope": "high_density_electrostatic_regimes_supported_by_source",
+      "comparison_rule": "separate_regime_and_accuracy_matched_cohort"
+    },
+    {
+      "method": "Full_EPIC_GOD_energy_conserving_PIC",
+      "scope": "full_electromagnetic_Vlasov_Maxwell_where_equation_and_problem_match",
+      "comparison_rule": "do_not_compare_as_same_task_to_electrostatic_NEOPIC_runs"
+    }
+  ]
 }
