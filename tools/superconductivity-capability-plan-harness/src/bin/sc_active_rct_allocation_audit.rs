@@ -873,4 +873,19 @@ mod tests{
         value["held_out_world_state_id"]=json!("not_a_world");
         assert!(Instance::from_bytes(&schema,&serde_json::to_vec(&value).unwrap()).is_err());
     }
+
+    #[test]
+    fn candidate_randomization_positivity_violation_fails_closed(){
+        let(schema,fixture)=inputs_for("superconductivity_active_rct_allocation_fixture_positivity_v0_1.json");
+        let err=Instance::from_bytes(&schema,&fixture).unwrap_err();
+        assert!(err.contains("violates randomized assignment positivity gate"));
+    }
+
+    #[test]
+    fn missing_family_support_cannot_be_hidden_by_other_families(){
+        let(schema,fixture)=inputs_for("superconductivity_active_rct_allocation_fixture_family_support_v0_1.json");
+        let instance=Instance::from_bytes(&schema,&fixture).unwrap();
+        let err=instance.receipt().unwrap_err();
+        assert!(err.contains("no feasible RCT allocation"));
+    }
 }
