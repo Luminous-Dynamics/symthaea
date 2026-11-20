@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-observer-calibration-dataset-v1.schema.json",
+  "title": "MUSE Observer Calibration Dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dataset_id",
+    "observer_id",
+    "observer_version",
+    "feature_id",
+    "annotation_protocol_sha256",
+    "rights_clearance_receipt_sha256",
+    "observations",
+    "dataset_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-observer-calibration-dataset-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "observer_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "observer_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "feature_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "annotation_protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rights_clearance_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2000000,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "dataset_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "source_group_id",
+        "split",
+        "observer_id",
+        "observer_version",
+        "feature_id",
+        "measurement_state",
+        "raw_score_db",
+        "event_present",
+        "negative_family",
+        "reference_kind",
+        "source_audio_sha256",
+        "source_midi_sha256",
+        "observation_receipt_sha256",
+        "reference_receipt_sha256"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_group_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "split": {
+          "enum": [
+            "fit",
+            "threshold_selection",
+            "held_out"
+          ]
+        },
+        "observer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "observer_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "feature_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "measurement_state": {
+          "enum": [
+            "measured",
+            "no_measurable_spectral_energy",
+            "insufficient_duration",
+            "truncated_by_audio",
+            "fundamental_above_nyquist",
+            "insufficient_frequency_resolution"
+          ]
+        },
+        "raw_score_db": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -300,
+          "maximum": 120
+        },
+        "event_present": {
+          "type": "boolean"
+        },
+        "negative_family": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reference_kind": {
+          "enum": [
+            "synthetic_known_answer",
+            "measured_renderer_adjudicated",
+            "human_adjudicated"
+          ]
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_midi_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observation_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "measurement_state": {
+                "const": "measured"
+              }
+            },
+            "required": [
+              "measurement_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "raw_score_db": {
+                "type": "number",
+                "minimum": -300,
+                "maximum": 120
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "measurement_state": {
+                "enum": [
+                  "no_measurable_spectral_energy",
+                  "insufficient_duration",
+                  "truncated_by_audio",
+                  "fundamental_above_nyquist",
+                  "insufficient_frequency_resolution"
+                ]
+              }
+            },
+            "required": [
+              "measurement_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "raw_score_db": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_present": {
+                "const": true
+              }
+            },
+            "required": [
+              "event_present"
+            ]
+          },
+          "then": {
+            "properties": {
+              "negative_family": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_present": {
+                "const": false
+              }
+            },
+            "required": [
+              "event_present"
+            ]
+          },
+          "then": {
+            "properties": {
+              "negative_family": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
