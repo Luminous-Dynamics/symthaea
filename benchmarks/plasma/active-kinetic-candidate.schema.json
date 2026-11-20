@@ -452,7 +452,8 @@
           "selection_status": {
             "enum": [
               "selected",
-              "executed"
+              "executed",
+              "failed"
             ]
           }
         },
@@ -472,7 +473,10 @@
       "if": {
         "properties": {
           "selection_status": {
-            "const": "executed"
+            "enum": [
+              "executed",
+              "failed"
+            ]
           }
         },
         "required": [
