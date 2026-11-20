@@ -6,7 +6,7 @@
 
 ## Objective
 
-Extend the risk-neutral scalar-budget EVSI planner with independently constrained resource vectors and an ex-ante precommitment tail-risk value-of-information objective. Expected-loss EVSI and mutual information remain separate comparators.
+Extend the risk-neutral scalar-budget EVSI planner with independently constrained resource vectors and an ex-ante precommitment tail-risk value-of-information objective. Expected-loss EVSI and joint-world-state mutual information remain separate comparators.
 
 ## Mathematical contract
 
@@ -55,7 +55,7 @@ The Rust binary sc_risk_multiresource_audit:
 - exact-enumerates feasible action subsets (at most 12 actions and 10 binary observations);
 - validates capability prerequisites and eligibility as hard constraints;
 - enforces all resource capacities independently;
-- emits expected-loss EVSI, precommitment CVaR-EVSI, mutual information and resource-use receipts;
+- emits expected-loss EVSI, precommitment CVaR-EVSI, joint-world-state mutual information and resource-use receipts;
 - computes exact oracles and marginal-per-financial-resource greedy baselines;
 - emits an outcome-contingent decision policy and exact schema/fixture SHA-256 digests.
 
