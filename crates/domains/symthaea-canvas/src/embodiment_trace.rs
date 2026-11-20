@@ -90,27 +90,34 @@ impl EmbodimentTrace {
         let mut previous_activity: Option<(EmbodimentActivity, u64)> = None;
 
         for event in &self.events {
-            match &event.kind {
-                EmbodimentEventKind::ActivityChanged { activity } => {
-                    if let Some((previous, started_at)) = previous_activity {
-                        if previous != *activity {
-                            activity_changes = activity_changes.saturating_add(1);
-                            let duration = event.monotonic_ns.saturating_sub(started_at);
-                            completed_activity_intervals =
-                                completed_activity_intervals.saturating_add(1);
-                            if previous == EmbodimentActivity::Speaking {
-                                speaking_intervals_completed =
-                                    speaking_intervals_completed.saturating_add(1);
-                                speaking_duration_ns =
-                                    speaking_duration_ns.saturating_add(u128::from(duration));
-                            }
-                            previous_activity = Some((*activity, event.monotonic_ns));
-                        }
-                    } else {
+            let activity_update = match &event.kind {
+                EmbodimentEventKind::ActivityChanged { activity } => Some(*activity),
+                EmbodimentEventKind::Reset => Some(EmbodimentActivity::Idle),
+                _ => None,
+            };
+
+            if let Some(activity) = activity_update {
+                if let Some((previous, started_at)) = previous_activity {
+                    if previous != activity {
                         activity_changes = activity_changes.saturating_add(1);
-                        previous_activity = Some((*activity, event.monotonic_ns));
+                        let duration = event.monotonic_ns.saturating_sub(started_at);
+                        completed_activity_intervals =
+                            completed_activity_intervals.saturating_add(1);
+                        if previous == EmbodimentActivity::Speaking {
+                            speaking_intervals_completed =
+                                speaking_intervals_completed.saturating_add(1);
+                            speaking_duration_ns =
+                                speaking_duration_ns.saturating_add(u128::from(duration));
+                        }
+                        previous_activity = Some((activity, event.monotonic_ns));
                     }
+                } else {
+                    activity_changes = activity_changes.saturating_add(1);
+                    previous_activity = Some((activity, event.monotonic_ns));
                 }
+            }
+
+            match &event.kind {
                 EmbodimentEventKind::VisemeChanged { .. } => {
                     viseme_event_count = viseme_event_count.saturating_add(1);
                 }
