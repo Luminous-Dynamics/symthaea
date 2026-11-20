@@ -126,7 +126,7 @@
         "manufacturer",
         "board_model",
         "board_revision",
-        "fpga_part"
+        "device_part"
       ],
       "properties": {
         "manufacturer": {
@@ -141,11 +141,11 @@
           "type": "string",
           "minLength": 1
         },
-        "fpga_part": {
+        "som_ordering_code": {
           "type": "string",
           "minLength": 1
         },
-        "som_ordering_code": {
+        "device_part": {
           "type": "string",
           "minLength": 1
         }
