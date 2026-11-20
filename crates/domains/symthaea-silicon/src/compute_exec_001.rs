@@ -327,6 +327,11 @@ pub struct ExecutionLedger {
     /// A timeout, reset race or ambiguous device failure blocks all new work
     /// in this epoch until a new epoch is established through reset/recovery.
     submission_blocked: bool,
+    /// Old epochs whose DMA contexts must be independently proven quiescent.
+    quiescence_required_epochs: HashSet<String>,
+    /// A new epoch must be established after an uncertain outcome before
+    /// confirmation of old-epoch quiescence can resume dispatch.
+    recovery_epoch_pending: bool,
     pending: HashMap<u64, PendingCommand>,
     seen_command_ids: HashSet<String>,
 }
@@ -352,6 +357,8 @@ impl ExecutionLedger {
             last_sequence: 0,
             max_inflight_commands,
             submission_blocked: false,
+            quiescence_required_epochs: HashSet::new(),
+            recovery_epoch_pending: false,
             pending: HashMap::new(),
             seen_command_ids: HashSet::new(),
         })
@@ -548,6 +555,8 @@ impl ExecutionLedger {
             }
             "failed" | "cancelled" | "outcome_unknown" => {
                 self.submission_blocked = true;
+                self.recovery_epoch_pending = true;
+                self.quiescence_required_epochs.insert(self.device_epoch.clone());
                 for key in &pending.buffers {
                     registry.set_ownership(
                         key,
@@ -578,6 +587,8 @@ impl ExecutionLedger {
             ValidationError::new("UNKNOWN_TIMEOUT", "sequence is not pending")
         })?;
         self.submission_blocked = true;
+        self.recovery_epoch_pending = true;
+        self.quiescence_required_epochs.insert(self.device_epoch.clone());
         for key in &pending.buffers {
             registry.set_ownership(
                 key,
@@ -607,7 +618,9 @@ impl ExecutionLedger {
             ));
         }
         let old_epoch = self.device_epoch.clone();
+        let mut reset_interrupted_work = false;
         for (sequence, pending) in self.pending.drain() {
+            reset_interrupted_work = true;
             for key in pending.buffers {
                 registry.set_ownership(
                     &key,
@@ -618,20 +631,37 @@ impl ExecutionLedger {
                 );
             }
         }
+        if reset_interrupted_work
+            || registry.buffers.values().any(|buffer| {
+                matches!(
+                    &buffer.ownership,
+                    BufferOwnership::Quarantined { device_epoch, .. } if device_epoch == old_epoch
+                )
+            })
+        {
+            self.quiescence_required_epochs.insert(old_epoch);
+        }
+
         self.device_epoch = new_epoch;
         self.last_sequence = 0;
-        self.submission_blocked = false;
+        self.recovery_epoch_pending = false;
+        self.submission_blocked = !self.quiescence_required_epochs.is_empty();
         Ok(())
     }
 
     /// Release only buffers quarantined under the supplied epoch. The caller
     /// must invoke this after an independent driver/platform quiescence check;
     /// this pure state machine cannot establish that physical fact itself.
+    /// Dispatch resumes only when a new epoch has also been established.
     pub fn confirm_dma_quiescent(
-        &self,
+        &mut self,
         old_epoch: &str,
         registry: &mut BufferRegistry,
     ) -> usize {
+        if !self.quiescence_required_epochs.remove(old_epoch) {
+            return 0;
+        }
+
         let mut released = 0usize;
         for buffer in registry.buffers.values_mut() {
             if matches!(
@@ -642,6 +672,8 @@ impl ExecutionLedger {
                 released += 1;
             }
         }
+        self.submission_blocked =
+            self.recovery_epoch_pending || !self.quiescence_required_epochs.is_empty();
         released
     }
 }
