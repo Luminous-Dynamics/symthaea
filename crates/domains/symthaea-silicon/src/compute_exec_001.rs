@@ -1544,6 +1544,20 @@ pub fn verify_exact_output_bytes(
         ));
     }
     validate_sha256(&command.implementation_sha256, "command.implementation_sha256")?;
+    validate_sha256(&command.workload_manifest_sha256, "command.workload_manifest_sha256")?;
+    if command.representation.representation_id != REPRESENTATION_ID
+        || command.representation.dimension_bits != DIMENSION_BITS
+        || command.representation.payload_bytes != VECTOR_BYTES
+        || command.representation.bit_order != "lsb0"
+        || command.representation.byte_order != "little"
+    {
+        return Err(ValidationError::new(
+            "OUTPUT_VERIFICATION_REPRESENTATION_MISMATCH",
+            "output verifier only admits the canonical 16,384-bit BinaryHV representation",
+        ));
+    }
+    validate_epoch(&command.device_epoch)?;
+    parse_decimal_u64(&command.sequence, false, "command.sequence")?;
 
     let expected_role = output_role(&command.operation_id);
     let output_descriptor = command
@@ -1927,6 +1941,18 @@ mod tests {
         );
         assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
     }
+    #[test]
+    fn output_verification_rejects_noncanonical_representation() {
+        let (_, mut command, completion, _, _) = setup();
+        command.representation.dimension_bits = 8_192;
+        assert_eq!(
+            verify_exact_output_bytes(&command, &completion, &[0u8; 16], &[0u8; 16])
+                .unwrap_err()
+                .code,
+            "OUTPUT_VERIFICATION_REPRESENTATION_MISMATCH"
+        );
+    }
+
     #[test]
     fn output_verification_rejects_digest_and_oracle_mismatches() {
         let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
