@@ -42,6 +42,64 @@
         "grid_based_Fourier_GEMPIC"
       ],
       "caveat": "their fully discrete and semi-discrete conservation statements differ; pin the chosen method, field-space truncation, projection, filter and time integrator"
+    },
+    "execution_path_audit": {
+      "paper_result_tag": {
+        "commit": "2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431",
+        "paper_accuracy_configs": {
+          "two_d_multi_app": {
+            "use_dse": true,
+            "use_kb": false,
+            "use_toeplitz": false,
+            "matrix_free": false
+          },
+          "three_d_five_mini_apps": {
+            "use_dse": true,
+            "use_kb": false,
+            "use_toeplitz": false,
+            "matrix_free": true
+          },
+          "three_d_evaluations": {
+            "use_dse": true,
+            "use_kb": false,
+            "use_toeplitz": false,
+            "matrix_free": true
+          }
+        },
+        "selected_branch": "DSELayer with VandermondeTransformMatrixFree for the 3D config",
+        "implementation": "per-axis exp(-i*k*x) phase factors and tensor contractions; this is the source paper's direct spectral evaluation path, not its FINUFFT cost branch"
+      },
+      "nufft_cost_tag": {
+        "commit": "1222226acab272b8d78ba541cb67c1e877669785",
+        "config": "config/electrostatic_plasma3d_pic.yaml",
+        "config_values": {
+          "use_dse": false,
+          "use_kb": false,
+          "use_finufft": true,
+          "use_toeplitz": false,
+          "kX": 16,
+          "kY": 16,
+          "kZ": 16,
+          "n_particles": 1000000,
+          "pred_only": true
+        },
+        "implementation": "pytorch_finufft FINUFFT type-1 and type-2 transforms",
+        "type1": {
+          "eps": 0.000001,
+          "modeord": 1,
+          "isign": -1,
+          "gpu_method": 3
+        },
+        "type2": {
+          "eps": 0.000001,
+          "modeord": 1,
+          "isign": 1
+        },
+        "retained_modes_per_axis": 32,
+        "coordinate_normalization": "per-axis sample min/max mapped to [0,2*pi] unless explicit min/max supplied"
+      },
+      "cost_measurement_note": "paper-scripts cost jobs use a separate NUFFT tag, architecture subset checkpoints, and exclude the first warmup iteration. They are not paired accuracy measurements for the DSE evaluation configs.",
+      "required_paired_comparison_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12988"
     }
   },
   "method": {
@@ -127,7 +185,13 @@
     "periodic_seam_crossing_field_and_force_jump",
     "one_particle_extremal_perturbation_normalization_sensitivity",
     "normalization_lipschitz_sensitivity_vs_particle_count",
-    "open_boundary_normalized_box_padding_and_artificial_periodicity"
+    "open_boundary_normalized_box_padding_and_artificial_periodicity",
+    "DSE_vs_FINUFFT_paired_field_accuracy",
+    "DSE_vs_FINUFFT_closed_loop_trajectory_accuracy",
+    "transform_specific_full_step_timing",
+    "transform_specific_peak_memory_and_energy",
+    "mode_count_scaling_separate_from_particle_count_scaling",
+    "warmup_and_plan_amortisation"
   ],
   "claim_limits": {
     "source_reproduction": false,
@@ -138,7 +202,9 @@
     "variational_fourier_method_is_prior_art": true,
     "no_physical_grid_deposition": true,
     "no_internal_oversampled_grid": false,
-    "deployed_error_theorem_qualified_for_per_sample_minmax_and_linear_periodic_lifting": false
+    "deployed_error_theorem_qualified_for_per_sample_minmax_and_linear_periodic_lifting": false,
+    "paper_accuracy_results_are_FINUFFT_results": false,
+    "FINUFFT_accuracy_inferred_from_DSE_results": false
   },
   "related_solver_lanes": [
     {
