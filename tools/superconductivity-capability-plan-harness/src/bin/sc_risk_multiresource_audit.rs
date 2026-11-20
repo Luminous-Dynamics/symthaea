@@ -46,6 +46,7 @@ struct Plan {
     cvar_evsi: f64,
     mutual_information_nats: f64,
     cvar_eta: f64,
+    expected_policy: Vec<usize>,
     policy: Vec<usize>,
     outcome_count: usize,
 }
@@ -570,7 +571,7 @@ impl Instance {
             expected_regret, cvar_regret,
             expected_evsi: expected_evsi.max(0.0), cvar_evsi: cvar_evsi.max(0.0),
             mutual_information_nats: self.information_gain(&masses),
-            cvar_eta: eta, policy, outcome_count: masses.len(),
+            cvar_eta: eta, expected_policy, policy, outcome_count: masses.len(),
         }))
     }
     fn reference_cost(&self, plan: &Plan) -> u64 {
@@ -678,13 +679,21 @@ impl Instance {
         let measured_ids: Vec<String> = plan.ordered_indices.iter()
             .filter(|i| !self.actions[**i].likelihoods.is_empty())
             .map(|i| self.actions[*i].id.clone()).collect();
-        let policy: Vec<Value> = plan.policy.iter().enumerate().map(|(mask, di)| {
-            let outcomes: Vec<Value> = (0..measured_ids.len()).map(|bit| json!({
-                "action_id": measured_ids[bit],
-                "outcome": self.outcome_labels[(mask >> bit) & 1]
-            })).collect();
-            json!({"outcome_mask":mask,"outcomes":outcomes,"decision_id":self.decisions[*di].id})
-        }).collect();
+        let render_policy = |decision_indices: &[usize]| -> Vec<Value> {
+            decision_indices.iter().enumerate().map(|(mask, decision_index)| {
+                let outcomes: Vec<Value> = (0..measured_ids.len()).map(|bit| json!({
+                    "action_id": measured_ids[bit],
+                    "outcome": self.outcome_labels[(mask >> bit) & 1]
+                })).collect();
+                json!({
+                    "outcome_mask":mask,
+                    "outcomes":outcomes,
+                    "decision_id":self.decisions[*decision_index].id
+                })
+            }).collect()
+        };
+        let expected_policy = render_policy(&plan.expected_policy);
+        let cvar_policy = render_policy(&plan.policy);
         let usage: Vec<Value> = self.resources.iter().enumerate().map(|(i, resource)| json!({
             "resource_id":resource.id,
             "unit":resource.unit,
@@ -709,7 +718,8 @@ impl Instance {
             "cvar_alpha":self.alpha,
             "rockafellar_uryasev_eta":plan.cvar_eta,
             "outcome_count":plan.outcome_count,
-            "precommitment_decision_policy":policy
+            "expected_loss_decision_policy":expected_policy,
+            "precommitment_cvar_decision_policy":cvar_policy
         })
     }
 }
