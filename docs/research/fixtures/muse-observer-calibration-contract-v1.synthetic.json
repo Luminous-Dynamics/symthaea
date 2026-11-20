@@ -5,5 +5,8 @@
   "minimum_threshold_examples_per_class": 5,
   "minimum_held_out_examples_per_class": 5,
   "maximum_false_support_rate": 0.01,
-  "ece_bins": 10
+  "ece_bins": 10,
+  "minimum_held_out_groups": 5,
+  "bootstrap_replicates": 200,
+  "bootstrap_seed": 12345
 }
