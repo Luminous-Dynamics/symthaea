@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/onsager_tensor_audit_v0_1.schema.json",
+  "title": "Pinned ReactCA Onsager tensor audit manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "benchmark_id", "source", "transport_method_source", "expected", "tensor_contract", "interpretation"],
+  "properties": {
+    "contract": {"const": "SC-ONSAGER-TENSOR-AUDIT-0.1"},
+    "benchmark_id": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "commit", "path", "raw_url", "git_blob_sha1", "license", "license_url", "attribution"],
+      "properties": {
+        "repository": {"const": "mcgalcode/rxn-ca"},
+        "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "path": {"type": "string", "minLength": 1},
+        "raw_url": {"type": "string", "format": "uri"},
+        "git_blob_sha1": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "license": {"const": "MIT"},
+        "license_url": {"type": "string", "format": "uri"},
+        "attribution": {"type": "string", "minLength": 1}
+      }
+    },
+    "transport_method_source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "commit", "path", "raw_url", "license", "description"],
+      "properties": {
+        "repository": {"const": "vir-k01/py-OATS"},
+        "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "path": {"type": "string", "minLength": 1},
+        "raw_url": {"type": "string", "format": "uri"},
+        "license": {"const": "MIT"},
+        "description": {"type": "string", "minLength": 1}
+      }
+    },
+    "expected": {
+      "type": "object", "additionalProperties": false,
+      "required": ["record_count", "formula_count", "temperature_count", "temperatures_k", "total_tensor_symmetric_count", "self_tensor_psd_count", "total_tensor_psd_count", "total_tensor_non_psd_count", "fit_uncertainty_present_count"],
+      "properties": {
+        "record_count": {"type": "integer", "minimum": 1},
+        "formula_count": {"type": "integer", "minimum": 1},
+        "temperature_count": {"type": "integer", "minimum": 1},
+        "temperatures_k": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "number", "exclusiveMinimum": 0}},
+        "total_tensor_symmetric_count": {"type": "integer", "minimum": 0},
+        "self_tensor_psd_count": {"type": "integer", "minimum": 0},
+        "total_tensor_psd_count": {"type": "integer", "minimum": 0},
+        "total_tensor_non_psd_count": {"type": "integer", "minimum": 0},
+        "fit_uncertainty_present_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "tensor_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["species_order_source", "species_index_map_source", "total_tensor", "self_tensor", "distinct_tensor", "units", "volume_units", "reciprocity_relative_tolerance", "decomposition_relative_tolerance", "psd_relative_tolerance", "qualification_policy"],
+      "properties": {
+        "species_order_source": {"type": "string", "minLength": 1},
+        "species_index_map_source": {"type": "string", "minLength": 1},
+        "total_tensor": {"type": "string", "minLength": 1},
+        "self_tensor": {"type": "string", "minLength": 1},
+        "distinct_tensor": {"type": "string", "minLength": 1},
+        "units": {"const": "cm^-1 s^-1 eV^-1"},
+        "volume_units": {"const": "angstrom^3"},
+        "reciprocity_relative_tolerance": {"type": "number", "exclusiveMinimum": 0},
+        "decomposition_relative_tolerance": {"type": "number", "exclusiveMinimum": 0},
+        "psd_relative_tolerance": {"type": "number", "exclusiveMinimum": 0},
+        "qualification_policy": {"type": "string", "minLength": 1}
+      }
+    },
+    "interpretation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["non_psd_policy", "uncertainty_policy", "missing_data_policy", "claim_ceiling"],
+      "properties": {
+        "non_psd_policy": {"type": "string", "minLength": 1},
+        "uncertainty_policy": {"type": "string", "minLength": 1},
+        "missing_data_policy": {"type": "string", "minLength": 1},
+        "claim_ceiling": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
