@@ -26,7 +26,6 @@ impl CognitiveLoopService {
         let output = state.output;
         let prediction_error = state.prediction_error;
         let unified_psi = state.unified_psi;
-        let hv16_cached = state.hv16_cached;
         let urgency = state.urgency;
         let _t = Instant::now();
         // 1. Every cycle: record high-surprise events for later dreaming.
@@ -209,20 +208,10 @@ impl CognitiveLoopService {
                                 "Dream replay generated insights"
                             );
 
-                            // Dream→Narrative coupling: dream insights feed narrative self-model.
-                            // Science: Revonsuo (2000) — dreaming enhances threat simulation
-                            // and narrative integration of novel experiences.
-                            if let Some(ref mut narrative) =
-                                self.consciousness.self_model_tier.narrative_self
-                            {
-                                narrative.process_experience(
-                                    hv16_cached,
-                                    &format!("dream_insight_{}", result.insights),
-                                    true, // counterfactual-validated
-                                    unified_psi,
-                                    result.best_phi_improvement as f64,
-                                );
-                            }
+                            // Counterfactual dream results are proposals, not observed
+                            // successes. Keep them in dream/wisdom channels; an actual
+                            // waking outcome must pass through ordinary experience
+                            // recording before it can enter autobiographical memory.
 
                             // Autobiography narration: once enough new episodes
                             // have accumulated since the last narration, hand the
@@ -257,11 +246,11 @@ impl CognitiveLoopService {
                                 }
                             }
 
-                            // Dream→MCE Narrative coupling: dream insights are
-                            // high-integration episodes (counterfactual-validated).
+                            // Dream→MCE Narrative coupling records a generated insight as an internal
+                            // reflection event, not as empirical validation of its counterfactual.
                             // Science: Walker (2009) — sleep-dependent memory consolidation
                             // strengthens autobiographical narrative structure.
-                            // Valence: phi improvement is intrinsically positive.
+                            // The valence below is model-internal, not an observed outcome.
                             self.consciousness
                                 .master_equation
                                 .narrative_coherence
@@ -373,14 +362,9 @@ impl CognitiveLoopService {
                 let wisdom_exploration_boost = (avg_phi_improvement * 0.5).clamp(0.0, 0.2);
                 self.adjust_exploration("dream_wisdom", wisdom_exploration_boost);
 
-                // FEEDBACK: Dream Phi insights feed forward into waking prediction confidence
-                // Science: Prospective consciousness — offline simulation prepares waking cognition.
-                // Dream-discovered Phi improvements signal that exploration can yield better states,
-                // boosting confidence that the system can navigate toward them.
-                if avg_phi_improvement > 0.01 {
-                    let dream_confidence_boost = (avg_phi_improvement * 0.1).min(0.05);
-                    self.adjust_confidence("dream_phi_insight", dream_confidence_boost);
-                }
+                // Dream-derived Phi improvement remains an exploration heuristic.
+                // It is not evidence that the proposed action will succeed, so it
+                // must not promote waking prediction confidence.
             }
         }
 
