@@ -407,13 +407,15 @@ mod tests {
     }
 
     #[test]
-    fn summary_counts_only_completed_activity_intervals() {
+    fn summary_counts_activity_and_playback_intervals_separately() {
         let summary = sample_trace().summarize().unwrap();
-        assert_eq!(summary.event_count, 4);
+        assert_eq!(summary.event_count, 9);
         assert_eq!(summary.activity_changes, 3);
         assert_eq!(summary.completed_activity_intervals, 2);
-        assert_eq!(summary.speaking_intervals_completed, 1);
-        assert_eq!(summary.speaking_duration_ns, 100);
+        assert_eq!(summary.speech_output_transitions, 5);
+        assert_eq!(summary.completed_playback_intervals, 1);
+        assert_eq!(summary.playback_duration_ns, 70);
+        assert_eq!(summary.open_playback, None);
         assert_eq!(summary.viseme_event_count, 1);
         assert_eq!(
             summary.open_activity,
