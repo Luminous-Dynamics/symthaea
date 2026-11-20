@@ -13,7 +13,7 @@
   "supported_representations": [
     "luminous.binaryhv.bipolar.16384.v1"
   ],
-  "max_transfer_bytes": 16777216,
+  "max_transfer_bytes": "16777216",
   "required_alignment_bytes": 8,
   "max_inflight_commands": 4,
   "dma_isolation": "none",
