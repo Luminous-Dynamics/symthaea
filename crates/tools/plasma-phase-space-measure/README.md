@@ -76,7 +76,7 @@ performance claim is made.
 
 ## Validation status
 
-The crate includes 13 source-authored unit tests covering permutation,
+The crate includes 14 source-authored unit tests covering permutation,
 co-located split/merge, periodic representatives, velocity-sensitive and
 weight-sensitive negative controls, signed weights, zero/empty measures,
 invalid configurations, and non-finite inputs.
