@@ -197,7 +197,23 @@ fn simulate(case: &Case) -> Result<ResultCase, String> {
     let mut influx_a = 0.0;
     let mut influx_b = 0.0;
     let dt = case.time_step;
-    for _step in 0..steps {
+    for step_index in 0..steps {
+        let maximum_current_reaction_rate = (0..n).fold(0.0_f64, |maximum, i| {
+            maximum
+                .max(case.target_rate * b[i] + case.competitor_rate)
+                .max(case.target_rate * a[i])
+        });
+        let dynamic_reaction_limit = if maximum_current_reaction_rate > 0.0 {
+            0.20 / maximum_current_reaction_rate
+        } else {
+            f64::INFINITY
+        };
+        if dt > dynamic_reaction_limit * (1.0 + 1.0e-12) {
+            return Err(format!(
+                "case {} time step {} exceeds dynamic reaction stability limit {} at step {}",
+                case.id, dt, dynamic_reaction_limit, step_index
+            ));
+        }
         let (ja, jb) = fluxes(&a, &b, case, dx);
         influx_a += ja[0] * dt;
         influx_b += jb[0] * dt;
