@@ -89,6 +89,26 @@ For each group size, the harness performed a full exact record round-trip, a sel
 
 This validates the local PZG2 reference implementation and its declared test cases only. It does not validate the checked-in Rust crate, CI, a production storage engine, random-access latency or a full public-data benchmark.
 
+
+
+## 5.1 Analytical query-amplification proxy (not measured I/O)
+
+The current 64-key fixture layout assigns 16 adjacent keys to each entity/service. This creates a useful illustration of why group size must be tuned to a declared query distribution:
+
+| Group size | Single key: series decompressed | One 16-series service cohort | Four-service slice (keys 0,16,32,48) | Sparse-frame size overhead vs whole PRN1 |
+|---:|---:|---:|---:|---:|
+| 1 | 1 | 16 | 4 | +25.09% |
+| 2 | 2 | 16 | 8 | +19.24% |
+| 4 | 4 | 16 | 16 | +13.92% |
+| 8 | 8 | 16 | 32 | +9.64% |
+| 16 | 16 | 16 | 64 | +5.93% |
+| 32 | 32 | 32 | 64 | +3.22% |
+| 64 | 64 | 64 | 64 | +0.68% |
+
+For an illustrative query mix of 35% one-key, 35% one-service cohort, 10% four-service slice and 20% full scan, weighted decompressed-series counts are 19.15, 19.90, 21.40, 24.40, 30.40, 41.60 and 64.00 for group sizes 1 through 64. Weighted decompression amplification against requested series is 1.00x, 1.04x, 1.12x, 1.27x, 1.59x, 2.17x and 3.34x.
+
+This is arithmetic derived from the grouping layout, not measured bytes-read, CPU or query latency. It assumes the first-seen key order aligns groups with service cohorts, which is true for the current synthetic fixture and may not hold on real data. Under this illustrative mix, group sizes 8 and 16 are plausible Pareto points; neither is a universal optimum. Changing query weights, service topology or key ordering can change the result. The public-data programme in [CDL-Bench-015 #12970](https://github.com/Luminous-Dynamics/symthaea/issues/12970) must replace this proxy with frozen query replay and measured cold/warm I/O.
+
 ## 6. What is still missing
 
 - No true file-I/O benchmark: no random disk reads, cold/warm cache separation, p50/p95/p99 latency, bytes read or decompression CPU measured.
