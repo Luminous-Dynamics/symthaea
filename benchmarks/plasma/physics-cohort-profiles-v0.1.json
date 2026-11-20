@@ -1,0 +1,112 @@
+{
+  "schema_version": "0.1.0",
+  "status": "comparison_eligibility_profiles_not_solver_validation",
+  "profiles": [
+    {
+      "lane": "collisionless_electrostatic_vlasov_poisson",
+      "governing_equation": "vlasov_poisson",
+      "required_diagnostics": [
+        "poisson_gauss_residual",
+        "charge_continuity_residual",
+        "particle_field_energy_drift",
+        "momentum_drift",
+        "distribution_error",
+        "linear_mode_rate_error"
+      ],
+      "entropy_monotonicity_gate": false
+    },
+    {
+      "lane": "electrostatic_vlasov_ampere",
+      "governing_equation": "vlasov_ampere_electrostatic",
+      "required_diagnostics": [
+        "gauss_law_residual",
+        "charge_continuity_residual",
+        "curl_free_residual",
+        "mass_drift",
+        "momentum_drift",
+        "total_energy_drift"
+      ]
+    },
+    {
+      "lane": "collisional_vlasov_poisson_landau",
+      "governing_equation": "vlasov_poisson_landau",
+      "required_diagnostics": [
+        "mass_drift",
+        "momentum_drift",
+        "total_energy_drift",
+        "entropy_production",
+        "collision_operator_degeneracy"
+      ],
+      "entropy_monotonicity_gate": true
+    },
+    {
+      "lane": "electromagnetic_vlasov_maxwell",
+      "governing_equation": "vlasov_maxwell",
+      "required_diagnostics": [
+        "gauss_e_residual",
+        "div_b_residual",
+        "charge_continuity_residual",
+        "maxwell_residual",
+        "particle_field_energy_drift",
+        "momentum_drift"
+      ]
+    },
+    {
+      "lane": "quasineutral_vlasov_ampere",
+      "governing_equation": "quasineutral_reduced_vlasov_ampere",
+      "required_diagnostics": [
+        "gauss_law_residual",
+        "mass_drift",
+        "momentum_drift",
+        "total_energy_drift",
+        "distribution_minimum",
+        "quasineutral_asymptotic_error"
+      ],
+      "positivity_gate": true,
+      "asymptotic_sweep_required": true
+    },
+    {
+      "lane": "relativistic_vlasov_maxwell",
+      "governing_equation": "relativistic_vlasov_maxwell",
+      "required_diagnostics": [
+        "gauss_e_residual",
+        "div_b_residual",
+        "charge_continuity_residual",
+        "maxwell_residual",
+        "particle_field_energy_drift",
+        "momentum_drift",
+        "relativistic_invariant_error",
+        "energy_correction_failure_count"
+      ],
+      "correction_failure_accounting_required": true
+    }
+  ],
+  "paired_comparison_requires": [
+    "governing_equation_lane",
+    "phase_space_dimensions",
+    "geometry_and_topology",
+    "boundary_conditions",
+    "unit_and_coordinate_normalization",
+    "physical_parameters",
+    "initial_state_digest",
+    "reference_corpus_digest",
+    "time_step_and_final_time",
+    "output_schedule",
+    "metric_profile_and_definitions",
+    "held_out_split_and_seed"
+  ],
+  "strict_performance_additionally_requires": [
+    "numeric_precision",
+    "platform_fingerprint"
+  ],
+  "provenance_required": [
+    "solver_source_commit",
+    "build_digest",
+    "configuration_digest",
+    "training_data_digest_for_learned_methods",
+    "checkpoint_digest_for_learned_methods",
+    "test_initial_state_digest",
+    "execution_receipt_digest",
+    "output_bundle_digest"
+  ]
+}
