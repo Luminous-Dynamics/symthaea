@@ -1,0 +1,230 @@
+{
+  "benchmark_id": "M5BAT-FIELD-EXECUTION-001",
+  "version": "1",
+  "state": "discovered_not_staged",
+  "source": {
+    "dataset_title": "Improving Real-World Execution of Optimized Trading Schedules for Large-Scale Battery Storage Systems through Data-Driven Component Parametrization: Dataset",
+    "dataset_doi": "10.18154/RWTH-2025-06555",
+    "dataset_record_url": "https://publications.rwth-aachen.de/record/1015732",
+    "dataset_archive_url": "https://publications.rwth-aachen.de/record/1015732/files/Dataset.zip",
+    "supplementary_file_url": "https://publications.rwth-aachen.de/record/1015732/files/Supplementary_file.pdf",
+    "article_title": "Improving real-world execution of optimized trading schedules for large-scale battery storage systems through data-driven component parametrization",
+    "article_doi": "10.1016/j.apenergy.2025.127340",
+    "publication": "Applied Energy 407, article 127340",
+    "publication_date": "2026-03-15",
+    "publisher": "RWTH Publications / Applied Energy",
+    "license": "CC-BY-4.0",
+    "source_class": "public_field_dataset_and_peer_reviewed_article",
+    "retrieved_at_utc": "2026-11-05T20:30:00Z",
+    "archive_sha256": null,
+    "archive_size_bytes": null,
+    "staged_path": null,
+    "staging_note": "Public record and direct ZIP URL verified, but this execution environment returned an unsupported application/zip response and DNS resolution prevented direct download. No archive bytes or content hashes are claimed."
+  },
+  "asset_scope": {
+    "site": "M5BAT, Aachen, Germany",
+    "rated_power_mw": 5,
+    "nominal_energy_mwh": 7.5,
+    "technology": "hybrid multi-technology BESS",
+    "experimental_scope": "LMO subsystem used for the two schedule-execution validation tests described in the article",
+    "sampling_resolution_seconds": 1,
+    "field_tests": [
+      "Test 1: reference parametrization",
+      "Test 2: improved data-driven parametrization"
+    ]
+  },
+  "expected_data_domains": [
+    "optimized power-delivery schedules",
+    "inverter AC-side power",
+    "inverter DC-side power",
+    "individual battery-unit state of charge",
+    "system state of charge",
+    "grid-connection-point power"
+  ],
+  "frozen_claims_from_article": {
+    "test_1_unfulfilled_energy_kwh": 1094,
+    "test_2_unfulfilled_energy_kwh": 238,
+    "unfulfilled_energy_reduction_percent": 78.2,
+    "balancing_energy_cost_reduction_percent": 71.7,
+    "test_2_balancing_cost_percent_of_trading_revenue": 1.8,
+    "test_2_system_round_trip_efficiency_model_error_percentage_points": 2.2,
+    "test_2_inverter_efficiency_model_error_percentage_points": 0.55,
+    "reported_validation_duration_hours": 61,
+    "note": "These values describe the cited M5BAT study and its selected LMO test scope. They are reference targets, not Symthaea results or universal industry limits."
+  },
+  "evaluation_protocol": {
+    "calibration_test": "Test 1",
+    "validation_test": "Test 2",
+    "leakage_rule": "No Test 2 measurements, fitted parameters or revised data may be used to fit the Test 1-calibrated model. All source and model versions must be content-addressed before the validation replay.",
+    "raw_preservation": "Preserve the original ZIP and every extracted member unchanged; hash the archive and each data member before parsing.",
+    "time_alignment": "Preserve every raw timestamp string and its source-declared offset. The schedule CSV is documented as UTC+1 and the measurement CSV as UTC+2. Convert each independently to UTC using the source_time_mapping kernel; same wall-clock labels differ by exactly 3,600 seconds after conversion. This difference is not a correction instruction. The schedule-to-meter alignment remains unresolved until the primary article or dataset maintainers confirm the intended clock basis. Never silently shift a source file.",
+    "schedule_mapping": "Map each optimized schedule interval to synchronized one-second grid-point measurements, then aggregate using energy integration rather than averaging power values without duration weights.",
+    "physical_replay": "Compare schedule against grid-connection-point energy; separately evaluate inverter AC/DC efficiency, system SOC drift and individual-unit SOC trajectories.",
+    "balancing_cost": "Only calculate balancing cost when the required market price/settlement evidence is present in the dataset or separately source-frozen. Never infer a currency charge from energy deviation alone.",
+    "capability_envelope": "Fit conservative charge/discharge SOC capability curves on Test 1 data only; evaluate envelope coverage, derating decisions and delivery outcomes on Test 2.",
+    "minimum_output": "Raw digests, schema/column map, time-quality report, data coverage, 15-minute schedule reconciliation, one-second residuals, SOC drift, unfulfilled energy, efficiency errors and an exact reproduction report.",
+    "power_trace_integration": "The public Rust power_trace module now integrates signed integer-milliwatt samples by exact trapezoidal intervals within a declared maximum gap. It reports uncovered seconds and requires horizon endpoints; it does not interpolate or forward-fill. The module has synthetic exact-known-answer tests only. No M5BAT raw CSV has been staged, parsed or evaluated by this kernel.",
+    "data_download_limitation": "The RWTH 2024-04895 dataset record lists M5BAT_04-2023_RAW.zip at approximately 97.0 MB and the public field-data registry documents manual browser download. Scripted archive retrieval was not possible in the present execution environment; archive SHA-256 and member digests remain null until raw bytes are staged.",
+    "schedule_reconciliation": "The new power_trace_execution module compares the integrated power-trace rational milli-Wh numerator/denominator directly with signed scheduled milli-Wh for one exact matching interval. It keeps import/export direction, under-delivery, over-delivery and absolute deviation distinct; it withholds fulfilment when trace coverage is incomplete. This bridge is synthetic-only and does not yet aggregate multiple intervals or booked settlement."
+  },
+  "target_gates": {
+    "first_gate": "Reproduce the published Test 1 and Test 2 reference metrics within the dataset's documented rounding/tolerance before claiming any improvement.",
+    "stretch_unfulfilled_energy_kwh_max": 120,
+    "stretch_reduction_vs_test_1_percent_min": 89,
+    "stretch_balancing_cost_percent_of_revenue_max": 1,
+    "stretch_system_rte_error_percentage_points_max": 1,
+    "stretch_inverter_efficiency_error_percentage_points_max": 0.3,
+    "critical_constraints": [
+      "same M5BAT asset/test scope and initial SOC",
+      "same schedule horizon and interval alignment",
+      "same price and tariff/settlement basis",
+      "same LMO units and power-delivery boundary",
+      "same data-cleaning and missing-data treatment",
+      "no Test 2 information used in calibration"
+    ]
+  },
+  "results": {
+    "dataset_downloaded": false,
+    "archive_sha256": null,
+    "test_1_reproduced": false,
+    "test_2_reproduced": false,
+    "symthaea_comparison_run": false,
+    "field_metrics_state": "not_run",
+    "clock_mapping_kernel_tested": false,
+    "m5bat_source_clock_reconciled": false,
+    "schedule_measurement_alignment_state": "not_reconciled",
+    "power_trace_kernel_tested": true,
+    "power_trace_kernel_state": "synthetic_exact_head_tests_only",
+    "raw_dataset_integration_state": "not_run",
+    "power_trace_schedule_bridge_kernel_tested": true,
+    "power_trace_schedule_bridge_state": "synthetic_exact_rational_schedule_tests_only"
+  },
+  "field_data_registry_context": {
+    "repository": "Astrolabe-Analytics/public-battery-field-data",
+    "repository_url": "https://github.com/Astrolabe-Analytics/public-battery-field-data",
+    "registry_version": "1.2.0",
+    "registry_commit_sha": "04803c0606facc96e899b2d648759646b989c609",
+    "registry_commit_date": "2026-10-26",
+    "registry_snapshot_date": "2026-11-06",
+    "published_registry_totals": {
+      "releases": 35,
+      "batteries": 3187,
+      "li_ion_cells": 149188,
+      "faults": 6465,
+      "energy_mwh": 115.6,
+      "unit_years": 3040,
+      "observation_hours": 331704,
+      "charging_sessions": 31449,
+      "charging_sessions_counted_as_batteries": false
+    },
+    "related_field_datasets": [
+      {
+        "package_id": "m5bat-2023-04",
+        "role": "high-resolution operational context and component-level replay support",
+        "source_record": "https://publications.rwth-aachen.de/record/985923",
+        "data_doi": "https://doi.org/10.18154/RWTH-2024-04895",
+        "license": "CC-BY-4.0",
+        "asset_scope": "10 M5BAT units, 6.714 MWh subset, Apr 2023; 1-second unit and plant time series",
+        "access": "manual_browser",
+        "package_size_gb": 0.103,
+        "known_caveats": [
+          "This is a separate public field-data release and is not assumed to be the Applied Energy Test 1/Test 2 archive at DOI 10.18154/RWTH-2025-06555.",
+          "Plant BESS.csv is the point-of-connection measurement; BattN files are battery-unit/inverter measurements.",
+          "The SOC fields are BMS/system estimates, not independent measurements.",
+          "Ambient temperature is not cell temperature.",
+          "M5BAT_P and BESS point-of-connection sign is documented with negative charging and positive discharging.",
+          "M5BAT unit Pb1 is separately counted in m5bat-pbacid; do not double-count."
+        ]
+      },
+      {
+        "package_id": "m5bat-pbacid",
+        "role": "long-horizon flooded lead-acid degradation and operational-state context",
+        "source_record": "https://publications.rwth-aachen.de/record/1038622",
+        "data_doi": "https://doi.org/10.18154/RWTH-2026-06637",
+        "paper_doi": "https://doi.org/10.3390/en19174141",
+        "license": "CC-BY-4.0",
+        "asset_scope": "one M5BAT Pb1 flooded lead-acid string; 1.066 MWh; 2017-2025",
+        "access": "manual_browser",
+        "package_size_gb": 4.661,
+        "known_caveats": [
+          "Processed data rather than raw manufacturer exports.",
+          "Short gaps under 5 seconds were forward-filled; the exported data do not label each filled row.",
+          "SOC is a proprietary BMS estimate, not an independent calibrated measurement.",
+          "Some cumulative energy counters reset and must be analysed with period-to-period differences.",
+          "The flag semantics and data quality require the published codebook and schema."
+        ]
+      },
+      {
+        "package_id": "pnnl_epri",
+        "role": "multi-technology stationary storage external validation cohort",
+        "source_record": "https://doi.org/10.5281/zenodo.22947521",
+        "license": "CC-BY-4.0",
+        "asset_scope": "11 stationary storage systems; 9 have stated or computed energy ratings totalling 63.87 MWh; LFP, NMC, LMO/NMC and vanadium flow",
+        "access": "one_command",
+        "package_size_gb": 3.428,
+        "known_caveats": [
+          "Nine of eleven systems have energy values; two are unrated.",
+          "Data are system/pack-level; no individual cell-voltage channels are released.",
+          "One system has a documented overlap with the PPL release and is counted only once in registry totals.",
+          "EPRI_LFP3 energy is computed from power and E/P assumptions, not a stated nameplate; preserve this uncertainty."
+        ]
+      },
+      {
+        "package_id": "aitio",
+        "role": "African distributed stationary-storage transferability cohort; not a grid-scale BESS comparator",
+        "source_record": "https://doi.org/10.5287/bodleian:aVR4oDV4N",
+        "paper_doi": "https://doi.org/10.1016/j.joule.2021.11.006",
+        "license": "CC-BY-NC-4.0",
+        "asset_scope": "1,027 lead-acid off-grid/distributed batteries; approximately 0.24648 MWh computed from stated 12 V / 20 Ah configuration",
+        "access": "one_command",
+        "package_size_gb": 3.051,
+        "use_boundary": "Non-commercial only unless a separate commercial license is obtained. Do not mix these off-grid fleet observations into the M5BAT grid-scale dispatch score."
+      }
+    ],
+    "acquisition_policy": [
+      "Acquire the Applied Energy Test 1/Test 2 archive as the primary schedule-execution benchmark; keep it distinct from the April 2023 registry release until archive member manifests prove overlap.",
+      "Use m5bat-2023-04 for high-resolution POC, per-unit power, SOC and converter-mode checks, not as a substitute for the paper's separate calibration/validation tests.",
+      "Use PNNL/EPRI as a technology-transfer validation set with chemistry-stratified cohorts; do not aggregate all systems into one error score.",
+      "Use Aitio only for non-commercial African distributed-storage transferability research unless commercial reuse rights are separately obtained.",
+      "Store all raw archives outside the public repo; preserve original bytes, per-member SHA-256, publisher DOI, acquisition timestamp, license and immutable extraction manifest before parsing."
+    ],
+    "claim_boundary": "The registry is a discovery catalogue and its headline totals are not a validation result. No candidate archive in this registry context is marked as staged by this record; source files must be acquired, digested and independently checked before any raw-field metric is claimed."
+  },
+  "source_clock_contract": {
+    "state": "source_offsets_documented_alignment_unresolved",
+    "schedule_clock": {
+      "source_document_label": "UTC + 1",
+      "declared_utc_offset_minutes": 60,
+      "evidence_ref": "M5BAT supplementary dataset PDF, p. 6 / schedule CSV field description",
+      "evidence_url": "https://publications.rwth-aachen.de/record/1015732/files/Supplementary_file.pdf"
+    },
+    "measurement_clock": {
+      "source_document_label": "UTC + 2",
+      "declared_utc_offset_minutes": 120,
+      "evidence_ref": "M5BAT supplementary dataset PDF, p. 7 / measurement CSV field description",
+      "evidence_url": "https://publications.rwth-aachen.de/record/1015732/files/Supplementary_file.pdf"
+    },
+    "equal_civil_wall_time_comparison": {
+      "measurement_utc_minus_schedule_utc_seconds": -3600,
+      "interpretation": "For identical local wall-clock label, converting schedule UTC+1 and measurement UTC+2 independently to UTC yields measurement UTC instant one hour earlier.",
+      "status": "mathematically_determined_from_declared_offsets"
+    },
+    "prohibited_assumptions": [
+      "Do not treat raw timestamps as UTC.",
+      "Do not normalize both files using the workstation timezone.",
+      "Do not silently add or subtract one hour to force schedule/meter alignment.",
+      "Do not assume the two labels share the same intended physical instant.",
+      "Do not infer daylight-saving transitions from the city name alone."
+    ],
+    "required_reconciliation": [
+      "Stage and hash both original CSVs and the archive.",
+      "Parse raw timestamp strings without changing their wall-clock values.",
+      "Confirm the time basis in the primary article or with dataset maintainers.",
+      "Determine whether one file is intentionally offset, mislabelled, or expressed in a different clock convention.",
+      "Emit a source-clock mapping receipt for every file and any per-row offset changes.",
+      "Only then align 15-minute schedule intervals with one-second measurements."
+    ],
+    "automatic_clock_correction_permitted": false,
+    "field_alignment_state": "not_reconciled"
+  }
+}
