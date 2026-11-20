@@ -439,15 +439,17 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
     }
 
     match &candidate.selection_status {
-        SelectionStatus::Selected | SelectionStatus::Executed => {
+        SelectionStatus::Selected | SelectionStatus::Executed | SelectionStatus::Failed => {
             if candidate.rights_state != RightsState::Verified {
                 add("rights_not_verified", "A selected or executed candidate must have rights_state=verified.");
             }
         }
         _ => {}
     }
-    if candidate.selection_status == SelectionStatus::Executed
-        && candidate.execution_receipt_id.as_ref().is_none_or(|value| !non_empty(value))
+    if matches!(
+        candidate.selection_status,
+        SelectionStatus::Executed | SelectionStatus::Failed
+    ) && candidate.execution_receipt_id.as_ref().is_none_or(|value| !non_empty(value))
     {
         add("execution_receipt_missing", "An executed candidate must include an execution_receipt_id.");
     }
@@ -595,6 +597,21 @@ mod tests {
         let report = audit_candidate(&valid_pic_candidate()).expect("audit");
         assert_eq!(report.body.disposition, AuditDisposition::Admissible);
         assert!(report.body.findings.is_empty());
+    }
+
+    #[test]
+    fn failed_run_requires_verified_rights_and_execution_receipt() {
+        let mut candidate = valid_pic_candidate();
+        candidate.selection_status = SelectionStatus::Failed;
+        candidate.rights_state = RightsState::Unknown;
+        let report = audit_candidate(&candidate).expect("audit");
+        assert!(report.body.findings.iter().any(|finding| finding.code == "rights_not_verified"));
+        assert!(report.body.findings.iter().any(|finding| finding.code == "execution_receipt_missing"));
+
+        candidate.rights_state = RightsState::Verified;
+        candidate.execution_receipt_id = Some("run-receipt-001".to_owned());
+        let report = audit_candidate(&candidate).expect("audit");
+        assert_eq!(report.body.disposition, AuditDisposition::Admissible);
     }
 
     #[test]
