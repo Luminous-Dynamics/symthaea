@@ -10,10 +10,14 @@ use muse_render_receipt::{verify_bundle as verify_render_bundle, verify_receipt_
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
-use std::path::Path;
+use std::{fs, path::Path};
 use symthaea_muse::{
-    audio_edit_observer::verify_gain_envelope_observation_seal,
-    edit_evidence::verify_result_seal,
+    audio_edit_observer::{
+        observe_gain_envelope_v1,
+        verify_gain_envelope_observation_seal,
+        GainEnvelopeContractV1,
+    },
+    edit_evidence::{evaluate_symbolic_case, verify_result_seal},
 };
 
 pub const BUNDLE_SCHEMA_V1: &str = "muse-evidence-bundle-v1";
@@ -189,9 +193,12 @@ pub struct BundleManifestV1 {
 
 #[derive(Clone, Debug, Default)]
 pub struct EvidenceInputsV1<'a> {
+    pub case_json: Option<&'a [u8]>,
+    pub source_audio_wav: Option<&'a [u8]>,
     pub symbolic_result_json: Option<&'a [u8]>,
     pub render_receipt_json: Option<&'a [u8]>,
     pub render_bundle_root: Option<&'a Path>,
+    pub gain_envelope_contract_json: Option<&'a [u8]>,
     pub acoustic_result_json: Option<&'a [u8]>,
     /// Reserved for the v1 score-to-audio receipt. No registered public
     /// verifier exists yet, so presence alone cannot authorize a pass.
@@ -555,9 +562,34 @@ fn parse_optional_json(bytes: Option<&[u8]>, label: &str) -> Result<Option<Value
     }).transpose()
 }
 
+fn read_artifact(root: Option<&Path>, relative: &str, label: &str) -> Result<Option<Vec<u8>>, String> {
+    let Some(root) = root else { return Ok(None) };
+    let path = root.join(relative);
+    match fs::read(&path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(format!("read {label} {}: {error}", path.display())),
+    }
+}
+
+fn comparable_symbolic_result(value: &Value) -> Value {
+    let mut normalized = value.clone();
+    if let Some(artifacts) = normalized.get_mut("artifacts").and_then(Value::as_object_mut) {
+        artifacts.remove("evaluation_receipt_sha256");
+    }
+    if let Some(system) = normalized.get_mut("system").and_then(Value::as_object_mut) {
+        // This field records the runtime duration of the original call and is
+        // intentionally excluded from deterministic semantic reproduction.
+        system.remove("compute_budget_ms");
+    }
+    normalized
+}
+
 fn verify_symbolic(
     manifest: &BundleManifestV1,
-    bytes: Option<&[u8]>,
+    result_bytes: Option<&[u8]>,
+    case_bytes: Option<&[u8]>,
+    render_bundle_root: Option<&Path>,
 ) -> Result<ComponentReportV1, String> {
     let component = &manifest.components.symbolic_edit;
     let artifacts = &manifest.artifacts;
@@ -567,14 +599,16 @@ fn verify_symbolic(
     {
         return Ok(hard_binding("symbolic component case/source/candidate Score binding mismatch"));
     }
-    let Some(value) = parse_optional_json(bytes, "symbolic result")? else {
+    let Some(bytes) = result_bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("symbolic result bytes were not supplied".into())));
     };
-    verify_result_seal(&value).map_err(|error| format!("symbolic result seal invalid: {error}"))?;
-    if value.get("schema").and_then(Value::as_str) != Some("muse-edit-evidence-result-v1") {
+    let supplied: Value = serde_json::from_slice(bytes)
+        .map_err(|error| format!("symbolic result JSON invalid: {error}"))?;
+    verify_result_seal(&supplied).map_err(|error| format!("symbolic result seal invalid: {error}"))?;
+    if supplied.get("schema").and_then(Value::as_str) != Some("muse-edit-evidence-result-v1") {
         return Err("unsupported symbolic result schema".into());
     }
-    let system = value.get("system").ok_or("symbolic result system metadata missing")?;
+    let system = supplied.get("system").ok_or("symbolic result system metadata missing")?;
     let actual_id = system.get("system_id").and_then(Value::as_str).unwrap_or("");
     let actual_version = system.get("version").and_then(Value::as_str).unwrap_or("");
     if component.base.producer_id.as_deref() != Some(actual_id)
@@ -585,29 +619,55 @@ fn verify_symbolic(
     if actual_id != "muse-symbolic-edit-evaluator" || actual_version != "0.3.0" {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("symbolic evaluator version is not in the v1 verifier allowlist".into())));
     }
-    let result_receipt = value.get("artifacts").and_then(|v| v.get("evaluation_receipt_sha256")).and_then(Value::as_str);
-    if result_receipt != component.base.receipt_sha256.as_deref() {
+    let supplied_receipt = supplied.pointer("/artifacts/evaluation_receipt_sha256").and_then(Value::as_str);
+    if supplied_receipt != component.base.receipt_sha256.as_deref() {
         return Ok(hard_binding("symbolic result receipt digest does not match the bundle reference"));
     }
-    let result_artifacts = value.get("artifacts").ok_or("symbolic result artifacts missing")?;
+    let Some(case_bytes) = case_bytes else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("frozen case JSON is required to reproduce the symbolic edit".into())));
+    };
+    let Some(source_score) = read_artifact(render_bundle_root, "source-score.json", "source Score")? else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("source-score.json is missing from the render bundle".into())));
+    };
+    let Some(candidate_score) = read_artifact(render_bundle_root, "candidate-score.json", "candidate Score")? else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("candidate-score.json is missing from the render bundle".into())));
+    };
+    let Some(candidate_audio) = read_artifact(render_bundle_root, "output.wav", "candidate WAV")? else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("output.wav is missing from the render bundle".into())));
+    };
+    let Some(_source_audio) = None::<Vec<u8>> else { unreachable!() };
+    let reproduced = evaluate_symbolic_case(
+        case_bytes,
+        &source_score,
+        &candidate_score,
+        Some(&candidate_audio),
+    ).map_err(|error| format!("independent symbolic edit reproduction failed: {error}"))?;
+    let reproduced_artifacts = reproduced.get("artifacts").ok_or("reproduced symbolic artifacts missing")?;
     for (field, expected) in [
         ("case_sha256", artifacts.case_sha256.as_str()),
         ("source_score_sha256", artifacts.source_score_sha256.as_str()),
         ("candidate_score_sha256", artifacts.candidate_score_sha256.as_str()),
+        ("candidate_audio_sha256", artifacts.candidate_audio_sha256.as_str()),
     ] {
-        if result_artifacts.get(field).and_then(Value::as_str) != Some(expected) {
-            return Ok(hard_binding(format!("symbolic result {field} does not match the bundle")));
+        if reproduced_artifacts.get(field).and_then(Value::as_str) != Some(expected) {
+            return Ok(hard_binding(format!("reproduced symbolic result {field} does not match the bundle")));
         }
     }
-    if value.get("schema").and_then(Value::as_str) != Some("muse-edit-evidence-result-v1") {
-        return Err("unsupported symbolic result schema".into());
+    let supplied_artifacts = supplied.get("artifacts").ok_or("symbolic result artifacts missing")?;
+    if supplied_artifacts.get("candidate_audio_sha256").and_then(Value::as_str)
+        != Some(artifacts.candidate_audio_sha256.as_str())
+    {
+        return Ok(hard_binding("symbolic result is not bound to the exact rendered candidate WAV"));
     }
-    let outcome = value.get("outcome").ok_or("symbolic result outcome missing")?;
+    if comparable_symbolic_result(&supplied) != comparable_symbolic_result(&reproduced) {
+        return Ok(hard_binding("supplied symbolic receipt differs from independent reproduction"));
+    }
+    let outcome = reproduced.get("outcome").ok_or("reproduced symbolic outcome missing")?;
     let gates = ["target_pass", "preservation_pass", "correspondence_pass"];
     let failed: Vec<&str> = gates
         .iter()
         .copied()
-        .filter(|field| outcome.get(field).and_then(Value::as_bool) == Some(false))
+        .filter(|field| outcome.get(*field).and_then(Value::as_bool) == Some(false))
         .collect();
     if !failed.is_empty() {
         return Ok(gate_report(component.base.status, GateStatusV1::Fail, Some(format!("symbolic sub-gates failed: {failed:?}"))));
@@ -752,7 +812,10 @@ fn verify_render(
 
 fn verify_acoustic(
     manifest: &BundleManifestV1,
-    bytes: Option<&[u8]>,
+    result_bytes: Option<&[u8]>,
+    contract_bytes: Option<&[u8]>,
+    source_audio_bytes: Option<&[u8]>,
+    render_bundle_root: Option<&Path>,
 ) -> Result<ComponentReportV1, String> {
     let component = &manifest.components.acoustic_observation;
     let artifacts = &manifest.artifacts;
@@ -761,21 +824,21 @@ fn verify_acoustic(
     {
         return Ok(hard_binding("acoustic component source/candidate WAV binding mismatch"));
     }
-    let Some(bytes) = bytes else {
+    let Some(result_bytes) = result_bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("acoustic observation bytes were not supplied".into())));
     };
-    let value: Value = serde_json::from_slice(bytes)
+    let supplied: Value = serde_json::from_slice(result_bytes)
         .map_err(|error| format!("acoustic observation JSON invalid: {error}"))?;
-    verify_gain_envelope_observation_seal(&value)
+    verify_gain_envelope_observation_seal(&supplied)
         .map_err(|error| format!("acoustic observation seal invalid: {error}"))?;
-    let actual_receipt = value.get("receipt_sha256").and_then(Value::as_str);
+    let actual_receipt = supplied.get("receipt_sha256").and_then(Value::as_str);
     if actual_receipt != component.base.receipt_sha256.as_deref() {
         return Ok(hard_binding("acoustic receipt digest does not match bundle reference"));
     }
-    if value.get("schema").and_then(Value::as_str) != Some("muse-acoustic-observation-v1") {
+    if supplied.get("schema").and_then(Value::as_str) != Some("muse-acoustic-observation-v1") {
         return Err("unsupported acoustic observation schema".into());
     }
-    let observer = value.get("observer").ok_or("acoustic observer metadata missing")?;
+    let observer = supplied.get("observer").ok_or("acoustic observer metadata missing")?;
     let observer_id = observer.get("observer_id").and_then(Value::as_str).unwrap_or("");
     let observer_version = observer.get("version").and_then(Value::as_str).unwrap_or("");
     if component.base.producer_id.as_deref() != Some(observer_id)
@@ -786,21 +849,48 @@ fn verify_acoustic(
     if observer_id != "muse-windowed-rms-gain-observer" || observer_version != "0.1.0" {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("acoustic observer version is not in the v1 verifier allowlist".into())));
     }
-    let bound = value.get("artifacts").ok_or("acoustic artifacts missing")?;
+    let Some(contract_bytes) = contract_bytes else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("gain-envelope contract JSON is required to reproduce the acoustic observation".into())));
+    };
+    let Some(source_audio) = source_audio_bytes else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("source WAV bytes are required to reproduce the acoustic observation".into())));
+    };
+    let Some(candidate_audio) = read_artifact(render_bundle_root, "output.wav", "candidate WAV")? else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("output.wav is missing from the render bundle".into())));
+    };
+    let observed_source_hash = format!("{:x}", Sha256::digest(source_audio));
+    let observed_candidate_hash = format!("{:x}", Sha256::digest(&candidate_audio));
+    if observed_source_hash != artifacts.source_audio_sha256
+        || observed_candidate_hash != artifacts.candidate_audio_sha256
+    {
+        return Ok(hard_binding("source or candidate WAV bytes do not match the bundle artifact digests"));
+    }
+    let contract: GainEnvelopeContractV1 = serde_json::from_slice(contract_bytes)
+        .map_err(|error| format!("gain-envelope contract JSON invalid: {error}"))?;
+    let reproduced = observe_gain_envelope_v1(source_audio, &candidate_audio, &contract)
+        .map_err(|error| format!("independent acoustic observer reproduction failed: {error}"))?;
+    let reproduced_receipt = reproduced.get("receipt_sha256").and_then(Value::as_str);
+    if reproduced_receipt != component.base.receipt_sha256.as_deref() {
+        return Ok(hard_binding("reproduced acoustic receipt does not match the bundle reference"));
+    }
+    if supplied != reproduced {
+        return Ok(hard_binding("supplied acoustic observation differs from independent WAV/contract reproduction"));
+    }
+    let bound = reproduced.get("artifacts").ok_or("reproduced acoustic artifacts missing")?;
     if bound.get("source_audio_sha256").and_then(Value::as_str) != Some(artifacts.source_audio_sha256.as_str())
         || bound.get("candidate_audio_sha256").and_then(Value::as_str) != Some(artifacts.candidate_audio_sha256.as_str())
         || bound.get("contract_sha256").and_then(Value::as_str) != component.contract_sha256.as_deref()
     {
         return Ok(hard_binding("acoustic observation source/candidate/contract digest mismatch"));
     }
-    let scope_kind = value.pointer("/scope/kind").and_then(Value::as_str).unwrap_or("");
+    let scope_kind = reproduced.pointer("/scope/kind").and_then(Value::as_str).unwrap_or("");
     if scope_kind == "isolated_stem" {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("isolated-stem identity requires a separately verified stem/material lineage receipt".into())));
     }
     if scope_kind != "full_mix" {
         return Ok(gate_report(component.base.status, GateStatusV1::Fail, Some("acoustic observer scope kind is unsupported".into())));
     }
-    let status = value.pointer("/outcome/acoustic_observation_status").and_then(Value::as_str).unwrap_or("abstain");
+    let status = reproduced.pointer("/outcome/acoustic_observation_status").and_then(Value::as_str).unwrap_or("abstain");
     let observed = match status {
         "pass" => GateStatusV1::Pass,
         "fail" => GateStatusV1::Fail,
@@ -840,9 +930,15 @@ pub fn verify_evidence_bundle_v1(
 
     let mut reasons = Vec::new();
     let components = BundleReportComponentsV1 {
-        symbolic_edit: verify_symbolic(&manifest, inputs.symbolic_result_json)?,
+        symbolic_edit: verify_symbolic(&manifest, inputs.symbolic_result_json, inputs.case_json, inputs.render_bundle_root)?,
         render_execution: verify_render(&manifest, inputs.render_receipt_json, inputs.render_bundle_root)?,
-        acoustic_observation: verify_acoustic(&manifest, inputs.acoustic_result_json)?,
+        acoustic_observation: verify_acoustic(
+            &manifest,
+            inputs.acoustic_result_json,
+            inputs.gain_envelope_contract_json,
+            inputs.source_audio_wav,
+            inputs.render_bundle_root,
+        )?,
         score_audio_conformance: unsupported_component(
             manifest.components.score_audio_conformance.base.status,
             inputs.score_audio_result_json.is_some(),
