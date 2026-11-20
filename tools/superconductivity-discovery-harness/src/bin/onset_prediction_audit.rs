@@ -171,6 +171,13 @@ fn parse_evidence(value: &Value) -> Result<Evidence, String> {
             observation.outcome == outcome && same_temperature(observation.dwell_k, temperature)
         })
     };
+    let has_no_cross_product_at = |temperature: f64| {
+        observations.iter().any(|observation| {
+            (observation.outcome == "no_cross_precursor_product"
+                || observation.outcome == "transformed_only")
+                && same_temperature(observation.dwell_k, temperature)
+        })
+    };
     let valid = match kind.as_str() {
         "left_censored" => {
             lower_k.is_none() && positive(upper_k) && exact_k.is_none()
@@ -178,13 +185,13 @@ fn parse_evidence(value: &Value) -> Result<Evidence, String> {
         }
         "right_censored" => {
             positive(lower_k) && upper_k.is_none() && exact_k.is_none()
-                && has_outcome_at("no_cross_precursor_product", lower_k.unwrap_or_default())
+                && has_no_cross_product_at(lower_k.unwrap_or_default())
         }
         "interval_censored" => {
             positive(lower_k) && positive(upper_k) && exact_k.is_none()
                 && lower_k.zip(upper_k).is_some_and(|(lower, upper)| {
                     lower < upper
-                        && has_outcome_at("no_cross_precursor_product", lower)
+                        && has_no_cross_product_at(lower)
                         && has_outcome_at("cross_precursor_product_detected", upper)
                 })
         }
@@ -599,10 +606,22 @@ mod tests {
         assert!(error.contains("artifact digest"));
     }
     #[test]
-    fn transformed_only_observation_cannot_be_used_as_a_nonreaction_bound() {
+    fn transformed_only_is_negative_evidence_only_for_cross_precursor_product_onset() {
         let (schema, fixture) = inputs();
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
         data["pairs"][1]["evidence_observations"][0]["outcome"] = json!("transformed_only");
+        let receipt = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap();
+        let pair = receipt["models"][0]["per_pair_scores"].as_array().unwrap().iter()
+            .find(|row| row["pair_id"] == "synthetic_pair_02").unwrap();
+        assert_eq!(pair["evidence_kind"], "right_censored");
+        assert_eq!(pair["evidence_observations"][0]["outcome"], "transformed_only");
+    }
+
+    #[test]
+    fn uncharacterizable_observation_cannot_establish_a_negative_product_bound() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["pairs"][1]["evidence_observations"][0]["outcome"] = json!("uncharacterizable");
         let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
         assert!(error.contains("lacks matching characterized evidence"));
     }
