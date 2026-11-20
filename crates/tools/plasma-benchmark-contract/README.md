@@ -61,3 +61,17 @@ cargo clippy --locked --all-targets -- -D warnings
 ~~~
 
 The crate has no third-party dependencies.
+
+## Selective learned solvers
+
+A learned solver marked as selective (able to accept/correct/fallback from a
+calibrated statistical risk estimate) must carry a calibration-artifact
+SHA-256 digest. The artifact must be bound externally to the exact solver
+source/build/configuration, checkpoint, training dataset, normalization,
+physics lane and metric profile. This crate checks that the digest is present
+and well-formed; it does not inspect or validate the calibration contents.
+
+Statistical calibration is not a deterministic physics certificate. Its
+coverage, risk, false-safe rate, independence assumptions and subgroup
+performance must be evaluated under the protocol in
+[issue #13010](https://github.com/Luminous-Dynamics/symthaea/issues/13010).
