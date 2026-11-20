@@ -433,5 +433,160 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "passed_gate_count": {
+                "const": 5
+              },
+              "failed_gate_count": {
+                "const": 0
+              },
+              "abstained_gate_count": {
+                "const": 0
+              }
+            }
+          },
+          "components": {
+            "properties": {
+              "symbolic_edit": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "render_execution": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "acoustic_observation": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "score_audio_conformance": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "human_acceptance": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "status": {
+                "const": "fail"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "failed_gate_count": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "status": {
+                "const": "abstain"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "failed_gate_count": {
+                "const": 0
+              },
+              "abstained_gate_count": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
