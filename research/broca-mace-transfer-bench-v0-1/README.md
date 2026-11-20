@@ -376,7 +376,9 @@ The three evidence planes remain deliberately distinct:
 - Mycelix lineage, calibration, trust policy, lifecycle and bitemporal receipts govern source identity and whether the evidence was known/valid at the queried snapshot;
 - Symthaea consolidation emits a proposal; an independent consolidation receipt verifier must attest the exact decision/input/output before the candidate can consume the promoted procedure.
 
-The older raw-JSONL evaluator now fails closed when the outcome receipt does not bind the exact preserved observation line, observed-at time, utility value and unit. The receipt registry remains a synthetic injected verifier seam. The canonical ingress/consolidation cross-crate path is stronger, but the raw-JSONL evaluator still uses a parallel test-only receipt schema; unifying it with the existing evidence receipt bundle and consolidation receipt types is the next integration task.
+The older raw-JSONL evaluator still uses test-only execution, outcome and source registries, but its consolidation gate now uses the same canonical `ConsolidationReceiptProposalV1`, `ConsolidationEvidencePackV1`, `VerifiedConsolidationReceiptV1` and `verify_and_release_promoted_experiences` contract as the cross-crate Session-A → B → C path. The adapter checks the exact (valid_at, known_at) snapshot and compares the released experience against the JSONL action, scope, utility, source-family/root digests, measurement bound, trust and reconciliation fields. The old `verified: bool` receipt is removed. Tests cover non-promotion dispositions, proposal-digest tampering, source-binding substitution after digest reissue, and replay at a later knowledge time.
+
+This narrows the duplicate-schema gap; it does **not** make the JSONL fixture production-authoritative. Its execution/outcome/source registries remain synthetic test adapters, and no live Mycelix/Symtropy signature verification is claimed.
 
 ### Treatment-effect transport semantics (MACE v0.6)
 
@@ -396,3 +398,10 @@ This remains a deterministic prototype: measurement bounds and root digests requ
 The consolidation integration suite now has a Session-A → Session-B transport control built from raw `RawInteractionV1` records. Session A is ingested at an explicit (valid_at, known_at) snapshot, grouped into action-/scope-specific evidence packs, promoted through proposal-only consolidation, and released only after an independent receipt verifier accepts the exact source bindings. Session B contributes one receipt-verified witness per action under a shifted regime with a +0.15 common-mode baseline shift. Exact-scope policy abstains; invariant transport uses the stable A-B treatment effect.
 
 The fixture verifier is synthetic. This validates crate composition and receipt/evidence interfaces, not live Mycelix cryptographic verification or physical causal inference.
+
+
+### Legacy JSONL consolidation gate (MACE v0.8)
+
+The test-only JSONL adapter no longer accepts a `verified: bool` consolidation record. It now consumes a canonical promotion proposal, receipt-preserving evidence pack and verifier-issued receipt; it calls the shared canonical release function and checks full bitemporal snapshot equality before exposing the released experience. Additional equality checks bind the legacy JSONL observation to the canonical action, scope, outcome, source-family/root digests, trust and measurement error bound.
+
+Four additional adversarial regressions cover non-promotion dispositions, output/proposal digest tampering, a substituted source event even when a matching proposal digest is supplied, and stale receipt replay against a later knowledge snapshot. This is still a synthetic fixture adapter: execution, outcome and source verifier registries are not live Mycelix/Symtropy verifiers.
