@@ -1,0 +1,115 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "DYN-TRAJECTORY-VECTOR-FIELD-IDENTIFIABILITY-001",
+  "track": "dynamical_symmetry",
+  "case_id": "DYN-ORBIT-SYMMETRY-NOT-FIELD-SYMMETRY-001",
+  "vector_field": {
+    "state_variables": [
+      "x",
+      "y"
+    ],
+    "components": [
+      {
+        "component": "x_dot",
+        "terms": [
+          {
+            "exponents": [
+              1,
+              0
+            ],
+            "coefficient": 1
+          }
+        ]
+      },
+      {
+        "component": "y_dot",
+        "terms": [
+          {
+            "exponents": [
+              0,
+              1
+            ],
+            "coefficient": 1
+          },
+          {
+            "exponents": [
+              1,
+              2
+            ],
+            "coefficient": 1
+          }
+        ]
+      }
+    ]
+  },
+  "candidate_action": {
+    "action_id": "reflection_y",
+    "matrix": [
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        -1
+      ]
+    ],
+    "order": 2,
+    "action_semantics": "z maps to R z; vector-field equivariance requires F(R z) = R F(z)"
+  },
+  "observed_invariant_submanifold": {
+    "equation": "y=0",
+    "domain": "x>0",
+    "is_invariant_under_candidate_action": true,
+    "vector_field_tangent_to_submanifold": true,
+    "normal_component_on_submanifold": "y_dot(x,0)=0",
+    "analytic_trajectory": {
+      "x_of_t": "x0*exp(t)",
+      "y_of_t": "0",
+      "x0_domain": "x0>0"
+    }
+  },
+  "global_equivariance": {
+    "expected": false,
+    "residual_convention": "F(R z) - R F(z)",
+    "exact_residual_polynomial": [
+      {
+        "component": "x",
+        "exponents": [
+          0,
+          0
+        ],
+        "coefficient": 0
+      },
+      {
+        "component": "y",
+        "exponents": [
+          1,
+          2
+        ],
+        "coefficient": 2
+      }
+    ],
+    "witness_state": [
+      1,
+      1
+    ],
+    "witness_residual": [
+      0,
+      2
+    ]
+  },
+  "expected_semantics": {
+    "observed_trajectory_set_invariant": true,
+    "candidate_is_global_vector_field_symmetry": false,
+    "permitted_report": "trajectory-set invariance only; do not promote to global vector-field or flow-map symmetry",
+    "false_global_symmetry_promotion": true,
+    "hard_pruning_permitted": false
+  },
+  "source": {
+    "comparator": "Tahmasebi & Weber, Adaptive Symmetry Discovery for Dynamical System Identification, ICML 2026",
+    "url": "https://proceedings.mlr.press/v306/tahmasebi26a.html",
+    "role": "exact out-of-assumption/identifiability stress case; theorem applicability must be checked against the full paper assumptions"
+  },
+  "claim_boundary": "This exact analytic control demonstrates that a single observed invariant orbit need not identify a global vector-field symmetry. It is not an empirical trajectory dataset or a reproduction of the ICML method."
+}
