@@ -94,3 +94,11 @@ There is no scalar score across the four physics lanes. An overall task pass req
 ## Claim ceiling
 
 The portfolio is an execution map, not a result. It does not claim paper reproductions, cross-physics transfer, SOTA superiority, PIC acceleration, or fusion-device qualification.
+
+
+### L6. Structure-preserving plasma closures
+
+- [#12958 — Hamiltonian / metriplectic closure qualification](https://github.com/Luminous-Dynamics/symthaea/issues/12958); protocol in [PR #12959](https://github.com/Luminous-Dynamics/symthaea/pull/12959).
+- Plasma-native reference: Finn et al., discrete-gradient Vlasov-Poisson-Landau PIC (JCP 2026, DOI 10.1016/j.jcp.2026.114749).
+- Transferable neural-operator prior art: GENERIC-FNO (arXiv:2606.08343); not yet a plasma result.
+- Keep collisionless Hamiltonian Vlasov-Poisson and collisional metriplectic Vlasov-Poisson-Landau in separate score lanes. Do not impose collisional entropy monotonicity as a generic collisionless gate.
