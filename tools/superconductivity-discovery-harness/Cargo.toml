@@ -43,3 +43,7 @@ path = "src/bin/reaction_selectivity_audit.rs"
 [[bin]]
 name = "sc_thermochemical_network_audit"
 path = "src/bin/thermochemical_network_audit.rs"
+
+[[bin]]
+name = "sc_transport_kinetic_selectivity_audit"
+path = "src/bin/transport_kinetic_selectivity_audit.rs"

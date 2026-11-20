@@ -1,0 +1,26 @@
+{
+  "contract": "SC-TRANSPORT-KINETIC-SELECTIVITY-SUITE-0.1",
+  "suite_id": "superconductivity_transport_kinetic_selectivity_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json",
+  "fixtures": [
+    {
+      "benchmark_id": "synthetic_two_ion_competing_route_time_selectivity_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/transport_kinetic_selectivity_smoke_v0_1.json",
+      "expected": [
+        "same_thermodynamics_opposite_cross_correlation_changes_phase_selectivity",
+        "negative_correlation_short_hold_target_wins",
+        "negative_correlation_long_hold_competitor_wins",
+        "phase_fractions_sum_to_one"
+      ]
+    },
+    {
+      "benchmark_id": "adversarial_non_psd_transport_matrix_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/transport_kinetic_selectivity_non_psd_v0_1.json",
+      "expected": [
+        "cross_correlation_outside_positive_definite_transport_bound_rejected"
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic two-route transport-coupled kinetic-selectivity model only; no measured diffusion coefficient, reaction rate, phase yield, superconducting material or laboratory procedure is established."
+}
