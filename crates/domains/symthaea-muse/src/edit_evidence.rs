@@ -694,7 +694,7 @@ mod tests {
         let source = score(false);
         let mut candidate = score(true);
         candidate.notes[0].velocity = 0.99;
-        let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
+        let result = evaluate_symbolic_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
         assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
     }
 
@@ -703,7 +703,7 @@ mod tests {
         let source = score(false);
         let mut candidate = score(true);
         candidate.notes[2].velocity = 0.51;
-        let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
+        let result = evaluate_symbolic_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
         assert!(!result["outcome"]["preservation_pass"].as_bool().unwrap());
     }
 
@@ -713,7 +713,7 @@ mod tests {
         let candidate = score(true);
         let mut case = case_for(&source);
         case["target"]["event_correspondence"][1]["source_note_ordinals"] = json!([0]);
-        let error = evaluate_velocity_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
+        let error = evaluate_symbolic_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
         assert!(error.contains("duplicate source"));
     }
 
@@ -723,7 +723,7 @@ mod tests {
         let candidate = score(true);
         let mut case = case_for(&source);
         case["source"]["score_sha256"] = json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        let error = evaluate_velocity_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
+        let error = evaluate_symbolic_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
         assert!(error.contains("source Score digest mismatch"));
     }
 
@@ -733,7 +733,7 @@ mod tests {
         let candidate = score(true);
         let mut malformed = serde_json::to_value(&source).unwrap();
         malformed["notes"][0]["onset"]["den"] = json!(0);
-        let error = evaluate_velocity_case(
+        let error = evaluate_symbolic_case(
             &bytes(&case_for(&source)),
             &bytes(&malformed),
             &bytes(&candidate),
@@ -748,7 +748,7 @@ mod tests {
         let mut case = case_for(&source);
         case["edit_contract"]["parameters"]["scale_numerator"] = json!(1);
         case["edit_contract"]["parameters"]["scale_denominator"] = json!(1);
-        let error = evaluate_velocity_case(
+        let error = evaluate_symbolic_case(
             &bytes(&case),
             &bytes(&source),
             &bytes(&source),
@@ -764,7 +764,7 @@ mod tests {
         let mut case = case_for(&source);
         case["edit_contract"]["parameters"]["scale_numerator"] = json!(9);
         case["edit_contract"]["parameters"]["scale_denominator"] = json!(8);
-        let result = evaluate_velocity_case(
+        let result = evaluate_symbolic_case(
             &bytes(&case),
             &bytes(&source),
             &bytes(&candidate),
@@ -783,7 +783,7 @@ mod tests {
             "start": {"numerator": 0, "denominator": 1},
             "end": {"numerator": 2, "denominator": 1}
         }]);
-        let result = evaluate_velocity_case(
+        let result = evaluate_symbolic_case(
             &bytes(&case),
             &bytes(&source),
             &bytes(&candidate),
@@ -798,7 +798,7 @@ mod tests {
         let source = score(false);
         let mut candidate = score(true);
         candidate.push(note(30, 2, 0.4));
-        let result = evaluate_velocity_case(
+        let result = evaluate_symbolic_case(
             &bytes(&case_for(&source)),
             &bytes(&source),
             &bytes(&candidate),
@@ -817,7 +817,7 @@ mod tests {
         case["instruction"]["text"] = json!("Raise part 10 by two semitones.");
         case["edit_contract"]["parameters"] = json!({"semitones": 2});
         case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "pitch_accuracy"]);
-        let result = evaluate_velocity_case(
+        let result = evaluate_symbolic_case(
             &bytes(&case),
             &bytes(&source),
             &bytes(&candidate),
@@ -837,7 +837,7 @@ mod tests {
         case["instruction"]["operation_family"] = json!("pitch");
         case["edit_contract"]["parameters"] = json!({"semitones": -2});
         case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "pitch_accuracy"]);
-        let result = evaluate_velocity_case(
+        let result = evaluate_symbolic_case(
             &bytes(&case),
             &bytes(&source),
             &bytes(&candidate),
@@ -872,7 +872,7 @@ mod tests {
         let candidate = score(true);
         let mut case = case_for(&source);
         case["instruction"]["operation_family"] = json!("harmony");
-        let error = evaluate_velocity_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
+        let error = evaluate_symbolic_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
         assert!(error.contains("abstain"));
     }
 }
