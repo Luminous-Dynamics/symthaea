@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_thermochemical_network_v0_1.schema.json",
+  "title": "Finite thermochemical reaction network and route consistency",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "network_id",
+    "fixture_only",
+    "conditions",
+    "reference_extent_basis_id",
+    "reference_extent_unit",
+    "balance_tolerance",
+    "cycle_closure_tolerance_eV",
+    "species",
+    "reactions",
+    "paths",
+    "cycles",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-THERMOCHEMICAL-NETWORK-0.1"
+    },
+    "network_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conditions_id",
+        "temperature_k",
+        "pressure_gpa",
+        "atmosphere",
+        "chemical_potential_context"
+      ],
+      "properties": {
+        "conditions_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "temperature_k": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pressure_gpa": {
+          "type": "number",
+          "minimum": 0
+        },
+        "atmosphere": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chemical_potential_context": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reference_extent_basis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_extent_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "balance_tolerance": {
+      "type": "number",
+      "minimum": 0
+    },
+    "cycle_closure_tolerance_eV": {
+      "type": "number",
+      "minimum": 0
+    },
+    "species": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "species_id",
+          "formula_as_declared",
+          "elemental_composition",
+          "charge"
+        ],
+        "properties": {
+          "species_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "formula_as_declared": {
+            "type": "string",
+            "minLength": 1
+          },
+          "elemental_composition": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "charge": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "reactions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reaction_id",
+          "role",
+          "conditions_id",
+          "extent_basis_id",
+          "extent_unit",
+          "stoichiometric_terms",
+          "delta_g_interval_eV",
+          "activation_barrier_interval_eV",
+          "source_class"
+        ],
+        "properties": {
+          "reaction_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "target_route_step",
+              "competing_route_step",
+              "intermediate_conversion",
+              "polymorph_conversion"
+            ]
+          },
+          "conditions_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extent_basis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extent_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stoichiometric_terms": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 30,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "species_id",
+                "coefficient"
+              ],
+              "properties": {
+                "species_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "coefficient": {
+                  "type": "number",
+                  "not": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          },
+          "delta_g_interval_eV": {
+            "$ref": "#/$defs/interval"
+          },
+          "activation_barrier_interval_eV": {
+            "$ref": "#/$defs/nonnegative_interval"
+          },
+          "source_class": {
+            "enum": [
+              "first_principles_calculated",
+              "machine_learning_predicted",
+              "thermochemical_database",
+              "synthetic_fixture",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "paths": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path_id",
+          "path_role",
+          "input_species_ids",
+          "target_species_id",
+          "reaction_ids"
+        ],
+        "properties": {
+          "path_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path_role": {
+            "enum": [
+              "target",
+              "competing"
+            ]
+          },
+          "input_species_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "target_species_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reaction_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "cycles": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cycle_id",
+          "terms"
+        ],
+        "properties": {
+          "cycle_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "terms": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 30,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reaction_id",
+                "orientation"
+              ],
+              "properties": {
+                "reaction_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "orientation": {
+                  "enum": [
+                    -1,
+                    1
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic stoichiometric and thermodynamic network audit only; no real synthesis route, DFT calculation, superconducting phase or laboratory authorization is established."
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    },
+    "nonnegative_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
