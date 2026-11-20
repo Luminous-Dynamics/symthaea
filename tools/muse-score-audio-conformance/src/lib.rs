@@ -13,12 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::{cmp::Ordering, io::Cursor};
-use symthaea_music_theory::{
-    pitch::{Pitch, PitchClass},
-    rhythm::Duration,
-    score::{Emphasis, PartId, Score, ScoreNote, VoiceRole},
-    Key,
-};
+use symthaea_music_theory::score::{Score, ScoreNote};
 
 pub const SCORE_AUDIO_CONFORMANCE_SCHEMA_V1: &str = "muse-score-audio-conformance-v1";
 pub const SCORE_AUDIO_CONTRACT_SCHEMA_V1: &str = "muse-score-audio-contract-v1";
@@ -582,6 +577,12 @@ pub fn verify_score_audio_conformance_seal(result: &Value) -> Result<(), String>
 mod tests {
     use super::*;
     use hound::{WavSpec, WavWriter};
+    use symthaea_music_theory::{
+        pitch::{Pitch, PitchClass},
+        rhythm::Duration,
+        score::{Emphasis, PartId, ScoreNote, VoiceRole},
+        Key,
+    };
 
     fn score(midi: u8, duration: Duration) -> Score {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
