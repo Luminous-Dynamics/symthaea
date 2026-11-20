@@ -59,7 +59,7 @@ No second event ledger or PDE solver should be created. Solver-specific adapters
 3. **Structure-preserving residual learning:** the trusted numerical operator retains final acceptance authority.
 4. **Resolution and time semantics as first-class inputs:** separate spatial mesh changes, timestep changes, RK stage policies, physical-time lag and diagnostic clock alignment.
 5. **Domain-of-trust envelopes:** publish accuracy, physical-admissibility, epistemic/OOD and numerical-portability envelopes independently.
-6. **Active multi-fidelity acquisition:** use disagreement, residual structure and calibrated uncertainty to choose the next expensive kinetic runs; retain a sealed test set and report cost per reduction in decision uncertainty.
+6. **Active multi-fidelity acquisition:** use disagreement, residual structure and calibrated uncertainty to choose the next expensive kinetic runs; retain a sealed test set and report cost per reduction in decision uncertainty. This is now tracked separately in [#12944](https://github.com/Luminous-Dynamics/symthaea/issues/12944), with random/space-filling, uncertainty, residual and cost-aware multi-fidelity baselines.
 
 ## Cross-lane reporting contract
 
