@@ -1,0 +1,108 @@
+{
+  "contract": "SC-MODEL-DISCRIMINATION-0.1",
+  "instance_id": "synthetic-four-hypothesis-mechanism-discrimination-v0",
+  "fixture_only": true,
+  "models": [
+    { "model_id": "uniform_electron_phonon", "prior_probability": 0.35, "none_of_above": false },
+    { "model_id": "multiband_electron_phonon", "prior_probability": 0.25, "none_of_above": false },
+    { "model_id": "finite_q_pairing", "prior_probability": 0.25, "none_of_above": false },
+    { "model_id": "none_of_above", "prior_probability": 0.15, "none_of_above": true }
+  ],
+  "outcome_labels": ["signature_observed", "signature_not_observed"],
+  "initial_capabilities": ["transport_measurement", "stiffness_probe"],
+  "budget_units": 6,
+  "actions": [
+    {
+      "action_id": "qualify_thermodynamic_channel",
+      "action_type": "capability",
+      "label": "Qualify an independent thermodynamic measurement channel",
+      "cost_units": 1,
+      "requires_capabilities": [],
+      "provides_capabilities": ["qualified_thermodynamic_channel"],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": []
+    },
+    {
+      "action_id": "bulk_thermodynamic_crosscheck",
+      "action_type": "measurement",
+      "label": "Independent thermodynamic bulk-transition cross-check",
+      "cost_units": 1,
+      "requires_capabilities": ["qualified_thermodynamic_channel"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "outcome_probabilities": [0.90, 0.10] },
+        { "model_id": "multiband_electron_phonon", "outcome_probabilities": [0.90, 0.10] },
+        { "model_id": "finite_q_pairing", "outcome_probabilities": [0.85, 0.15] },
+        { "model_id": "none_of_above", "outcome_probabilities": [0.10, 0.90] }
+      ]
+    },
+    {
+      "action_id": "field_angle_hc2",
+      "action_type": "measurement",
+      "label": "Field-angle-dependent upper-critical-field signature",
+      "cost_units": 2,
+      "requires_capabilities": ["transport_measurement"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "outcome_probabilities": [0.15, 0.85] },
+        { "model_id": "multiband_electron_phonon", "outcome_probabilities": [0.80, 0.20] },
+        { "model_id": "finite_q_pairing", "outcome_probabilities": [0.65, 0.35] },
+        { "model_id": "none_of_above", "outcome_probabilities": [0.50, 0.50] }
+      ]
+    },
+    {
+      "action_id": "stiffness_tensor",
+      "action_type": "measurement",
+      "label": "Longitudinal/transverse stiffness-tensor signature",
+      "cost_units": 2,
+      "requires_capabilities": ["stiffness_probe"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "outcome_probabilities": [0.05, 0.95] },
+        { "model_id": "multiband_electron_phonon", "outcome_probabilities": [0.25, 0.75] },
+        { "model_id": "finite_q_pairing", "outcome_probabilities": [0.85, 0.15] },
+        { "model_id": "none_of_above", "outcome_probabilities": [0.50, 0.50] }
+      ]
+    },
+    {
+      "action_id": "cheap_resistivity_repeat",
+      "action_type": "replication",
+      "label": "Low-cost repeat of the same resistive proxy",
+      "cost_units": 1,
+      "requires_capabilities": ["transport_measurement"],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "outcome_probabilities": [0.65, 0.35] },
+        { "model_id": "multiband_electron_phonon", "outcome_probabilities": [0.65, 0.35] },
+        { "model_id": "finite_q_pairing", "outcome_probabilities": [0.65, 0.35] },
+        { "model_id": "none_of_above", "outcome_probabilities": [0.65, 0.35] }
+      ]
+    },
+    {
+      "action_id": "unreviewed_high_field_probe",
+      "action_type": "measurement",
+      "label": "Deliberately ineligible high-field discriminator",
+      "cost_units": 1,
+      "requires_capabilities": ["high_field_facility"],
+      "provides_capabilities": [],
+      "eligible": false,
+      "exclusion_reason": "Independent facility and safety qualification is absent",
+      "model_likelihoods": [
+        { "model_id": "uniform_electron_phonon", "outcome_probabilities": [0.99, 0.01] },
+        { "model_id": "multiband_electron_phonon", "outcome_probabilities": [0.95, 0.05] },
+        { "model_id": "finite_q_pairing", "outcome_probabilities": [0.90, 0.10] },
+        { "model_id": "none_of_above", "outcome_probabilities": [0.01, 0.99] }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic model-discrimination planning contract only; likelihoods are illustrative and do not describe a real specimen, authorize an experiment, or establish a pairing mechanism."
+}

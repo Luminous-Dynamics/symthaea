@@ -1,0 +1,185 @@
+{
+  "contract": "SC-CAPABILITY-PLAN-0.1",
+  "instance_id": "synthetic-two-parameter-capability-gate-v0",
+  "fixture_only": true,
+  "parameter_names": [
+    "amplitude_parameter",
+    "phase_stiffness_parameter"
+  ],
+  "prior_precision": [
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "target_direction": [
+    1,
+    1
+  ],
+  "initial_capabilities": [
+    "amplitude_spectroscopy",
+    "transport_measurement"
+  ],
+  "budget_units": 5,
+  "actions": [
+    {
+      "action_id": "amp_map",
+      "action_type": "measurement",
+      "label": "Amplitude-sensitive mapping",
+      "cost_units": 2,
+      "requires_capabilities": [
+        "amplitude_spectroscopy"
+      ],
+      "provides_capabilities": [],
+      "information_matrix": [
+        [
+          4,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "eligible": true,
+      "exclusion_reason": ""
+    },
+    {
+      "action_id": "heat_calibration",
+      "action_type": "capability",
+      "label": "Qualify calorimetry workflow",
+      "cost_units": 2,
+      "requires_capabilities": [],
+      "provides_capabilities": [
+        "heat_capacity_measurement"
+      ],
+      "information_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "eligible": true,
+      "exclusion_reason": ""
+    },
+    {
+      "action_id": "heat_scan",
+      "action_type": "measurement",
+      "label": "Heat-capacity measurement",
+      "cost_units": 1,
+      "requires_capabilities": [
+        "heat_capacity_measurement"
+      ],
+      "provides_capabilities": [],
+      "information_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          4
+        ]
+      ],
+      "eligible": true,
+      "exclusion_reason": ""
+    },
+    {
+      "action_id": "cheap_transport",
+      "action_type": "measurement",
+      "label": "Low-cost transport proxy",
+      "cost_units": 1,
+      "requires_capabilities": [
+        "transport_measurement"
+      ],
+      "provides_capabilities": [],
+      "information_matrix": [
+        [
+          0.4,
+          0.1
+        ],
+        [
+          0.1,
+          0.2
+        ]
+      ],
+      "eligible": true,
+      "exclusion_reason": ""
+    },
+    {
+      "action_id": "vortex_qualification",
+      "action_type": "capability",
+      "label": "Qualify vortex imaging workflow",
+      "cost_units": 3,
+      "requires_capabilities": [],
+      "provides_capabilities": [
+        "vortex_imaging"
+      ],
+      "information_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "eligible": true,
+      "exclusion_reason": ""
+    },
+    {
+      "action_id": "vortex_map",
+      "action_type": "measurement",
+      "label": "Vortex-core and density imaging",
+      "cost_units": 2,
+      "requires_capabilities": [
+        "vortex_imaging"
+      ],
+      "provides_capabilities": [],
+      "information_matrix": [
+        [
+          1,
+          0.8
+        ],
+        [
+          0.8,
+          1
+        ]
+      ],
+      "eligible": true,
+      "exclusion_reason": ""
+    },
+    {
+      "action_id": "unreviewed_high_field",
+      "action_type": "measurement",
+      "label": "Unreviewed high-field test",
+      "cost_units": 1,
+      "requires_capabilities": [
+        "high_field_facility"
+      ],
+      "provides_capabilities": [],
+      "information_matrix": [
+        [
+          10,
+          0
+        ],
+        [
+          0,
+          10
+        ]
+      ],
+      "eligible": false,
+      "exclusion_reason": "Missing independent safety and facility qualification"
+    }
+  ],
+  "claim_ceiling": "Synthetic capability-gated planning benchmark only; no physical experiment is authorized or performed and no material property is established."
+}
