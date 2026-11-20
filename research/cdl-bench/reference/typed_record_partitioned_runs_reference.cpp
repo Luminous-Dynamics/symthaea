@@ -733,6 +733,146 @@ bool decode_partitioned_columnar(const std::vector<std::uint8_t>& bytes, std::si
     return output.size() == count64;
 }
 
+
+std::vector<std::uint8_t> encode_partitioned_adaptive(const std::vector<Record>& records,
+                                                       std::size_t* row_children = nullptr,
+                                                       std::size_t* columnar_children = nullptr) {
+    for (std::size_t i = 1U; i < records.size(); ++i) {
+        if (records[i].timestamp <= records[i - 1U].timestamp)
+            throw std::runtime_error("adaptive partition prototype requires strictly increasing unique timestamps");
+    }
+    std::map<Key, std::size_t> key_to_id;
+    std::vector<Key> keys;
+    std::vector<std::vector<Record>> per_key;
+    for (const auto& record : records) {
+        const Key key = key_of(record);
+        auto [it, inserted] = key_to_id.emplace(key, keys.size());
+        if (inserted) {
+            keys.push_back(key);
+            per_key.emplace_back();
+        }
+        per_key[it->second].push_back(record);
+    }
+
+    std::vector<std::vector<std::uint8_t>> streams;
+    std::vector<std::uint8_t> layouts;
+    streams.reserve(keys.size());
+    layouts.reserve(keys.size());
+    std::size_t row_count = 0U;
+    std::size_t columnar_count = 0U;
+    for (const auto& rows : per_key) {
+        const auto row_stream = encode_one_series(rows);
+        const auto columnar_stream = encode_one_series_columnar(rows);
+        if (row_stream.size() <= columnar_stream.size()) {
+            streams.push_back(row_stream);
+            layouts.push_back(0U); // row-state child
+            ++row_count;
+        } else {
+            streams.push_back(columnar_stream);
+            layouts.push_back(1U); // field-columnar child
+            ++columnar_count;
+        }
+    }
+
+    if (row_children != nullptr) *row_children = row_count;
+    if (columnar_children != nullptr) *columnar_children = columnar_count;
+
+    std::vector<std::uint8_t> out;
+    out.insert(out.end(), {'P', 'A', 'X', '1'});
+    put_u64(records.size(), out);
+    put_u32(static_cast<std::uint32_t>(keys.size()), out);
+    out.push_back(static_cast<std::uint8_t>(kFields));
+    out.insert(out.end(), kSchema.begin(), kSchema.end());
+    for (std::size_t i = 0U; i < keys.size(); ++i) {
+        put_u32(keys[i].first, out);
+        put_u32(keys[i].second, out);
+        put_u64(per_key[i].size(), out);
+        put_u64(streams[i].size(), out);
+        out.push_back(layouts[i]);
+        out.insert(out.end(), streams[i].begin(), streams[i].end());
+    }
+    put_u32(crc32(out.data(), out.size()), out);
+    return out;
+}
+
+bool decode_partitioned_adaptive(const std::vector<std::uint8_t>& bytes, std::size_t max_records,
+                                 std::vector<Record>& output) {
+    output.clear();
+    if (bytes.size() < 4U + 8U + 4U + 1U + kFields + 4U) return false;
+    const std::size_t crc_pos = bytes.size() - 4U;
+    std::size_t crc_cursor = crc_pos;
+    std::uint32_t stored_crc = 0U;
+    if (!get_u32(bytes, crc_cursor, stored_crc) || crc32(bytes.data(), crc_pos) != stored_crc) return false;
+
+    std::size_t cursor = 0U;
+    if (bytes[cursor++] != 'P' || bytes[cursor++] != 'A' ||
+        bytes[cursor++] != 'X' || bytes[cursor++] != '1') return false;
+    std::uint64_t count64 = 0U;
+    std::uint32_t key_count = 0U;
+    if (!get_u64(bytes, cursor, count64) || count64 > max_records || count64 > SIZE_MAX ||
+        !get_u32(bytes, cursor, key_count) || key_count > count64 ||
+        key_count > 1'000'000U) return false;
+    if ((count64 == 0U) != (key_count == 0U)) return false;
+    if (cursor >= crc_pos || bytes[cursor++] != kFields ||
+        bytes.size() - cursor < kFields) return false;
+    for (const auto kind : kSchema) if (bytes[cursor++] != kind) return false;
+
+    std::vector<Key> keys;
+    std::vector<std::vector<Record>> rows;
+    keys.reserve(key_count);
+    rows.resize(key_count);
+    std::uint64_t total_rows = 0U;
+    for (std::uint32_t i = 0U; i < key_count; ++i) {
+        std::uint32_t entity = 0U, series = 0U;
+        std::uint64_t row_count = 0U, child_len = 0U;
+        if (!get_u32(bytes, cursor, entity) || !get_u32(bytes, cursor, series) ||
+            !get_u64(bytes, cursor, row_count) || !get_u64(bytes, cursor, child_len) ||
+            row_count == 0U || row_count > count64 || row_count > SIZE_MAX ||
+            cursor >= crc_pos) return false;
+        const auto layout = bytes[cursor++];
+        if (layout > 1U || cursor > crc_pos || child_len > crc_pos - cursor) return false;
+        keys.emplace_back(entity, series);
+        for (std::uint32_t j = 0U; j < i; ++j) if (keys[j] == keys.back()) return false;
+        std::vector<std::uint8_t> child(
+            bytes.begin() + static_cast<std::ptrdiff_t>(cursor),
+            bytes.begin() + static_cast<std::ptrdiff_t>(cursor + static_cast<std::size_t>(child_len)));
+        cursor += static_cast<std::size_t>(child_len);
+        const bool decoded = layout == 0U
+            ? decode_one_series(child, static_cast<std::size_t>(row_count), keys.back(), rows[i])
+            : decode_one_series_columnar(child, static_cast<std::size_t>(row_count), keys.back(), rows[i]);
+        if (!decoded) return false;
+        for (std::size_t j = 1U; j < rows[i].size(); ++j) {
+            if (rows[i][j].timestamp <= rows[i][j - 1U].timestamp) return false;
+        }
+        if (row_count > count64 - total_rows) return false;
+        total_rows += row_count;
+    }
+    if (total_rows != count64 || cursor != crc_pos) return false;
+
+    using HeapEntry = std::pair<std::uint64_t, std::size_t>;
+    std::priority_queue<HeapEntry, std::vector<HeapEntry>, std::greater<HeapEntry>> heap;
+    std::vector<std::size_t> cursors(key_count, 0U);
+    for (std::size_t key = 0U; key < rows.size(); ++key) {
+        if (!rows[key].empty()) heap.emplace(rows[key][0].timestamp, key);
+    }
+    output.reserve(static_cast<std::size_t>(count64));
+    bool have_previous = false;
+    std::uint64_t previous_timestamp = 0U;
+    while (!heap.empty()) {
+        const auto [timestamp, key] = heap.top();
+        heap.pop();
+        if (have_previous && timestamp <= previous_timestamp) return false;
+        const auto row_index = cursors[key]++;
+        if (row_index >= rows[key].size() || rows[key][row_index].timestamp != timestamp) return false;
+        output.push_back(rows[key][row_index]);
+        previous_timestamp = timestamp;
+        have_previous = true;
+        if (cursors[key] < rows[key].size()) heap.emplace(rows[key][cursors[key]].timestamp, key);
+    }
+    for (std::size_t key = 0U; key < rows.size(); ++key) if (cursors[key] != rows[key].size()) return false;
+    return output.size() == count64;
+}
+
 void write_file(const std::filesystem::path& path,const std::vector<std::uint8_t>& bytes){std::ofstream f(path,std::ios::binary);if(!f)throw std::runtime_error("open failed");f.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));if(!f)throw std::runtime_error("write failed");}
 void require(bool v,const std::string& m){if(!v)throw std::runtime_error(m);}
 void test_columnar_empty() {
