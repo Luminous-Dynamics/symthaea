@@ -1,0 +1,32 @@
+{
+  "key": {
+    "tonic": 0,
+    "tonality": "Major"
+  },
+  "tempo_bpm": 120,
+  "meter": 4,
+  "notes": [
+    {
+      "part": 0,
+      "pitch": {
+        "midi": 60
+      },
+      "onset": {
+        "num": 0,
+        "den": 1
+      },
+      "duration": {
+        "num": 1,
+        "den": 1
+      },
+      "velocity": 0.7,
+      "role": "Melody",
+      "emphasis": "Normal",
+      "section_intensity": 1
+    }
+  ],
+  "total_beats": {
+    "num": 1,
+    "den": 1
+  }
+}
