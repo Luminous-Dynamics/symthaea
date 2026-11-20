@@ -1442,6 +1442,13 @@ mod tests {
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
         let error = ledger.submit(&command, &capabilities, &mut registry).unwrap_err();
         assert_eq!(error.code, "NON_MONOTONIC_SEQUENCE");
+
+        let mut next_sequence_same_id = command.clone();
+        next_sequence_same_id.sequence = "2".into();
+        let error = ledger
+            .submit(&next_sequence_same_id, &capabilities, &mut registry)
+            .unwrap_err();
+        assert_eq!(error.code, "DUPLICATE_COMMAND_ID");
     }
 
     #[test]
