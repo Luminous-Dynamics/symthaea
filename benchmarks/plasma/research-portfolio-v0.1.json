@@ -162,6 +162,43 @@
         "matched_cost_accuracy_frontier"
       ],
       "execution_status": "mathematical_protocol_only"
+    },
+    {
+      "id": "variational_particle_measure_neural_field",
+      "issues": [
+        12960
+      ],
+      "prs": [
+        12961
+      ],
+      "primary_task": "electrostatic_particle_measure_scalar_energy_and_gradient_force",
+      "required_outputs": [
+        "force_integrability",
+        "permutation_translation_symmetries",
+        "self_force_negative_control",
+        "discrete_time_energy_by_integrator",
+        "matched_NEOPIC_PIF_PIC_cost"
+      ],
+      "execution_status": "mathematical_protocol_only"
+    },
+    {
+      "id": "local_gauss_preserving_electrostatic_pic",
+      "issues": [
+        12962
+      ],
+      "prs": [
+        12963
+      ],
+      "primary_task": "electrostatic_vlasov_ampere_local_Gauss_preserving_GP_PIC",
+      "source_doi": "10.1016/j.cpc.2026.110296",
+      "required_outputs": [
+        "per_cell_Gauss_residual",
+        "charge_continuity",
+        "curl_free_residual",
+        "Landau_two_stream_Diocotron",
+        "communication_scaling"
+      ],
+      "execution_status": "source_review_protocol_only"
     }
   ],
   "shared_infrastructure": {
