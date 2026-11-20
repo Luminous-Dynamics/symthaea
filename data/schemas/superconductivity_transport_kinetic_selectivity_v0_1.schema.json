@@ -49,7 +49,8 @@
           "target_route",
           "competitor_route",
           "thermodynamic_selectivity_margin_eV",
-          "observation_status"
+          "observation_status",
+          "thermodynamic_conditions_id"
         ],
         "properties": {
           "case_id": {
@@ -114,6 +115,10 @@
           },
           "observation_status": {
             "const": "unknown_not_reported"
+          },
+          "thermodynamic_conditions_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -148,7 +153,10 @@
         "reaction_activation_barrier_eV",
         "reaction_prefactor_s_inverse",
         "delta_g_interval_eV_per_route_extent",
-        "availability_fraction"
+        "availability_fraction",
+        "thermodynamic_conditions_id",
+        "reaction_extent_basis_id",
+        "standard_state_id"
       ],
       "properties": {
         "route_id": {
@@ -176,6 +184,18 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1
+        },
+        "thermodynamic_conditions_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reaction_extent_basis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standard_state_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
