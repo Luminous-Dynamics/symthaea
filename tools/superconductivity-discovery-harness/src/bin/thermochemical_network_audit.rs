@@ -28,6 +28,7 @@ struct ReactionTerm {
 struct Reaction {
     id: String,
     role: String,
+    standard_state_id: String,
     terms: Vec<ReactionTerm>,
     delta_g: Interval,
     activation_barrier: Interval,
@@ -69,6 +70,7 @@ struct Network {
     chemical_potential_context: String,
     extent_basis_id: String,
     extent_unit: String,
+    standard_state_id: String,
     balance_tolerance: f64,
     cycle_tolerance: f64,
     species: Vec<Species>,
@@ -177,6 +179,7 @@ fn parse_reactions(
     conditions_id: &str,
     basis_id: &str,
     basis_unit: &str,
+    standard_state_id: &str,
     balance_tolerance: f64,
 ) -> Result<(Vec<Reaction>, HashMap<String, usize>, Vec<Balance>), String> {
     let mut reactions = Vec::with_capacity(rows.len());
@@ -193,6 +196,9 @@ fn parse_reactions(
         if text_field(row, "extent_basis_id")? != basis_id
             || text_field(row, "extent_unit")? != basis_unit {
             return Err(format!("reaction {id} extent basis/unit does not match the network"));
+        }
+        if text_field(row, "standard_state_id")? != standard_state_id {
+            return Err(format!("reaction {id} standard-state ID does not match the network"));
         }
         let delta_g = interval(
             row.get("delta_g_interval_eV").ok_or("reaction missing delta_g_interval_eV")?,
@@ -236,6 +242,7 @@ fn parse_reactions(
         let reaction = Reaction {
             id,
             role: text_field(row, "role")?.to_owned(),
+            standard_state_id: text_field(row, "standard_state_id")?.to_owned(),
             terms,
             delta_g,
             activation_barrier,
@@ -403,6 +410,7 @@ impl Network {
         }
         let extent_basis_id = text_field(&fixture, "reference_extent_basis_id")?.to_owned();
         let extent_unit = text_field(&fixture, "reference_extent_unit")?.to_owned();
+        let standard_state_id = text_field(&fixture, "standard_state_id")?.to_owned();
         let balance_tolerance = number_field(&fixture, "balance_tolerance")?;
         let cycle_tolerance = number_field(&fixture, "cycle_closure_tolerance_eV")?;
         if balance_tolerance < 0.0 || cycle_tolerance < 0.0 {
@@ -415,7 +423,7 @@ impl Network {
             .ok_or("network reactions must be an array")?;
         let (reactions, reaction_index, balances) = parse_reactions(
             reaction_rows, &species, &species_index, &conditions_id,
-            &extent_basis_id, &extent_unit, balance_tolerance
+            &extent_basis_id, &extent_unit, &standard_state_id, balance_tolerance
         )?;
         let paths = parse_paths(
             fixture.get("paths").and_then(Value::as_array).ok_or("network paths must be an array")?,
@@ -436,6 +444,7 @@ impl Network {
             chemical_potential_context: text_field(conditions, "chemical_potential_context")?.to_owned(),
             extent_basis_id,
             extent_unit,
+            standard_state_id,
             balance_tolerance,
             cycle_tolerance,
             species,
@@ -493,7 +502,7 @@ impl Network {
         let mut terms = Vec::new();
         for term in &cycle.terms {
             let reaction = &self.reactions[term.reaction_index];
-            let orientation = f64::from(term.orientation);
+            let orientation = term.orientation as f64;
             let signed = if term.orientation == 1 {
                 reaction.delta_g
             } else {
@@ -557,6 +566,7 @@ impl Network {
             json!({
                 "reaction_id": reaction.id,
                 "role": reaction.role,
+                "standard_state_id": reaction.standard_state_id,
                 "source_class": reaction.source_class,
                 "computed_element_residuals": balance.element_residuals.iter().map(|(element, residual)| json!({
                     "element": element,
@@ -589,6 +599,7 @@ impl Network {
             },
             "reference_extent_basis_id": self.extent_basis_id,
             "reference_extent_unit": self.extent_unit,
+            "standard_state_id": self.standard_state_id,
             "balance_tolerance": self.balance_tolerance,
             "species": self.species.iter().map(|s| json!({
                 "species_id": s.id,
@@ -758,6 +769,16 @@ mod tests {
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
         data["reactions"][1]["extent_basis_id"] = json!("different_basis");
         assert!(Network::from_bytes(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
+    }
+
+
+    #[test]
+    fn standard_state_mismatch_fails_closed() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["reactions"][1]["standard_state_id"] = json!("different_standard_state");
+        let error = Network::from_bytes(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
+        assert!(error.contains("standard-state ID does not match"));
     }
 
     #[test]
