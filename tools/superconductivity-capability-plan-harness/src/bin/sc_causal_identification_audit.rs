@@ -289,6 +289,43 @@ impl Instance {
         }
     }
 
+    // Hájek normalized inverse-probability estimator. It is a distinct,
+    // generally finite-sample biased comparator to Horvitz-Thompson.
+    fn hajek_estimate(&self, cohort: &Cohort) -> Estimate {
+        let observed: Vec<&Record> = cohort.records.iter().filter(|r| r.outcome_observed).collect();
+        if observed.iter().any(|r| r.propensity < 0.05 || r.propensity > 0.95) {
+            return Estimate {
+                value: None,
+                n_treated: observed.iter().filter(|r| r.treatment).count(),
+                n_control: observed.iter().filter(|r| !r.treatment).count(),
+                n_observed: observed.len(),
+                reason: Some("assignment propensity violates the preregistered [0.05,0.95] overlap gate".to_owned()),
+            };
+        }
+        let treated: Vec<&Record> = observed.iter().copied().filter(|r| r.treatment).collect();
+        let control: Vec<&Record> = observed.iter().copied().filter(|r| !r.treatment).collect();
+        let treated_weight: f64 = treated.iter().map(|r| 1.0 / r.propensity).sum();
+        let control_weight: f64 = control.iter().map(|r| 1.0 / (1.0-r.propensity)).sum();
+        if treated_weight <= 0.0 || control_weight <= 0.0 {
+            return Estimate {
+                value: None,
+                n_treated: treated.len(),
+                n_control: control.len(),
+                n_observed: observed.len(),
+                reason: Some("Hájek estimator lacks positive weight in one assignment arm".to_owned()),
+            };
+        }
+        let treated_mean = treated.iter().map(|r| r.outcome / r.propensity).sum::<f64>() / treated_weight;
+        let control_mean = control.iter().map(|r| r.outcome / (1.0-r.propensity)).sum::<f64>() / control_weight;
+        Estimate {
+            value: Some(treated_mean-control_mean),
+            n_treated: treated.len(),
+            n_control: control.len(),
+            n_observed: observed.len(),
+            reason: None,
+        }
+    }
+
     fn assignment_combinations(indices: &[usize], treated_count: usize) -> Vec<Vec<usize>> {
         fn walk(
             indices: &[usize],
@@ -347,7 +384,7 @@ impl Instance {
         let mut blocks: HashMap<String, Vec<usize>> = HashMap::new();
         for (index, record) in cohort.records.iter().enumerate() {
             if !record.outcome_observed {
-                return Err("v0.1 exact randomization inference requires complete outcomes".to_owned());
+                return Err("exact blocked randomization inference abstains when outcomes are missing; missingness cannot be silently imputed".to_owned());
             }
             blocks.entry(record.batch.clone()).or_default().push(index);
         }
@@ -434,6 +471,22 @@ impl Instance {
             mean(&self.samples.iter().filter(|s|ids.contains(s.id.as_str()))
                 .map(|s|s.baseline_coherence).collect::<Vec<_>>())
         };
+        let family_counts: Vec<Value> = {
+            let mut grouped: HashMap<&str,(usize,usize)> = HashMap::new();
+            for record in &observed {
+                let entry=grouped.entry(&record.family).or_default();
+                if record.treatment { entry.0+=1; } else { entry.1+=1; }
+            }
+            let mut rows: Vec<_>=grouped.into_iter().collect();
+            rows.sort_by(|a,b|a.0.cmp(b.0));
+            rows.into_iter().map(|(family,(treated,control))|json!({
+                "material_family":family,"treated":treated,"control":control
+            })).collect()
+        };
+        let dose_by_assignment = |treated: bool| -> Option<f64> {
+            mean(&cohort.records.iter().filter(|r|r.treatment==treated)
+                .map(|r|r.delivered_dose).collect::<Vec<_>>())
+        };
         let batch_counts: Vec<Value> = {
             let mut grouped: HashMap<&str,(usize,usize)> = HashMap::new();
             for record in &observed {
@@ -451,6 +504,9 @@ impl Instance {
             "baseline_pairing_proxy_mean_control":pairing_mean(false),
             "baseline_coherence_proxy_mean_treated":coherence_mean(true),
             "baseline_coherence_proxy_mean_control":coherence_mean(false),
+            "mean_delivered_dose_fraction_treated":dose_by_assignment(true),
+            "mean_delivered_dose_fraction_control":dose_by_assignment(false),
+            "assignment_counts_by_material_family":family_counts,
             "assignment_counts_by_batch":batch_counts
         })
     }
@@ -464,8 +520,18 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         let pooled=instance.pooled_difference(cohort);
         let blocked=instance.blocked_difference(cohort);
         let ht=instance.inverse_propensity_estimate(cohort);
+        let hajek=instance.hajek_estimate(cohort);
         let randomization=if cohort.assignment_mechanism=="blocked_randomized" {
-            Some(instance.exact_blocked_randomization(cohort)?)
+            match instance.exact_blocked_randomization(cohort) {
+                Ok(result) => Some(json!({
+                    "status":"exact_randomization_inference_available",
+                    "observed_blocked_statistic":result.observed_statistic,
+                    "two_sided_sharp_null_p_value":result.p_value_two_sided,
+                    "enumerated_assignments":result.assignment_count,
+                    "treated_control_counts_by_block":result.treated_per_block
+                })),
+                Err(reason) => Some(json!({"status":"abstained","reason":reason}))
+            }
         } else { None };
         cohort_receipts.push(json!({
             "cohort_id":cohort.id,
@@ -479,16 +545,15 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             "pooled_difference_in_means":instance.estimate_receipt(&pooled,truth),
             "batch_blocked_difference_in_means":instance.estimate_receipt(&blocked,truth),
             "horvitz_thompson_known_propensity":{
-                "interpretation":"Causal only under correct assignment propensities, conditional exchangeability, consistency and positivity; observational weighting alone does not establish these assumptions.",
+                "interpretation":"Causal only under correct assignment propensities, conditional exchangeability, consistency, positivity and appropriate handling of missing outcomes; observational weighting alone does not establish these assumptions.",
                 "estimate":instance.estimate_receipt(&ht,truth)
             },
+            "hajek_normalized_inverse_propensity":{
+                "interpretation":"Normalized weighting comparator; generally finite-sample biased. Requires the same assignment and missingness assumptions as inverse-probability estimation.",
+                "estimate":instance.estimate_receipt(&hajek,truth)
+            },
             "baseline_balance_and_batch_counts":instance.baseline_balance(cohort),
-            "exact_blocked_randomization_inference":randomization.map(|x|json!({
-                "observed_blocked_statistic":x.observed_statistic,
-                "two_sided_sharp_null_p_value":x.p_value_two_sided,
-                "enumerated_assignments":x.assignment_count,
-                "treated_control_counts_by_block":x.treated_per_block
-            }))
+            "exact_blocked_randomization_inference":randomization
         }));
     }
     let truth_by_family: Value = {
@@ -586,9 +651,9 @@ mod tests{
         let randomized=receipt["cohorts"].as_array().unwrap().iter()
             .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
         let exact=&randomized["exact_blocked_randomization_inference"];
+        assert_eq!(exact["status"],"exact_randomization_inference_available");
         assert_eq!(exact["enumerated_assignments"],216);
-        assert!(exact["two_sided_sharp_null_p_value"].as_f64().unwrap()>=0.0);
-        assert!(exact["two_sided_sharp_null_p_value"].as_f64().unwrap()<=1.0);
+        assert!((exact["two_sided_sharp_null_p_value"].as_f64().unwrap()-0.018518518518518517).abs()<1.0e-12);
     }
 
     #[test]
@@ -622,4 +687,27 @@ mod tests{
             changed["finite_population_ground_truth_ate"]
         );
     }
+    #[test]
+    fn missing_randomized_outcome_is_reported_and_exact_test_abstains() {
+        let (schema,fixture)=inputs();
+        let mut value:Value=serde_json::from_slice(&fixture).unwrap();
+        value["cohorts"][0]["records"][0]["outcome_observed"]=json!(false);
+        let receipt=audit(&schema,&serde_json::to_vec(&value).unwrap()).unwrap();
+        let randomized=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
+        assert_eq!(randomized["assignment_counts"]["missing_outcomes"],1);
+        assert_eq!(randomized["exact_blocked_randomization_inference"]["status"],"abstained");
+        assert!(randomized["exact_blocked_randomization_inference"]["reason"].as_str().unwrap().contains("missing"));
+    }
+
+    #[test]
+    fn dose_receipt_preserves_assignment_separately_from_delivered_treatment() {
+        let (schema,fixture)=inputs();
+        let receipt=audit(&schema,&fixture).unwrap();
+        let randomized=receipt["cohorts"].as_array().unwrap().iter()
+            .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
+        assert_eq!(randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_treated"],1.0);
+        assert_eq!(randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_control"],0.0);
+    }
+
 }
