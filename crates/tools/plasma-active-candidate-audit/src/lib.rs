@@ -441,7 +441,7 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
     match &candidate.selection_status {
         SelectionStatus::Selected | SelectionStatus::Executed | SelectionStatus::Failed => {
             if candidate.rights_state != RightsState::Verified {
-                add("rights_not_verified", "A selected or executed candidate must have rights_state=verified.");
+                add("rights_not_verified", "Selected, executed or failed candidates must have rights_state=verified.");
             }
         }
         _ => {}
@@ -451,7 +451,7 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
         SelectionStatus::Executed | SelectionStatus::Failed
     ) && candidate.execution_receipt_id.as_ref().is_none_or(|value| !non_empty(value))
     {
-        add("execution_receipt_missing", "An executed candidate must include an execution_receipt_id.");
+        add("execution_receipt_missing", "Executed or failed candidates must include an execution_receipt_id.");
     }
     if candidate.split_role != SplitRole::Training
         && candidate.split_role != SplitRole::DevelopmentValidation
