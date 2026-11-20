@@ -13,6 +13,9 @@ The evidence directory may contain:
 
 | Path | Purpose |
 |---|---|
+| `case.json` | Frozen case JSON; the verifier replays its case digest and source-audio binding |
+| `source-audio.wav` | Exact source WAV bytes, independently hashed and used for acoustic replay |
+| `gain-envelope-contract.json` | Frozen gain-envelope contract used to reproduce the acoustic observer |
 | `symbolic-result.json` | Sealed v1 symbolic evaluation result |
 | `render-receipt.json` | Sealed v1 render execution receipt |
 | `render-bundle/` | Full render artifact directory accepted by the render receipt verifier |
@@ -30,10 +33,10 @@ The CLI writes a JSON verification report to stdout. Exit codes are:
 ## Verification design
 
 - Parses a closed manifest wire shape and verifies its recursively key-normalized, domain-separated bundle seal.
-- Calls `symthaea_muse::edit_evidence::verify_result_seal` for symbolic results.
+- Calls `symthaea_muse::edit_evidence::verify_result_seal` and re-runs `evaluate_symbolic_case` against the frozen case, source/candidate Scores and actual rendered candidate WAV; compute-time-only fields are excluded from semantic comparison.
 - Calls `muse_render_receipt::verify_receipt_bytes` and `muse_render_receipt::verify_bundle` for render receipts and full artifact directories.
-- Calls `symthaea_muse::audio_edit_observer::verify_gain_envelope_observation_seal` for acoustic observations.
-- Rechecks case/source/candidate Score/MIDI/WAV/contract/receipt digests across components.
+- Calls `symthaea_muse::audio_edit_observer::verify_gain_envelope_observation_seal` and re-runs `observe_gain_envelope_v1` from the exact source WAV, rendered candidate WAV and gain-envelope contract; the supplied observer result must exactly match the recomputed result.
+- Rechecks case/source/candidate Score/MIDI/WAV/contract/receipt digests across components. Candidate Score/MIDI/WAV bytes come from the render bundle; the frozen case and source WAV are supplied separately.
 - Recomputes the five-gate outcome: any failure dominates abstention; any missing or unsupported required verifier abstains; no aggregate score compensates across gates.
 
 ## Deliberate abstention boundaries
