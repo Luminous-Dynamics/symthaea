@@ -1,0 +1,51 @@
+{
+  "schema": "muse-score-audio-conformance-v1",
+  "observer": {
+    "observer_id": "muse-score-audio-pitch-observer",
+    "version": "0.1.0",
+    "method": "harmonic_salience_fft_pitch"
+  },
+  "scope": {
+    "kind": "isolated_stem",
+    "scope_id": "stem-melody-001"
+  },
+  "artifacts": {
+    "score_digest_schema": "muse-score-serde-json-sha256-v1",
+    "score_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "contract_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "alignment": {
+    "mode": "fixed_score_tempo_no_auto_alignment",
+    "tempo_bpm": 120,
+    "offset_frames": 0
+  },
+  "audio": {
+    "sample_rate_hz": 16000,
+    "channels": 1,
+    "frame_count": 8000,
+    "sample_format": "ieee_float",
+    "bits_per_sample": 32,
+    "clipped_sample_fraction": 0
+  },
+  "events": [
+    {
+      "score_note_ordinal": 0,
+      "expected_pitch_midi": 60,
+      "observed_pitch_midi": 60,
+      "estimated_frequency_hz": 261.62,
+      "pitch_error_cents": 0.4,
+      "pitch_confidence": 0.82,
+      "window_rms_dbfs": -18,
+      "window_start_frame": 1952,
+      "window_end_frame": 6048,
+      "status": "pass",
+      "reason": null
+    }
+  ],
+  "outcome": {
+    "score_audio_status": "pass",
+    "reasons": []
+  },
+  "receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+}
