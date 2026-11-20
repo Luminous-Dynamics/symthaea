@@ -30,7 +30,7 @@ The fixture declares alpha=0.90. The schema restricts the operational range to [
 
 Every resource has an explicit ID, unit, capacity and semantic description. Action consumption is an integer vector. Each dimension is checked independently; there is no exchange rate between money, instrument time, specimen mass, furnace time, synthesis runs or compute allocation. Unknown resource IDs, unit mismatches, duplicate entries, non-positive quantities, arithmetic overflow, over-capacity plans and ineligible actions fail closed.
 
-The synthetic fixture uses:
+The baseline synthetic fixture uses:
 - financial budget in USD cents;
 - cryostat and magnetometer booking minutes;
 - specimen mass in mg;
@@ -91,3 +91,13 @@ The expected-loss and CVaR receipts contain separate outcome-contingent decision
 - [#12966 intervention dynamics](https://github.com/Luminous-Dynamics/symthaea/issues/12966) owns state-changing interventions, path dependence, carryover and specimen-state transitions. The present contract conditions observations on a static joint world state; it does not simulate pressure/strain/light/annealing changing that state.
 
 The planner is therefore a risk/resource decision layer, not yet the whole campaign simulator. It becomes scientifically useful only when its losses and resources are populated from the reviewed application profiles and specimen/protocol evidence, with the causal state-transition layer handling interventions.
+
+## Multi-instance adversarial suite
+
+The frozen suite registry is `data/research/superconductivity_risk_multiresource_suite_v0_1.json`. Each instance is independently schema-validated and emits its own source-bound receipt.
+
+1. **Capability/resource smoke fixture** — exercises capability closure, nine independent resource dimensions, specimen consumption, pressure-cell limits and the ineligible high-field negative control.
+2. **Expected-versus-tail objective fixture** — a rare `none_of_above` state creates a deliberate divergence: the expected-loss oracle selects `expected_value_probe`, while the precommitment CVaR oracle selects `tail_risk_probe`. Both probes fit independently but cannot be selected together under the frozen financial capacity.
+3. **Information-without-decision-value fixture** — one probe has positive joint-world-state mutual information but every downstream decision has identical statewise loss. Expected-loss and CVaR oracles must choose the empty plan; the information oracle selects the probe.
+
+The exact-head workflow runs all three fixtures separately, preserves all receipts and hashes every input. The Rust tests assert the expected objective-specific action sequences. These are deliberately adversarial software-contract controls, not physical or SOTA-performance evidence.
