@@ -921,12 +921,15 @@ mod tests {
     use super::*;
     use std::fs;
 
-    fn inputs() -> (Vec<u8>, Vec<u8>) {
+    fn inputs_for(filename: &str) -> (Vec<u8>, Vec<u8>) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         (
             fs::read(root.join("data/schemas/superconductivity_risk_multiresource_v0_1.schema.json")).unwrap(),
-            fs::read(root.join("data/research/superconductivity_risk_multiresource_fixture_v0_1.json")).unwrap(),
+            fs::read(root.join("data/research").join(filename)).unwrap(),
         )
+    }
+    fn inputs() -> (Vec<u8>, Vec<u8>) {
+        inputs_for("superconductivity_risk_multiresource_fixture_v0_1.json")
     }
     fn mutated_fixture(mut mutation: impl FnMut(&mut Value)) -> Result<Value, String> {
         let (schema, bytes) = inputs();
@@ -1157,6 +1160,40 @@ mod tests {
         assert_eq!(instance.actions[high_field].consumption[pressure_resource], 60);
         assert_eq!(instance.resources[pressure_resource].capacity, 45);
         assert!(instance.feasible_order(&[high_field]).is_none());
+    }
+
+    #[test]
+    fn expected_value_and_tail_risk_oracles_choose_different_adversarial_actions() {
+        let (schema, fixture) = inputs_for("superconductivity_risk_multiresource_fixture_expected_vs_tail_v0_1.json");
+        let receipt = audit(&schema, &fixture).unwrap();
+        let expected = &receipt["expected_loss_oracle"]["plan"]["ordered_action_ids"];
+        let tail = &receipt["precommitment_cvar_oracle"]["plan"]["ordered_action_ids"];
+        assert_eq!(expected.as_array().unwrap().len(), 1);
+        assert_eq!(tail.as_array().unwrap().len(), 1);
+        assert_eq!(expected[0], "expected_value_probe");
+        assert_eq!(tail[0], "tail_risk_probe");
+        assert!(
+            receipt["expected_loss_oracle"]["plan"]["expected_loss_evsi"].as_f64().unwrap()
+                > receipt["precommitment_cvar_oracle"]["plan"]["expected_loss_evsi"].as_f64().unwrap()
+        );
+        assert!(
+            receipt["precommitment_cvar_oracle"]["plan"]["precommitment_cvar_evsi"].as_f64().unwrap()
+                > receipt["expected_loss_oracle"]["plan"]["precommitment_cvar_evsi"].as_f64().unwrap()
+        );
+    }
+
+    #[test]
+    fn information_only_fixture_proves_information_is_not_decision_value() {
+        let (schema, fixture) = inputs_for("superconductivity_risk_multiresource_fixture_information_only_v0_1.json");
+        let receipt = audit(&schema, &fixture).unwrap();
+        assert!(receipt["expected_loss_oracle"]["plan"]["ordered_action_ids"].as_array().unwrap().is_empty());
+        assert!(receipt["precommitment_cvar_oracle"]["plan"]["ordered_action_ids"].as_array().unwrap().is_empty());
+        assert_eq!(
+            receipt["mutual_information_oracle"]["plan"]["ordered_action_ids"][0],
+            "information_only_probe"
+        );
+        assert!(receipt["mutual_information_oracle"]["plan"]["joint_world_state_information_gain_nats"]
+            .as_f64().unwrap() > 0.0);
     }
 
 }
