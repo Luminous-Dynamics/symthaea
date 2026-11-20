@@ -105,8 +105,9 @@
     "configuration_digest",
     "training_data_digest_for_learned_methods",
     "checkpoint_digest_for_learned_methods",
-    "test_initial_state_digest",
     "execution_receipt_digest",
-    "output_bundle_digest"
+    "output_bundle_digest",
+    "test_dataset_manifest_digest",
+    "test_initial_state_digest"
   ]
 }
