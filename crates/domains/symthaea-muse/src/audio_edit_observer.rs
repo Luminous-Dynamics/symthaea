@@ -189,6 +189,12 @@ fn decode_wav(bytes: &[u8], label: &str) -> Result<DecodedWav, String> {
     let expected_samples = frame_count
         .checked_mul(spec.channels as u64)
         .ok_or_else(|| format!("{label} WAV sample count overflows"))?;
+    if expected_samples > MAX_INTERLEAVED_SAMPLES {
+        return Err(format!(
+            "{label} WAV exceeds the {} interleaved-sample memory limit",
+            MAX_INTERLEAVED_SAMPLES
+        ));
+    }
     let capacity = usize::try_from(expected_samples)
         .map_err(|_| format!("{label} WAV is too large"))?;
     let mut samples = Vec::with_capacity(capacity);
@@ -400,6 +406,11 @@ pub fn observe_gain_envelope_v1(
         || source.frame_count != candidate.frame_count
     {
         return Err("abstain: source and candidate WAV timelines must have identical sample rate, channels, and frame count; no time-warp alignment is performed".into());
+    }
+    if source.sample_format != candidate.sample_format
+        || source.bits_per_sample != candidate.bits_per_sample
+    {
+        return Err("source and candidate WAV encodings must have identical sample format and bit depth".into());
     }
     if source.sample_rate_hz != contract.sample_rate_hz
         || source.channels != contract.channels
@@ -633,6 +644,16 @@ mod tests {
         assert_eq!(result["audio"]["source_bits_per_sample"], 16);
         assert_eq!(result["target"]["status"], "pass");
         assert_eq!(result["preservation"]["status"], "pass");
+    }
+
+    #[test]
+    fn mixed_sample_encodings_are_rejected() {
+        let source_samples = vec![0.25_f32; 1_000];
+        let candidate_samples = vec![8192_i16; 1_000];
+        let source = wav(&source_samples, 8_000);
+        let candidate = int16_wav(&candidate_samples, 8_000);
+        let error = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap_err();
+        assert!(error.contains("identical sample format and bit depth"));
     }
 
     #[test]
