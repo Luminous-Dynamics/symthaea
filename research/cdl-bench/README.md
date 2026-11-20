@@ -610,7 +610,7 @@ Run from the repository root:
 bash scripts/research/cdl_partitioned_telemetry_reference.sh
 ```
 
-The partition runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror` and tests empty input, timestamp-merge fixtures, randomized interleavings, duplicate/out-of-order fallback and malformed frames. The latest integrated mode-1 template dictionary is authored but has **not yet been compiled** in the full PRN1 C++ frame.
+The partition runner compiles with `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror` and tests empty input, four 65,536-record timestamp-merge fixtures, duplicate-time tie templates, alternating templates, same-series multi-row ties, out-of-order full-schedule fallback, 100 randomized interleaved round-trips and malformed frames. The integrated three-mode frame was compiled locally with GCC 14.2 and passed these tests. Mode-1 decoding uses a min-heap merge frontier and sparse per-key tie multiplicity counts, avoiding a full scan over all keys for every timestamp group.
 
 The tie-schedule primitive is separately reproducible:
 
