@@ -1,0 +1,56 @@
+{
+  "contract": "SC-PRECURSOR-GENOME-GRAPH-0.1",
+  "benchmark_id": "precursor_genome_complete_pair_graph_001",
+  "source": {
+    "repository": "lauren-walters/precursor-genome",
+    "commit": "78cb026aa6c9b53aa0ec26ea5611d523bc3c320a",
+    "ledger_path": "ledger_precursor_genome.json",
+    "ledger_git_blob_sha1": "a8ef03cee29670b22ed04b9cebb1686fe26e1acd",
+    "raw_url": "https://raw.githubusercontent.com/lauren-walters/precursor-genome/78cb026aa6c9b53aa0ec26ea5611d523bc3c320a/ledger_precursor_genome.json",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "Lauren Walters, Matthew J. McDermott, Bernardus Rendy, Yuxing Fei, and Gerbrand Ceder, Precursor Genome (2026), Lawrence Berkeley National Laboratory.",
+    "dataset_doi": "https://doi.org/10.5281/zenodo.21285545",
+    "paper_url": "https://arxiv.org/abs/2611.23527"
+  },
+  "expected": {
+    "sample_count": 1035,
+    "precursor_count": 46,
+    "edge_count": 1035,
+    "degree_per_precursor": 45,
+    "physical_failure_exclusions": 26,
+    "poor_refinement_quality_score": 3,
+    "poor_refinement_exclusions": 9,
+    "analyzable_count": 1000,
+    "raw_category_counts": {
+      "transformed": 384,
+      "unreacted": 369,
+      "completely_reacted": 143,
+      "partially_reacted": 113,
+      "unclassified": 26
+    },
+    "analyzable_category_counts": {
+      "transformed": 380,
+      "unreacted": 367,
+      "completely_reacted": 143,
+      "partially_reacted": 110
+    },
+    "positive_count": 253,
+    "negative_count": 747
+  },
+  "endpoint": {
+    "name": "formation of at least one phase incorporating ions from both precursors",
+    "positive_categories": ["completely_reacted", "partially_reacted"],
+    "negative_categories": ["transformed", "unreacted"],
+    "transformed_semantics": "Negative only for the cross-precursor-product endpoint; a transformed-only sample may contain oxidation, reduction or decomposition products and is not chemically inert.",
+    "physical_failure_semantics": "A sample not recovered as a characterizable powder is excluded, never treated as a negative reaction.",
+    "poor_refinement_semantics": "An active refinement with human quality score 3 is excluded, never treated as a negative reaction."
+  },
+  "thermal_metadata": {
+    "use_recorded_dwell_field": "synthesis.heating_temperature",
+    "warning": "Do not reconstruct the experimental dwell temperature from precursor.melting_point_c. The paper's reference temperature is the first thermally accessible transition (which may be melting, decomposition, reduction, sublimation or phase transformation); the proxy reference temperature used in model features is a further decomposition-product adjustment.",
+    "paper_dwell_rule": "T_dwell = 100 * floor((2/3 * min(T_ref,1, T_ref,2))/100), clipped to 200..1100 °C.",
+    "audit_policy": "The v0.1 auditor reports the recorded dwell field and missingness but does not infer missing values or use nominal setpoint as a measured thermal history."
+  },
+  "claim_ceiling": "Public-dataset provenance, graph-completeness and cohort-reconciliation audit only. No new reaction-onset prediction, synthesis recommendation, phase-yield claim or material discovery is established."
+}
