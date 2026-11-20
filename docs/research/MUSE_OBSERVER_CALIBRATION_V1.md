@@ -44,6 +44,7 @@ Rows whose observer measurement is `no_measurable_spectral_energy`, `insufficien
 - Isotonic regression provides a monotone mapping. It is not a multi-feature classifier and does not solve harmonic attribution.
 - The model hash binds only the fit split, observer/version, feature and protocol/rights receipts. The threshold-selection split and held-out split have separate hashes in the output.
 - The output reports Brier score, fixed-bin ECE, ROC-AUC, average precision, support precision, event recall, false-support rates, measurement coverage, support coverage and abstention rate.
+- A deterministic, seeded cluster bootstrap resamples whole source groups—not individual note rows—and reports percentile 95% intervals for support precision, false-support rate, event recall, support coverage and Brier score. The contract freezes the seed, replicate count and minimum held-out group count.
 - `verify_calibration_bundle_v1` deterministically re-runs fitting, threshold selection and held-out scoring from the exact sealed dataset and contract; it rejects a modified model, threshold or metric report.
 - If no threshold satisfies the false-support ceiling, the result emits no support threshold and all cases abstain. It never relaxes the ceiling to obtain a positive coverage number.
 
@@ -52,7 +53,7 @@ Rows whose observer measurement is `no_measurable_spectral_energy`, `insufficien
 - `docs/research/fixtures/muse-observer-calibration-dataset-v1.synthetic.json`
 - `docs/research/fixtures/muse-observer-calibration-contract-v1.synthetic.json`
 
-The dataset contains 39 synthetic rows across fit, threshold-selection and held-out groups, including explicit insufficient-frequency-resolution rows. Placeholder digests are synthetic identifiers. This fixture exercises schema, group leakage, fit/threshold/test separation, and output replay. It is not real audio, measured instrument data, an independently adjudicated cohort or evidence of calibration quality.
+The dataset contains 39 synthetic rows across fit, threshold-selection and held-out groups, including explicit insufficient-frequency-resolution rows. Group IDs are independent of split names, and the fixture has seven held-out source groups for the cluster-bootstrap test. Placeholder digests are synthetic identifiers. This fixture exercises schema, group leakage, fit/threshold/test separation, and output replay. It is not real audio, measured instrument data, an independently adjudicated cohort or evidence of calibration quality.
 
 ## Prospective targets — not achieved
 
@@ -85,13 +86,13 @@ SMEBench's human validation is an additional warning against equating automatic 
 - Schemas: `docs/research/schemas/muse-observer-calibration-*.schema.json`
 - Exact-head workflow: `.github/workflows/muse-observer-calibration.yml`
 
-Eleven unit tests are authored for monotonic isotonic fitting, threshold selection, unmeasured abstention, group leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, bundle tampering, and checked-in fixture replay. They have **not** been compiled or executed. The local environment has no Cargo, rustc or rustfmt. No exact-head Rust formatting, compilation, test or Clippy pass is claimed.
+Thirteen unit tests are authored for monotonic isotonic fitting, threshold selection, unmeasured abstention, group leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, bundle tampering, and checked-in fixture replay. They have **not** been compiled or executed. The local environment has no Cargo, rustc or rustfmt. No exact-head Rust formatting, compilation, test or Clippy pass is claimed.
 
 ## Next
 
 1. Run the exact-head workflow and repair any compile/format/test issue without weakening fail-closed behavior.
 2. Build a rights-cleared observer-row importer that calls #11617 replay on exact WAV/MIDI inputs before dataset admission.
 3. Add real measured renderer/performer cohorts and blind adjudication; keep synthetic, renderer and real-instrument strata separate.
-4. Add source-group-clustered bootstrap confidence intervals and leave-one-patch-out evaluation.
+4. Extend the synthetic/renderer/real cohort and run leave-one-patch-out evaluation; cluster-bootstrap intervals are implemented, but the synthetic fixture is not large enough to support a research claim.
 5. Compare the calibrated observer against pinned YIN/pYIN and permitted learned F0/transcription baselines on identical stems and labels.
 6. Register the calibration receipt as an independent component in #12985. A calibration receipt may support an acoustic claim; it cannot replace symbolic correctness, render execution integrity, score-to-audio conformance or human acceptance.
