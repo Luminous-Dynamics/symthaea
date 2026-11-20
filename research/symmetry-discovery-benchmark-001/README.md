@@ -72,6 +72,23 @@ For each degree (l) and target subgroup (H), reproduce the published leakage sco
 
 Preserve the paper's normalization constants and rank templates; aggregate over degrees only as specified by the reproduction protocol. Report per-degree LS/pLS, pooled LS/pLS, template accuracy, ambiguity, and local defect localization. The paper sets (\epsilon_{norm}=\epsilon_{log}=10^{-10}) in its stated default. These scores describe representation compatibility, not a verified group action or a physical invariant. [SymFP preprint](https://arxiv.org/abs/2611.07410)
 
+
+#### SymFP rank-compatibility non-identifiability controls
+
+The frozen SymFP lane includes two literature-reported negative controls from the preprint's leakage discussion (Cen et al., arXiv:2611.07410, p. 21):
+
+- **C2 → Cs:** the true C2 rank sequence lies within the Cs fixed-subspace dimensions for degrees 0–9, producing zero leakage / pLS=10 against Cs, while full rank-template matching identifies C2.
+- **Th → D6h:** the true Th rank sequence lies within the D6h fixed-subspace dimensions for degrees 0–9, producing zero leakage / pLS=10 against D6h, while full rank-template matching identifies Th.
+
+These are encoded as the fixture file at fixtures/v0.1/symfp_nonidentifiability_cases.json with a Draft 2020-12 schema and exact semantic assertions in the fixture workflow. They are source-reported counterexamples, not new molecular or physical measurements.
+
+For every SymFP run, keep three outcomes separate:
+1. **Leakage compatibility:** per-degree and pooled LS/pLS against a specified target rank template.
+2. **Rank-template identification:** full candidate-family distance, including every tie or abstention.
+3. **Exact action/structural verification:** independent proof or oracle result for the claimed finite/continuous action, where available.
+
+If a method asserts Cs or D6h as the exact group solely because the respective leakage is zero on these cases, count a false exact promotion. A high pLS cannot replace rank-template comparison, and neither metric grants physical or quotient-pruning authority.
+
 ### Active acquisition — static, myopic, adaptive and lookahead
 
 AFABench evaluates static, greedy/myopic, non-myopic oracle/lookahead, and RL policies. The synthetic CUBE-NM task is particularly relevant: a context feature has zero immediate label information but reveals which later feature block is useful. A myopic policy therefore misses the value of the context observation; a non-myopic policy must invest in it. Include an analogous symmetry-experiment case where the first probe only identifies which second probe will separate the remaining group hypotheses.
