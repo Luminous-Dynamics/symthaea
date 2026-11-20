@@ -173,7 +173,7 @@ Never map internal affect values directly to human emotions such as happiness, s
 Added to symthaea-canvas:
 
 - embodiment.rs: typed cognitive activity, independent speech-output lifecycle, visemes, gaze, provenance, and uncertainty signals;
-- a session-scoped monotonic event sequencer for multiple runtime producers;
+- a session-scoped monotonic event sequencer and `EmbodimentSession` facade: one publish operation assigns an event ID/time, validates and reduces it, and appends the accepted event to the session trace; rejected signals do not mutate the authoritative snapshot or trace (sequence gaps are allowed);
 - strict sequence ordering, monotonic timestamps, provenance checks, finite [0, 1] validation and fail-closed speech-state transition validation;
 - visemes accepted only while a RuntimeEvent confirms SpeechOutputState::Playing;
 - stale visemes cleared when playback stops; reset clears transient state and speech lifecycle;
