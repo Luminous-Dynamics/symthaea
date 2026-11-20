@@ -599,6 +599,51 @@ mod tests {
     }
 
     #[test]
+    fn octave_corruption_fails_score_audio_conformance() {
+        let score = score(60, Duration::quarter());
+        let result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(72, 8_000, 16_000), 16_000),
+            &contract(),
+        ).unwrap();
+        assert_eq!(result["outcome"]["score_audio_status"], "fail");
+        assert_eq!(result["events"][0]["observed_pitch_midi"], 72);
+    }
+
+    #[test]
+    fn multiple_assigned_parts_abstain_instead_of_claiming_attribution() {
+        let mut score = score(60, Duration::quarter());
+        score.push(ScoreNote {
+            part: PartId(1),
+            pitch: Pitch::from_midi(67),
+            onset: Duration::quarter(),
+            duration: Duration::quarter(),
+            velocity: 0.7,
+            role: VoiceRole::Bass,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        let result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(60, 16_000, 16_000), 16_000),
+            &contract(),
+        ).unwrap();
+        assert_eq!(result["outcome"]["score_audio_status"], "abstain");
+        assert!(result["outcome"]["reasons"][0].as_str().unwrap().contains("one isolated Score part"));
+    }
+
+    #[test]
+    fn sample_rate_mismatch_is_rejected() {
+        let score = score(60, Duration::quarter());
+        let error = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(60, 8_000, 44_100), 44_100),
+            &contract(),
+        ).unwrap_err();
+        assert!(error.contains("sample rate/channel count differs"));
+    }
+
+    #[test]
     fn silent_expected_event_is_a_failure_not_a_pass() {
         let score = score(60, Duration::quarter());
         let result = evaluate_score_audio_conformance_v1(&serde_json::to_vec(&score).unwrap(), &wav(&vec![0.0_f32;8_000],16_000), &contract()).unwrap();
