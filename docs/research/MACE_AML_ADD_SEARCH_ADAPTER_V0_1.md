@@ -27,7 +27,7 @@ Required fields:
 
 Textual/Coding content is a string. Multimodal content can be a string or ordered text/image_url parts.
 
-Successful Add returns HTTP 200 only after the write is durable and immediately searchable. The adapter models this with a typed write/search-visibility receipt bound to track, user, session and the exact request digest. A configured `AddVisibilityVerifierV1` authenticates the durable-write and read-after-write receipts before creating a private `VerifiedAddVisibilityV1` token; only that token can complete an idempotency reservation. HTTP 202 is only supported with an approved Add-status route; this prototype does not implement it. The checked-in verifier is fixture-only, not a live signed Mycelix/backend verifier.
+Successful Add returns HTTP 200 only after the write is durable and immediately searchable. The adapter models this with a typed write/search-visibility receipt bound to track, user, session and the exact request digest. A configured `AddVisibilityVerifierV1` authenticates the durable-write and read-after-write receipts before creating a private `VerifiedAddVisibilityV1` token; only that token can complete an idempotency reservation. A committed retry replays the same verified token and original write/search receipt digests plus visible memory IDs, rather than synthesizing a fresh acknowledgement. HTTP 202 is only supported with an approved Add-status route; this prototype does not implement it. The checked-in verifier is fixture-only, not a live signed Mycelix/backend verifier.
 
 Textual chunks are split at the first of 20 messages or 2,000 words, counted by the frozen AML adapter. Streaming uses incremental session/task units; Coding preserves repository/session trajectories; Multimodal follows benchmark source units and media limits.
 
@@ -80,7 +80,7 @@ These are programme goals, not achieved results. Recalculate absolute thresholds
 
 ## Implementation boundary
 
-The workspace contains broca-aml-adapter with 18 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, tenant/track-scoped SHA-256 Add idempotency, response-echo validation and receipt-bound write/search-visibility verification, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
+The workspace contains broca-aml-adapter with 18 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, tenant/track-scoped SHA-256 Add idempotency with receipt-preserving replay, response-echo validation and receipt-bound write/search-visibility verification, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
 
 Not implemented: HTTP service, authentication middleware, persistent store, atomic database idempotency, live signed write/search-visibility verifier, embeddings/retrieval/ranking, verified official word counter, live smoke/full evaluation, Cycle 2 submission, or end-to-end wiring from #12731 consolidation receipts into AML Add/Search.
 

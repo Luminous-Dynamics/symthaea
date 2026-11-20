@@ -97,22 +97,21 @@ pub trait AddVisibilityVerifierV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedAddVisibilityV1 {
-    track: Track,
-    request_id: String,
-    user_id: String,
-    session_id: String,
-    request_payload_digest: String,
+    receipt: AddVisibilityReceiptV1,
     response: AddResponse,
-    visible_memory_ids: Vec<String>,
 }
 
 impl VerifiedAddVisibilityV1 {
+    pub fn receipt(&self) -> &AddVisibilityReceiptV1 {
+        &self.receipt
+    }
+
     pub fn visible_memory_ids(&self) -> &[String] {
-        &self.visible_memory_ids
+        &self.receipt.visible_memory_ids
     }
 
     pub fn request_payload_digest(&self) -> &str {
-        &self.request_payload_digest
+        &self.receipt.request_payload_digest
     }
 }
 
@@ -534,14 +533,14 @@ pub fn add_payload_digest(track: Track, request: &AddRequest) -> String {
 pub enum AddRetryState {
     New,
     InFlight,
-    Committed(AddResponse),
+    Committed(VerifiedAddVisibilityV1),
 }
 
 /// In-memory contract helper only. A hosted service must persist this state
 /// atomically with the memory write in its durable store/transaction.
 #[derive(Clone, Debug, Default)]
 pub struct AddIdempotencyLedger {
-    entries: BTreeMap<(Track, String, String), (String, Option<AddResponse>)>,
+    entries: BTreeMap<(Track, String, String), (String, Option<VerifiedAddVisibilityV1>)>,
 }
 
 fn idempotency_key(track: Track, request: &AddRequest) -> (Track, String, String) {
@@ -562,8 +561,8 @@ impl AddIdempotencyLedger {
         let digest = add_payload_digest(track, request);
         let key = idempotency_key(track, request);
         match self.entries.get(&key) {
-            Some((existing, Some(response))) if existing == &digest => {
-                Ok(AddRetryState::Committed(response.clone()))
+            Some((existing, Some(receipt))) if existing == &digest => {
+                Ok(AddRetryState::Committed(receipt.clone()))
             }
             Some((existing, None)) if existing == &digest => Ok(AddRetryState::InFlight),
             Some(_) => Err(AmlReject::RequestIdPayloadConflict),
@@ -581,27 +580,28 @@ pub fn complete(
         verified: VerifiedAddVisibilityV1,
     ) -> Result<(), AmlReject> {
         validate_add_request(track, request)?;
+        let receipt = verified.receipt();
         let digest = add_payload_digest(track, request);
-        if verified.track != track
-            || verified.request_id != request.request_id
-            || verified.user_id != request.user_id
-            || verified.session_id != request.session_id
-            || verified.request_payload_digest != digest
+        if receipt.track != track
+            || receipt.request_id != request.request_id
+            || receipt.user_id != request.user_id
+            || receipt.session_id != request.session_id
+            || receipt.request_payload_digest != digest
         {
             return Err(AmlReject::AddVisibilityBindingMismatch);
         }
         let key = idempotency_key(track, request);
-        let Some((stored_digest, stored_response)) = self.entries.get_mut(&key)
+        let Some((stored_digest, stored_receipt)) = self.entries.get_mut(&key)
         else {
             return Err(AmlReject::UnknownRequestId);
         };
         if *stored_digest != digest {
             return Err(AmlReject::RequestIdPayloadConflict);
         }
-        if stored_response.is_some() {
+        if stored_receipt.is_some() {
             return Err(AmlReject::AddAlreadyCompleted);
         }
-        *stored_response = Some(verified.response);
+        *stored_receipt = Some(verified);
         Ok(())
     }
 
@@ -993,7 +993,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             ledger.begin(Track::Textual, &request),
-            Ok(AddRetryState::Committed(ack(&request)))
+            Ok(AddRetryState::Committed(verified_add(Track::Textual, &request)))
         );
 
         let mut changed = request.clone();
@@ -1002,6 +1002,34 @@ mod tests {
             ledger.begin(Track::Textual, &changed),
             Err(AmlReject::RequestIdPayloadConflict)
         );
+    }
+
+    #[test]
+    fn committed_idempotency_replay_preserves_visibility_receipt_evidence() {
+        let request = add_request("receipt-replay");
+        let original = verified_add(Track::Textual, &request);
+        let expected_write = original.receipt().write_receipt_digest.clone();
+        let expected_search = original
+            .receipt()
+            .search_visibility_receipt_digest
+            .clone();
+        let expected_ids = original.visible_memory_ids().to_vec();
+
+        let mut ledger = AddIdempotencyLedger::default();
+        ledger.begin(Track::Textual, &request).unwrap();
+        ledger.complete(Track::Textual, &request, original).unwrap();
+
+        let AddRetryState::Committed(replayed) =
+            ledger.begin(Track::Textual, &request).unwrap()
+        else {
+            panic!("committed retry must replay the verified receipt token");
+        };
+        assert_eq!(replayed.receipt().write_receipt_digest, expected_write);
+        assert_eq!(
+            replayed.receipt().search_visibility_receipt_digest,
+            expected_search
+        );
+        assert_eq!(replayed.visible_memory_ids(), expected_ids);
     }
 
     #[test]
@@ -1089,11 +1117,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             ledger.begin(Track::Textual, &user_one),
-            Ok(AddRetryState::Committed(ack(&user_one)))
+            Ok(AddRetryState::Committed(verified_add(Track::Textual, &user_one)))
         );
         assert_eq!(
             ledger.begin(Track::Textual, &user_two),
-            Ok(AddRetryState::Committed(ack(&user_two)))
+            Ok(AddRetryState::Committed(verified_add(Track::Textual, &user_two)))
         );
 
         // Identical request ID, tenant and payload on a different track is
@@ -1112,7 +1140,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             ledger.begin(Track::Coding, &same_tenant_other_track),
-            Ok(AddRetryState::Committed(ack(&same_tenant_other_track)))
+            Ok(AddRetryState::Committed(verified_add(Track::Coding, &same_tenant_other_track)))
         );
     }
 
