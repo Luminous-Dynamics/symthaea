@@ -571,6 +571,20 @@ fn verify_symbolic(
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("symbolic result bytes were not supplied".into())));
     };
     verify_result_seal(&value).map_err(|error| format!("symbolic result seal invalid: {error}"))?;
+    if value.get("schema").and_then(Value::as_str) != Some("muse-edit-evidence-result-v1") {
+        return Err("unsupported symbolic result schema".into());
+    }
+    let system = value.get("system").ok_or("symbolic result system metadata missing")?;
+    let actual_id = system.get("system_id").and_then(Value::as_str).unwrap_or("");
+    let actual_version = system.get("version").and_then(Value::as_str).unwrap_or("");
+    if component.base.producer_id.as_deref() != Some(actual_id)
+        || component.base.producer_version.as_deref() != Some(actual_version)
+    {
+        return Ok(hard_binding("symbolic producer identity/version does not match the sealed result"));
+    }
+    if actual_id != "muse-symbolic-edit-evaluator" || actual_version != "0.3.0" {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("symbolic evaluator version is not in the v1 verifier allowlist".into())));
+    }
     let result_receipt = value.get("artifacts").and_then(|v| v.get("evaluation_receipt_sha256")).and_then(Value::as_str);
     if result_receipt != component.base.receipt_sha256.as_deref() {
         return Ok(hard_binding("symbolic result receipt digest does not match the bundle reference"));
@@ -655,6 +669,11 @@ fn verify_render(
     let Some(bytes) = bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("render receipt bytes were not supplied".into())));
     };
+    if component.base.producer_id.as_deref() != Some("muse-render-receipt-verifier")
+        || component.base.producer_version.as_deref() != Some("0.1.0")
+    {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("render verifier identity/version is not in the v1 allowlist".into())));
+    }
     let receipt = verify_receipt_bytes(bytes)
         .map_err(|error| format!("render receipt failed public verification: {error}"))?;
     if component.base.receipt_sha256.as_deref() != Some(receipt.receipt_sha256.as_str()) {
@@ -752,6 +771,20 @@ fn verify_acoustic(
     let actual_receipt = value.get("receipt_sha256").and_then(Value::as_str);
     if actual_receipt != component.base.receipt_sha256.as_deref() {
         return Ok(hard_binding("acoustic receipt digest does not match bundle reference"));
+    }
+    if value.get("schema").and_then(Value::as_str) != Some("muse-acoustic-observation-v1") {
+        return Err("unsupported acoustic observation schema".into());
+    }
+    let observer = value.get("observer").ok_or("acoustic observer metadata missing")?;
+    let observer_id = observer.get("observer_id").and_then(Value::as_str).unwrap_or("");
+    let observer_version = observer.get("version").and_then(Value::as_str).unwrap_or("");
+    if component.base.producer_id.as_deref() != Some(observer_id)
+        || component.base.producer_version.as_deref() != Some(observer_version)
+    {
+        return Ok(hard_binding("acoustic observer identity/version does not match the sealed result"));
+    }
+    if observer_id != "muse-windowed-rms-gain-observer" || observer_version != "0.1.0" {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("acoustic observer version is not in the v1 verifier allowlist".into())));
     }
     let bound = value.get("artifacts").ok_or("acoustic artifacts missing")?;
     if bound.get("source_audio_sha256").and_then(Value::as_str) != Some(artifacts.source_audio_sha256.as_str())
@@ -939,6 +972,30 @@ mod tests {
         let mut value: Value = serde_json::from_slice(&sealed_manifest([GateStatusV1::Pass; 5])).unwrap();
         value["bundle_id"] = Value::String("changed".into());
         assert!(verify_evidence_bundle_v1(&serde_json::to_vec(&value).unwrap(), EvidenceInputsV1::default()).is_err());
+    }
+
+    #[test]
+    fn cross_candidate_audio_binding_is_a_hard_failure() {
+        let mut value: Value = serde_json::from_slice(&sealed_manifest([GateStatusV1::Pass; 5])).unwrap();
+        value["components"]["acoustic_observation"]["candidate_audio_sha256"] = Value::String(d('8'));
+        let mut unsealed = value;
+        unsealed["receipt_sha256"] = Value::Null;
+        let digest = domain_digest(BUNDLE_DIGEST_DOMAIN_V1, &canonical_json_bytes(&unsealed).unwrap());
+        unsealed["receipt_sha256"] = Value::String(digest);
+        let report = verify_evidence_bundle_v1(&serde_json::to_vec(&unsealed).unwrap(), EvidenceInputsV1::default()).unwrap();
+        assert_eq!(report.verified_status, BundleStatusV1::Fail);
+    }
+
+    #[test]
+    fn pass_component_requires_a_receipt_and_producer_identity() {
+        let mut value: Value = serde_json::from_slice(&sealed_manifest([GateStatusV1::Pass; 5])).unwrap();
+        value["components"]["human_acceptance"]["receipt_sha256"] = Value::Null;
+        let mut unsealed = value;
+        unsealed["receipt_sha256"] = Value::Null;
+        let digest = domain_digest(BUNDLE_DIGEST_DOMAIN_V1, &canonical_json_bytes(&unsealed).unwrap());
+        unsealed["receipt_sha256"] = Value::String(digest);
+        let error = verify_evidence_bundle_v1(&serde_json::to_vec(&unsealed).unwrap(), EvidenceInputsV1::default()).unwrap_err();
+        assert!(error.contains("cannot declare pass without a receipt digest"));
     }
 
     #[test]
