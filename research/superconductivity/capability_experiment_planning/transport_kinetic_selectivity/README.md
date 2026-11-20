@@ -34,6 +34,8 @@ D_{\mathrm{co}}=\frac{D_{AA}+D_{BB}+2D_{AB}}{2}.
 
 The competing reaction uses A only. The declared product-layer thickness \(L\) yields characteristic transport rates \(d_j=2D_{\mathrm{eff},j}/L^2\).
 
+Both routes must carry the same thermodynamic-conditions ID, reaction-extent basis ID and standard-state ID within a case. The auditor rejects mismatches before comparing the route ΔG intervals; it does not infer equivalence of reference states from matching numeric values alone.
+
 The reaction waiting rate is computed separately:
 
 \[
