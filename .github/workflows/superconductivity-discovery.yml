@@ -11,6 +11,8 @@ on:
       - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
       - "data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json"
+      - "data/schemas/superconductivity_thermochemical_network_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
@@ -24,6 +26,8 @@ on:
       - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
       - "data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json"
+      - "data/schemas/superconductivity_thermochemical_network_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
@@ -59,6 +63,7 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/synthesis_protocol_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/pair_coherence_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/reaction_selectivity_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/thermochemical_network_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -80,6 +85,9 @@ jobs:
 
       - name: Test thermodynamic reaction selectivity and phase evidence contract
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reaction_selectivity_audit
+
+      - name: Test stoichiometric reaction balance, route connectivity and cycle closure
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit
 
       - name: Run metrics runner on synthetic plumbing fixture
         run: |
@@ -125,6 +133,46 @@ jobs:
             --out "$RUNNER_TEMP/sc-reaction-selectivity-smoke.json"
           cat "$RUNNER_TEMP/sc-reaction-selectivity-smoke.json"
 
+      - name: Run synthetic thermochemical reaction network audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit -- \
+            --schema data/schemas/superconductivity_thermochemical_network_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/thermochemical_network_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-thermochemical-network-smoke.json"
+          cat "$RUNNER_TEMP/sc-thermochemical-network-smoke.json"
+
+      - name: Verify unbalanced reaction negative control is rejected
+        run: |
+          set +e
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit -- \
+            --schema data/schemas/superconductivity_thermochemical_network_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_v0_1.json \
+            > "$RUNNER_TEMP/sc-thermochemical-unbalanced-negative.log" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then echo "unbalanced reaction unexpectedly accepted"; exit 1; fi
+          grep -F "fails computed conservation" "$RUNNER_TEMP/sc-thermochemical-unbalanced-negative.log"
+
+      - name: Verify disconnected route negative control is rejected
+        run: |
+          set +e
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit -- \
+            --schema data/schemas/superconductivity_thermochemical_network_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/thermochemical_network_disconnected_v0_1.json \
+            > "$RUNNER_TEMP/sc-thermochemical-disconnected-negative.log" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then echo "disconnected route unexpectedly accepted"; exit 1; fi
+          grep -F "is disconnected" "$RUNNER_TEMP/sc-thermochemical-disconnected-negative.log"
+
+      - name: Run thermodynamic cycle inconsistency fixture
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit -- \
+            --schema data/schemas/superconductivity_thermochemical_network_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/thermochemical_network_cycle_inconsistent_v0_1.json \
+            --out "$RUNNER_TEMP/sc-thermochemical-cycle-inconsistent.json"
+          cat "$RUNNER_TEMP/sc-thermochemical-cycle-inconsistent.json"
+
       - name: Run exact-input registry audit
         run: |
           cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- \
@@ -141,6 +189,7 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reaction_selectivity_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -160,6 +209,13 @@ jobs:
             sha256sum tools/superconductivity-discovery-harness/fixtures/reaction_selectivity_smoke_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/reaction_selectivity_suite_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/src/bin/reaction_selectivity_audit.rs
+            sha256sum data/schemas/superconductivity_thermochemical_network_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_smoke_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_cycle_inconsistent_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_disconnected_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_suite_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/thermochemical_network_audit.rs
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
@@ -184,3 +240,7 @@ jobs:
             ${{ runner.temp }}/sc-synthesis-protocol-smoke.json
             ${{ runner.temp }}/sc-pair-coherence-smoke.json
             ${{ runner.temp }}/sc-reaction-selectivity-smoke.json
+            ${{ runner.temp }}/sc-thermochemical-network-smoke.json
+            ${{ runner.temp }}/sc-thermochemical-unbalanced-negative.log
+            ${{ runner.temp }}/sc-thermochemical-disconnected-negative.log
+            ${{ runner.temp }}/sc-thermochemical-cycle-inconsistent.json
