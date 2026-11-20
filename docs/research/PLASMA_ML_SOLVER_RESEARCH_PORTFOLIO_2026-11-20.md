@@ -102,3 +102,18 @@ The portfolio is an execution map, not a result. It does not claim paper reprodu
 - Plasma-native reference: Finn et al., discrete-gradient Vlasov-Poisson-Landau PIC (JCP 2026, DOI 10.1016/j.jcp.2026.114749).
 - Transferable neural-operator prior art: GENERIC-FNO (arXiv:2606.08343); not yet a plasma result.
 - Keep collisionless Hamiltonian Vlasov-Poisson and collisional metriplectic Vlasov-Poisson-Landau in separate score lanes. Do not impose collisional entropy monotonicity as a generic collisionless gate.
+
+
+### L7. Variational particle-measure neural field
+
+- [#12960 — learn a scalar particle energy and derive forces](https://github.com/Luminous-Dynamics/symthaea/issues/12960); protocol in [PR #12961](https://github.com/Luminous-Dynamics/symthaea/pull/12961).
+- Compare direct NEOPIC field prediction against U_theta(X) with F_p = -∂U_theta/∂x_p, pairwise Hamiltonian networks and PIF.
+- Test conservative-force integrability, permutation symmetry, conditional translation invariance, no self-force and exact small-N references.
+- Continuous-force conservativity is not discrete energy conservation; test compatible time integration separately.
+
+### L8. Local Gauss-law-preserving electrostatic PIC
+
+- [#12962 — local Gauss-preserving GP-PIC baseline](https://github.com/Luminous-Dynamics/symthaea/issues/12962); protocol in [PR #12963](https://github.com/Luminous-Dynamics/symthaea/pull/12963).
+- Source: Qiao et al., *Computer Physics Communications* 327 (October 2026), article 110296, DOI 10.1016/j.cpc.2026.110296.
+- Benchmark discrete per-cell Gauss and charge-continuity residuals, curl-free relaxation, Landau/two-stream/Diocotron outcomes, and measured communication/synchronization scaling.
+- This is an electrostatic Vlasov–Ampere lane, not a full electromagnetic Maxwell result.
