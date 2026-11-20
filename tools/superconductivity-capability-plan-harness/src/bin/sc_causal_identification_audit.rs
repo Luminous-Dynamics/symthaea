@@ -33,9 +33,18 @@ struct PotentialOutcome {
     treated: f64,
 }
 #[derive(Clone, Debug)]
+struct AllocationDesign {
+    randomization_unit: String,
+    allocation_algorithm: String,
+    blocking_variable: String,
+    randomization_seed: Option<u64>,
+    assignment_receipt: HashMap<String, bool>,
+}
+#[derive(Clone, Debug)]
 struct Cohort {
     id: String,
     assignment_mechanism: String,
+    allocation_design: AllocationDesign,
     records: Vec<Record>,
 }
 #[derive(Clone, Debug)]
@@ -135,6 +144,43 @@ impl Instance {
             let cohort_id = field_text(row, "cohort_id")?.to_owned();
             if !cohort_ids.insert(cohort_id.clone()) { return Err(format!("duplicate cohort {cohort_id}")); }
             let assignment_mechanism = field_text(row, "assignment_mechanism")?.to_owned();
+            let design_row = row.get("allocation_design")
+                .ok_or_else(|| format!("cohort {cohort_id} missing allocation_design"))?;
+            let randomization_unit = field_text(design_row, "randomization_unit")?.to_owned();
+            let allocation_algorithm = field_text(design_row, "allocation_algorithm")?.to_owned();
+            let blocking_variable = field_text(design_row, "blocking_variable")?.to_owned();
+            let seed_value = design_row.get("randomization_seed")
+                .ok_or_else(|| format!("cohort {cohort_id} missing randomization_seed"))?;
+            let randomization_seed = if seed_value.is_null() { None } else {
+                Some(seed_value.as_u64().ok_or_else(|| format!("cohort {cohort_id} randomization_seed must be a non-negative integer or null"))?)
+            };
+            if randomization_unit != "specimen" {
+                return Err(format!("cohort {cohort_id} currently requires specimen-level randomization"));
+            }
+            match assignment_mechanism.as_str() {
+                "blocked_randomized" => {
+                    if allocation_algorithm != "blocked_complete_randomization_fixed_counts"
+                        || blocking_variable != "batch_id" || randomization_seed.is_none() {
+                        return Err(format!("cohort {cohort_id} randomization design does not match blocked complete randomization contract"));
+                    }
+                }
+                "historical_targeting_policy" => {
+                    if allocation_algorithm != "historical_targeting_policy" || randomization_seed.is_some() {
+                        return Err(format!("cohort {cohort_id} historical design must not claim a randomization seed"));
+                    }
+                }
+                _ => return Err(format!("cohort {cohort_id} has unsupported assignment mechanism")),
+            }
+            let mut assignment_receipt = HashMap::new();
+            for receipt_row in design_row.get("assignment_receipt").and_then(Value::as_array)
+                .ok_or_else(|| format!("cohort {cohort_id} assignment_receipt must be an array"))? {
+                let sample_id = field_text(receipt_row, "sample_id")?.to_owned();
+                let treatment = receipt_row.get("treatment_assigned").and_then(Value::as_bool)
+                    .ok_or_else(|| format!("cohort {cohort_id} assignment receipt requires treatment_assigned"))?;
+                if assignment_receipt.insert(sample_id.clone(), treatment).is_some() {
+                    return Err(format!("cohort {cohort_id} assignment receipt duplicates sample {sample_id}"));
+                }
+            }
             let mut records = Vec::new();
             let mut observed_ids = HashSet::new();
             for record_row in row.get("records").and_then(Value::as_array)
@@ -172,7 +218,19 @@ impl Instance {
             if records.len() != samples.len() || observed_ids.len() != samples.len() {
                 return Err(format!("cohort {cohort_id} must contain exactly one record per specimen"));
             }
-            cohorts.push(Cohort { id: cohort_id, assignment_mechanism, records });
+            if assignment_receipt.len() != records.len() || records.iter().any(|record| {
+                assignment_receipt.get(&record.sample_id) != Some(&record.treatment)
+            }) {
+                return Err(format!("cohort {cohort_id} assignment receipt does not exactly match the observed assignment records"));
+            }
+            let allocation_design = AllocationDesign {
+                randomization_unit,
+                allocation_algorithm,
+                blocking_variable,
+                randomization_seed,
+                assignment_receipt,
+            };
+            cohorts.push(Cohort { id: cohort_id, assignment_mechanism, allocation_design, records });
         }
 
         let truth_rows = fixture.get("ground_truth").and_then(Value::as_array)
@@ -495,6 +553,12 @@ impl Instance {
         if cohort.assignment_mechanism != "blocked_randomized" {
             return Err("exact randomization inference is reserved for blocked_randomized cohorts".to_owned());
         }
+        if cohort.allocation_design.allocation_algorithm != "blocked_complete_randomization_fixed_counts"
+            || cohort.allocation_design.randomization_seed.is_none()
+            || cohort.allocation_design.randomization_unit != "specimen"
+            || cohort.allocation_design.blocking_variable != "batch_id" {
+            return Err("exact randomization inference requires a complete, seed-bound specimen-level blocked assignment receipt".to_owned());
+        }
         if cohort.records.iter().any(|r| (r.propensity-0.5).abs() > 1.0e-9) {
             return Err("blocked randomization fixture must declare equal 0.5 assignment probabilities".to_owned());
         }
@@ -654,6 +718,17 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         cohort_receipts.push(json!({
             "cohort_id":cohort.id,
             "assignment_mechanism":cohort.assignment_mechanism,
+            "allocation_design":{
+                "randomization_unit":cohort.allocation_design.randomization_unit,
+                "allocation_algorithm":cohort.allocation_design.allocation_algorithm,
+                "blocking_variable":cohort.allocation_design.blocking_variable,
+                "randomization_seed":cohort.allocation_design.randomization_seed,
+                "assignment_receipt_sample_count":cohort.allocation_design.assignment_receipt.len(),
+                "assignment_receipt_sha256":format!("{:x}",Sha256::digest(
+                    serde_json::to_vec(&cohort.allocation_design.assignment_receipt)
+                        .expect("assignment receipt serializes")
+                ))
+            },
             "record_count":cohort.records.len(),
             "assignment_counts":{
                 "treated":cohort.records.iter().filter(|r|r.treatment).count(),
@@ -917,6 +992,26 @@ mod tests{
         assert!(historical["hajek_normalized_inverse_propensity"]["estimate"]["estimate"].is_null());
         assert!(historical["family_stratified_aipw_comparator"]["estimate"]["estimate"].is_null());
         assert_eq!(historical["propensity_overlap_and_effective_sample_size"]["outside_overlap_gate_count"],1);
+    }
+
+    #[test]
+    fn assignment_receipt_mismatch_fails_closed() {
+        let (schema,fixture)=inputs();
+        let mut value:Value=serde_json::from_slice(&fixture).unwrap();
+        let receipt_row=&mut value["cohorts"][0]["allocation_design"]["assignment_receipt"][0];
+        receipt_row["treatment_assigned"]=json!(!receipt_row["treatment_assigned"].as_bool().unwrap());
+        assert!(Instance::from_bytes(&schema,&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn blocked_randomization_requires_seed_algorithm_and_block_key() {
+        let (schema,fixture)=inputs();
+        let mut value:Value=serde_json::from_slice(&fixture).unwrap();
+        value["cohorts"][0]["allocation_design"]["randomization_seed"]=Value::Null;
+        assert!(Instance::from_bytes(&schema,&serde_json::to_vec(&value).unwrap()).is_err());
+        let mut value:Value=serde_json::from_slice(&fixture).unwrap();
+        value["cohorts"][0]["allocation_design"]["allocation_algorithm"]=json!("random");
+        assert!(Instance::from_bytes(&schema,&serde_json::to_vec(&value).unwrap()).is_err());
     }
 
 }
