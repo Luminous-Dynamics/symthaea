@@ -1,0 +1,66 @@
+{
+  "schema_version": "0.1.0",
+  "portfolio_id": "plasma-ml-solver-research-portfolio-v0.1",
+  "created_at": "2026-11-20",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12942",
+  "status": "coordination_registry_only",
+  "scientific_lanes": [
+    {
+      "id": "landau_damping_memory",
+      "issues": [12907,12910,12914,12921],
+      "primary_task": "1d_electrostatic_landau_damping",
+      "separate_task_lanes": ["ADEPT_original_task","online_FNO","Fourier_Hermite_reservoir"],
+      "required_outputs": ["full_rollout","physical_entropy_diagnostics","OOD_abstention","solver_transfer"],
+      "execution_status": "source_admission_and_reproduction_pending"
+    },
+    {
+      "id": "magnetosheath_pressure_tensor",
+      "issues": [12923],
+      "prs": [12926],
+      "primary_task": "2d_3v_magnetosheath_electron_pressure_tensor",
+      "required_outputs": ["componentwise_pressure","PSD_symmetry","divergence_under_exact_solver_operator","pressure_strain","energy_channels"],
+      "source_blocker": "B2_B3_B4_B5_B6_training_validation_artifact_admission",
+      "execution_status": "source_review_specification_only"
+    },
+    {
+      "id": "icf_nonlocal_heat_transport",
+      "issues": [12938],
+      "prs": [12940],
+      "primary_task": "PIC_trained_nonlocal_electron_heat_flux_closure",
+      "required_outputs": ["coarse_to_fine_zero_shot","implicit_solver_rollout","SNB_baseline","energy_balance","temporal_extrapolation","OOD_uncertainty"],
+      "source_doi": "10.1103/9l4n-mnz6",
+      "source_blocker": "author_code_data_weights_and_record_licence_not_admitted",
+      "execution_status": "source_review_specification_only"
+    },
+    {
+      "id": "pic_residual_solver_acceleration",
+      "issues": [12939],
+      "prs": [12941],
+      "primary_task": "neural_initial_guess_plus_exact_classical_residual_correction",
+      "tasks": ["LLD","two_stream_instability","SOL"],
+      "required_outputs": ["exact_discrete_residual","same_stopping_tolerance","conservation_invariants","closed_loop_stability","end_to_end_speedup_including_fallback"],
+      "source_arxiv": "2606.17733",
+      "source_blocker": "author_code_data_solver_operator_and_licence_not_admitted",
+      "execution_status": "source_review_specification_only"
+    }
+  ],
+  "shared_infrastructure": {
+    "symtropy_solver_receipt_issue": 1685,
+    "native_time_alignment_pr": 6190,
+    "stream_telemetry_pr": 6252,
+    "pressure_tensor_audit_pr": 6243
+  },
+  "cross_lane_gates": [
+    "source_revision_data_hash_and_rights",
+    "paper_reproduction_before_superiority",
+    "matched_solver_boundary_and_compute_budgets",
+    "a_posteriori_rollouts",
+    "task_specific_physical_gates",
+    "calibrated_OOD_abstention",
+    "zero_shot_mesh_timestep_integrator_transfer",
+    "end_to_end_training_data_inference_solver_fallback_cost",
+    "negative_controls_and_visible_failed_unscored_states"
+  ],
+  "prohibited_comparison": "do_not_rank_different_physics_tasks_on_one_scalar_leaderboard",
+  "claim_ceiling": "coordination_registry_only"
+}
