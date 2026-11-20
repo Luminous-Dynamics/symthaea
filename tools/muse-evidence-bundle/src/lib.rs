@@ -317,6 +317,49 @@ fn exact_fields(value: &Value, expected: &[&str], label: &str) -> Result<(), Str
     Ok(())
 }
 
+fn validate_gain_contract_wire_shape(value: &Value) -> Result<(), String> {
+    exact_fields(
+        value,
+        &[
+            "schema",
+            "scope_kind",
+            "scope_id",
+            "sample_rate_hz",
+            "channels",
+            "frame_count",
+            "minimum_source_rms_dbfs",
+            "maximum_candidate_clipped_sample_fraction",
+            "protected_max_abs_gain_delta_db",
+            "target_windows",
+            "protected_windows",
+        ],
+        "gain-envelope contract",
+    )?;
+    let targets = value.get("target_windows").and_then(Value::as_array)
+        .ok_or("gain-envelope target_windows must be an array")?;
+    if targets.is_empty() {
+        return Err("gain-envelope contract requires target windows".into());
+    }
+    for (index, target) in targets.iter().enumerate() {
+        let label = format!("target_windows[{index}]");
+        exact_fields(target, &["range", "expected_gain_db", "tolerance_db"], &label)?;
+        exact_fields(
+            target.get("range").ok_or("gain target range missing")?,
+            &["start_frame", "end_frame"],
+            &format!("{label}.range"),
+        )?;
+    }
+    let protected = value.get("protected_windows").and_then(Value::as_array)
+        .ok_or("gain-envelope protected_windows must be an array")?;
+    if protected.is_empty() {
+        return Err("gain-envelope contract requires protected windows".into());
+    }
+    for (index, window) in protected.iter().enumerate() {
+        exact_fields(window, &["start_frame", "end_frame"], &format!("protected_windows[{index}]"))?;
+    }
+    Ok(())
+}
+
 fn validate_manifest_shape(value: &Value) -> Result<(), String> {
     exact_fields(
         value,
@@ -875,8 +918,11 @@ fn verify_acoustic(
     {
         return Ok(hard_binding("source or candidate WAV bytes do not match the bundle artifact digests"));
     }
-    let contract: GainEnvelopeContractV1 = serde_json::from_slice(contract_bytes)
+    let contract_value: Value = serde_json::from_slice(contract_bytes)
         .map_err(|error| format!("gain-envelope contract JSON invalid: {error}"))?;
+    validate_gain_contract_wire_shape(&contract_value)?;
+    let contract: GainEnvelopeContractV1 = serde_json::from_value(contract_value)
+        .map_err(|error| format!("gain-envelope contract wire fields invalid: {error}"))?;
     let reproduced = observe_gain_envelope_v1(source_audio, &candidate_audio, &contract)
         .map_err(|error| format!("independent acoustic observer reproduction failed: {error}"))?;
     let reproduced_receipt = reproduced.get("receipt_sha256").and_then(Value::as_str);
