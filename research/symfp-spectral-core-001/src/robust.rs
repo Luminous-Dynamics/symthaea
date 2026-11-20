@@ -283,6 +283,29 @@ mod tests {
     }
 
     #[test]
+    fn zero_delta_envelope_does_not_promote_th_to_d6h_despite_zero_leakage() {
+        let receipt = receipt_for_rank_template("Th", 9);
+        let result = classify_rank_templates_with_perturbation_bounds(
+            &receipt,
+            &super::super::CRYSTALLOGRAPHIC_TEMPLATES_V1,
+            &[0.0; 10],
+        )
+        .unwrap();
+
+        assert_eq!(result.guaranteed_nearest_template, Some("Th"));
+        assert_eq!(result.not_ruled_out_templates, vec!["Th"]);
+        let d6h = super::super::template_by_name("D6h").unwrap();
+        let leakage = super::super::target_leakage(&receipt, d6h).unwrap();
+        assert_eq!(leakage.pooled_leakage_score, 0.0);
+        close(leakage.p_ls, 10.0, 1.0e-12);
+        assert_ne!(result.guaranteed_nearest_template, Some("D6h"));
+        assert_eq!(
+            result.authority,
+            "SPECTRAL_COMPATIBILITY_INTERVAL_ONLY_NOT_A_SYMMETRY_CERTIFICATE"
+        );
+    }
+
+    #[test]
     fn threshold_crossing_returns_a_rank_interval_and_abstains_on_label() {
         let profile = SymFpProfileV1 {
             tau_rel: 0.1,
