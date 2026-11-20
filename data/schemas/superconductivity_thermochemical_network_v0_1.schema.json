@@ -9,6 +9,7 @@
     "network_id",
     "fixture_only",
     "conditions",
+    "standard_state_id",
     "reference_extent_basis_id",
     "reference_extent_unit",
     "balance_tolerance",
@@ -131,7 +132,8 @@
           "stoichiometric_terms",
           "delta_g_interval_eV",
           "activation_barrier_interval_eV",
-          "source_class"
+          "source_class",
+          "standard_state_id"
         ],
         "properties": {
           "reaction_id": {
@@ -197,6 +199,10 @@
               "synthetic_fixture",
               "unknown"
             ]
+          },
+          "standard_state_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -298,6 +304,10 @@
     },
     "claim_ceiling": {
       "const": "Synthetic stoichiometric and thermodynamic network audit only; no real synthesis route, DFT calculation, superconducting phase or laboratory authorization is established."
+    },
+    "standard_state_id": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "$defs": {
