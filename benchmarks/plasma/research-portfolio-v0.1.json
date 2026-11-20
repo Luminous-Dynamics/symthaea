@@ -7,38 +7,87 @@
   "scientific_lanes": [
     {
       "id": "landau_damping_memory",
-      "issues": [12907,12910,12914,12921],
+      "issues": [
+        12907,
+        12910,
+        12914,
+        12921
+      ],
       "primary_task": "1d_electrostatic_landau_damping",
-      "separate_task_lanes": ["ADEPT_original_task","online_FNO","Fourier_Hermite_reservoir"],
-      "required_outputs": ["full_rollout","physical_entropy_diagnostics","OOD_abstention","solver_transfer"],
+      "separate_task_lanes": [
+        "ADEPT_original_task",
+        "online_FNO",
+        "Fourier_Hermite_reservoir"
+      ],
+      "required_outputs": [
+        "full_rollout",
+        "physical_entropy_diagnostics",
+        "OOD_abstention",
+        "solver_transfer"
+      ],
       "execution_status": "source_admission_and_reproduction_pending"
     },
     {
       "id": "magnetosheath_pressure_tensor",
-      "issues": [12923],
-      "prs": [12926],
+      "issues": [
+        12923
+      ],
+      "prs": [
+        12926
+      ],
       "primary_task": "2d_3v_magnetosheath_electron_pressure_tensor",
-      "required_outputs": ["componentwise_pressure","PSD_symmetry","divergence_under_exact_solver_operator","pressure_strain","energy_channels"],
+      "required_outputs": [
+        "componentwise_pressure",
+        "PSD_symmetry",
+        "divergence_under_exact_solver_operator",
+        "pressure_strain",
+        "energy_channels"
+      ],
       "source_blocker": "B2_B3_B4_B5_B6_training_validation_artifact_admission",
       "execution_status": "source_review_specification_only"
     },
     {
       "id": "icf_nonlocal_heat_transport",
-      "issues": [12938],
-      "prs": [12940],
+      "issues": [
+        12938
+      ],
+      "prs": [
+        12940
+      ],
       "primary_task": "PIC_trained_nonlocal_electron_heat_flux_closure",
-      "required_outputs": ["coarse_to_fine_zero_shot","implicit_solver_rollout","SNB_baseline","energy_balance","temporal_extrapolation","OOD_uncertainty"],
+      "required_outputs": [
+        "coarse_to_fine_zero_shot",
+        "implicit_solver_rollout",
+        "SNB_baseline",
+        "energy_balance",
+        "temporal_extrapolation",
+        "OOD_uncertainty"
+      ],
       "source_doi": "10.1103/9l4n-mnz6",
       "source_blocker": "author_code_data_weights_and_record_licence_not_admitted",
       "execution_status": "source_review_specification_only"
     },
     {
       "id": "pic_residual_solver_acceleration",
-      "issues": [12939],
-      "prs": [12941],
+      "issues": [
+        12939
+      ],
+      "prs": [
+        12941
+      ],
       "primary_task": "neural_initial_guess_plus_exact_classical_residual_correction",
-      "tasks": ["LLD","two_stream_instability","SOL"],
-      "required_outputs": ["exact_discrete_residual","same_stopping_tolerance","conservation_invariants","closed_loop_stability","end_to_end_speedup_including_fallback"],
+      "tasks": [
+        "LLD",
+        "two_stream_instability",
+        "SOL"
+      ],
+      "required_outputs": [
+        "exact_discrete_residual",
+        "same_stopping_tolerance",
+        "conservation_invariants",
+        "closed_loop_stability",
+        "end_to_end_speedup_including_fallback"
+      ],
       "source_arxiv": "2606.17733",
       "source_blocker": "author_code_data_solver_operator_and_licence_not_admitted",
       "execution_status": "source_review_specification_only"
@@ -62,5 +111,30 @@
     "negative_controls_and_visible_failed_unscored_states"
   ],
   "prohibited_comparison": "do_not_rank_different_physics_tasks_on_one_scalar_leaderboard",
-  "claim_ceiling": "coordination_registry_only"
+  "claim_ceiling": "coordination_registry_only",
+  "shared_research_programs": [
+    {
+      "id": "active_kinetic_design",
+      "issue": 12944,
+      "purpose": "select_expensive_kinetic_simulations_to_expand_qualified_domain_of_trust",
+      "baselines": [
+        "random",
+        "space_filling",
+        "committee_disagreement",
+        "calibrated_uncertainty",
+        "physical_residual",
+        "admissibility_failure",
+        "support_distance",
+        "cost_aware_multifidelity",
+        "hybrid_pareto"
+      ],
+      "guardrails": [
+        "sealed_test_never_acquired_from",
+        "source_and_solver_contract_required",
+        "fidelity_labels_preserved",
+        "full_acquisition_and_run_cost_accounted"
+      ],
+      "execution_status": "protocol_open_not_executed"
+    }
+  ]
 }
