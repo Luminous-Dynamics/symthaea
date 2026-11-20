@@ -13,9 +13,10 @@ The paper's core contribution is a nonuniform Fourier neural operator (NUFNO) th
 Source links:
 - Paper: https://arxiv.org/abs/2610.40528
 - Implementation/configurations (as stated by paper): https://github.com/srikrrish/operator_learning
-- Paper result tag (as stated): neopic-arxiv-v1
-- NUFFT cost tag (as stated): neopic-arxiv-v1-nufft
+- Paper result tag: neopic-arxiv-v1 → commit `2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431` (annotated tag object `8e872e5fa520843a9c9db4a68d43036a66355c19`)
+- NUFFT cost tag: neopic-arxiv-v1-nufft → commit `1222226acab272b8d78ba541cb67c1e877669785` (annotated tag object `0230db29af90d143ccfe8dfd2e0eb28496139ccb`)
 - Paper scripts: https://github.com/NEOPIC-framework/neopic-paper-scripts
+- Paper scripts tag: neopic-arxiv-v1 → commit `2ee358abed5c782213d6d35c1194568da26ed8f1` (annotated tag object `dea39090f5ad1c9efd8c3435ed0d19ecb058dec4`)
 - Separate NEOPIC repository: https://github.com/srikrrish/NEOPIC
 
 Observed licensing/access facts:
@@ -24,7 +25,7 @@ Observed licensing/access facts:
 - The separate srikrrish/NEOPIC repository's default-branch LICENSE is BSD 3-Clause (copyright Sriramkrishnan Muralikrishnan, 2025).
 - The paper says implementation/configurations are in operator_learning and that training datasets, trained models and reference HDF5 outputs are available from the corresponding author on reasonable request, not included in Git.
 
-**Admission caveat:** the named paper tags and exact commits have not yet been resolved to immutable commit SHAs in this review. Default-branch licences do not establish the licences of every tagged snapshot, submodule, dependency, dataset, trained model or reference output. The HDF5 datasets/checkpoints and their redistribution rights remain unadmitted.
+**Admission caveat:** the three named annotated tags are now resolved to immutable target commit SHAs. This pins source identity but does not establish the licences of every tagged snapshot, submodule, dependency, dataset, trained model or reference output. The HDF5 datasets/checkpoints and their redistribution rights remain unadmitted.
 
 ## 2. Why this changes our research strategy
 
@@ -32,6 +33,12 @@ NEOPIC makes direct particle-measure operator learning a mandatory serious basel
 - grid-based FNOs that learn on deposited fields and can receive aliased particle noise;
 - LRC-FNO, which uses compressed fields and latent residual refinement;
 - a warm-start neural model whose output is accepted only after a classical residual-correction solve.
+
+**Add a variational Fourier particle method as an explicit comparator.** Variational Fourier particle methods are established prior art: they derive particle-field coupling from a discrete variational principle and can preserve semi-discrete charge/Gauss, energy and momentum under their declared discretisation. Their global coupling / communication cost is part of the comparison, not a reason to omit them. See *On Variational Fourier Particle Methods*, Journal of Scientific Computing (2024), DOI `10.1007/s10915-024-02708-w`. Our new small-N energy-gradient oracle is a known-answer tool for testing candidate learned energies; it is not a claim to invent variational PIF.
+
+The core tournament therefore includes source NEOPIC NUFNO, deposited-grid FNO, LRC-FNO, variational Fourier particle method, standard CIC-PIC, PIF/NUFFT, Barnes–Hut and direct-sum small-N checks.
+
+Keep adjacent solver lanes separate unless the governing equation, geometry, boundary conditions and diagnostic definitions match: local Gauss-preserving electrostatic Vlasov–Ampère PIC; semi-implicit energy-conserving electrostatic PIC in its high-density regime; and energy-conserving full electromagnetic PIC (e.g. EPIC-GOD) only in a full Vlasov–Maxwell cohort. These are stronger physical references for their own scopes, not interchangeable scores against every NEOPIC mini-app.
 
 The benchmark needs three separate questions:
 1. Is the particle-measure neural field operator more accurate at matched particle count and reference field solve?
@@ -188,6 +195,18 @@ Measure the complete particle-field step:
 | exact paper reproduction | Not performed |
 | head-to-head tournament | Not performed |
 
-## 8. Claim ceiling
+## 8. Source identity and prior-art update (20 November 2026)
+
+The immutable tag targets were resolved directly from the public Git references:
+
+| Artifact | Tag | Commit SHA |
+|---|---|---|
+| `srikrish/operator_learning` | `neopic-arxiv-v1` | `2cf6a15e0ddb6c408a4ef6d162c31faf1deb9431` |
+| `srikrish/operator_learning` | `neopic-arxiv-v1-nufft` | `1222226acab272b8d78ba541cb67c1e877669785` |
+| `NEOPIC-framework/neopic-paper-scripts` | `neopic-arxiv-v1` | `2ee358abed5c782213d6d35c1194568da26ed8f1` |
+
+These are annotated tags dereferenced to their commit targets. Dataset/checkpoint/HDF5 provenance and usage/redistribution rights still need independent admission.
+
+## 9. Claim ceiling
 
 This is a reproduction protocol and source admission record. It does not claim NEOPIC was reproduced, trained, beaten, integrated into Symthaea or validated for plasma control.
