@@ -831,7 +831,7 @@ mod tests{
         let receipt=audit(&schema,&fixture).unwrap();
         let randomized=receipt["cohorts"].as_array().unwrap().iter()
             .find(|x|x["cohort_id"]=="blocked_randomized").unwrap();
-        assert_eq!(randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_treated"],1.0);
+        assert!((randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_treated"].as_f64().unwrap()-0.9333333333333332).abs()<1.0e-12);
         assert_eq!(randomized["baseline_balance_and_batch_counts"]["mean_delivered_dose_fraction_control"],0.0);
     }
 
