@@ -1,0 +1,239 @@
+{
+  "contract": "SC-CAUSAL-TRANSITION-0.1",
+  "instance_id": "adversarial_destructive_information_vs_specimen_value_001",
+  "fixture_only": true,
+  "specimen_id": "specimen_P",
+  "horizon": 2,
+  "initial_state_distribution": [
+    {
+      "state_id": "sample_coherent",
+      "probability": 0.6
+    },
+    {
+      "state_id": "sample_noncoherent",
+      "probability": 0.4
+    }
+  ],
+  "physical_states": [
+    {
+      "state_id": "sample_coherent",
+      "state_role": "target",
+      "pairing_strength": 0.9,
+      "phase_coherence": 0.9,
+      "sample_integrity": 1,
+      "phase_status": "realized"
+    },
+    {
+      "state_id": "sample_noncoherent",
+      "state_role": "baseline",
+      "pairing_strength": 0.2,
+      "phase_coherence": 0.1,
+      "sample_integrity": 1,
+      "phase_status": "not_realized"
+    },
+    {
+      "state_id": "sample_destroyed",
+      "state_role": "damaged",
+      "pairing_strength": 0.2,
+      "phase_coherence": 0.05,
+      "sample_integrity": 0.01,
+      "phase_status": "not_realized"
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "use_for_application",
+      "losses": [
+        {
+          "state_id": "sample_coherent",
+          "loss": 0
+        },
+        {
+          "state_id": "sample_noncoherent",
+          "loss": 20
+        },
+        {
+          "state_id": "sample_destroyed",
+          "loss": 100
+        }
+      ]
+    },
+    {
+      "decision_id": "defer_preserve",
+      "losses": [
+        {
+          "state_id": "sample_coherent",
+          "loss": 5
+        },
+        {
+          "state_id": "sample_noncoherent",
+          "loss": 2
+        },
+        {
+          "state_id": "sample_destroyed",
+          "loss": 100
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "financial_budget",
+      "unit": "USD_cent",
+      "capacity": 200,
+      "semantics": "Synthetic budget."
+    },
+    {
+      "resource_id": "xray_time",
+      "unit": "minute",
+      "capacity": 15,
+      "semantics": "Synthetic characterization slot."
+    },
+    {
+      "resource_id": "specimen_A_mass",
+      "unit": "mg",
+      "capacity": 2,
+      "semantics": "Available specimen mass."
+    }
+  ],
+  "reference_resource_id": "financial_budget",
+  "outcome_labels": [
+    "diagnostic_positive",
+    "diagnostic_negative"
+  ],
+  "initial_capabilities": [],
+  "actions": [
+    {
+      "action_id": "destructive_characterization",
+      "action_kind": "destructive_characterization",
+      "specimen_id": "specimen_P",
+      "reversibility": "irreversible",
+      "requires_capabilities": [],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 80
+        },
+        {
+          "resource_id": "xray_time",
+          "unit": "minute",
+          "quantity": 10
+        },
+        {
+          "resource_id": "specimen_A_mass",
+          "unit": "mg",
+          "quantity": 2
+        }
+      ],
+      "transition_rows": [
+        {
+          "from_state_id": "sample_coherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "sample_destroyed",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.98,
+                0.020000000000000018
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "sample_noncoherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "sample_destroyed",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.03,
+                0.97
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "sample_destroyed",
+          "transition_outcomes": [
+            {
+              "next_state_id": "sample_destroyed",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "sham_control",
+      "action_kind": "sham_control",
+      "specimen_id": "specimen_P",
+      "reversibility": "non_destructive",
+      "requires_capabilities": [],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 10
+        },
+        {
+          "resource_id": "xray_time",
+          "unit": "minute",
+          "quantity": 2
+        }
+      ],
+      "transition_rows": [
+        {
+          "from_state_id": "sample_coherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "sample_coherent",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "sample_noncoherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "sample_noncoherent",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "sample_destroyed",
+          "transition_outcomes": [
+            {
+              "next_state_id": "sample_destroyed",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic causal intervention planner only; no material response, causal effect, instrument protocol, superconductivity result or laboratory authorization is established."
+}

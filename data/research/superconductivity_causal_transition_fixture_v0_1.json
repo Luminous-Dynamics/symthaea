@@ -1,0 +1,730 @@
+{
+  "contract": "SC-CAUSAL-TRANSITION-0.1",
+  "instance_id": "synthetic_pressure_strain_path_dependence_001",
+  "fixture_only": true,
+  "specimen_id": "specimen_A",
+  "horizon": 2,
+  "initial_state_distribution": [
+    {
+      "state_id": "fresh_unpaired",
+      "probability": 0.82
+    },
+    {
+      "state_id": "unknown_discrepant",
+      "probability": 0.18
+    }
+  ],
+  "physical_states": [
+    {
+      "state_id": "fresh_unpaired",
+      "state_role": "baseline",
+      "pairing_strength": 0.2,
+      "phase_coherence": 0.1,
+      "sample_integrity": 1,
+      "phase_status": "not_realized"
+    },
+    {
+      "state_id": "preformed_incoherent",
+      "state_role": "intermediate",
+      "pairing_strength": 0.88,
+      "phase_coherence": 0.18,
+      "sample_integrity": 1,
+      "phase_status": "metastable_or_conditional"
+    },
+    {
+      "state_id": "bulk_coherent",
+      "state_role": "target",
+      "pairing_strength": 0.9,
+      "phase_coherence": 0.9,
+      "sample_integrity": 0.95,
+      "phase_status": "realized"
+    },
+    {
+      "state_id": "damaged",
+      "state_role": "damaged",
+      "pairing_strength": 0.35,
+      "phase_coherence": 0.05,
+      "sample_integrity": 0.15,
+      "phase_status": "not_realized"
+    },
+    {
+      "state_id": "unknown_discrepant",
+      "state_role": "unknown",
+      "pairing_strength": 0.25,
+      "phase_coherence": 0.1,
+      "sample_integrity": 0.8,
+      "phase_status": "unknown"
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "proceed_to_application",
+      "losses": [
+        {
+          "state_id": "fresh_unpaired",
+          "loss": 12
+        },
+        {
+          "state_id": "preformed_incoherent",
+          "loss": 8
+        },
+        {
+          "state_id": "bulk_coherent",
+          "loss": 0.5
+        },
+        {
+          "state_id": "damaged",
+          "loss": 35
+        },
+        {
+          "state_id": "unknown_discrepant",
+          "loss": 20
+        }
+      ]
+    },
+    {
+      "decision_id": "preserve_or_defer",
+      "losses": [
+        {
+          "state_id": "fresh_unpaired",
+          "loss": 2.5
+        },
+        {
+          "state_id": "preformed_incoherent",
+          "loss": 5
+        },
+        {
+          "state_id": "bulk_coherent",
+          "loss": 8
+        },
+        {
+          "state_id": "damaged",
+          "loss": 3
+        },
+        {
+          "state_id": "unknown_discrepant",
+          "loss": 4
+        }
+      ]
+    },
+    {
+      "decision_id": "continue_characterization",
+      "losses": [
+        {
+          "state_id": "fresh_unpaired",
+          "loss": 4
+        },
+        {
+          "state_id": "preformed_incoherent",
+          "loss": 3.5
+        },
+        {
+          "state_id": "bulk_coherent",
+          "loss": 5
+        },
+        {
+          "state_id": "damaged",
+          "loss": 4
+        },
+        {
+          "state_id": "unknown_discrepant",
+          "loss": 3
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "financial_budget",
+      "unit": "USD_cent",
+      "capacity": 400,
+      "semantics": "Synthetic campaign budget; not a laboratory quote."
+    },
+    {
+      "resource_id": "pressure_cell_time",
+      "unit": "minute",
+      "capacity": 15,
+      "semantics": "Booked pressure-cell time; queue wait and temperature ramp intervals are not modelled."
+    },
+    {
+      "resource_id": "strain_stage_time",
+      "unit": "minute",
+      "capacity": 20,
+      "semantics": "Booked strain-stage time; load/unload scheduling is not modelled."
+    },
+    {
+      "resource_id": "thermo_instrument_time",
+      "unit": "minute",
+      "capacity": 25,
+      "semantics": "Booked thermodynamic measurement time."
+    },
+    {
+      "resource_id": "destructive_analysis_time",
+      "unit": "minute",
+      "capacity": 10,
+      "semantics": "Booked destructive-characterization slot."
+    },
+    {
+      "resource_id": "specimen_A_mass",
+      "unit": "mg",
+      "capacity": 2,
+      "semantics": "Consumable mass available from one identified specimen."
+    }
+  ],
+  "reference_resource_id": "financial_budget",
+  "outcome_labels": [
+    "supportive_or_transition_observed",
+    "not_supportive_or_transition_not_observed"
+  ],
+  "initial_capabilities": [
+    "pressure_cell_qualified",
+    "strain_stage_qualified",
+    "thermodynamic_channel_qualified",
+    "xray_access"
+  ],
+  "actions": [
+    {
+      "action_id": "pressure_step",
+      "action_kind": "reversible_intervention",
+      "specimen_id": "specimen_A",
+      "reversibility": "reversible_unverified",
+      "requires_capabilities": [
+        "pressure_cell_qualified"
+      ],
+      "provides_capabilities": [
+        "pressure_history_set"
+      ],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 100
+        },
+        {
+          "resource_id": "pressure_cell_time",
+          "unit": "minute",
+          "quantity": 10
+        }
+      ],
+      "transition_rows": [
+        {
+          "from_state_id": "fresh_unpaired",
+          "transition_outcomes": [
+            {
+              "next_state_id": "preformed_incoherent",
+              "probability": 0.88,
+              "outcome_probabilities": [
+                0.75,
+                0.25
+              ]
+            },
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 0.12,
+              "outcome_probabilities": [
+                0.25,
+                0.75
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "preformed_incoherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "preformed_incoherent",
+              "probability": 0.95,
+              "outcome_probabilities": [
+                0.75,
+                0.25
+              ]
+            },
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 0.05,
+              "outcome_probabilities": [
+                0.25,
+                0.75
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "bulk_coherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "bulk_coherent",
+              "probability": 0.98,
+              "outcome_probabilities": [
+                0.95,
+                0.050000000000000044
+              ]
+            },
+            {
+              "next_state_id": "damaged",
+              "probability": 0.02,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "damaged",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 0.99,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            },
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 0.01,
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "unknown_discrepant",
+          "transition_outcomes": [
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 0.9,
+              "outcome_probabilities": [
+                0.25,
+                0.75
+              ]
+            },
+            {
+              "next_state_id": "damaged",
+              "probability": 0.1,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "strain_step",
+      "action_kind": "reversible_intervention",
+      "specimen_id": "specimen_A",
+      "reversibility": "path_dependent",
+      "requires_capabilities": [
+        "strain_stage_qualified"
+      ],
+      "provides_capabilities": [
+        "strain_history_set"
+      ],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 80
+        },
+        {
+          "resource_id": "strain_stage_time",
+          "unit": "minute",
+          "quantity": 15
+        }
+      ],
+      "transition_rows": [
+        {
+          "from_state_id": "fresh_unpaired",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 0.75,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            },
+            {
+              "next_state_id": "fresh_unpaired",
+              "probability": 0.25,
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "preformed_incoherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "bulk_coherent",
+              "probability": 0.88,
+              "outcome_probabilities": [
+                0.95,
+                0.050000000000000044
+              ]
+            },
+            {
+              "next_state_id": "damaged",
+              "probability": 0.12,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "bulk_coherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "bulk_coherent",
+              "probability": 0.94,
+              "outcome_probabilities": [
+                0.95,
+                0.050000000000000044
+              ]
+            },
+            {
+              "next_state_id": "damaged",
+              "probability": 0.06,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "damaged",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 0.99,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            },
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 0.01,
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "unknown_discrepant",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 0.4,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            },
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 0.6,
+              "outcome_probabilities": [
+                0.2,
+                0.8
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "bulk_thermodynamic_check",
+      "action_kind": "passive_observation",
+      "specimen_id": "specimen_A",
+      "reversibility": "non_destructive",
+      "requires_capabilities": [
+        "thermodynamic_channel_qualified"
+      ],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 150
+        },
+        {
+          "resource_id": "thermo_instrument_time",
+          "unit": "minute",
+          "quantity": 20
+        }
+      ],
+      "transition_rows": [
+        {
+          "from_state_id": "fresh_unpaired",
+          "transition_outcomes": [
+            {
+              "next_state_id": "fresh_unpaired",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.05,
+                0.95
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "preformed_incoherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "preformed_incoherent",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.18,
+                0.8200000000000001
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "bulk_coherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "bulk_coherent",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.98,
+                0.020000000000000018
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "damaged",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "unknown_discrepant",
+          "transition_outcomes": [
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.08,
+                0.92
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "destructive_xray",
+      "action_kind": "destructive_characterization",
+      "specimen_id": "specimen_A",
+      "reversibility": "irreversible",
+      "requires_capabilities": [
+        "xray_access"
+      ],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 90
+        },
+        {
+          "resource_id": "destructive_analysis_time",
+          "unit": "minute",
+          "quantity": 10
+        },
+        {
+          "resource_id": "specimen_A_mass",
+          "unit": "mg",
+          "quantity": 2
+        }
+      ],
+      "transition_rows": [
+        {
+          "from_state_id": "fresh_unpaired",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "preformed_incoherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.85,
+                0.15000000000000002
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "bulk_coherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.95,
+                0.050000000000000044
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "damaged",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.05,
+                0.95
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "unknown_discrepant",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.3,
+                0.7
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "sham_control",
+      "action_kind": "sham_control",
+      "specimen_id": "specimen_A",
+      "reversibility": "non_destructive",
+      "requires_capabilities": [],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 30
+        },
+        {
+          "resource_id": "thermo_instrument_time",
+          "unit": "minute",
+          "quantity": 5
+        }
+      ],
+      "transition_rows": [
+        {
+          "from_state_id": "fresh_unpaired",
+          "transition_outcomes": [
+            {
+              "next_state_id": "fresh_unpaired",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "preformed_incoherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "preformed_incoherent",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "bulk_coherent",
+          "transition_outcomes": [
+            {
+              "next_state_id": "bulk_coherent",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "damaged",
+          "transition_outcomes": [
+            {
+              "next_state_id": "damaged",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "from_state_id": "unknown_discrepant",
+          "transition_outcomes": [
+            {
+              "next_state_id": "unknown_discrepant",
+              "probability": 1,
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic causal intervention planner only; no material response, causal effect, instrument protocol, superconductivity result or laboratory authorization is established."
+}
