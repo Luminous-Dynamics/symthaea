@@ -182,7 +182,7 @@ Added to symthaea-canvas:
 - embodiment_trace.rs: bounded, versioned event corpus, deterministic replay, activity/playback interval summaries and exact event-index failure reporting;
 - tests/fixtures/embodiment_trace_v1.json: a reference trace that covers listening, synthesis, ready, queueing, playback, visemes, completion, uncertainty and reset;
 - examples/embodiment_trace_replay.rs: a standalone CLI that validates a trace, performs warmup and repeated replay, reports P50/P95 reducer latency, and emits a BLAKE3 digest plus platform metadata;
-- reduced-motion behavior inherited from the existing SVG renderer, with adapter-level tests.
+- reduced-motion behavior inherited from the existing SVG renderer, with adapter-level tests; geometric motifs tested separately from palette changes to avoid relying on hue alone.
 
 Run the semantic reducer benchmark with:
 
