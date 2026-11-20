@@ -525,7 +525,38 @@ impl ExecutionLedger {
         capabilities: &DeviceCapabilities,
         registry: &mut BufferRegistry,
     ) -> ValidationResult<CompletionDisposition> {
-        validate_completion_envelope(completion)?;
+        if let Err(error) = validate_completion_envelope(completion) {
+            // A malformed rejected envelope for a matching pending command is
+            // an uncertain device outcome. Do not leave the epoch open to more
+            // submissions merely because the proof fields were absent/false.
+            if completion.status == "rejected"
+                && completion.device_id == self.device_id
+                && completion.device_epoch == self.device_epoch
+            {
+                if let Ok(sequence) =
+                    parse_decimal_u64(&completion.sequence, false, "completion.sequence")
+                {
+                    if let Some(pending) = self.pending.get(&sequence).cloned() {
+                        if completion.command_id == pending.command_id {
+                            self.submission_blocked = true;
+                            self.recovery_epoch_pending = true;
+                            self.quiescence_required_epochs.insert(self.device_epoch.clone());
+                            for key in &pending.buffers {
+                                registry.set_ownership(
+                                    key,
+                                    BufferOwnership::Quarantined {
+                                        device_epoch: self.device_epoch.clone(),
+                                        sequence,
+                                    },
+                                );
+                            }
+                            self.pending.remove(&sequence);
+                        }
+                    }
+                }
+            }
+            return Err(error);
+        }
         let sequence = parse_decimal_u64(&completion.sequence, false, "sequence")?;
 
         if completion.device_id != self.device_id || completion.device_epoch != self.device_epoch {
@@ -613,8 +644,10 @@ impl ExecutionLedger {
             }
             "rejected" => {
                 // A device-reported pre-DMA rejection is not sufficient proof
-                // by itself. Keep ranges quarantined until the trusted adapter
-                // independently observes that submission/DMA never occurred.
+                // by itself. Block further submissions and keep ranges
+                // quarantined until the trusted adapter independently observes
+                // that queue dispatch/DMA acquisition never occurred.
+                self.submission_blocked = true;
                 for key in &pending.buffers {
                     registry.set_ownership(
                         key,
@@ -723,6 +756,10 @@ impl ExecutionLedger {
         for key in &pending.buffers {
             registry.set_ownership(key, BufferOwnership::HostOwned);
         }
+        self.submission_blocked =
+            self.recovery_epoch_pending
+                || !self.quiescence_required_epochs.is_empty()
+                || !self.rejected_pending.is_empty();
         Ok(pending.buffers.len())
     }
 
@@ -798,7 +835,8 @@ impl ExecutionLedger {
         self.device_epoch = new_epoch;
         self.last_sequence = 0;
         self.recovery_epoch_pending = false;
-        self.submission_blocked = !self.quiescence_required_epochs.is_empty();
+        self.submission_blocked =
+            !self.quiescence_required_epochs.is_empty() || !self.rejected_pending.is_empty();
         Ok(())
     }
 
@@ -828,7 +866,9 @@ impl ExecutionLedger {
         self.rejected_pending
             .retain(|(epoch, _), _| epoch != old_epoch);
         self.submission_blocked =
-            self.recovery_epoch_pending || !self.quiescence_required_epochs.is_empty();
+            self.recovery_epoch_pending
+                || !self.quiescence_required_epochs.is_empty()
+                || !self.rejected_pending.is_empty();
         released
     }
 }
@@ -2042,17 +2082,25 @@ mod tests {
             ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap(),
             CompletionDisposition::RejectedAwaitingDriverProof
         );
+        let mut next = command.clone();
+        next.command_id = "fixture-before-driver-proof".into();
+        next.sequence = "2".into();
+        assert_eq!(
+            ledger.submit(&next, &capabilities, &mut registry).unwrap_err().code,
+            "DEVICE_EPOCH_REQUIRES_RECONCILIATION"
+        );
         assert!(matches!(
             registry.ownership("fixture-result", 1),
             Some(BufferOwnership::Quarantined { .. })
         ));
+
         let released = ledger
             .confirm_rejected_before_dma("00112233445566778899aabbccddeeff", 1, &mut registry)
             .unwrap();
         assert_eq!(released, 4);
         assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
+        ledger.submit(&next, &capabilities, &mut registry).unwrap();
     }
-
     #[test]
     fn rejected_buffer_release_validates_all_handles_before_mutating_any() {
         let (capabilities, command, _, mut registry, mut ledger) = setup();
@@ -2082,8 +2130,8 @@ mod tests {
     }
 
     #[test]
-    fn rejected_completion_without_pre_dma_assertion_never_releases_buffers() {
-        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+    fn rejected_completion_without_pre_dma_assertion_quarantines_and_blocks_epoch() {
+        let (mut capabilities, mut command, mut completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
         completion.status = "rejected".into();
         completion.error_code = Some("UNSUPPORTED_DESCRIPTOR".into());
@@ -2096,14 +2144,36 @@ mod tests {
         );
         assert!(matches!(
             registry.ownership("fixture-result", 1),
-            Some(BufferOwnership::DeviceOwned { .. })
+            Some(BufferOwnership::Quarantined { .. })
         ));
-        assert_eq!(ledger.pending_count(), 1);
-    }
+        assert_eq!(ledger.pending_count(), 0);
 
+        command.command_id = "fixture-after-malformed-rejection".into();
+        command.sequence = "2".into();
+        assert_eq!(
+            ledger.submit(&command, &capabilities, &mut registry).unwrap_err().code,
+            "DEVICE_EPOCH_REQUIRES_RECONCILIATION"
+        );
+
+        ledger
+            .reset("ffeeddccbbaa99887766554433221100", &mut registry)
+            .unwrap();
+        command.device_epoch = "ffeeddccbbaa99887766554433221100".into();
+        capabilities.device_epoch = command.device_epoch.clone();
+        command.sequence = "1".into();
+        assert_eq!(
+            ledger.submit(&command, &capabilities, &mut registry).unwrap_err().code,
+            "DEVICE_EPOCH_REQUIRES_RECONCILIATION"
+        );
+        assert_eq!(
+            ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
+            4
+        );
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+    }
     #[test]
-    fn rejected_completion_cannot_claim_dma_acquisition() {
-        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+    fn rejected_completion_claiming_dma_acquisition_quarantines_and_blocks_epoch() {
+        let (capabilities, mut command, mut completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
         completion.status = "rejected".into();
         completion.error_code = Some("UNSUPPORTED_DESCRIPTOR".into());
@@ -2117,10 +2187,15 @@ mod tests {
         );
         assert!(matches!(
             registry.ownership("fixture-result", 1),
-            Some(BufferOwnership::DeviceOwned { .. })
+            Some(BufferOwnership::Quarantined { .. })
         ));
+        command.command_id = "fixture-after-contradictory-rejection".into();
+        command.sequence = "2".into();
+        assert_eq!(
+            ledger.submit(&command, &capabilities, &mut registry).unwrap_err().code,
+            "DEVICE_EPOCH_REQUIRES_RECONCILIATION"
+        );
     }
-
     #[test]
     fn output_verification_rejects_digest_and_oracle_mismatches() {
         let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
