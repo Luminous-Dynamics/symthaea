@@ -216,7 +216,6 @@ fn receipt_bound_evidence_digest(evidence: &ConsolidationEvidenceRefV1) -> Strin
         scope_code(evidence.scope()).to_owned(),
         evidence.session_id().to_owned(),
         evidence.task_id().to_owned(),
-        scope_code(evidence.scope()).to_owned(),
         evidence.action().name().to_owned(),
         evidence.observed_utility().to_bits().to_string(),
         evidence.measurement_error_bound().to_bits().to_string(),
@@ -390,7 +389,7 @@ fn validate_candidate(
         if prediction.predicted_at_ms > as_known.known_at_ms {
             return Err(SalienceReject::PredictionFutureLeakage);
         }
-        if prediction.horizon_end_ms <= known_at_ms
+        if prediction.horizon_end_ms <= as_known.known_at_ms
             || prediction.predicted_at_ms >= prediction.horizon_end_ms
         {
             return Err(SalienceReject::InvalidPredictionHorizon);
