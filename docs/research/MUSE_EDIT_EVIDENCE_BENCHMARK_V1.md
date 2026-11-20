@@ -209,13 +209,13 @@ To claim a meaningful improvement over a reproduced baseline, require at least a
 
 ## 10. Executable scoring increment — 2026-11-20
 
-The first scorer is intentionally narrow and fail-closed:
+The first scorer is intentionally narrow and fail-closed. It currently supports deterministic symbolic velocity scaling and bounded pitch transposition:
 
 - Accepts typed `symthaea_music_theory::Score` JSON for the frozen source and candidate.
 - Recomputes the Score content digest using the same `serde_json::to_vec(typed_score)` followed by SHA-256 convention used by MUSE score provenance, and rejects a stale/mismatched source binding.
-- Supports only velocity edits with explicit one-to-one source/target note correspondence and `preserve` / `modify` relations. Note ordinals are interpreted only against their bound source/candidate Score digests.
+- Supports velocity scaling and fixed-semitone pitch transposition with explicit one-to-one source/target note correspondence and `preserve` / `modify` relations. Pitch transposition refuses MIDI-boundary saturation; note ordinals are interpreted only against their bound source/candidate Score digests.
 - Uses rational beat bounds and PartId scopes; checks that target and protected scopes do not overlap, that the declared event relation agrees with scope membership, and that all non-velocity note attributes and global Score metadata remain unchanged.
-- Checks the requested rational velocity scale with the case's MIDI-velocity tolerance. Protected and outside-scope agreement and collateral-change rate remain separate result metrics.
+- Checks the requested rational velocity scale with the case's MIDI-velocity tolerance or the exact semitone transposition without clamping. Protected and outside-scope agreement and collateral-change rate remain separate result metrics.
 - Produces the v1 result shape with canonical case SHA-256, typed source Score SHA-256, candidate Score/audio hashes, and a domain-separated evaluation receipt seal. The case digest uses compact serde_json serialization of the parsed JSON value (sorted object keys), domain-separated as `muse-edit-evidence-case-serde-json-sha256-v1`; this is a project recipe, not an RFC 8785 claim. A public seal-verification function recomputes the result receipt. An optional candidate WAV is byte-hashed and checked against the exact/acceptable audio hashes only for the exact-score-and-audio target kind.
 - Exposes the evaluator through a `theory`-gated CLI:
 
@@ -225,4 +225,4 @@ cargo run -p symthaea-muse --features theory --bin muse_edit_evaluator -- --case
 
 **Deliberate non-claims:** this slice does not evaluate free-form instruction compatibility, audio perceptibility, musical validity, acoustic preservation, or renderer execution integrity. It emits `not_run` for instruction and integrity evidence; consequently `strict_sample_exact_match` remains false even when the symbolic velocity and preservation sub-gates pass. Unsupported edit families, target kinds, and split/merge/insert/delete correspondence relations are refused rather than heuristically scored.
 
-Nine unit tests are authored for a positive velocity edit, wrong velocity, protected-note mutation, duplicate correspondence, stale source digest, unsupported-operation abstention, malformed rational timing, no-op scale rejection and wrong-direction rejection. The positive test also mutates the case digest and verifies that the result seal detects tampering. They have **not** been compiled or executed: no local Cargo/rustc/rustfmt is available, and no exact-head CI pass is claimed. The full JSON Schema validator remains outstanding; these tests are source additions, not test results.
+Fourteen unit tests are authored across positive velocity and pitch edits, wrong velocity/pitch direction, protected-note mutation, duplicate correspondence, stale source digest, unsupported-operation abstention, malformed rational timing, no-op scale rejection, inserted candidate notes, empty protected-scope rejection, MIDI-boundary pitch saturation and result-seal tampering. They have **not** been compiled or executed: no local Cargo/rustc/rustfmt is available, and no exact-head CI pass is claimed. The full JSON Schema validator remains outstanding; these tests are source additions, not test results.
