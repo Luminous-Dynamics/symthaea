@@ -1,0 +1,23 @@
+{
+  "contract": "SC-REACTION-SELECTIVITY-SUITE-0.1",
+  "suite_id": "superconductivity_reaction_selectivity_adversarial_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json",
+  "fixture_path": "tools/superconductivity-discovery-harness/fixtures/reaction_selectivity_smoke_v0_1.json",
+  "expected_case_ids": [
+    "low_hull_wrong_reaction_route",
+    "metastable_hull_selective_route_unknown",
+    "overlapping_reaction_intervals_unknown",
+    "selective_multiphase_target_observed"
+  ],
+  "expected_properties": [
+    "low_hull_does_not_override_competing_reaction_selectivity",
+    "metastable_positive_hull_does_not_automatically_reject_a_potential_route",
+    "overlapping_delta_g_intervals_abstain_from_selectivity_claim",
+    "kinetic_barriers_are_reported_separately_from_reaction_thermodynamics",
+    "unknown_not_reported_is_not_a_failed_synthesis",
+    "non_detection_requires_method_conditions_and_detection_limit",
+    "multi_phase_outcomes_preserve_each_phase_fraction"
+  ],
+  "claim_ceiling": "Synthetic thermodynamic selectivity and evidence audit only; no real synthesis route, reaction feasibility, observed superconductivity, or laboratory authorization is established."
+}

@@ -35,3 +35,11 @@ path = "src/bin/synthesis_protocol_audit.rs"
 [[bin]]
 name = "sc_pair_coherence_audit"
 path = "src/bin/pair_coherence_audit.rs"
+
+[[bin]]
+name = "sc_reaction_selectivity_audit"
+path = "src/bin/reaction_selectivity_audit.rs"
+
+[[bin]]
+name = "sc_reaction_selectivity_audit"
+path = "src/bin/reaction_selectivity_audit.rs"

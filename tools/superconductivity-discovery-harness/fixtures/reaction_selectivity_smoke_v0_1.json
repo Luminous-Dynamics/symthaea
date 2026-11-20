@@ -1,0 +1,387 @@
+{
+  "contract": "SC-REACTION-SELECTIVITY-0.1",
+  "suite_id": "synthetic_reaction_selectivity_and_phase_evidence_001",
+  "fixture_only": true,
+  "cases": [
+    {
+      "case_id": "low_hull_wrong_reaction_route",
+      "protocol_id": "protocol_low_hull_wrong_reaction_route",
+      "protocol_revision": "synthetic-v0",
+      "conditions": {
+        "conditions_id": "conditions_hull_false_positive",
+        "temperature_k": 850,
+        "pressure_gpa": 0.001,
+        "atmosphere": "declared synthetic inert atmosphere",
+        "chemical_potential_context": "synthetic reference chemical-potential set μ0; not an experimental condition"
+      },
+      "reaction_basis": {
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "standard_state": "synthetic common reference state at the case conditions",
+        "balance_status": "verified"
+      },
+      "hull_screen": {
+        "above_hull_interval_mev_atom": {
+          "lower": 3,
+          "upper": 12
+        },
+        "screening_threshold_mev_atom": 25,
+        "source_class": "first_principles_calculated"
+      },
+      "target_reaction": {
+        "reaction_id": "low_hull_wrong_reaction_route_target",
+        "role": "target",
+        "balanced_equation": "synthetic precursors -> target_phase",
+        "balance_status": "verified",
+        "product_phase_id": "target_phase",
+        "conditions_id": "conditions_hull_false_positive",
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "delta_g_interval_eV_per_basis": {
+          "lower": -0.05,
+          "upper": 0.1
+        },
+        "activation_barrier_interval_eV": {
+          "lower": 0.8,
+          "upper": 1.1
+        }
+      },
+      "competing_reactions": [
+        {
+          "reaction_id": "low_hull_wrong_reaction_route_competing_1",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_1",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_1",
+          "conditions_id": "conditions_hull_false_positive",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": -0.4,
+            "upper": -0.25
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        },
+        {
+          "reaction_id": "low_hull_wrong_reaction_route_competing_2",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_2",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_2",
+          "conditions_id": "conditions_hull_false_positive",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": 0.15,
+            "upper": 0.3
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        }
+      ],
+      "selectivity_margin_eV_per_basis": 0.1,
+      "kinetic_barrier_limit_eV": 0.5,
+      "observed_target_phase_status": "target_phase_not_detected_under_conditions",
+      "characterization_evidence": {
+        "sample_id": "sample_hull_false",
+        "method": "synthetic powder X-ray diffraction plus Rietveld phase analysis",
+        "conditions_id": "characterization_low_hull_wrong_reaction_route",
+        "source_locator": "fixture-only/table-1/row-1",
+        "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "detection_limit_phase_fraction": 0.02,
+        "realized_phases": [
+          {
+            "phase_id": "competitor_phase_1",
+            "identity_status": "identified",
+            "phase_fraction": 0.7
+          }
+        ],
+        "execution_run_id": "run_low_hull_wrong_reaction_route"
+      }
+    },
+    {
+      "case_id": "metastable_hull_selective_route_unknown",
+      "protocol_id": "protocol_metastable_hull_selective_route_unknown",
+      "protocol_revision": "synthetic-v0",
+      "conditions": {
+        "conditions_id": "conditions_metastable_route",
+        "temperature_k": 850,
+        "pressure_gpa": 0.001,
+        "atmosphere": "declared synthetic inert atmosphere",
+        "chemical_potential_context": "synthetic reference chemical-potential set μ0; not an experimental condition"
+      },
+      "reaction_basis": {
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "standard_state": "synthetic common reference state at the case conditions",
+        "balance_status": "verified"
+      },
+      "hull_screen": {
+        "above_hull_interval_mev_atom": {
+          "lower": 65,
+          "upper": 90
+        },
+        "screening_threshold_mev_atom": 25,
+        "source_class": "first_principles_calculated"
+      },
+      "target_reaction": {
+        "reaction_id": "metastable_hull_selective_route_unknown_target",
+        "role": "target",
+        "balanced_equation": "synthetic precursors -> target_phase",
+        "balance_status": "verified",
+        "product_phase_id": "target_phase",
+        "conditions_id": "conditions_metastable_route",
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "delta_g_interval_eV_per_basis": {
+          "lower": -0.65,
+          "upper": -0.45
+        },
+        "activation_barrier_interval_eV": {
+          "lower": 0.25,
+          "upper": 0.35
+        }
+      },
+      "competing_reactions": [
+        {
+          "reaction_id": "metastable_hull_selective_route_unknown_competing_1",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_1",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_1",
+          "conditions_id": "conditions_metastable_route",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": 0.05,
+            "upper": 0.25
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        },
+        {
+          "reaction_id": "metastable_hull_selective_route_unknown_competing_2",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_2",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_2",
+          "conditions_id": "conditions_metastable_route",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": 0.35,
+            "upper": 0.55
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        }
+      ],
+      "selectivity_margin_eV_per_basis": 0.1,
+      "kinetic_barrier_limit_eV": 0.5,
+      "observed_target_phase_status": "unknown_not_reported",
+      "characterization_evidence": null
+    },
+    {
+      "case_id": "overlapping_reaction_intervals_unknown",
+      "protocol_id": "protocol_overlapping_reaction_intervals_unknown",
+      "protocol_revision": "synthetic-v0",
+      "conditions": {
+        "conditions_id": "conditions_ambiguous",
+        "temperature_k": 850,
+        "pressure_gpa": 0.001,
+        "atmosphere": "declared synthetic inert atmosphere",
+        "chemical_potential_context": "synthetic reference chemical-potential set μ0; not an experimental condition"
+      },
+      "reaction_basis": {
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "standard_state": "synthetic common reference state at the case conditions",
+        "balance_status": "verified"
+      },
+      "hull_screen": {
+        "above_hull_interval_mev_atom": {
+          "lower": 15,
+          "upper": 45
+        },
+        "screening_threshold_mev_atom": 30,
+        "source_class": "first_principles_calculated"
+      },
+      "target_reaction": {
+        "reaction_id": "overlapping_reaction_intervals_unknown_target",
+        "role": "target",
+        "balanced_equation": "synthetic precursors -> target_phase",
+        "balance_status": "verified",
+        "product_phase_id": "target_phase",
+        "conditions_id": "conditions_ambiguous",
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "delta_g_interval_eV_per_basis": {
+          "lower": -0.4,
+          "upper": -0.1
+        },
+        "activation_barrier_interval_eV": {
+          "lower": 0.4,
+          "upper": 0.9
+        }
+      },
+      "competing_reactions": [
+        {
+          "reaction_id": "overlapping_reaction_intervals_unknown_competing_1",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_1",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_1",
+          "conditions_id": "conditions_ambiguous",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": -0.2,
+            "upper": 0.05
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        },
+        {
+          "reaction_id": "overlapping_reaction_intervals_unknown_competing_2",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_2",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_2",
+          "conditions_id": "conditions_ambiguous",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": 0.1,
+            "upper": 0.3
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        }
+      ],
+      "selectivity_margin_eV_per_basis": 0.1,
+      "kinetic_barrier_limit_eV": 0.6,
+      "observed_target_phase_status": "unknown_not_reported",
+      "characterization_evidence": null
+    },
+    {
+      "case_id": "selective_multiphase_target_observed",
+      "protocol_id": "protocol_selective_multiphase_target_observed",
+      "protocol_revision": "synthetic-v0",
+      "conditions": {
+        "conditions_id": "conditions_multiphase",
+        "temperature_k": 850,
+        "pressure_gpa": 0.001,
+        "atmosphere": "declared synthetic inert atmosphere",
+        "chemical_potential_context": "synthetic reference chemical-potential set μ0; not an experimental condition"
+      },
+      "reaction_basis": {
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "standard_state": "synthetic common reference state at the case conditions",
+        "balance_status": "verified"
+      },
+      "hull_screen": {
+        "above_hull_interval_mev_atom": {
+          "lower": 8,
+          "upper": 20
+        },
+        "screening_threshold_mev_atom": 25,
+        "source_class": "first_principles_calculated"
+      },
+      "target_reaction": {
+        "reaction_id": "selective_multiphase_target_observed_target",
+        "role": "target",
+        "balanced_equation": "synthetic precursors -> target_phase",
+        "balance_status": "verified",
+        "product_phase_id": "target_phase",
+        "conditions_id": "conditions_multiphase",
+        "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+        "basis_unit": "eV_per_shared_precursor_basis",
+        "delta_g_interval_eV_per_basis": {
+          "lower": -0.8,
+          "upper": -0.6
+        },
+        "activation_barrier_interval_eV": {
+          "lower": 0.2,
+          "upper": 0.3
+        }
+      },
+      "competing_reactions": [
+        {
+          "reaction_id": "selective_multiphase_target_observed_competing_1",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_1",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_1",
+          "conditions_id": "conditions_multiphase",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": -0.15,
+            "upper": 0.05
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        },
+        {
+          "reaction_id": "selective_multiphase_target_observed_competing_2",
+          "role": "competing",
+          "balanced_equation": "synthetic precursors -> competitor_phase_2",
+          "balance_status": "verified",
+          "product_phase_id": "competitor_phase_2",
+          "conditions_id": "conditions_multiphase",
+          "normalization_basis": "per shared precursor-basis reaction extent (one fixed limiting-reactant equivalent)",
+          "basis_unit": "eV_per_shared_precursor_basis",
+          "delta_g_interval_eV_per_basis": {
+            "lower": 0.2,
+            "upper": 0.4
+          },
+          "activation_barrier_interval_eV": {
+            "lower": 0.2,
+            "upper": 0.6
+          }
+        }
+      ],
+      "selectivity_margin_eV_per_basis": 0.1,
+      "kinetic_barrier_limit_eV": 0.5,
+      "observed_target_phase_status": "target_phase_observed",
+      "characterization_evidence": {
+        "sample_id": "sample_multiphase",
+        "method": "synthetic powder X-ray diffraction plus Rietveld phase analysis",
+        "conditions_id": "characterization_selective_multiphase_target_observed",
+        "source_locator": "fixture-only/table-1/row-1",
+        "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "detection_limit_phase_fraction": 0.01,
+        "realized_phases": [
+          {
+            "phase_id": "target_phase",
+            "identity_status": "refined",
+            "phase_fraction": 0.35
+          },
+          {
+            "phase_id": "competitor_phase_1",
+            "identity_status": "identified",
+            "phase_fraction": 0.55
+          }
+        ],
+        "execution_run_id": "run_selective_multiphase_target_observed"
+      }
+    }
+  ],
+  "claim_ceiling": "Synthetic thermodynamic selectivity and evidence audit only; no real synthesis route, reaction feasibility, observed superconductivity, or laboratory authorization is established."
+}
