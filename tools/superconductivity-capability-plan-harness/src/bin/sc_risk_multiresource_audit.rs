@@ -1133,4 +1133,26 @@ mod tests {
         assert!(first.ordered_indices.iter().all(|index| instance.actions[*index].eligible));
     }
 
+    #[test]
+    fn pressure_cell_capacity_rejects_action_even_when_other_gates_are_open() {
+        let (schema, fixture_bytes) = inputs();
+        let mut fixture: Value = serde_json::from_slice(&fixture_bytes).unwrap();
+        fixture["actions"].as_array_mut().unwrap().iter_mut()
+            .find(|action| action["action_id"] == "unreviewed_high_field_probe")
+            .unwrap()["eligible"] = json!(true);
+        fixture["initial_capabilities"].as_array_mut().unwrap()
+            .push(json!("high_field_facility"));
+        fixture["resources"].as_array_mut().unwrap().iter_mut()
+            .find(|resource| resource["resource_id"] == "magnetometer_B_time")
+            .unwrap()["capacity"] = json!(80);
+        let instance = Instance::from_bytes(&schema, &serde_json::to_vec(&fixture).unwrap()).unwrap();
+        let high_field = instance.actions.iter()
+            .position(|action| action.id == "unreviewed_high_field_probe").unwrap();
+        let pressure_resource = instance.resources.iter()
+            .position(|resource| resource.id == "pressure_cell_A_time").unwrap();
+        assert_eq!(instance.actions[high_field].consumption[pressure_resource], 60);
+        assert_eq!(instance.resources[pressure_resource].capacity, 45);
+        assert!(instance.feasible_order(&[high_field]).is_none());
+    }
+
 }
