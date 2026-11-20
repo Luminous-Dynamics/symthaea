@@ -631,6 +631,46 @@ mod tests {
     }
 
     #[test]
+    fn piecewise_gain_envelope_checks_each_temporal_segment() {
+        let source_samples = vec![0.25_f32; 1_000];
+        let mut candidate_samples = source_samples.clone();
+        let gains = [
+            (100..200, 10_f32.powf(-2.0 / 20.0)),
+            (200..300, 10_f32.powf(-4.0 / 20.0)),
+            (300..400, 10_f32.powf(-6.0 / 20.0)),
+        ];
+        for (range, gain) in gains {
+            for sample in &mut candidate_samples[range] {
+                *sample *= gain;
+            }
+        }
+        let source = wav(&source_samples, 8_000);
+        let candidate = wav(&candidate_samples, 8_000);
+        let mut case = contract();
+        case.target_windows = vec![
+            GainTargetWindowV1 {
+                range: FrameRangeV1 { start_frame: 100, end_frame: 200 },
+                expected_gain_db: -2.0,
+                tolerance_db: 0.1,
+            },
+            GainTargetWindowV1 {
+                range: FrameRangeV1 { start_frame: 200, end_frame: 300 },
+                expected_gain_db: -4.0,
+                tolerance_db: 0.1,
+            },
+            GainTargetWindowV1 {
+                range: FrameRangeV1 { start_frame: 300, end_frame: 400 },
+                expected_gain_db: -6.0,
+                tolerance_db: 0.1,
+            },
+        ];
+        let result = observe_gain_envelope_v1(&source, &candidate, &case).unwrap();
+        assert_eq!(result["target"]["status"], "pass");
+        assert_eq!(result["target"]["windows"].as_array().unwrap().len(), 3);
+        assert_eq!(result["outcome"]["acoustic_observation_status"], "pass");
+    }
+
+    #[test]
     fn integer_pcm16_gain_envelope_is_decoded_and_measured() {
         let source_samples = vec![8192_i16; 1_000];
         let mut candidate_samples = source_samples.clone();
@@ -701,6 +741,39 @@ mod tests {
         assert_eq!(result["target"]["status"], "pass");
         assert_eq!(result["preservation"]["status"], "fail");
         assert_eq!(result["outcome"]["acoustic_observation_status"], "fail");
+    }
+
+    #[test]
+    fn protected_window_is_checked_per_channel() {
+        let source_samples = vec![[0.25_f32, 0.25_f32]; 1_000];
+        let mut candidate_samples = source_samples.clone();
+        let gain = 10_f32.powf(-6.0 / 20.0);
+        for frame in &mut candidate_samples[100..400] {
+            frame[0] *= gain;
+            frame[1] *= gain;
+        }
+        for frame in &mut candidate_samples[600..900] {
+            frame[0] *= gain; // collateral change on left channel only
+        }
+        let source = stereo_wav(&source_samples, 8_000);
+        let candidate = stereo_wav(&candidate_samples, 8_000);
+        let mut case = contract();
+        case.channels = 2;
+        let result = observe_gain_envelope_v1(&source, &candidate, &case).unwrap();
+        assert_eq!(result["target"]["status"], "pass");
+        assert_eq!(result["preservation"]["status"], "fail");
+        assert_eq!(result["preservation"]["windows"][0]["passed"], false);
+    }
+
+    #[test]
+    fn non_finite_float_samples_are_rejected() {
+        let mut source_samples = vec![0.25_f32; 1_000];
+        source_samples[10] = f32::NAN;
+        let candidate_samples = vec![0.25_f32; 1_000];
+        let source = wav(&source_samples, 8_000);
+        let candidate = wav(&candidate_samples, 8_000);
+        let error = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap_err();
+        assert!(error.contains("non-finite or out-of-range float sample"));
     }
 
     #[test]
