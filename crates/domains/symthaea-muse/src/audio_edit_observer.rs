@@ -55,6 +55,8 @@ struct DecodedWav {
     sample_rate_hz: u32,
     channels: u16,
     frame_count: u64,
+    sample_format: String,
+    bits_per_sample: u16,
     samples: Vec<f64>,
     clipped_sample_fraction: f64,
 }
@@ -234,6 +236,11 @@ fn decode_wav(bytes: &[u8], label: &str) -> Result<DecodedWav, String> {
         sample_rate_hz: spec.sample_rate,
         channels: spec.channels,
         frame_count,
+        sample_format: match spec.sample_format {
+            SampleFormat::Int => "pcm_integer".to_string(),
+            SampleFormat::Float => "ieee_float".to_string(),
+        },
+        bits_per_sample: spec.bits_per_sample,
         samples,
         clipped_sample_fraction,
     })
@@ -446,6 +453,10 @@ pub fn observe_gain_envelope_v1(
             "sample_rate_hz": source.sample_rate_hz,
             "channels": source.channels,
             "frame_count": source.frame_count,
+            "source_sample_format": source.sample_format,
+            "source_bits_per_sample": source.bits_per_sample,
+            "candidate_sample_format": candidate.sample_format,
+            "candidate_bits_per_sample": candidate.bits_per_sample,
             "source_clipped_sample_fraction": source.clipped_sample_fraction,
             "candidate_clipped_sample_fraction": candidate.clipped_sample_fraction
         },
@@ -517,7 +528,7 @@ mod tests {
             schema: GAIN_ENVELOPE_CONTRACT_SCHEMA_V1.into(),
             scope_kind: "isolated_stem".into(),
             scope_id: Some("melody-stem-01".into()),
-            sample_rate_hz: 1_000,
+            sample_rate_hz: 8_000,
             channels: 1,
             frame_count: 1_000,
             minimum_source_rms_dbfs: -75.0,
@@ -539,7 +550,7 @@ mod tests {
         for sample in &mut candidate_samples[100..400] {
             *sample *= gain;
         }
-        (wav(&source_samples, 1_000), wav(&candidate_samples, 1_000))
+        (wav(&source_samples, 8_000), wav(&candidate_samples, 8_000))
     }
 
     #[test]
@@ -555,7 +566,7 @@ mod tests {
     #[test]
     fn no_op_does_not_pass_a_requested_gain_edit() {
         let source_samples = vec![0.25_f32; 1_000];
-        let source = wav(&source_samples, 1_000);
+        let source = wav(&source_samples, 8_000);
         let result = observe_gain_envelope_v1(&source, &source, &contract()).unwrap();
         assert_eq!(result["target"]["status"], "fail");
         assert_eq!(result["preservation"]["status"], "pass");
@@ -573,7 +584,7 @@ mod tests {
         for sample in &mut samples[600..900] {
             *sample *= gain;
         }
-        let candidate = wav(&samples, 1_000);
+        let candidate = wav(&samples, 8_000);
         let result = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap();
         assert_eq!(result["target"]["status"], "pass");
         assert_eq!(result["preservation"]["status"], "fail");
@@ -587,7 +598,7 @@ mod tests {
         source_samples[100..400].fill(0.0);
         candidate_samples[100..400].fill(0.0);
         let source = wav(&source_samples, 1_000);
-        let candidate = wav(&candidate_samples, 1_000);
+        let candidate = wav(&candidate_samples, 8_000);
         let result = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap();
         assert_eq!(result["target"]["status"], "abstain");
         assert_eq!(result["outcome"]["acoustic_observation_status"], "abstain");
@@ -596,7 +607,7 @@ mod tests {
     #[test]
     fn timeline_mismatch_is_rejected_without_time_warp() {
         let (source, _) = source_and_candidate();
-        let candidate = wav(&vec![0.25_f32; 999], 1_000);
+        let candidate = wav(&vec![0.25_f32; 999], 8_000);
         let error = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap_err();
         assert!(error.contains("no time-warp alignment"));
     }
@@ -611,7 +622,7 @@ mod tests {
         }
         candidate_samples[500] = 1.0;
         let source = wav(&source_samples, 1_000);
-        let candidate = wav(&candidate_samples, 1_000);
+        let candidate = wav(&candidate_samples, 8_000);
         let mut case = contract();
         case.maximum_candidate_clipped_sample_fraction = 0.0;
         let result = observe_gain_envelope_v1(&source, &candidate, &case).unwrap();
