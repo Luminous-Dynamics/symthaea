@@ -410,6 +410,22 @@ fn validate_manifest_shape(value: &Value) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_component_base(label: &str, base: &ComponentBaseV1) -> Result<(), String> {
+    if let Some(digest) = base.receipt_sha256.as_deref() {
+        if !is_sha256(digest) {
+            return Err(format!("{label} receipt_sha256 is invalid"));
+        }
+    }
+    if matches!(base.status, GateStatusV1::Pass)
+        && (base.receipt_sha256.is_none()
+            || base.producer_id.as_deref().unwrap_or("").trim().is_empty()
+            || base.producer_version.as_deref().unwrap_or("").trim().is_empty())
+    {
+        return Err(format!("{label} cannot declare pass without a receipt digest and producer identity/version"));
+    }
+    Ok(())
+}
+
 fn validate_hashes(manifest: &BundleManifestV1) -> Result<(), String> {
     let values = [
         ("case_sha256", manifest.artifacts.case_sha256.as_str()),
@@ -430,11 +446,48 @@ fn validate_hashes(manifest: &BundleManifestV1) -> Result<(), String> {
         }
     }
     for (label, digest) in [
-        ("acoustic contract", manifest.components.acoustic_observation.contract_sha256.as_deref().unwrap_or("")),
+        ("symbolic case", manifest.components.symbolic_edit.case_sha256.as_str()),
+        ("symbolic source Score", manifest.components.symbolic_edit.source_score_sha256.as_str()),
+        ("symbolic candidate Score", manifest.components.symbolic_edit.candidate_score_sha256.as_str()),
+        ("render source Score", manifest.components.render_execution.source_score_sha256.as_str()),
+        ("render candidate Score", manifest.components.render_execution.candidate_score_sha256.as_str()),
+        ("render candidate MIDI", manifest.components.render_execution.candidate_midi_sha256.as_str()),
+        ("render candidate WAV", manifest.components.render_execution.candidate_audio_sha256.as_str()),
+        ("acoustic source WAV", manifest.components.acoustic_observation.source_audio_sha256.as_str()),
+        ("acoustic candidate WAV", manifest.components.acoustic_observation.candidate_audio_sha256.as_str()),
+        ("score-audio candidate Score", manifest.components.score_audio_conformance.candidate_score_sha256.as_str()),
+        ("score-audio candidate WAV", manifest.components.score_audio_conformance.candidate_audio_sha256.as_str()),
+        ("human case", manifest.components.human_acceptance.case_sha256.as_str()),
+        ("human candidate Score", manifest.components.human_acceptance.candidate_score_sha256.as_str()),
+        ("human candidate WAV", manifest.components.human_acceptance.candidate_audio_sha256.as_str()),
     ] {
-        if !digest.is_empty() && !is_sha256(digest) {
-            return Err(format!("{label} is not lowercase SHA-256"));
+        if !is_sha256(digest) {
+            return Err(format!("{label} binding is not lowercase SHA-256"));
         }
+    }
+    if let Some(digest) = manifest.components.acoustic_observation.contract_sha256.as_deref() {
+        if !is_sha256(digest) {
+            return Err("acoustic contract binding is not lowercase SHA-256".into());
+        }
+    }
+    for (label, component) in [
+        ("symbolic_edit", &manifest.components.symbolic_edit.base),
+        ("render_execution", &manifest.components.render_execution.base),
+        ("acoustic_observation", &manifest.components.acoustic_observation.base),
+        ("score_audio_conformance", &manifest.components.score_audio_conformance.base),
+        ("human_acceptance", &manifest.components.human_acceptance.base),
+    ] {
+        validate_component_base(label, component)?;
+    }
+    if manifest.components.render_execution.base.status == GateStatusV1::Pass
+        && manifest.components.render_execution.attempt_id.as_deref().unwrap_or("").trim().is_empty()
+    {
+        return Err("render_execution cannot declare pass without an attempt ID".into());
+    }
+    if manifest.components.acoustic_observation.base.status == GateStatusV1::Pass
+        && manifest.components.acoustic_observation.contract_sha256.is_none()
+    {
+        return Err("acoustic_observation cannot declare pass without a contract digest".into());
     }
     Ok(())
 }
@@ -444,7 +497,10 @@ fn declared_components_valid(manifest: &BundleManifestV1) -> Result<(), String> 
         || manifest.digest_recipe != BUNDLE_DIGEST_RECIPE_V1
         || manifest.verifier.verifier_id != BUNDLE_VERIFIER_ID_V1
         || manifest.verifier.version.is_empty()
+        || manifest.verifier.version.len() > 64
         || manifest.bundle_id.trim().is_empty()
+        || manifest.bundle_id.len() > 128
+        || manifest.outcome.reasons.iter().any(|reason| reason.len() > 2048)
     {
         return Err("unsupported bundle schema, digest recipe, verifier identity or empty bundle ID".into());
     }
@@ -529,6 +585,9 @@ fn verify_symbolic(
             return Ok(hard_binding(format!("symbolic result {field} does not match the bundle")));
         }
     }
+    if value.get("schema").and_then(Value::as_str) != Some("muse-edit-evidence-result-v1") {
+        return Err("unsupported symbolic result schema".into());
+    }
     let outcome = value.get("outcome").ok_or("symbolic result outcome missing")?;
     let gates = ["target_pass", "preservation_pass", "correspondence_pass"];
     let failed: Vec<&str> = gates
@@ -556,6 +615,27 @@ fn render_evidence_status(verdict: &str) -> GateStatusV1 {
         "abstain" => GateStatusV1::Abstain,
         _ => GateStatusV1::NotRun,
     }
+}
+
+fn verify_render_channel_binding(
+    label: &str,
+    evidence: &muse_render_receipt::EvidenceResultV1,
+    component: &ComponentBaseV1,
+) -> Result<(), String> {
+    if let Some(expected) = component.receipt_sha256.as_deref() {
+        if evidence.receipt_sha256.as_deref() != Some(expected) {
+            return Err(format!("{label} receipt reference does not match the render receipt channel"));
+        }
+    } else if component.status == GateStatusV1::Pass {
+        return Err(format!("{label} cannot pass without a receipt reference"));
+    }
+    if component.status == GateStatusV1::Pass && evidence.verdict != "pass" {
+        return Err(format!("{label} manifest says pass but render receipt channel is {}", evidence.verdict));
+    }
+    if component.status == GateStatusV1::Fail && evidence.verdict != "fail" {
+        return Err(format!("{label} manifest says fail but render receipt channel is {}", evidence.verdict));
+    }
+    Ok(())
 }
 
 fn verify_render(
@@ -590,6 +670,27 @@ fn verify_render(
         || receipt.audio.audio_sha256.as_deref() != Some(artifacts.candidate_audio_sha256.as_str())
     {
         return Ok(hard_binding("render receipt has a source/candidate/MIDI/WAV cross-binding mismatch"));
+    }
+    for (label, evidence, component) in [
+        (
+            "protected_audio_preservation",
+            &receipt.verification.protected_audio_preservation,
+            &manifest.components.acoustic_observation.base,
+        ),
+        (
+            "rendered_score_conformance",
+            &receipt.verification.rendered_score_conformance,
+            &manifest.components.score_audio_conformance.base,
+        ),
+        (
+            "human_evaluation",
+            &receipt.verification.human_evaluation,
+            &manifest.components.human_acceptance.base,
+        ),
+    ] {
+        if let Err(error) = verify_render_channel_binding(label, evidence, component) {
+            return Ok(hard_binding(error));
+        }
     }
     if receipt.attempt_state == "failed" || receipt.execution.state == "failed" {
         return Ok(gate_report(component.base.status, GateStatusV1::Fail, Some("render receipt records a failed attempt".into())));
