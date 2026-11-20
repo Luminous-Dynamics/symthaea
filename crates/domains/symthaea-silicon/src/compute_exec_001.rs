@@ -166,6 +166,10 @@ pub struct HdcCompletion {
     pub semantic_contract_sha256: String,
     pub implementation_sha256: String,
     pub status: String,
+    /// Required for a rejected command: device rejected before dispatch/doorbell.
+    pub rejection_stage: Option<String>,
+    /// Required false for a rejected command; corroborate with driver observation.
+    pub dma_acquired: Option<bool>,
     pub error_code: Option<String>,
     pub error_detail: Option<String>,
     pub result: Option<CompletionResult>,
@@ -307,7 +311,9 @@ pub enum CompletionDisposition {
     /// DMA ownership has returned to the host and the output is available.
     /// The caller must still verify output bytes/digest and oracle parity.
     CompletedOutputAvailable,
-    RejectedBeforeExecution,
+    /// Device asserted pre-DMA rejection; buffers remain quarantined until
+    /// trusted host adapter independently confirms no DMA was acquired.
+    RejectedAwaitingDriverProof,
     Quarantined,
 }
 
@@ -371,6 +377,7 @@ pub struct ExecutionLedger {
     /// confirmation of old-epoch quiescence can resume dispatch.
     recovery_epoch_pending: bool,
     pending: HashMap<u64, PendingCommand>,
+    rejected_pending: HashMap<(String, u64), PendingCommand>,
     seen_command_ids: HashSet<String>,
 }
 
@@ -398,6 +405,7 @@ impl ExecutionLedger {
             quiescence_required_epochs: HashSet::new(),
             recovery_epoch_pending: false,
             pending: HashMap::new(),
+            rejected_pending: HashMap::new(),
             seen_command_ids: HashSet::new(),
         })
     }
@@ -473,6 +481,16 @@ impl ExecutionLedger {
             }
         }
 
+        let output = command
+            .buffers
+            .iter()
+            .find(|buffer| buffer.role == output_role(&command.operation_id))
+            .cloned()
+            .ok_or_else(|| {
+                ValidationError::new("MISSING_OUTPUT_BUFFER", "validated output disappeared")
+            })?;
+
+        // No fallible validation remains after this ownership transition.
         for key in &keys {
             registry.set_ownership(
                 key,
@@ -482,15 +500,6 @@ impl ExecutionLedger {
                 },
             );
         }
-
-        let output = command
-            .buffers
-            .iter()
-            .find(|buffer| buffer.role == output_role(&command.operation_id))
-            .cloned()
-            .ok_or_else(|| {
-                ValidationError::new("MISSING_OUTPUT_BUFFER", "validated output disappeared")
-            })?;
 
         self.pending.insert(
             sequence,
@@ -603,13 +612,22 @@ impl ExecutionLedger {
                 Ok(CompletionDisposition::CompletedOutputAvailable)
             }
             "rejected" => {
-                // Contract meaning: the device rejected the descriptor before
-                // execution and therefore never acquired DMA ownership.
+                // A device-reported pre-DMA rejection is not sufficient proof
+                // by itself. Keep ranges quarantined until the trusted adapter
+                // independently observes that submission/DMA never occurred.
                 for key in &pending.buffers {
-                    registry.set_ownership(key, BufferOwnership::HostOwned);
+                    registry.set_ownership(
+                        key,
+                        BufferOwnership::Quarantined {
+                            device_epoch: self.device_epoch.clone(),
+                            sequence,
+                        },
+                    );
                 }
+                self.rejected_pending
+                    .insert((self.device_epoch.clone(), sequence), pending);
                 self.pending.remove(&sequence);
-                Ok(CompletionDisposition::RejectedBeforeExecution)
+                Ok(CompletionDisposition::RejectedAwaitingDriverProof)
             }
             "failed" | "cancelled" | "outcome_unknown" => {
                 self.submission_blocked = true;
@@ -665,6 +683,43 @@ impl ExecutionLedger {
                 "verification token does not match an unverified output owned by this ledger",
             )),
         }
+    }
+
+    /// Release a rejected command's buffers only after the trusted driver
+    /// independently establishes that the descriptor was rejected before
+    /// dispatch/doorbell and no DMA mapping/ownership was acquired. The wire
+    /// fields alone never release memory. Only the driver adapter may call this.
+    pub fn confirm_rejected_before_dma(
+        &mut self,
+        old_epoch: &str,
+        sequence: u64,
+        registry: &mut BufferRegistry,
+    ) -> ValidationResult<usize> {
+        let pending = self
+            .rejected_pending
+            .remove(&(old_epoch.to_owned(), sequence))
+            .ok_or_else(|| ValidationError::new(
+                "UNKNOWN_REJECTED_COMMAND",
+                "no pre-DMA rejected command awaits driver confirmation for this epoch/sequence",
+            ))?;
+
+        let mut released = 0usize;
+        for key in &pending.buffers {
+            let ownership = registry.entry(key)?.ownership.clone();
+            if ownership == (BufferOwnership::Quarantined {
+                device_epoch: old_epoch.to_owned(),
+                sequence,
+            }) {
+                registry.set_ownership(key, BufferOwnership::HostOwned);
+                released += 1;
+            } else {
+                return Err(ValidationError::new(
+                    "REJECTED_BUFFER_OWNERSHIP_MISMATCH",
+                    "a rejected command buffer is no longer quarantined under its original epoch/sequence",
+                ));
+            }
+        }
+        Ok(released)
     }
 
     /// Move a timed-out command into quarantine. A timeout is not proof that
@@ -1310,6 +1365,21 @@ fn validate_completion_envelope(completion: &HdcCompletion) -> ValidationResult<
                     "failure status requires error_code and forbids result/output_buffer",
                 ));
             }
+            if completion.status == "rejected" {
+                if completion.rejection_stage.as_deref() != Some("before_dma")
+                    || completion.dma_acquired != Some(false)
+                {
+                    return Err(ValidationError::new(
+                        "REJECTION_LACKS_PRE_DMA_ASSERTION",
+                        "rejected requires rejection_stage=before_dma and dma_acquired=false",
+                    ));
+                }
+            } else if completion.rejection_stage.is_some() || completion.dma_acquired.is_some() {
+                return Err(ValidationError::new(
+                    "UNEXPECTED_REJECTION_EVIDENCE",
+                    "rejection-only fields must be omitted for non-rejected statuses",
+                ));
+            }
             if completion.status == "outcome_unknown"
                 && completion.error_code.as_deref() != Some("OUTCOME_UNKNOWN")
             {
@@ -1951,6 +2021,72 @@ mod tests {
                 .code,
             "OUTPUT_VERIFICATION_REPRESENTATION_MISMATCH"
         );
+    }
+
+    #[test]
+    fn rejected_completion_requires_explicit_pre_dma_assertion_and_driver_confirmation() {
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        completion.status = "rejected".into();
+        completion.error_code = Some("UNSUPPORTED_DESCRIPTOR".into());
+        completion.rejection_stage = Some("before_dma".into());
+        completion.dma_acquired = Some(false);
+        completion.result = None;
+        completion.output_buffer = None;
+
+        assert_eq!(
+            ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap(),
+            CompletionDisposition::RejectedAwaitingDriverProof
+        );
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::Quarantined { .. })
+        ));
+        let released = ledger
+            .confirm_rejected_before_dma("00112233445566778899aabbccddeeff", 1, &mut registry)
+            .unwrap();
+        assert_eq!(released, 4);
+        assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
+    }
+
+    #[test]
+    fn rejected_completion_without_pre_dma_assertion_never_releases_buffers() {
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        completion.status = "rejected".into();
+        completion.error_code = Some("UNSUPPORTED_DESCRIPTOR".into());
+        completion.result = None;
+        completion.output_buffer = None;
+
+        assert_eq!(
+            ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap_err().code,
+            "REJECTION_LACKS_PRE_DMA_ASSERTION"
+        );
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::DeviceOwned { .. })
+        ));
+        assert_eq!(ledger.pending_count(), 1);
+    }
+
+    #[test]
+    fn rejected_completion_cannot_claim_dma_acquisition() {
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        completion.status = "rejected".into();
+        completion.error_code = Some("UNSUPPORTED_DESCRIPTOR".into());
+        completion.rejection_stage = Some("before_dma".into());
+        completion.dma_acquired = Some(true);
+        completion.result = None;
+        completion.output_buffer = None;
+        assert_eq!(
+            ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap_err().code,
+            "REJECTION_LACKS_PRE_DMA_ASSERTION"
+        );
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::DeviceOwned { .. })
+        ));
     }
 
     #[test]
