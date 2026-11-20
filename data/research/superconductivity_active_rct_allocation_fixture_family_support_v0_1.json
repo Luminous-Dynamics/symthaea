@@ -981,7 +981,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.08,
       "domain_discrepancy": 0.1,
-      "family_representation_weight": 0.4,
+      "family_representation_weight": 0.6,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1047,7 +1047,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.5,
       "domain_discrepancy": 0.3,
-      "family_representation_weight": 0.4,
+      "family_representation_weight": 0.6,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1113,7 +1113,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.92,
       "domain_discrepancy": 0.65,
-      "family_representation_weight": 0.4,
+      "family_representation_weight": 0.6,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1179,7 +1179,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.08,
       "domain_discrepancy": 0.1,
-      "family_representation_weight": 0.35,
+      "family_representation_weight": 0.3,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1245,7 +1245,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.5,
       "domain_discrepancy": 0.3,
-      "family_representation_weight": 0.35,
+      "family_representation_weight": 0.3,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1311,7 +1311,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.92,
       "domain_discrepancy": 0.65,
-      "family_representation_weight": 0.35,
+      "family_representation_weight": 0.3,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1377,7 +1377,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.08,
       "domain_discrepancy": 0.1,
-      "family_representation_weight": 0.25,
+      "family_representation_weight": 0.1,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1443,7 +1443,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.5,
       "domain_discrepancy": 0.3,
-      "family_representation_weight": 0.25,
+      "family_representation_weight": 0.1,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1509,7 +1509,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.92,
       "domain_discrepancy": 0.65,
-      "family_representation_weight": 0.25,
+      "family_representation_weight": 0.1,
       "resource_consumption": [
         {
           "resource_id": "financial_budget",
@@ -1574,7 +1574,7 @@
       "randomization_probability": 0.5,
       "historical_treatment_propensity": 0.99,
       "domain_discrepancy": 0.9,
-      "family_representation_weight": 0.35,
+      "family_representation_weight": 0.3,
       "resource_consumption": [],
       "observation_likelihoods": [
         {
