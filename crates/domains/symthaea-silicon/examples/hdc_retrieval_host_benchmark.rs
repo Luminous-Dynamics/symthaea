@@ -286,18 +286,17 @@ fn run() -> Result<(), String> {
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(detect_cpu_identity);
     let working_set_bytes = config.store_size * VECTOR_BYTES + config.batch_size * VECTOR_BYTES;
-    let latency_scope = "single query: full scan of prebuilt host-resident store, exact canonical Hamming scoring, deterministic top-1 selection; excludes store/query construction and serialization";
     let metrics = vec![
-        metric("query_major_single_latency_p50", percentile(&query_latency_samples, 0.50) as f64, "ns", "measured", "separate diagnostic: one query scanned against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
-        metric("query_major_single_latency_p95", percentile(&query_latency_samples, 0.95) as f64, "ns", "measured", "separate diagnostic: one query scanned against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
-        metric("query_major_single_latency_p99", percentile(&query_latency_samples, 0.99) as f64, "ns", "measured", "separate diagnostic: one query scanned against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
-        metric("query_major_batch_latency_p50", percentile(&query_major_batch_samples, 0.50) as f64, "ns", "measured", "complete batch: run one independent full store scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("query_major_batch_latency_p95", percentile(&query_major_batch_samples, 0.95) as f64, "ns", "measured", "complete batch: run one independent full store scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("candidate_major_batch_latency_p50", percentile(&candidate_major_batch_samples, 0.50) as f64, "ns", "measured", "complete batch: load each candidate and compare against all queries before advancing", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("candidate_major_batch_latency_p95", percentile(&candidate_major_batch_samples, 0.95) as f64, "ns", "measured", "complete batch: load each candidate and compare against all queries before advancing", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("query_major_throughput", query_major_throughput, "queries/s", "measured", "paired batch runs; excludes warm-up, store/query generation and diagnostic per-query timing pass", measured_queries_per_schedule, "query count divided by sum of query-major batch elapsed time"),
-        metric("candidate_major_throughput", candidate_major_throughput, "queries/s", "measured", "paired batch runs; excludes warm-up, store/query generation and diagnostic per-query timing pass", measured_queries_per_schedule, "query count divided by sum of candidate-major batch elapsed time"),
-        metric("candidate_major_amortized_batch_ns_per_query", percentile(&candidate_major_batch_samples, 0.50) as f64 / config.batch_size as f64, "ns/query", "derived", "median candidate-major batch completion time divided by query batch size; not individual request latency", candidate_major_batch_samples.len(), "batch latency / batch size"),
+        metric("latency_p50", percentile(&query_latency_samples, 0.50) as f64, "ns", "measured", "query-major diagnostic: individual query latency against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
+        metric("latency_p95", percentile(&query_latency_samples, 0.95) as f64, "ns", "measured", "query-major diagnostic: individual query latency against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
+        metric("latency_p99", percentile(&query_latency_samples, 0.99) as f64, "ns", "measured", "query-major diagnostic: individual query latency against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
+        metric("throughput", query_major_throughput, "queries/s", "measured", "query-major paired batch runs; excludes warm-up, store/query generation and diagnostic per-query timing pass", measured_queries_per_schedule, "query count divided by sum of query-major batch elapsed time"),
+        metric("other", percentile(&query_major_batch_samples, 0.50) as f64, "ns", "measured", "query-major complete-batch completion latency; one full scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("other", percentile(&query_major_batch_samples, 0.95) as f64, "ns", "measured", "query-major complete-batch completion latency; one full scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("other", candidate_major_throughput, "queries/s", "measured", "candidate-major paired batch runs; one candidate loaded then reused across all queries in the batch", measured_queries_per_schedule, "query count divided by sum of candidate-major batch elapsed time"),
+        metric("other", percentile(&candidate_major_batch_samples, 0.50) as f64, "ns", "measured", "candidate-major complete-batch completion latency; scan candidates outside and queries inside", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("other", percentile(&candidate_major_batch_samples, 0.95) as f64, "ns", "measured", "candidate-major complete-batch completion latency; scan candidates outside and queries inside", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("other", percentile(&candidate_major_batch_samples, 0.50) as f64 / config.batch_size as f64, "ns/query", "derived", "median candidate-major batch completion time divided by query batch size; not individual request latency", candidate_major_batch_samples.len(), "batch latency / batch size"),
         metric("working_set_bytes", working_set_bytes as f64, "bytes", "derived", "logical vector-store plus one batch of query hypervectors; excludes allocator metadata and runtime overhead", 1, "derived from canonical 2048-byte vectors"),
         metric("other", setup_ns as f64, "ns", "measured", "setup duration for deterministic store and query generation; outside retrieval latency", 1, "monotonic wall clock around generation")
     ];
@@ -332,13 +331,8 @@ fn run() -> Result<(), String> {
             "store_vector_count": config.store_size,
             "query_batch_size": config.batch_size,
             "query_count": config.batch_size,
-            "schedule_comparison": ["query_major", "candidate_major"],
-            "schedule_semantics": "both schedules process identical queries against identical candidate IDs and use exact Hamming plus lowest-index tie breaking",
             "operations": ["hamming_distance", "retrieve"],
             "tie_break_policy": "lowest stable vector-store index wins equal Hamming distance",
-            "task_quality_metric": "synthetic target top-1 accuracy",
-            "task_quality_value": if mismatches == 0 { 1.0 } else { 0.0 },
-            "task_quality_floor": "1.0"
         },
         "profile": {
             "profile_id": "canonical-rust-binaryhv-host-scan",
@@ -350,10 +344,11 @@ fn run() -> Result<(), String> {
             "clock_power_profile": env::var("SYMTHAEA_BENCH_CLOCK_POWER_PROFILE").unwrap_or_else(|_| "not captured".to_owned())
         },
         "execution": {
-            "measurement_boundary": latency_scope,
+            "measurement_boundary": "prebuilt store + fixed query batch + exact Hamming and Top-1; compare query-major and candidate-major schedules",
             "boundary_complete": false,
             "warmup_batches": config.warmup,
             "measured_batches": config.repetitions,
+            "run_order": "paired; alternate query-major-first and candidate-major-first by repetition",
             "invocation": args.join(" "),
             "commands": []
         },
@@ -367,6 +362,9 @@ fn run() -> Result<(), String> {
             "fixtures_attempted": measured_queries_per_schedule * 2,
             "fixtures_passed": measured_queries_per_schedule * 2 - mismatches,
             "mismatches": mismatches,
+            "task_quality_metric": "synthetic target top-1 accuracy for both schedules",
+            "task_quality_value": (measured_queries_per_schedule * 2 - query_major_mismatches - candidate_major_mismatches) as f64 / (measured_queries_per_schedule * 2) as f64,
+            "task_quality_floor": 1.0,
             "malformed_frames_accepted": Value::Null
         },
         "metrics": metrics,
@@ -380,8 +378,8 @@ fn run() -> Result<(), String> {
 
     println!("{}", String::from_utf8_lossy(&receipt_bytes));
     eprintln!(
-        "output={} status={} batches={} queries={} mismatches={}",
-        output_dir.display(), status, config.repetitions, measured_queries, mismatches
+        "output={} status={} paired_batches_per_schedule={} queries_per_batch={} mismatches={}",
+        output_dir.display(), status, config.repetitions, config.batch_size, mismatches
     );
     Ok(())
 }
@@ -583,6 +581,103 @@ fn retrieve_top1(store: &[BinaryHV], query: &BinaryHV) -> (usize, u32) {
     (best_id, best_distance)
 }
 
+/// Query-major schedule: finish one complete store scan before moving to the
+/// next query. This is the software reference schedule for the paired test.
+fn retrieve_batch_query_major(
+    store: &[BinaryHV],
+    queries: &[QueryCase],
+) -> Vec<(usize, u32)> {
+    queries
+        .iter()
+        .map(|query| retrieve_top1(store, &query.vector))
+        .collect()
+}
+
+/// Candidate-major schedule: load each candidate in the outer loop and reuse
+/// it across the complete query batch before advancing to the next candidate.
+/// This preserves exact Hamming and lowest-stable-index Top-1 semantics.
+fn retrieve_batch_candidate_major(
+    store: &[BinaryHV],
+    queries: &[QueryCase],
+) -> Vec<(usize, u32)> {
+    let mut best = vec![(usize::MAX, u32::MAX); queries.len()];
+    for (item_id, candidate) in store.iter().enumerate() {
+        for (query_index, query) in queries.iter().enumerate() {
+            let distance = query.vector.hamming_distance(candidate);
+            let current = &mut best[query_index];
+            if distance < current.1 || (distance == current.1 && item_id < current.0) {
+                *current = (item_id, distance);
+            }
+        }
+    }
+    best
+}
+
+fn batch_result_json(
+    repetition: usize,
+    elapsed_ns: u128,
+    queries: &[QueryCase],
+    results: &[(usize, u32)],
+) -> Value {
+    json!({
+        "repetition": repetition,
+        "batch_elapsed_ns": elapsed_ns,
+        "results": queries.iter().zip(results.iter()).map(|(query, (actual_id, distance))| json!({
+            "query_index": query.index,
+            "expected_id": query.target_id,
+            "expected_distance": TARGET_NOISE_BITS,
+            "actual_id": actual_id,
+            "hamming_distance": distance
+        })).collect::<Vec<_>>()
+    })
+}
+
+fn count_batch_mismatches(batches: &[Value]) -> usize {
+    let mut mismatches = 0usize;
+    for batch in batches {
+        let Some(results) = batch.get("results").and_then(Value::as_array) else {
+            mismatches += 1;
+            continue;
+        };
+        for result in results {
+            let expected_id = result.get("expected_id").and_then(Value::as_u64);
+            let actual_id = result.get("actual_id").and_then(Value::as_u64);
+            let expected_distance = result.get("expected_distance").and_then(Value::as_u64);
+            let actual_distance = result.get("hamming_distance").and_then(Value::as_u64);
+            if expected_id != actual_id || expected_distance != actual_distance {
+                mismatches += 1;
+            }
+        }
+    }
+    mismatches
+}
+
+fn count_cross_schedule_mismatches(
+    query_major: &[Value],
+    candidate_major: &[Value],
+) -> usize {
+    let mut mismatches = query_major.len().abs_diff(candidate_major.len());
+    for (query_batch, candidate_batch) in query_major.iter().zip(candidate_major.iter()) {
+        let query_results = query_batch.get("results").and_then(Value::as_array);
+        let candidate_results = candidate_batch.get("results").and_then(Value::as_array);
+        let (Some(query_results), Some(candidate_results)) = (query_results, candidate_results) else {
+            mismatches += 1;
+            continue;
+        };
+        mismatches += query_results.len().abs_diff(candidate_results.len());
+        for (query_result, candidate_result) in query_results.iter().zip(candidate_results.iter()) {
+            let query_id = query_result.get("actual_id").and_then(Value::as_u64);
+            let candidate_id = candidate_result.get("actual_id").and_then(Value::as_u64);
+            let query_distance = query_result.get("hamming_distance").and_then(Value::as_u64);
+            let candidate_distance = candidate_result.get("hamming_distance").and_then(Value::as_u64);
+            if query_id != candidate_id || query_distance != candidate_distance {
+                mismatches += 1;
+            }
+        }
+    }
+    mismatches
+}
+
 fn percentile(sorted_samples: &[u128], percentile: f64) -> u128 {
     let rank = ((sorted_samples.len() as f64) * percentile).ceil() as usize;
     sorted_samples[rank.saturating_sub(1).min(sorted_samples.len() - 1)]
@@ -696,6 +791,24 @@ mod tests {
         let vector = BinaryHV::random(99);
         let store = vec![vector, vector];
         assert_eq!(retrieve_top1(&store, &vector), (0, 0));
+    }
+
+    #[test]
+    fn candidate_major_matches_query_major_for_exact_results_and_ties() {
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(101);
+        let store = vec![a, b, a, BinaryHV::random(102)];
+        let queries = vec![
+            QueryCase { index: 0, target_id: 0, vector: a },
+            QueryCase { index: 1, target_id: 1, vector: b },
+            QueryCase { index: 2, target_id: 2, vector: a },
+        ];
+        assert_eq!(
+            retrieve_batch_candidate_major(&store, &queries),
+            retrieve_batch_query_major(&store, &queries)
+        );
+        assert_eq!(retrieve_batch_candidate_major(&store, &queries)[0], (0, 0));
+        assert_eq!(retrieve_batch_candidate_major(&store, &queries)[2], (0, 0));
     }
 
     #[test]
