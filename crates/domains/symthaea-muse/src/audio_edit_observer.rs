@@ -506,9 +506,10 @@ pub fn verify_gain_envelope_observation_seal(result: &Value) -> Result<(), Strin
         .get("receipt_sha256")
         .and_then(Value::as_str)
         .ok_or("acoustic observation is missing receipt_sha256")?;
+    let actual = observation_seal(result)?;
     if recorded.len() != 64
         || !recorded.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        || recorded != observation_seal(result)?
+        || recorded != actual.as_str()
     {
         return Err("acoustic observation receipt seal is invalid".into());
     }
@@ -665,6 +666,24 @@ mod tests {
         let candidate = wav(&vec![0.25_f32; 999], 8_000);
         let error = observe_gain_envelope_v1(&source, &candidate, &contract()).unwrap_err();
         assert!(error.contains("no time-warp alignment"));
+    }
+
+    #[test]
+    fn target_and_protected_windows_must_not_overlap() {
+        let mut case = contract();
+        case.protected_windows[0] = FrameRangeV1 { start_frame: 300, end_frame: 900 };
+        let (source, candidate) = source_and_candidate();
+        let error = observe_gain_envelope_v1(&source, &candidate, &case).unwrap_err();
+        assert!(error.contains("must not overlap"));
+    }
+
+    #[test]
+    fn isolated_stem_scope_requires_an_explicit_identity() {
+        let mut case = contract();
+        case.scope_id = None;
+        let (source, candidate) = source_and_candidate();
+        let error = observe_gain_envelope_v1(&source, &candidate, &case).unwrap_err();
+        assert!(error.contains("requires a non-empty scope_id"));
     }
 
     #[test]
