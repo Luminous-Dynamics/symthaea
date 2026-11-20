@@ -122,14 +122,31 @@ fn certificate_is_valid(value: &PeriodicPoissonCertificate) -> bool {
         || value.electric_field_error_l2_bound < 0.0
         || !value.potential_error_l2_bound.is_finite()
         || value.potential_error_l2_bound < 0.0
+        || !value.removed_charge_density_mean.is_finite()
+        || !value.removed_potential_mean.is_finite()
+        || !value.net_charge_before_projection.is_finite()
     {
         return false;
     }
 
-    let expected_potential_bound = value.residual_l2 / value.lambda_min_nonzero;
-    let expected_field_bound = value.residual_l2 / value.lambda_min_nonzero.sqrt();
-    let potential_tolerance = 64.0 * f64::EPSILON * expected_potential_bound.abs().max(1.0);
-    let field_tolerance = 64.0 * f64::EPSILON * expected_field_bound.abs().max(1.0);
+    let n = value.cell_count as f64;
+    let inverse_dx_squared = 1.0 / (value.cell_width * value.cell_width);
+    let expected_lambda = 4.0 * (std::f64::consts::PI / n).sin().powi(2) * inverse_dx_squared;
+    if !expected_lambda.is_finite() || expected_lambda <= 0.0 {
+        return false;
+    }
+
+    let lambda_tolerance = 64.0 * f64::EPSILON * expected_lambda.abs();
+    if (value.lambda_min_nonzero - expected_lambda).abs() > lambda_tolerance {
+        return false;
+    }
+
+    let expected_potential_bound = value.residual_l2 / expected_lambda;
+    let expected_field_bound = value.residual_l2 / expected_lambda.sqrt();
+    let potential_tolerance =
+        64.0 * f64::EPSILON * expected_potential_bound.abs().max(f64::MIN_POSITIVE);
+    let field_tolerance =
+        64.0 * f64::EPSILON * expected_field_bound.abs().max(f64::MIN_POSITIVE);
 
     (value.potential_error_l2_bound - expected_potential_bound).abs() <= potential_tolerance
         && (value.electric_field_error_l2_bound - expected_field_bound).abs() <= field_tolerance
