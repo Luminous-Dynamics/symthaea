@@ -1,0 +1,42 @@
+{
+  "contract": "SC-RISK-MULTIRESOURCE-BENCHMARK-SUITE-0.1",
+  "suite_id": "superconductivity_risk_multiresource_adversarial_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_risk_multiresource_v0_1.schema.json",
+  "instances": [
+    {
+      "instance_id": "synthetic_tail_risk_resource_fixture_001",
+      "path": "data/research/superconductivity_risk_multiresource_fixture_v0_1.json",
+      "role": "capability_and_multi_resource_smoke",
+      "scientific_question": "Does the exact planner respect capability closure, nine independent resource dimensions and hard action eligibility?"
+    },
+    {
+      "instance_id": "adversarial_expected_vs_tail_risk_001",
+      "path": "data/research/superconductivity_risk_multiresource_fixture_expected_vs_tail_v0_1.json",
+      "role": "objective_divergence",
+      "scientific_question": "Can expected-loss EVSI and precommitment CVaR-EVSI rationally select different observations under a rare catastrophic world state?",
+      "expected_exact_plans": {
+        "expected_loss": [
+          "expected_value_probe"
+        ],
+        "precommitment_cvar": [
+          "tail_risk_probe"
+        ]
+      }
+    },
+    {
+      "instance_id": "adversarial_information_without_decision_value_001",
+      "path": "data/research/superconductivity_risk_multiresource_fixture_information_only_v0_1.json",
+      "role": "information_without_decision_value",
+      "scientific_question": "Does the decision planner abstain from an informative experiment when no available downstream decision can change, while mutual information still rewards it?",
+      "expected_exact_plans": {
+        "expected_loss": [],
+        "precommitment_cvar": [],
+        "mutual_information": [
+          "information_only_probe"
+        ]
+      }
+    }
+  ],
+  "claim_ceiling": "All instances are synthetic contract fixtures. The suite does not establish a physical superconducting material, intervention response, experimental efficiency gain or SOTA superiority."
+}
