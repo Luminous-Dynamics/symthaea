@@ -20,8 +20,8 @@
 //!
 //! 3. **`evolve_closed_form_iterative`**: Budgeted sub-stepped exponential evolution
 //!    - Recomputes nonlinear equilibrium at each tau/10 step; callers must provide a work budget.
-//!    - **<1% error vs RK4** - validated across all scenarios
-//!    - O(dt/tau) complexity but still faster than Euler/RK4
+//!    - Current regression target: <1% error vs fine-step RK4 on the frozen scenario matrix
+//!    - O(dt/tau) complexity; the dt/tau ratio sweep must execute before generalizing the error bound
 //!
 //! ## Key Finding: Nonlinear Equilibrium
 //!
