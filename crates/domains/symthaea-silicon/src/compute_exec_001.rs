@@ -2054,6 +2054,34 @@ mod tests {
     }
 
     #[test]
+    fn rejected_buffer_release_validates_all_handles_before_mutating_any() {
+        let (capabilities, command, _, mut registry, mut ledger) = setup();
+        let completion: HdcCompletion = serde_json::from_str(REJECTED_COMPLETION).unwrap();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap();
+
+        registry.set_ownership(
+            &BufferKey {
+                handle_id: "fixture-candidate-ids".into(),
+                generation: 1,
+            },
+            BufferOwnership::HostOwned,
+        );
+        let error = ledger
+            .confirm_rejected_before_dma("00112233445566778899aabbccddeeff", 1, &mut registry)
+            .unwrap_err();
+        assert_eq!(error.code, "REJECTED_BUFFER_OWNERSHIP_MISMATCH");
+        assert!(matches!(
+            registry.ownership("fixture-query", 1),
+            Some(BufferOwnership::Quarantined { .. })
+        ));
+        assert!(matches!(
+            registry.ownership("fixture-candidates", 1),
+            Some(BufferOwnership::Quarantined { .. })
+        ));
+    }
+
+    #[test]
     fn rejected_completion_without_pre_dma_assertion_never_releases_buffers() {
         let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
