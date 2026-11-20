@@ -137,6 +137,15 @@
     },
     "semantic_contract_sha256": {
       "$ref": "#/$defs/sha256"
+    },
+    "rejection_stage": {
+      "type": "string",
+      "enum": [
+        "before_dma"
+      ]
+    },
+    "dma_acquired": {
+      "type": "boolean"
     }
   },
   "allOf": [
@@ -207,6 +216,65 @@
           "error_code": {
             "const": "OUTCOME_UNKNOWN"
           }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "rejected"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "rejection_stage",
+          "dma_acquired"
+        ],
+        "properties": {
+          "rejection_stage": {
+            "const": "before_dma"
+          },
+          "dma_acquired": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "completed",
+              "failed",
+              "cancelled",
+              "outcome_unknown"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "rejection_stage"
+              ]
+            },
+            {
+              "required": [
+                "dma_acquired"
+              ]
+            }
+          ]
         }
       }
     }
