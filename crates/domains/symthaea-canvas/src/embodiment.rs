@@ -582,8 +582,8 @@ mod tests {
 
     #[test]
     fn sequencer_assigns_strictly_increasing_sequences_and_timestamps() {
-        let started = Instant::now();
         let mut sequencer = EmbodimentEventSequencer::new();
+        let started = Instant::now();
         let first_at = started + std::time::Duration::from_millis(1);
         let second_at = started + std::time::Duration::from_millis(2);
 
@@ -610,6 +610,35 @@ mod tests {
         assert_eq!(second.sequence, 2);
         assert!(second.monotonic_ns >= first.monotonic_ns);
     }
+
+
+    #[test]
+    fn sequencer_reports_sequence_exhaustion_without_wrapping() {
+        let mut sequencer = EmbodimentEventSequencer::new();
+        sequencer.next_sequence = Some(u64::MAX);
+        let at = Instant::now() + std::time::Duration::from_millis(1);
+        let event = sequencer
+            .emit_at(
+                at,
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Listening,
+                },
+            )
+            .unwrap();
+        assert_eq!(event.sequence, u64::MAX);
+        assert_eq!(
+            sequencer.emit_at(
+                at,
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Idle,
+                },
+            ),
+            Err(EmbodimentSequenceError::SequenceExhausted)
+        );
+    }
+
 
     #[test]
     fn sequencer_rejects_regressing_observation_without_consuming_sequence() {
