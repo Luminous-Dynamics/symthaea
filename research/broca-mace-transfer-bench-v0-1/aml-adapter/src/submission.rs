@@ -109,9 +109,6 @@ fn endpoint_host(value: &str) -> Option<&str> {
     if authority.is_empty() {
         return None;
     }
-    if authority.contains('@') || authority.contains('?') || authority.contains('#') {
-        return None;
-    }
     if authority.bytes().any(|byte| byte.is_ascii_whitespace()) {
         return None;
     }
@@ -138,7 +135,13 @@ fn is_obviously_local_host(host: &str) -> bool {
             IpAddr::V4(ip) => {
                 ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified()
             }
-            IpAddr::V6(ip) => ip.is_loopback() || ip.is_unspecified(),
+            IpAddr::V6(ip) => {
+                let bytes = ip.octets();
+                ip.is_loopback()
+                    || ip.is_unspecified()
+                    || (bytes[0] & 0xfe == 0xfc)
+                    || (bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80)
+            },
         };
     }
     false
@@ -148,12 +151,12 @@ fn validate_endpoint(value: &str) -> Result<(), SubmissionProfileReject> {
     if !value.starts_with("https://") {
         return Err(SubmissionProfileReject::InvalidAddEndpoint);
     }
-    let host = endpoint_host(value).ok_or(SubmissionProfileReject::InvalidAddEndpoint)?;
-    if host.is_empty() || !host.contains('.') && host.parse::<IpAddr>().is_err() {
-        return Err(SubmissionProfileReject::InvalidAddEndpoint);
-    }
     if value.contains('@') || value.contains('?') || value.contains('#') {
         return Err(SubmissionProfileReject::EndpointContainsCredentialsOrQuery);
+    }
+    let host = endpoint_host(value).ok_or(SubmissionProfileReject::InvalidAddEndpoint)?;
+    if host.is_empty() || (!host.contains('.') && host.parse::<IpAddr>().is_err()) {
+        return Err(SubmissionProfileReject::InvalidAddEndpoint);
     }
     if is_obviously_local_host(host) {
         return Err(SubmissionProfileReject::EndpointUsesLocalHost);
@@ -397,6 +400,23 @@ mod tests {
             value.add_endpoint = endpoint.into();
             assert!(validate_declared_submission_profile(value).is_err());
         }
+    }
+
+    #[test]
+    fn search_endpoint_has_distinct_validation_and_secret_url_rejects_are_specific() {
+        let mut bad_search = profile(SubmissionDivision::OpenSourceMethods);
+        bad_search.search_endpoint = "http://memory.example.org/search".into();
+        assert_eq!(
+            validate_declared_submission_profile(bad_search),
+            Err(SubmissionProfileReject::InvalidSearchEndpoint)
+        );
+
+        let mut credentialed = profile(SubmissionDivision::OpenSourceMethods);
+        credentialed.add_endpoint = "https://user:secret@memory.example.org/add".into();
+        assert_eq!(
+            validate_declared_submission_profile(credentialed),
+            Err(SubmissionProfileReject::EndpointContainsCredentialsOrQuery)
+        );
     }
 
     #[test]
