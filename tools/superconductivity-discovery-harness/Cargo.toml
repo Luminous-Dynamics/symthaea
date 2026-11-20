@@ -47,3 +47,7 @@ path = "src/bin/thermochemical_network_audit.rs"
 [[bin]]
 name = "sc_transport_kinetic_selectivity_audit"
 path = "src/bin/transport_kinetic_selectivity_audit.rs"
+
+[[bin]]
+name = "sc_spatial_reaction_diffusion_audit"
+path = "src/bin/spatial_reaction_diffusion_audit.rs"
