@@ -345,7 +345,7 @@ fn run() -> Result<(), String> {
             "tie_break_policy": "lowest stable vector-store index wins equal Hamming distance",
         },
         "profile": {
-            "profile_id": "canonical-rust-binaryhv-host-scan",
+            "profile_id": "canonical-rust-binaryhv-query-major-vs-candidate-major",
             "backend": "cpu_dispatch",
             "host_stages": ["scan store", "BinaryHV::hamming_distance", "deterministic top-1 selection"],
             "device_stages": [],
