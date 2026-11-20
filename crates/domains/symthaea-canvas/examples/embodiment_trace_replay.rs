@@ -7,7 +7,6 @@
 //! This measures semantic reduction only. It does not measure SVG rasterization,
 //! browser presentation, audio playback, GPU rendering, or human perception.
 
-use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -40,7 +39,7 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), Box<dyn Error>> {
+fn run() -> Result<(), String> {
     let mut trace_path: Option<PathBuf> = None;
     let mut iterations = DEFAULT_ITERATIONS;
     let mut args = std::env::args().skip(1);
@@ -48,18 +47,18 @@ fn run() -> Result<(), Box<dyn Error>> {
     while let Some(argument) = args.next() {
         match argument.as_str() {
             "--trace" => {
-                let value = args.next().ok_or("--trace requires a path")?;
+                let value = args.next().ok_or_else(|| "--trace requires a path".to_string())?;
                 trace_path = Some(PathBuf::from(value));
             }
             "--iterations" => {
-                let value = args.next().ok_or("--iterations requires an integer")?;
-                iterations = value.parse::<usize>()?;
+                let value = args.next().ok_or_else(|| "--iterations requires an integer".to_string())?;
+                iterations = value.parse::<usize>().map_err(|error| error.to_string())?;
             }
             "--help" | "-h" => {
                 print_usage();
                 return Ok(());
             }
-            _ => return Err(format!("unknown argument: {argument}").into()),
+            _ => return Err(format!("unknown argument: {argument}")),
         }
     }
 
@@ -67,42 +66,41 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Err(format!(
             "--iterations must be within 1..={MAX_ITERATIONS}"
         )
-        .into());
+        );
     }
-    let trace_path = trace_path.ok_or("--trace is required")?;
-    let metadata = fs::metadata(&trace_path)?;
+    let trace_path = trace_path.ok_or_else(|| "--trace is required".to_string())?;
+    let metadata = fs::metadata(&trace_path).map_err(|error| error.to_string())?;
     if metadata.len() > MAX_TRACE_FILE_BYTES {
         return Err(format!(
             "trace file is {} bytes; maximum is {} bytes",
             metadata.len(),
             MAX_TRACE_FILE_BYTES
         )
-        .into());
+        );
     }
 
-    let bytes = fs::read(&trace_path)?;
-    let trace: EmbodimentTrace = serde_json::from_slice(&bytes)?;
+    let bytes = fs::read(&trace_path).map_err(|error| error.to_string())?;
+    let trace: EmbodimentTrace = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
     if trace.schema_version != EMBODIMENT_TRACE_SCHEMA_VERSION {
         return Err(format!(
             "trace schema {} is unsupported; this binary supports {}",
             trace.schema_version, EMBODIMENT_TRACE_SCHEMA_VERSION
-        )
-        .into());
+        ));
     }
 
     // Validate and summarize before timing so malformed input never produces
     // a benchmark report that could be mistaken for a valid run.
-    let summary = trace.summarize()?;
+    let summary = trace.summarize().map_err(|error| error.to_string())?;
 
     // Warm the allocator and code paths outside the reported sample window.
     for _ in 0..3 {
-        std::hint::black_box(trace.replay()?);
+        std::hint::black_box(trace.replay().map_err(|error| error.to_string())?);
     }
 
     let mut samples_ns = Vec::with_capacity(iterations);
     for _ in 0..iterations {
         let start = Instant::now();
-        std::hint::black_box(trace.replay()?);
+        std::hint::black_box(trace.replay().map_err(|error| error.to_string())?);
         samples_ns.push(start.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64);
     }
 
@@ -128,7 +126,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         summary,
     };
 
-    println!("{}", serde_json::to_string_pretty(&report)?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?
+    );
     Ok(())
 }
 
