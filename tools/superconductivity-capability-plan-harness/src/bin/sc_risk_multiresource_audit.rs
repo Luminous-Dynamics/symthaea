@@ -66,6 +66,14 @@ struct Instance {
     actions: Vec<Action>,
 }
 
+fn splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut value = *state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
 fn required_text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value.get(key).and_then(Value::as_str)
         .filter(|text| !text.trim().is_empty())
@@ -675,6 +683,41 @@ impl Instance {
         Ok(frontier)
     }
 
+    fn random_feasible(&self, seed: u64) -> Result<Plan, String> {
+        let mut rng_state = seed;
+        let mut chosen = Vec::new();
+        let mut available = self.initial_capabilities.clone();
+        let mut selected = HashSet::new();
+        loop {
+            let current = self.plan(&chosen)?.ok_or("current random plan is infeasible")?;
+            let mut candidates = Vec::new();
+            for index in 0..self.actions.len() {
+                if selected.contains(&index) { continue; }
+                let action = &self.actions[index];
+                if !action.eligible
+                    || !action.requires.iter().all(|capability| available.contains(capability)) {
+                    continue;
+                }
+                let mut trial = chosen.clone();
+                trial.push(index);
+                if self.plan(&trial)?.is_some() {
+                    candidates.push(index);
+                }
+            }
+            if candidates.is_empty() {
+                return Ok(current);
+            }
+            let random = splitmix64(&mut rng_state);
+            let position = ((u128::from(random) * candidates.len() as u128) >> 64) as usize;
+            let index = candidates[position];
+            chosen.push(index);
+            selected.insert(index);
+            for capability in &self.actions[index].provides {
+                available.insert(capability.clone());
+            }
+        }
+    }
+
     fn plan_receipt(&self, plan: &Plan) -> Value {
         let measured_ids: Vec<String> = plan.ordered_indices.iter()
             .filter(|i| !self.actions[**i].likelihoods.is_empty())
@@ -740,6 +783,13 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let expected_greedy = instance.greedy(Objective::ExpectedValue)?;
     let tail_greedy = instance.greedy(Objective::TailRisk)?;
     let information_greedy = instance.greedy(Objective::InformationGain)?;
+    const RANDOM_SEEDS: [u64; 32] = [
+        1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,
+        17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32
+    ];
+    let random_trials: Vec<(u64, Plan)> = RANDOM_SEEDS.iter()
+        .map(|seed| Ok((*seed, instance.random_feasible(*seed)?)))
+        .collect::<Result<Vec<_>, String>>()?;
     let pareto_frontier = instance.pareto_frontier()?;
     let excluded: Vec<Value> = instance.actions.iter().filter(|a| !a.eligible)
         .map(|a| json!({"action_id":a.id,"exclusion_reason":a.exclusion_reason})).collect();
@@ -784,6 +834,17 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             "dominance":"maximize expected-loss EVSI and precommitment CVaR-EVSI; minimize precommitment CVaR regret and every resource consumption dimension",
             "frontier_size":pareto_frontier.len(),
             "plans":pareto_frontier.iter().map(|plan|instance.plan_receipt(plan)).collect::<Vec<_>>()
+        },
+        "random_feasible_baseline":{
+            "algorithm":"uniformly sample among currently feasible next actions; stop when no further action fits; deterministic SplitMix64 seeds",
+            "seed_count":random_trials.len(),
+            "trials":random_trials.iter().map(|(seed,plan)|json!({
+                "seed":seed,
+                "plan":instance.plan_receipt(plan)
+            })).collect::<Vec<_>>(),
+            "mean_expected_loss_evsi":random_trials.iter().map(|(_,p)|p.expected_evsi).sum::<f64>() / random_trials.len() as f64,
+            "mean_precommitment_cvar_evsi":random_trials.iter().map(|(_,p)|p.cvar_evsi).sum::<f64>() / random_trials.len() as f64,
+            "mean_joint_world_state_information_nats":random_trials.iter().map(|(_,p)|p.mutual_information_nats).sum::<f64>() / random_trials.len() as f64
         },
         "greedy_expected_loss_baseline":{
             "algorithm":"myopic marginal expected-loss EVSI per reference resource",
@@ -1049,6 +1110,20 @@ mod tests {
         assert!((tail_fixed - 100.0).abs() < 1.0e-12);
         assert!((mean_adaptive - 7.0).abs() < 1.0e-12);
         assert!((tail_adaptive - 14.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn deterministic_random_feasible_baseline_is_reproducible_and_never_overbooks_resources() {
+        let (schema, fixture) = inputs();
+        let instance = Instance::from_bytes(&schema, &fixture).unwrap();
+        let first = instance.random_feasible(20261120).unwrap();
+        let second = instance.random_feasible(20261120).unwrap();
+        assert_eq!(instance.plan_ids(&first), instance.plan_ids(&second));
+        assert_eq!(first.consumption, second.consumption);
+        for (used, resource) in first.consumption.iter().zip(instance.resources.iter()) {
+            assert!(*used <= resource.capacity);
+        }
+        assert!(first.ordered_indices.iter().all(|index| instance.actions[*index].eligible));
     }
 
 }
