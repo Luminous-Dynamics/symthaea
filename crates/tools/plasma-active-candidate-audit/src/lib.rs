@@ -456,7 +456,7 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
     {
         add(
             "forbidden_split_role",
-            "Only training and development_validation can be proposed for acquisition; sealed test is never selectable.",
+            "Only training and development_validation are eligible; sealed test is never selectable.",
         );
     }
 
