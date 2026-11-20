@@ -120,9 +120,9 @@ The event is the authority. Animation curves, facial expressions, glow, particle
 
 ### 2. Evidence-aware reduction
 
-A small deterministic reducer turns ordered events into a renderer-facing snapshot. It rejects non-increasing sequence numbers, timestamp regression, invalid normalized values, and viseme events without an explicit speaking state.
+A session-scoped event sequencer assigns one monotonic timestamp and strictly increasing sequence across producers. A deterministic reducer turns the ordered events into a renderer-facing snapshot. It rejects timestamp regression, invalid normalized values, impossible speech-output transitions, invalid provenance, and viseme events outside confirmed playback.
 
-The reducer must not infer listening, retrieving, associating, predicting, speaking, or tool execution from visual timing or generic conversation text. Only the owning runtime adapter may publish those states.
+The reducer must not infer listening, retrieving, associating, predicting, playback, or tool execution from visual timing or generic conversation text. Only the owning runtime adapter may publish those states.
 
 ### 3. Presentation adapters
 
@@ -173,7 +173,8 @@ Never map internal affect values directly to human emotions such as happiness, s
 Added to symthaea-canvas:
 
 - embodiment.rs: typed cognitive activity, independent speech-output lifecycle, visemes, gaze, provenance, and uncertainty signals;
-- strict per-session sequence ordering, monotonic timestamps, provenance checks, finite [0, 1] validation and fail-closed speech-state transition validation;
+- a session-scoped monotonic event sequencer for multiple runtime producers;
+- strict sequence ordering, monotonic timestamps, provenance checks, finite [0, 1] validation and fail-closed speech-state transition validation;
 - visemes accepted only while a RuntimeEvent confirms SpeechOutputState::Playing;
 - stale visemes cleared when playback stops; reset clears transient state and speech lifecycle;
 - negative controls for invalid provenance, invalid lifecycle transitions, stale events, and visemes outside confirmed playback;
@@ -227,7 +228,8 @@ For facial animation, use more than one metric: LSE-D/LSE-C for audio-visual syn
 
 | Metric | Study design | Initial target |
 |---|---|---:|
-| Runtime-state recognition | Blind participants classify idle/listening/associating/predicting/speaking/executing | ≥90% macro-F1 |
+| Cognitive-state recognition | Blind participants classify idle/listening/associating/predicting/executing | ≥90% macro-F1 |
+| Playback-state recognition | Participants distinguish synthesis-ready, queued, playing and completed | ≥95% accuracy |
 | Provenance comprehension | Identify runtime event vs derived signal vs renderer-local effect | ≥90% accuracy |
 | Uncertainty comprehension | Participants correctly recognize absent vs present uncertainty signal | ≥90% |
 | Accessibility | Reduced-motion, static mode, captions, non-color cues | 100% required checks |
@@ -271,7 +273,7 @@ Only run this track when the underlying runtime exports a calibrated probability
 
 ### P1 — real runtime signals
 - [ ] Add adapters for speech output lifecycle, tool lifecycle, perception, retrieval/association, and prediction.
-- [ ] Ensure event producers emit only from the authoritative subsystem.
+- [ ] Ensure event producers emit only from the authoritative subsystem and share one session sequencer.
 - [ ] Add a real playback-start observer to the Rodio/live-voice and browser playback paths; synthesis and queueing remain separate.
 - [ ] Add audio-clock timestamps and a calibrated viseme adapter; retain a static/no-mouth fallback if no viseme source is present.
 - [x] Add versioned trace recording format, deterministic replay and a reference fixture.
@@ -288,6 +290,7 @@ Only run this track when the underlying runtime exports a calibrated probability
 - [ ] Add optional VRM 1.0/VRMA import/export for humanoid embodiments.
 - [ ] Evaluate Live2D and NVIDIA Audio2Face as comparative/adaptor backends.
 - [ ] Add cross-renderer semantic-parity tests.
+- [x] Add a trace replay CLI reporting reducer P50/P95 latency, exact-input BLAKE3 digest and OS/architecture metadata.
 - [ ] Run the first SEFB benchmark with fixed traces, hardware metadata, and human-study protocol.
 
 ### P4 — research frontier
