@@ -401,8 +401,29 @@ fn note_window(
     if level < contract.minimum_signal_rms_dbfs {
         return abstain("expected note window is below the calibrated signal floor".into(), stable_start, end, level);
     }
-    let (observed_midi, frequency, confidence) = pitch_salience(samples, audio.sample_rate_hz);
-    let cents = 1200.0 * (frequency / midi_frequency(note.pitch.midi())).log2();
+    let expected_frequency = midi_frequency(note.pitch.midi());
+    let nyquist_hz = audio.sample_rate_hz as f64 / 2.0;
+    if expected_frequency >= nyquist_hz {
+        return abstain(
+            "expected pitch is at or above the WAV Nyquist frequency".into(),
+            stable_start,
+            end,
+            level,
+        );
+    }
+    let semitone_frequency_gap =
+        expected_frequency * (2.0_f64.powf(1.0 / 12.0) - 1.0);
+    let fft_bin_width = audio.sample_rate_hz as f64 / contract.analysis_window_frames as f64;
+    if semitone_frequency_gap < fft_bin_width * 1.5 {
+        return abstain(
+            "FFT window resolution is insufficient to discriminate the nearest semitone".into(),
+            stable_start,
+            end,
+            level,
+        );
+    }
+    let (observed_midi, frequency, salience_margin) = pitch_salience(samples, audio.sample_rate_hz);
+    let cents = 1200.0 * (frequency / expected_frequency).log2();
     let status = if salience_margin < contract.minimum_salience_margin {
         "abstain"
     } else if observed_midi != note.pitch.midi() || cents.abs() > contract.pitch_tolerance_cents {
@@ -424,7 +445,7 @@ fn note_window(
         reason: match status {
             "pass" => None,
             "fail" => Some("observed pitch does not match the score event".into()),
-            _ => Some("pitch evidence is below the calibrated confidence threshold".into()),
+            _ => Some("pitch evidence is below the frozen salience-margin threshold".into()),
         },
     }
 }
