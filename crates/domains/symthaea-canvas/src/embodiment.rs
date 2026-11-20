@@ -202,6 +202,9 @@ impl EmbodimentController {
             EmbodimentEventKind::ActivityChanged { .. } => {
                 validate_runtime_provenance("activity", event.provenance)?;
             }
+            EmbodimentEventKind::Reset => {
+                validate_runtime_provenance("reset", event.provenance)?;
+            }
             EmbodimentEventKind::VisemeChanged { weight, .. } => {
                 validate_runtime_provenance("viseme", event.provenance)?;
                 validate_unit_interval("viseme weight", *weight)?;
@@ -591,6 +594,33 @@ mod tests {
             })
         ));
         assert_eq!(controller.snapshot().last_event_sequence, None);
+    }
+
+
+    #[test]
+    fn renderer_local_reset_cannot_manufacture_idle_runtime_state() {
+        let mut controller = EmbodimentController::new();
+        controller
+            .ingest(event(
+                1,
+                10,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Predicting,
+                },
+            ))
+            .unwrap();
+        let before = controller.snapshot().clone();
+
+        let mut reset = event(2, 20, EmbodimentEventKind::Reset);
+        reset.provenance = SignalProvenance::RendererLocal;
+        assert!(matches!(
+            controller.ingest(reset),
+            Err(EmbodimentIngestError::SignalProvenanceNotAllowed {
+                field: "reset",
+                provenance: SignalProvenance::RendererLocal
+            })
+        ));
+        assert_eq!(*controller.snapshot(), before);
     }
 
     #[test]
