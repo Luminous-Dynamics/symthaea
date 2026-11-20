@@ -264,6 +264,15 @@ impl Instance {
     // Horvitz-Thompson estimate. Its causal interpretation requires a correct
     // assignment propensity, conditional exchangeability, consistency and positivity.
     fn inverse_propensity_estimate(&self, cohort: &Cohort) -> Estimate {
+        if cohort.records.iter().any(|r| !r.outcome_observed) {
+            return Estimate {
+                value: None,
+                n_treated: cohort.records.iter().filter(|r| r.treatment).count(),
+                n_control: cohort.records.iter().filter(|r| !r.treatment).count(),
+                n_observed: cohort.records.iter().filter(|r| r.outcome_observed).count(),
+                reason: Some("missing outcomes: v0.1 inverse-propensity estimators abstain without a declared missingness model".to_owned()),
+            };
+        }
         let observed: Vec<&Record> = cohort.records.iter().filter(|r| r.outcome_observed).collect();
         let bad_overlap = observed.iter().any(|r| r.propensity < 0.05 || r.propensity > 0.95);
         if bad_overlap {
@@ -295,6 +304,15 @@ impl Instance {
     // Hájek normalized inverse-probability estimator. It is a distinct,
     // generally finite-sample biased comparator to Horvitz-Thompson.
     fn hajek_estimate(&self, cohort: &Cohort) -> Estimate {
+        if cohort.records.iter().any(|r| !r.outcome_observed) {
+            return Estimate {
+                value: None,
+                n_treated: cohort.records.iter().filter(|r| r.treatment).count(),
+                n_control: cohort.records.iter().filter(|r| !r.treatment).count(),
+                n_observed: cohort.records.iter().filter(|r| r.outcome_observed).count(),
+                reason: Some("missing outcomes: v0.1 inverse-propensity estimators abstain without a declared missingness model".to_owned()),
+            };
+        }
         let observed: Vec<&Record> = cohort.records.iter().filter(|r| r.outcome_observed).collect();
         if observed.iter().any(|r| r.propensity < 0.05 || r.propensity > 0.95) {
             return Estimate {
