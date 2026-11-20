@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: superconductivity-risk-multiresource-\${{ github.event.pull_request.head.sha || github.sha }}
+  group: superconductivity-risk-multiresource-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Install pinned Rust toolchain
@@ -90,6 +90,6 @@ jobs:
           if-no-files-found: warn
           path: |
             tools/superconductivity-capability-plan-harness/Cargo.lock
-            \${{ runner.temp }}/sc-risk-multiresource-environment.txt
-            \${{ runner.temp }}/sc-risk-multiresource-receipt.json
-            \${{ runner.temp }}/sc-risk-rustfmt.patch
+            ${{ runner.temp }}/sc-risk-multiresource-environment.txt
+            ${{ runner.temp }}/sc-risk-multiresource-receipt.json
+            ${{ runner.temp }}/sc-risk-rustfmt.patch
