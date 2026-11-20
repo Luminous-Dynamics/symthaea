@@ -281,6 +281,19 @@ fn require_fields(value: &Value, fields: &[&str], label: &str) -> Result<(), Str
     Ok(())
 }
 
+fn require_exact_fields(value: &Value, fields: &[&str], label: &str) -> Result<(), String> {
+    require_fields(value, fields, label)?;
+    let object = value.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+    if object.len() != fields.len() {
+        let unexpected: Vec<&str> = object.keys()
+            .filter(|key| !fields.contains(&key.as_str()))
+            .map(String::as_str)
+            .collect();
+        return Err(format!("{label} contains unsupported fields: {}", unexpected.join(", ")));
+    }
+    Ok(())
+}
+
 fn validate_receipt_shape(value: &Value) -> Result<(), String> {
     require_fields(value, &["schema","attempt_id","attempt_state","source","edit","midi","renderer","execution","audio","verification","attestation","digest_recipe","receipt_sha256"], "receipt")?;
     let source = &value["source"];
@@ -867,6 +880,28 @@ fn verify_edit_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
         || window_ids != string_array(&edit, "protected_window_ids", "edit receipt")?
     { return Err("operation or protected-window IDs differ across the edit transaction".into()); }
 
+    require_exact_fields(&plan, &["schema","input_digest_schema","input_score_sha256","operations","protected_windows"], "edit plan")?;
+    if let Some(operations) = plan.get("operations").and_then(Value::as_array) {
+        for (index, operation) in operations.iter().enumerate() {
+            require_exact_fields(operation, &["id","part_id","start","end","numerator","denominator"], &format!("edit plan operation {index}"))?;
+            require_exact_fields(operation.get("start").ok_or("operation start missing")?, &["numerator","denominator"], "operation start")?;
+            require_exact_fields(operation.get("end").ok_or("operation end missing")?, &["numerator","denominator"], "operation end")?;
+        }
+    }
+    if let Some(windows) = plan.get("protected_windows").and_then(Value::as_array) {
+        for (index, window) in windows.iter().enumerate() {
+            require_exact_fields(window, &["id","part_id","start","end"], &format!("protected window {index}"))?;
+            require_exact_fields(window.get("start").ok_or("protected start missing")?, &["numerator","denominator"], "protected start")?;
+            require_exact_fields(window.get("end").ok_or("protected end missing")?, &["numerator","denominator"], "protected end")?;
+        }
+    }
+    require_exact_fields(&edit, &["schema","input_digest_schema","input_score_sha256","operation_ids","changes","protected_window_ids"], "edit receipt")?;
+    if let Some(changes) = edit.get("changes").and_then(Value::as_array) {
+        for (index, change) in changes.iter().enumerate() {
+            require_exact_fields(change, &["operation_id","note_index","part_id","before","after"], &format!("edit receipt change {index}"))?;
+        }
+    }
+    require_exact_fields(&verification, &["schema","input_score_sha256","candidate_note_count","authorized_note_count","changed_note_count","preserved_note_count","protected_note_count","verified","issues"], "edit verification report")?;
     let source_score = json_file(&root.join("source-score.json"), "source Score")?;
     let candidate_score = json_file(&root.join("candidate-score.json"), "candidate Score")?;
     verify_score_edit_semantics(
@@ -1146,10 +1181,77 @@ fn verify_timeline_binding_bundle(
         candidate_score.get("total_beats").ok_or("candidate Score total_beats missing")?,
         "num", "den", "candidate.total_beats",
     )?;
+    require_exact_fields(&timeline, &["schema","score_digest_schema","score_sha256","segments"], "orchestration timeline")?;
     let segments = timeline.get("segments").and_then(Value::as_array)
         .ok_or("timeline.segments must be an array")?;
     if segments.len() > MAX_TIMELINE_SEGMENTS_V1 || segments.len() != manifest.tracks.len() {
         return Err("timeline segment count differs from MIDI track count".into());
+    }
+    let mut by_id = BTreeMap::new();
+    let candidate_notes = candidate_score.get("notes").and_then(Value::as_array)
+        .ok_or("candidate Score notes missing while validating timeline")?;
+    let known_parts: std::collections::BTreeSet<u16> = candidate_notes.iter().enumerate()
+        .map(|(index, note)| parse_source_note_time(note, index).map(|value| value.0))
+        .collect::<Result<_, _>>()?;
+    let mut segments_by_part: BTreeMap<u16, Vec<(String, String, EditBeat, EditBeat, Option<(String, String)>)>> = BTreeMap::new();
+    for (index, segment) in segments.iter().enumerate() {
+        require_exact_fields(segment, &["id","part_id","instrument_id","start","end","musical_function","handoff"], &format!("timeline segment {index}"))?;
+        let id = string_field(segment, "id", "timeline segment")?.to_owned();
+        if id.trim().is_empty() { return Err("timeline segment ID is empty".into()); }
+        let part_id = json_u16(segment.get("part_id").ok_or("timeline part_id missing")?, "timeline.part_id")?;
+        if part_id == u16::MAX || !known_parts.contains(&part_id) {
+            return Err(format!("timeline segment {id} references an unassigned or unknown PartId"));
+        }
+        let instrument_id = string_field(segment, "instrument_id", "timeline segment")?.to_owned();
+        let musical_function = string_field(segment, "musical_function", "timeline segment")?;
+        if instrument_id.trim().is_empty() || musical_function.trim().is_empty() {
+            return Err(format!("timeline segment {id} has empty instrument or musical function"));
+        }
+        let start = EditBeat::parse(segment.get("start").ok_or("timeline segment start missing")?,
+            "numerator","denominator","timeline.start")?;
+        let end = EditBeat::parse(segment.get("end").ok_or("timeline segment end missing")?,
+            "numerator","denominator","timeline.end")?;
+        if start.cmp(end) != std::cmp::Ordering::Less || end.cmp(score_end) == std::cmp::Ordering::Greater {
+            return Err(format!("timeline segment {id} is empty or outside candidate Score duration"));
+        }
+        let handoff = match segment.get("handoff").ok_or("timeline segment handoff field missing")? {
+            Value::Null => None,
+            value => {
+                require_exact_fields(value, &["from_segment_id","kind"], "timeline handoff")?;
+                let from = string_field(value, "from_segment_id", "timeline handoff")?.to_owned();
+                let kind = string_field(value, "kind", "timeline handoff")?.to_owned();
+                if !["reattack","after_rest"].contains(&kind.as_str()) {
+                    return Err(format!("timeline segment {id} has unsupported handoff kind {kind}"));
+                }
+                Some((from,kind))
+            }
+        };
+        segments_by_part.entry(part_id).or_default().push((id.clone(),instrument_id,start,end,handoff));
+    }
+    for (part_id, part_segments) in &mut segments_by_part {
+        part_segments.sort_by(|left,right| left.2.cmp(right.2).then_with(|| left.0.cmp(&right.0)));
+        for pair in part_segments.windows(2) {
+            let previous=&pair[0];
+            let current=&pair[1];
+            if previous.3.cmp(current.2)==std::cmp::Ordering::Greater {
+                return Err(format!("PartId {part_id} has overlapping timeline segments {} and {}",previous.0,current.0));
+            }
+            if previous.1 != current.1 && current.4.is_none() {
+                return Err(format!("timeline instrument change {} -> {} is missing an explicit handoff",previous.0,current.0));
+            }
+            if let Some((from,kind))=&current.4 {
+                if from != &previous.0 {
+                    return Err(format!("timeline handoff on {} does not reference the immediately preceding segment",current.0));
+                }
+                let expected=if previous.3.cmp(current.2)==std::cmp::Ordering::Equal {"reattack"} else {"after_rest"};
+                if kind != expected {
+                    return Err(format!("timeline handoff on {} has incorrect timing kind",current.0));
+                }
+            }
+        }
+        if part_segments.first().is_some_and(|segment| segment.4.is_some()) {
+            return Err(format!("first timeline segment for PartId {part_id} cannot contain a handoff"));
+        }
     }
     let mut by_id = BTreeMap::new();
     for segment in segments {
@@ -1369,6 +1471,9 @@ fn verify_midi_bundle(root: &Path, r: &ReceiptV1) -> Result<(), String> {
     verify_timeline_binding_bundle(root, r, &m, &candidate_score)?;
     verify_midi_manifest_matches_candidate_score(&m, &candidate_score)?;
     let encoded = serde_json::to_vec(&m).map_err(|e| format!("manifest serialization failed: {e}"))?;
+    if encoded != bytes {
+        return Err("MIDI manifest is not the exact canonical exporter serialization (unsupported fields/order/whitespace)".into());
+    }
     if domain_sha256(MIDI_MANIFEST_DIGEST_SCHEMA_V1.as_bytes(), &encoded) != r.midi.manifest_sha256 {
         return Err("MIDI manifest digest mismatch".into());
     }
