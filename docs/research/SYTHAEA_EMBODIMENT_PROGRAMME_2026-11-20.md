@@ -149,8 +149,10 @@ Added to symthaea-canvas:
 - reset and transient-clear handling;
 - serialization round-trip and negative-control tests;
 - exports from symthaea-canvas::lib.
+- mycelial_presence.rs: deterministic non-humanoid branch geometry, activity-dependent palette, explicit uncertainty halo, speech-weight core modulation, and SVG rendering through the existing renderer.
+- reduced-motion behavior inherited from the existing SVG renderer, with adapter-level tests.
 
-**Not implemented yet:** a running avatar renderer, runtime event producers, audio-to-viseme inference, VRM loading, live gaze tracking, platform packaging, or benchmark measurements. The contract is the first integration boundary, not a completed digital puppet.
+**Not implemented yet:** a running frontend/session integration, runtime event producers, real audio-to-viseme inference, VRM loading, live gaze tracking, platform packaging, or benchmark measurements. The SVG adapter is a first renderable presence, not a completed conversational puppet.
 
 ## Benchmark programme: Symthaea Embodiment Fidelity Benchmark (SEFB)
 
@@ -234,7 +236,8 @@ Only run this track when the underlying runtime exports a calibrated probability
 - [ ] Add audio timestamps and a viseme adapter; retain a simple fallback if no viseme model is present.
 
 ### P2 — first visible puppet
-- [ ] Render the Mycelial Presence from the existing SVG scene graph.
+- [x] Add a Mycelial Presence SVG scene adapter on the feature branch.
+- [ ] Embed the adapter in a live frontend/session and measure actual event-to-frame latency.
 - [ ] Build a 2D/2.5D face with separate gaze, viseme, and activity channels.
 - [ ] Add captions, static mode, reduced-motion mode, and user choice of embodiment.
 - [ ] Measure latency, frame time, and power on desktop and Pixel 8 Pro.
