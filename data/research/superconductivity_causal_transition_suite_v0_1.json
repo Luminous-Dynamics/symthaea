@@ -1,0 +1,29 @@
+{
+  "contract": "SC-CAUSAL-TRANSITION-BENCHMARK-SUITE-0.1",
+  "suite_id": "superconductivity_causal_state_transition_adversarial_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_causal_transition_v0_1.schema.json",
+  "instances": [
+    {
+      "instance_id": "synthetic_pressure_strain_path_dependence_001",
+      "path": "data/research/superconductivity_causal_transition_fixture_v0_1.json",
+      "role": "path_dependence_and_adaptive_intervention",
+      "expected_properties": [
+        "pressure_then_strain_better_than_strain_then_pressure",
+        "supportive_pressure_observation_unlocks_strain_branch",
+        "pairing_strength_and_phase_coherence_can_move_in_opposite_directions"
+      ]
+    },
+    {
+      "instance_id": "adversarial_destructive_information_vs_specimen_value_001",
+      "path": "data/research/superconductivity_causal_transition_fixture_preserve_v0_1.json",
+      "role": "specimen_preservation_and_stop",
+      "expected_properties": [
+        "destructive_action_is_informative_about_initial_state",
+        "destructive_action_damages_specimen",
+        "exact_policy_stops_and_preserves_specimen"
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic transition-planning benchmark only; not experimental causal evidence or permission to intervene on a specimen."
+}
