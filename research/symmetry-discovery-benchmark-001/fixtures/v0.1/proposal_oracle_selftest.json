@@ -1,0 +1,5744 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001",
+  "benchmark_track": "exact_finite_structural_stabilizer",
+  "split": "discovery",
+  "method": {
+    "name": "exact-manifest-target-smoke-test-not-a-baseline",
+    "version": "0.1.0",
+    "source_revision": "self-test-only",
+    "configuration_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "predictions": [
+    {
+      "case_id": "CASE-3706ff1dd2068255",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-3e981672922b0a09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-70ce2c6f3a560099",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-ed27e7da45dcaf49",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-b7a8a8f3eb88a8f9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-3ee5ab04de5bd141",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-6ca9d41f94de3421",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-a088b4c4c7faaeed",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-4af965da36123679",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-53662050dce4fab1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-0156726fc9b3a8b9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-8ea5b0daeffe0b71",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-2aa55e3ebda79d01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-cdf13e93d9ada3dd",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-c0c70670534e9e99",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-fdacd2595c5ed589",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-32f842bccf470909",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-9ab1e63564ffdca1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-3c0765d53175ca09",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-b1ae764a41fa7fdd",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-bb68009261583791",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-80bfd6cf632c4711",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-55ff44784b66bf01",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-31c2703c5954bb99",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-3e76f47356c009b1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-3af519a35875a979",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-d1613e94dd30a299",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-959d6c23efec43f9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-d4e7cd90f2c79569",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-f702514b554ead99",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.125,
+        "r90": 0.125,
+        "r180": 0.125,
+        "r270": 0.125,
+        "fx": 0.125,
+        "fy": 0.125,
+        "fdiag": 0.125,
+        "fanti": 0.125
+      }
+    },
+    {
+      "case_id": "CASE-ce47529f7171e94d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-0f6f0033f4fbcbbd",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8a45e4d584935261",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-53827f37d19008ad",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-aec052379d74162d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-bd4cb9b751a7389d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2410031b9bf3a2fd",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-78dcf7ba2f5b6899",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-0fd004df0bca399d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8c60394c65949bbd",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8acf2ad1fb842649",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-0ab70f362b1f1c4d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-585989063455dacd",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-7b5c000436b3bba9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c2f540e863dc0c1d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2311ec0d12dbf41d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-50b89775ff458925",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-4cad49d5a351fc65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2961763c9912d619",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-3e759cddc3dd23b5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c3a14293fb9fa01d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b86a24197bdfcb65",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-517b30f6c53295b1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-740ec6ccfddacc45",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-4c4e984b2e06aac5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6c0832dd3b3ba581",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f9f4cb037dbac775",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-59d2d9f43c15cef1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-907f0669d485627d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-88b4533acccf90a9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0.25,
+        "r180": 0.25,
+        "r270": 0.25,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c1f8ee2fdda2cd9f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-74bf9a4c51757407",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-034250cd3ed1ae31",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8488f18066e9c47d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5f233b631dae7b59",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b6d4660835c0f6a9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2e46fe532f4ab171",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-ee40bbdce375b693",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c3223ec160f9be9d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8864ab853bd36ee5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6560eaf273da64e7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f6955e76719fd45d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-fb222096160fcbe5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-fab4d9fe6daeab11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-e08a44a7e7fd46c7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-bb6f60a654436adb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8ef54caf1da01fe9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-3348adb25ed58d9b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f139a4731515fa9b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b78ea4b47ad64e13",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c462f458f712e7a1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2ed02f77403c233b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c4ed1c821385c1df",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9f26c4d8ff2e0c4d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9c7088330b3f843b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-40b56ea9f2e01b27",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-467cb59827a026db",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-fb118849bcf8b451",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b058b99f24a476a3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6e5d0891d2a6630d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0.5,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-abaea1a1d1834a1c",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-84816b661ae96f68",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c68bc41daa484da8",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-4fc7376caf742580",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-418d83f7f63100f6",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8ce59e060c20fb50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b9403d0efb17a882",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c31d8d2c38376cb0",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2c47af2547954572",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-0c6fefb3179f0d64",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-fcbbe293eca300b0",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-47f9d88bdf324f68",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b4fcc6e3bc09c1fe",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-ba0aaa74923865b4",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b5cf0775ee1cc1e4",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-ae7a491551932b2e",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-35f84211e1af118c",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-3032719395af560c",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-824e7c93caae6de8",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5aafc24efa9a9af2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2fa8f74ef6fb5f42",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8159698993dd3e2c",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-21c5ce47154bd6fa",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-d20e784f1d4b8a18",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6ce3c402d8e83c10",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-7f14c8acb38214c6",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5c102a69905da03a",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-57149db9dcdced64",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-289c1d0453bd1f50",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-30f54a3850dcc122",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fx"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0.5,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2d151c02c11ed27e",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9e6c25932859a4aa",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f5fb2e0536264f4e",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-60f6933e2493cb92",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-815fe463cbac4e66",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-21dc30204da2d9e2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6c4b766772e72838",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-02c6e093f1d7ea10",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6269821737214ee2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-097c2e08d1bc2ea2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-de064a7a62a6ed02",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-fd12adfcdb87dd16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-e87658e72294d822",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f65b944d605aa872",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-87426eca83727d62",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-0ceba52a8233c8fa",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-bd13b6f30aedebce",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-256e12aa0b011c34",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5734a2783c75ccf2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-ff96c15e41d9dde2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-4e1db9e8a8c126e4",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-187e52f97c985356",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-237acdda2097dcae",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-d49698e8567dc68a",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c5ab50cb9424ecb6",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-72642e7f7e6ae46c",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-322d336cc44c0de2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6834c34ed2ef97fe",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-bcf5ad828639c0ec",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5370fc5e18e737a6",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0.5,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-562083b9611bd237",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-29e8955fd0c0ebd1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-daccfc0eb243467d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-e3a0b4f25b9fba97",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9c120f0bba9460dd",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-0d15276d52fe9bdb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-bf0e3741387d74c9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-1fa2974da8411707",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-239e55c5463c8913",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-8e07d7031a41811f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-379b5eb979faf29f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-666fdd1407e64345",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-0d509703bcbf113d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-91c6fee69b55aaab",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-23c69f952d55f7d1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c1743d9a80ff5fa1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2575ea09a0664881",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c7ae2444e2509993",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-98611c6189dbbf11",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-72e50ae905a56233",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-ff948a4be51a996d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-afc8b9d89e1f6fd9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-20064c14359acba7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b7e11c6fe57142df",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5cb92ba427b65d29",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-d2beb8b782ccaaad",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-144589ce4a522b29",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-25981aaceafd8e8d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-a131a84cfd5dd585",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6224dcde4430bf69",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fdiag"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.5,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-1294052267891811",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-a11edb05f58f504f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-6dde2335f66b9adf",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-c1c50e7dace2263d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-6f8ccbe9adb0724f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-574acc932d748963",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-589e497e37ed6ccf",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-9d65c4efa5fd35cb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-f74029e1fad2c727",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-d612f8051ffe1137",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-3a064b648b526635",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-a716d38536af61a5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-9621cb5cac495fe9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-559735f186eea41f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-12d2bd48fd665865",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-2c4eeeb30a724373",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-f23dcaa7d2eed2ff",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-12522f5c96d021c1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-94a9eab15e828ea9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-767f0e936906e895",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-80b6104310b59ef3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-16936c21fa2391e1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-b22f95d9e92ebf37",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-a3c5a2cbbc8ffeeb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-69343eebd950a4a3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-760cae68da7dabb3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-4ef96977db00d4a1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-1ace7583872c9d8b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-f16a08158be16625",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-f66a7c7fbdc9f137",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.5,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0.5
+      }
+    },
+    {
+      "case_id": "CASE-7f175554721834eb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f6caced75cfb045d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-696ffbeaab3ef063",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-1e47d529e1186461",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9f986962abe47073",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-e86b554b71f54cb7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6a8e1eea5d815381",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-4c10354033e7c387",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-72f8df76f9457145",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-75cdaee4d7c83aed",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-79f0dee5db91a671",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-a882d2fabc3225a1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-cd2ae02802fb7a07",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-06410b6f8b3fd35f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-e17b3e66101b971b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f7b3477f425bf7bb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-33872df566f75bf3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9c3dafdd975cb16b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2411c220a1f77fe9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6ebcf2a85b8f94a7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-3252baffbd9d5849",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-a77147740e2aae8f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-90c5db1f9cac48ff",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-7f46082ef83b5f81",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-b9d09337dfd3c2b1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-1f3f57047e31b563",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-7dbf61d689272423",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-00c289819fb4e771",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-bf4fe7d18d19d60b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6bec28ec549c817f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fx",
+        "fy"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0.25,
+        "fy": 0.25,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-826d34259e898fff",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-69a78bd6c06807e1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-6b86ed06084a293d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-6fc698b3824be4e1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-fb28671d505f56fb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-96d37a7c639da2b9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-2b74ba0331359383",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-0b7a05098f50b337",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-fce9bb041b9ae4ed",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-b1bf18f9a4ebf9b7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-a1c26a82546e29eb",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-d25bea75f1a25cf3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-0d3978a58129f047",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-daab5ccfa0228621",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-a0adcb2d0060b63b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-20e2fb08fcd43d83",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-678f34f266b96457",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-cea8405a0872faf9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-3b26e9be624f26d3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-3e1d2c9beb328057",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-77df92bf142e97ff",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-dfdbb17c648c7b4b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-499e709ce553dbb5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-6ed25366c9be8c9f",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-c2ebf538dcaf51ef",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-322a961b3233ce4b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-ab3dd488a1d18bb5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-a3ad9dfa18bdeb53",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-f07207b96c655df3",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-2cc95b1f0d13c517",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e",
+        "r180",
+        "fdiag",
+        "fanti"
+      ],
+      "group_distribution": {
+        "e": 0.25,
+        "r90": 0,
+        "r180": 0.25,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0.25,
+        "fanti": 0.25
+      }
+    },
+    {
+      "case_id": "CASE-8c626682113fd9db",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f2996e5a5a72362b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-a5d6d1f629be3d28",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-ff95000c92e7b49e",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-aed269374d0890d9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-65dfd597c71f6860",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-2290bfb13a2fa926",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6b4213177d11f4f0",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-6a6b3ed26a16f5a7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-ff224215ae3688d1",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-635b1e4cbc6f5823",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-988fb990d2ad0c16",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-f7ca1a5eae2ce67c",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5a56f6964f542ad8",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-380a55c409a068ef",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-99743fe4f0c36c69",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-c4015d18936c5528",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-5efe8bc5bf9ec4e9",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-06febc091629b0b5",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9d18b75574ac9805",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-3d4aefe5a99c52e2",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-cfbc3866981c4299",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-287f34ba10bee035",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-333419ba17639d54",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9d15037234bc4b6b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-4f859aa2834df12d",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9c5390d123fa68f7",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-bf093dc63c13ecaa",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-9a165471a4923072",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    },
+    {
+      "case_id": "CASE-aaa707611e3d708b",
+      "disposition": "predicted",
+      "proposed_elements": [
+        "e"
+      ],
+      "group_distribution": {
+        "e": 1,
+        "r90": 0,
+        "r180": 0,
+        "r270": 0,
+        "fx": 0,
+        "fy": 0,
+        "fdiag": 0,
+        "fanti": 0
+      }
+    }
+  ]
+}

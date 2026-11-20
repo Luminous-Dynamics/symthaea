@@ -1,0 +1,126 @@
+name: Symmetry discovery benchmark fixture validation
+
+on:
+  push:
+    branches: [research/symm-qualification-benchmark-v0-1]
+    paths:
+      - "research/symmetry-discovery-benchmark-001/**"
+      - ".github/workflows/symmetry-discovery-benchmark-fixtures.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/symmetry-discovery-benchmark-001/**"
+      - ".github/workflows/symmetry-discovery-benchmark-fixtures.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symmetry-discovery-benchmark-fixtures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-fixtures:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Validate Draft 2020-12 schema and manifest
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("research/symmetry-discovery-benchmark-001")
+          schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
+          scorecard_schema = json.loads((root / "schemas/run_scorecard.schema.json").read_text())
+          proposal_schema = json.loads((root / "schemas/proposal_submission.schema.json").read_text())
+          public_schema = json.loads((root / "schemas/public_inputs.schema.json").read_text())
+          symfp_schema = json.loads((root / "schemas/symfp_nonidentifiability.schema.json").read_text())
+          symfp_cases = json.loads((root / "fixtures/v0.1/symfp_nonidentifiability_cases.json").read_text())
+          manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
+          proposal_smoke = json.loads((root / "fixtures/v0.1/proposal_oracle_selftest.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(manifest)
+          Draft202012Validator.check_schema(scorecard_schema)
+          Draft202012Validator.check_schema(proposal_schema)
+          Draft202012Validator.check_schema(public_schema)
+          Draft202012Validator(proposal_schema).validate(proposal_smoke)
+          Draft202012Validator.check_schema(symfp_schema)
+          Draft202012Validator(symfp_schema).validate(symfp_cases)
+          expected_symfp = {
+              "SYMFP-C2-ZERO-LEAKAGE-CS-001": ("C2", "Cs", [1,1,3,3,5,5,7,7,9,9], [1,2,3,4,5,6,7,8,9,10]),
+              "SYMFP-TH-ZERO-LEAKAGE-D6H-001": ("Th", "D6h", [1,0,0,0,1,0,2,0,1,0], [1,0,1,0,1,0,2,0,2,0]),
+          }
+          actual_symfp = {case["case_id"]: case for case in symfp_cases["cases"]}
+          assert set(actual_symfp) == set(expected_symfp)
+          for case_id, (actual_group, target_group, ranks, target_dims) in expected_symfp.items():
+              case = actual_symfp[case_id]
+              assert case["actual_point_group"] == actual_group
+              assert case["leakage_target_group"] == target_group
+              assert case["actual_representation_rank_sequence"] == ranks
+              assert case["target_fixed_subspace_dimension_sequence"] == target_dims
+              assert all(rank <= dimension for rank, dimension in zip(ranks, target_dims))
+              assert case["expected_pooled_leakage_score"] == 0
+              assert case["expected_p_ls"] == 10
+              assert case["expected_full_rank_template_match"] == [actual_group]
+              assert case["target_group_is_actual"] is False
+              assert case["must_not_infer_target_group_from_zero_leakage"] is True
+          print("SY MFP_ZERO_LEAKAGE_NONIDENTIFIABILITY_PASS: C2/Cs and Th/D6h".replace(" ", ""))
+          for split in ("discovery", "calibration", "final_holdout"):
+              public_case_file = root / "fixtures" / "v0.1" / "public_inputs" / f"{split}.json"
+              public_cases = json.loads(public_case_file.read_text())
+              Draft202012Validator(public_schema).validate(public_cases)
+          PY
+      - name: Validate exact group axioms, point stabilizers and polynomial invariance
+        run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
+      - name: Self-test auditable benchmark scorecard validator
+        run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_scorecard.py --self-test
+      - name: Verify label-free public input exports
+        run: python3 -I research/symmetry-discovery-benchmark-001/tools/export_public_inputs.py --check
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format independent Rust ground-truth oracle
+        run: cargo fmt --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --all -- --check
+      - name: Run independent Rust exact oracle
+        run: cargo test --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml
+      - name: Strict Clippy for exact oracle
+        run: cargo clippy --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --all-targets -- -D warnings
+      - name: Execute complete-split proposal audit smoke test (not a baseline)
+        run: |
+          cargo run --locked --manifest-path research/symmetry-discovery-benchmark-001/oracle/Cargo.toml --bin audit-proposals -- research/symmetry-discovery-benchmark-001/fixtures/v0.1/proposal_oracle_selftest.json > /tmp/symm-proposal-audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/symm-proposal-audit.json").read_text())
+          expected = {
+              "cases_in_scope": 300,
+              "predicted": 300,
+              "abstained": 0,
+              "exact_subgroup_matches": 300,
+              "false_promotions": 0,
+              "missed_symmetries": 0,
+              "invalid_group_proposals": 0,
+              "distribution_cases": 300,
+              "mean_target_subgroup_probability_mass": 1.0,
+              "mean_outside_subgroup_probability_mass": 0.0,
+              "mean_group_distribution_entropy_nats": 0.970406052783923,
+              "mean_wasserstein_1_d4_word_metric": 0.0,
+          }
+          if report["summary"] != expected:
+              raise SystemExit(f"proposal adapter smoke mismatch: {report['summary']!r}")
+          if len(report["cases"]) != 300:
+              raise SystemExit("proposal adapter omitted a frozen case")
+          print("SYMM_Q_PROPOSAL_ADAPTER_SMOKE_PASS: 300 cases; not a learner baseline")
+          PY

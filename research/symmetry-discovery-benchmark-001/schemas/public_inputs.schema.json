@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/public_inputs.schema.json",
+  "title": "Label-free symmetry benchmark public inputs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "benchmark_track",
+    "split",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001"
+    },
+    "benchmark_track": {
+      "const": "exact_finite_structural_stabilizer"
+    },
+    "split": {
+      "enum": [
+        "discovery",
+        "calibration",
+        "final_holdout"
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "split",
+          "track",
+          "geometry"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^CASE-[0-9a-f]{16}$"
+          },
+          "split": {
+            "enum": [
+              "discovery",
+              "calibration",
+              "final_holdout"
+            ]
+          },
+          "track": {
+            "const": "exact_finite_structural_stabilizer"
+          },
+          "geometry": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dimension",
+              "points",
+              "point_order_semantics"
+            ],
+            "properties": {
+              "dimension": {
+                "const": 2
+              },
+              "points": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "point_order_semantics": {
+                "const": "unordered set"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "SYMFP-RANK-COMPATIBILITY-NONIDENTIFIABILITY-001",
+  "source": {
+    "title": "Spectral symmetry fingerprints in equivariant representations",
+    "arxiv_id": "2611.07410",
+    "version": "v1",
+    "submitted": "2026-11-05",
+    "location": "Leakage-score discussion, page 21 of the current preprint",
+    "url": "https://arxiv.org/abs/2611.07410"
+  },
+  "degree_window": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "regularization": {
+    "epsilon_norm": 1e-10,
+    "epsilon_log": 1e-10,
+    "expected_p_ls_when_exact_zero_leakage": 10
+  },
+  "semantics": {
+    "spectral_leakage": "compatibility with target fixed-subspace rank constraints",
+    "rank_template_match": "best fit of the complete degree-wise rank sequence to the candidate template family",
+    "exact_group_truth": "ground-truth structural point group for the source example",
+    "authority": "neither zero leakage nor rank-template match is a physical action certificate"
+  },
+  "cases": [
+    {
+      "case_id": "SYMFP-C2-ZERO-LEAKAGE-CS-001",
+      "source_reported": true,
+      "actual_point_group": "C2",
+      "leakage_target_group": "Cs",
+      "actual_representation_rank_sequence": [
+        1,
+        1,
+        3,
+        3,
+        5,
+        5,
+        7,
+        7,
+        9,
+        9
+      ],
+      "target_fixed_subspace_dimension_sequence": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "expected_pooled_leakage_score": 0,
+      "expected_p_ls": 10,
+      "expected_full_rank_template_match": [
+        "C2"
+      ],
+      "target_group_is_actual": false,
+      "must_not_infer_target_group_from_zero_leakage": true
+    },
+    {
+      "case_id": "SYMFP-TH-ZERO-LEAKAGE-D6H-001",
+      "source_reported": true,
+      "actual_point_group": "Th",
+      "leakage_target_group": "D6h",
+      "actual_representation_rank_sequence": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        2,
+        0,
+        1,
+        0
+      ],
+      "target_fixed_subspace_dimension_sequence": [
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        2,
+        0,
+        2,
+        0
+      ],
+      "expected_pooled_leakage_score": 0,
+      "expected_p_ls": 10,
+      "expected_full_rank_template_match": [
+        "Th"
+      ],
+      "target_group_is_actual": false,
+      "must_not_infer_target_group_from_zero_leakage": true
+    }
+  ],
+  "benchmark_rule": {
+    "count_false_target_promotion": "If a method reports the leakage target as the discovered exact group when expected_full_rank_template_match is different, count one false exact promotion.",
+    "retain_distinct_metrics": [
+      "pooled leakage and pLS",
+      "rank-template match and ties",
+      "exact action/stabilizer verification"
+    ],
+    "no_pruning_from_spectral_score": true
+  },
+  "claim_boundary": "These are literature-reported spectral-rank counterexamples encoded as test vectors. They are not new measurements or independent experimental reproductions."
+}
