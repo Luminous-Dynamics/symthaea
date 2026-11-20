@@ -460,12 +460,16 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         let profile_min = finite_temps.iter().copied().reduce(f64::min);
         let profile_max = finite_temps.iter().copied().reduce(f64::max);
         let category = sample.category.as_deref();
-        let endpoint = category.and_then(category_label);
         let status = cohort_status(
             sample.has_physical_failure,
             sample.quality_score,
             category,
         );
+        let endpoint = if status == CohortStatus::Analyzable {
+            category.and_then(category_label)
+        } else {
+            None
+        };
         let phases = row.get("outcome").and_then(|o| o.get("phases"))
             .cloned().unwrap_or_else(|| json!([]));
         json!({
