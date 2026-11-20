@@ -40,12 +40,12 @@
   ],
   "candidates": [
     "source_FNO",
-    "grid_matched_CNN",
-    "mesh_aware_neural_operator",
-    "graph_or_finite_volume_operator",
+    "LINN_theory_informed_spatiotemporal_kernel",
+    "TCNN_time_embedded_CNN",
     "SNB_nonlocal_transport",
     "applicable_local_transport_baseline",
-    "trusted_operator_with_neural_preconditioner"
+    "mesh_aware_or_graph_finite_volume_neural_operator",
+    "trusted_implicit_solver_with_neural_initial_guess"
   ],
   "metrics": [
     "heat_flux_divergence_MAE_RMSE_relative_L2",
@@ -79,5 +79,26 @@
     "implicit_solver_replication": false,
     "SOTA_superiority": false,
     "facility_validation": false
-  }
+  },
+  "required_prior_art": [
+    {
+      "id": "PRX_FNO_2026",
+      "doi": "10.1103/9l4n-mnz6",
+      "task": "ICF_nonlocal_heat_flux_operator",
+      "status": "primary_source"
+    },
+    {
+      "id": "LINN_2025",
+      "doi": "10.1103/m215-3f6c",
+      "task": "PIC_trained_nonlocal_spatiotemporal_kernel",
+      "status": "required_prior_art_separate_source_reproduction"
+    },
+    {
+      "id": "TCNN_2026",
+      "doi": "10.1103/xx8k-xw91",
+      "task": "time_embedded_CNN_coupled_normalized_heat_flux_and_nonlocality",
+      "status": "required_prior_art_separate_source_reproduction"
+    }
+  ],
+  "comparability_rule": "published_metrics_are_not_head_to_head_comparable_until_PIC_reference_profile_collisionality_equation_solver_split_and_resolution_are_matched"
 }
