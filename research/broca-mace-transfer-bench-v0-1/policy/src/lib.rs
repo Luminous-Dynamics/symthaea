@@ -471,6 +471,7 @@ pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
         && (0.0..=1.0).contains(&item.measurement_error_bound)
+        && item.causal_identification.qualifies_for_transfer()
         && item.intervention
         && item.prediction_pre_registered
         && item.outcome_reconciled
