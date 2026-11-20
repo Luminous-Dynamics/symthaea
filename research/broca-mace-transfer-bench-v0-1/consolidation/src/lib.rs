@@ -602,7 +602,8 @@ impl ConsolidationPolicyV1 {
 mod tests {
     use super::*;
     use broca_mace_ingress::{
-        Action, AsKnownQuery, ConsolidationEvidenceSummaryV1, SourceTrustStatus,
+        Action, AsKnownQuery, ConsolidationEvidenceSummaryV1, EvidenceReceiptBundle,
+        SourceTrustStatus,
     };
     use broca_mace_policy::{Objective, Regime, Scope};
 
@@ -634,6 +635,53 @@ mod tests {
         }
     }
 
+    fn source_binding_fixture(
+        identification: CausalIdentificationV1,
+    ) -> ConsolidationSourceBindingV1 {
+        let digest = "a".repeat(64);
+        ConsolidationSourceBindingV1 {
+            event_id: 1,
+            action: Action::A,
+            scope: Scope {
+                regime: Regime::Baseline,
+                objective: Objective::Quality,
+            },
+            measurement_error_bound_bits: 0.02_f64.to_bits(),
+            receipts: EvidenceReceiptBundle {
+                raw_event_digest: digest.clone(),
+                raw_event_receipt_digest: digest.clone(),
+                session_id: "session-a".into(),
+                task_id: "task-a".into(),
+                canonical_event_hash: digest.clone(),
+                authority_receipt_digest: digest.clone(),
+                event_occurred_at_ms: 100,
+                authority_received_at_ms: 200,
+                lineage_digest: digest.clone(),
+                source_family: 1,
+                source_root_id: 1,
+                source_root_digest: broca_mace_policy::SourceRootDigest::from_bytes([1; 32]),
+                source_acquisition_mode: "fixture".into(),
+                upstream_source_id: "upstream-1".into(),
+                source_artifact_digest: digest.clone(),
+                transformation_digest: digest.clone(),
+                source_issuer_id: "issuer-1".into(),
+                source_trust_status: SourceTrustStatus::TrustedForScope,
+                source_trust_policy_digest: digest.clone(),
+                calibration_digest: digest.clone(),
+                measurement_unit: "normalized_utility".into(),
+                measurement_instrument_id: "instrument-1".into(),
+                calibration_method_id: "method-1".into(),
+                calibration_revision: "cal-r1".into(),
+                causal_assessment_digest: digest.clone(),
+                causal_identification: identification,
+                outcome_success: true,
+                outcome_observed_utility_bits: 0.9_f64.to_bits(),
+                outcome_utility_unit: "normalized_utility".into(),
+                outcome_digest: digest,
+            },
+        }
+    }
+
     #[test]
     fn canonical_source_binding_covers_every_causal_identification_field() {
         let mut bytes_a = [0_u8; 32];
@@ -651,9 +699,10 @@ mod tests {
             50_000,
             true,
         );
+        let base_binding = source_binding_fixture(base);
         let base_digest = digest_fields(
-            b"mycelix:mace:causal-identification:v1\0",
-            &causal_identification_fields(base),
+            b"mycelix:mace:source-binding-test:v1\\0",
+            &binding_fields(&base_binding),
         );
         let variants = [
             CausalIdentificationV1::new(
@@ -722,9 +771,11 @@ mod tests {
         ];
 
         for variant in variants {
+            let mut binding = base_binding.clone();
+            binding.receipts.causal_identification = variant;
             let digest = digest_fields(
-                b"mycelix:mace:causal-identification:v1\0",
-                &causal_identification_fields(variant),
+                b"mycelix:mace:source-binding-test:v1\\0",
+                &binding_fields(&binding),
             );
             assert_ne!(digest, base_digest);
         }
