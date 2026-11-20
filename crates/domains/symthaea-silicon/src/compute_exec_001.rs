@@ -161,6 +161,8 @@ pub struct HdcCompletion {
     pub device_id: String,
     pub device_epoch: String,
     pub sequence: String,
+    pub operation_id: String,
+    pub implementation_sha256: String,
     pub status: String,
     pub error_code: Option<String>,
     pub error_detail: Option<String>,
@@ -483,6 +485,18 @@ impl ExecutionLedger {
             return Err(ValidationError::new(
                 "IMPLEMENTATION_PROFILE_CHANGED",
                 "device implementation identity changed while a command was in flight",
+            ));
+        }
+        if completion.implementation_sha256 != pending.implementation_sha256 {
+            return Err(ValidationError::new(
+                "COMPLETION_IMPLEMENTATION_MISMATCH",
+                "completion implementation digest differs from the submitted command",
+            ));
+        }
+        if completion.operation_id != pending.operation_id {
+            return Err(ValidationError::new(
+                "COMPLETION_OPERATION_MISMATCH",
+                "completion operation differs from the submitted semantic operation",
             ));
         }
 
@@ -1077,6 +1091,16 @@ fn validate_completion_envelope(completion: &HdcCompletion) -> ValidationResult<
     }
     validate_epoch(&completion.device_epoch)?;
     parse_decimal_u64(&completion.sequence, false, "completion.sequence")?;
+    validate_sha256(&completion.implementation_sha256, "completion.implementation_sha256")?;
+    if !matches!(
+        completion.operation_id.as_str(),
+        "hdc.bind_xor.exact.v1" | "hdc.hamming.exact.v1" | "hdc.top1.exact.v1"
+    ) {
+        return Err(ValidationError::new(
+            "UNKNOWN_COMPLETION_OPERATION",
+            "completion operation is not admitted by protocol v0.1",
+        ));
+    }
     if completion.command_id.is_empty() || completion.device_id.is_empty() {
         return Err(ValidationError::new(
             "INVALID_COMPLETION_IDENTITY",
@@ -1509,6 +1533,28 @@ mod tests {
             .accept_completion(&completion, &capabilities, &mut registry)
             .unwrap_err();
         assert_eq!(error.code, "STALE_OR_FOREIGN_COMPLETION");
+    }
+
+    #[test]
+    fn completion_must_echo_operation_and_implementation_identity() {
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        completion.implementation_sha256 = "a".repeat(64);
+        let error = ledger
+            .accept_completion(&completion, &capabilities, &mut registry)
+            .unwrap_err();
+        assert_eq!(error.code, "COMPLETION_IMPLEMENTATION_MISMATCH");
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::DeviceOwned { .. })
+        ));
+
+        completion.implementation_sha256 = command.implementation_sha256.clone();
+        completion.operation_id = "hdc.hamming.exact.v1".into();
+        let error = ledger
+            .accept_completion(&completion, &capabilities, &mut registry)
+            .unwrap_err();
+        assert_eq!(error.code, "COMPLETION_OPERATION_MISMATCH");
     }
 
     #[test]
