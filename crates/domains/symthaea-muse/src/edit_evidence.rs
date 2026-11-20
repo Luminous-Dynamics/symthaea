@@ -1,0 +1,633 @@
+//! Deterministic symbolic scoring for MUSE paired edit evidence v1.
+//! The first implementation supports only explicit one-to-one velocity edits.
+//! Unsupported operations and correspondence relations fail closed.
+
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
+use std::time::Instant;
+use symthaea_music_theory::{
+    pitch::{Pitch, PitchClass},
+    rhythm::Duration,
+    score::{Emphasis, PartId, Score, ScoreNote, VoiceRole},
+    harmony::Key,
+};
+
+const CASE_SCHEMA: &str = "muse-edit-evidence-case-v1";
+const RESULT_SCHEMA: &str = "muse-edit-evidence-result-v1";
+const RESULT_DIGEST_DOMAIN: &[u8] = b"luminous-dynamics-muse-edit-evidence-result-v1";
+
+#[derive(Clone, Copy)]
+struct Scope {
+    part: u16,
+    start_num: i64,
+    start_den: i64,
+    end_num: i64,
+    end_den: i64,
+}
+
+fn sha256(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn score_sha256(score: &Score) -> Result<String, String> {
+    let bytes = serde_json::to_vec(score)
+        .map_err(|error| format!("could not serialize typed Score: {error}"))?;
+    Ok(sha256(&bytes))
+}
+
+fn required<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a Value, String> {
+    value.get(key).ok_or_else(|| format!("{label} is missing {key}"))
+}
+
+fn string_field(value: &Value, key: &str, label: &str) -> Result<String, String> {
+    required(value, key, label)?
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| format!("{label}.{key} must be a string"))
+}
+
+fn integer_field(value: &Value, key: &str, label: &str) -> Result<i64, String> {
+    required(value, key, label)?
+        .as_i64()
+        .ok_or_else(|| format!("{label}.{key} must be an integer"))
+}
+
+fn optional_hash(value: &Value, key: &str, label: &str) -> Result<Option<String>, String> {
+    match required(value, key, label)? {
+        Value::Null => Ok(None),
+        Value::String(hash) if is_sha256(hash) => Ok(Some(hash.clone())),
+        _ => Err(format!("{label}.{key} must be null or a lowercase SHA-256 digest")),
+    }
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn cmp_fraction(a_num: i64, a_den: i64, b_num: i64, b_den: i64) -> Ordering {
+    (a_num as i128 * b_den as i128).cmp(&(b_num as i128 * a_den as i128))
+}
+
+fn parse_scopes(value: &Value, label: &str) -> Result<Vec<Scope>, String> {
+    let entries = value.as_array().ok_or_else(|| format!("{label} must be an array"))?;
+    let mut scopes = Vec::with_capacity(entries.len());
+    for (index, entry) in entries.iter().enumerate() {
+        let item = format!("{label}[{index}]");
+        let part = integer_field(entry, "part_id", &item)?;
+        let start = required(entry, "start", &item)?;
+        let end = required(entry, "end", &item)?;
+        let start_num = integer_field(start, "numerator", "scope.start")?;
+        let start_den = integer_field(start, "denominator", "scope.start")?;
+        let end_num = integer_field(end, "numerator", "scope.end")?;
+        let end_den = integer_field(end, "denominator", "scope.end")?;
+        if !(0..=65534).contains(&part) || start_num < 0 || end_num < 0
+            || start_den <= 0 || end_den <= 0
+        {
+            return Err(format!("{item} has an invalid part or rational time"));
+        }
+        if cmp_fraction(start_num, start_den, end_num, end_den) != Ordering::Less {
+            return Err(format!("{item} must have start < end"));
+        }
+        scopes.push(Scope {
+            part: part as u16,
+            start_num,
+            start_den,
+            end_num,
+            end_den,
+        });
+    }
+    Ok(scopes)
+}
+
+fn scope_contains(scope: Scope, note: &ScoreNote) -> bool {
+    note.part.0 == scope.part
+        && cmp_fraction(scope.start_num, scope.start_den, note.onset.num(), note.onset.den())
+            != Ordering::Greater
+        && cmp_fraction(note.onset.num(), note.onset.den(), scope.end_num, scope.end_den)
+            == Ordering::Less
+}
+
+fn in_scopes(scopes: &[Scope], note: &ScoreNote) -> bool {
+    scopes.iter().copied().any(|scope| scope_contains(scope, note))
+}
+
+fn scopes_overlap(a: Scope, b: Scope) -> bool {
+    a.part == b.part
+        && cmp_fraction(a.start_num, a.start_den, b.end_num, b.end_den) == Ordering::Less
+        && cmp_fraction(b.start_num, b.start_den, a.end_num, a.end_den) == Ordering::Less
+}
+
+fn non_velocity_equal(a: &ScoreNote, b: &ScoreNote) -> bool {
+    a.part == b.part
+        && a.pitch == b.pitch
+        && a.onset == b.onset
+        && a.duration == b.duration
+        && a.role == b.role
+        && a.emphasis == b.emphasis
+        && a.section_intensity.to_bits() == b.section_intensity.to_bits()
+}
+
+fn exact_equal(a: &ScoreNote, b: &ScoreNote) -> bool {
+    non_velocity_equal(a, b) && a.velocity.to_bits() == b.velocity.to_bits()
+}
+
+fn score_metadata_equal(a: &Score, b: &Score) -> bool {
+    a.key == b.key
+        && a.tempo_bpm.to_bits() == b.tempo_bpm.to_bits()
+        && a.meter == b.meter
+        && a.total_beats == b.total_beats
+}
+
+fn metric(id: &str, numerator: usize, denominator: usize, threshold: f64, lower: bool) -> Value {
+    let score = (denominator != 0).then_some(numerator as f64 / denominator as f64);
+    let passed = score.map(|actual| {
+        if lower { actual <= threshold } else { actual >= threshold }
+    }).unwrap_or(true);
+    json!({
+        "metric_id": id,
+        "numerator": numerator,
+        "denominator": denominator,
+        "score": score,
+        "threshold": threshold,
+        "passed": passed
+    })
+}
+
+fn unavailable_metric(id: &str) -> Value {
+    json!({
+        "metric_id": id,
+        "numerator": 0,
+        "denominator": 0,
+        "score": null,
+        "threshold": null,
+        "passed": false
+    })
+}
+
+fn seal_digest(result: &Value) -> Result<String, String> {
+    let mut unsealed = result.clone();
+    unsealed["artifacts"]["evaluation_receipt_sha256"] = Value::Null;
+    let bytes = serde_json::to_vec(&unsealed)
+        .map_err(|error| format!("could not serialize result for sealing: {error}"))?;
+    let mut hash = Sha256::new();
+    hash.update(RESULT_DIGEST_DOMAIN);
+    hash.update([0]);
+    hash.update(bytes);
+    Ok(format!("{:x}", hash.finalize()))
+}
+
+/// Recompute the domain-separated evaluation receipt seal.
+pub fn verify_result_seal(result: &Value) -> Result<(), String> {
+    let recorded = result
+        .pointer("/artifacts/evaluation_receipt_sha256")
+        .and_then(Value::as_str)
+        .ok_or("result is missing evaluation receipt digest")?;
+    if !is_sha256(recorded) || recorded != seal_digest(result)? {
+        return Err("evaluation receipt seal is invalid".into());
+    }
+    Ok(())
+}
+
+/// Evaluate a v1 velocity edit. Score bytes must deserialize as a typed
+/// symthaea_music_theory Score. Optional audio is hashed as raw artifact bytes.
+pub fn evaluate_velocity_case(
+    case_bytes: &[u8],
+    source_score_bytes: &[u8],
+    candidate_score_bytes: &[u8],
+    candidate_audio_bytes: Option<&[u8]>,
+) -> Result<Value, String> {
+    let started = Instant::now();
+    let case: Value = serde_json::from_slice(case_bytes)
+        .map_err(|error| format!("invalid case JSON: {error}"))?;
+    if string_field(&case, "schema", "case")? != CASE_SCHEMA {
+        return Err("unsupported case schema".into());
+    }
+    let case_id = string_field(&case, "case_id", "case")?;
+    let instruction = required(&case, "instruction", "case")?;
+    let operation = string_field(instruction, "operation_family", "instruction")?;
+    if operation != "velocity" {
+        return Err(format!("abstain: operation family {operation} is not implemented"));
+    }
+
+    let source: Score = serde_json::from_slice(source_score_bytes)
+        .map_err(|error| format!("invalid source Score JSON: {error}"))?;
+    let candidate: Score = serde_json::from_slice(candidate_score_bytes)
+        .map_err(|error| format!("invalid candidate Score JSON: {error}"))?;
+    let source_digest = score_sha256(&source)?;
+    let candidate_digest = score_sha256(&candidate)?;
+    let source_binding = required(&case, "source", "case")?;
+    let expected_source = optional_hash(source_binding, "score_sha256", "source")?
+        .ok_or("source.score_sha256 is required for symbolic scoring")?;
+    if source_digest != expected_source {
+        return Err(format!("source Score digest mismatch: expected {expected_source}, got {source_digest}"));
+    }
+    if source.notes.is_empty() || source.notes.len() > 100_000 || candidate.notes.len() > 100_000 {
+        return Err("source must contain 1..=100,000 notes and candidate must contain <=100,000".into());
+    }
+
+    let edit = required(&case, "edit_contract", "case")?;
+    let target_scopes = parse_scopes(required(edit, "target_scopes", "edit_contract")?, "target_scopes")?;
+    let protected_scopes = parse_scopes(required(edit, "protected_scopes", "edit_contract")?, "protected_scopes")?;
+    if target_scopes.is_empty() {
+        return Err("velocity edit requires at least one target scope".into());
+    }
+    if target_scopes.iter().any(|a| protected_scopes.iter().copied().any(|b| scopes_overlap(*a, b))) {
+        return Err("target and protected scopes overlap".into());
+    }
+
+    let params = required(edit, "parameters", "edit_contract")?;
+    let scale_num = integer_field(params, "scale_numerator", "parameters")?;
+    let scale_den = integer_field(params, "scale_denominator", "parameters")?;
+    if scale_num <= 0 || scale_den <= 0 || scale_num == scale_den {
+        return Err("velocity scale must be positive and different from 1".into());
+    }
+    let evaluation = required(&case, "evaluation", "case")?;
+    let tolerances = required(evaluation, "tolerances", "evaluation")?;
+    let velocity_tolerance = required(tolerances, "velocity_0_to_127", "tolerances")?
+        .as_u64().filter(|v| *v <= 127)
+        .ok_or("velocity_0_to_127 must be an integer in 0..=127")? as f32 / 127.0;
+    let minimum_coverage = required(tolerances, "minimum_correspondence_coverage", "tolerances")?
+        .as_f64().filter(|v| (0.0..=1.0).contains(v))
+        .ok_or("minimum_correspondence_coverage must be in [0,1]")?;
+
+    let target = required(&case, "target", "case")?;
+    let target_kind = string_field(target, "target_kind", "target")?;
+    if !matches!(target_kind.as_str(), "exact_score_and_audio" | "score_target_audio_variable") {
+        return Err(format!("abstain: target kind {target_kind} is outside symbolic-score evaluation"));
+    }
+
+    // Use only explicit, digest-scoped event correspondence. Never infer event
+    // identity from nearest pitch or onset.
+    let mappings = required(target, "event_correspondence", "target")?
+        .as_array().ok_or("event_correspondence must be an array")?;
+    let mut source_to_target = vec![None; source.notes.len()];
+    let mut target_to_source = vec![None; candidate.notes.len()];
+    for (index, mapping) in mappings.iter().enumerate() {
+        let relation = string_field(mapping, "relation", &format!("mapping[{index}]"))?;
+        if !matches!(relation.as_str(), "preserve" | "modify") {
+            return Err(format!("abstain: correspondence relation {relation} is unsupported"));
+        }
+        let sources = required(mapping, "source_note_ordinals", "mapping")?
+            .as_array().ok_or("source_note_ordinals must be an array")?;
+        let targets = required(mapping, "target_note_ordinals", "mapping")?
+            .as_array().ok_or("target_note_ordinals must be an array")?;
+        if sources.len() != 1 || targets.len() != 1 {
+            return Err("v1 velocity scorer requires one-to-one correspondence".into());
+        }
+        let si = sources[0].as_u64().ok_or("source ordinal must be non-negative")? as usize;
+        let ti = targets[0].as_u64().ok_or("target ordinal must be non-negative")? as usize;
+        if si >= source_to_target.len() || ti >= target_to_source.len() {
+            return Err("event correspondence ordinal is outside its bound Score".into());
+        }
+        if source_to_target[si].replace(ti).is_some() || target_to_source[ti].replace(si).is_some() {
+            return Err("duplicate source or target event correspondence".into());
+        }
+    }
+
+    let mapped_sources = source_to_target.iter().filter(|item| item.is_some()).count();
+    let mapped_targets = target_to_source.iter().filter(|item| item.is_some()).count();
+    let coverage = mapped_sources as f64 / source.notes.len() as f64;
+    let mut target_expected = 0usize;
+    let mut target_correct = 0usize;
+    let mut protected_expected = 0usize;
+    let mut protected_exact = 0usize;
+    let mut outside_expected = 0usize;
+    let mut outside_exact = 0usize;
+    let mut collateral_changes = candidate.notes.len().saturating_sub(mapped_targets);
+    let mut scope_pass = true;
+    let mut edit_pass = true;
+
+    for (si, source_note) in source.notes.iter().enumerate() {
+        let in_target = in_scopes(&target_scopes, source_note);
+        let in_protected = in_scopes(&protected_scopes, source_note);
+        if in_target && in_protected {
+            return Err("source note falls inside both target and protected scopes".into());
+        }
+        if !source_note.part.is_assigned() {
+            scope_pass = false;
+        }
+        let Some(ti) = source_to_target[si] else {
+            if in_target {
+                target_expected += 1;
+            } else {
+                outside_expected += 1;
+                collateral_changes += 1;
+                if in_protected { protected_expected += 1; }
+            }
+            edit_pass = false;
+            continue;
+        };
+        let candidate_note = &candidate.notes[ti];
+        let expected_relation = if in_target { "modify" } else { "preserve" };
+        let declared_relation = mappings.iter().find_map(|mapping| {
+            let ordinals = mapping.get("source_note_ordinals")?.as_array()?;
+            (ordinals.len() == 1 && ordinals[0].as_u64() == Some(si as u64))
+                .then(|| mapping.get("relation")?.as_str()).flatten()
+        });
+        if declared_relation != Some(expected_relation) { scope_pass = false; }
+
+        if in_target {
+            target_expected += 1;
+            let expected_velocity = source_note.velocity * scale_num as f32 / scale_den as f32;
+            let velocity_ok = source_note.velocity.is_finite()
+                && candidate_note.velocity.is_finite()
+                && expected_velocity.is_finite()
+                && (0.0..=1.0).contains(&expected_velocity)
+                && (candidate_note.velocity - expected_velocity).abs() <= velocity_tolerance;
+            if non_velocity_equal(source_note, candidate_note) && velocity_ok {
+                target_correct += 1;
+            } else {
+                edit_pass = false;
+            }
+        } else {
+            outside_expected += 1;
+            let exact = exact_equal(source_note, candidate_note);
+            if exact { outside_exact += 1; } else { collateral_changes += 1; edit_pass = false; }
+            if in_protected {
+                protected_expected += 1;
+                if exact { protected_exact += 1; }
+            }
+        }
+    }
+
+    if !score_metadata_equal(&source, &candidate) {
+        scope_pass = false;
+        edit_pass = false;
+    }
+    if mapped_targets != candidate.notes.len() { edit_pass = false; }
+    if !scope_pass { edit_pass = false; }
+
+    let requested_targets = required(evaluation, "target_metrics", "evaluation")?
+        .as_array().ok_or("target_metrics must be an array")?;
+    let requested_preservation = required(evaluation, "preservation_metrics", "evaluation")?
+        .as_array().ok_or("preservation_metrics must be an array")?;
+    let mut target_metrics = Vec::new();
+    for request in requested_targets {
+        let id = request.as_str().ok_or("target metric IDs must be strings")?;
+        target_metrics.push(match id {
+            "exact_event_accuracy" | "velocity_accuracy" => metric(id, target_correct, target_expected, 1.0, false),
+            _ => unavailable_metric(id),
+        });
+    }
+    if !edit_pass {
+        target_metrics.push(json!({
+            "metric_id": "velocity_edit_contract",
+            "numerator": 0,
+            "denominator": 1,
+            "score": 0.0,
+            "threshold": 1.0,
+            "passed": false
+        }));
+    }
+
+    let expected_score = optional_hash(target, "expected_score_sha256", "target")?;
+    if let Some(expected) = expected_score {
+        let pass = expected == candidate_digest;
+        target_metrics.push(json!({
+            "metric_id": "expected_score_digest_match",
+            "numerator": if pass { 1 } else { 0 },
+            "denominator": 1,
+            "score": if pass { 1.0 } else { 0.0 },
+            "threshold": 1.0,
+            "passed": pass
+        }));
+    }
+
+    let audio_digest = candidate_audio_bytes.map(sha256);
+    let expected_audio = optional_hash(target, "expected_audio_sha256", "target")?;
+    let acceptable_audio = required(target, "acceptable_audio_sha256", "target")?
+        .as_array().ok_or("acceptable_audio_sha256 must be an array")?;
+    if target_kind == "exact_score_and_audio" {
+        let pass = audio_digest.as_deref().map(|hash| {
+            expected_audio.as_deref() == Some(hash)
+                || acceptable_audio.iter().any(|entry| entry.as_str() == Some(hash))
+        }).unwrap_or(false);
+        target_metrics.push(json!({
+            "metric_id": "audio_exact_match",
+            "numerator": if pass { 1 } else { 0 },
+            "denominator": 1,
+            "score": if pass { 1.0 } else { 0.0 },
+            "threshold": 1.0,
+            "passed": pass
+        }));
+    }
+
+    let target_pass = target_metrics.iter()
+        .all(|item| item.get("passed").and_then(Value::as_bool) == Some(true));
+    let mut preservation_metrics = Vec::new();
+    for request in requested_preservation {
+        let id = request.as_str().ok_or("preservation metric IDs must be strings")?;
+        preservation_metrics.push(match id {
+            "protected_event_agreement" => metric(id, protected_exact, protected_expected, 1.0, false),
+            "outside_scope_event_agreement" => metric(id, outside_exact, outside_expected, 1.0, false),
+            "collateral_change_rate" => metric(id, collateral_changes, outside_expected.max(1), 0.0, true),
+            _ => unavailable_metric(id),
+        });
+    }
+    let preservation_pass = preservation_metrics.iter()
+        .all(|item| item.get("passed").and_then(Value::as_bool) == Some(true));
+    let correspondence_required = required(evaluation, "correspondence_required", "evaluation")?
+        .as_bool().ok_or("correspondence_required must be boolean")?;
+    let correspondence_pass = correspondence_required
+        && mapped_sources == source.notes.len()
+        && mapped_targets == candidate.notes.len()
+        && coverage >= minimum_coverage;
+    let human = required(evaluation, "human_evaluation", "evaluation")?;
+    let human_required = required(human, "required", "human_evaluation")?
+        .as_bool().ok_or("human_evaluation.required must be boolean")?;
+
+    let mut result = json!({
+        "schema": RESULT_SCHEMA,
+        "case_id": case_id,
+        "system": {
+            "system_id": "muse-symbolic-velocity-evaluator",
+            "version": "0.1.0",
+            "track": "symbolic_editor",
+            "compute_budget_ms": started.elapsed().as_millis(),
+            "candidate_budget": 1
+        },
+        "artifacts": {
+            "candidate_audio_sha256": audio_digest,
+            "candidate_score_sha256": candidate_digest,
+            "render_receipt_sha256": null,
+            "evaluation_receipt_sha256": null
+        },
+        "integrity": {
+            "verdict": "not_run",
+            "verifier_id": null,
+            "verifier_version": null,
+            "receipt_sha256": null
+        },
+        "target": target_metrics,
+        "preservation": preservation_metrics,
+        "correspondence": {
+            "expected_source_events": source.notes.len(),
+            "mapped_source_events": mapped_sources,
+            "unresolved_source_events": source.notes.len().saturating_sub(mapped_sources),
+            "coverage": coverage,
+            "minimum_coverage_passed": correspondence_pass
+        },
+        "instruction_compatibility": {
+            "verdict": "not_run",
+            "evaluator_id": null,
+            "evaluator_version": null,
+            "receipt_sha256": null
+        },
+        "human_evaluation": {
+            "status": if human_required { "pending" } else { "not_required" },
+            "rater_count": 0,
+            "questions": []
+        },
+        "outcome": {
+            "target_pass": target_pass,
+            "preservation_pass": preservation_pass,
+            "correspondence_pass": correspondence_pass,
+            "integrity_pass": false,
+            "strict_sample_exact_match": false,
+            "human_gate_pass": if human_required { Value::Null } else { Value::Bool(true) },
+            "abstention_reason": "Natural-language instruction compatibility, render integrity and perceptual evaluation are outside this symbolic scorer."
+        }
+    });
+    let seal = seal_digest(&result)?;
+    result["artifacts"]["evaluation_receipt_sha256"] = Value::String(seal);
+    verify_result_seal(&result)?;
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_music_theory::harmony::Key;
+
+    fn note(part: u16, beat: i64, velocity: f32) -> ScoreNote {
+        ScoreNote {
+            part: PartId(part),
+            pitch: Pitch::from_midi(60 + beat as u8),
+            onset: Duration::new(beat, 1),
+            duration: Duration::quarter(),
+            velocity,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        }
+    }
+
+    fn score(candidate: bool) -> Score {
+        let mut value = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        value.push(note(10, 0, if candidate { 0.8 * 8.0 / 9.0 } else { 0.8 }));
+        value.push(note(10, 1, if candidate { 0.7 * 8.0 / 9.0 } else { 0.7 }));
+        value.push(note(20, 0, 0.5));
+        value
+    }
+
+    fn case_for(source: &Score) -> Value {
+        json!({
+            "schema": CASE_SCHEMA,
+            "case_id": "synthetic.velocity.part10.001",
+            "dataset_version": "test",
+            "split": "development",
+            "source_work_id": "work-1",
+            "rights": {"basis": "synthetic_owned", "license_id": "test", "derivative_policy": "private_evaluation"},
+            "source": {
+                "audio": {
+                    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                    "duration_ms": 1000, "sample_rate_hz": 44100, "channels": 2, "encoding": "wav_pcm16"
+                },
+                "score_sha256": score_sha256(source).unwrap(),
+                "stems": []
+            },
+            "instruction": {"text": "Make part 10 softer.", "locale": "en", "operation_family": "velocity", "strength": "moderate"},
+            "edit_contract": {
+                "target_scopes": [{"part_id": 10, "start": {"numerator": 0, "denominator": 1}, "end": {"numerator": 2, "denominator": 1}}],
+                "protected_scopes": [{"part_id": 20, "start": {"numerator": 0, "denominator": 1}, "end": {"numerator": 2, "denominator": 1}}],
+                "parameters": {"scale_numerator": 8, "scale_denominator": 9}
+            },
+            "target": {
+                "target_kind": "score_target_audio_variable",
+                "expected_score_sha256": null, "expected_audio_sha256": null, "acceptable_audio_sha256": [],
+                "event_correspondence": [
+                    {"source_note_ordinals": [0], "target_note_ordinals": [0], "relation": "modify"},
+                    {"source_note_ordinals": [1], "target_note_ordinals": [1], "relation": "modify"},
+                    {"source_note_ordinals": [2], "target_note_ordinals": [2], "relation": "preserve"}
+                ]
+            },
+            "evaluation": {
+                "target_metrics": ["exact_event_accuracy", "velocity_accuracy", "instruction_rubric_pass"],
+                "preservation_metrics": ["protected_event_agreement", "outside_scope_event_agreement", "collateral_change_rate"],
+                "correspondence_required": true,
+                "tolerances": {"onset_ms": 10, "pitch_cents": 25, "velocity_0_to_127": 0, "minimum_correspondence_coverage": 1.0},
+                "human_evaluation": {"required": true, "raters_per_item": 3, "questions": ["edit_perceptibility", "instruction_recognition", "musical_validity"]}
+            }
+        })
+    }
+
+    fn bytes<T: serde::Serialize>(value: &T) -> Vec<u8> {
+        serde_json::to_vec(value).unwrap()
+    }
+
+    #[test]
+    fn velocity_edit_passes_symbolic_gates_but_strict_emr_remains_false() {
+        let source = score(false);
+        let candidate = score(true);
+        let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
+        assert_eq!(result["outcome"]["target_pass"], true);
+        assert_eq!(result["outcome"]["preservation_pass"], true);
+        assert_eq!(result["outcome"]["correspondence_pass"], true);
+        assert_eq!(result["outcome"]["strict_sample_exact_match"], false);
+        assert_eq!(result["instruction_compatibility"]["verdict"], "not_run");
+        assert_eq!(result["integrity"]["verdict"], "not_run");
+        verify_result_seal(&result).unwrap();
+    }
+
+    #[test]
+    fn wrong_velocity_fails_target_gate() {
+        let source = score(false);
+        let mut candidate = score(true);
+        candidate.notes[0].velocity = 0.99;
+        let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
+        assert_eq!(result["outcome"]["target_pass"], false);
+    }
+
+    #[test]
+    fn protected_note_mutation_fails_preservation_gate() {
+        let source = score(false);
+        let mut candidate = score(true);
+        candidate.notes[2].velocity = 0.51;
+        let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
+        assert_eq!(result["outcome"]["preservation_pass"], false);
+    }
+
+    #[test]
+    fn duplicate_correspondence_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["target"]["event_correspondence"][1]["source_note_ordinals"] = json!([0]);
+        let error = evaluate_velocity_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
+        assert!(error.contains("duplicate source"));
+    }
+
+    #[test]
+    fn stale_source_digest_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["source"]["score_sha256"] = json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let error = evaluate_velocity_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
+        assert!(error.contains("source Score digest mismatch"));
+    }
+
+    #[test]
+    fn unsupported_edit_family_abstains() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("harmony");
+        let error = evaluate_velocity_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
+        assert!(error.contains("abstain"));
+    }
+}
