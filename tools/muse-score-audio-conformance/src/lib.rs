@@ -763,6 +763,32 @@ mod tests {
     }
 
     #[test]
+    fn zero_rational_denominator_is_rejected_before_score_arithmetic() {
+        let score = score(60, Duration::quarter());
+        let mut value = serde_json::to_value(&score).unwrap();
+        value["notes"][0]["duration"]["den"] = json!(0);
+        let error = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&value).unwrap(),
+            &wav(&sine(60, 8_000, 16_000), 16_000),
+            &contract(),
+        ).unwrap_err();
+        assert!(error.contains("bounded non-negative rational range"));
+    }
+
+    #[test]
+    fn oversized_rational_numerator_is_rejected_before_score_arithmetic() {
+        let score = score(60, Duration::quarter());
+        let mut value = serde_json::to_value(&score).unwrap();
+        value["notes"][0]["duration"]["num"] = json!(i64::MAX);
+        let error = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&value).unwrap(),
+            &wav(&sine(60, 8_000, 16_000), 16_000),
+            &contract(),
+        ).unwrap_err();
+        assert!(error.contains("bounded non-negative rational range"));
+    }
+
+    #[test]
     fn result_tampering_is_detected() {
         let score = score(60, Duration::quarter());
         let mut result = evaluate_score_audio_conformance_v1(&serde_json::to_vec(&score).unwrap(), &wav(&sine(60,8_000,16_000),16_000), &contract()).unwrap();
