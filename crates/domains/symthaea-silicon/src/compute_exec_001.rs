@@ -302,6 +302,7 @@ pub enum CompletionDisposition {
 struct PendingCommand {
     command_id: String,
     operation_id: String,
+    implementation_sha256: String,
     output: BufferDescriptor,
     buffers: Vec<BufferKey>,
 }
@@ -435,6 +436,7 @@ impl ExecutionLedger {
             PendingCommand {
                 command_id: command.command_id.clone(),
                 operation_id: command.operation_id.clone(),
+                implementation_sha256: command.implementation_sha256.clone(),
                 output,
                 buffers: keys,
             },
@@ -452,13 +454,6 @@ impl ExecutionLedger {
         capabilities: &DeviceCapabilities,
         registry: &mut BufferRegistry,
     ) -> ValidationResult<CompletionDisposition> {
-        validate_capabilities(capabilities)?;
-        if capabilities.device_id != self.device_id || capabilities.device_epoch != self.device_epoch {
-            return Err(ValidationError::new(
-                "CAPABILITY_IDENTITY_MISMATCH",
-                "completion validation requires the active device capability profile",
-            ));
-        }
         validate_completion_envelope(completion)?;
         let sequence = parse_decimal_u64(&completion.sequence, false, "sequence")?;
 
@@ -469,12 +464,27 @@ impl ExecutionLedger {
             ));
         }
 
+        validate_capabilities(capabilities)?;
+        if capabilities.device_id != self.device_id || capabilities.device_epoch != self.device_epoch {
+            return Err(ValidationError::new(
+                "CAPABILITY_IDENTITY_MISMATCH",
+                "completion validation requires the active device capability profile",
+            ));
+        }
+
         let pending = self.pending.get(&sequence).cloned().ok_or_else(|| {
             ValidationError::new(
                 "UNKNOWN_COMPLETION",
                 "no pending command exists for this device epoch and sequence",
             )
         })?;
+
+        if capabilities.implementation_sha256 != pending.implementation_sha256 {
+            return Err(ValidationError::new(
+                "IMPLEMENTATION_PROFILE_CHANGED",
+                "device implementation identity changed while a command was in flight",
+            ));
+        }
 
         if completion.command_id != pending.command_id {
             return Err(ValidationError::new(
