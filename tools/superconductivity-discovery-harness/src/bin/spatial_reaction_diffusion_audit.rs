@@ -229,6 +229,9 @@ fn simulate(case: &Case) -> Result<ResultCase, String> {
     let final_b = inventory(&b, dx);
     let balance_a = balance(initial_a, influx_a, final_a, target_product, competitor_product);
     let balance_b = balance(initial_b, influx_b, final_b, target_product, 0.0);
+    if initial_a + influx_a <= 0.0 || initial_b + influx_b <= 0.0 {
+        return Err(format!("case {} has no positive available A or B inventory", case.id));
+    }
     if balance_a.relative_residual > 1.0e-8 || balance_b.relative_residual > 1.0e-8 {
         return Err(format!(
             "case {} conservation residual exceeds tolerance: A={}, B={}",
@@ -263,7 +266,10 @@ fn simulate(case: &Case) -> Result<ResultCase, String> {
 }
 fn case_receipt(case: &Case, result: &ResultCase) -> Value {
     let total_a_consumed = result.target_product + result.competitor_product;
-    let phase_denominator = result.influx_a.max(1.0e-30);
+    let available_a = result.balance_a.initial + result.balance_a.boundary_influx;
+    let available_b = result.balance_b.initial + result.balance_b.boundary_influx;
+    let phase_denominator_a = available_a.max(1.0e-30);
+    let phase_denominator_b = available_b.max(1.0e-30);
     json!({
         "case_id": case.id,
         "thermodynamic_preference": case.thermodynamic_preference,
@@ -292,10 +298,12 @@ fn case_receipt(case: &Case, result: &ResultCase) -> Value {
         "phase_products_per_area": {
             "target": result.target_product,
             "competitor": result.competitor_product,
-            "target_fraction_of_a_influx": result.target_product / phase_denominator,
-            "competitor_fraction_of_a_influx": result.competitor_product / phase_denominator,
-            "unreacted_a_fraction_of_a_influx": result.balance_a.final_inventory / phase_denominator,
-            "converted_a_fraction_of_a_influx": total_a_consumed / phase_denominator
+            "target_fraction_of_a_available": result.target_product / phase_denominator_a,
+            "competitor_fraction_of_a_available": result.competitor_product / phase_denominator_a,
+            "unreacted_a_fraction_of_a_available": result.balance_a.final_inventory / phase_denominator_a,
+            "target_fraction_of_b_available": result.target_product / phase_denominator_b,
+            "unreacted_b_fraction_of_b_available": result.balance_b.final_inventory / phase_denominator_b,
+            "converted_a_fraction_of_a_available": total_a_consumed / phase_denominator_a
         },
         "final_mobile_inventory_per_area": {
             "a": result.balance_a.final_inventory,
