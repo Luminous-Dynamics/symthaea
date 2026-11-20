@@ -69,3 +69,16 @@ cargo clippy --locked --all-targets -- -D warnings
 ~~~
 
 No third-party Rust dependencies are used.
+
+## 3. Coordinate normalization and periodic-topology audit
+
+The `coordinate_audit` module provides four small mathematical helpers:
+
+- sample min–max normalization, where changing an extremal coordinate can move every other normalized coordinate;
+- fixed-domain periodic normalization, where one particle's coordinate does not depend on other particles;
+- the periodic embedding `(sin(2*pi*x/L), cos(2*pi*x/L))`;
+- a maximum unaffected-particle displacement metric for paired before/after coordinates.
+
+Tests quantify extremal-particle perturbation at multiple particle counts and verify seam continuity/integer-period invariance of the periodic embedding. These are properties of the coordinate maps only. They do not prove a defect in NEOPIC or measure the trained model's field/trajectory response. The implementation-level tests remain tracked in [issue #12980](https://github.com/Luminous-Dynamics/symthaea/issues/12980).
+
+This fixed-domain map is appropriate only for a correctly declared periodic domain. Open-boundary coordinate systems require their own physical normalization and must not be forced into a periodic embedding.
