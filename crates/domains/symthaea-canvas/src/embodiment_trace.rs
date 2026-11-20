@@ -75,8 +75,8 @@ impl EmbodimentTrace {
         Ok(controller.snapshot().clone())
     }
 
-    /// Compute deterministic, renderer-independent counts and completed
-    /// activity intervals from a valid trace.
+    /// Compute deterministic, renderer-independent state changes and
+    /// completed activity/playback intervals from a valid trace.
     ///
     /// The currently active interval is reported separately and is not counted
     /// as completed duration because its end boundary is not known.
@@ -113,7 +113,8 @@ impl EmbodimentTrace {
                         previous_activity = Some((activity, event.monotonic_ns));
                     }
                 } else {
-                    activity_changes = activity_changes.saturating_add(1);
+                    // The first observation establishes the initial state;
+                    // it is not a transition from an unknown state.
                     previous_activity = Some((activity, event.monotonic_ns));
                 }
             }
@@ -138,7 +139,7 @@ impl EmbodimentTrace {
                         previous_playback = Some((next, event.monotonic_ns));
                     }
                     (None, Some(next)) => {
-                        speech_output_transitions = speech_output_transitions.saturating_add(1);
+                        // Initial observation is not counted as a transition.
                         previous_playback = Some((next, event.monotonic_ns));
                     }
                     (Some((previous, started_at)), None) => {
@@ -587,10 +588,10 @@ mod tests {
 
         assert_eq!(summary.session_id, "sefb-fixture-v1");
         assert_eq!(summary.event_count, 11);
-        assert_eq!(summary.activity_changes, 2);
+        assert_eq!(summary.activity_changes, 1);
         assert_eq!(summary.completed_activity_intervals, 1);
         assert_eq!(summary.activity_duration_ns, 2_600_000);
-        assert_eq!(summary.speech_output_transitions, 5);
+        assert_eq!(summary.speech_output_transitions, 4);
         assert_eq!(summary.completed_playback_intervals, 1);
         assert_eq!(summary.playback_duration_ns, 1_700_000);
         assert_eq!(summary.open_playback, None);
@@ -625,7 +626,7 @@ mod tests {
     fn summary_counts_activity_and_playback_intervals_separately() {
         let summary = sample_trace().summarize().unwrap();
         assert_eq!(summary.event_count, 9);
-        assert_eq!(summary.activity_changes, 3);
+        assert_eq!(summary.activity_changes, 2);
         assert_eq!(summary.completed_activity_intervals, 2);
         assert_eq!(summary.activity_duration_ns, 180);
         assert_eq!(summary.speech_output_transitions, 5);
@@ -660,7 +661,7 @@ mod tests {
             .unwrap();
 
         let summary = trace.summarize().unwrap();
-        assert_eq!(summary.speech_output_transitions, 1);
+        assert_eq!(summary.speech_output_transitions, 0);
         assert_eq!(summary.completed_playback_intervals, 1);
         assert_eq!(summary.playback_duration_ns, 100);
         assert_eq!(summary.open_playback, None);
