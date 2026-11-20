@@ -16,7 +16,7 @@ pub const GAIN_ENVELOPE_CONTRACT_SCHEMA_V1: &str = "muse-gain-envelope-contract-
 pub const GAIN_ENVELOPE_OBSERVER_ID_V1: &str = "muse-windowed-rms-gain-observer";
 pub const GAIN_ENVELOPE_OBSERVER_VERSION_V1: &str = "0.1.0";
 const RECEIPT_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-acoustic-observation-v1";
-const MIN_REPORTABLE_RMS_DBFS: f64 = -120.0;
+const MIN_REPORTABLE_RMS_DBFS: f64 = -300.0;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FrameRangeV1 {
@@ -64,11 +64,11 @@ struct DecodedWav {
 #[derive(Clone, Debug)]
 struct WindowObservation {
     range: FrameRangeV1,
-    source_rms_dbfs: Option<f64>,
-    candidate_rms_dbfs: Option<f64>,
+    source_rms_dbfs: Option<Vec<f64>>,
+    candidate_rms_dbfs: Option<Vec<f64>>,
     expected_gain_db: Option<f64>,
-    observed_gain_db: Option<f64>,
-    absolute_error_db: Option<f64>,
+    observed_gain_db: Option<Vec<f64>>,
+    absolute_error_db: Option<Vec<f64>>,
     passed: Option<bool>,
     abstention_reason: Option<String>,
 }
@@ -216,8 +216,8 @@ fn decode_wav(bytes: &[u8], label: &str) -> Result<DecodedWav, String> {
             }
             for sample in reader.samples::<f32>() {
                 let raw = sample.map_err(|error| format!("{label} WAV float decode failed: {error}"))?;
-                if !raw.is_finite() {
-                    return Err(format!("{label} WAV contains a non-finite sample"));
+                if !raw.is_finite() || raw.abs() > 15.0 {
+                    return Err(format!("{label} WAV contains a non-finite or out-of-range float sample"));
                 }
                 samples.push(raw as f64);
             }
@@ -246,18 +246,26 @@ fn decode_wav(bytes: &[u8], label: &str) -> Result<DecodedWav, String> {
     })
 }
 
-fn rms_dbfs(audio: &DecodedWav, range: &FrameRangeV1) -> f64 {
+fn rms_dbfs_per_channel(audio: &DecodedWav, range: &FrameRangeV1) -> Vec<f64> {
     let channels = audio.channels as usize;
-    let start = range.start_frame as usize * channels;
-    let end = range.end_frame as usize * channels;
-    let slice = &audio.samples[start..end];
-    let mean_square = slice.iter().map(|sample| sample * sample).sum::<f64>() / slice.len() as f64;
-    let rms = mean_square.sqrt();
-    if rms <= 0.0 {
-        MIN_REPORTABLE_RMS_DBFS
-    } else {
-        (20.0 * rms.log10()).max(MIN_REPORTABLE_RMS_DBFS)
-    }
+    let start = range.start_frame as usize;
+    let end = range.end_frame as usize;
+    (0..channels)
+        .map(|channel| {
+            let mut sum_squares = 0.0;
+            let frame_count = (end - start) as f64;
+            for frame in start..end {
+                let sample = audio.samples[frame * channels + channel];
+                sum_squares += sample * sample;
+            }
+            let rms = (sum_squares / frame_count).sqrt();
+            if rms <= 0.0 {
+                MIN_REPORTABLE_RMS_DBFS
+            } else {
+                (20.0 * rms.log10()).max(MIN_REPORTABLE_RMS_DBFS)
+            }
+        })
+        .collect()
 }
 
 fn target_observation(
@@ -266,30 +274,35 @@ fn target_observation(
     target: &GainTargetWindowV1,
     minimum_source_rms_dbfs: f64,
 ) -> WindowObservation {
-    let source_db = rms_dbfs(source, &target.range);
-    if source_db < minimum_source_rms_dbfs {
+    let source_db = rms_dbfs_per_channel(source, &target.range);
+    let candidate_db = rms_dbfs_per_channel(candidate, &target.range);
+    if source_db.iter().any(|value| *value < minimum_source_rms_dbfs) {
         return WindowObservation {
             range: target.range.clone(),
             source_rms_dbfs: Some(source_db),
-            candidate_rms_dbfs: Some(rms_dbfs(candidate, &target.range)),
+            candidate_rms_dbfs: Some(candidate_db),
             expected_gain_db: Some(target.expected_gain_db),
             observed_gain_db: None,
             absolute_error_db: None,
             passed: None,
-            abstention_reason: Some("source target window is below the calibrated RMS floor".into()),
+            abstention_reason: Some("at least one source target channel is below the calibrated RMS floor".into()),
         };
     }
-    let candidate_db = rms_dbfs(candidate, &target.range);
-    let observed = candidate_db - source_db;
-    let error = (observed - target.expected_gain_db).abs();
+    let observed: Vec<f64> = candidate_db.iter().zip(source_db.iter())
+        .map(|(candidate, source)| candidate - source)
+        .collect();
+    let errors: Vec<f64> = observed.iter()
+        .map(|value| (value - target.expected_gain_db).abs())
+        .collect();
+    let passed = errors.iter().all(|error| *error <= target.tolerance_db);
     WindowObservation {
         range: target.range.clone(),
         source_rms_dbfs: Some(source_db),
         candidate_rms_dbfs: Some(candidate_db),
         expected_gain_db: Some(target.expected_gain_db),
         observed_gain_db: Some(observed),
-        absolute_error_db: Some(error),
-        passed: Some(error <= target.tolerance_db),
+        absolute_error_db: Some(errors),
+        passed: Some(passed),
         abstention_reason: None,
     }
 }
@@ -301,30 +314,33 @@ fn protected_observation(
     minimum_source_rms_dbfs: f64,
     tolerance_db: f64,
 ) -> WindowObservation {
-    let source_db = rms_dbfs(source, range);
-    if source_db < minimum_source_rms_dbfs {
+    let source_db = rms_dbfs_per_channel(source, range);
+    let candidate_db = rms_dbfs_per_channel(candidate, range);
+    if source_db.iter().any(|value| *value < minimum_source_rms_dbfs) {
         return WindowObservation {
             range: range.clone(),
             source_rms_dbfs: Some(source_db),
-            candidate_rms_dbfs: Some(rms_dbfs(candidate, range)),
+            candidate_rms_dbfs: Some(candidate_db),
             expected_gain_db: Some(0.0),
             observed_gain_db: None,
             absolute_error_db: None,
             passed: None,
-            abstention_reason: Some("source protected window is below the calibrated RMS floor".into()),
+            abstention_reason: Some("at least one source protected channel is below the calibrated RMS floor".into()),
         };
     }
-    let candidate_db = rms_dbfs(candidate, range);
-    let observed = candidate_db - source_db;
-    let error = observed.abs();
+    let observed: Vec<f64> = candidate_db.iter().zip(source_db.iter())
+        .map(|(candidate, source)| candidate - source)
+        .collect();
+    let errors: Vec<f64> = observed.iter().map(|value| value.abs()).collect();
+    let passed = errors.iter().all(|error| *error <= tolerance_db);
     WindowObservation {
         range: range.clone(),
         source_rms_dbfs: Some(source_db),
         candidate_rms_dbfs: Some(candidate_db),
         expected_gain_db: Some(0.0),
         observed_gain_db: Some(observed),
-        absolute_error_db: Some(error),
-        passed: Some(error <= tolerance_db),
+        absolute_error_db: Some(errors),
+        passed: Some(passed),
         abstention_reason: None,
     }
 }
@@ -523,6 +539,26 @@ mod tests {
         bytes
     }
 
+    fn stereo_wav(samples: &[[f32; 2]], sample_rate_hz: u32) -> Vec<u8> {
+        let spec = WavSpec {
+            channels: 2,
+            sample_rate: sample_rate_hz,
+            bits_per_sample: 32,
+            sample_format: SampleFormat::Float,
+        };
+        let mut bytes = Vec::new();
+        {
+            let cursor = Cursor::new(&mut bytes);
+            let mut writer = WavWriter::new(cursor, spec).unwrap();
+            for frame in samples {
+                writer.write_sample(frame[0]).unwrap();
+                writer.write_sample(frame[1]).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        bytes
+    }
+
     fn contract() -> GainEnvelopeContractV1 {
         GainEnvelopeContractV1 {
             schema: GAIN_ENVELOPE_CONTRACT_SCHEMA_V1.into(),
@@ -561,6 +597,25 @@ mod tests {
         assert_eq!(result["preservation"]["status"], "pass");
         assert_eq!(result["outcome"]["acoustic_observation_status"], "pass");
         verify_gain_envelope_observation_seal(&result).unwrap();
+    }
+
+    #[test]
+    fn target_gain_must_pass_independently_on_each_channel() {
+        let source_samples = vec![[0.25_f32, 0.25_f32]; 1_000];
+        let mut candidate_samples = source_samples.clone();
+        let gain = 10_f32.powf(-6.0 / 20.0);
+        for frame in &mut candidate_samples[100..400] {
+            frame[0] *= gain; // left channel changed as requested
+            // right channel deliberately remains unchanged
+        }
+        let source = stereo_wav(&source_samples, 8_000);
+        let candidate = stereo_wav(&candidate_samples, 8_000);
+        let mut case = contract();
+        case.channels = 2;
+        let result = observe_gain_envelope_v1(&source, &candidate, &case).unwrap();
+        assert_eq!(result["target"]["status"], "fail");
+        assert_eq!(result["target"]["windows"][0]["passed"], false);
+        assert_eq!(result["outcome"]["acoustic_observation_status"], "fail");
     }
 
     #[test]
