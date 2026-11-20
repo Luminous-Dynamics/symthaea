@@ -1,0 +1,90 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "neopic-particle-measure-field-operator-v0.1",
+  "created_at": "2026-11-20",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12952",
+  "status": "source_review_protocol_only",
+  "source": {
+    "arxiv": "2610.40528",
+    "title": "NEOPIC: A Neural Operator Framework for Particle-based Kinetic Plasma Simulations",
+    "submitted": "2026-10-29",
+    "paper_code_repository": "https://github.com/srikrrish/operator_learning",
+    "paper_code_tag": "neopic-arxiv-v1",
+    "cost_code_tag": "neopic-arxiv-v1-nufft",
+    "paper_scripts_repository": "https://github.com/NEOPIC-framework/neopic-paper-scripts",
+    "paper_scripts_tag": "neopic-arxiv-v1",
+    "separate_neopic_repository": "https://github.com/srikrrish/NEOPIC",
+    "tag_commit_shas": "pending_resolution",
+    "default_branch_licenses": {
+      "operator_learning": "MIT",
+      "neopic_paper_scripts": "MIT",
+      "separate_NEOPIC_repository": "BSD-3-Clause"
+    },
+    "training_data": "not_in_repository_author_request_required",
+    "trained_models": "not_in_repository_author_request_required",
+    "reference_hdf5": "not_in_repository_author_request_required"
+  },
+  "method": {
+    "family": "nonuniform_fourier_neural_operator_on_empirical_particle_measure",
+    "input": "particle_empirical_measure",
+    "output": "electric_field_at_particle_positions",
+    "mesh_deposition_for_learned_operator": false,
+    "complexity_claim": "O(N_p)_under_paper_assumptions",
+    "exact_energy_conservation": false
+  },
+  "source_reported_metrics": {
+    "weak_landau_2d2v_particle_counts": [50000,100000,200000,400000,800000,1600000],
+    "teacher_forced_diagonal_field_error": [0.0023,0.00073],
+    "teacher_forced_fit_exponent": -0.39,
+    "in_loop_diagonal_field_error": [0.0067,0.0015],
+    "in_loop_fit_exponent": -0.54,
+    "example_800k_train_50k_inference_teacher_forced_error": 0.0076,
+    "example_800k_train_50k_error_ratio_to_diagonal": 10.0,
+    "example_800k_train_50k_error_ratio_to_50k_trained": 3.4,
+    "three_d_five_app_weak_landau_rate": -0.179,
+    "three_d_barnes_hut_weak_landau_rate": -0.191,
+    "three_d_five_app_two_stream_growth_rate": 0.537,
+    "three_d_pif_two_stream_growth_rate": 0.547,
+    "three_d_five_app_two_stream_saturation_time": 17.3,
+    "three_d_pif_two_stream_saturation_time": 16.4,
+    "three_d_five_app_two_stream_peak": 642,
+    "three_d_pif_two_stream_peak": 509,
+    "three_d_full_model_step_seconds_at_4m_particles": 1.245,
+    "three_d_untrained_subnet_step_seconds_at_4m_particles": 0.183,
+    "three_d_barnes_hut_step_seconds_at_4m_particles": 0.172,
+    "three_d_pif_epsilon_1e_12_step_seconds_at_4m_particles": 0.158,
+    "implicit_midpoint_dt1_step_seconds": 0.64,
+    "implicit_midpoint_residual_evaluations": 4.2,
+    "implicit_midpoint_jacobian_vector_products": 43,
+    "claim_state": "paper_reported_not_reproduced"
+  },
+  "candidate_methods": [
+    "source_NEOPIC_NUFNO",
+    "source_grid_FNO",
+    "source_LRC_FNO",
+    "CIC_PIC",
+    "PIF_NUFFT",
+    "Barnes_Hut",
+    "direct_sum_small_particle_known_answer"
+  ],
+  "benchmark_axes": [
+    "N_train_by_N_inference_particle_count_matrix",
+    "both_directions_particle_count_transfer",
+    "independent_teacher_seeds",
+    "field_position_velocity_errors",
+    "noise_covariance_and_spectrum",
+    "grid_aliasing_and_translation_equivariance",
+    "damping_growth_and_saturation",
+    "energy_drift_and_poisson_residual",
+    "dimension_and_timestep_transfer",
+    "implicit_solver_residual_and_jvp_cost",
+    "end_to_end_particle_field_step_cost"
+  ],
+  "claim_limits": {
+    "source_reproduction": false,
+    "benchmark_tournament": false,
+    "SOTA_superiority": false,
+    "integration_in_symthaea": false,
+    "plasma_control_validation": false
+  }
+}
