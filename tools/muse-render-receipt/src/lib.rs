@@ -1664,6 +1664,13 @@ mod tests {
     }
 
     #[test]
+    fn exact_wire_field_validation_rejects_unknown_fields() {
+        let value = serde_json::json!({"schema":"score-edit-plan-v1","unexpected":true});
+        assert!(require_exact_fields(&value,&["schema"],"edit plan")
+            .unwrap_err().contains("unsupported fields"));
+    }
+
+    #[test]
     fn receipt_seal_verifies_and_tampering_is_detected() {
         let bytes = sample_receipt();
         assert_eq!(verify_receipt_bytes(&bytes).unwrap().attempt_state, "completed");
@@ -2047,6 +2054,30 @@ mod tests {
         assert!(report.midi_event_manifest_verified);
         assert!(report.wav_integrity_verified);
         assert!(!report.acceptance_eligible);
+
+        // Canonical MIDI manifest bytes are required; ignored trailing bytes or
+        // reordered/unknown fields cannot be hidden by typed reserialization.
+        let mut noncanonical_manifest = manifest_bytes.clone();
+        noncanonical_manifest.push(b' ');
+        std::fs::write(root.join("midi-manifest.json"), &noncanonical_manifest).unwrap();
+        assert!(verify_midi_bundle(&root, &parsed).unwrap_err().contains("exact canonical exporter serialization"));
+        std::fs::write(root.join("midi-manifest.json"), &manifest_bytes).unwrap();
+
+        // Timeline handoff semantics are independently replayed. The only
+        // segment for this PartId cannot claim a predecessor.
+        let mut bad_handoff_timeline: Value = serde_json::from_slice(&timeline_bytes).unwrap();
+        bad_handoff_timeline["segments"][0]["handoff"] = serde_json::json!({
+            "from_segment_id":"missing-previous","kind":"reattack"
+        });
+        let bad_handoff_bytes = serde_json::to_vec(&bad_handoff_timeline).unwrap();
+        std::fs::write(root.join("orchestration-timeline.json"), &bad_handoff_bytes).unwrap();
+        let mut bad_handoff_receipt = parsed.clone();
+        bad_handoff_receipt.midi.timeline_sha256 =
+            domain_sha256(MIDI_TIMELINE_DIGEST_SCHEMA_V1.as_bytes(), &bad_handoff_bytes);
+        assert!(verify_timeline_binding_bundle(
+            &root,&bad_handoff_receipt,&midi_manifest,&candidate_value
+        ).unwrap_err().contains("first timeline segment"));
+        std::fs::write(root.join("orchestration-timeline.json"), &timeline_bytes).unwrap();
 
         // Capability digests cannot disguise a pitch outside the declared range.
         let bad_range_capability_bytes = serde_json::to_vec(&serde_json::json!([{
