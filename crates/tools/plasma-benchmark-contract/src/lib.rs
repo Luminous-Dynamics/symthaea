@@ -285,7 +285,7 @@ pub fn validate_run(run: &RunManifest) -> Vec<Finding> {
 
     if run.data.test_initial_state_sha256 != run.task.initial_state_sha256 {
         findings.push(Finding {
-            code: "test_data_identity_mismatch",
+            code: "test_initial_state_identity_mismatch",
             detail: "test_initial_state_sha256 must equal the task initial_state_sha256".to_owned(),
         });
     }
