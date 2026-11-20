@@ -1416,6 +1416,21 @@ mod tests {
     }
 
     #[test]
+    fn checked_buffer_offset_plus_length_overflow_is_rejected() {
+        let (capabilities, mut command, _, registry, _) = setup();
+        let query = command
+            .buffers
+            .iter_mut()
+            .find(|buffer| buffer.role == "query")
+            .unwrap();
+        // u64::MAX - 7 is correctly aligned to the fixture's 8-byte
+        // requirement, so checked addition—not alignment—must reject it.
+        query.offset_bytes = "18446744073709551608".into();
+        let error = validate_command(&command, &capabilities, &registry).unwrap_err();
+        assert_eq!(error.code, "BUFFER_RANGE_OVERFLOW");
+    }
+
+    #[test]
     fn registered_read_only_output_is_rejected_before_submission() {
         let (capabilities, command, _, _, mut ledger) = setup();
         let mut registry = BufferRegistry::default();
