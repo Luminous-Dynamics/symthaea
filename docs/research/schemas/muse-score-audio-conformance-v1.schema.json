@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-score-audio-conformance-v1.schema.json",
+  "title": "MUSE Score-Audio Conformance Result v1",
+  "description": "Independent fixed-tempo, mono isolated-stem pitch conformance. This does not prove polyphonic part attribution, note onset/offset, musicality or listener acceptance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observer",
+    "scope",
+    "artifacts",
+    "alignment",
+    "audio",
+    "events",
+    "outcome",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-score-audio-conformance-v1"
+    },
+    "observer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observer_id",
+        "version",
+        "method"
+      ],
+      "properties": {
+        "observer_id": {
+          "const": "muse-score-audio-pitch-observer"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "method": {
+          "const": "harmonic_salience_fft_pitch"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "scope_id"
+      ],
+      "properties": {
+        "kind": {
+          "const": "isolated_stem"
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score_digest_schema",
+        "score_sha256",
+        "audio_sha256",
+        "contract_sha256"
+      ],
+      "properties": {
+        "score_digest_schema": {
+          "const": "muse-score-serde-json-sha256-v1"
+        },
+        "score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "alignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "tempo_bpm",
+        "offset_frames"
+      ],
+      "properties": {
+        "mode": {
+          "const": "fixed_score_tempo_no_auto_alignment"
+        },
+        "tempo_bpm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "offset_frames": {
+          "const": 0
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_rate_hz",
+        "channels",
+        "frame_count",
+        "sample_format",
+        "bits_per_sample",
+        "clipped_sample_fraction"
+      ],
+      "properties": {
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 192000
+        },
+        "channels": {
+          "const": 1
+        },
+        "frame_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32000000
+        },
+        "sample_format": {
+          "enum": [
+            "pcm_integer",
+            "ieee_float"
+          ]
+        },
+        "bits_per_sample": {
+          "enum": [
+            16,
+            24,
+            32
+          ]
+        },
+        "clipped_sample_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score_audio_status",
+        "reasons"
+      ],
+      "properties": {
+        "score_audio_status": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score_note_ordinal",
+        "expected_pitch_midi",
+        "observed_pitch_midi",
+        "estimated_frequency_hz",
+        "pitch_error_cents",
+        "pitch_confidence",
+        "window_rms_dbfs",
+        "window_start_frame",
+        "window_end_frame",
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "score_note_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_pitch_midi": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "observed_pitch_midi": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 127
+        },
+        "estimated_frequency_hz": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "pitch_error_cents": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pitch_confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "window_rms_dbfs": {
+          "type": "number",
+          "maximum": 0
+        },
+        "window_start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "window_end_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048
+        }
+      }
+    }
+  }
+}
