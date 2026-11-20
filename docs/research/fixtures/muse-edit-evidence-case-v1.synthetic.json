@@ -80,29 +80,29 @@
     "acceptable_audio_sha256": [],
     "event_correspondence": [
       {
-        "source_event_ids": [
-          "src-note-0001"
+        "source_note_ordinals": [
+          0
         ],
-        "target_event_ids": [
-          "target-note-0001"
-        ],
-        "relation": "modify"
-      },
-      {
-        "source_event_ids": [
-          "src-note-0002"
-        ],
-        "target_event_ids": [
-          "target-note-0002"
+        "target_note_ordinals": [
+          0
         ],
         "relation": "modify"
       },
       {
-        "source_event_ids": [
-          "src-bass-0001"
+        "source_note_ordinals": [
+          1
         ],
-        "target_event_ids": [
-          "target-bass-0001"
+        "target_note_ordinals": [
+          1
+        ],
+        "relation": "modify"
+      },
+      {
+        "source_note_ordinals": [
+          2
+        ],
+        "target_note_ordinals": [
+          2
         ],
         "relation": "preserve"
       }
