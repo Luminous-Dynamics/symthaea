@@ -528,6 +528,36 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         })
     }).collect();
 
+    let precursor_names: Vec<String> = nodes.iter().cloned().collect();
+    let node_count = precursor_names.len();
+    let lopo_train_edges = (node_count - 1) * (node_count - 2) / 2;
+    let lopo_test_edges = node_count - 1;
+    let double_node_train_edges = (node_count - 2) * (node_count - 3) / 2;
+    let double_node_test_edges = 2 * (node_count - 2) + 1;
+    let leave_one_precursor_out_folds: Vec<Value> = precursor_names.iter().map(|held| {
+        json!({
+            "fold_id": format!("leave_one_precursor_out__{held}"),
+            "held_precursor": held,
+            "training_node_count": node_count - 1,
+            "training_edge_count": lopo_train_edges,
+            "test_edge_count": lopo_test_edges,
+            "test_edge_predicate": "canonical_pair contains held_precursor"
+        })
+    }).collect();
+    let mut double_node_holdout_folds = Vec::with_capacity(node_count * (node_count - 1) / 2);
+    for (index, left) in precursor_names.iter().enumerate() {
+        for right in precursor_names.iter().skip(index + 1) {
+            double_node_holdout_folds.push(json!({
+                "fold_id": format!("double_node_holdout__{left}__{right}"),
+                "held_precursors": [left, right],
+                "training_node_count": node_count - 2,
+                "training_edge_count": double_node_train_edges,
+                "test_edge_count": double_node_test_edges,
+                "test_edge_predicate": "canonical_pair contains either held_precursor"
+            }));
+        }
+    }
+
     Ok(json!({
         "status": "precursor_genome_graph_audit_pass",
         "contract": "SC-PRECURSOR-GENOME-GRAPH-AUDIT-0.1",
@@ -550,6 +580,30 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
             "per_precursor": per_precursor
         },
         "sample_records": sample_records,
+        "validation_protocols": {
+            "random_pair_split": {
+                "status": "diagnostic_only",
+                "reason": "Every precursor appears in 45 source edges; random edge splits leak precursor identities into train and test."
+            },
+            "leave_one_precursor_out": {
+                "fold_count": leave_one_precursor_out_folds.len(),
+                "training_edge_count_per_fold": lopo_train_edges,
+                "test_edge_count_per_fold": lopo_test_edges,
+                "rule": "Remove all source edges incident to one precursor from training; test only on those incident edges.",
+                "folds": leave_one_precursor_out_folds
+            },
+            "double_node_holdout": {
+                "fold_count": double_node_holdout_folds.len(),
+                "training_edge_count_per_fold": double_node_train_edges,
+                "test_edge_count_per_fold": double_node_test_edges,
+                "rule": "Remove every edge incident to either of two held precursors from training; test on the union of both held-node neighborhoods.",
+                "folds": double_node_holdout_folds
+            },
+            "chemistry_family_holdout": {
+                "status": "not_materialized",
+                "reason": "A precursor family assignment must be declared independently of outcomes and frozen before evaluation; no family labels are inferred from this ledger."
+            }
+        },
         "cohort": {
             "source_sample_count": sample_count,
             "physical_failure_exclusions": physical_failure_exclusions,
@@ -699,6 +753,18 @@ mod tests {
         assert_eq!(category_label("transformed"), Some(false));
         assert_eq!(category_label("unclassified"), None);
     }
+    #[test]
+    fn cold_start_split_sizes_match_complete_pair_graph_combinatorics() {
+        let nodes = 46_usize;
+        let lopo_train = (nodes - 1) * (nodes - 2) / 2;
+        let lopo_test = nodes - 1;
+        let double_train = (nodes - 2) * (nodes - 3) / 2;
+        let double_test = 2 * (nodes - 2) + 1;
+        assert_eq!((lopo_train, lopo_test), (990, 45));
+        assert_eq!((double_train, double_test), (946, 89));
+        assert_eq!(nodes * (nodes - 1) / 2, 1035);
+    }
+
     #[test]
     fn physical_failure_and_poor_refinement_are_exclusions_not_negatives() {
         assert_eq!(
