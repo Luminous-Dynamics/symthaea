@@ -17,6 +17,24 @@ The paper learns the nonlocal constitutive map from electron temperature profile
 
 The article is CC BY 4.0. This does not automatically grant rights to separate PIC datasets, model weights or third-party figures. No public author code or source dataset artifact/record licence has been admitted by this project yet.
 
+## 2.1 Required adjacent neural-transport baselines
+
+The SOTA comparison must also include two directly related neural heat-transport methods:
+
+- **LINN / nonlocal theory-informed neural kernel:** Luo et al., *Physical Review Research* 7, L042017 (2025), DOI [10.1103/m215-3f6c](https://doi.org/10.1103/m215-3f6c). This approach learns spatiotemporal heat-flux kernels from kinetic PIC data across local and nonlocal regimes, using LMV transport theory as a prior.
+- **TCNN / time-embedded CNN:** Luo et al., *Physical Review E* 113, 035303 (2026), DOI [10.1103/xx8k-xw91](https://doi.org/10.1103/xx8k-xw91). It models the coupled evolution of normalised heat flux and a characteristic nonlocality parameter, addressing a limitation of quasi-stationary LMV-informed kernels under strongly time-dependent transport.
+
+These papers are required prior-art families, not matched score rows by default. Their kinetic datasets, collisionality ranges, input/target conventions, solver and geometry may differ from the PRX FNO paper. First reproduce each on its own source task; then adapt them to a common hot-spot / Epperlein–Short benchmark only after source and data admission.
+
+The matched common-task tournament must therefore distinguish:
+1. source FNO operator;
+2. LINN theory-informed time-varying kernel;
+3. TCNN time-embedded coupled heat-flux/nonlocality model;
+4. SNB nonlocal transport;
+5. applicable local transport baseline;
+6. mesh-/coordinate-aware or graph/finite-volume neural operator;
+7. neural initial guess / trusted implicit residual-correction hybrid.
+
 ## 2. Important source-faithful details
 
 The article identifies the learned operator as Te(x) → d_x q_e(x), and the coupled electron energy equation in the source model as a relation of the form:
