@@ -101,11 +101,13 @@
             "properties": {
               "normalization_basis": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "description": "Shared reaction-extent basis used to compare all target and competing routes; all reaction rows must match this exact declared basis."
               },
               "basis_unit": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "description": "Common energy-per-extent unit; all reaction rows must match this exact declared unit."
               },
               "standard_state": {
                 "type": "string",
