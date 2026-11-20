@@ -162,6 +162,7 @@ pub struct HdcCompletion {
     pub device_epoch: String,
     pub sequence: String,
     pub operation_id: String,
+    pub semantic_contract_sha256: String,
     pub implementation_sha256: String,
     pub status: String,
     pub error_code: Option<String>,
@@ -304,6 +305,7 @@ pub enum CompletionDisposition {
 struct PendingCommand {
     command_id: String,
     operation_id: String,
+    semantic_contract_sha256: String,
     implementation_sha256: String,
     output: BufferDescriptor,
     buffers: Vec<BufferKey>,
@@ -438,6 +440,7 @@ impl ExecutionLedger {
             PendingCommand {
                 command_id: command.command_id.clone(),
                 operation_id: command.operation_id.clone(),
+                semantic_contract_sha256: command.semantic_contract.contract_sha256.clone(),
                 implementation_sha256: command.implementation_sha256.clone(),
                 output,
                 buffers: keys,
@@ -491,6 +494,12 @@ impl ExecutionLedger {
             return Err(ValidationError::new(
                 "COMPLETION_IMPLEMENTATION_MISMATCH",
                 "completion implementation digest differs from the submitted command",
+            ));
+        }
+        if completion.semantic_contract_sha256 != pending.semantic_contract_sha256 {
+            return Err(ValidationError::new(
+                "COMPLETION_SEMANTIC_CONTRACT_MISMATCH",
+                "completion semantic-contract digest differs from the submitted command",
             ));
         }
         if completion.operation_id != pending.operation_id {
@@ -870,6 +879,14 @@ pub fn validate_command(
             "semantic contract ID/version does not match the admitted operation",
         ));
     }
+    if command.semantic_contract.contract_sha256
+        != expected_contract_sha256(&command.operation_id)?
+    {
+        return Err(ValidationError::new(
+            "NON_CANONICAL_SEMANTIC_DIGEST",
+            "semantic-contract digest is not the host-pinned canonical operation descriptor",
+        ));
+    }
 
     let expected = expected_buffers(command)?;
     if command.buffers.len() != expected.len() {
@@ -1072,6 +1089,25 @@ fn expected_contract_id(operation: &str) -> ValidationResult<&'static str> {
     }
 }
 
+/// SHA-256 digests of the normative canonical descriptors in
+/// COMPUTE_EXEC_001_HDC_DEVICE_CONTRACT_V0_1.md. The exact descriptor bytes use
+/// UTF-8, LF line endings and a final LF. Changing meaning requires a new
+/// semantic version and digest, not a silent host-side update.
+fn expected_contract_sha256(operation: &str) -> ValidationResult<&'static str> {
+    match operation {
+        "hdc.bind_xor.exact.v1" => {
+            Ok("156f87ae7d96cdc89cf09d84723c2f65aa80f2c0fcfc193df06f8545ed332c67")
+        }
+        "hdc.hamming.exact.v1" => {
+            Ok("c7e4cdcf7ee0ae962e1d4d033a125312a82e65a1aac7ce2f8d4f4d03b132712e")
+        }
+        "hdc.top1.exact.v1" => {
+            Ok("04b106f50f40963f0d2f88f9d779b83d9a55bd22d2e151f45f5211fa05c3f9cd")
+        }
+        _ => Err(ValidationError::new("UNKNOWN_OPERATION", "no semantic digest is registered")),
+    }
+}
+
 fn output_role(operation: &str) -> &'static str {
     if operation == "hdc.bind_xor.exact.v1" {
         "output"
@@ -1092,6 +1128,10 @@ fn validate_completion_envelope(completion: &HdcCompletion) -> ValidationResult<
     validate_epoch(&completion.device_epoch)?;
     parse_decimal_u64(&completion.sequence, false, "completion.sequence")?;
     validate_sha256(&completion.implementation_sha256, "completion.implementation_sha256")?;
+    validate_sha256(
+        &completion.semantic_contract_sha256,
+        "completion.semantic_contract_sha256",
+    )?;
     if !matches!(
         completion.operation_id.as_str(),
         "hdc.bind_xor.exact.v1" | "hdc.hamming.exact.v1" | "hdc.top1.exact.v1"
@@ -1550,11 +1590,27 @@ mod tests {
         ));
 
         completion.implementation_sha256 = command.implementation_sha256.clone();
+        completion.semantic_contract_sha256 = "b".repeat(64);
+        let error = ledger
+            .accept_completion(&completion, &capabilities, &mut registry)
+            .unwrap_err();
+        assert_eq!(error.code, "COMPLETION_SEMANTIC_CONTRACT_MISMATCH");
+
+        completion.semantic_contract_sha256 =
+            command.semantic_contract.contract_sha256.clone();
         completion.operation_id = "hdc.hamming.exact.v1".into();
         let error = ledger
             .accept_completion(&completion, &capabilities, &mut registry)
             .unwrap_err();
         assert_eq!(error.code, "COMPLETION_OPERATION_MISMATCH");
+    }
+
+    #[test]
+    fn command_rejects_noncanonical_semantic_contract_digest() {
+        let (capabilities, mut command, _, registry, _) = setup();
+        command.semantic_contract.contract_sha256 = "a".repeat(64);
+        let error = validate_command(&command, &capabilities, &registry).unwrap_err();
+        assert_eq!(error.code, "NON_CANONICAL_SEMANTIC_DIGEST");
     }
 
     #[test]
