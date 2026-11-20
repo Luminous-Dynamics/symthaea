@@ -19,7 +19,7 @@ Do not replace one-sided bounds with point labels. That invents information and 
 
 ## Contract and scoring
 
-The fixture schema uses absolute temperature in kelvin because the log-normal AFT likelihood operates on positive absolute temperatures. Each pair carries precursor IDs, evidence IDs and a raw-data digest. Each model carries an artifact digest, explicit uncertainty method, training pair IDs and one predictive log-normal distribution per evaluation pair.
+The fixture schema uses absolute temperature in kelvin because the log-normal AFT likelihood operates on positive absolute temperatures. Each pair carries precursor IDs plus typed, sample-bound observation records: sample ID, execution-run ID, characterization conditions, method, outcome, dwell temperature, detection limit and raw-data digest. The auditor requires actual cross-precursor-product detection for the reaction endpoint and characterized no-product evidence for the non-reaction endpoint. `transformed_only` and `uncharacterizable` observations cannot be relabelled as no reaction. Exact observations additionally require a measured onset and instrument uncertainty. Each model carries an artifact digest, explicit uncertainty method, training pair IDs and one predictive log-normal distribution per evaluation pair.
 
 For a predicted onset X distributed log-normally with median m and log-scale sigma:
 - left-censored evidence scores P(X <= upper bound);
@@ -31,6 +31,9 @@ The main metric is mean negative log-likelihood across the stated evidence class
 
 The auditor rejects:
 - malformed or inconsistent censoring bounds;
+- a censoring bound without matching sample/run/conditions/method-bound characterized evidence;
+- transformed-only or uncharacterizable outcomes used to assert no reaction;
+- exact onset claims without an onset measurement and instrument uncertainty;
 - invalid evidence or model artifact digests;
 - duplicate evaluation pairs, model IDs or predictions;
 - missing/extra predictions;
