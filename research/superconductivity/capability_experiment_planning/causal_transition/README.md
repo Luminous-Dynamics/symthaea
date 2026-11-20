@@ -65,3 +65,9 @@ Follow-on work should compare factorial / response-surface policies, one-factor-
 ## Claim ceiling
 
 This is a synthetic transition-planning contract. It does not establish an empirical causal effect, pairing mechanism, bulk superconductivity, instrument protocol, specimen availability, safe operating conditions or permission to conduct an experiment.
+
+## Pairing/coherence separation control
+
+The pressure/strain fixture assigns separate pairing-strength and phase-coherence coordinates. Under its synthetic transition table, the single-step strain intervention raises the expected pairing-strength coordinate relative to sham while lowering expected phase coherence and specimen integrity. The unit test asserts the signs separately. This is deliberately not collapsed into a scalar “superconductivity score” or interpreted as a real material prediction.
+
+The preservation fixture has prior expected terminal loss 3.8 under defer/preserve and 8.0 under immediate application. Destructive characterization maps both possible initial sample classes into the destroyed state; because the terminal application value is lost, the exact policy stops and preserves the sample even though the diagnostic outcome distinguishes the initial states. These are fixture semantics, not observed specimen utilities.
