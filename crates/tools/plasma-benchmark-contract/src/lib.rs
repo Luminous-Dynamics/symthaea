@@ -350,7 +350,7 @@ pub fn validate_run(run: &RunManifest) -> Vec<Finding> {
                 detail: "diagnostic metric_id must be non-empty".to_owned(),
             });
         }
-        if seen_metrics.iter().any(|seen| seen == &metric.metric_id) {
+        if seen_metrics.iter().any(|seen| *seen == metric.metric_id.as_str()) {
             findings.push(Finding {
                 code: "duplicate_metric",
                 detail: format!("diagnostic {} occurs more than once", metric.metric_id),
@@ -533,7 +533,7 @@ fn is_hex(value: &str, length: usize) -> bool {
     value.len() == length
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn is_object_id(value: &str) -> bool {
