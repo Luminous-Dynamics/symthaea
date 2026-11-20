@@ -1,0 +1,34 @@
+{
+  "contract": "SC-THERMOCHEMICAL-NETWORK-SUITE-0.1",
+  "suite_id": "superconductivity_thermochemical_network_adversarial_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_thermochemical_network_v0_1.schema.json",
+  "fixtures": [
+    {
+      "network_id": "synthetic_balanced_target_competitor_network_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_smoke_v0_1.json",
+      "expectation": "all stoichiometric balances pass; routes connect; cycle closure interval includes zero"
+    },
+    {
+      "network_id": "adversarial_unbalanced_reaction_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_v0_1.json",
+      "expectation": "auditor rejects nonconservation of element C"
+    },
+    {
+      "network_id": "adversarial_thermodynamic_cycle_inconsistent_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_cycle_inconsistent_v0_1.json",
+      "expectation": "audit reports cycle inconsistency because propagated interval excludes zero closure tolerance"
+    },
+    {
+      "network_id": "adversarial_disconnected_route_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_disconnected_v0_1.json",
+      "expectation": "auditor rejects a route whose second step consumes no product of the preceding step"
+    },
+    {
+      "network_id": "adversarial_unbalanced_charge_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_charge_v0_1.json",
+      "expectation": "auditor rejects reaction with nonzero computed charge residual even when element balances close"
+    }
+  ],
+  "claim_ceiling": "Synthetic stoichiometric and thermodynamic network audit only; no real synthesis route, DFT calculation, superconducting phase or laboratory authorization is established."
+}
