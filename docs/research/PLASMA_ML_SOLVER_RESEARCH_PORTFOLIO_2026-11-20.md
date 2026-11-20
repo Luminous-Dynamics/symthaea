@@ -12,6 +12,12 @@ The portfolio is deliberately split by physics. Each lane has a separate equatio
 
 ## Four scientific lanes
 
+### L0. Structure-preserving closure / realizable distribution tournament
+
+- [#12947 — positive distribution, Levermore maximum entropy and reversible/dissipative structure](https://github.com/Luminous-Dynamics/symthaea/issues/12947); protocol in [PR #12948](https://github.com/Luminous-Dynamics/symthaea/pull/12948).
+- Companion Symtropy finite-dimensional GENERIC algebra audit: [#6306 / PR #6311](https://github.com/Luminous-Dynamics/symtropy/pull/6311).
+- Keep collisionless Vlasov, collisional Vlasov-Poisson-Landau, magnetosheath collisionless PIC and ICF collisional transport in distinct physics lanes. No blanket entropy monotonicity gate for collisionless phase mixing.
+
 ### L1. Electrostatic kinetic memory / Landau damping
 
 - Issues: [#12907](https://github.com/Luminous-Dynamics/symthaea/issues/12907), [#12910](https://github.com/Luminous-Dynamics/symthaea/issues/12910), [#12914](https://github.com/Luminous-Dynamics/symthaea/issues/12914), [#12921](https://github.com/Luminous-Dynamics/symthaea/issues/12921).
