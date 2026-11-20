@@ -202,7 +202,9 @@ mod tests {
                 particle_count - 1,
             )
             .unwrap();
-            assert!(shift > 0.49, "N={particle_count}, shift={shift}");
+            let expected_shift =
+                (particle_count - 2) as f64 / (2.0 * (particle_count - 1) as f64);
+            close(shift, expected_shift, 1.0e-14);
         }
     }
 
