@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-observer-calibration-contract-v1.schema.json",
+  "title": "MUSE Observer Calibration Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "feature_id",
+    "minimum_fit_examples_per_class",
+    "minimum_threshold_examples_per_class",
+    "minimum_held_out_examples_per_class",
+    "maximum_false_support_rate",
+    "ece_bins"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-observer-calibration-contract-v1"
+    },
+    "feature_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "minimum_fit_examples_per_class": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "minimum_threshold_examples_per_class": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "minimum_held_out_examples_per_class": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "maximum_false_support_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.5
+    },
+    "ece_bins": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 100
+    }
+  }
+}
