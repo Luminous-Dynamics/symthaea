@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/schemas/muse-acoustic-observation-v1.schema.json",
+  "$id": "https://luminousdynamics.io/schemas/muse-acoustic-observation-v1.schema.json",
   "title": "MUSE Acoustic Observation v1",
   "description": "Independent sample-aligned WAV gain-envelope observation. Per-channel window metrics are ordered by WAV channel index. This receipt is an acoustic proxy, not an instruction, musicality, or human-perceptibility verdict.",
   "type": "object",
@@ -116,7 +116,8 @@
         },
         "frame_count": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 32000000
         },
         "source_sample_format": {
           "enum": [
