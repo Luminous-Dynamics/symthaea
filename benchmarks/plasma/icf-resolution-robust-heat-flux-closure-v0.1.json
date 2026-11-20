@@ -26,7 +26,42 @@
       "hot_spot_relaxation",
       "Epperlein_Short_temperature_perturbation"
     ],
-    "reported_nonlinearity": "nonlocal_transport_with_reported_Knudsen_number_around_0.17"
+    "reported_nonlinearity": "nonlocal_transport_with_reported_Knudsen_number_around_0.17",
+    "reported_source_cohorts": {
+      "hot_spot_training_alpha": [
+        1,
+        1.25,
+        1.5,
+        1.75,
+        2
+      ],
+      "hot_spot_intermediate_test_alpha": [
+        1.125,
+        1.375,
+        1.625,
+        1.875
+      ],
+      "epperlein_short_beta": [
+        1,
+        4,
+        7,
+        10,
+        13,
+        16
+      ],
+      "epperlein_short_k_lambda0": [
+        0.063,
+        0.251,
+        0.44,
+        0.628,
+        0.817,
+        1
+      ],
+      "reported_coarse_model_name": "F(6,10)",
+      "temporal_training_interval": "(0,20]",
+      "reported_temporal_extrapolation_interval": "(20,30]",
+      "claim_status": "source_article_text_not_independently_reproduced"
+    }
   },
   "evaluation_tracks": [
     "source_faithful_FNO_and_SNB_reproduction",
