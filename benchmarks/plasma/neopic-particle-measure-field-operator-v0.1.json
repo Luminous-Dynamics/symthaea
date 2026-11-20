@@ -191,7 +191,12 @@
     "transform_specific_full_step_timing",
     "transform_specific_peak_memory_and_energy",
     "mode_count_scaling_separate_from_particle_count_scaling",
-    "warmup_and_plan_amortisation"
+    "warmup_and_plan_amortisation",
+    "weighted_empirical_measure_representation_consistency",
+    "co_located_weighted_particle_split_merge_invariance",
+    "duplicate_support_quadrature_refinement_invariance",
+    "particle_storage_order_and_batch_layout_invariance",
+    "diagonal_self_energy_and_background_convention_under_particle_splitting"
   ],
   "claim_limits": {
     "source_reproduction": false,
@@ -204,7 +209,8 @@
     "no_internal_oversampled_grid": false,
     "deployed_error_theorem_qualified_for_per_sample_minmax_and_linear_periodic_lifting": false,
     "paper_accuracy_results_are_FINUFFT_results": false,
-    "FINUFFT_accuracy_inferred_from_DSE_results": false
+    "FINUFFT_accuracy_inferred_from_DSE_results": false,
+    "weighted_particle_split_merge_support_assumed": false
   },
   "related_solver_lanes": [
     {
@@ -228,5 +234,8 @@
     "human_review": "none reported by review page at time of inspection",
     "status": "independent hypotheses for falsification; not established implementation defects",
     "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12980"
-  }
+  },
+  "related_research_issues": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12991"
+  ]
 }
