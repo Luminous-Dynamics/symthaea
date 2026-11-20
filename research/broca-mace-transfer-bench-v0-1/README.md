@@ -467,3 +467,9 @@ The official Cycle 2 results were published on November 19, 2026: open-source le
 The AML API guide also specifies that Open-Source Methods must use `text-embedding-v4` for embeddings and `gpt-4o-mini` for LLM-related components; rerankers are unrestricted. Commercial Products have no such model restrictions.
 
 The `aml-adapter::submission` module now checks declared division, track, participant-hosted API mode, HTTPS Add/Search endpoints, secret-free URLs, source/runtime digests, and division-specific model usage. It returns a digest-bound declaration only: it does not prove endpoint reachability, runtime model identity, or a passed AML Smoke test. Nine authored preflight tests cover model policy, division differences, hosted endpoints, local/secret URLs and declaration digest changes.
+
+## Learned future-use forecasting experiment
+
+The consolidation crate now contains `salience_learning`, a deterministic logistic-regression baseline using seven observable features. It fits on training data, calibrates with a separate partition, and evaluates on held-out data. Split qualification requires disjoint cluster IDs, task-family IDs, upstream source-root digests, and event IDs. The evaluator fixture uses 64 training, 32 calibration, and 32 held-out clusters; the evaluator owns the hidden reuse response function and future-reuse labels.
+
+The report includes Brier score versus a base-rate comparator, expected calibration error, worst task-family ECE, and split cardinalities. This is separate from the older oracle-informed predictive-salience positive control. It is a learned synthetic baseline, not demonstrated utility lift, production forecasting, or a SOTA result. It is not yet wired into `VerifiedFutureUsePredictionV1` receipt issuance.

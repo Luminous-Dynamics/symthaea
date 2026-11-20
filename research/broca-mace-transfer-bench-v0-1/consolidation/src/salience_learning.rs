@@ -434,10 +434,10 @@ mod tests {
     }
     #[test]
     fn learned_model_calibrates_and_reports_heldout_metrics() {
-        let train = rows(1, 1, 10);
+        let training_rows = rows(1, 1, 10);
         let calibration = rows(10_000, 100, 30);
         let heldout = rows(20_000, 200, 50);
-        let model = train(&train, ModelConfigV1::default()).unwrap();
+        let model = train(&training_rows, ModelConfigV1::default()).unwrap();
         let calibrator = calibrate(&model, &calibration).unwrap();
         let metrics = evaluate(&model, &calibrator, &heldout).unwrap();
         assert_eq!(metrics.examples, heldout.len() as u32);

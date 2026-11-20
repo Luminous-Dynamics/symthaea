@@ -394,3 +394,9 @@ Top commercial results:
 These metrics are track-specific and division-specific; do not pool them or compare MACE synthetic utility to them. For a future Open-Source Methods submission, current programme goals are **66.22 textual**, **68.33% coding resolved**, and **48.26 multimodal**, each 5 points above the relevant Cycle 2 open-source leader. Recalculate when the next cycle freezes its data/API/model rules. The official Add/Search guide also requires `text-embedding-v4` for open-source embedding components and `gpt-4o-mini` for open-source LLM-related components, with unrestricted rerankers; Commercial Products do not have those model restrictions.
 
 The new AML submission preflight checks the declared profile, but it is not a runtime attestation and cannot replace a live, public Smoke test. Cycle 2 is closed; the next eligible cycle is the target.
+
+### Learned forecasting qualification boundary
+
+The separate `salience_learning` module implements deterministic logistic regression, Platt calibration, Brier-vs-base-rate, ECE and worst-family ECE over train/calibration/held-out partitions. It requires cluster, task-family, source-root and event disjointness. The evaluator fixture uses 64/32/32 clusters and owns the hidden response function and future-reuse labels; model fitting sees only features and training labels.
+
+This is a candidate-model baseline, not a production forecast, SOTA result or proof of downstream utility. It is not yet wired into the opaque `VerifiedFutureUsePredictionV1` issuance path. Future integration must bind model, calibrator and split digests into an independently verified calibration receipt.
