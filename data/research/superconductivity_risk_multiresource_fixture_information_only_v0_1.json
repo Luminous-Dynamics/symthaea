@@ -1,0 +1,180 @@
+{
+  "contract": "SC-RISK-MULTIRESOURCE-0.1",
+  "instance_id": "adversarial_information_without_decision_value_001",
+  "fixture_only": true,
+  "risk_alpha": 0.9,
+  "reference_resource_id": "financial_budget",
+  "world_states": [
+    {
+      "world_state_id": "state_a",
+      "prior_probability": 0.5,
+      "model_family": "conventional_electron_phonon",
+      "phase_realization": "realized",
+      "evidence_qualification": "unresolved",
+      "engineering_use": "unmeasured"
+    },
+    {
+      "world_state_id": "state_b",
+      "prior_probability": 0.3,
+      "model_family": "finite_q_pairing",
+      "phase_realization": "metastable_or_conditional",
+      "evidence_qualification": "transport_only",
+      "engineering_use": "not_met"
+    },
+    {
+      "world_state_id": "unknown_state",
+      "prior_probability": 0.2,
+      "model_family": "none_of_above",
+      "phase_realization": "unknown",
+      "evidence_qualification": "unknown",
+      "engineering_use": "unknown"
+    }
+  ],
+  "nuisance_states": [
+    {
+      "state_id": "nominal",
+      "prior_probability": 0.5
+    },
+    {
+      "state_id": "common_drift",
+      "prior_probability": 0.5
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "continue",
+      "losses": [
+        {
+          "world_state_id": "state_a",
+          "loss": 5
+        },
+        {
+          "world_state_id": "state_b",
+          "loss": 5
+        },
+        {
+          "world_state_id": "unknown_state",
+          "loss": 5
+        }
+      ]
+    },
+    {
+      "decision_id": "stop",
+      "losses": [
+        {
+          "world_state_id": "state_a",
+          "loss": 5
+        },
+        {
+          "world_state_id": "state_b",
+          "loss": 5
+        },
+        {
+          "world_state_id": "unknown_state",
+          "loss": 5
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "financial_budget",
+      "unit": "USD_cent",
+      "capacity": 100,
+      "semantics": "Synthetic budget."
+    },
+    {
+      "resource_id": "instrument_A_time",
+      "unit": "minute",
+      "capacity": 50,
+      "semantics": "Synthetic instrument time."
+    }
+  ],
+  "outcome_labels": [
+    "positive",
+    "negative"
+  ],
+  "initial_capabilities": [],
+  "actions": [
+    {
+      "action_id": "information_only_probe",
+      "action_type": "measurement",
+      "requires_capabilities": [],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 25
+        },
+        {
+          "resource_id": "instrument_A_time",
+          "unit": "minute",
+          "quantity": 20
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "state_a",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.95,
+                0.050000000000000044
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.95,
+                0.050000000000000044
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "state_b",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "unknown_state",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.55,
+                0.44999999999999996
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.55,
+                0.44999999999999996
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic multi-resource and precommitment tail-risk planning contract only; no physical likelihood, laboratory cost, synthesis yield, superconducting property, or application outcome is calibrated or claimed."
+}

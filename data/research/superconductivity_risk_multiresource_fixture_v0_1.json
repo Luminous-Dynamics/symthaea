@@ -1,0 +1,806 @@
+{
+  "contract": "SC-RISK-MULTIRESOURCE-0.1",
+  "instance_id": "synthetic_tail_risk_resource_fixture_001",
+  "fixture_only": true,
+  "risk_alpha": 0.9,
+  "reference_resource_id": "financial_budget",
+  "world_states": [
+    {
+      "world_state_id": "bulk_conventional",
+      "prior_probability": 0.5,
+      "model_family": "conventional_electron_phonon",
+      "phase_realization": "realized",
+      "evidence_qualification": "bulk_thermodynamic_and_magnetic",
+      "engineering_use": "application_envelope_met"
+    },
+    {
+      "world_state_id": "metastable_transport_only",
+      "prior_probability": 0.25,
+      "model_family": "multiband_electron_phonon",
+      "phase_realization": "metastable_or_conditional",
+      "evidence_qualification": "transport_only",
+      "engineering_use": "not_met"
+    },
+    {
+      "world_state_id": "finite_q_bulk",
+      "prior_probability": 0.2,
+      "model_family": "finite_q_pairing",
+      "phase_realization": "realized",
+      "evidence_qualification": "unresolved",
+      "engineering_use": "unmeasured"
+    },
+    {
+      "world_state_id": "none_of_above_unknown",
+      "prior_probability": 0.05,
+      "model_family": "none_of_above",
+      "phase_realization": "unknown",
+      "evidence_qualification": "unknown",
+      "engineering_use": "unknown"
+    }
+  ],
+  "nuisance_states": [
+    {
+      "state_id": "nominal_common_calibration",
+      "prior_probability": 0.8
+    },
+    {
+      "state_id": "shared_positive_bias",
+      "prior_probability": 0.2
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "defer_or_stop",
+      "losses": [
+        {
+          "world_state_id": "bulk_conventional",
+          "loss": 5
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "loss": 1
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "loss": 0.2
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "loss": 1
+        }
+      ]
+    },
+    {
+      "decision_id": "continue_characterization",
+      "losses": [
+        {
+          "world_state_id": "bulk_conventional",
+          "loss": 1.5
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "loss": 2
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "loss": 2.5
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "loss": 2
+        }
+      ]
+    },
+    {
+      "decision_id": "attempt_synthesis",
+      "losses": [
+        {
+          "world_state_id": "bulk_conventional",
+          "loss": 0
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "loss": 8
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "loss": 2
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "loss": 100
+        }
+      ]
+    },
+    {
+      "decision_id": "declare_bulk_superconductivity",
+      "losses": [
+        {
+          "world_state_id": "bulk_conventional",
+          "loss": 0
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "loss": 35
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "loss": 30
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "loss": 500
+        }
+      ]
+    },
+    {
+      "decision_id": "qualify_application",
+      "losses": [
+        {
+          "world_state_id": "bulk_conventional",
+          "loss": 1
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "loss": 16
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "loss": 12
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "loss": 200
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "financial_budget",
+      "unit": "USD_cent",
+      "capacity": 18000,
+      "semantics": "Conservative direct campaign budget in US cents; excludes unpriced overhead."
+    },
+    {
+      "resource_id": "cryostat_A_time",
+      "unit": "minute",
+      "capacity": 110,
+      "semantics": "Available booked measurement time on cryostat A; queue wait is not represented."
+    },
+    {
+      "resource_id": "magnetometer_B_time",
+      "unit": "minute",
+      "capacity": 50,
+      "semantics": "Available booked measurement time on magnetometer B."
+    },
+    {
+      "resource_id": "specimen_A_mass",
+      "unit": "mg",
+      "capacity": 6,
+      "semantics": "Consumable mass from one identified synthetic specimen inventory."
+    },
+    {
+      "resource_id": "furnace_C_time",
+      "unit": "minute",
+      "capacity": 120,
+      "semantics": "Available furnace processing time."
+    },
+    {
+      "resource_id": "synthesis_run_slots",
+      "unit": "run",
+      "capacity": 1,
+      "semantics": "Maximum synthesis runs available in this fixture."
+    },
+    {
+      "resource_id": "precursor_mix_A_mass",
+      "unit": "mg",
+      "capacity": 5,
+      "semantics": "Available precursor mixture mass for the synthetic route."
+    },
+    {
+      "resource_id": "compute_cluster_time",
+      "unit": "core_minute",
+      "capacity": 50,
+      "semantics": "Allocated CPU core-minutes for route assessment."
+    },
+    {
+      "resource_id": "pressure_cell_A_time",
+      "unit": "minute",
+      "capacity": 45,
+      "semantics": "Available booked pressure-cell time on facility A; queue wait and decompression/thermal-cycle schedule are not represented."
+    }
+  ],
+  "outcome_labels": [
+    "supportive_or_qualified",
+    "not_supportive_or_unqualified"
+  ],
+  "initial_capabilities": [
+    "magnetometer_calibrated",
+    "stiffness_probe"
+  ],
+  "actions": [
+    {
+      "action_id": "qualify_thermodynamic_channel",
+      "action_type": "capability",
+      "requires_capabilities": [],
+      "provides_capabilities": [
+        "thermodynamic_channel_qualified"
+      ],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 1000
+        },
+        {
+          "resource_id": "cryostat_A_time",
+          "unit": "minute",
+          "quantity": 10
+        }
+      ],
+      "outcome_likelihoods": []
+    },
+    {
+      "action_id": "bulk_thermodynamic_check",
+      "action_type": "measurement",
+      "requires_capabilities": [
+        "thermodynamic_channel_qualified"
+      ],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 3500
+        },
+        {
+          "resource_id": "cryostat_A_time",
+          "unit": "minute",
+          "quantity": 90
+        },
+        {
+          "resource_id": "specimen_A_mass",
+          "unit": "mg",
+          "quantity": 3
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "bulk_conventional",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.95,
+                0.050000000000000044
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.9995,
+                0.0004999999999999449
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.08,
+                0.92
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.16,
+                0.84
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.78,
+                0.21999999999999997
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.86,
+                0.14
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.002,
+                0.998
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.082,
+                0.918
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "independent_magnetization",
+      "action_type": "measurement",
+      "requires_capabilities": [
+        "magnetometer_calibrated"
+      ],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 2500
+        },
+        {
+          "resource_id": "magnetometer_B_time",
+          "unit": "minute",
+          "quantity": 40
+        },
+        {
+          "resource_id": "specimen_A_mass",
+          "unit": "mg",
+          "quantity": 2
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "bulk_conventional",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.9,
+                0.09999999999999998
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.98,
+                0.020000000000000018
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.12,
+                0.88
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.2,
+                0.8
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.72,
+                0.28
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.7999999999999999,
+                0.20000000000000007
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.001,
+                0.999
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.081,
+                0.919
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "stiffness_tensor",
+      "action_type": "measurement",
+      "requires_capabilities": [
+        "stiffness_probe"
+      ],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 2200
+        },
+        {
+          "resource_id": "cryostat_A_time",
+          "unit": "minute",
+          "quantity": 70
+        },
+        {
+          "resource_id": "specimen_A_mass",
+          "unit": "mg",
+          "quantity": 4
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "bulk_conventional",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.05,
+                0.95
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.13,
+                0.87
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.05,
+                0.95
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.13,
+                0.87
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.99,
+                0.010000000000000009
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.9995,
+                0.0004999999999999449
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.001,
+                0.999
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.081,
+                0.919
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "qualify_synthesis_route",
+      "action_type": "capability",
+      "requires_capabilities": [],
+      "provides_capabilities": [
+        "synthesis_route_ready"
+      ],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 1500
+        },
+        {
+          "resource_id": "compute_cluster_time",
+          "unit": "core_minute",
+          "quantity": 20
+        }
+      ],
+      "outcome_likelihoods": []
+    },
+    {
+      "action_id": "synthesis_trial",
+      "action_type": "synthesis",
+      "requires_capabilities": [
+        "synthesis_route_ready"
+      ],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 5000
+        },
+        {
+          "resource_id": "furnace_C_time",
+          "unit": "minute",
+          "quantity": 90
+        },
+        {
+          "resource_id": "synthesis_run_slots",
+          "unit": "run",
+          "quantity": 1
+        },
+        {
+          "resource_id": "precursor_mix_A_mass",
+          "unit": "mg",
+          "quantity": 5
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "bulk_conventional",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.98,
+                0.020000000000000018
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.9995,
+                0.0004999999999999449
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.18,
+                0.8200000000000001
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.7,
+                0.30000000000000004
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.7799999999999999,
+                0.22000000000000008
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.0005,
+                0.9995
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.0805,
+                0.9195
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "unreviewed_high_field_probe",
+      "action_type": "measurement",
+      "requires_capabilities": [
+        "high_field_facility"
+      ],
+      "provides_capabilities": [],
+      "eligible": false,
+      "exclusion_reason": "Independent facility and safety qualification is absent",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 1200
+        },
+        {
+          "resource_id": "magnetometer_B_time",
+          "unit": "minute",
+          "quantity": 60
+        },
+        {
+          "resource_id": "specimen_A_mass",
+          "unit": "mg",
+          "quantity": 2
+        },
+        {
+          "resource_id": "pressure_cell_A_time",
+          "unit": "minute",
+          "quantity": 60
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "bulk_conventional",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.8,
+                0.19999999999999996
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.88,
+                0.12
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "metastable_transport_only",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.7,
+                0.30000000000000004
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.7799999999999999,
+                0.22000000000000008
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "finite_q_bulk",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.6,
+                0.4
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.6799999999999999,
+                0.32000000000000006
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "none_of_above_unknown",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal_common_calibration",
+              "outcome_probabilities": [
+                0.5,
+                0.5
+              ]
+            },
+            {
+              "state_id": "shared_positive_bias",
+              "outcome_probabilities": [
+                0.58,
+                0.42000000000000004
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic multi-resource and precommitment tail-risk planning contract only; no physical likelihood, laboratory cost, synthesis yield, superconducting property, or application outcome is calibrated or claimed."
+}

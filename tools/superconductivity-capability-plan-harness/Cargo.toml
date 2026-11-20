@@ -29,3 +29,7 @@ path = "src/bin/sc_correlated_evidence_audit.rs"
 [[bin]]
 name = "sc_decision_value_audit"
 path = "src/bin/sc_decision_value_audit.rs"
+
+[[bin]]
+name = "sc_risk_multiresource_audit"
+path = "src/bin/sc_risk_multiresource_audit.rs"
