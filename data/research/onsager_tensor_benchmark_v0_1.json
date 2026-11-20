@@ -1,0 +1,52 @@
+{
+  "contract": "SC-ONSAGER-TENSOR-AUDIT-0.1",
+  "benchmark_id": "reactca_ba_ti_o_onsager_transport_001",
+  "source": {
+    "repository": "mcgalcode/rxn-ca",
+    "commit": "4c1b9beba8f111d6dac19aa0b0fa4c88a4e8912c",
+    "path": "src/rxn_ca/phases/transport_db/Ba-Ti-O.json",
+    "raw_url": "https://raw.githubusercontent.com/mcgalcode/rxn-ca/4c1b9beba8f111d6dac19aa0b0fa4c88a4e8912c/src/rxn_ca/phases/transport_db/Ba-Ti-O.json",
+    "git_blob_sha1": "09e6057fdb042fd5e8c12428d72e75b043ca7e34",
+    "license": "MIT",
+    "license_url": "https://opensource.org/license/mit",
+    "attribution": "mcgalcode and contributors, rxn-ca, MIT-licensed. Derived benchmark audit by Luminous Dynamics."
+  },
+  "transport_method_source": {
+    "repository": "vir-k01/py-OATS",
+    "commit": "3888154cc4062dee2200c9354dae6f2a995450d4",
+    "path": "src/py_oats/analyzers/transport.py",
+    "raw_url": "https://raw.githubusercontent.com/vir-k01/py-OATS/3888154cc4062dee2200c9354dae6f2a995450d4/src/py_oats/analyzers/transport.py",
+    "license": "MIT",
+    "description": "FFT-derived species self and distinct correlation functions, independently fitted slopes, and Onsager tensor serialization."
+  },
+  "expected": {
+    "record_count": 55,
+    "formula_count": 11,
+    "temperature_count": 5,
+    "temperatures_k": [750, 1000, 1250, 1500, 1750],
+    "total_tensor_symmetric_count": 55,
+    "self_tensor_psd_count": 55,
+    "total_tensor_psd_count": 41,
+    "total_tensor_non_psd_count": 14,
+    "fit_uncertainty_present_count": 0
+  },
+  "tensor_contract": {
+    "species_order_source": "species",
+    "species_index_map_source": "mapping",
+    "total_tensor": "L_tensor",
+    "self_tensor": "L_tensor_self",
+    "distinct_tensor": "L_tensor_dis",
+    "units": "cm^-1 s^-1 eV^-1",
+    "volume_units": "angstrom^3",
+    "reciprocity_relative_tolerance": 1e-12,
+    "decomposition_relative_tolerance": 1e-12,
+    "psd_relative_tolerance": 1e-10,
+    "qualification_policy": "Report non-PSD total tensors as estimates that fail admissibility; do not silently project, clip, repair or use them as qualified physical transport."
+  },
+  "interpretation": {
+    "non_psd_policy": "Finite-trajectory correlation curves are fit independently; a non-PSD estimated Onsager tensor is retained as source evidence and flagged. It is not proof that the underlying material transport is nonphysical.",
+    "uncertainty_policy": "The bundled ReactCA transport JSON omits py-OATS fit dictionaries / covariance. Missing uncertainty must remain explicit; do not infer it from decimal precision.",
+    "missing_data_policy": "Exact formula and temperature matching is required by default. Nearest-temperature and identity-scaled missing-formula fallback are not treated as measured transport.",
+    "claim_ceiling": "Pinned source data and tensor-consistency audit only. No new diffusion coefficients, experimentally validated model reproduction, phase prediction or material discovery is established."
+  }
+}
