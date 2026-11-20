@@ -103,6 +103,25 @@ Before calling the verifier qualified, test:
 
 Targets (prospective, not measured): 100% rejection of deterministic wrong-binding and tampered-receipt controls; zero false pass on missing required evidence; identical canonical bundle digest for semantically identical reordered JSON; and O(number of components) lookup/verification cost.
 
+## Runtime verifier v0.1 — source implementation added
+
+A standalone package now exists at `tools/muse-evidence-bundle/`:
+
+- Library: `tools/muse-evidence-bundle/src/lib.rs`.
+- CLI: `tools/muse-evidence-bundle/src/main.rs`.
+- Usage: `cargo run --manifest-path tools/muse-evidence-bundle/Cargo.toml -- verify MANIFEST.json EVIDENCE_DIR`.
+
+The library:
+- Validates a closed manifest field set and the recursively key-normalized bundle receipt seal.
+- Uses public `symthaea_muse::edit_evidence::verify_result_seal`, `symthaea_muse::audio_edit_observer::verify_gain_envelope_observation_seal`, and `muse_render_receipt::verify_receipt_bytes` / `verify_bundle` APIs.
+- Rechecks case/source/candidate Score/MIDI/WAV/contract/receipt cross-bindings.
+- Confirms that the render receipt's protected-audio, rendered-score and human evidence channels reference the corresponding bundle component receipts.
+- Derives the pass/fail/abstain lattice and emits a JSON report. Exit codes are 0 pass, 2 fail, 3 abstain, 4 invalid manifest/input/verifier error.
+
+**Current status is deliberately fail-closed:** Score-to-audio and human receipts have no registered public verifier, so those gates remain abstain even when a file is supplied. Render byte/MIDI/WAV integrity is rechecked through the public verifier, but render execution also remains abstain until trusted executor/input-consumption attestation exists. Isolated-stem acoustic claims remain abstain until independently verified stem/material lineage is present. Consequently v0.1 is not able to produce a full overall pass; this is intentional.
+
+Seven unit tests are authored for outcome precedence, required-gate abstention, seal tampering, cross-binding mismatches, missing receipt rejection and canonical key-order stability. They have **not** been compiled or executed. No Cargo/rustc/rustfmt is available locally and no exact-head CI pass is claimed. The schema and five shape-valid fixtures remain structural contract artifacts; placeholder digests are not cryptographic test receipts.
+
 ## Implementation order
 
 1. Verify each component using its existing public API; do not recreate its digest logic in the bundle verifier.
