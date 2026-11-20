@@ -533,25 +533,42 @@ impl ExecutionLedger {
                 && completion.device_id == self.device_id
                 && completion.device_epoch == self.device_epoch
             {
-                if let Ok(sequence) =
-                    parse_decimal_u64(&completion.sequence, false, "completion.sequence")
-                {
+                // Command IDs are unique for the ledger lifetime. Prefer the
+                // sequence echo when valid, but fall back to command ID when
+                // the rejected envelope corrupts its sequence representation.
+                let matching_sequence = parse_decimal_u64(
+                    &completion.sequence,
+                    false,
+                    "completion.sequence",
+                )
+                .ok()
+                .filter(|sequence| {
+                    self.pending
+                        .get(sequence)
+                        .is_some_and(|pending| pending.command_id == completion.command_id)
+                })
+                .or_else(|| {
+                    self.pending
+                        .iter()
+                        .find(|(_, pending)| pending.command_id == completion.command_id)
+                        .map(|(sequence, _)| *sequence)
+                });
+
+                if let Some(sequence) = matching_sequence {
                     if let Some(pending) = self.pending.get(&sequence).cloned() {
-                        if completion.command_id == pending.command_id {
-                            self.submission_blocked = true;
-                            self.recovery_epoch_pending = true;
-                            self.quiescence_required_epochs.insert(self.device_epoch.clone());
-                            for key in &pending.buffers {
-                                registry.set_ownership(
-                                    key,
-                                    BufferOwnership::Quarantined {
-                                        device_epoch: self.device_epoch.clone(),
-                                        sequence,
-                                    },
-                                );
-                            }
-                            self.pending.remove(&sequence);
+                        self.submission_blocked = true;
+                        self.recovery_epoch_pending = true;
+                        self.quiescence_required_epochs.insert(self.device_epoch.clone());
+                        for key in &pending.buffers {
+                            registry.set_ownership(
+                                key,
+                                BufferOwnership::Quarantined {
+                                    device_epoch: self.device_epoch.clone(),
+                                    sequence,
+                                },
+                            );
                         }
+                        self.pending.remove(&sequence);
                     }
                 }
             }
@@ -2171,6 +2188,51 @@ mod tests {
         );
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
     }
+    #[test]
+    fn rejected_completion_with_malformed_sequence_quarantines_by_command_id() {
+        let (mut capabilities, mut command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        completion.status = "rejected".into();
+        completion.error_code = Some("UNSUPPORTED_DESCRIPTOR".into());
+        completion.rejection_stage = Some("before_dma".into());
+        completion.dma_acquired = Some(false);
+        completion.result = None;
+        completion.output_buffer = None;
+        completion.sequence = "01".into();
+
+        assert_eq!(
+            ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap_err().code,
+            "INVALID_DECIMAL_U64"
+        );
+        assert_eq!(ledger.pending_count(), 0);
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::Quarantined { .. })
+        ));
+
+        command.command_id = "fixture-after-malformed-sequence".into();
+        command.sequence = "2".into();
+        assert_eq!(
+            ledger.submit(&command, &capabilities, &mut registry).unwrap_err().code,
+            "DEVICE_EPOCH_REQUIRES_RECONCILIATION"
+        );
+        ledger
+            .reset("ffeeddccbbaa99887766554433221100", &mut registry)
+            .unwrap();
+        command.device_epoch = "ffeeddccbbaa99887766554433221100".into();
+        capabilities.device_epoch = command.device_epoch.clone();
+        command.sequence = "1".into();
+        assert_eq!(
+            ledger.submit(&command, &capabilities, &mut registry).unwrap_err().code,
+            "DEVICE_EPOCH_REQUIRES_RECONCILIATION"
+        );
+        assert_eq!(
+            ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
+            4
+        );
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+    }
+
     #[test]
     fn rejected_completion_claiming_dma_acquisition_quarantines_and_blocks_epoch() {
         let (capabilities, mut command, mut completion, mut registry, mut ledger) = setup();
