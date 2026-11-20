@@ -19,12 +19,12 @@ Attribution: Lauren Walters, Matthew J. McDermott, Bernardus Rendy, Yuxing Fei, 
 
 The dataset contains 1,035 unique unordered pairs among 46 precursors. Since `46 × 45 / 2 = 1,035`, the experiment design is the complete undirected graph (K_{46}): every precursor has exactly 45 incident pair experiments, and there are no repeated unordered pairs in this cohort.
 
-This is not a random sample of isolated reactions. It permits pair-interaction and per-precursor analyses, but it creates an important validation hazard: a random pair split leaks both precursor identities across train and test. More credible generalization tests should include:
+This is not a random sample of isolated reactions. It permits pair-interaction and per-precursor analyses, but it creates an important validation hazard: a random pair split leaks both precursor identities across train and test. More credible generalization tests are now emitted in the audit receipt:
 
-- 46-fold leave-one-precursor-out: hold out all 45 edges incident to one precursor.
-- Chemistry-family-held-out splits, with families declared independently of observed labels.
-- Double-node-held-out tests for truly unseen precursor combinations.
-- Random pair splits only as an easier diagnostic, not the main generalization claim.
+- **46-fold leave-one-precursor-out:** hold out one node's 45 incident edges; train on the remaining 990 edges. Every test prediction involves a precursor never seen in training.
+- **1,035-fold double-node holdout:** hold out two nodes and every edge touching either node; train on the 946 edges among the remaining 44 nodes and test on the 89 edges incident to the two held nodes. This is a stricter test for transfer to an unseen precursor pair.
+- **Chemistry-family-held-out:** not yet materialized. Family assignments must be declared independently of outcomes and frozen before evaluation; the audit does not infer families from labels.
+- **Random pair splits:** diagnostic only, not a primary generalization result.
 
 ## Exact cohort reconciliation
 
@@ -74,6 +74,8 @@ Walters et al. (arXiv:2611.23527, posted 2026-11-17) report a three-feature log-
 The next valid comparison is an exact reproduction of the same PG + PG-LIT cohort, preprocessing, 26-pair holdout and score definitions. The source ledger alone is not sufficient to reproduce the published AFT model: the literature observations, decomposition-product proxy features and exact model implementation must also be pinned and audited.
 
 ### New tests that could provide a real advantage
+
+For every split, publish fold-level metrics and uncertainty; do not pool folds and hide a precursor that is consistently hard to generalize. For the double-node protocol, report the distribution across all 1,035 held-node pairs.
 
 1. **Graph-aware reactivity:** compare a dyadic model with precursor effects and sparse pair interactions against simple prevalence, per-precursor degree, Tammann and thermodynamic-only baselines.
 2. **Cold-start chemistry:** evaluate leave-one-precursor-out, chemistry-family-held-out and double-node-held-out performance; report per-fold uncertainty, not only pooled accuracy.
