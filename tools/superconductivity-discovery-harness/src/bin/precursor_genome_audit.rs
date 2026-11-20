@@ -263,7 +263,6 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
             }
         } else {
             *active_quality_counts.entry("no_active_refinement".to_owned()).or_default() += 1;
-            *active_acceptance_counts.entry("no_active_refinement".to_owned()).or_default() += 1;
             no_active_refinement_ids.push(sample_id.clone());
         }
     }
@@ -277,11 +276,20 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
     }
 
     let mut expected_quality = BTreeMap::new();
-    for key in ["1", "2", "3", "missing", "no_active_refinement"] {
-        expected_quality.insert(key.to_owned(), *active_quality_counts.get(key).unwrap_or(&0));
+    for (reported, observed) in [
+        ("score_1", "1"),
+        ("score_2", "2"),
+        ("score_3", "3"),
+        ("missing", "missing"),
+        ("no_active_refinement", "no_active_refinement"),
+    ] {
+        expected_quality.insert(
+            reported.to_owned(),
+            *active_quality_counts.get(observed).unwrap_or(&0),
+        );
     }
     let mut expected_acceptance = BTreeMap::new();
-    for key in ["accepted", "rejected", "missing", "no_active_refinement"] {
+    for key in ["accepted", "rejected", "missing"] {
         expected_acceptance.insert(key.to_owned(), *active_acceptance_counts.get(key).unwrap_or(&0));
     }
 
