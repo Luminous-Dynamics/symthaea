@@ -1,0 +1,70 @@
+name: D4 COLT finite regression corpus
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/symmetry-colt-regression-001/**"
+      - "research/symmetry-discovery-benchmark-001/oracle/**"
+      - ".github/workflows/symmetry-colt-regression-fixtures.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/symmetry-colt-regression-001/**"
+      - "research/symmetry-discovery-benchmark-001/oracle/**"
+      - ".github/workflows/symmetry-colt-regression-fixtures.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symmetry-colt-regression-fixtures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-and-qualify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup component add rustfmt clippy --toolchain 1.96.0
+      - name: Format
+        run: cargo +1.96.0 fmt --manifest-path research/symmetry-colt-regression-001/Cargo.toml --all -- --check
+      - name: Exact corpus tests
+        run: cargo +1.96.0 test --locked --manifest-path research/symmetry-colt-regression-001/Cargo.toml
+      - name: Strict Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path research/symmetry-colt-regression-001/Cargo.toml --all-targets -- -D warnings
+      - name: Generate label-free public inputs
+        run: cargo +1.96.0 run --release --locked --manifest-path research/symmetry-colt-regression-001/Cargo.toml -- --output-dir "${RUNNER_TEMP}/d4-colt-regression"
+      - name: Validate public split schemas
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          root = Path("research/symmetry-colt-regression-001/schemas")
+          schema = json.loads((root / "public_split.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          generated = Path(os.environ["RUNNER_TEMP"]) / "d4-colt-regression" / "public_inputs"
+          for split in ("discovery", "calibration", "final_holdout"):
+              data = json.loads((generated / f"{split}.json").read_text())
+              Draft202012Validator(schema).validate(data)
+          PY
+      - name: Upload reproducible public inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: d4-colt-regression-public-inputs-v0.1
+          path: ${{ runner.temp }}/d4-colt-regression/public_inputs/
+          if-no-files-found: error
+          retention-days: 30

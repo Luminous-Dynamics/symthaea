@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-colt-regression-001/schemas/public_split.schema.json",
+  "title": "Label-free D4 regression public split v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "split",
+    "ambient_group_id",
+    "feature_basis_id",
+    "feature_basis",
+    "coordinate_distribution",
+    "sample_counts_per_function",
+    "target_encoding",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "SYMM-COLT-D4-REGRESSION-001"
+    },
+    "split": {
+      "enum": [
+        "discovery",
+        "calibration",
+        "final_holdout"
+      ]
+    },
+    "ambient_group_id": {
+      "const": "D4"
+    },
+    "feature_basis_id": {
+      "const": "xy-monomials-total-degree-le-4-graded-lex-v1"
+    },
+    "feature_basis": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "coordinate_distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "coordinate_scale",
+        "integer_grid_min",
+        "integer_grid_max",
+        "sampling_rule"
+      ],
+      "properties": {
+        "family": {
+          "const": "product-uniform discrete grid"
+        },
+        "coordinate_scale": {
+          "const": 10
+        },
+        "integer_grid_min": {
+          "const": -20
+        },
+        "integer_grid_max": {
+          "const": 20
+        },
+        "sampling_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sample_counts_per_function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "training",
+        "calibration",
+        "holdout"
+      ],
+      "properties": {
+        "training": {
+          "const": 32
+        },
+        "calibration": {
+          "const": 16
+        },
+        "holdout": {
+          "const": 32
+        }
+      }
+    },
+    "target_encoding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numerator_denominator",
+        "common_denominator",
+        "note"
+      ],
+      "properties": {
+        "numerator_denominator": {
+          "const": "exact signed integer rational"
+        },
+        "common_denominator": {
+          "const": 80000
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 300,
+      "maxItems": 300,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "feature_basis_id",
+          "training_samples",
+          "calibration_samples",
+          "holdout_samples"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^REG-[0-9a-f]{16}$"
+          },
+          "feature_basis_id": {
+            "const": "xy-monomials-total-degree-le-4-graded-lex-v1"
+          },
+          "training_samples": {
+            "type": "array",
+            "minItems": 32,
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/$defs/sample"
+            }
+          },
+          "calibration_samples": {
+            "type": "array",
+            "minItems": 16,
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/$defs/sample"
+            }
+          },
+          "holdout_samples": {
+            "type": "array",
+            "minItems": 32,
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/$defs/sample"
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "target_subgroup_label"
+              ]
+            },
+            {
+              "required": [
+                "target_subgroup_element_ids"
+              ]
+            },
+            {
+              "required": [
+                "target_polynomial"
+              ]
+            },
+            {
+              "required": [
+                "generation_seed"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x_scaled",
+        "y_scaled",
+        "coordinate_scale",
+        "target_numerator",
+        "target_denominator"
+      ],
+      "properties": {
+        "x_scaled": {
+          "type": "integer",
+          "minimum": -20,
+          "maximum": 20
+        },
+        "y_scaled": {
+          "type": "integer",
+          "minimum": -20,
+          "maximum": 20
+        },
+        "coordinate_scale": {
+          "const": 10
+        },
+        "target_numerator": {
+          "type": "integer"
+        },
+        "target_denominator": {
+          "const": 80000
+        }
+      }
+    }
+  }
+}
