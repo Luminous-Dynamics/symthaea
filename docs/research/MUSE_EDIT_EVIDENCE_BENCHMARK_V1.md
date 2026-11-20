@@ -194,6 +194,27 @@ To claim a meaningful improvement over a reproduced baseline, require at least a
 
 ## 9. Current status
 
-**Implemented here:** case/result schemas, one synthetic case fixture, one synthetic result fixture, and this protocol.
+**Implemented here:** case/result schemas, synthetic fixtures, protocol, and an initial deterministic Rust scorer/CLI for the one-to-one velocity-edit slice.
 
-**Not yet implemented or measured:** real dataset, scorer, evaluator calibration, acoustic observer, human panel, matched baseline reproduction, held-out evaluation and all prospective targets. Synthetic fixtures are not benchmark performance evidence.
+**Not yet implemented or measured:** full schema-validation pipeline, general multi-operation scorer, calibrated instruction evaluator, acoustic observers, real dataset, human panel, matched baseline reproduction, held-out evaluation and all prospective targets. Synthetic fixtures and authored tests are not benchmark performance evidence.
+
+
+## 10. Executable scoring increment — 2026-11-20
+
+The first scorer is intentionally narrow and fail-closed:
+
+- Accepts typed `symthaea_music_theory::Score` JSON for the frozen source and candidate.
+- Recomputes the Score content digest using the same `serde_json::to_vec(typed_score)` followed by SHA-256 convention used by MUSE score provenance, and rejects a stale/mismatched source binding.
+- Supports only velocity edits with explicit one-to-one source/target note correspondence and `preserve` / `modify` relations. Note ordinals are interpreted only against their bound source/candidate Score digests.
+- Uses rational beat bounds and PartId scopes; checks that target and protected scopes do not overlap, that the declared event relation agrees with scope membership, and that all non-velocity note attributes and global Score metadata remain unchanged.
+- Checks the requested rational velocity scale with the case's MIDI-velocity tolerance. Protected and outside-scope agreement and collateral-change rate remain separate result metrics.
+- Produces the v1 result shape and a domain-separated SHA-256 evaluation receipt seal, with a public seal-verification function. An optional candidate WAV is byte-hashed and checked against the exact/acceptable audio hashes only for the exact-score-and-audio target kind.
+- Exposes the evaluator through a `theory`-gated CLI:
+
+~~~sh
+cargo run -p symthaea-muse --features theory --bin muse_edit_evaluator -- --case case.json --source-score source-score.json --candidate-score candidate-score.json --output result.json
+~~~
+
+**Deliberate non-claims:** this slice does not evaluate free-form instruction compatibility, audio perceptibility, musical validity, acoustic preservation, or renderer execution integrity. It emits `not_run` for instruction and integrity evidence; consequently `strict_sample_exact_match` remains false even when the symbolic velocity and preservation sub-gates pass. Unsupported edit families, target kinds, and split/merge/insert/delete correspondence relations are refused rather than heuristically scored.
+
+Six unit tests are authored for a positive velocity edit, wrong velocity, protected-note mutation, duplicate correspondence, stale source digest, and unsupported-operation abstention. They have **not** been compiled or executed: no local Cargo/rustc/rustfmt is available, and no exact-head CI pass is claimed. The full JSON Schema validator remains outstanding; these tests are source additions, not test results.
