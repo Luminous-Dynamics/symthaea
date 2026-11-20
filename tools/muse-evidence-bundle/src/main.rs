@@ -15,9 +15,9 @@ fn run() -> Result<i32, String> {
     if args.len() < 4 || args[1] != "verify" {
         println!(
             "muse-evidence-bundle verify MANIFEST.json EVIDENCE_DIR\n\
-             EVIDENCE_DIR may contain symbolic-result.json, render-receipt.json,\n\
-             render-bundle/, acoustic-result.json, score-audio-result.json,\n\
-             and human-acceptance.json."
+             EVIDENCE_DIR may contain case.json, source-audio.wav, gain-envelope-contract.json,\n\
+             symbolic-result.json, render-receipt.json, render-bundle/,\n\
+             acoustic-result.json, score-audio-result.json, and human-acceptance.json."
         );
         return Ok(2);
     }
