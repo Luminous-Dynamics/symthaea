@@ -37,8 +37,10 @@ from the physical task key: different solver families are the competitors.
 
 ## Evidence and split integrity
 
-All runs require valid SHA-256 receipts for the test state, build,
-configuration, execution and output bundle. Learned methods additionally
+All runs require separate valid SHA-256 digests for the test dataset manifest
+and the exact test initial state, plus build, configuration, execution and
+output bundle. The initial-state digest must match the task identity; the
+dataset-manifest digest binds the larger held-out corpus. Learned methods additionally
 require training-data and checkpoint digests. Per-case training state digests
 are checked against the held-out test state. This exact-state check does not
 replace a full dataset-level leakage audit; the dataset manifest must also
