@@ -228,6 +228,9 @@ fn simulate(case: &Case) -> Result<ResultCase, String> {
             let diffusion_b = -(jb[i + 1] - jb[i]) / dx;
             next_a[i] = a[i] + dt * (diffusion_a - reaction_target - reaction_competitor);
             next_b[i] = b[i] + dt * (diffusion_b - reaction_target);
+            if !next_a[i].is_finite() || !next_b[i].is_finite() {
+                return Err(format!("case {} generated a non-finite concentration at cell {}", case.id, i));
+            }
             if next_a[i] < -1.0e-12 || next_b[i] < -1.0e-12 {
                 return Err(format!(
                     "case {} generated negative concentration at cell {}: A={}, B={}",
@@ -243,6 +246,11 @@ fn simulate(case: &Case) -> Result<ResultCase, String> {
     }
     let final_a = inventory(&a, dx);
     let final_b = inventory(&b, dx);
+    if ![
+        influx_a, influx_b, target_product, competitor_product, final_a, final_b
+    ].iter().all(|value| value.is_finite()) {
+        return Err(format!("case {} generated a non-finite mass-balance quantity", case.id));
+    }
     let balance_a = balance(initial_a, influx_a, final_a, target_product, competitor_product);
     let balance_b = balance(initial_b, influx_b, final_b, target_product, 0.0);
     if initial_a + influx_a <= 0.0 || initial_b + influx_b <= 0.0 {
