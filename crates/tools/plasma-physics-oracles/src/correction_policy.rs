@@ -31,7 +31,6 @@ pub enum CorrectionReason {
     CertificateInvalid,
     InvalidTolerance,
     CorrectionBudgetExhausted,
-    TrustedFallbackUnavailable,
 }
 
 /// Decision record. A caller should persist this together with the solver,
@@ -40,6 +39,7 @@ pub enum CorrectionReason {
 pub struct CorrectionDecision {
     pub action: CorrectionAction,
     pub reason: CorrectionReason,
+    pub trusted_fallback_available: bool,
 }
 
 /// Select accept, correction, fallback or unresolved.
@@ -76,6 +76,7 @@ pub fn decide_correction(
         Some(_) if correction_steps_remaining > 0 => CorrectionDecision {
             action: CorrectionAction::RunTrustedCorrection,
             reason: CorrectionReason::BoundExceedsTolerance,
+            trusted_fallback_available,
         },
         Some(_) => fallback_or_unresolved(
             trusted_fallback_available,
@@ -84,6 +85,7 @@ pub fn decide_correction(
         None if correction_steps_remaining > 0 => CorrectionDecision {
             action: CorrectionAction::RunTrustedCorrection,
             reason: CorrectionReason::CertificateMissing,
+            trusted_fallback_available,
         },
         None => fallback_or_unresolved(
             trusted_fallback_available,
@@ -100,11 +102,13 @@ fn fallback_or_unresolved(
         CorrectionDecision {
             action: CorrectionAction::TrustedFallback,
             reason,
+            trusted_fallback_available,
         }
     } else {
         CorrectionDecision {
             action: CorrectionAction::Unresolved,
-            reason: CorrectionReason::TrustedFallbackUnavailable,
+            reason,
+            trusted_fallback_available,
         }
     }
 }
@@ -219,7 +223,7 @@ mod tests {
             false,
         );
         assert_eq!(unresolved.action, CorrectionAction::Unresolved);
-        assert_eq!(unresolved.reason, CorrectionReason::TrustedFallbackUnavailable);
+        assert_eq!(unresolved.reason, CorrectionReason::CorrectionBudgetExhausted);
     }
 
     #[test]
@@ -259,7 +263,7 @@ mod tests {
         for tolerance in [0.0, -1.0, f64::NAN, f64::INFINITY] {
             let decision = decide_correction(Some(&certificate), tolerance, 10, false);
             assert_eq!(decision.action, CorrectionAction::Unresolved);
-            assert_eq!(decision.reason, CorrectionReason::TrustedFallbackUnavailable);
+            assert_eq!(decision.reason, CorrectionReason::InvalidTolerance);
         }
     }
 }
