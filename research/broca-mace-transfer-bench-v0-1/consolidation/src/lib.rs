@@ -244,7 +244,7 @@ fn causal_identification_fields(identification: CausalIdentificationV1) -> Vec<S
 
 fn binding_fields(binding: &ConsolidationSourceBindingV1) -> Vec<String> {
     let receipt = &binding.receipts;
-    vec![
+    let mut fields = vec![
         binding.event_id.to_string(),
         binding.action.name().to_owned(),
         scope_code(binding.scope).to_owned(),
@@ -274,12 +274,15 @@ fn binding_fields(binding: &ConsolidationSourceBindingV1) -> Vec<String> {
         receipt.calibration_method_id.clone(),
         receipt.calibration_revision.clone(),
         receipt.causal_assessment_digest.clone(),
-        causal_identification_fields(receipt.causal_identification),
+    ];
+    fields.extend(causal_identification_fields(receipt.causal_identification));
+    fields.extend([
         receipt.outcome_success.to_string(),
         receipt.outcome_observed_utility_bits.to_string(),
         receipt.outcome_utility_unit.clone(),
         receipt.outcome_digest.clone(),
-    ]
+    ]);
+    fields
 }
 
 impl ConsolidationReceiptProposalV1 {
