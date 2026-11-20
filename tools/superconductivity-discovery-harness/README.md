@@ -215,3 +215,59 @@ Lambard's 2026 synthesis-first perspective calls for machine-readable protocols,
 ### Claim ceiling
 
 Passing the audit validates interval comparability, declared reaction-balance status, model classifications and outcome-evidence semantics for the synthetic fixture. It does not prove reaction feasibility, predict an actual reaction rate, establish a realized phase, establish superconductivity, recommend a laboratory route or authorize any experiment.
+
+
+## Reaction thermodynamic selectivity and phase-evidence contract
+
+The protocol/execution contract above records intended steps, actual execution traces and characterized outcomes. A separate binary, \`sc_reaction_selectivity_audit\`, checks a *declared* target route against competing reaction alternatives while preserving the difference between thermodynamic calculations and measured phase outcomes.
+
+Schema: \`data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json\`  
+Synthetic fixture: \`tools/superconductivity-discovery-harness/fixtures/reaction_selectivity_smoke_v0_1.json\`  
+Suite registry: \`tools/superconductivity-discovery-harness/fixtures/reaction_selectivity_suite_v0_1.json\`
+
+Run:
+
+\`\`\`bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reaction_selectivity_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reaction_selectivity_audit -- \\
+  --schema data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json \\
+  --fixture tools/superconductivity-discovery-harness/fixtures/reaction_selectivity_smoke_v0_1.json \\
+  --out /tmp/sc-reaction-selectivity.json
+\`\`\`
+
+### Independent axes
+
+- **Hull distance** is a structural stability screen. It is not reaction-route selectivity.
+- **Reaction Gibbs free energy** is compared across target and competing routes only when condition IDs, standard state, declared reaction extent and energy unit match. For a conservative target route, its upper \(\Delta G\) bound plus the declared margin must be below every competing route's lower bound. If intervals overlap, the result is indeterminate.
+- **Kinetic activation barrier** is a separate interval and is assessed against a declared case threshold. That threshold is not universal and is not combined into \(\Delta G\).
+- **Observed target-phase status** is an independent three-state record: observed; not detected under stated conditions; unknown/not reported.
+
+The common extent label is a caller-declared comparison basis (for the fixture, a shared limiting-reactant equivalent). The auditor checks exact agreement of those declarations, but it does not parse stoichiometry or independently rebalance elemental/charge equations. A \`balance_status=verified\` value is a source/input assertion and remains an explicit limitation, not a newly proven chemical fact.
+
+### Evidence and lineage
+
+Characterization has its own condition identifier, distinct from the reaction/synthesis condition identifier. An in-situ or ex-situ measurement may be performed under a different pressure/temperature after a synthesis step; the audit does not force those states to be equal. Each characterization record carries a specimen ID, execution-run join key, method, characterization conditions ID, source locator, raw-data digest, phase fractions and a positive detection-limit fraction.
+
+A target non-detection is accepted only when characterization evidence and its declared detection limit are present. An unknown/not-reported outcome must not carry fabricated negative evidence. A target-positive observation requires a target phase marked identified or refined and a fraction at or above the declared detection limit. Multiphase products retain each phase and its fraction.
+
+### Frozen synthetic controls
+
+The four cases test:
+1. a target inside a low-hull screening threshold that is nevertheless disfavored by at least one competing reaction and has a barrier above the declared limit;
+2. a target outside the hull threshold whose reaction interval is robustly preferred and barrier is below the declared limit, but whose empirical outcome remains unknown;
+3. overlapping reaction intervals, ambiguous kinetics and unknown outcome;
+4. a thermodynamically favored target in a multiphase characterized product.
+
+The numbers are invented. They are not a material prediction, real reaction, process recipe or experimental result.
+
+### Literature context and benchmark scope
+
+Schlesinger et al., *Thermodynamic assessment of machine learning models for solid-state synthesis prediction* (Materials Horizons, 2026), evaluate model scores against both energy above hull and reaction thermodynamic selectivity. They report that contemporary models generally overpredict synthesis likelihood, with some scores tracking the thermodynamic diagnostics. This motivates keeping hull and reaction selectivity as separate evaluation channels rather than declaring a successful synthesis from either one: https://doi.org/10.1039/D6MH00209A
+
+Lambard's 2026 synthesis-first perspective argues for machine-readable protocol variables, generative/inverse route design and closed-loop refinement, while distinguishing protocol executability from successful target-phase realization: https://doi.org/10.1088/2515-7639/ae6e72
+
+This v0.1 contract is an evidence/interval auditor, not an ML synthesizability predictor. The next comparison should include hull-only screening, reaction-selectivity-only scoring, kinetic-barrier-only scoring and a calibrated multi-fidelity phase-ensemble model, all on identical held-out protocol/route/source cohorts and with failed attempts and unknown outcomes retained.
+
+### Claim ceiling
+
+A passing fixture validates schema, unit/basis/condition comparability, interval ordering, declared reaction-balance metadata, evidence linkage and tri-state outcome semantics. It does not prove chemical balance, reaction progress, target-phase realization, synthesis success, superconductivity or permission to run a laboratory procedure.
