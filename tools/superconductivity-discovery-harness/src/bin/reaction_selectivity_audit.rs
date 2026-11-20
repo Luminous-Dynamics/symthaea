@@ -365,7 +365,9 @@ fn case_receipt(case: &Case) -> Value {
             "normalization_basis": case.basis,
             "basis_unit": case.basis_unit,
             "standard_state": case.standard_state,
-            "balance_status": case.basis_balance_status
+            "declared_balance_status": case.basis_balance_status,
+            "balance_status_semantics": "Caller/source-declared assertion; the auditor checks internal consistency but does not independently balance elemental or charge stoichiometry.",
+            "normalization_comparison_semantics": "Target and competing reactions are compared only after exact matching of the declared common extent, unit and reaction-condition identifier."
         },
         "hull_screen_assessment": hull_assessment(case),
         "above_hull_interval_mev_atom": {"lower":case.hull.lower,"upper":case.hull.upper},
