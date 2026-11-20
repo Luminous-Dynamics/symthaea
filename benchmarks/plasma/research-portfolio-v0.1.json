@@ -134,7 +134,9 @@
         "fidelity_labels_preserved",
         "full_acquisition_and_run_cost_accounted"
       ],
-      "execution_status": "protocol_open_not_executed"
+      "execution_status": "protocol_and_candidate_schema_authored_not_executed",
+      "pr": 12945,
+      "candidate_schema": "benchmarks/plasma/active-kinetic-candidate.schema.json"
     }
   ]
 }
