@@ -35,6 +35,27 @@ fn score_sha256(score: &Score) -> Result<String, String> {
     Ok(sha256(&bytes))
 }
 
+fn validate_score(score: &Score, label: &str) -> Result<(), String> {
+    if !score.tempo_bpm.is_finite() || score.tempo_bpm <= 0.0
+        || score.meter == 0
+        || score.key.tonic.value() > 11
+        || score.total_beats.den() <= 0
+        || score.total_beats.num() < 0
+    {
+        return Err(format!("{label} has invalid tempo, key, meter or total duration"));
+    }
+    for (index, note) in score.notes.iter().enumerate() {
+        if note.onset.den() <= 0 || note.onset.num() < 0
+            || note.duration.den() <= 0 || note.duration.num() <= 0
+            || !note.velocity.is_finite() || !(0.0..=1.0).contains(&note.velocity)
+            || !note.section_intensity.is_finite() || note.section_intensity < 0.0
+        {
+            return Err(format!("{label}.notes[{index}] has invalid rational timing or dynamics"));
+        }
+    }
+    Ok(())
+}
+
 fn required<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a Value, String> {
     value.get(key).ok_or_else(|| format!("{label} is missing {key}"))
 }
@@ -217,6 +238,8 @@ pub fn evaluate_velocity_case(
         .map_err(|error| format!("invalid source Score JSON: {error}"))?;
     let candidate: Score = serde_json::from_slice(candidate_score_bytes)
         .map_err(|error| format!("invalid candidate Score JSON: {error}"))?;
+    validate_score(&source, "source Score")?;
+    validate_score(&candidate, "candidate Score")?;
     let source_digest = score_sha256(&source)?;
     let candidate_digest = score_sha256(&candidate)?;
     let source_binding = required(&case, "source", "case")?;
@@ -631,6 +654,21 @@ mod tests {
         case["source"]["score_sha256"] = json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         let error = evaluate_velocity_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
         assert!(error.contains("source Score digest mismatch"));
+    }
+
+    #[test]
+    fn malformed_rational_score_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut malformed = serde_json::to_value(&source).unwrap();
+        malformed["notes"][0]["onset"]["den"] = json!(0);
+        let error = evaluate_velocity_case(
+            &bytes(&case_for(&source)),
+            &bytes(&malformed),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("invalid rational timing"));
     }
 
     #[test]
