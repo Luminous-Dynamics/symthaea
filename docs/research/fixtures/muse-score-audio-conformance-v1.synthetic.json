@@ -35,12 +35,12 @@
       "observed_pitch_midi": 60,
       "estimated_frequency_hz": 261.62,
       "pitch_error_cents": 0.4,
-      "pitch_confidence": 0.82,
       "window_rms_dbfs": -18,
       "window_start_frame": 1952,
       "window_end_frame": 6048,
       "status": "pass",
-      "reason": null
+      "reason": null,
+      "pitch_salience_margin": 0.82
     }
   ],
   "outcome": {
