@@ -182,10 +182,12 @@ pub fn periodic_fourier_energy_and_forces(
             return Err(OracleError::NonFiniteOracleOutput);
         }
 
-        for i in 0..particles.len() {
-            for j in (i + 1)..particles.len() {
-                let phase = wave_number * (positions[i] - positions[j]);
-                let charge_product = particles[i].charge * particles[j].charge;
+        for (i, (particle_i, position_i)) in particles.iter().zip(&positions).enumerate() {
+            for (j, (particle_j, position_j)) in
+                particles.iter().zip(&positions).enumerate().skip(i + 1)
+            {
+                let phase = wave_number * (position_i - position_j);
+                let charge_product = particle_i.charge * particle_j.charge;
                 let pair_energy = energy_scale * charge_product * phase.cos();
                 let pair_force = force_scale * charge_product * phase.sin();
 
@@ -252,11 +254,14 @@ pub fn verify_periodic_1d_gauss_law(
     let mut max_abs_residual: f64 = 0.0;
     let mut net_charge = 0.0;
 
-    for cell in 0..cell_count {
+    for (cell, (&right_face, &density)) in electric_field_right_faces
+        .iter()
+        .zip(charge_density.iter())
+        .enumerate()
+    {
         let left_face = electric_field_right_faces[(cell + cell_count - 1) % cell_count];
-        let right_face = electric_field_right_faces[cell];
         let divergence = (right_face - left_face) / cell_width;
-        let residual = divergence - charge_density[cell] / permittivity;
+        let residual = divergence - density / permittivity;
 
         cell_residuals.push(residual);
         squared_residual_sum += residual * residual;
@@ -299,7 +304,7 @@ mod tests {
     #[test]
     fn empty_and_single_particle_states_have_zero_pair_energy_and_force() {
         let empty = periodic_fourier_energy_and_forces(&[], config(2)).unwrap();
-        assert_eq!(empty.potential_energy, 0.0);
+        close(empty.potential_energy, 0.0, 0.0);
         assert!(empty.forces.is_empty());
 
         let single = periodic_fourier_energy_and_forces(
@@ -310,8 +315,9 @@ mod tests {
             config(4),
         )
         .unwrap();
-        assert_eq!(single.potential_energy, 0.0);
-        assert_eq!(single.forces, vec![0.0]);
+        close(single.potential_energy, 0.0, 0.0);
+        assert_eq!(single.forces.len(), 1);
+        close(single.forces[0], 0.0, 0.0);
     }
 
     #[test]
@@ -433,7 +439,7 @@ mod tests {
         let base = periodic_fourier_energy_and_forces(&particles, config(4)).unwrap();
         let step = 1.0e-6;
 
-        for index in 0..particles.len() {
+        for (index, expected_force) in base.forces.iter().enumerate() {
             let mut plus = particles;
             let mut minus = particles;
             plus[index].position += step;
@@ -443,7 +449,7 @@ mod tests {
             let energy_minus =
                 periodic_fourier_energy_and_forces(&minus, config(4)).unwrap().potential_energy;
             let derivative = (energy_plus - energy_minus) / (2.0 * step);
-            close(base.forces[index], -derivative, 2.0e-8);
+            close(*expected_force, -derivative, 2.0e-8);
         }
     }
 
