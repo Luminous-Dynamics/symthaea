@@ -42,7 +42,7 @@ The Hound WAV API defines `WavReader::duration()` in samples per channel, indepe
 - `crates/domains/symthaea-muse/src/audio_edit_observer.rs`
 - Exported through `symthaea_muse::audio_edit_observer`.
 - Contract schema: `docs/research/schemas/muse-gain-envelope-contract-v1.schema.json`.
-- Result schema: `docs/research/schemas/muse-acoustic-observation-result-v1.schema.json`.
+- Result schema: `docs/research/schemas/muse-acoustic-observation-v1.schema.json`.
 - Synthetic contract and result fixtures live under `docs/research/fixtures/`.
 
 ## Authored adversarial coverage
