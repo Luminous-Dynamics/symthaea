@@ -10,7 +10,7 @@ use crate::audio_event_observation::{
     AUDIO_EVENT_OBSERVATION_MAX_NOTES_V1, AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1,
     AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1, AudioEventObservationIssueV1,
     AudioStemEventObservationReceiptV1, expected_frame, observe_rendered_audio_stem_events_v1,
-    validate_audio_stem_event_observation_v1,
+    replay_audio_stem_event_observation_v1,
 };
 use crate::midi_performance::{
     MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
@@ -1181,7 +1181,8 @@ pub fn validate_and_observe_part_stem_v1(
 
 /// Replay-check a combined structural-admission + stem-observation receipt
 /// against the exact bundle, MIDI artifact and WAV byte inputs. This verifies
-/// the nested commitments and event coverage without re-running the FFT.
+/// nested commitments and bindings, then re-runs the FFT observer and requires
+/// exact equality with the recorded measurements.
 pub fn validate_part_stem_audio_evidence_receipt_v1(
     receipt: &PartStemAudioEvidenceReceiptV1,
     bundle: &PartStemEvidenceBundleV1,
@@ -1225,7 +1226,7 @@ pub fn validate_part_stem_audio_evidence_receipt_v1(
         });
         return issues;
     };
-    let observation_issues = validate_audio_stem_event_observation_v1(
+    let observation_issues = replay_audio_stem_event_observation_v1(
         &receipt.audio_observation,
         &wav.wav_bytes,
         midi,
@@ -1863,6 +1864,42 @@ mod tests {
             domain_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &manifest_bytes);
         let issues = verify_midi(&midi).unwrap_err();
         assert!(issues.contains(&PartStemEvidenceIssueV1::WrongMidiSchema));
+    }
+
+    #[test]
+    fn combined_receipt_replay_rejects_resealed_fabricated_spectral_measurement() {
+        let (bundle, midi, wavs) = fixture();
+        let mut receipt = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
+        assert!(validate_part_stem_audio_evidence_receipt_v1(
+            &receipt, &bundle, &midi, &wavs, 1
+        ).is_empty());
+
+        receipt.audio_observation.note_observations[0].fundamental_salience_db =
+            Some(receipt.audio_observation.note_observations[0].fundamental_salience_db.unwrap_or(0.0) + 12.0);
+        receipt.audio_observation.receipt_sha256 =
+            crate::audio_event_observation::audio_stem_event_observation_commitment_v1(
+                &receipt.audio_observation
+            ).unwrap();
+
+        // Reseal the outer combined receipt as well. A validator that checks
+        // only nested SHA-256 commitments would accept this forged measurement.
+        let commitment = PartStemAudioEvidenceCommitmentV1 {
+            schema: &receipt.schema,
+            stem_validation: &receipt.stem_validation,
+            audio_observation: &receipt.audio_observation,
+        };
+        let bytes = serde_json::to_vec(&commitment).unwrap();
+        receipt.receipt_sha256 = domain_sha256(
+            "muse-part-stem-audio-evidence-receipt-serde-json-sha256-v1",
+            &bytes,
+        );
+
+        let issues = validate_part_stem_audio_evidence_receipt_v1(
+            &receipt, &bundle, &midi, &wavs, 1
+        );
+        assert!(issues.contains(&PartStemAudioEvidenceIssueV1::Observation(
+            AudioEventObservationIssueV1::ObservationReplayMismatch { track_index: 1 }
+        )));
     }
 
     #[test]
