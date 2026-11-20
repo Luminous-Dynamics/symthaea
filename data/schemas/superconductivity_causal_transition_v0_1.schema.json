@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_causal_transition_v0_1.schema.json",
+  "title": "Causal specimen-state transition planning instance",
+  "description": "Synthetic horizon-two planner with action-conditioned specimen transitions, observations, sample integrity and vector resources.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "specimen_id",
+    "horizon",
+    "initial_state_distribution",
+    "physical_states",
+    "decisions",
+    "resources",
+    "reference_resource_id",
+    "outcome_labels",
+    "initial_capabilities",
+    "actions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-CAUSAL-TRANSITION-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "specimen_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "horizon": {
+      "const": 2
+    },
+    "initial_state_distribution": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state_id",
+          "probability"
+        ],
+        "properties": {
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "physical_states": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state_id",
+          "state_role",
+          "pairing_strength",
+          "phase_coherence",
+          "sample_integrity",
+          "phase_status"
+        ],
+        "properties": {
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state_role": {
+            "enum": [
+              "baseline",
+              "intermediate",
+              "target",
+              "damaged",
+              "unknown"
+            ]
+          },
+          "pairing_strength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "phase_coherence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "sample_integrity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "phase_status": {
+            "enum": [
+              "realized",
+              "metastable_or_conditional",
+              "not_realized",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision_id",
+          "losses"
+        ],
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "losses": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state_id",
+                "loss"
+              ],
+              "properties": {
+                "state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "loss": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "unit",
+          "capacity",
+          "semantics"
+        ],
+        "properties": {
+          "resource_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "semantics": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reference_resource_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome_labels": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "initial_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "action_kind",
+          "specimen_id",
+          "reversibility",
+          "requires_capabilities",
+          "provides_capabilities",
+          "eligible",
+          "exclusion_reason",
+          "resource_consumption",
+          "transition_rows"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_kind": {
+            "enum": [
+              "passive_observation",
+              "reversible_intervention",
+              "irreversible_intervention",
+              "destructive_characterization",
+              "sham_control"
+            ]
+          },
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reversibility": {
+            "enum": [
+              "reversible_with_verified_recovery",
+              "reversible_unverified",
+              "path_dependent",
+              "irreversible",
+              "non_destructive"
+            ]
+          },
+          "requires_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "provides_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "exclusion_reason": {
+            "type": "string"
+          },
+          "resource_consumption": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resource_id",
+                "unit",
+                "quantity"
+              ],
+              "properties": {
+                "resource_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "transition_rows": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from_state_id",
+                "transition_outcomes"
+              ],
+              "properties": {
+                "from_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "transition_outcomes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "next_state_id",
+                      "probability",
+                      "outcome_probabilities"
+                    ],
+                    "properties": {
+                      "next_state_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "probability": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1
+                      },
+                      "outcome_probabilities": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic causal intervention planner only; no material response, causal effect, instrument protocol, superconductivity result or laboratory authorization is established."
+    }
+  }
+}
