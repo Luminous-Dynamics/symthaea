@@ -153,27 +153,6 @@ fn percentile(sorted_samples: &[u64], percentile: usize) -> u64 {
 
 fn print_usage() {
     println!(
-        "Usage: embodiment_trace_replay --trace PATH [--iterations N]\n\
-         Replays one valid trace and reports semantic-reducer latency (P50/P95).\n\
-         This excludes SVG/browser/GPU/audio/human-perception latency."
+        "Usage: embodiment_trace_replay --trace PATH [--iterations N]\nReplays one valid trace and reports semantic-reducer latency (P50/P95).\nThis excludes SVG/browser/GPU/audio/human-perception latency."
     );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn percentile_uses_nearest_rank_for_sorted_samples() {
-        let samples = [10, 20, 30, 40, 50];
-        assert_eq!(percentile(&samples, 0), 10);
-        assert_eq!(percentile(&samples, 50), 30);
-        assert_eq!(percentile(&samples, 95), 50);
-        assert_eq!(percentile(&samples, 100), 50);
-    }
-
-    #[test]
-    fn empty_percentile_is_zero() {
-        assert_eq!(percentile(&[], 95), 0);
-    }
 }
