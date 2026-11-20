@@ -943,6 +943,68 @@ void test_columnar_corruption() {
     require(!decode_partitioned_columnar(corrupt, records.size(), decoded),
             "columnar trailing bytes accepted");
 }
+void test_adaptive_empty() {
+    const std::vector<Record> records;
+    const auto frame = encode_partitioned_adaptive(records);
+    std::vector<Record> decoded;
+    require(decode_partitioned_adaptive(frame, 0U, decoded), "empty adaptive frame rejected");
+    require(decoded.empty(), "empty adaptive frame produced records");
+}
+void test_adaptive_roundtrips() {
+    for (const std::string name : {"sparse", "bursty", "idle", "noisy"}) {
+        const auto records = fixture(name, 0xace5U);
+        std::size_t row_children = 0U;
+        std::size_t columnar_children = 0U;
+        const auto frame = encode_partitioned_adaptive(records, &row_children, &columnar_children);
+        require(row_children + columnar_children == kKeys, name + " adaptive child count mismatch");
+        std::vector<Record> decoded;
+        require(decode_partitioned_adaptive(frame, records.size(), decoded), name + " adaptive frame rejected");
+        require(decoded == records, name + " adaptive exact reconstruction mismatch");
+    }
+}
+void test_adaptive_layout_choice() {
+    const auto idle = fixture("idle", 0x7e1e0001U);
+    const auto noisy = fixture("noisy", 0x7e1e0001U);
+    std::size_t idle_rows = 0U, idle_columns = 0U;
+    std::size_t noisy_rows = 0U, noisy_columns = 0U;
+    const auto idle_frame = encode_partitioned_adaptive(idle, &idle_rows, &idle_columns);
+    const auto noisy_frame = encode_partitioned_adaptive(noisy, &noisy_rows, &noisy_columns);
+    require(idle_rows + idle_columns == kKeys && noisy_rows + noisy_columns == kKeys,
+            "adaptive layout counts do not cover every child");
+    require(idle_rows > noisy_rows, "idle data should select more row-state children than noisy data");
+    require(noisy_columns > idle_columns, "noisy data should select more columnar children than idle data");
+    std::vector<Record> decoded;
+    require(decode_partitioned_adaptive(idle_frame, idle.size(), decoded) && decoded == idle,
+            "adaptive idle reconstruction mismatch");
+    require(decode_partitioned_adaptive(noisy_frame, noisy.size(), decoded) && decoded == noisy,
+            "adaptive noisy reconstruction mismatch");
+}
+void test_adaptive_corruption() {
+    const auto rows = fixture("sparse", 0x7788U);
+    const auto valid = encode_partitioned_adaptive(rows);
+    std::vector<Record> decoded;
+    auto bad = valid;
+    bad[0] ^= 1U;
+    require(!decode_partitioned_adaptive(bad, rows.size(), decoded), "adaptive bad magic/CRC accepted");
+    bad = valid;
+    bad.pop_back();
+    require(!decode_partitioned_adaptive(bad, rows.size(), decoded), "adaptive truncated frame accepted");
+    bad = valid;
+    std::size_t cursor = 4U + 8U + 4U + 1U + kFields;
+    std::uint32_t entity = 0U, series = 0U;
+    std::uint64_t count = 0U, length = 0U;
+    require(get_u32(bad, cursor, entity) && get_u32(bad, cursor, series) &&
+            get_u64(bad, cursor, count) && get_u64(bad, cursor, length),
+            "adaptive corruption fixture header could not be parsed");
+    bad[cursor] = 2U; // unsupported child layout tag
+    const std::size_t crc_position = bad.size() - 4U;
+    const auto checksum = crc32(bad.data(), crc_position);
+    std::size_t crc_write = crc_position;
+    for (unsigned i = 0U; i < 4U; ++i)
+        bad[crc_write++] = static_cast<std::uint8_t>(checksum >> (i * 8U));
+    require(!decode_partitioned_adaptive(bad, rows.size(), decoded),
+            "adaptive unsupported child layout tag accepted");
+}
 void test_empty_stream(){const std::vector<Record> records;const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,0U,decoded),"empty partitioned stream rejected");require(decoded.empty(),"empty partitioned stream produced records");}
 void test_roundtrips(){for(const std::string name:{"sparse","bursty","idle","noisy"}){const auto records=fixture(name,0x7878U);const auto frame=encode_partitioned(records);require(frame.size()>26U&&frame[25]==0U,name+" should use timestamp-merge mode");std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),name+" partition decoder rejected frame");require(decoded==records,name+" partition order/data mismatch");}}
 void test_schedule_fallback(){auto records=fixture("sparse",0x887766U);for(std::size_t i=0U;i<records.size();++i)records[i].timestamp=static_cast<std::uint64_t>(i/kKeys)*1000U;const auto duplicate_frame=encode_partitioned(records);require(duplicate_frame.size()>26U&&duplicate_frame[25]==1U,"duplicate timestamps should use tie-template mode");std::vector<Record> decoded;require(decode_partitioned(duplicate_frame,records.size(),decoded)&&decoded==records,"duplicate timestamp fallback order mismatch");std::uint64_t tie_order_bits=0U;std::size_t offset=30U;require(get_u64(duplicate_frame,offset,tie_order_bits),"tie-template order bit count missing");require(tie_order_bits<records.size()*key_bits(kKeys),"repeated tie templates should compress below full schedule");require(tie_order_bits<9000U,"repeated tie templates should stay compact across 1,024 identical groups");auto changing=records;for(std::size_t start=0U;start<changing.size();start+=kKeys)if((start/kKeys)%2U==1U)std::reverse(changing.begin()+static_cast<std::ptrdiff_t>(start),changing.begin()+static_cast<std::ptrdiff_t>(start+kKeys));const auto changing_frame=encode_partitioned(changing);require(changing_frame[25]==1U,"nondecreasing changing ties should use template mode");require(decode_partitioned(changing_frame,changing.size(),decoded)&&decoded==changing,"changing tie template order mismatch");std::uint64_t changing_bits=0U;std::size_t changing_offset=30U;require(get_u64(changing_frame,changing_offset,changing_bits),"changing tie order bit count missing");require(changing_bits<10000U,"two recurring tie templates should be cached");auto out_of_order=fixture("bursty",0x778899U);std::swap(out_of_order[1],out_of_order[2]);const auto disorder_frame=encode_partitioned(out_of_order);require(disorder_frame.size()>26U&&disorder_frame[25]==2U,"out-of-order timestamps should use full schedule");require(decode_partitioned(disorder_frame,out_of_order.size(),decoded)&&decoded==out_of_order,"out-of-order fallback mismatch");}
@@ -976,21 +1038,29 @@ void emit(const std::filesystem::path& dir) {
         const auto delta = framed_global_state_delta(rows);
         const auto partitioned = encode_partitioned(rows);
         const auto columnar = encode_partitioned_columnar(rows);
+        std::size_t row_children = 0U, columnar_children = 0U;
+        const auto adaptive = encode_partitioned_adaptive(rows, &row_children, &columnar_children);
         std::vector<Record> decoded;
         require(decode_partitioned(partitioned, rows.size(), decoded) && decoded == rows,
                 name + " row-partitioned emission round-trip failed");
         require(decode_partitioned_columnar(columnar, rows.size(), decoded) && decoded == rows,
                 name + " field-columnar emission round-trip failed");
+        require(decode_partitioned_adaptive(adaptive, rows.size(), decoded) && decoded == rows,
+                name + " adaptive emission round-trip failed");
         write_file(dir / (name + "_raw.bin"), raw);
         write_file(dir / (name + "_global_delta.bin"), delta);
         write_file(dir / (name + "_partitioned.bin"), partitioned);
         write_file(dir / (name + "_columnar.bin"), columnar);
+        write_file(dir / (name + "_adaptive.bin"), adaptive);
         std::cout << name << ",records=" << rows.size()
                   << ",raw_frame=" << raw.size()
                   << ",global_delta_frame=" << delta.size()
-                  << ",partitioned_frame=" << partitioned.size()
-                  << ",columnar_frame=" << columnar.size() << "\n";
+                  << ",row_partitioned_frame=" << partitioned.size()
+                  << ",columnar_frame=" << columnar.size()
+                  << ",adaptive_frame=" << adaptive.size()
+                  << ",adaptive_row_children=" << row_children
+                  << ",adaptive_columnar_children=" << columnar_children << "\n";
     }
 }
 
-int main(int argc,char** argv){try{test_empty_stream();test_roundtrips();test_schedule_fallback();test_same_series_duplicate_timestamp_rows();test_randomized();test_corruption();test_columnar_empty();test_columnar_roundtrips();test_columnar_key_cardinality();test_columnar_corruption();std::cout<<"row_frame_tests=PASS columnar_empty=PASS columnar_fixtures=4 columnar_key_counts=1,8,64,1024,4096 columnar_corruption=3 randomized_roundtrips=100 status=PASS\\n";if(argc==3&&std::string(argv[1])=="--emit-dir")emit(argv[2]);else if(argc!=1){std::cerr<<"usage: "<<argv[0]<<" [--emit-dir DIR]\\n";return 2;}return 0;}catch(const std::exception& e){std::cerr<<"partitioned reference failed: "<<e.what()<<"\\n";return 1;}}
+int main(int argc,char** argv){try{test_empty_stream();test_roundtrips();test_schedule_fallback();test_same_series_duplicate_timestamp_rows();test_randomized();test_corruption();test_columnar_empty();test_columnar_roundtrips();test_columnar_key_cardinality();test_columnar_corruption();test_adaptive_empty();test_adaptive_roundtrips();test_adaptive_layout_choice();test_adaptive_corruption();std::cout<<"row_frame_tests=PASS columnar_empty=PASS columnar_fixtures=4 columnar_key_counts=1,8,64,1024,4096 columnar_corruption=3 adaptive_empty=PASS adaptive_fixtures=4 adaptive_layout_choice=PASS adaptive_corruption=3 randomized_roundtrips=100 status=PASS\\n";if(argc==3&&std::string(argv[1])=="--emit-dir")emit(argv[2]);else if(argc!=1){std::cerr<<"usage: "<<argv[0]<<" [--emit-dir DIR]\\n";return 2;}return 0;}catch(const std::exception& e){std::cerr<<"partitioned reference failed: "<<e.what()<<"\\n";return 1;}}
