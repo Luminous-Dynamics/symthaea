@@ -121,6 +121,26 @@
       "source_arxiv": "2606.17733",
       "source_blocker": "author_code_data_solver_operator_and_licence_not_admitted",
       "execution_status": "source_review_specification_only"
+    },
+    {
+      "id": "neopic_particle_measure_field_operator",
+      "issues": [
+        12952
+      ],
+      "prs": [
+        12954
+      ],
+      "primary_task": "particle_measure_to_electric_field_at_particle_positions",
+      "source_arxiv": "2610.40528",
+      "required_outputs": [
+        "particle_count_transfer_both_directions",
+        "teacher_forced_and_in_loop_error",
+        "noise_aliasing_and_translation_equivariance",
+        "energy_drift",
+        "multi_app_instability_diagnostics",
+        "end_to_end_particle_field_cost"
+      ],
+      "execution_status": "source_review_protocol_only"
     }
   ],
   "shared_infrastructure": {
