@@ -623,3 +623,56 @@ The proposed CDL contribution should be described as a research hypothesis with 
 6. Application-critical invariants: in a security graph, preserve attack paths; in a physical system, preserve safety-critical event and extrema constraints; in energy telemetry, preserve declared peak/error requirements.
 
 The combination may be differentiated, but it is not proven novel or superior merely because the pieces are assembled. A formal related-work review and matched implementation comparisons are required before making a publication or SOTA claim.
+
+
+## 1.12 tparquet + Pco + Parquet ALP: mandatory storage competitor (2026-11-20)
+
+Aperiodic's public `tparquet` benchmark materially raises the practical storage baseline. The relevant implementation/results snapshot is pinned to commit `d1a40f6fa5508c99ee95e9609f3c38b111e21cf6` (ALP baseline added); the benchmark report at that snapshot is `bench/RESULTS.md` (blob `c27c74dc5da5dd5330fdb3f9675492a7fad9b00e`). The report identifies its last run as 2026-11-07 on a 4-vCPU cloud VM, with 151,499,256 rows across 31 datasets.
+
+The all-dataset storage sizes are:
+
+| Representation | Size | Relative to tparquet |
+|---|---:|---:|
+| Parquet + ZSTD(9), default encodings | 957.1 MB | 2.00x |
+| Parquet + ZSTD(9), tuned per-column encodings | 700.7 MB | 1.46x |
+| Parquet + ZSTD(9), tuned encodings + ALP on every FLOAT/DOUBLE column | 649.5 MB | 1.36x |
+| tparquet (PCODEC/Pco or ZSTD selected per column) | 478.6 MB | 1.00x |
+
+By class, tparquet reports 362.2 MB for 138.9M trades (0.49x default ZSTD, 0.70x tuned, 0.75x ALP), 51.0 MB for 6.8M L1 quote rows (0.63x / 0.81x / 0.81x), 58.6 MB for 5.5M L2 order-book rows (0.46x / 0.54x / 0.61x), and 6.8 MB for 288K bars/metrics/derivative rows (0.52x / 0.83x / 0.68x). Every dataset in the published 31-dataset suite is reported smaller than all three baselines.
+
+The same report gives one-thread overall throughput of 102 MB/s write and 924 MB/s read for tparquet, versus 97/916 for default ZSTD, 141/1,129 for tuned ZSTD and 169/1,231 for ZSTD+ALP. On wide L2 order books, tparquet reports 47 MB/s write and 968 MB/s read, versus 146/1,656 for ALP. This illustrates why a compression-only score is insufficient: a codec may win bytes while losing CPU throughput.
+
+The key architectural lesson is already visible in the competitor: use type-aware encodings and **choose the smaller per-column arm**, rather than force one encoding on all lanes. tparquet currently selects PCODEC or ZSTD per numeric column based on an initial batch; its public report also notes that strings keep ZSTD and that tuned DELTA_BYTE_ARRAY can improve string storage further.
+
+**CDL consequence:** tparquet is now a mandatory end-to-end storage comparator. CDL must include ALP and Pco independently, plus tparquet itself, against the same normalized telemetry samples. Compare full container size, not just transformed payload bytes; include schema/footer/page/index overhead, exact float-bit reconstruction, write/read throughput, random access and memory. Do not compare CDL's current small synthetic C++ frame directly with tparquet's multi-provider Parquet totals: the datasets, schema, format layers and machines differ.
+
+Pinned source: https://github.com/aperiodic-io/tparquet/tree/d1a40f6fa5508c99ee95e9609f3c38b111e21cf6
+
+## 1.13 OpenTelemetry Arrow Dataflow Engine / OTAP: mandatory transport and processing comparator (2026-11-20)
+
+OpenTelemetry's Arrow project has advanced beyond the original OTEP-0156 adapter into the incubating Rust-based **OpenTelemetry Arrow Dataflow Engine (DFE)**. The audit pinned the repository main commit at `bd5909819727f7a16a7985d97e510d35a9302e66` (2026-11-20) and the benchmark guide blob at `b7e419dee0410cbe2eea2ca7612adbb6ff574a7d`. The README states that OTAP keeps logs, metrics and traces in Apache Arrow columns, streams Arrow IPC over gRPC, can interoperate with OTLP, and is currently incubating.
+
+Its public benchmark plan is substantially more mature than a compression-ratio-only test:
+- Continuous normal-load benchmark: approximately 100k records/sec input/output on a single CPU core.
+- Filter comparison: approximately 100k logs/sec input, 5k/sec output when dropping 95%, compared with the OTel Collector.
+- Backpressure with `wait_for_result=true`, including an in-memory attribute rename.
+- Batch-size sweep: 10, 100, 512, 1,024, 4,096 and 8,192 records.
+- Saturation tests for OTLP and OTAP, plus scaling at 1, 2, 4, 8 and 16 cores. The DFE benchmark guide states a target above 0.90 scaling efficiency at all core counts.
+- Pass-through mode, idle memory scaling and binary-size tracking.
+
+The live dashboards publish CPU, throughput, egress bytes per log, network RX/TX, dropped messages and RAM. These are transport/dataflow system benchmarks, not comparable to tparquet's storage-file bytes. They should nevertheless set the systems-performance bar for a telemetry pipeline built on CDL.
+
+**CDL consequence:** maintain a separate OTLP/OTAP transport track. Compare end-to-end encode → transmit → receive → decode/process, including conversion cost, memory pressure, bounded queues, backpressure, retries/acknowledgements, and dropped-event correctness. Require 100k records/sec per-core throughput as an initial parity target, then measure saturation and >0.90 multi-core efficiency at 1–16 cores. These are targets for CDL, not achieved results. Do not label Arrow IPC transport improvements as codec compression gains.
+
+Pinned source: https://github.com/open-telemetry/otel-arrow/tree/bd5909819727f7a16a7985d97e510d35a9302e66
+Benchmark guide: https://github.com/open-telemetry/otel-arrow/blob/bd5909819727f7a16a7985d97e510d35a9302e66/docs/benchmarks.md
+
+## 1.14 Revised competitive implication: CDL must win at three distinct layers
+
+The current competitive landscape is best represented as three orthogonal layers:
+
+1. **Value encoding:** ALP, Pco, Gorilla/Chimp/Sprintz, WZS/Rabbit and adaptive field/state encoders. Compare exact value streams, schema and exception cost.
+2. **Container/storage:** Parquet plus tuned encodings, Parquet+ALP, tparquet, and complete CDL frames. Compare full bytes, metadata/index overhead, scans and random access.
+3. **Transport/dataflow:** OTLP+Zstd versus OTAP/Arrow and any CDL transport. Compare bytes on wire, per-core records/sec, batch latency, backpressure, memory, drops and horizontal scaling.
+
+No single benchmark can establish superiority across all three. CDL should publish a Pareto frontier for bytes, encode/decode throughput, peak RAM, random-access latency and multi-core efficiency. The selection policy should be constrained by exact-lossless correctness, bounded resources and caller access requirements. A 1% size win that multiplies decode time or destroys random access is not automatically a win.
