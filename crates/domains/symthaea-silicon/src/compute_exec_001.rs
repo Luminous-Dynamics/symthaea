@@ -296,7 +296,9 @@ impl BufferRegistry {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompletionDisposition {
-    Completed,
+    /// DMA ownership has returned to the host and the output is available.
+    /// The caller must still verify output bytes/digest and oracle parity.
+    CompletedOutputAvailable,
     RejectedBeforeExecution,
     Quarantined,
 }
@@ -322,6 +324,9 @@ pub struct ExecutionLedger {
     device_epoch: String,
     last_sequence: u64,
     max_inflight_commands: usize,
+    /// A timeout, reset race or ambiguous device failure blocks all new work
+    /// in this epoch until a new epoch is established through reset/recovery.
+    submission_blocked: bool,
     pending: HashMap<u64, PendingCommand>,
     seen_command_ids: HashSet<String>,
 }
@@ -346,6 +351,7 @@ impl ExecutionLedger {
             device_epoch,
             last_sequence: 0,
             max_inflight_commands,
+            submission_blocked: false,
             pending: HashMap::new(),
             seen_command_ids: HashSet::new(),
         })
@@ -367,6 +373,12 @@ impl ExecutionLedger {
         capabilities: &DeviceCapabilities,
         registry: &mut BufferRegistry,
     ) -> ValidationResult<()> {
+        if self.submission_blocked {
+            return Err(ValidationError::new(
+                "DEVICE_EPOCH_REQUIRES_RECONCILIATION",
+                "no new work is admitted in an uncertain device epoch; reset/reconcile first",
+            ));
+        }
         let sequence = parse_decimal_u64(&command.sequence, false, "sequence")?;
 
         if self.device_id != command.device_id || self.device_id != capabilities.device_id {
@@ -523,7 +535,7 @@ impl ExecutionLedger {
                     registry.set_ownership(key, BufferOwnership::HostOwned);
                 }
                 self.pending.remove(&sequence);
-                Ok(CompletionDisposition::Completed)
+                Ok(CompletionDisposition::CompletedOutputAvailable)
             }
             "rejected" => {
                 // Contract meaning: the device rejected the descriptor before
@@ -535,6 +547,7 @@ impl ExecutionLedger {
                 Ok(CompletionDisposition::RejectedBeforeExecution)
             }
             "failed" | "cancelled" | "outcome_unknown" => {
+                self.submission_blocked = true;
                 for key in &pending.buffers {
                     registry.set_ownership(
                         key,
@@ -564,6 +577,7 @@ impl ExecutionLedger {
         let pending = self.pending.get(&sequence).cloned().ok_or_else(|| {
             ValidationError::new("UNKNOWN_TIMEOUT", "sequence is not pending")
         })?;
+        self.submission_blocked = true;
         for key in &pending.buffers {
             registry.set_ownership(
                 key,
@@ -606,6 +620,7 @@ impl ExecutionLedger {
         }
         self.device_epoch = new_epoch;
         self.last_sequence = 0;
+        self.submission_blocked = false;
         Ok(())
     }
 
@@ -1450,7 +1465,7 @@ mod tests {
             ledger
                 .accept_completion(&completion, &capabilities, &mut registry)
                 .unwrap(),
-            CompletionDisposition::Completed
+            CompletionDisposition::CompletedOutputAvailable
         );
         assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
         assert_eq!(ledger.pending_count(), 0);
@@ -1554,6 +1569,38 @@ mod tests {
             4
         );
         assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
+    }
+
+    #[test]
+    fn unknown_outcome_blocks_the_device_epoch_until_reset() {
+        let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        completion.status = "outcome_unknown".into();
+        completion.error_code = Some("OUTCOME_UNKNOWN".into());
+        completion.result = None;
+        completion.output_buffer = None;
+
+        assert_eq!(
+            ledger
+                .accept_completion(&completion, &capabilities, &mut registry)
+                .unwrap(),
+            CompletionDisposition::Quarantined
+        );
+
+        let mut next = command.clone();
+        next.command_id = "fixture-top1-0002".into();
+        next.sequence = "2".into();
+        let error = ledger.submit(&next, &capabilities, &mut registry).unwrap_err();
+        assert_eq!(error.code, "DEVICE_EPOCH_REQUIRES_RECONCILIATION");
+
+        ledger
+            .reset("ffeeddccbbaa99887766554433221100", &mut registry)
+            .unwrap();
+        assert_eq!(ledger.current_epoch(), "ffeeddccbbaa99887766554433221100");
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::Quarantined { .. })
+        ));
     }
 
     #[test]
