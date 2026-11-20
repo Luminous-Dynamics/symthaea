@@ -1086,6 +1086,13 @@ mod tests {
             receipt["pareto_frontier"]["frontier_size"].as_u64().unwrap() as usize,
             frontier.len()
         );
+        let expected_policy = receipt["precommitment_cvar_oracle"]["plan"]["expected_loss_decision_policy"]
+            .as_array().unwrap();
+        let cvar_policy = receipt["precommitment_cvar_oracle"]["plan"]["precommitment_cvar_decision_policy"]
+            .as_array().unwrap();
+        assert_eq!(expected_policy.len(), cvar_policy.len());
+        assert_eq!(receipt["random_feasible_baseline"]["seed_count"], 32);
+        assert_eq!(receipt["random_feasible_baseline"]["trials"].as_array().unwrap().len(), 32);
         for plan in &frontier {
             assert!(plan.expected_regret.is_finite());
             assert!(plan.cvar_regret.is_finite());
