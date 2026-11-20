@@ -678,6 +678,45 @@ mod tests {
     }
 
     #[test]
+    fn low_signal_window_abstains_instead_of_guessing_pitch() {
+        let score = score(60, Duration::quarter());
+        let mut contract = contract();
+        contract.minimum_signal_rms_dbfs = -10.0;
+        let result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(60, 8_000, 16_000), 16_000),
+            &contract,
+        ).unwrap();
+        assert_eq!(result["events"][0]["status"], "abstain");
+        assert_eq!(result["outcome"]["score_audio_status"], "abstain");
+    }
+
+    #[test]
+    fn out_of_calibration_range_score_pitch_abstains() {
+        let score = score(12, Duration::quarter());
+        let result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(60, 8_000, 16_000), 16_000),
+            &contract(),
+        ).unwrap();
+        assert_eq!(result["events"][0]["status"], "abstain");
+        assert_eq!(result["outcome"]["score_audio_status"], "abstain");
+    }
+
+    #[test]
+    fn confidence_threshold_can_force_abstention() {
+        let score = score(60, Duration::quarter());
+        let mut contract = contract();
+        contract.minimum_pitch_confidence = 1.0;
+        let result = evaluate_score_audio_conformance_v1(
+            &serde_json::to_vec(&score).unwrap(),
+            &wav(&sine(60, 8_000, 16_000), 16_000),
+            &contract,
+        ).unwrap();
+        assert_eq!(result["outcome"]["score_audio_status"], "abstain");
+    }
+
+    #[test]
     fn unknown_score_fields_are_rejected() {
         let score = score(60, Duration::quarter());
         let mut value = serde_json::to_value(&score).unwrap();
