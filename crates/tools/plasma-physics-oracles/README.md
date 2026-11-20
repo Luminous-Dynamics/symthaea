@@ -82,3 +82,24 @@ The `coordinate_audit` module provides four small mathematical helpers:
 Tests quantify extremal-particle perturbation at multiple particle counts and verify seam continuity/integer-period invariance of the periodic embedding. These are properties of the coordinate maps only. They do not prove a defect in NEOPIC or measure the trained model's field/trajectory response. The implementation-level tests remain tracked in [issue #12980](https://github.com/Luminous-Dynamics/symthaea/issues/12980).
 
 This fixed-domain map is appropriate only for a correctly declared periodic domain. Open-boundary coordinate systems require their own physical normalization and must not be forced into a periodic embedding.
+
+## 4. Residual-certified periodic Poisson warm starts
+
+The `poisson_certificate` module certifies a potential estimate for one
+specific operator: the uniform periodic 1D second-order finite-difference
+Laplacian, restricted to the mean-zero subspace. Given the projected residual
+norm and smallest nonzero eigenvalue, it reports conservative Euclidean
+(`L2` vector) bounds for potential error and the forward-difference electric
+field error.
+
+The routine rejects charge-density and potential means outside caller-declared
+tolerances. Small zero-mode projections are returned explicitly, including the
+net charge before projection. The certificate does not bound pointwise errors,
+particle-interpolated force errors, other stencils, nonuniform grids, open
+boundaries, or higher-dimensional solvers.
+
+Tests use manufactured Fourier eigenmodes, a deliberately perturbed potential,
+actual-versus-certified potential and field errors, zero-mode reporting, and
+invalid-input negative controls. This is a mathematical certificate for the
+specified discrete operator, not a claim that a neural solver is already using
+it. See [issue #12992](https://github.com/Luminous-Dynamics/symthaea/issues/12992).
