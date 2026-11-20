@@ -52,7 +52,7 @@ A_0+I_A=A_f+P_T+P_C,\qquad
 B_0+I_B=B_f+P_T.
 \]
 
-Both relative residuals must remain below \(10^{-8}\). The receipt preserves the spatial final concentration profiles and the boundary influx, rather than reporting only a scalar phase score. Target, competitor and unreacted A fractions are normalized against the total available A inventory and must close to one. The solver also reports the final B inventory separately. A dynamic per-step reaction-rate guard is applied using current cell concentrations, so cross-diffusion-driven overshoot cannot invalidate the nominal reservoir-based reaction timestep bound silently.
+Both relative residuals must remain below \(10^{-8}\). The receipt preserves the spatial final concentration profiles and the boundary influx, rather than reporting only a scalar phase score. Target, competitor and unreacted A fractions are normalized against the total available A inventory and must close to one. The solver also reports the final B inventory separately. Phase denominators include both initial inventory and net reservoir influx, so nonzero initial mobile profiles are not silently excluded. Non-finite concentrations or mass-balance quantities fail closed. A dynamic per-step reaction-rate guard is applied using current cell concentrations, so cross-diffusion-driven overshoot cannot invalidate the nominal reservoir-based reaction timestep bound silently.
 
 ## Frozen fixture cases
 
