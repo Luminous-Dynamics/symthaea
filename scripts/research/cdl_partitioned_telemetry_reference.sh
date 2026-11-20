@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Exact order-preserving per-series partition plus bit-packed interleave schedule.
+# Per-series row-state and field-columnar exact-lossless layouts with Zstd controls.
 # Independent C++ transform reference; not the Rust CDL codec.
 ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 SOURCE="${ROOT}/research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp"
@@ -22,34 +22,43 @@ mkdir -p "${OUT_DIR}/streams"
 printf 'zstd_version='
 "${ZSTD}" --version | head -n 1
 printf 'zstd_level=%s\n' "${LEVEL}"
-printf 'fixture,raw_bytes,global_state_delta_bytes,partitioned_frame_bytes,zstd_raw_bytes,zstd_global_delta_bytes,zstd_partitioned_bytes,partitioned_vs_global_delta_pct,partitioned_vs_raw_pct\n'
+printf 'fixture,raw_bytes,global_state_delta_bytes,row_partitioned_bytes,field_columnar_bytes,zstd_raw_bytes,zstd_global_delta_bytes,zstd_row_partitioned_bytes,zstd_field_columnar_bytes,row_vs_global_delta_pct,columnar_vs_global_delta_pct,columnar_vs_row_partitioned_pct,columnar_vs_raw_pct\n'
 
 for name in sparse bursty idle noisy; do
   raw="${OUT_DIR}/streams/${name}_raw.bin"
   delta="${OUT_DIR}/streams/${name}_global_delta.bin"
   part="${OUT_DIR}/streams/${name}_partitioned.bin"
+  columnar="${OUT_DIR}/streams/${name}_columnar.bin"
   raw_zst="${OUT_DIR}/streams/${name}_raw.zst"
   delta_zst="${OUT_DIR}/streams/${name}_global_delta.zst"
   part_zst="${OUT_DIR}/streams/${name}_partitioned.zst"
+  columnar_zst="${OUT_DIR}/streams/${name}_columnar.zst"
 
   "${ZSTD}" -q -"${LEVEL}" -f -c "${raw}" > "${raw_zst}"
   "${ZSTD}" -q -"${LEVEL}" -f -c "${delta}" > "${delta_zst}"
   "${ZSTD}" -q -"${LEVEL}" -f -c "${part}" > "${part_zst}"
+  "${ZSTD}" -q -"${LEVEL}" -f -c "${columnar}" > "${columnar_zst}"
   "${ZSTD}" -q -d -c "${raw_zst}" | cmp - "${raw}"
   "${ZSTD}" -q -d -c "${delta_zst}" | cmp - "${delta}"
   "${ZSTD}" -q -d -c "${part_zst}" | cmp - "${part}"
+  "${ZSTD}" -q -d -c "${columnar_zst}" | cmp - "${columnar}"
 
   raw_bytes="$(wc -c < "${raw}" | tr -d ' ')"
   delta_bytes="$(wc -c < "${delta}" | tr -d ' ')"
   part_bytes="$(wc -c < "${part}" | tr -d ' ')"
+  columnar_bytes="$(wc -c < "${columnar}" | tr -d ' ')"
   raw_zst_bytes="$(wc -c < "${raw_zst}" | tr -d ' ')"
   delta_zst_bytes="$(wc -c < "${delta_zst}" | tr -d ' ')"
   part_zst_bytes="$(wc -c < "${part_zst}" | tr -d ' ')"
-  vs_delta="$(awk -v a="${delta_zst_bytes}" -v b="${part_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
-  vs_raw="$(awk -v a="${raw_zst_bytes}" -v b="${part_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
-  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
-    "${name}" "${raw_bytes}" "${delta_bytes}" "${part_bytes}" \
-    "${raw_zst_bytes}" "${delta_zst_bytes}" "${part_zst_bytes}" "${vs_delta}" "${vs_raw}"
+  columnar_zst_bytes="$(wc -c < "${columnar_zst}" | tr -d ' ')"
+  row_vs_delta="$(awk -v a="${delta_zst_bytes}" -v b="${part_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
+  col_vs_delta="$(awk -v a="${delta_zst_bytes}" -v b="${columnar_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
+  col_vs_row="$(awk -v a="${part_zst_bytes}" -v b="${columnar_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
+  col_vs_raw="$(awk -v a="${raw_zst_bytes}" -v b="${columnar_zst_bytes}" 'BEGIN { printf "%.2f", (b/a-1)*100 }')"
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+    "${name}" "${raw_bytes}" "${delta_bytes}" "${part_bytes}" "${columnar_bytes}" \
+    "${raw_zst_bytes}" "${delta_zst_bytes}" "${part_zst_bytes}" "${columnar_zst_bytes}" \
+    "${row_vs_delta}" "${col_vs_delta}" "${col_vs_row}" "${col_vs_raw}"
 done
 
-echo "all_zstd_decompressions=exact"
+echo "all_row_and_columnar_zstd_decompressions=exact"
