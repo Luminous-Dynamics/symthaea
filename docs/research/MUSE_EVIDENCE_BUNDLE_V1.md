@@ -75,7 +75,7 @@ The human receipt must bind the exact case and candidate Score/WAV digests, the 
 
 Failure dominates abstention. Abstention dominates pass. No average or high reward score can reverse this order.
 
-The schema constrains the basic result shape and conditional status counts. Cross-object digest equality, receipt cryptography, semantic pass criteria and precedence are runtime verifier responsibilities; JSON Schema alone cannot establish them.
+The schema constrains the basic result shape, status-count conditions, and requires all five producer identities/versions and non-null receipt digests when the declared outcome is pass. Cross-object digest equality, receipt cryptography, semantic pass criteria and precedence are runtime verifier responsibilities; JSON Schema alone cannot establish them.
 
 ## Synthetic fixtures
 
@@ -85,7 +85,7 @@ The schema constrains the basic result shape and conditional status counts. Cros
 - \`muse-evidence-bundle-v1.case-lineage-mismatch.synthetic.json\`: symbolic receipt bound to a different case digest; runtime must fail it.
 - \`muse-evidence-bundle-v1.candidate-audio-mismatch.synthetic.json\`: acoustic receipt bound to a different candidate WAV; runtime must fail it.
 
-These fixtures are currently checked for schema/shape and intended lattice semantics. Their receipt digests are deliberately placeholders. They must never be presented as passing cryptographic tests.
+Four shape-valid fixtures (complete, incomplete, failure-precedence and the two cross-binding mismatches) are checked separately from the intentionally schema-invalid pass-with-missing-receipt fixture. Their receipt digests are deliberately placeholders. They must never be presented as passing cryptographic tests.
 
 ## Adversarial qualification matrix
 
