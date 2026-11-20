@@ -78,6 +78,22 @@ Sources:
 - https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm_animation-1.0/README.md
 - https://docs.live2d.com/en/cubism-sdk-manual/lipsync/
 
+### Additional 2026 speech-driven avatar baselines
+
+The 2026 literature adds three distinct backends that should be represented in the comparison matrix:
+
+- **Let Toon Talk** (Applied Sciences, 13 May 2026) combines parametric adaptation for heterogeneous cartoon geometry with identity-adaptive flow matching for speech-driven motion. On its MEAD evaluation it reports MVE 1.17 mm, LVE 5.19 mm, FDD 0.11, and per-frame motion inference time 1.30 ms. On VOCASET it reports MVE 1.56 mm, LVE 4.50 mm, FDD 0.10, and 1.22 ms/frame. These are the paper's own experimental conditions and should be treated as matched-baseline candidates, not universal deployment figures.
+- **CartoonTalk** (IEEE TVCG 2026) combines 2D cartoon keypoints with 3D motion coefficients and reports state-of-the-art results on its cartoon datasets. The accessible abstract does not provide the metric table, so do not invent a numerical score. Its key comparison is cartoon-specific topology handling rather than ordinary human face animation.
+- **AnyTalk / AnyTalk_RT** (IEEE TVCG 2026, early access) adapts a pretrained video-diffusion model to a target 3D character using rendered no-motion images, then estimates blendshape coefficients; the authors also describe a distilled real-time variant. This is a useful baseline for arbitrary character support and adaptation cost. It is not zero-shot in the strict no-optimization sense because the target character has a character-specific adaptation step.
+
+These papers imply that the Conversational Puppet should not be tied to a single face geometry or motion model. The canonical Symthaea event protocol should drive interchangeable backends: a light parameter rig, VRM/VRMA, cartoon-specialized models, or arbitrary-character motion adapters.
+
+Sources:
+- https://www.mdpi.com/2076-3417/16/10/4840
+- https://doi.org/10.1109/TVCG.2026.3687365
+- https://pubmed.ncbi.nlm.nih.gov/42030183/
+- https://dalab.sungshin.ac.kr/
+
 ### Evaluation literature and interaction quality
 
 - A 2025 benchmark study of speech-driven 3D facial animation explicitly reports that the field lacks consensus on standardized datasets and evaluation methods. This is a direct reason to publish matched traces, hardware metadata, model versions, and measurement scripts rather than comparing unrelated paper numbers.
@@ -105,6 +121,19 @@ For the optional humanoid backend, use established facial-animation datasets and
 Sources:
 - https://openaccess.thecvf.com/content/ICCV2025/papers/Kim_MemoryTalker_Personalized_Speech-Driven_3D_Facial_Animation_via_Audio-Guided_Stylization_ICCV_2025_paper.pdf
 - https://onlinelibrary.wiley.com/doi/10.1111/cgf.70073
+
+### Baseline policy for humanoid and cartoon puppets
+
+Before attempting a facial-animation SOTA claim:
+
+1. Reproduce one deterministic baseline and one expressive/probabilistic baseline on a fixed benchmark split.
+2. Include 2026 comparisons where code/assets permit: Let Toon Talk, CartoonTalk and AnyTalk_RT, alongside FaceFormer, CodeTalker, UniTalker and MemoryTalker.
+3. Report FVE/LVE/MVE/FDD, LDTW and LSE-D/C where their definitions apply; report diversity/MEE/CE for stochastic generators. Include LPIPS/SSIM/PSNR only for rendered-image tasks, not as substitutes for geometric articulation.
+4. Report both motion-decoder latency and end-to-end first-visible-frame latency. Include per-character adaptation time, memory, GPU/CPU usage and the exact rendering workload.
+5. Aim to reproduce baselines within their reported confidence intervals first. Only then set a research target of at least 10% lower LVE/LDTW or at least 10% better subjective lip-sync preference on the same split, while not degrading MVE/FDD, identity consistency, diversity or latency. Treat this as a target, not a claim.
+6. Evaluate unseen identities separately from seen identities. Target a zero-shot renderer-neutral motion interface across at least 10 held-out avatar identities; report how any per-character fine-tuning changes that claim.
+
+For Symthaea, the primary new contribution is still semantic fidelity. A facial engine can win LVE while the overall system loses if it lip-syncs audio while its speech output is only queued, shows a tool operation as completed before the tool returns, or depicts uncertainty that the runtime never emitted.
 
 ## Proposed architecture
 
@@ -256,7 +285,7 @@ Only run this track when the underlying runtime exports a calibrated probability
 
 | Dimension | NVIDIA ACE / Instant4D | Epic MetaHuman | Symthaea research objective |
 |---|---|---|---|
-| Facial fidelity | Strong specialist baseline | Strong production baseline | Use as optional backend; do not claim to beat it initially |
+| Facial fidelity | Strong specialist baseline | Strong production baseline | Use 2026 Let Toon Talk / CartoonTalk / AnyTalk_RT and established mesh baselines as adapters; do not claim to beat them without matched tests |
 | Animation throughput | Audio2Face publishes max-stream capacity using P1 FPS so 99% of samples stay above 30 FPS on named GPU/server configurations | Real-time capture/animation workflow; live and offline solvers differ | Match on named hardware, exact audio workload and fixed assets; report P1/P5 frame time and stream capacity |
 | Cognitive event semantics | Not the central published goal | Not the central published goal | First-class semantic contract |
 | Provenance and uncertainty | Emotion/animation controls exist | Solve controls exist | Preserve the source and confidence of every signal |
