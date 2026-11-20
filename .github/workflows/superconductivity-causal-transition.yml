@@ -6,6 +6,7 @@ on:
       - "tools/superconductivity-capability-plan-harness/**"
       - "data/schemas/superconductivity_causal_transition_v0_1.schema.json"
       - "data/research/superconductivity_causal_transition_fixture_*.json"
+      - "data/research/superconductivity_causal_transition_suite_v0_1.json"
       - "research/superconductivity/capability_experiment_planning/causal_transition/**"
       - ".github/workflows/superconductivity-causal-transition.yml"
   workflow_dispatch:
@@ -81,6 +82,7 @@ jobs:
             sha256sum data/schemas/superconductivity_causal_transition_v0_1.schema.json
             sha256sum data/research/superconductivity_causal_transition_fixture_v0_1.json
             sha256sum data/research/superconductivity_causal_transition_fixture_preserve_v0_1.json
+            sha256sum data/research/superconductivity_causal_transition_suite_v0_1.json
             sha256sum tools/superconductivity-capability-plan-harness/Cargo.toml
             sha256sum tools/superconductivity-capability-plan-harness/src/bin/sc_causal_transition_audit.rs
             sha256sum "$RUNNER_TEMP/sc-causal-path-dependence-receipt.json"
