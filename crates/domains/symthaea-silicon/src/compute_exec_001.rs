@@ -1572,6 +1572,23 @@ mod tests {
     }
 
     #[test]
+    fn timeout_quarantines_buffers_and_blocks_same_epoch_submissions() {
+        let (capabilities, command, _, mut registry, mut ledger) = setup();
+        ledger.submit(&command, &capabilities, &mut registry).unwrap();
+        ledger.mark_timeout(1, &mut registry).unwrap();
+
+        assert!(matches!(
+            registry.ownership("fixture-result", 1),
+            Some(BufferOwnership::Quarantined { .. })
+        ));
+        let mut next = command.clone();
+        next.command_id = "fixture-top1-timeout-followup".into();
+        next.sequence = "2".into();
+        let error = ledger.submit(&next, &capabilities, &mut registry).unwrap_err();
+        assert_eq!(error.code, "DEVICE_EPOCH_REQUIRES_RECONCILIATION");
+    }
+
+    #[test]
     fn unknown_outcome_blocks_the_device_epoch_until_reset() {
         let (capabilities, command, mut completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
