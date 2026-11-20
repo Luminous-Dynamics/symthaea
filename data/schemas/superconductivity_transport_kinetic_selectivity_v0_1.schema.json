@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json",
+  "title": "Coupled ion transport and competing phase-formation kinetics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "benchmark_id",
+    "fixture_only",
+    "boltzmann_constant_eV_per_K",
+    "integration_steps",
+    "cases",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-TRANSPORT-KINETIC-SELECTIVITY-0.1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "boltzmann_constant_eV_per_K": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "integration_steps": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 100000
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "temperature_k",
+          "hold_time_s",
+          "product_layer_thickness_m",
+          "transport",
+          "target_route",
+          "competitor_route",
+          "thermodynamic_selectivity_margin_eV",
+          "observation_status"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "temperature_k": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "hold_time_s": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "product_layer_thickness_m": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "transport": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "species_a_diffusivity_prefactor_m2_s",
+              "species_a_diffusion_activation_eV",
+              "species_b_diffusivity_prefactor_m2_s",
+              "species_b_diffusion_activation_eV",
+              "cross_correlation_coefficient"
+            ],
+            "properties": {
+              "species_a_diffusivity_prefactor_m2_s": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "species_a_diffusion_activation_eV": {
+                "type": "number",
+                "minimum": 0
+              },
+              "species_b_diffusivity_prefactor_m2_s": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "species_b_diffusion_activation_eV": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cross_correlation_coefficient": {
+                "type": "number",
+                "exclusiveMinimum": -1,
+                "exclusiveMaximum": 1
+              }
+            }
+          },
+          "target_route": {
+            "$ref": "#/$defs/route"
+          },
+          "competitor_route": {
+            "$ref": "#/$defs/route"
+          },
+          "thermodynamic_selectivity_margin_eV": {
+            "type": "number",
+            "minimum": 0
+          },
+          "observation_status": {
+            "const": "unknown_not_reported"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic two-route transport-coupled kinetic-selectivity model only; no measured diffusion coefficient, reaction rate, phase yield, superconducting material or laboratory procedure is established."
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_id",
+        "mobile_species_requirement",
+        "reaction_activation_barrier_eV",
+        "reaction_prefactor_s_inverse",
+        "delta_g_interval_eV_per_route_extent",
+        "availability_fraction"
+      ],
+      "properties": {
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mobile_species_requirement": {
+          "enum": [
+            "species_a_only",
+            "co_transport_a_b"
+          ]
+        },
+        "reaction_activation_barrier_eV": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reaction_prefactor_s_inverse": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "delta_g_interval_eV_per_route_extent": {
+          "$ref": "#/$defs/interval"
+        },
+        "availability_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
