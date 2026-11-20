@@ -52,7 +52,7 @@ A_0+I_A=A_f+P_T+P_C,\qquad
 B_0+I_B=B_f+P_T.
 \]
 
-Both relative residuals must remain below \(10^{-8}\). The receipt preserves the spatial final concentration profiles and the boundary influx, rather than reporting only a scalar phase score.
+Both relative residuals must remain below \(10^{-8}\). The receipt preserves the spatial final concentration profiles and the boundary influx, rather than reporting only a scalar phase score. Target, competitor and unreacted A fractions are normalized against the total available A inventory and must close to one. The solver also reports the final B inventory separately. A dynamic per-step reaction-rate guard is applied using current cell concentrations, so cross-diffusion-driven overshoot cannot invalidate the nominal reservoir-based reaction timestep bound silently.
 
 ## Frozen fixture cases
 
@@ -85,6 +85,8 @@ Report:
 The finite-volume solver is itself only a reference for this simplified 1D model. It does not include lateral microstructure, moving phase boundaries, concentration-dependent mobility, nucleation, nonideal chemical potentials, elastic stress, or product-layer evolution.
 
 ## Next numerical benchmarks
+
+The current tests run a small 24/48/96-cell refinement sweep with stability-scaled timesteps and verify conservation at every resolution. This is a smoke test, not a convergence proof.
 
 - Grid refinement at 24/48/96/192 cells with timestep scaled to the stability bound.
 - Timestep refinement at fixed grid.
