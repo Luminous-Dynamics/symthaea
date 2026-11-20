@@ -827,6 +827,29 @@ mod tests {
     }
 
     #[test]
+    fn th_spectrum_can_have_zero_leakage_against_d6h_without_proving_d6h() {
+        let receipt = analyze_spectra(
+            &spectra_for_rank_template("Th", 9),
+            SymFpProfileV1::paper_degree_9(),
+        )
+        .unwrap();
+        let d6h = template_by_name("D6h").unwrap();
+        let leakage = target_leakage(&receipt, d6h).unwrap();
+
+        assert_eq!(leakage.pooled_leakage_score, 0.0);
+        close(leakage.p_ls, 10.0, 1.0e-12);
+        assert_eq!(
+            leakage.authority,
+            "SPECTRAL_COMPATIBILITY_ONLY_NOT_A_SYMMETRY_CERTIFICATE"
+        );
+
+        let classification =
+            classify_rank_template(&receipt, &CRYSTALLOGRAPHIC_TEMPLATES_V1).unwrap();
+        assert_eq!(classification.minimum_l1_distance, 0);
+        assert_eq!(classification.matched_schoenflies, vec!["Th"]);
+    }
+
+    #[test]
     fn leakage_and_p_ls_are_monotone_for_a_declared_subgroup_pair() {
         let receipt = analyze_spectra(
             &spectra_for_rank_template("C1", 9),
