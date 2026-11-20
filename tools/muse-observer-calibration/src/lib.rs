@@ -130,6 +130,7 @@ pub struct IsotonicModelV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ThresholdSelectionV1 {
+    pub threshold_dataset_sha256: String,
     pub target_maximum_false_support_rate: f64,
     pub selected_support_threshold: Option<f64>,
     pub threshold_examples: u64,
@@ -145,6 +146,7 @@ pub struct ThresholdSelectionV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HeldOutMetricsV1 {
+    pub held_out_dataset_sha256: String,
     pub total_examples: u64,
     pub measured_examples: u64,
     pub unmeasured_examples: u64,
@@ -350,6 +352,25 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
     Ok(())
 }
 
+fn split_digest(dataset: &CalibrationDatasetV1, split: SplitV1) -> Result<String, String> {
+    let mut observations = dataset.observations.iter()
+        .filter(|row| row.split == split)
+        .collect::<Vec<_>>();
+    observations.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
+    let value = json!({
+        "schema": "muse-observer-calibration-split-v1",
+        "dataset_id": dataset.dataset_id,
+        "observer_id": dataset.observer_id,
+        "observer_version": dataset.observer_version,
+        "feature_id": dataset.feature_id,
+        "annotation_protocol_sha256": dataset.annotation_protocol_sha256,
+        "rights_clearance_receipt_sha256": dataset.rights_clearance_receipt_sha256,
+        "split": split,
+        "observations": observations
+    });
+    Ok(domain_digest(DATASET_DOMAIN_V1, &canonical_json_bytes(&value)?))
+}
+
 pub fn validate_contract_v1(contract: &CalibrationContractV1) -> Result<(), String> {
     if contract.schema != CONTRACT_SCHEMA_V1
         || contract.feature_id.trim().is_empty()
@@ -444,6 +465,7 @@ fn predict(model: &IsotonicModelV1, raw_score_db: f64) -> f64 {
 fn select_support_threshold(
     model: &IsotonicModelV1,
     rows: &[&CalibrationObservationV1],
+    threshold_dataset_sha256: &str,
     maximum_false_support_rate: f64,
 ) -> ThresholdSelectionV1 {
     let measured = rows.iter()
@@ -480,6 +502,7 @@ fn select_support_threshold(
         Some((threshold, supported_count, false_support_count)) => {
             let true_support_count = supported_count - false_support_count;
             ThresholdSelectionV1 {
+                threshold_dataset_sha256: threshold_dataset_sha256.into(),
                 target_maximum_false_support_rate: maximum_false_support_rate,
                 selected_support_threshold: Some(threshold),
                 threshold_examples: rows.len() as u64,
@@ -497,6 +520,7 @@ fn select_support_threshold(
             }
         }
         None => ThresholdSelectionV1 {
+            threshold_dataset_sha256: threshold_dataset_sha256.into(),
             target_maximum_false_support_rate: maximum_false_support_rate,
             selected_support_threshold: None,
             threshold_examples: rows.len() as u64,
@@ -564,6 +588,7 @@ fn held_out_metrics(
     model: &IsotonicModelV1,
     threshold: &ThresholdSelectionV1,
     rows: &[&CalibrationObservationV1],
+    held_out_dataset_sha256: &str,
     ece_bins: u16,
 ) -> HeldOutMetricsV1 {
     let total = rows.len() as u64;
@@ -608,6 +633,7 @@ fn held_out_metrics(
     let raw_scores = probs.clone();
 
     HeldOutMetricsV1 {
+        held_out_dataset_sha256: held_out_dataset_sha256.into(),
         total_examples: total,
         measured_examples: measured.len() as u64,
         unmeasured_examples: unmeasured,
@@ -671,6 +697,9 @@ pub fn run_calibration_v1(
             return Err(format!("{split_name} measured rows must contain at least {minimum} examples per class"));
         }
     }
+    let fit_split_sha256 = split_digest(dataset, SplitV1::Fit)?;
+    let threshold_split_sha256 = split_digest(dataset, SplitV1::ThresholdSelection)?;
+    let held_out_split_sha256 = split_digest(dataset, SplitV1::HeldOut)?;
     let blocks = fit_isotonic(&fit_rows)?;
     let fit_positive = count_class(&fit_rows, SplitV1::Fit, true) as u64;
     let fit_measured_count = fit_rows.iter()
@@ -682,7 +711,7 @@ pub fn run_calibration_v1(
         "calibrator_id": CALIBRATOR_ID_V1,
         "calibrator_version": CALIBRATOR_VERSION_V1,
         "feature_id": contract.feature_id,
-        "fit_dataset_sha256": dataset.dataset_sha256,
+        "fit_dataset_sha256": fit_split_sha256,
         "fit_example_count": fit_measured_count,
         "fit_unmeasured_count": fit_unmeasured_count,
         "fit_positive_count": fit_positive,
@@ -697,9 +726,12 @@ pub fn run_calibration_v1(
     let threshold = select_support_threshold(
         &model,
         &threshold_rows,
+        &threshold_split_sha256,
         contract.maximum_false_support_rate,
     );
-    let held_out = held_out_metrics(&model, &threshold, &held_out_rows, contract.ece_bins);
+    let held_out = held_out_metrics(
+        &model, &threshold, &held_out_rows, &held_out_split_sha256, contract.ece_bins
+    );
     let mut bundle = CalibrationBundleV1 {
         schema: BUNDLE_SCHEMA_V1.into(),
         dataset_sha256: dataset.dataset_sha256.clone(),
