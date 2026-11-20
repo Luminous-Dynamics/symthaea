@@ -10,6 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::time::Instant;
 
 /// Runtime cognitive activity that an embodiment may communicate.
 ///
@@ -189,6 +190,112 @@ pub struct VisemeSignal {
     pub weight: f32,
 }
 
+
+/// Session-scoped producer for a single strictly ordered embodiment event stream.
+///
+/// Create one sequencer at session start and share it behind the runtime's
+/// synchronization primitive. Producers submit the time at which the
+/// subsystem observed the event; out-of-order observations are rejected.
+#[derive(Debug)]
+pub struct EmbodimentEventSequencer {
+    session_started_at: Instant,
+    next_sequence: Option<u64>,
+    last_monotonic_ns: Option<u64>,
+}
+
+impl EmbodimentEventSequencer {
+    pub fn new() -> Self {
+        Self {
+            session_started_at: Instant::now(),
+            next_sequence: Some(1),
+            last_monotonic_ns: None,
+        }
+    }
+
+    /// Publish an event using the current monotonic clock.
+    pub fn emit(
+        &mut self,
+        provenance: SignalProvenance,
+        kind: EmbodimentEventKind,
+    ) -> Result<EmbodimentEvent, EmbodimentSequenceError> {
+        self.emit_at(Instant::now(), provenance, kind)
+    }
+
+    /// Publish an event using the subsystem's observation instant.
+    ///
+    /// This is useful for audio callbacks: capture the callback's Instant at
+    /// the actual playback boundary and pass it here. Never use synthesis
+    /// completion or queue insertion time as a substitute for playback start.
+    pub fn emit_at(
+        &mut self,
+        observed_at: Instant,
+        provenance: SignalProvenance,
+        kind: EmbodimentEventKind,
+    ) -> Result<EmbodimentEvent, EmbodimentSequenceError> {
+        if observed_at < self.session_started_at {
+            return Err(EmbodimentSequenceError::BeforeSessionStart);
+        }
+
+        let monotonic_ns = observed_at
+            .duration_since(self.session_started_at)
+            .as_nanos()
+            .min(u128::from(u64::MAX)) as u64;
+
+        if let Some(last) = self.last_monotonic_ns {
+            if monotonic_ns < last {
+                return Err(EmbodimentSequenceError::TimestampRegression {
+                    last,
+                    received: monotonic_ns,
+                });
+            }
+        }
+
+        let sequence = self
+            .next_sequence
+            .ok_or(EmbodimentSequenceError::SequenceExhausted)?;
+
+        self.next_sequence = sequence.checked_add(1);
+        self.last_monotonic_ns = Some(monotonic_ns);
+
+        Ok(EmbodimentEvent {
+            sequence,
+            monotonic_ns,
+            provenance,
+            kind,
+        })
+    }
+}
+
+impl Default for EmbodimentEventSequencer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EmbodimentSequenceError {
+    BeforeSessionStart,
+    TimestampRegression { last: u64, received: u64 },
+    SequenceExhausted,
+}
+
+impl fmt::Display for EmbodimentSequenceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BeforeSessionStart => {
+                write!(f, "event observation predates the embodiment session")
+            }
+            Self::TimestampRegression { last, received } => {
+                write!(f, "event timestamp {received} regresses behind {last}")
+            }
+            Self::SequenceExhausted => write!(f, "embodiment event sequence is exhausted"),
+        }
+    }
+}
+
+impl std::error::Error for EmbodimentSequenceError {}
+
+
 /// Stateful, deterministic event reducer for a single embodiment session.
 #[derive(Debug, Clone, Default)]
 pub struct EmbodimentController {
@@ -235,6 +342,9 @@ impl EmbodimentController {
             }
             EmbodimentEventKind::Reset => {
                 validate_runtime_provenance("reset", event.provenance)?;
+            }
+            EmbodimentEventKind::ClearTransient => {
+                validate_runtime_event_provenance("clear transient", event.provenance)?;
             }
             EmbodimentEventKind::VisemeChanged { weight, .. } => {
                 validate_runtime_provenance("viseme", event.provenance)?;
@@ -468,6 +578,103 @@ mod tests {
             kind,
         }
     }
+
+
+    #[test]
+    fn sequencer_assigns_strictly_increasing_sequences_and_timestamps() {
+        let started = Instant::now();
+        let mut sequencer = EmbodimentEventSequencer::new();
+        let first_at = started + std::time::Duration::from_millis(1);
+        let second_at = started + std::time::Duration::from_millis(2);
+
+        let first = sequencer
+            .emit_at(
+                first_at,
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Listening,
+                },
+            )
+            .unwrap();
+        let second = sequencer
+            .emit_at(
+                second_at,
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Synthesizing,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(first.sequence, 1);
+        assert_eq!(second.sequence, 2);
+        assert!(second.monotonic_ns >= first.monotonic_ns);
+    }
+
+    #[test]
+    fn sequencer_rejects_regressing_observation_without_consuming_sequence() {
+        let mut sequencer = EmbodimentEventSequencer::new();
+        let start = Instant::now();
+        let later = start + std::time::Duration::from_millis(20);
+        let earlier = start + std::time::Duration::from_millis(10);
+
+        let first = sequencer
+            .emit_at(
+                later,
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Listening,
+                },
+            )
+            .unwrap();
+        let rejected = sequencer.emit_at(
+            earlier,
+            SignalProvenance::RuntimeEvent,
+            EmbodimentEventKind::ActivityChanged {
+                activity: EmbodimentActivity::Predicting,
+            },
+        );
+        assert!(matches!(
+            rejected,
+            Err(EmbodimentSequenceError::TimestampRegression { .. })
+        ));
+
+        let next = sequencer
+            .emit_at(
+                later + std::time::Duration::from_millis(1),
+                SignalProvenance::RuntimeEvent,
+                EmbodimentEventKind::ActivityChanged {
+                    activity: EmbodimentActivity::Predicting,
+                },
+            )
+            .unwrap();
+        assert_eq!(first.sequence, 1);
+        assert_eq!(next.sequence, 2);
+    }
+
+    #[test]
+    fn renderer_local_clear_cannot_erase_runtime_signals() {
+        let mut controller = EmbodimentController::new();
+        controller
+            .ingest(event(
+                1,
+                10,
+                EmbodimentEventKind::UncertaintyChanged { level: 0.4 },
+            ))
+            .unwrap();
+        let before = controller.snapshot().clone();
+        let mut clear = event(2, 20, EmbodimentEventKind::ClearTransient);
+        clear.provenance = SignalProvenance::RendererLocal;
+        assert!(matches!(
+            controller.ingest(clear),
+            Err(EmbodimentIngestError::SignalProvenanceNotAllowed {
+                field: "clear transient",
+                provenance: SignalProvenance::RendererLocal
+            })
+        ));
+        assert_eq!(*controller.snapshot(), before);
+    }
+
 
     #[test]
     fn explicit_runtime_activity_is_preserved_with_provenance() {
