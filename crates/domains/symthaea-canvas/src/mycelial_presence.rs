@@ -588,9 +588,17 @@ mod tests {
 
         assert_eq!(motif_id(&associating_scene).as_deref(), Some("motif-associating"));
         assert_eq!(motif_id(&predicting_scene).as_deref(), Some("motif-predicting"));
+        let motif_node = |scene: &SceneNode| {
+            scene.children.iter().find(|child| match &child.kind {
+                NodeKind::Group { id } => {
+                    id.as_deref().is_some_and(|value| value.starts_with("motif-"))
+                }
+                _ => false,
+            })
+        };
         assert_ne!(
-            associating_scene.children.last().unwrap().node_count(),
-            predicting_scene.children.last().unwrap().node_count()
+            motif_node(&associating_scene).unwrap().node_count(),
+            motif_node(&predicting_scene).unwrap().node_count()
         );
     }
 
