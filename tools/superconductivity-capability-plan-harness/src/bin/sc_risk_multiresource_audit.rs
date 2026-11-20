@@ -183,6 +183,41 @@ fn precommitment_cvar(
     if !best_value.is_finite() { return Err("precommitment CVaR is non-finite".to_owned()); }
     Ok((best_value, best_eta, best_policy))
 }
+
+// Evaluate regret for a fixed outcome-contingent policy. This ensures the
+// receipt's tail-regret metric describes the same decision rule as its EVSI
+// policy, rather than silently optimizing a second, different policy.
+fn policy_regret_metrics(
+    masses: &[Vec<f64>],
+    decisions: &[Decision],
+    best_loss_by_world: &[f64],
+    policy: &[usize],
+    alpha: f64,
+) -> Result<(f64, f64), String> {
+    if masses.len() != policy.len() || masses.iter().any(|row| row.len() != best_loss_by_world.len()) {
+        return Err("policy regret dimensions do not match joint world/observation masses".to_owned());
+    }
+    let mut values = Vec::with_capacity(masses.len() * best_loss_by_world.len());
+    let mut probabilities = Vec::with_capacity(values.capacity());
+    let mut expected_regret = 0.0;
+    for (outcome_index, outcome_masses) in masses.iter().enumerate() {
+        let decision = decisions.get(policy[outcome_index])
+            .ok_or_else(|| "policy references an unknown decision".to_owned())?;
+        for (world_index, mass) in outcome_masses.iter().enumerate() {
+            let regret = (decision.losses[world_index] - best_loss_by_world[world_index]).max(0.0);
+            expected_regret += mass * regret;
+            values.push(regret);
+            probabilities.push(*mass);
+        }
+    }
+    let total_probability: f64 = probabilities.iter().sum();
+    if (total_probability - 1.0).abs() > 1.0e-8 {
+        return Err(format!("policy regret probability mass sums to {total_probability}, not 1"));
+    }
+    let cvar_regret = weighted_cvar(&values, &probabilities, alpha)?;
+    Ok((expected_regret, cvar_regret))
+}
+
 fn expected_policy_risk(masses: &[Vec<f64>], decisions: &[Decision]) -> (f64, Vec<usize>) {
     let mut total = 0.0;
     let mut policy = Vec::with_capacity(masses.len());
@@ -497,7 +532,7 @@ impl Instance {
     fn plan(&self, indices: &[usize]) -> Result<Option<Plan>, String> {
         let Some((ordered_indices, consumption)) = self.feasible_order(indices) else { return Ok(None); };
         let masses = self.joint_masses(&ordered_indices)?;
-        let (expected_risk, _) = expected_policy_risk(&masses, &self.decisions);
+        let (expected_risk, expected_policy) = expected_policy_risk(&masses, &self.decisions);
         let (cvar_risk, eta, policy) = precommitment_cvar(&masses, &self.decisions, self.alpha)?;
         let prior = vec![self.worlds.iter().map(|world| world.prior).collect::<Vec<_>>()];
         let (prior_expected, _) = expected_policy_risk(&prior, &self.decisions);
@@ -513,19 +548,18 @@ impl Instance {
             return Err("precommitment baseline CVaR disagrees with direct decision CVaR".to_owned());
         }
         // Regret is measured against the best decision available with full
-        // knowledge of each world state. Report it separately from decision loss.
+        // knowledge of each world state, under the policy actually reported
+        // for each objective (rather than re-optimizing a different policy).
         let best_loss_by_world: Vec<f64> = (0..self.worlds.len()).map(|world_index| {
             self.decisions.iter().map(|decision| decision.losses[world_index])
                 .fold(f64::INFINITY, f64::min)
         }).collect();
-        let regret_decisions: Vec<Decision> = self.decisions.iter().map(|decision| Decision {
-            id: decision.id.clone(),
-            losses: decision.losses.iter().enumerate()
-                .map(|(world_index, loss)| (loss - best_loss_by_world[world_index]).max(0.0))
-                .collect(),
-        }).collect();
-        let (expected_regret, _) = expected_policy_risk(&masses, &regret_decisions);
-        let (cvar_regret, _, _) = precommitment_cvar(&masses, &regret_decisions, self.alpha)?;
+        let (expected_regret, _) = policy_regret_metrics(
+            &masses, &self.decisions, &best_loss_by_world, &expected_policy, self.alpha
+        )?;
+        let (_, cvar_regret) = policy_regret_metrics(
+            &masses, &self.decisions, &best_loss_by_world, &policy, self.alpha
+        )?;
         let expected_evsi = prior_expected - expected_risk;
         let cvar_evsi = prior_cvar - cvar_risk;
         if expected_evsi < -1.0e-8 || cvar_evsi < -1.0e-8 {
