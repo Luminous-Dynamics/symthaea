@@ -187,3 +187,59 @@ The repository and artifact inspection is complete. The external helper passes `
 - The setup script is authored and pinned, but its runtime workflow remains pending an environment with the required toolchains.
 
 This distinction is intentional: source inspection and a pinned runner are reproducibility infrastructure, not reproduction evidence.
+
+
+## 4. tparquet: end-to-end Pco/PCODEC + Zstd + ALP storage benchmark
+
+The tparquet benchmark is now a mandatory storage comparator because it measures complete Parquet files on public market-data previews and selects PCODEC/Pco or Zstd per numeric column. Pin the ALP-inclusive result snapshot:
+
+| Field | Pinned value |
+|---|---|
+| Repository | https://github.com/aperiodic-io/tparquet |
+| Result/source commit | `d1a40f6fa5508c99ee95e9609f3c38b111e21cf6` |
+| Results file blob | `c27c74dc5da5dd5330fdb3f9675492a7fad9b00e` |
+| Benchmark report | `bench/RESULTS.md` |
+| Published run date | 2026-11-07 |
+| Host description | 4-vCPU cloud VM |
+| Datasets | 31 datasets, 151,499,256 rows, four market-data providers |
+| Reported all-dataset sizes | ZSTD(9) 957.1 MB; tuned ZSTD(9) 700.7 MB; tuned+ALP 649.5 MB; tparquet 478.6 MB |
+| Reported all-dataset throughput | tparquet 102 MB/s write, 924 MB/s read; ALP 169/1,231; tuned ZSTD 141/1,129; default ZSTD 97/916 |
+
+The run reports bit-exact values and smaller tparquet files for all 31 datasets. It chooses PCODEC or Zstd per numeric column from an initial batch; strings/flags remain on the general-purpose path. The ALP comparator applies ALP to all floating-point columns in addition to tuned Parquet encodings.
+
+The source snapshot and results can be inspected at the pinned commit URL. The benchmark depends on public provider previews and downloads about 1.2 GB. The top-level `make bench` command in the repository runs the harness and rewrites the result report. Follow the benchmark's own README and verify the exact dataset/checksum list before execution.
+
+### Fair comparison rules
+
+- Run the same source samples and preserve every input row, key, null and timestamp.
+- Compare complete Parquet/CDL file bytes, including footers, dictionaries, row groups, page metadata, indexes and checksums. Report value-payload size separately.
+- Include Parquet default Zstd, tuned Zstd, tuned+ALP, Pco/PCODEC per column, and tparquet's actual per-column selector. A fixed ALP-only arm is not a substitute for best-of-ALP/Zstd.
+- Measure read/write throughput, compression/decompression CPU, peak RSS, random single-row/field access, scans, and concurrent operation. Keep writer and reader implementations/cores comparable.
+- Record whether a Parquet implementation supports ALP 2.14 preview and do not assume every reader can decode it. An unsupported reader must fail, not silently return incorrect values.
+- This report is an external published benchmark, not an independently rerun CDL-Bench result.
+
+## 5. OpenTelemetry Arrow / OTAP Dataflow Engine: transport and processing baseline
+
+The project has advanced from the experimental adapter in OTEP-0156 to the incubating Rust OpenTelemetry Arrow Dataflow Engine. Pin the audited snapshot:
+
+| Field | Pinned value |
+|---|---|
+| Repository | https://github.com/open-telemetry/otel-arrow |
+| Main commit at audit | `bd5909819727f7a16a7985d97e510d35a9302e66` (2026-11-20) |
+| README blob | `4e763fda422dbe40cc0b611c2b6428c95067a1ad` |
+| Benchmark guide blob | `b7e419dee0410cbe2eea2ca7612adbb6ff574a7d` |
+| Architecture | Arrow record batches / Arrow IPC over gRPC; OTLP interoperability; Rust dataflow engine |
+| Status | Incubating / experimental |
+
+Benchmark coverage in the pinned guide includes ~100k records/sec single-core normal load, 95% filtering (100k logs/sec input and ~5k output), backpressure, batch sizes 10..8192, saturation, 1/2/4/8/16-core scaling, pass-through, idle memory and binary size. The stated scaling target is >0.90 efficiency. The dashboards track throughput, CPU, network bytes, egress bytes per log, RAM and dropped-message percentage.
+
+This is a transport/dataflow comparator, not a file compression comparator. Use it in a separate OTLP/OTAP track with end-to-end conversion, wire bytes, processing, memory, backpressure, retries/acks and drops included. Do not compare its message bytes directly with tparquet file bytes.
+
+Reproduction URLs:
+- Benchmark guide: https://github.com/open-telemetry/otel-arrow/blob/bd5909819727f7a16a7985d97e510d35a9302e66/docs/benchmarks.md
+- Continuous benchmark dashboard: https://open-telemetry.github.io/otel-arrow/benchmarks/continuous/
+- Filter comparison: https://open-telemetry.github.io/otel-arrow/benchmarks/nightly/filter/
+- Saturation: https://open-telemetry.github.io/otel-arrow/benchmarks/nightly/saturation/
+- Scaling efficiency: https://open-telemetry.github.io/otel-arrow/benchmarks/nightly/scaling-efficiency/
+
+**CDL benchmark target, not current achievement:** match 100k records/sec per core in a comparable normal-load scenario, then target >0.90 scaling efficiency to 16 cores. Include pass-through and transformed-path tests, and report dropped records (must be zero for lossless transport), CPU, RAM and bytes on wire.
