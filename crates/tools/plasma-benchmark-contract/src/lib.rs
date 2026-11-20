@@ -707,6 +707,21 @@ mod tests {
     }
 
     #[test]
+    fn selective_learned_solver_requires_calibration_artifact_digest() {
+        let mut candidate = run("selective-candidate", "neural");
+        candidate.solver.learned = true;
+        candidate.solver.selective = true;
+        candidate.data.training_data_sha256 = Some(DIGEST_A.to_owned());
+        candidate.data.checkpoint_sha256 = Some(DIGEST_B.to_owned());
+        let findings = validate_run(&candidate);
+        assert!(has_code(&findings, "missing_calibration_artifact_digest"));
+
+        candidate.solver.calibration_artifact_sha256 = Some(DIGEST_A.to_owned());
+        let findings = validate_run(&candidate);
+        assert!(!has_code(&findings, "missing_calibration_artifact_digest"));
+    }
+
+    #[test]
     fn accuracy_can_compare_different_precision_but_timing_cannot() {
         let left = run("fp64", "pif");
         let mut right = run("fp32", "neopic");
