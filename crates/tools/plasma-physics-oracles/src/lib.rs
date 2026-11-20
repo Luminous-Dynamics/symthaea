@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod coordinate_audit;
+pub mod poisson_certificate;
 
 use std::error::Error;
 use std::f64::consts::TAU;
