@@ -589,6 +589,15 @@ mod tests {
             .ingest(event(
                 2,
                 20,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
+                },
+            ))
+            .unwrap();
+        controller
+            .ingest(event(
+                3,
+                30,
                 EmbodimentEventKind::VisemeChanged {
                     viseme: Viseme::Ou,
                     weight: 0.5,
