@@ -1,0 +1,26 @@
+{
+  "schema_version": "textile-data-intake-v0.1",
+  "dataset_id": "OpenTextile-NIR",
+  "dataset_version": "record-18269172-unverified-version",
+  "source": {
+    "title": "OpenTextile-NIR: Near-infrared hyperspectral imaging and photography dataset for optical identification of textiles",
+    "publisher": "Zenodo (dataset record curated by VTT Technical Research Centre of Finland)",
+    "landing_page": "https://zenodo.org/records/18269172",
+    "doi": "10.5281/zenodo.18269172",
+    "version": "unverified; confirm canonical Zenodo version metadata during intake",
+    "retrieved_at_utc": ""
+  },
+  "rights": {
+    "status": "pending",
+    "license_url": null,
+    "license_text_local_path": null,
+    "license_text_sha256": null,
+    "reviewed_by": null,
+    "reviewed_at_utc": null,
+    "permitted_uses": [],
+    "attribution": "Sormunen, T.; Mahlamäki, E.; Mäkelä, S.-M.; Mäkelä, M. (2026). OpenTextile-NIR: Near-infrared hyperspectral imaging and photography dataset for optical identification of textiles. Zenodo. https://doi.org/10.5281/zenodo.18269172",
+    "notes": "Dataset-level Zenodo license has not yet been independently confirmed. The related Data in Brief article is CC BY 4.0, but the article license is not assumed to govern the dataset files. Keep pending until the canonical Zenodo record license, exact version, file inventory and any third-party content terms are reviewed and locally checksum-bound."
+  },
+  "files": [],
+  "claim_ceiling": "Source inventory and local file-integrity verification only; not NIR calibration qualification, sample-level composition truth, model performance, or physical sorting/recycling acceptance."
+}

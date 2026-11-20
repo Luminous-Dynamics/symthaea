@@ -115,9 +115,9 @@ mod tests {
     #[test]
     fn test_similarity_matrix_symmetric() {
         let m = MaterialHdcEncoder::new().similarity_matrix(&MaterialProperty::presets());
-        for i in 0..6 {
-            for j in 0..6 {
-                assert!((m[i][j] - m[j][i]).abs() < 1e-6);
+        for (i, row) in m.iter().take(6).enumerate() {
+            for (j, value) in row.iter().take(6).enumerate() {
+                assert!((*value - m[j][i]).abs() < 1e-6);
             }
         }
     }

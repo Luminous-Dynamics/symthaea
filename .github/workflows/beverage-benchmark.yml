@@ -4,26 +4,21 @@ on:
   push:
     branches: [main]
     paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
       - "crates/domains/symthaea-culinary/**"
       - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
       - "docs/research/beverage-data-sources-v1.json"
-      - ".github/workflows/beverage-benchmark.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
       - "crates/domains/symthaea-culinary/**"
       - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
       - "docs/research/beverage-data-sources-v1.json"
-      - ".github/workflows/beverage-benchmark.yml"
   workflow_dispatch:
 
 permissions:
@@ -36,6 +31,7 @@ concurrency:
 jobs:
   synthetic-contract:
     name: Synthetic Corpus Contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

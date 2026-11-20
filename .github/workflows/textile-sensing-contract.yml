@@ -1,0 +1,128 @@
+name: Textile Sensing Contract
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-materials/**"
+      - "tools/textile-dataset-intake/**"
+      - "docs/research/TEXTILE_SORT_FUSION_001.md"
+      - "docs/research/TEXTILE_DESIGN_TO_RECOVERY_BENCHMARK_001.md"
+      - "docs/research/TEXTILE_MATERIAL_FLOW_001.md"
+      - "docs/research/fixtures/textile_sort_fusion_v0_1/**"
+      - ".github/workflows/textile-sensing-contract.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+  workflow_dispatch:
+
+concurrency:
+  group: textile-sensing-contract-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  qualify:
+    name: Textile sensing exact-head qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      REPOSITORY: ${{ github.repository }}
+      RUN_ID: ${{ github.run_id }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
+    steps:
+      - name: Checkout exact subject head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact subject checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_SUBJECT_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SUBJECT_SHA" = "$EXPECTED_SUBJECT_SHA"
+          printf 'subject_sha=%s\nchecked_out_sha=%s\n' \
+            "$EXPECTED_SUBJECT_SHA" "$ACTUAL_SUBJECT_SHA"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            tools/textile-dataset-intake/target
+          key: textile-sensing-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'tools/textile-dataset-intake/Cargo.toml') }}
+          restore-keys: |
+            textile-sensing-${{ runner.os }}-
+
+      - name: Test materials crate
+        run: cargo test -p symthaea-materials -- --nocapture
+
+      - name: Check materials formatting
+        run: cargo fmt --package symthaea-materials -- --check
+
+      - name: Run Clippy with warnings denied for materials
+        run: cargo clippy -p symthaea-materials --all-targets -- -D warnings
+
+      - name: Test offline textile dataset intake
+        run: cargo test --manifest-path tools/textile-dataset-intake/Cargo.toml -- --nocapture
+
+      - name: Check textile dataset intake formatting
+        run: cargo fmt --manifest-path tools/textile-dataset-intake/Cargo.toml --all -- --check
+
+      - name: Run Clippy with warnings denied for textile intake
+        run: cargo clippy --manifest-path tools/textile-dataset-intake/Cargo.toml --all-targets -- -D warnings
+
+      - name: Emit exact-subject qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_SUBJECT_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SUBJECT_SHA" = "$EXPECTED_SUBJECT_SHA"
+          mkdir -p artifacts/textile-sensing
+          cat > artifacts/textile-sensing/receipt.json <<EOF
+          {
+            "receipt_version": "textile-sensing-contract-ci-v0.1",
+            "repository": "$REPOSITORY",
+            "subject_sha": "$EXPECTED_SUBJECT_SHA",
+            "checked_out_sha": "$ACTUAL_SUBJECT_SHA",
+            "run_id": $RUN_ID,
+            "run_attempt": $RUN_ATTEMPT,
+            "rust_toolchain": "1.96.0",
+            "checks": [
+              "cargo test -p symthaea-materials -- --nocapture",
+              "cargo fmt --package symthaea-materials -- --check",
+              "cargo clippy -p symthaea-materials --all-targets -- -D warnings",
+              "cargo test --manifest-path tools/textile-dataset-intake/Cargo.toml -- --nocapture",
+              "cargo fmt --manifest-path tools/textile-dataset-intake/Cargo.toml --all -- --check",
+              "cargo clippy --manifest-path tools/textile-dataset-intake/Cargo.toml --all-targets -- -D warnings"
+            ],
+            "claim_ceiling": "synthetic_contract_and_local_file_integrity_tests_only"
+          }
+          EOF
+          sha256sum artifacts/textile-sensing/receipt.json \
+            > artifacts/textile-sensing/receipt.sha256
+
+      - name: Upload exact-subject qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: textile-sensing-${{ env.EXPECTED_SUBJECT_SHA }}
+          path: artifacts/textile-sensing/
+          if-no-files-found: error
+          retention-days: 30
