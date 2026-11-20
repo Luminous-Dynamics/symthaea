@@ -733,6 +733,74 @@ bool decode_partitioned_columnar(const std::vector<std::uint8_t>& bytes, std::si
 
 void write_file(const std::filesystem::path& path,const std::vector<std::uint8_t>& bytes){std::ofstream f(path,std::ios::binary);if(!f)throw std::runtime_error("open failed");f.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));if(!f)throw std::runtime_error("write failed");}
 void require(bool v,const std::string& m){if(!v)throw std::runtime_error(m);}
+void test_columnar_empty() {
+    const std::vector<Record> records;
+    const auto frame = encode_partitioned_columnar(records);
+    std::vector<Record> decoded;
+    require(decode_partitioned_columnar(frame, 0U, decoded), "empty columnar frame rejected");
+    require(decoded.empty(), "empty columnar frame produced records");
+}
+void test_columnar_roundtrips() {
+    for (const std::string name : {"sparse", "bursty", "idle", "noisy"}) {
+        const auto records = fixture(name, 0x6677U);
+        const auto frame = encode_partitioned_columnar(records);
+        std::vector<Record> decoded;
+        require(decode_partitioned_columnar(frame, records.size(), decoded),
+                name + " columnar frame rejected");
+        require(decoded == records, name + " columnar exact reconstruction mismatch");
+    }
+}
+void test_columnar_key_cardinality() {
+    std::mt19937_64 rng(0xc011U);
+    for (const std::size_t key_count : {1U, 8U, 64U, 1024U, 4096U}) {
+        const std::size_t record_count = std::max<std::size_t>(4096U, key_count * 2U);
+        std::vector<Record> last(key_count);
+        std::vector<bool> initialized(key_count, false);
+        std::vector<Record> records;
+        records.reserve(record_count);
+        for (std::size_t i = 0U; i < record_count; ++i) {
+            const std::size_t key = static_cast<std::size_t>(rng() % key_count);
+            Record record = initialized[key] ? last[key] : Record{};
+            record.timestamp = static_cast<std::uint64_t>(i + 1U);
+            record.entity = static_cast<std::uint32_t>(key / 16U);
+            record.series = static_cast<std::uint32_t>(key % 16U);
+            if (!initialized[key]) record.present = 0xffU;
+            for (std::size_t field = 0U; field < kFields; ++field) {
+                const auto bit = static_cast<std::uint8_t>(1U << field);
+                if (!initialized[key] || rng() % 19U == 0U) {
+                    if (initialized[key] && rng() % 11U == 0U)
+                        record.present = static_cast<std::uint8_t>(record.present ^ bit);
+                    record.values[field] = (record.present & bit) == 0U ? 0U : value_for(field, rng());
+                }
+            }
+            records.push_back(record);
+            last[key] = record;
+            initialized[key] = true;
+        }
+        const auto frame = encode_partitioned_columnar(records);
+        std::vector<Record> decoded;
+        require(decode_partitioned_columnar(frame, records.size(), decoded),
+                "columnar high-cardinality decode rejected");
+        require(decoded == records, "columnar high-cardinality reconstruction mismatch");
+    }
+}
+void test_columnar_corruption() {
+    const auto records = fixture("sparse", 0x77ccU);
+    const auto valid = encode_partitioned_columnar(records);
+    std::vector<Record> decoded;
+    auto corrupt = valid;
+    corrupt[0] ^= 1U;
+    require(!decode_partitioned_columnar(corrupt, records.size(), decoded),
+            "columnar bad magic/CRC accepted");
+    corrupt = valid;
+    corrupt.pop_back();
+    require(!decode_partitioned_columnar(corrupt, records.size(), decoded),
+            "columnar truncated frame accepted");
+    corrupt = valid;
+    corrupt.push_back(0U);
+    require(!decode_partitioned_columnar(corrupt, records.size(), decoded),
+            "columnar trailing bytes accepted");
+}
 void test_empty_stream(){const std::vector<Record> records;const auto frame=encode_partitioned(records);std::vector<Record> decoded;require(decode_partitioned(frame,0U,decoded),"empty partitioned stream rejected");require(decoded.empty(),"empty partitioned stream produced records");}
 void test_roundtrips(){for(const std::string name:{"sparse","bursty","idle","noisy"}){const auto records=fixture(name,0x7878U);const auto frame=encode_partitioned(records);require(frame.size()>26U&&frame[25]==0U,name+" should use timestamp-merge mode");std::vector<Record> decoded;require(decode_partitioned(frame,records.size(),decoded),name+" partition decoder rejected frame");require(decoded==records,name+" partition order/data mismatch");}}
 void test_schedule_fallback(){auto records=fixture("sparse",0x887766U);for(std::size_t i=0U;i<records.size();++i)records[i].timestamp=static_cast<std::uint64_t>(i/kKeys)*1000U;const auto duplicate_frame=encode_partitioned(records);require(duplicate_frame.size()>26U&&duplicate_frame[25]==1U,"duplicate timestamps should use tie-template mode");std::vector<Record> decoded;require(decode_partitioned(duplicate_frame,records.size(),decoded)&&decoded==records,"duplicate timestamp fallback order mismatch");std::uint64_t tie_order_bits=0U;std::size_t offset=30U;require(get_u64(duplicate_frame,offset,tie_order_bits),"tie-template order bit count missing");require(tie_order_bits<records.size()*key_bits(kKeys),"repeated tie templates should compress below full schedule");require(tie_order_bits<9000U,"repeated tie templates should stay compact across 1,024 identical groups");auto changing=records;for(std::size_t start=0U;start<changing.size();start+=kKeys)if((start/kKeys)%2U==1U)std::reverse(changing.begin()+static_cast<std::ptrdiff_t>(start),changing.begin()+static_cast<std::ptrdiff_t>(start+kKeys));const auto changing_frame=encode_partitioned(changing);require(changing_frame[25]==1U,"nondecreasing changing ties should use template mode");require(decode_partitioned(changing_frame,changing.size(),decoded)&&decoded==changing,"changing tie template order mismatch");std::uint64_t changing_bits=0U;std::size_t changing_offset=30U;require(get_u64(changing_frame,changing_offset,changing_bits),"changing tie order bit count missing");require(changing_bits<10000U,"two recurring tie templates should be cached");auto out_of_order=fixture("bursty",0x778899U);std::swap(out_of_order[1],out_of_order[2]);const auto disorder_frame=encode_partitioned(out_of_order);require(disorder_frame.size()>26U&&disorder_frame[25]==2U,"out-of-order timestamps should use full schedule");require(decode_partitioned(disorder_frame,out_of_order.size(),decoded)&&decoded==out_of_order,"out-of-order fallback mismatch");}
@@ -765,17 +833,22 @@ void emit(const std::filesystem::path& dir) {
         const auto raw = framed_raw(rows);
         const auto delta = framed_global_state_delta(rows);
         const auto partitioned = encode_partitioned(rows);
+        const auto columnar = encode_partitioned_columnar(rows);
         std::vector<Record> decoded;
         require(decode_partitioned(partitioned, rows.size(), decoded) && decoded == rows,
-                name + " emission round-trip failed");
+                name + " row-partitioned emission round-trip failed");
+        require(decode_partitioned_columnar(columnar, rows.size(), decoded) && decoded == rows,
+                name + " field-columnar emission round-trip failed");
         write_file(dir / (name + "_raw.bin"), raw);
         write_file(dir / (name + "_global_delta.bin"), delta);
         write_file(dir / (name + "_partitioned.bin"), partitioned);
+        write_file(dir / (name + "_columnar.bin"), columnar);
         std::cout << name << ",records=" << rows.size()
                   << ",raw_frame=" << raw.size()
                   << ",global_delta_frame=" << delta.size()
-                  << ",partitioned_frame=" << partitioned.size() << "\n";
+                  << ",partitioned_frame=" << partitioned.size()
+                  << ",columnar_frame=" << columnar.size() << "\n";
     }
 }
 
-int main(int argc,char** argv){try{test_empty_stream();test_roundtrips();test_schedule_fallback();test_same_series_duplicate_timestamp_rows();test_randomized();test_corruption();std::cout<<"empty_stream=PASS timestamp_merge=PASS duplicate_tie_template=PASS same_series_multirow_ties=PASS disorder_full_schedule=PASS fixture_roundtrips=4 randomized_roundtrips=100 corruption_rejections=3 status=PASS\\n";if(argc==3&&std::string(argv[1])=="--emit-dir")emit(argv[2]);else if(argc!=1){std::cerr<<"usage: "<<argv[0]<<" [--emit-dir DIR]\\n";return 2;}return 0;}catch(const std::exception& e){std::cerr<<"partitioned reference failed: "<<e.what()<<"\\n";return 1;}}
+int main(int argc,char** argv){try{test_empty_stream();test_roundtrips();test_schedule_fallback();test_same_series_duplicate_timestamp_rows();test_randomized();test_corruption();test_columnar_empty();test_columnar_roundtrips();test_columnar_key_cardinality();test_columnar_corruption();std::cout<<"row_frame_tests=PASS columnar_empty=PASS columnar_fixtures=4 columnar_key_counts=1,8,64,1024,4096 columnar_corruption=3 randomized_roundtrips=100 status=PASS\\n";if(argc==3&&std::string(argv[1])=="--emit-dir")emit(argv[2]);else if(argc!=1){std::cerr<<"usage: "<<argv[0]<<" [--emit-dir DIR]\\n";return 2;}return 0;}catch(const std::exception& e){std::cerr<<"partitioned reference failed: "<<e.what()<<"\\n";return 1;}}
