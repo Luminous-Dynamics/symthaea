@@ -1,3 +1,5 @@
+pub mod coordinate_audit;
+
 //! Small, deterministic reference oracles for electrostatic PIC research.
 //!
 //! These routines are deliberately small-N verification tools, not production
