@@ -7,7 +7,7 @@
 //! surface in a context window. It cannot promote evidence, alter trust,
 //! authorize an action, delete memory, or override lifecycle controls.
 
-use broca_mace_ingress::{ConsolidationEvidenceRefV1, SourceTrustStatus};
+use broca_mace_ingress::{AsKnownQuery, ConsolidationEvidenceRefV1, SourceTrustStatus};
 use broca_mace_policy::Scope;
 use sha2::{Digest, Sha256};
 
@@ -130,6 +130,8 @@ pub struct MemoryAccessTelemetryV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MemorySurfacingCandidateV1 {
     event_id: u32,
+    scope: Scope,
+    as_known: AsKnownQuery,
     context_token_cost: u32,
     last_accessed_at_ms: i64,
     historical_access_count: u32,
@@ -143,7 +145,7 @@ impl MemorySurfacingCandidateV1 {
         evidence: &ConsolidationEvidenceRefV1,
         access: MemoryAccessTelemetryV1,
         prediction: Option<FutureUsePredictionV1>,
-        known_at_ms: i64,
+        as_known: AsKnownQuery,
     ) -> Result<Self, SalienceReject> {
         if evidence.event_id() == 0 {
             return Err(SalienceReject::InvalidEventId);
@@ -166,7 +168,10 @@ impl MemorySurfacingCandidateV1 {
         if access.context_token_cost == 0 {
             return Err(SalienceReject::InvalidContextCost);
         }
-        if access.last_accessed_at_ms > known_at_ms {
+        if evidence.as_known() != as_known {
+            return Err(SalienceReject::EvidenceSnapshotMismatch);
+        }
+        if access.last_accessed_at_ms > as_known.known_at_ms {
             return Err(SalienceReject::FutureAccessTimestamp);
         }
 
@@ -182,6 +187,8 @@ impl MemorySurfacingCandidateV1 {
 
         Ok(Self {
             event_id: evidence.event_id(),
+            scope: evidence.scope(),
+            as_known,
             context_token_cost: access.context_token_cost,
             last_accessed_at_ms: access.last_accessed_at_ms,
             historical_access_count: access.historical_access_count,
@@ -203,7 +210,10 @@ impl MemorySurfacingCandidateV1 {
 fn receipt_bound_evidence_digest(evidence: &ConsolidationEvidenceRefV1) -> String {
     let receipt = evidence.receipts();
     let fields = vec![
+        evidence.as_known().valid_at_ms.to_string(),
+        evidence.as_known().known_at_ms.to_string(),
         evidence.event_id().to_string(),
+        scope_code(evidence.scope()).to_owned(),
         evidence.session_id().to_owned(),
         evidence.task_id().to_owned(),
         scope_code(evidence.scope()).to_owned(),
@@ -262,6 +272,8 @@ pub enum SalienceReject {
     InvalidPredictionDigest,
     EvidenceNotTrusted,
     EvidenceOutcomeUnreconciled,
+    EvidenceScopeMismatch,
+    EvidenceSnapshotMismatch,
     EvidenceRootUnknown,
     InvalidEvidenceMeasurement,
 }
@@ -279,7 +291,7 @@ pub struct MemorySurfacingPlanV1 {
     pub schema_version: u16,
     pub mode: MemorySurfacingModeV1,
     pub target_scope: Scope,
-    pub known_at_ms: i64,
+    pub as_known: AsKnownQuery,
     pub context_budget_tokens: u32,
     pub context_tokens_used: u32,
     pub predicted_net_value_micros: i64,
@@ -345,10 +357,16 @@ fn digest_fields(domain: &[u8], fields: &[String]) -> String {
 fn validate_candidate(
     candidate: &MemorySurfacingCandidateV1,
     target_scope: Scope,
-    known_at_ms: i64,
+    as_known: AsKnownQuery,
 ) -> Result<(), SalienceReject> {
     if candidate.event_id == 0 {
         return Err(SalienceReject::InvalidEventId);
+    }
+    if candidate.scope != target_scope {
+        return Err(SalienceReject::EvidenceScopeMismatch);
+    }
+    if candidate.as_known != as_known {
+        return Err(SalienceReject::EvidenceSnapshotMismatch);
     }
     if candidate.context_token_cost == 0 {
         return Err(SalienceReject::InvalidContextCost);
@@ -356,7 +374,7 @@ fn validate_candidate(
     if !is_lower_sha256(&candidate.evidence_sha256) {
         return Err(SalienceReject::InvalidEvidenceDigest);
     }
-    if candidate.last_accessed_at_ms > known_at_ms {
+    if candidate.last_accessed_at_ms > as_known.known_at_ms {
         return Err(SalienceReject::FutureAccessTimestamp);
     }
     if let Some(prediction) = &candidate.prediction {
@@ -369,7 +387,7 @@ fn validate_candidate(
         if prediction.target_scope != target_scope {
             return Err(SalienceReject::PredictionScopeMismatch);
         }
-        if prediction.predicted_at_ms > known_at_ms {
+        if prediction.predicted_at_ms > as_known.known_at_ms {
             return Err(SalienceReject::PredictionFutureLeakage);
         }
         if prediction.horizon_end_ms <= known_at_ms
@@ -428,7 +446,7 @@ pub fn select_for_context(
     candidates: &[MemorySurfacingCandidateV1],
     mode: MemorySurfacingModeV1,
     target_scope: Scope,
-    known_at_ms: i64,
+    as_known: AsKnownQuery,
     context_budget_tokens: u32,
 ) -> Result<MemorySurfacingPlanV1, SalienceReject> {
     if context_budget_tokens == 0 || context_budget_tokens > MAX_CONTEXT_BUDGET_TOKENS {
@@ -443,7 +461,7 @@ pub fn select_for_context(
         if !seen.insert(candidate.event_id) {
             return Err(SalienceReject::DuplicateEventId);
         }
-        validate_candidate(candidate, target_scope, known_at_ms)?;
+        validate_candidate(candidate, target_scope, as_known)?;
     }
 
     let mut selected_indices = Vec::<usize>::new();
@@ -569,7 +587,7 @@ pub fn select_for_context(
         schema_version: 1,
         mode,
         target_scope,
-        known_at_ms,
+        as_known,
         context_budget_tokens,
         context_tokens_used,
         predicted_net_value_micros,
@@ -586,7 +604,8 @@ impl MemorySurfacingPlanV1 {
             self.schema_version.to_string(),
             self.mode.code().to_owned(),
             scope_code(self.target_scope).to_owned(),
-            self.known_at_ms.to_string(),
+            self.as_known.valid_at_ms.to_string(),
+            self.as_known.known_at_ms.to_string(),
             self.context_budget_tokens.to_string(),
             self.context_tokens_used.to_string(),
             self.predicted_net_value_micros.to_string(),
@@ -628,6 +647,11 @@ mod tests {
     ) -> MemorySurfacingCandidateV1 {
         MemorySurfacingCandidateV1 {
             event_id,
+            scope: scope(),
+            as_known: AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             context_token_cost: tokens,
             last_accessed_at_ms: last_access,
             historical_access_count: frequency,
@@ -683,7 +707,10 @@ mod tests {
             &candidates,
             MemorySurfacingModeV1::FailureOnly,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             8,
         )
         .unwrap();
@@ -691,7 +718,10 @@ mod tests {
             &candidates,
             MemorySurfacingModeV1::PredictedFutureValue,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             8,
         )
         .unwrap();
@@ -738,7 +768,10 @@ mod tests {
             &candidates,
             MemorySurfacingModeV1::FrequencyFirst,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             8,
         )
         .unwrap();
@@ -746,7 +779,10 @@ mod tests {
             &candidates,
             MemorySurfacingModeV1::PredictedFutureValue,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             8,
         )
         .unwrap();
@@ -769,7 +805,10 @@ mod tests {
             &[candidate],
             MemorySurfacingModeV1::PredictedFutureValue,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             8,
         )
         .unwrap();
@@ -789,7 +828,10 @@ mod tests {
                 &[candidate],
                 MemorySurfacingModeV1::PredictedFutureValue,
                 scope(),
-                100,
+                AsKnownQuery {
+                    valid_at_ms: 100,
+                    known_at_ms: 100,
+                },
                 8,
             ),
             Err(SalienceReject::PredictionFutureLeakage)
@@ -804,7 +846,10 @@ mod tests {
                 &[candidate],
                 MemorySurfacingModeV1::PredictedFutureValue,
                 scope(),
-                100,
+                AsKnownQuery {
+                    valid_at_ms: 100,
+                    known_at_ms: 100,
+                },
                 8,
             ),
             Err(SalienceReject::PredictionScopeMismatch)
@@ -827,7 +872,10 @@ mod tests {
                 &[candidate],
                 MemorySurfacingModeV1::PredictedFutureValue,
                 scope(),
-                100,
+                AsKnownQuery {
+                    valid_at_ms: 100,
+                    known_at_ms: 100,
+                },
                 8,
             ),
             Err(SalienceReject::InvalidPredictionDigest)
@@ -866,7 +914,10 @@ mod tests {
             &candidates,
             MemorySurfacingModeV1::PredictedFutureValue,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             12,
         )
         .unwrap();
@@ -895,7 +946,10 @@ mod tests {
             &[candidate.clone()],
             MemorySurfacingModeV1::PredictedFutureValue,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             8,
         )
         .unwrap();
@@ -903,12 +957,75 @@ mod tests {
             &[candidate],
             MemorySurfacingModeV1::PredictedFutureValue,
             scope(),
-            100,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
             8,
         )
         .unwrap();
         assert_eq!(first, second);
         assert_eq!(first.plan_sha256, first.canonical_digest());
+    }
+
+    #[test]
+    fn cross_scope_evidence_is_rejected_by_every_surfacing_policy() {
+        let mut value = candidate(9, 4, false, 90, 1, None);
+        value.scope.objective = Objective::Cost;
+        for mode in [
+            MemorySurfacingModeV1::FailureOnly,
+            MemorySurfacingModeV1::RecencyFirst,
+            MemorySurfacingModeV1::FrequencyFirst,
+            MemorySurfacingModeV1::PredictedFutureValue,
+        ] {
+            assert_eq!(
+                select_for_context(
+                    &[value.clone()],
+                    mode,
+                    scope(),
+                    AsKnownQuery {
+                        valid_at_ms: 100,
+                        known_at_ms: 100,
+                    },
+                    8,
+                ),
+                Err(SalienceReject::EvidenceScopeMismatch)
+            );
+        }
+    }
+
+    #[test]
+    fn salience_rejects_stale_and_future_bitemporal_evidence_snapshots() {
+        let value = candidate(10, 4, false, 90, 1, None);
+        for requested in [
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 99,
+            },
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 101,
+            },
+            AsKnownQuery {
+                valid_at_ms: 99,
+                known_at_ms: 100,
+            },
+            AsKnownQuery {
+                valid_at_ms: 101,
+                known_at_ms: 100,
+            },
+        ] {
+            assert_eq!(
+                select_for_context(
+                    &[value.clone()],
+                    MemorySurfacingModeV1::RecencyFirst,
+                    scope(),
+                    requested,
+                    8,
+                ),
+                Err(SalienceReject::EvidenceSnapshotMismatch)
+            );
+        }
     }
 
     #[test]
@@ -919,7 +1036,10 @@ mod tests {
                 &[candidate.clone()],
                 MemorySurfacingModeV1::RecencyFirst,
                 scope(),
-                100,
+                AsKnownQuery {
+                    valid_at_ms: 100,
+                    known_at_ms: 100,
+                },
                 MAX_CONTEXT_BUDGET_TOKENS + 1,
             ),
             Err(SalienceReject::InvalidBudget)
@@ -929,7 +1049,10 @@ mod tests {
                 &[candidate.clone(), candidate],
                 MemorySurfacingModeV1::RecencyFirst,
                 scope(),
-                100,
+                AsKnownQuery {
+                    valid_at_ms: 100,
+                    known_at_ms: 100,
+                },
                 8,
             ),
             Err(SalienceReject::DuplicateEventId)

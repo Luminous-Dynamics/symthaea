@@ -412,3 +412,7 @@ Four additional adversarial regressions cover non-promotion dispositions, output
 Provider traces can now be bound to a canonical run manifest containing model/release, API surface/version, harness revision, system-instruction digest, tool-schema digest, sandbox image, memory policy/state, runtime configuration, capture digest, run time window and retention mode. This enables matched tests for same-model/different-harness and different-model/same-harness.
 
 The manifest is self-declared metadata: it proves consistency with the captured trace, not that the provider actually executed the declared model or harness. Provider/runtime signatures and independent attestation remain future work. It is not execution or outcome authority.
+
+### Bitemporal and scope-safe predictive salience
+
+The consolidation salience planner pins each candidate to the exact source scope and `(valid_at, known_at)` snapshot. Both coordinates are carried into the receipt-bound evidence digest and resulting surfacing-plan digest. Failure-only, recency-first, frequency-first and predicted-future-value selection all reject cross-scope evidence and evidence from a different knowledge snapshot; a model prediction cannot bypass the gate. Salience only chooses which already-admitted records to surface in context; it cannot promote evidence or grant action authority.

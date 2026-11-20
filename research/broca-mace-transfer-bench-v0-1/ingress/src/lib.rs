@@ -523,6 +523,7 @@ impl IngestBatch {
 
 #[derive(Clone, Debug)]
 pub struct ConsolidationEvidenceRefV1 {
+    as_known: AsKnownQuery,
     event_id: u32,
     session_id: String,
     task_id: String,
@@ -544,6 +545,10 @@ pub struct ConsolidationEvidenceRefV1 {
 }
 
 impl ConsolidationEvidenceRefV1 {
+    pub fn as_known(&self) -> AsKnownQuery {
+        self.as_known
+    }
+
     /// Candidate-visible projection reconstructed from the receipt-preserving
     /// evidence reference. This does not restore trust by caller assertion:
     /// every field originates in the previously admitted receipt bundle.
@@ -997,6 +1002,7 @@ pub fn build_consolidation_evidence_pack(
             SourceTrustStatus::Unknown => unknown_trust_event_count += 1,
         }
         events.push(ConsolidationEvidenceRefV1 {
+            as_known: item.as_known,
             event_id: experience.event_id,
             session_id: item.receipts.session_id.clone(),
             task_id: item.receipts.task_id.clone(),
