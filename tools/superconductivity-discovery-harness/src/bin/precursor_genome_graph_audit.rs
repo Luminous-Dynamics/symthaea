@@ -516,6 +516,30 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         })
     }).collect();
 
+    let mut precursor_rates: Vec<f64> = node_counts.values()
+        .filter(|counts| counts.analyzable_pairs > 0)
+        .map(|counts| counts.positive_pairs as f64 / counts.analyzable_pairs as f64)
+        .collect();
+    precursor_rates.sort_by(f64::total_cmp);
+    let precursor_eligible_degrees: Vec<u64> = node_counts.values()
+        .map(|counts| counts.analyzable_pairs).collect();
+    let minimum_eligible_degree = precursor_eligible_degrees.iter().copied().min().unwrap_or(0);
+    let maximum_eligible_degree = precursor_eligible_degrees.iter().copied().max().unwrap_or(0);
+    let mean_eligible_degree = precursor_eligible_degrees.iter().sum::<u64>() as f64
+        / precursor_eligible_degrees.len().max(1) as f64;
+    let precursor_rate_summary = json!({
+        "precursor_count_with_eligible_pairs": precursor_rates.len(),
+        "eligible_degree_minimum": minimum_eligible_degree,
+        "eligible_degree_maximum": maximum_eligible_degree,
+        "eligible_degree_mean": mean_eligible_degree,
+        "observed_positive_fraction_minimum": precursor_rates.first().copied(),
+        "observed_positive_fraction_median": precursor_rates.get(precursor_rates.len() / 2).copied(),
+        "observed_positive_fraction_maximum": precursor_rates.last().copied(),
+        "observed_positive_fraction_unweighted_mean": precursor_rates.iter().sum::<f64>()
+            / precursor_rates.len().max(1) as f64,
+        "interpretation": "Descriptive node-level outcome fractions only; not out-of-sample precursor propensity estimates."
+    });
+
     let per_precursor: Vec<Value> = node_counts.iter().map(|(formula, counts)| {
         json!({
             "precursor_formula": formula,
@@ -584,6 +608,7 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
             "unique_unordered_pair_count": edges.len(),
             "complete_undirected_graph": true,
             "expected_degree": expected_degree,
+            "per_precursor_reactivity_summary": precursor_rate_summary,
             "per_precursor": per_precursor
         },
         "sample_records": sample_records,
