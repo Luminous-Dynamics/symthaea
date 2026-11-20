@@ -56,13 +56,17 @@ impl fmt::Display for PoissonCertificateError {
 
 impl Error for PoissonCertificateError {}
 
+/// Stable identity for this exact discrete periodic Poisson operator.
+pub const PERIODIC_1D_FD_POISSON_OPERATOR_ID: &str = "periodic_1d_fd_poisson_v1";
+
 /// A conservative residual-based error certificate for a periodic 1D solve.
-///
+
 /// Norms are Euclidean vector norms (not dx-weighted norms). The reported
 /// bounds apply after the explicit zero-mode and gauge projections in this
 /// record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeriodicPoissonCertificate {
+    pub operator_id: &'static str,
     pub cell_count: usize,
     pub cell_width: f64,
     pub lambda_min_nonzero: f64,
@@ -195,6 +199,7 @@ pub fn certify_periodic_1d_poisson(
     }
 
     Ok(PeriodicPoissonCertificate {
+        operator_id: PERIODIC_1D_FD_POISSON_OPERATOR_ID,
         cell_count,
         cell_width,
         lambda_min_nonzero,
