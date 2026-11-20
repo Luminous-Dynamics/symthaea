@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/symmetry-discovery-benchmark-001/schemas/dynamical_trajectory_identifiability.schema.json",
+  "title": "Dynamical trajectory versus vector-field symmetry fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "track",
+    "case_id",
+    "vector_field",
+    "candidate_action",
+    "observed_invariant_submanifold",
+    "global_equivariance",
+    "expected_semantics",
+    "source",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fixture_id": {
+      "const": "DYN-TRAJECTORY-VECTOR-FIELD-IDENTIFIABILITY-001"
+    },
+    "track": {
+      "const": "dynamical_symmetry"
+    },
+    "case_id": {
+      "const": "DYN-ORBIT-SYMMETRY-NOT-FIELD-SYMMETRY-001"
+    },
+    "vector_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_variables",
+        "components"
+      ],
+      "properties": {
+        "state_variables": {
+          "const": [
+            "x",
+            "y"
+          ]
+        },
+        "components": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component",
+              "terms"
+            ],
+            "properties": {
+              "component": {
+                "enum": [
+                  "x_dot",
+                  "y_dot"
+                ]
+              },
+              "terms": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "exponents",
+                    "coefficient"
+                  ],
+                  "properties": {
+                    "exponents": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "coefficient": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidate_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "matrix",
+        "order",
+        "action_semantics"
+      ],
+      "properties": {
+        "action_id": {
+          "const": "reflection_y"
+        },
+        "matrix": {
+          "const": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              -1
+            ]
+          ]
+        },
+        "order": {
+          "const": 2
+        },
+        "action_semantics": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "observed_invariant_submanifold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equation",
+        "domain",
+        "is_invariant_under_candidate_action",
+        "vector_field_tangent_to_submanifold",
+        "normal_component_on_submanifold",
+        "analytic_trajectory"
+      ],
+      "properties": {
+        "equation": {
+          "const": "y=0"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_invariant_under_candidate_action": {
+          "const": true
+        },
+        "vector_field_tangent_to_submanifold": {
+          "const": true
+        },
+        "normal_component_on_submanifold": {
+          "const": "y_dot(x,0)=0"
+        },
+        "analytic_trajectory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x_of_t",
+            "y_of_t",
+            "x0_domain"
+          ],
+          "properties": {
+            "x_of_t": {
+              "const": "x0*exp(t)"
+            },
+            "y_of_t": {
+              "const": "0"
+            },
+            "x0_domain": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "global_equivariance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected",
+        "residual_convention",
+        "exact_residual_polynomial",
+        "witness_state",
+        "witness_residual"
+      ],
+      "properties": {
+        "expected": {
+          "const": false
+        },
+        "residual_convention": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exact_residual_polynomial": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component",
+              "exponents",
+              "coefficient"
+            ],
+            "properties": {
+              "component": {
+                "enum": [
+                  "x",
+                  "y"
+                ]
+              },
+              "exponents": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "coefficient": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "witness_state": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "witness_residual": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "expected_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_trajectory_set_invariant",
+        "candidate_is_global_vector_field_symmetry",
+        "permitted_report",
+        "false_global_symmetry_promotion",
+        "hard_pruning_permitted"
+      ],
+      "properties": {
+        "observed_trajectory_set_invariant": {
+          "const": true
+        },
+        "candidate_is_global_vector_field_symmetry": {
+          "const": false
+        },
+        "permitted_report": {
+          "type": "string",
+          "minLength": 1
+        },
+        "false_global_symmetry_promotion": {
+          "const": true
+        },
+        "hard_pruning_permitted": {
+          "const": false
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparator",
+        "url",
+        "role"
+      ],
+      "properties": {
+        "comparator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
