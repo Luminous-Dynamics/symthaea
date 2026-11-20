@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_reaction_selectivity_v0_1.schema.json",
+  "title": "Synthesis reaction selectivity and evidence contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "suite_id",
+    "fixture_only",
+    "cases",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-REACTION-SELECTIVITY-0.1"
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "const": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "protocol_id",
+          "protocol_revision",
+          "conditions",
+          "reaction_basis",
+          "hull_screen",
+          "target_reaction",
+          "competing_reactions",
+          "selectivity_margin_eV_per_basis",
+          "kinetic_barrier_limit_eV",
+          "observed_target_phase_status",
+          "characterization_evidence"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "conditions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "conditions_id",
+              "temperature_k",
+              "pressure_gpa",
+              "atmosphere",
+              "chemical_potential_context"
+            ],
+            "properties": {
+              "conditions_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "temperature_k": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "pressure_gpa": {
+                "type": "number",
+                "minimum": 0
+              },
+              "atmosphere": {
+                "type": "string",
+                "minLength": 1
+              },
+              "chemical_potential_context": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "reaction_basis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "normalization_basis",
+              "basis_unit",
+              "standard_state",
+              "balance_status"
+            ],
+            "properties": {
+              "normalization_basis": {
+                "type": "string",
+                "minLength": 1
+              },
+              "basis_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "standard_state": {
+                "type": "string",
+                "minLength": 1
+              },
+              "balance_status": {
+                "enum": [
+                  "verified",
+                  "unverified"
+                ]
+              }
+            }
+          },
+          "hull_screen": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "above_hull_interval_mev_atom",
+              "screening_threshold_mev_atom",
+              "source_class"
+            ],
+            "properties": {
+              "above_hull_interval_mev_atom": {
+                "$ref": "#/$defs/nonnegative_interval"
+              },
+              "screening_threshold_mev_atom": {
+                "type": "number",
+                "minimum": 0
+              },
+              "source_class": {
+                "enum": [
+                  "first_principles_calculated",
+                  "machine_learning_predicted",
+                  "experimentally_refined",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "target_reaction": {
+            "$ref": "#/$defs/reaction"
+          },
+          "competing_reactions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/$defs/reaction"
+            }
+          },
+          "selectivity_margin_eV_per_basis": {
+            "type": "number",
+            "minimum": 0
+          },
+          "kinetic_barrier_limit_eV": {
+            "type": "number",
+            "minimum": 0
+          },
+          "observed_target_phase_status": {
+            "enum": [
+              "target_phase_observed",
+              "target_phase_not_detected_under_conditions",
+              "unknown_not_reported"
+            ]
+          },
+          "characterization_evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sample_id",
+                  "method",
+                  "conditions_id",
+                  "source_locator",
+                  "raw_data_sha256",
+                  "detection_limit_phase_fraction",
+                  "realized_phases"
+                ],
+                "properties": {
+                  "sample_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "method": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conditions_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source_locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "raw_data_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-fA-F0-9]{64}$"
+                  },
+                  "detection_limit_phase_fraction": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                  },
+                  "realized_phases": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "phase_id",
+                        "identity_status",
+                        "phase_fraction"
+                      ],
+                      "properties": {
+                        "phase_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "identity_status": {
+                          "enum": [
+                            "refined",
+                            "identified",
+                            "tentative",
+                            "unresolved"
+                          ]
+                        },
+                        "phase_fraction": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Synthetic thermodynamic selectivity and evidence audit only; no real synthesis route, reaction feasibility, observed superconductivity, or laboratory authorization is established."
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    },
+    "nonnegative_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "reaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reaction_id",
+        "role",
+        "balanced_equation",
+        "balance_status",
+        "product_phase_id",
+        "conditions_id",
+        "normalization_basis",
+        "basis_unit",
+        "delta_g_interval_eV_per_basis",
+        "activation_barrier_interval_eV"
+      ],
+      "properties": {
+        "reaction_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "target",
+            "competing"
+          ]
+        },
+        "balanced_equation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "balance_status": {
+          "enum": [
+            "verified",
+            "unverified"
+          ]
+        },
+        "product_phase_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalization_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delta_g_interval_eV_per_basis": {
+          "$ref": "#/$defs/interval"
+        },
+        "activation_barrier_interval_eV": {
+          "$ref": "#/$defs/nonnegative_interval"
+        }
+      }
+    }
+  }
+}
