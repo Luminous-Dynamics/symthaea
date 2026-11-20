@@ -118,20 +118,60 @@ fn exact_fields(value: &Value, fields: &[&str], label: &str) -> Result<(), Strin
     Ok(())
 }
 
+fn validate_rational_wire(value: &Value, label: &str, allow_zero: bool) -> Result<(), String> {
+    exact_fields(value, &["num", "den"], label)?;
+    let numerator = value.get("num").and_then(Value::as_i64)
+        .ok_or_else(|| format!("{label}.num must be an integer"))?;
+    let denominator = value.get("den").and_then(Value::as_i64)
+        .ok_or_else(|| format!("{label}.den must be an integer"))?;
+    if denominator <= 0
+        || denominator > 1_000_000
+        || numerator < 0
+        || numerator > 1_000_000_000
+        || (!allow_zero && numerator == 0)
+    {
+        return Err(format!("{label} is outside the bounded non-negative rational range"));
+    }
+    Ok(())
+}
+
 fn validate_score_wire_shape(value: &Value) -> Result<(), String> {
     exact_fields(value, &["key", "tempo_bpm", "meter", "notes", "total_beats"], "Score")?;
+    let tempo = value.get("tempo_bpm").and_then(Value::as_f64)
+        .ok_or("Score.tempo_bpm must be numeric")?;
+    if !tempo.is_finite() || !(1.0..=1000.0).contains(&tempo) {
+        return Err("Score.tempo_bpm must be finite and in 1..=1000".into());
+    }
     exact_fields(value.get("key").ok_or("Score.key is missing")?, &["tonic", "tonality"], "Score.key")?;
-    exact_fields(value.get("total_beats").ok_or("Score.total_beats is missing")?, &["num", "den"], "Score.total_beats")?;
+    validate_rational_wire(
+        value.get("total_beats").ok_or("Score.total_beats is missing")?,
+        "Score.total_beats",
+        true,
+    )?;
     let notes = value.get("notes").and_then(Value::as_array).ok_or("Score.notes must be an array")?;
+    if notes.len() > 100_000 {
+        return Err("Score.notes exceeds the 100000-note observer limit".into());
+    }
     for (index, note) in notes.iter().enumerate() {
         let label = format!("Score.notes[{index}]");
         exact_fields(note, &["part", "pitch", "onset", "duration", "velocity", "role", "emphasis", "section_intensity"], &label)?;
         if note.get("part").and_then(Value::as_u64).is_none_or(|part| part > u16::MAX as u64) {
             return Err(format!("{label}.part must be a u16 PartId"));
         }
+        let pitch = note.pointer("/pitch/midi").and_then(Value::as_u64);
+        if pitch.is_none_or(|value| value > 127) {
+            return Err(format!("{label}.pitch.midi must be in 0..=127"));
+        }
         exact_fields(note.get("pitch").ok_or("Score note pitch is missing")?, &["midi"], &format!("{label}.pitch"))?;
-        exact_fields(note.get("onset").ok_or("Score note onset is missing")?, &["num", "den"], &format!("{label}.onset"))?;
-        exact_fields(note.get("duration").ok_or("Score note duration is missing")?, &["num", "den"], &format!("{label}.duration"))?;
+        validate_rational_wire(note.get("onset").ok_or("Score note onset is missing")?, &format!("{label}.onset"), true)?;
+        validate_rational_wire(note.get("duration").ok_or("Score note duration is missing")?, &format!("{label}.duration"), false)?;
+        let velocity = note.get("velocity").and_then(Value::as_f64)
+            .ok_or_else(|| format!("{label}.velocity must be numeric"))?;
+        let intensity = note.get("section_intensity").and_then(Value::as_f64)
+            .ok_or_else(|| format!("{label}.section_intensity must be numeric"))?;
+        if !(0.0..=1.0).contains(&velocity) || !intensity.is_finite() || intensity < 0.0 {
+            return Err(format!("{label} has invalid velocity or section intensity"));
+        }
     }
     Ok(())
 }
