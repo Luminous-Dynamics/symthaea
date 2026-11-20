@@ -4,6 +4,9 @@
 
 #![deny(unsafe_code)]
 
+/// Versioned host/device contract and pure validation state machine.
+pub mod compute_exec_001;
+
 use serde::{Deserialize, Serialize};
 use symthaea_engineering::{EngineeringConcept, EngineeringRequirement, RequirementCriticality};
 use symthaea_formal_safety::EvidenceKind;

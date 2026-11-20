@@ -12,5 +12,15 @@
     "hamming_distance_bits": 7,
     "result_record_bytes": 16
   },
-  "device_profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  "device_profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "output_buffer": {
+    "role": "result",
+    "handle_id": "fixture-result",
+    "generation": "1",
+    "offset_bytes": "0",
+    "length_bytes": "16"
+  },
+  "operation_id": "hdc.top1.exact.v1",
+  "implementation_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "semantic_contract_sha256": "04b106f50f40963f0d2f88f9d779b83d9a55bd22d2e151f45f5211fa05c3f9cd"
 }

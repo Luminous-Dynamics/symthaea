@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-silicon/schemas/compute_exec_001/hdc_device_completion_v0_1.schema.json",
   "title": "Luminous HDC device completion v0.1",
-  "description": "Device-reported completion shape. The host must match command ID, device epoch, sequence, buffer generation and expected output range. A digest is not a signature or correctness proof. Sequence and stable item IDs are decimal strings in JSON to preserve exact u64 values.",
+  "description": "Device-reported completion shape. The host must match command ID, device epoch, sequence, operation, canonical semantic-contract digest and implementation identity, plus the exact successful output handle, generation and byte range. Digests are identities, not signatures or proofs of correct computation.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,10 @@
     "device_id",
     "device_epoch",
     "sequence",
-    "status"
+    "status",
+    "operation_id",
+    "implementation_sha256",
+    "semantic_contract_sha256"
   ],
   "properties": {
     "schema": {
@@ -85,6 +88,64 @@
     "device_profile_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "output_buffer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "handle_id",
+        "generation",
+        "offset_bytes",
+        "length_bytes"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "output",
+            "result"
+          ]
+        },
+        "handle_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "offset_bytes": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "length_bytes": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,19}$"
+        }
+      }
+    },
+    "operation_id": {
+      "enum": [
+        "hdc.bind_xor.exact.v1",
+        "hdc.hamming.exact.v1",
+        "hdc.top1.exact.v1"
+      ]
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "semantic_contract_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rejection_stage": {
+      "type": "string",
+      "enum": [
+        "before_dma"
+      ]
+    },
+    "dma_acquired": {
+      "type": "boolean"
     }
   },
   "allOf": [
@@ -101,7 +162,8 @@
       },
       "then": {
         "required": [
-          "result"
+          "result",
+          "output_buffer"
         ],
         "not": {
           "required": [
@@ -132,7 +194,8 @@
         ],
         "not": {
           "required": [
-            "result"
+            "result",
+            "output_buffer"
           ]
         }
       }
@@ -153,6 +216,65 @@
           "error_code": {
             "const": "OUTCOME_UNKNOWN"
           }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "rejected"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "rejection_stage",
+          "dma_acquired"
+        ],
+        "properties": {
+          "rejection_stage": {
+            "const": "before_dma"
+          },
+          "dma_acquired": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "completed",
+              "failed",
+              "cancelled",
+              "outcome_unknown"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "rejection_stage"
+              ]
+            },
+            {
+              "required": [
+                "dma_acquired"
+              ]
+            }
+          ]
         }
       }
     }
