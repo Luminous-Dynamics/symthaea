@@ -1,30 +1,28 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Φ Tier Validation: Comparing Heuristic vs Exact
+//! HDC Proxy Validation: SampledPartition vs ExhaustivePartition
 //!
-//! This test validates that our O(n) Heuristic approximation correlates
-//! strongly with the O(2^n) Exact IIT MIP calculation.
+//! This test compares an O(n) HDC similarity proxy with an exhaustive partition
+//! search over the same proxy objective. Exhaustive search is not exact IIT.
 //!
 //! ## Purpose
 //!
-//! We need to scientifically validate that our fast Heuristic tier
-//! produces Φ values that correlate with true IIT Φ (Exact tier).
+//! We test whether the sampled approximation tracks the exhaustive HDC similarity
+//! objective on this synthetic representation suite; this is not PyPhi validation.
 //!
 //! ## Method
 //!
 //! 1. Generate systems with known topologies (star, ring, random, modular)
-//! 2. Compute Exact Φ (ground truth) for n=4-8 nodes
-//! 3. Compute Heuristic Φ for same systems
+//! 2. Compute the exhaustive HDC similarity-proxy score for n=4-8 components
+//! 3. Compute the sampled HDC similarity-proxy score for the same representations
 //! 4. Calculate Pearson correlation
-//! 5. Validate r > 0.70 threshold
+//! 5. Report an internal proxy-agreement threshold
 //!
-//! ## Expected Results (Based on IIT Theory)
+//! ## Exploratory synthetic hypotheses (not IIT predictions)
 //!
-//! - Star topology: HIGH Φ (hub integrates all spokes)
-//! - Ring topology: MODERATE Φ (local integration only)
-//! - Random topology: VARIABLE Φ (depends on structure)
-//! - Modular topology: LOW Φ (easy to partition at module boundaries)
+//! - Generated star/ring/random/modular HDC representations exercise varied similarity patterns.
+//! - Their ranking is an empirical property of this generator/objective, not an IIT prediction.
 //!
 //! ## Date: January 17, 2026
 //! ## Author: Symthaea Theory Validation
@@ -162,7 +160,7 @@ fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
 #[test]
 fn test_heuristic_vs_exact_correlation() {
     println!("\n========================================");
-    println!("Φ TIER VALIDATION: Heuristic vs Exact");
+    println!("HDC PROXY VALIDATION: Sampled vs Exhaustive");
     println!("========================================\n");
 
     let mut exact_values = Vec::new();
@@ -186,7 +184,7 @@ fn test_heuristic_vs_exact_correlation() {
 
     println!(
         "{:<10} {:<8} {:<8} {:<10} {:<10} {:<10}",
-        "Topology", "Size", "Trial", "Exact", "Heuristic", "Spectral"
+        "Topology", "Size", "Trial", "Exhaustive proxy", "Sampled proxy", "Spectral connectivity"
     );
     println!("{}", "-".repeat(60));
 
@@ -229,12 +227,12 @@ fn test_heuristic_vs_exact_correlation() {
     let spectral_pearson = pearson_correlation(&exact_values, &spectral_values);
     let spectral_spearman = spearman_correlation(&exact_values, &spectral_values);
 
-    println!("Heuristic vs Exact:");
+    println!("Sampled proxy vs exhaustive proxy:");
     println!("  Pearson r:  {:.4}", heuristic_pearson);
     println!("  Spearman ρ: {:.4}", heuristic_spearman);
     println!();
 
-    println!("Spectral vs Exact:");
+    println!("Spectral connectivity vs exhaustive proxy:");
     println!("  Pearson r:  {:.4}", spectral_pearson);
     println!("  Spearman ρ: {:.4}", spectral_spearman);
     println!();
@@ -244,48 +242,48 @@ fn test_heuristic_vs_exact_correlation() {
     let heuristic_mean: f64 = heuristic_values.iter().sum::<f64>() / heuristic_values.len() as f64;
     let spectral_mean: f64 = spectral_values.iter().sum::<f64>() / spectral_values.len() as f64;
 
-    println!("Mean Φ values:");
-    println!("  Exact:     {:.4}", exact_mean);
-    println!("  Heuristic: {:.4}", heuristic_mean);
-    println!("  Spectral:  {:.4}", spectral_mean);
+    println!("Mean HDC proxy values:");
+    println!("  Exhaustive proxy: {:.4}", exact_mean);
+    println!("  Sampled proxy: {:.4}", heuristic_mean);
+    println!("  Spectral connectivity: {:.4}", spectral_mean);
     println!();
 
     // Validation thresholds
-    let heuristic_validated = heuristic_pearson > 0.70 || heuristic_spearman > 0.70;
-    let spectral_validated = spectral_pearson > 0.70 || spectral_spearman > 0.70;
+    let heuristic_internal_agreement_target_met = heuristic_pearson > 0.70 || heuristic_spearman > 0.70;
+    let spectral_matches_proxy_target = spectral_pearson > 0.70 || spectral_spearman > 0.70;
 
     println!("========================================");
-    println!("VALIDATION RESULTS");
+    println!("INTERNAL PROXY-AGREEMENT RESULTS");
     println!("========================================\n");
 
     println!(
-        "Heuristic Tier: {}",
-        if heuristic_validated {
-            "✅ VALIDATED"
+        "Sampled HDC proxy: {}",
+        if heuristic_internal_agreement_target_met {
+            "✅ INTERNAL TARGET MET"
         } else {
-            "❌ NOT VALIDATED"
+            "❌ INTERNAL TARGET NOT MET"
         }
     );
-    println!("  (Threshold: r > 0.70 or ρ > 0.70)");
+    println!("  (Internal proxy-agreement target: r > 0.70 or ρ > 0.70)");
     println!();
 
     println!(
-        "Spectral Tier:  {}",
-        if spectral_validated {
-            "✅ VALIDATED"
+        "Spectral connectivity diagnostic: {}",
+        if spectral_matches_proxy_target {
+            "✅ INTERNAL TARGET MET"
         } else {
-            "❌ NOT VALIDATED (as expected)"
+            "❌ NOT AN IIT MEASURE"
         }
     );
     println!("  (Spectral measures λ₂ mixing time, NOT IIT Φ)");
     println!();
 
-    // Theory-based topology ranking check
+    // Exploratory proxy-ranking check (not an IIT prediction)
     println!("========================================");
-    println!("TOPOLOGY RANKING CHECK (IIT Predictions)");
+    println!("TOPOLOGY RANKING CHECK (HDC PROXY ONLY)");
     println!("========================================\n");
 
-    // Compute average Φ by topology for Exact tier
+    // Compute average HDC proxy score by synthetic representation family
     let mut topology_means: Vec<(&str, f64)> = Vec::new();
     for topology in &topologies {
         let indices: Vec<usize> = (0..exact_values.len())
@@ -304,35 +302,35 @@ fn test_heuristic_vs_exact_correlation() {
     // Sort by mean Φ (descending)
     topology_means.sort_by(|a, b| b.1.total_cmp(&a.1));
 
-    println!("Exact Φ ranking by topology (highest first):");
+    println!("Exhaustive HDC proxy ranking by generated representation (highest first):");
     for (rank, (topo, mean)) in topology_means.iter().enumerate() {
         println!("  {}. {:<10} Φ = {:.4}", rank + 1, topo, mean);
     }
     println!();
 
-    println!("IIT Theory Prediction:");
-    println!("  Star > Ring > Random (expected for hub-and-spoke integration)");
-    println!("  Modular should be LOW (easy to partition)");
+    println!("No topology ranking is asserted by this proxy benchmark:");
+    println!("  Results describe only the synthetic HDC representation generator.");
+    println!("  They do not validate IIT or identify consciousness.");
     println!();
 
-    // Check if star has highest Φ (IIT prediction)
+    // Record whether this generator gives the star label the highest proxy score.
     let star_highest = topology_means[0].0 == "star";
     println!(
-        "Star has highest Φ: {}",
+        "Star label has highest HDC proxy score: {}",
         if star_highest {
-            "✅ YES (matches IIT)"
+            "YES (HDC proxy result only)"
         } else {
             "❌ NO"
         }
     );
 
     // Phase 4.4: Tightened threshold from r > 0.30 to r > 0.70
-    // HDC-based Φ should meaningfully correlate with exact IIT Φ.
-    // r > 0.30 was barely above noise; r > 0.70 indicates genuine signal.
+    // The threshold is only an internal approximation-agreement criterion.
+    // It is not validation against formal IIT.
     assert!(
         heuristic_pearson > 0.70 || heuristic_spearman > 0.70,
-        "Heuristic tier shows insufficient correlation with Exact (r={:.4}, ρ={:.4}). \
-         Expected at least r > 0.70 for a meaningful approximation.",
+        "Sampled proxy shows insufficient correlation with exhaustive proxy (r={:.4}, ρ={:.4}). \
+         Expected at least r > 0.70 for this internal proxy-agreement target.",
         heuristic_pearson,
         heuristic_spearman
     );
@@ -343,13 +341,13 @@ fn test_heuristic_vs_exact_correlation() {
 }
 
 #[test]
-fn test_exact_tier_topology_discrimination() {
+fn test_exhaustive_proxy_topology_discrimination() {
     println!("\n========================================");
-    println!("EXACT TIER: Topology Discrimination Test");
+    println!("EXHAUSTIVE HDC PROXY: Representation Discrimination Test");
     println!("========================================\n");
 
-    // This test verifies that Exact tier correctly discriminates topologies
-    // according to IIT predictions (Star > Ring for integration)
+    // This tests only whether the exhaustive HDC similarity proxy distinguishes
+    // synthetic representation families; no IIT ranking is assumed.
 
     let mut calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);
     let n = 6; // Small enough for exact computation
@@ -373,7 +371,7 @@ fn test_exact_tier_topology_discrimination() {
     let random_mean: f64 = random_phis.iter().sum::<f64>() / trials as f64;
     let modular_mean: f64 = modular_phis.iter().sum::<f64>() / trials as f64;
 
-    println!("Mean Exact Φ over {} trials (n={}):", trials, n);
+    println!("Mean exhaustive HDC proxy scores over {} trials (n={}):", trials, n);
     println!("  Star:    {:.4} ± {:.4}", star_mean, std_dev(&star_phis));
     println!("  Ring:    {:.4} ± {:.4}", ring_mean, std_dev(&ring_phis));
     println!(
@@ -388,8 +386,8 @@ fn test_exact_tier_topology_discrimination() {
     );
     println!();
 
-    // The exact tier should show SOME discrimination between topologies
-    // Even if our HDC implementation differs from pure IIT, topologies should differ
+    // This HDC proxy should show some discrimination between generated representation families.
+    // This is an implementation sanity check, not a claim about formal IIT.
     let max_phi = star_mean.max(ring_mean).max(random_mean).max(modular_mean);
     let min_phi = star_mean.min(ring_mean).min(random_mean).min(modular_mean);
     let discrimination = max_phi - min_phi;
@@ -400,12 +398,12 @@ fn test_exact_tier_topology_discrimination() {
     // We expect at least some discrimination (>0.05)
     assert!(
         discrimination > 0.02,
-        "Exact tier shows almost no discrimination between topologies (Δ={:.4}). \
+        "Exhaustive HDC proxy shows almost no discrimination between representation families (Δ={:.4}). \
          This suggests the MIP calculation may not be working correctly.",
         discrimination
     );
 
-    println!("\n✅ Exact tier discriminates between topologies");
+    println!("\n✅ Exhaustive HDC proxy discriminates between generated representations");
 }
 
 #[test]
@@ -455,27 +453,10 @@ fn std_dev(values: &[f64]) -> f64 {
 }
 
 // =============================================================================
-// Phase 4.4: KNOWN ANALYTICAL VALUE TESTS
-// =============================================================================
-// Cross-validates against validation/pyphi_crossvalidation.py estimates.
-// These known values represent validated HDC-Φ estimates for standard topologies.
-
-/// Known analytical Φ estimates from pyphi cross-validation (8-node baseline)
-/// Source: validation/pyphi_crossvalidation.py lines 399-419
-#[allow(dead_code)]
-const KNOWN_PHI_ESTIMATES: &[(&str, f64)] = &[
-    ("ring", 0.4954),
-    ("star", 0.4553),
-    ("line", 0.4768),
-    ("cube", 0.4960),
-    ("torus", 0.4953),
-    ("binary_tree", 0.4712),
-];
-
 #[test]
-fn test_exact_tier_produces_positive_phi_for_standard_topologies() {
-    // Verifies that ExhaustivePartition (Exact) tier gives non-trivial Phi
-    // for topologies known to have analytical Phi > 0
+fn test_exhaustive_proxy_produces_finite_scores_for_standard_representations() {
+    // Verifies only that the exhaustive HDC proxy returns finite, bounded values
+    // for these synthetic representations. No analytical IIT values are implied.
 
     let mut calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);
 
@@ -505,9 +486,8 @@ fn test_exact_tier_produces_positive_phi_for_standard_topologies() {
 }
 
 #[test]
-fn test_topology_ordering_star_vs_modular() {
-    // IIT predicts: Star (hub integrates all) > Modular (easy to partition)
-    // This tests that our Exact tier preserves this ordering.
+fn test_topology_scores_can_differ_for_star_vs_modular_representations() {
+    // Exploratory HDC proxy comparison only; the ranking is not an IIT prediction.
 
     let mut calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);
     let n = 6;
@@ -528,42 +508,9 @@ fn test_topology_ordering_star_vs_modular() {
     // We expect at least some differentiation between topologies
     assert!(
         (star_mean - modular_mean).abs() > 0.01,
-        "Exact tier should differentiate star from modular topologies (Δ={:.4})",
+        "Exhaustive HDC proxy should differentiate star from modular representations (Δ={:.4})",
         (star_mean - modular_mean).abs()
     );
-}
-
-#[test]
-fn test_phi_within_known_analytical_range() {
-    // Validates that our spectral tier produces values in the same ballpark as
-    // the pyphi cross-validation estimates (±0.3 tolerance for HDC approximation).
-    // The known values cluster around 0.45–0.50 for 8-node topologies.
-
-    let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
-
-    // Test with 8-node topologies matching the pyphi validation conditions
-    let star_8 = generate_star_topology(8);
-    let ring_8 = generate_ring_topology(8);
-
-    let phi_star = calc.compute(&star_8);
-    let phi_ring = calc.compute(&ring_8);
-
-    println!(
-        "8-node Star Φ (spectral) = {:.4} (expected ~0.4553)",
-        phi_star
-    );
-    println!(
-        "8-node Ring Φ (spectral) = {:.4} (expected ~0.4954)",
-        phi_ring
-    );
-
-    // Wide tolerance: HDC spectral approximation uses different math than
-    // exact IIT. We just check values are in a reasonable range [0, 1]
-    // and are non-trivial (> 0.01).
-    assert!(phi_star > 0.01, "Star Φ should be non-trivial");
-    assert!(phi_ring > 0.01, "Ring Φ should be non-trivial");
-    assert!(phi_star <= 1.0);
-    assert!(phi_ring <= 1.0);
 }
 
 #[test]

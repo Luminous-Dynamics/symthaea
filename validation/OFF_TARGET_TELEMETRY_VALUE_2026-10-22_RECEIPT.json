@@ -1,0 +1,67 @@
+{
+  "schema": "symthaea-off-target-telemetry-value-receipt-v1",
+  "date": "2026-10-22",
+  "status": "EXACT_LOCAL_ENUMERATION_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source": {
+    "path": "validation/off_target_telemetry_value.py",
+    "git_blob": "0f811ee1264816b4afa159285bdfa834f5ad0fbb",
+    "sha256": "c6b6140b25636e7dc9f364b7b0db07527632590b05bee2a01c34d602f8ab3ff6",
+    "bytes": 12545
+  },
+  "tests": {
+    "path": "validation/test_off_target_telemetry_value.py",
+    "git_blob": "3e734c85ba273c1f3ed78aac62eec573444f01a8",
+    "sha256": "5e63188b16363a692c71aee35ee59a63d22efc33ccce4ab4c93a9009f082c3ce",
+    "count": 6,
+    "result": "6/6_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "off_target_telemetry_value_results_exact.json",
+    "bytes": 23589,
+    "sha256": "e601f4683e3335b4aa978ca8a5d1997c95558a7ea3006cdffcd8714be2dca79d",
+    "rows": 48,
+    "source_git_blob_bound": "0f811ee1264816b4afa159285bdfa834f5ad0fbb",
+    "repository_summary_path": "validation/off_target_telemetry_value_summary_2026-10-22.json",
+    "repository_summary_git_blob": "0a662222c1f1e1e5cedb3ecf77cd77800aca442e"
+  },
+  "report": {
+    "path": "docs/research/OFF_TARGET_TELEMETRY_VALUE_2026-10-22.md",
+    "git_blob": "cee2407e802d81eae8f1ae378f1caf906eb27506"
+  },
+  "protocol": {
+    "action_budget": 2,
+    "telemetry_modes": [
+      "outcome_only",
+      "noisy_spill_sensor",
+      "perfect_subset_telemetry"
+    ],
+    "noisy_sensor_sensitivity": 0.9,
+    "noisy_sensor_specificity": 0.9,
+    "policies": [
+      "graph_eig",
+      "actuation_balanced"
+    ],
+    "rows": 48
+  },
+  "validation": {
+    "embedded_self_test": "PASS_LOCAL",
+    "unit_tests": "6/6_PASS_LOCAL",
+    "source_and_test_git_blobs_match_executed_bytes": true,
+    "remote_ci": "not asserted as passing",
+    "combined_compatibility_suite": {
+      "count": 32,
+      "result": "32/32_PASS_LOCAL",
+      "suites": [
+        "validation/test_off_target_kernel_inference.py",
+        "validation/test_off_target_replicate_design.py",
+        "validation/test_off_target_telemetry_value.py",
+        "validation/test_causal_probe_pareto_benchmark.py",
+        "validation/test_open_world_reference_stress.py"
+      ],
+      "note": "Executed locally on source snapshots whose Git blob SHAs were verified; independent of GitHub Actions."
+    }
+  },
+  "conclusion": "Realized-target telemetry substantially increases inference about off-target probability in this exact small-SCM fixture; OOD surprise AUC declines, showing that actuator diagnosis and graph falsification must be evaluated separately. No SOTA claim."
+}

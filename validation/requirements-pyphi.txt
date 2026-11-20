@@ -1,0 +1,4 @@
+# Reproducibility pin for validation/pyphi_crossvalidation.py.
+# This validates only the Python reference-side environment; the full transitive
+# environment is managed separately by the project's Nix/uv lock as it matures.
+pyphi[emd]==2.0.0

@@ -1,0 +1,17 @@
+# schema=entropy-causality-model-manifest-v1
+# columns: case_name<TAB>node_count<TAB>rule_list<TAB>flip_probability_f64_hex<TAB>prior_spec
+# rule_list tokens: copy:<source>, xor:<left>:<right>, and:<left>:<right>, constant:0|1
+# prior_spec: uniform OR sparse:<state-index>:<probability-f64-hex>[,<state-index>:<probability-f64-hex>...]
+independent_max_noise	3	copy:0,copy:1,copy:2	3fe0000000000000	uniform
+recurrent_ring_uniform_prior	3	copy:1,copy:2,copy:0	0000000000000000	uniform
+recurrent_ring_skewed_prior	3	copy:1,copy:2,copy:0	0000000000000000	sparse:0:3fe6666666666666,1:3fd3333333333333
+common_driver_no_noise	3	copy:0,copy:0,copy:0	0000000000000000	uniform
+feed_forward_chain_no_noise	4	copy:0,copy:0,copy:1,copy:2	0000000000000000	uniform
+xor_synergy_no_noise	3	copy:0,copy:1,xor:0:1	0000000000000000	uniform
+and_synergy_no_noise	3	copy:0,copy:1,and:0:1	0000000000000000	uniform
+ring_noise_0.00	3	copy:1,copy:2,copy:0	0000000000000000	uniform
+ring_noise_0.05	3	copy:1,copy:2,copy:0	3fa999999999999a	uniform
+ring_noise_0.10	3	copy:1,copy:2,copy:0	3fb999999999999a	uniform
+ring_noise_0.20	3	copy:1,copy:2,copy:0	3fc999999999999a	uniform
+ring_noise_0.35	3	copy:1,copy:2,copy:0	3fd6666666666666	uniform
+ring_noise_0.50	3	copy:1,copy:2,copy:0	3fe0000000000000	uniform

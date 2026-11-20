@@ -1,0 +1,49 @@
+{
+  "schema": "symthaea-intervention-reliability-audit-receipt-v1",
+  "date": "2026-10-22",
+  "status": "EXACT_SOURCE_LOCAL_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source": {
+    "path": "validation/intervention_reliability_audit.py",
+    "git_blob": "f0f0a684891707171c886737a536ef1d96174052",
+    "sha256": "df9414f40ac0fcdc39043548f29a96e5b596bd7e061350084195f613b499975d",
+    "bytes": 12814
+  },
+  "tests": {
+    "path": "validation/test_intervention_reliability_audit.py",
+    "git_blob": "cc7a0dffa4907861a5d050a8853b2e44fcf5d2ef",
+    "sha256": "5ae9a7f5cd6853ed347fe8f6e2de0ee40a336c822e9845ba3d6d7e3b2bd73033",
+    "count": 10,
+    "result": "10/10_PASS_LOCAL"
+  },
+  "report": {
+    "path": "docs/research/INTERVENTION_RELIABILITY_AUDIT_2026-10-22.md",
+    "git_blob": "fec1c975fdaa210c628f8e2fe27bb7b341efbc14",
+    "sha256": "96a7e16b5ad5650e7f24f1007b344c5e0f631df1cc3139da3a79e4568c2f2415",
+    "bytes": 9764
+  },
+  "artifact": {
+    "path": "validation/intervention_reliability_2026-10-22.json",
+    "git_blob": "32bec2ba6eb5aa03bb04522fee376da332c6ab2c",
+    "bytes": 6630,
+    "sha256": "14bfad7f19b167e6ee740f564a219235a975f9df15c1b82780f0f71212fc3170",
+    "source_git_blob_bound": "f0f0a684891707171c886737a536ef1d96174052"
+  },
+  "protocol": {
+    "variables": 3,
+    "adaptive_intervention_budget": 2,
+    "actual_compliance": [0.5, 0.75, 1.0],
+    "mechanism_noise": [0.1, 0.25],
+    "truths": "candidate chain and fork, plus out-of-class XOR collider",
+    "scope": "exact enumerable reference pilot; compliance/noise families are not representative sampling of real-world SCMs"
+  },
+  "validation": {
+    "embedded_self_test": "PASS_LOCAL",
+    "unit_tests": "10/10_PASS_LOCAL",
+    "test_source_matches_git_blob": true,
+    "execution_source_matches_git_blob": true,
+    "remote_ci": "not asserted as passing; skipped runs are not passes"
+  },
+  "conclusion": "In this controlled fixture, assuming perfect compliance with actual q=0.5 or 0.75 produces nonzero in-class probability mass on impossible learner paths. This is actuator-model misspecification, not diagnostic proof of graph error. No external benchmark, SOTA, or generalized policy advantage is established."
+}
