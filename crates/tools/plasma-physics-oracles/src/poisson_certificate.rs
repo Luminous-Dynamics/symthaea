@@ -268,10 +268,12 @@ mod tests {
                 .unwrap();
 
         let potential_error = l2(&perturbation);
-        let field_error_values: Vec<f64> = (0..count)
-            .map(|cell| {
+        let field_error_values: Vec<f64> = perturbation
+            .iter()
+            .enumerate()
+            .map(|(cell, value)| {
                 let next = (cell + 1) % count;
-                -(perturbation[next] - perturbation[cell]) / dx
+                -(perturbation[next] - value) / dx
             })
             .collect();
         let field_error = l2(&field_error_values);
