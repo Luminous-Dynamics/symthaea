@@ -260,6 +260,16 @@ The immutable tag targets were resolved directly from the public Git references:
 
 These are annotated tags dereferenced to their commit targets. Dataset/checkpoint/HDF5 provenance and usage/redistribution rights still need independent admission.
 
-## 11. Claim ceiling
+## 11. Particle-measure representation consistency
+
+Particle-count transfer does not fully test measure consistency. A stronger test asks whether an operator depends on the physical weighted empirical measure or on arbitrary choices about its particle representation.
+
+Track [#12991](https://github.com/Luminous-Dynamics/symthaea/issues/12991) for weighted particle permutation, co-located split/merge, duplicate-support quadrature refinement and storage-layout changes. The contract is to preserve the declared weighted measure exactly and then compare the predicted field at common probe locations.
+
+Pin the weight convention, neutralizing background and self-energy/diagonal convention before running these tests. A naive pairwise self-interaction-excluded energy can change under particle splitting because two co-located records become a non-self pair; the diagonal convention must be transformed consistently. Do not assume that the current NEOPIC or reference-solver interfaces support arbitrary macro-particle weights. First establish the source semantics and implement an adapter only if it preserves them.
+
+Negative controls must change the physical measure while holding particle count fixed, and must keep distinct physical co-located particles separate from multiple records that merely represent one particle. This is a new research extension, not an existing NEOPIC capability or result.
+
+## 12. Claim ceiling
 
 This is a reproduction protocol and source admission record. It does not claim NEOPIC was reproduced, trained, beaten, integrated into Symthaea or validated for plasma control.
