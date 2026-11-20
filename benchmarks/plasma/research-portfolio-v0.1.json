@@ -6,6 +6,27 @@
   "status": "coordination_registry_only",
   "scientific_lanes": [
     {
+      "id": "structure_preserving_realizable_closure",
+      "issues": [
+        12947
+      ],
+      "prs": [
+        12948
+      ],
+      "symtropy_issue": 6306,
+      "symtropy_pr": 6311,
+      "candidates": [
+        "Levermore_maximum_entropy",
+        "positive_Gaussian_mixture",
+        "positive_exponential_family",
+        "Hamiltonian_operator",
+        "GENERIC_metriplectic_operator",
+        "discrete_gradient_kinetic_reference"
+      ],
+      "guardrail": "collisionless_and_collisional_entropy_contracts_must_remain_distinct",
+      "execution_status": "protocol_and_finite_dimensional_audit_authored_no_plasma_model_or_solver_reproduction"
+    },
+    {
       "id": "landau_damping_memory",
       "issues": [
         12907,
