@@ -692,3 +692,20 @@ The benchmark programme now tracks public microservice observability data separa
 The environment used for this research could not resolve the Zenodo host, so dataset bytes were not acquired or hashed. Published record metadata/checksum values were inspected, but the archive acquisition remains explicitly pending. Do not describe the public-data benchmark as executed until actual source files, hashes and schema validation receipts exist.
 
 The benchmark is now a workload-level test: include single-series, service-cohort, host-cohort, time-window, service+time, anomaly drill-down, cross-service and full-scan queries. Compare cold/warm-cache bytes read and decompressed, groups touched, unrelated keys decoded, rows replayed, p50/p95/p99 latency, throughput, CPU and peak RSS. ALP in Parquet/Arrow is mandatory for eligible decimal-like numeric columns; Pco/Pcodec and exact-bit Gorilla/Chimp/Elf variants remain matched baselines. OpenTelemetry Arrow is a transport/dataflow comparator, not a persisted-file codec. Zstandard seekable frames are prior art, so PZG2's contribution must be measured telemetry-aware grouping and verified query semantics rather than "chunks plus an index".
+
+
+## Query-affinity grouping and query-distribution drift
+
+- [CDL_QUERY_AFFINITY_GROUPING_V1_2026-11-20.md](../../docs/research/CDL_QUERY_AFFINITY_GROUPING_V1_2026-11-20.md): first-seen, interleaved, query-affinity and compression-affinity placement; frozen train/test query profiles; results and limitations.
+- [CDL-Bench-017 #12984](https://github.com/Luminous-Dynamics/symthaea/issues/12984): drift-aware query grouping, bounded compaction and overlay index research.
+
+At group size 8, on the synthetic shifted query mix, interleaved placement reduced weighted bytes fetched/decompressed by about 27% while changing complete frame size by less than 0.6%. First-seen placement was better on the training mix, which favored service cohorts. This is a workload-shift result, not real I/O or latency evidence. Compression-affinity offered tiny byte gains but worsened shifted query bytes.
+
+## Shared dictionary / independent group frames
+
+- [CDL_SHARED_DICTIONARY_GROUPS_PZG3_V1_2026-11-20.md](../../docs/research/CDL_SHARED_DICTIONARY_GROUPS_PZG3_V1_2026-11-20.md): PZG3 self-contained frame with an embedded shared Zstandard dictionary, independent group frames, a checksummed directory and selective decode.
+- [CDL-Bench-016 #12983](https://github.com/Luminous-Dynamics/symthaea/issues/12983): dictionary lifecycle, external registry and adaptive no-dictionary fallback.
+
+PZG3 decouples compression context from decompression granularity. A 1 KiB dictionary improved sparse/group-1 cold-frame size by 5.43%, while a 4 KiB dictionary made an idle/group-8 cold frame 58.24% larger. The separately calculated external-catalog amortization is a future architecture scenario, not a measurement of the embedded PZG3 frame.
+
+The PZG2, grouping-policy and PZG3 C++20 references and shell runners are part of the companion research artifact set; use the exact reference files with the matching scripts. This README does not imply the source files have been imported into the repository yet.
