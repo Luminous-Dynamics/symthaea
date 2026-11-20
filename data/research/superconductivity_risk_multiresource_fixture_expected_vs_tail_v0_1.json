@@ -1,0 +1,293 @@
+{
+  "contract": "SC-RISK-MULTIRESOURCE-0.1",
+  "instance_id": "adversarial_expected_vs_tail_risk_001",
+  "fixture_only": true,
+  "risk_alpha": 0.9,
+  "reference_resource_id": "financial_budget",
+  "world_states": [
+    {
+      "world_state_id": "world_alpha",
+      "prior_probability": 0.6185428538145714,
+      "model_family": "conventional_electron_phonon",
+      "phase_realization": "realized",
+      "evidence_qualification": "bulk_thermodynamic_and_magnetic",
+      "engineering_use": "application_envelope_met"
+    },
+    {
+      "world_state_id": "world_beta",
+      "prior_probability": 0.37155479628445204,
+      "model_family": "multiband_electron_phonon",
+      "phase_realization": "metastable_or_conditional",
+      "evidence_qualification": "transport_only",
+      "engineering_use": "not_met"
+    },
+    {
+      "world_state_id": "rare_none_of_above",
+      "prior_probability": 0.009902349900976501,
+      "model_family": "none_of_above",
+      "phase_realization": "unknown",
+      "evidence_qualification": "unknown",
+      "engineering_use": "unknown"
+    }
+  ],
+  "nuisance_states": [
+    {
+      "state_id": "nominal",
+      "prior_probability": 0.5
+    },
+    {
+      "state_id": "common_drift",
+      "prior_probability": 0.5
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "safe_defer",
+      "losses": [
+        {
+          "world_state_id": "world_alpha",
+          "loss": 6
+        },
+        {
+          "world_state_id": "world_beta",
+          "loss": 15
+        },
+        {
+          "world_state_id": "rare_none_of_above",
+          "loss": 7
+        }
+      ]
+    },
+    {
+      "decision_id": "bulk_declare",
+      "losses": [
+        {
+          "world_state_id": "world_alpha",
+          "loss": 0
+        },
+        {
+          "world_state_id": "world_beta",
+          "loss": 6
+        },
+        {
+          "world_state_id": "rare_none_of_above",
+          "loss": 50
+        }
+      ]
+    },
+    {
+      "decision_id": "investigate",
+      "losses": [
+        {
+          "world_state_id": "world_alpha",
+          "loss": 11
+        },
+        {
+          "world_state_id": "world_beta",
+          "loss": 4
+        },
+        {
+          "world_state_id": "rare_none_of_above",
+          "loss": 13
+        }
+      ]
+    },
+    {
+      "decision_id": "synthesis_forward",
+      "losses": [
+        {
+          "world_state_id": "world_alpha",
+          "loss": 5
+        },
+        {
+          "world_state_id": "world_beta",
+          "loss": 24
+        },
+        {
+          "world_state_id": "rare_none_of_above",
+          "loss": 7
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "financial_budget",
+      "unit": "USD_cent",
+      "capacity": 100,
+      "semantics": "Synthetic budget; one of the two alternatives can be selected."
+    },
+    {
+      "resource_id": "instrument_A_time",
+      "unit": "minute",
+      "capacity": 75,
+      "semantics": "Synthetic instrument booking capacity."
+    }
+  ],
+  "outcome_labels": [
+    "alarm",
+    "no_alarm"
+  ],
+  "initial_capabilities": [],
+  "actions": [
+    {
+      "action_id": "expected_value_probe",
+      "action_type": "measurement",
+      "requires_capabilities": [],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 60
+        },
+        {
+          "resource_id": "instrument_A_time",
+          "unit": "minute",
+          "quantity": 40
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "world_alpha",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.07173207,
+                0.92826793
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.07173207,
+                0.92826793
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "world_beta",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.97299267,
+                0.027007329999999996
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.97299267,
+                0.027007329999999996
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "rare_none_of_above",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.19905508,
+                0.8009449200000001
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.19905508,
+                0.8009449200000001
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "tail_risk_probe",
+      "action_type": "measurement",
+      "requires_capabilities": [],
+      "provides_capabilities": [],
+      "eligible": true,
+      "exclusion_reason": "",
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 60
+        },
+        {
+          "resource_id": "instrument_A_time",
+          "unit": "minute",
+          "quantity": 40
+        }
+      ],
+      "outcome_likelihoods": [
+        {
+          "world_state_id": "world_alpha",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.83094999,
+                0.16905000999999997
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.83094999,
+                0.16905000999999997
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "world_beta",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.98255861,
+                0.01744139
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.98255861,
+                0.01744139
+              ]
+            }
+          ]
+        },
+        {
+          "world_state_id": "rare_none_of_above",
+          "nuisance_likelihoods": [
+            {
+              "state_id": "nominal",
+              "outcome_probabilities": [
+                0.18996299,
+                0.8100370100000001
+              ]
+            },
+            {
+              "state_id": "common_drift",
+              "outcome_probabilities": [
+                0.18996299,
+                0.8100370100000001
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic multi-resource and precommitment tail-risk planning contract only; no physical likelihood, laboratory cost, synthesis yield, superconducting property, or application outcome is calibrated or claimed."
+}
