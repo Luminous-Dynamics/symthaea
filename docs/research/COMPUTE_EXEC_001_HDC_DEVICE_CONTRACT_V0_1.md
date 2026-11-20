@@ -198,7 +198,18 @@ No buffer may be freed, remapped or reused while a device could still write it.
 - **Dedicated bounded DMA pool:** weaker fallback for boards without an available IOMMU. All device-visible memory is isolated in a dedicated pool, with bounds and ownership checked by the driver. This profile must be disclosed and tested.
 - **None / unknown:** physical DMA execution is not admitted.
 
-Do not assume the selected K26/KV260, ECP5 board, SoM, firmware or carrier exposes an IOMMU or coherent DMA. Verify the exact platform documentation and then test the actual board.
+### K26 / Zynq UltraScale+ platform note
+
+The AMD Zynq UltraScale+ MPSoC used by the K26 family includes an SMMU capable of restricting DMA-capable masters to assigned address spaces. This is a potential implementation of the protocol's IOMMU-domain profile, not automatic qualification. AMD's 2026.1 UG1137 documents SMMU behavior; UG1085 describes SMMU translation/protection. AMD's deployment guidance for Zynq UltraScale+ notes that PetaLinux BSPs disable the SMMU by default and that programmable-logic master integration has additional configuration and limitations.
+
+For a K26 board, the qualification record must therefore identify the exact SOM, carrier, boot firmware/BSP, SMMU configuration, PL DMA master/Stream ID, IOMMU domain attachment and the actual negative out-of-domain DMA test. A SoC block's presence or a device-tree node is not enough. If the configured PL path cannot be independently qualified, use the weaker dedicated bounded DMA pool and label it accordingly.
+
+References:
+- AMD [UG1137 2026.1 — System Memory Management Unit](https://docs.amd.com/r/en-US/ug1137-zynq-ultrascale-mpsoc-swdev/System-Memory-Management-Unit)
+- AMD [UG1085 — System Memory Management Unit](https://docs.amd.com/r/en-US/ug1085-zynq-ultrascale-trm/System-Memory-Management-Unit)
+- AMD [Zynq UltraScale+ MPSoC SMMU integration guidance](https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/428114096/Zynq+UltraScale+MPSoC+SMMU)
+
+Do not assume the selected K26/KV260, ECP5 board, SoM, firmware or carrier has an enabled/usable IOMMU path or coherent DMA. Verify exact platform documentation and then test the actual board.
 
 ### 5.3 Cache and ordering
 
