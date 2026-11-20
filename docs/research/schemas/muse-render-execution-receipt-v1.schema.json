@@ -556,7 +556,8 @@
         },
         "required": [
           "attempt_state"
-        ]
+        ],
+        "additionalProperties": false
       },
       "then": {
         "properties": {
@@ -578,7 +579,8 @@
                 "type": "string",
                 "format": "date-time"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "audio": {
             "properties": {
@@ -604,9 +606,11 @@
                 "type": "integer",
                 "minimum": 1
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -618,7 +622,8 @@
         },
         "required": [
           "attempt_state"
-        ]
+        ],
+        "additionalProperties": false
       },
       "then": {
         "properties": {
@@ -636,7 +641,8 @@
               "exit_code": {
                 "type": "null"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "audio": {
             "properties": {
@@ -658,9 +664,11 @@
               "frames": {
                 "type": "null"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -672,7 +680,8 @@
         },
         "required": [
           "attempt_state"
-        ]
+        ],
+        "additionalProperties": false
       },
       "then": {
         "properties": {
@@ -681,7 +690,8 @@
               "state": {
                 "const": "unknown"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "verification": {
             "properties": {
@@ -693,7 +703,8 @@
                       "not_run"
                     ]
                   }
-                }
+                },
+                "additionalProperties": false
               },
               "rendered_score_conformance": {
                 "properties": {
@@ -703,7 +714,8 @@
                       "not_run"
                     ]
                   }
-                }
+                },
+                "additionalProperties": false
               },
               "protected_audio_preservation": {
                 "properties": {
@@ -713,11 +725,14 @@
                       "not_run"
                     ]
                   }
-                }
+                },
+                "additionalProperties": false
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       }
     }
   ]
