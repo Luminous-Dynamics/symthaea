@@ -183,8 +183,11 @@ fn validate_case_wire_shape(case: &Value) -> Result<(), String> {
     let evaluation = required(case, "evaluation", "case")?;
     check_object_shape(evaluation, &["target_metrics", "preservation_metrics", "correspondence_required", "tolerances", "human_evaluation"], &["target_metrics", "preservation_metrics", "correspondence_required", "tolerances", "human_evaluation"], "evaluation")?;
     for field in ["target_metrics", "preservation_metrics"] {
-        if !required(evaluation, field, "evaluation")?.is_array() {
-            return Err(format!("evaluation.{field} must be an array"));
+        let metrics = required(evaluation, field, "evaluation")?
+            .as_array()
+            .ok_or_else(|| format!("evaluation.{field} must be an array"))?;
+        if metrics.is_empty() {
+            return Err(format!("evaluation.{field} must not be empty"));
         }
     }
     let tolerances = required(evaluation, "tolerances", "evaluation")?;
@@ -446,8 +449,11 @@ pub fn evaluate_symbolic_case(
     let velocity_scale = if operation == "velocity" {
         let numerator = integer_field(params, "scale_numerator", "parameters")?;
         let denominator = integer_field(params, "scale_denominator", "parameters")?;
-        if numerator <= 0 || denominator <= 0 || numerator == denominator {
-            return Err("velocity scale must be positive and different from 1".into());
+        if !(1..=1024).contains(&numerator)
+            || !(1..=1024).contains(&denominator)
+            || numerator == denominator
+        {
+            return Err("velocity scale numerator/denominator must be in 1..=1024 and differ".into());
         }
         Some((numerator, denominator))
     } else {
@@ -597,6 +603,11 @@ pub fn evaluate_symbolic_case(
         .as_array().ok_or("target_metrics must be an array")?;
     let requested_preservation = required(evaluation, "preservation_metrics", "evaluation")?
         .as_array().ok_or("preservation_metrics must be an array")?;
+    let primary_metric = if operation == "velocity" { "velocity_accuracy" } else { "pitch_accuracy" };
+    let has_primary_metric = requested_targets.iter().any(|request| request.as_str() == Some(primary_metric));
+    if !has_primary_metric && !requested_targets.iter().any(|request| request.as_str() == Some("exact_event_accuracy")) {
+        return Err(format!("evaluation.target_metrics must include exact_event_accuracy or {primary_metric}"));
+    }
     let mut target_metrics = Vec::new();
     for request in requested_targets {
         let id = request.as_str().ok_or("target metric IDs must be strings")?;
@@ -896,6 +907,51 @@ mod tests {
             None,
         ).unwrap_err();
         assert!(error.contains("unsupported field"));
+    }
+
+    #[test]
+    fn empty_preservation_metric_list_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["evaluation"]["preservation_metrics"] = json!([]);
+        let error = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("preservation_metrics must not be empty"));
+    }
+
+    #[test]
+    fn instruction_only_target_metric_list_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["evaluation"]["target_metrics"] = json!(["instruction_rubric_pass"]);
+        let error = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("must include exact_event_accuracy"));
+    }
+
+    #[test]
+    fn midi_pitch_outside_legal_range_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut source_value = serde_json::to_value(&source).unwrap();
+        source_value["notes"][0]["pitch"]["midi"] = json!(200);
+        let error = evaluate_symbolic_case(
+            &bytes(&case_for(&source)),
+            &bytes(&source_value),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("invalid rational timing or dynamics"));
     }
 
     #[test]
