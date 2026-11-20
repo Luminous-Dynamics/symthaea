@@ -60,3 +60,7 @@ path = "src/bin/onset_prediction_audit.rs"
 [[bin]]
 name = "sc_precursor_genome_audit"
 path = "src/bin/precursor_genome_audit.rs"
+
+[[bin]]
+name = "sc_onset_holdout_leakage_audit"
+path = "src/bin/onset_holdout_leakage_audit.rs"
