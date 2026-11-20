@@ -19,6 +19,7 @@ pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
 pub mod embodiment;
+pub mod embodiment_trace;
 pub mod color;
 pub mod geometry;
 pub mod mycelial_presence;
@@ -37,6 +38,11 @@ pub use embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
     EmbodimentIngestError, EmbodimentSnapshot, GazeTarget, Observed, SignalProvenance,
     Viseme, VisemeSignal,
+};
+pub use embodiment_trace::{
+    EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentTrace, EmbodimentTraceError,
+    EmbodimentTraceSummary, MAX_EMBODIMENT_SESSION_ID_BYTES, MAX_EMBODIMENT_TRACE_EVENTS,
+    OpenActivityInterval,
 };
 pub use color::{Color, Palette};
 pub use geometry::build_scene;
