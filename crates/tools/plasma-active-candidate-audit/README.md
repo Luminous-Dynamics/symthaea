@@ -25,8 +25,8 @@ The auditor parses a strict typed candidate schema and then applies cross-field 
 - acquisition signals and cost values must be finite;
 - cost estimates use raw resource units, not hidden weighted or monetary scores;
 - only training and development/validation roles can be acquired; a sealed-test role is rejected at deserialization;
-- selected or executed candidates require rights_state=verified;
-- executed candidates require an execution receipt.
+- selected, executed or failed candidates require rights_state=verified;
+- executed or failed candidates require an execution receipt.
 
 The JSON Schema Draft 2020-12 lives at benchmarks/plasma/active-kinetic-candidate.schema.json. The Rust implementation duplicates the operationally important cross-field constraints and refuses unknown fields at every typed object boundary. Keep the schema and tests in sync.
 
