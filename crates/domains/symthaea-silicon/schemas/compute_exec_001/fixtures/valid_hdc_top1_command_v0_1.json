@@ -4,7 +4,7 @@
   "command_id": "fixture-top1-0001",
   "device_id": "sim-iverilog-hdc-tile",
   "device_epoch": "00112233445566778899aabbccddeeff",
-  "sequence": 1,
+  "sequence": "1",
   "operation_id": "hdc.top1.exact.v1",
   "semantic_contract": {
     "contract_id": "symthaea.binaryhv.top1-exact",
@@ -30,33 +30,33 @@
     {
       "role": "query",
       "handle_id": "fixture-query",
-      "generation": 1,
-      "offset_bytes": 0,
-      "length_bytes": 2048,
+      "generation": "1",
+      "offset_bytes": "0",
+      "length_bytes": "2048",
       "access": "read"
     },
     {
       "role": "candidate_vectors",
       "handle_id": "fixture-candidates",
-      "generation": 1,
-      "offset_bytes": 0,
-      "length_bytes": 4096,
+      "generation": "1",
+      "offset_bytes": "0",
+      "length_bytes": "4096",
       "access": "read"
     },
     {
       "role": "candidate_ids",
       "handle_id": "fixture-candidate-ids",
-      "generation": 1,
-      "offset_bytes": 0,
-      "length_bytes": 16,
+      "generation": "1",
+      "offset_bytes": "0",
+      "length_bytes": "16",
       "access": "read"
     },
     {
       "role": "result",
       "handle_id": "fixture-result",
-      "generation": 1,
-      "offset_bytes": 0,
-      "length_bytes": 16,
+      "generation": "1",
+      "offset_bytes": "0",
+      "length_bytes": "16",
       "access": "write"
     }
   ]
