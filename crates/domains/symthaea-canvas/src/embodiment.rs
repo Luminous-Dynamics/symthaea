@@ -202,9 +202,10 @@ impl EmbodimentController {
             _ => {}
         }
 
-        let observed = |value| {
-            Observed::new(value, event.provenance, event.sequence, event.monotonic_ns)
-        };
+        let provenance = event.provenance;
+        let sequence = event.sequence;
+        let monotonic_ns = event.monotonic_ns;
+        let observed = |value| Observed::new(value, provenance, sequence, monotonic_ns);
 
         match event.kind {
             EmbodimentEventKind::ActivityChanged { activity } => {
@@ -236,8 +237,8 @@ impl EmbodimentController {
             }
         }
 
-        self.snapshot.last_event_sequence = Some(event.sequence);
-        self.snapshot.last_event_ns = Some(event.monotonic_ns);
+        self.snapshot.last_event_sequence = Some(sequence);
+        self.snapshot.last_event_ns = Some(monotonic_ns);
         Ok(())
     }
 }
