@@ -38,8 +38,9 @@ pub struct PeriodicFourierConfig {
 /// Particle charge is the effective weighted charge under the caller's declared
 /// unit convention. The field is linear in the weighted empirical measure, so
 /// permutation and co-located weight-splitting preserve the answer up to
-/// floating-point summation order. The zero Fourier mode is omitted; no
-/// neutralizing background field is represented by this routine.
+/// floating-point summation order. The zero Fourier mode is omitted, which is
+/// equivalent to removing the spatially uniform mean charge (a uniform
+/// neutralizing-background convention); that background contributes no field.
 pub fn periodic_fourier_field_at_probes(
     particles: &[Particle1d],
     probe_positions: &[f64],
