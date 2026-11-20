@@ -93,6 +93,15 @@ impl<T> Observed<T> {
     }
 }
 
+fn make_observed<T>(
+    value: T,
+    provenance: SignalProvenance,
+    sequence: u64,
+    monotonic_ns: u64,
+) -> Observed<T> {
+    Observed::new(value, provenance, sequence, monotonic_ns)
+}
+
 /// A typed event emitted by a runtime adapter or explicit user control.
 ///
 /// Sequence numbers must strictly increase within one controller/session.
@@ -210,24 +219,22 @@ impl EmbodimentController {
         let provenance = event.provenance;
         let sequence = event.sequence;
         let monotonic_ns = event.monotonic_ns;
-        let observed = |value| Observed::new(value, provenance, sequence, monotonic_ns);
-
         match event.kind {
             EmbodimentEventKind::ActivityChanged { activity } => {
                 let changed = self.snapshot.current_activity() != Some(activity);
-                self.snapshot.activity = Some(observed(activity));
+                self.snapshot.activity = Some(make_observed(activity, provenance, sequence, monotonic_ns));
                 if changed || activity != EmbodimentActivity::Speaking {
                     self.snapshot.viseme = None;
                 }
             }
             EmbodimentEventKind::VisemeChanged { viseme, weight } => {
-                self.snapshot.viseme = Some(observed(VisemeSignal { viseme, weight }));
+                self.snapshot.viseme = Some(make_observed(VisemeSignal { viseme, weight }, provenance, sequence, monotonic_ns));
             }
             EmbodimentEventKind::GazeChanged { target } => {
-                self.snapshot.gaze = Some(observed(target));
+                self.snapshot.gaze = Some(make_observed(target, provenance, sequence, monotonic_ns));
             }
             EmbodimentEventKind::UncertaintyChanged { level } => {
-                self.snapshot.uncertainty = Some(observed(level));
+                self.snapshot.uncertainty = Some(make_observed(level, provenance, sequence, monotonic_ns));
             }
             EmbodimentEventKind::ClearTransient => {
                 self.snapshot.viseme = None;
@@ -235,7 +242,7 @@ impl EmbodimentController {
                 self.snapshot.uncertainty = None;
             }
             EmbodimentEventKind::Reset => {
-                self.snapshot.activity = Some(observed(EmbodimentActivity::Idle));
+                self.snapshot.activity = Some(make_observed(EmbodimentActivity::Idle, provenance, sequence, monotonic_ns));
                 self.snapshot.viseme = None;
                 self.snapshot.gaze = None;
                 self.snapshot.uncertainty = None;
