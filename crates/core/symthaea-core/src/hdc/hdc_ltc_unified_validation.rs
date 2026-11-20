@@ -18,8 +18,8 @@
 //!    - ~10% error due to nonlinear equilibrium (x_inf depends on x)
 //!    - Fast O(1) computation
 //!
-//! 3. **`evolve_closed_form_iterative`**: Sub-stepped exponential decay (RECOMMENDED)
-//!    - Handles nonlinear equilibrium by sub-stepping (tau/10 per step)
+//! 3. **`evolve_closed_form_iterative`**: Budgeted sub-stepped exponential evolution
+//!    - Recomputes nonlinear equilibrium at each tau/10 step; callers must provide a work budget.
 //!    - **<1% error vs RK4** - validated across all scenarios
 //!    - O(dt/tau) complexity but still faster than Euler/RK4
 //!
@@ -46,6 +46,9 @@
 
 use crate::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 use crate::hdc::unified_hv::ContinuousHV;
+
+/// Explicit upper bound for iterative solver work in numerical validation.
+const MAX_ITERATIVE_VALIDATION_SUBSTEPS: usize = 100_000;
 
 /// Test configuration for validation runs
 #[derive(Debug, Clone)]
@@ -259,7 +262,9 @@ pub fn validate_iterative_closed_form_vs_rk4(config: &ValidationConfig) -> Valid
 
     // Iterative closed-form (handles nonlinear equilibrium)
     let mut neuron_iter = create_test_neuron(config.tau_base, config.dimension, 42);
-    neuron_iter.evolve_closed_form_iterative(config.total_time, &input);
+    neuron_iter
+        .evolve_closed_form_iterative(config.total_time, &input, MAX_ITERATIVE_VALIDATION_SUBSTEPS)
+        .expect("validation scenario must fit its explicit iterative work budget");
 
     let l2 = l2_error(neuron_rk4.state(), neuron_iter.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_iter.state());
@@ -1222,7 +1227,9 @@ mod tests {
 
         // Iterative
         let mut neuron_iter = create_test_neuron(tau, dim, 42);
-        neuron_iter.evolve_closed_form_iterative(dt, &input);
+        neuron_iter
+            .evolve_closed_form_iterative(dt, &input, MAX_ITERATIVE_VALIDATION_SUBSTEPS)
+            .expect("comparison scenario must fit its explicit iterative work budget");
 
         // Report similarities to RK4
         let cfc_sim = neuron_cfc.state().similarity(neuron_rk4.state());
