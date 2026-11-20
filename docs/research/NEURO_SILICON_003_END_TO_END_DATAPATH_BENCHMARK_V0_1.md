@@ -32,6 +32,8 @@ A specific, falsifiable schedule comparison is now part of the host baseline:
 
 Both schedules perform the same number of Hamming comparisons and use identical frozen query/candidate bytes. Candidate-major tests cache/data reuse; it does not reduce the mathematical comparison count. Alternate schedule order across repetitions, report complete-batch latency and throughput separately, and retain query-major single-query p50/p95/p99 as a separate diagnostic. Candidate-major batch completion is not the same metric as single-request latency.
 
+The receipt schema names query-major and candidate-major throughput, batch p50/p95, and paired speedup-ratio p50/p95 explicitly. A speedup ratio is the paired query-major batch time divided by candidate-major batch time (>1 means candidate-major was faster); it is descriptive until repeated multi-host runs establish uncertainty and generality.
+
 The experiment must include batch size 1 as a negative control, plus 4/16/64. A candidate-major throughput win is useful only if it survives larger stores, resource/working-set pressure, and the application's tail-latency constraints. Any claimed memory-traffic reduction needs physical memory-controller counters or a declared, independently validated traffic model; source loop order alone is not a measured DRAM-read reduction.
 
 ### H4 — heterogeneous compute is allowed to win
