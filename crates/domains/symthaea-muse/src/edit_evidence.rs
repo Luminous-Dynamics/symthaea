@@ -237,7 +237,7 @@ pub fn verify_result_seal(result: &Value) -> Result<(), String> {
     Ok(())
 }
 
-/// Evaluate a v1 velocity edit. Score bytes must deserialize as a typed
+/// Evaluate a v1 symbolic edit. Score bytes must deserialize as a typed
 /// symthaea_music_theory Score. Optional audio is hashed as raw artifact bytes.
 #[allow(clippy::too_many_lines)] // One v1 scoring transaction keeps all gates in one auditable path.
 pub fn evaluate_symbolic_case(
@@ -340,7 +340,7 @@ pub fn evaluate_symbolic_case(
         let targets = required(mapping, "target_note_ordinals", "mapping")?
             .as_array().ok_or("target_note_ordinals must be an array")?;
         if sources.len() != 1 || targets.len() != 1 {
-            return Err("v1 velocity scorer requires one-to-one correspondence".into());
+            return Err("v1 symbolic scorer requires one-to-one correspondence".into());
         }
         let si = sources[0].as_u64().ok_or("source ordinal must be non-negative")? as usize;
         let ti = targets[0].as_u64().ok_or("target ordinal must be non-negative")? as usize;
@@ -864,6 +864,52 @@ mod tests {
             None,
         ).unwrap();
         assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn inverse_pitch_edit_restores_original_score() {
+        let original = score(false);
+        let transposed = pitch_edited_score();
+        let mut inverse_case = case_for(&transposed);
+        inverse_case["case_id"] = json!("synthetic.pitch.inverse.001");
+        inverse_case["instruction"]["operation_family"] = json!("pitch");
+        inverse_case["instruction"]["text"] = json!("Lower part 10 by two semitones.");
+        inverse_case["edit_contract"]["parameters"] = json!({"semitones": -2});
+        inverse_case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "pitch_accuracy"]);
+        let result = evaluate_symbolic_case(
+            &bytes(&inverse_case),
+            &bytes(&transposed),
+            &bytes(&original),
+            None,
+        ).unwrap();
+        assert!(result["outcome"]["target_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["preservation_pass"].as_bool().unwrap());
+        assert_eq!(
+            result["artifacts"]["candidate_score_sha256"],
+            json!(score_sha256(&original).unwrap())
+        );
+    }
+
+    #[test]
+    fn explicit_event_map_supports_candidate_note_reordering() {
+        let source = score(false);
+        let mut candidate = score(true);
+        candidate.notes.swap(0, 2);
+        let mut case = case_for(&source);
+        case["target"]["event_correspondence"] = json!([
+            {"source_note_ordinals": [0], "target_note_ordinals": [2], "relation": "modify"},
+            {"source_note_ordinals": [1], "target_note_ordinals": [1], "relation": "modify"},
+            {"source_note_ordinals": [2], "target_note_ordinals": [0], "relation": "preserve"}
+        ]);
+        let result = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(result["outcome"]["target_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["preservation_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["correspondence_pass"].as_bool().unwrap());
     }
 
     #[test]
