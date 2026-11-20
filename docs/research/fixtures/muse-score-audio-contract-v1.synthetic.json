@@ -6,6 +6,6 @@
   "channels": 1,
   "analysis_window_frames": 4096,
   "minimum_signal_rms_dbfs": -65,
-  "minimum_pitch_confidence": 0.15,
-  "pitch_tolerance_cents": 35
+  "pitch_tolerance_cents": 35,
+  "minimum_salience_margin": 0.15
 }
