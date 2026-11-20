@@ -699,6 +699,53 @@ mod tests {
     }
 
     #[test]
+    fn all_physics_lanes_serialize_to_the_schema_wire_names() {
+        assert_eq!(
+            serde_json::to_string(&PhysicsLane::LandauDamping1dElectrostatic).expect("serialize"),
+            "\"landau_damping_1d_electrostatic\""
+        );
+        assert_eq!(
+            serde_json::to_string(&PhysicsLane::Magnetosheath2d3vPressureTensor).expect("serialize"),
+            "\"magnetosheath_2d3v_pressure_tensor\""
+        );
+        assert_eq!(
+            serde_json::to_string(&PhysicsLane::IcfNonlocalElectronHeatTransport).expect("serialize"),
+            "\"icf_nonlocal_electron_heat_transport\""
+        );
+        assert_eq!(
+            serde_json::to_string(&PhysicsLane::PicFieldSolverWarmStart).expect("serialize"),
+            "\"pic_field_solver_warm_start\""
+        );
+    }
+
+    #[test]
+    fn proposed_candidate_may_wait_for_rights_but_cannot_be_selected() {
+        let mut candidate = valid_pic_candidate();
+        candidate.rights_state = RightsState::PermissionPending;
+        candidate.selection_status = SelectionStatus::Proposed;
+        let report = audit_candidate(&candidate).expect("audit");
+        assert_eq!(report.body.disposition, AuditDisposition::Admissible);
+
+        candidate.selection_status = SelectionStatus::Selected;
+        let report = audit_candidate(&candidate).expect("audit");
+        assert_eq!(report.body.disposition, AuditDisposition::Rejected);
+    }
+
+    #[test]
+    fn duplicate_observables_and_acquisition_reasons_are_rejected() {
+        let mut candidate = valid_pic_candidate();
+        candidate.target_observables.push("electric_field".to_owned());
+        candidate.acquisition.reason_codes.push(AcquisitionReason::Random);
+        let report = audit_candidate(&candidate).expect("audit");
+        assert!(report.body.findings.iter().any(|finding| {
+            finding.code == "duplicate_target_observable"
+        }));
+        assert!(report.body.findings.iter().any(|finding| {
+            finding.code == "duplicate_acquisition_reason"
+        }));
+    }
+
+    #[test]
     fn frozen_valid_candidate_fixture_parses_and_passes() {
         let input = include_str!("../../../../benchmarks/plasma/active-kinetic-candidate-valid-v0.json");
         let candidate: CandidateRun = serde_json::from_str(input).expect("candidate fixture parses");
