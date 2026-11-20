@@ -1,0 +1,17 @@
+{
+  "schema": "luminous.hdc-device-completion",
+  "schema_version": "0.1.0",
+  "command_id": "fixture-top1-0001",
+  "device_id": "sim-iverilog-hdc-tile",
+  "device_epoch": "00112233445566778899aabbccddeeff",
+  "sequence": "1",
+  "status": "rejected",
+  "device_profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "operation_id": "hdc.top1.exact.v1",
+  "implementation_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "semantic_contract_sha256": "04b106f50f40963f0d2f88f9d779b83d9a55bd22d2e151f45f5211fa05c3f9cd",
+  "error_code": "UNSUPPORTED_DESCRIPTOR",
+  "error_detail": "The descriptor was rejected before queue dispatch.",
+  "rejection_stage": "before_dma",
+  "dma_acquired": false
+}
