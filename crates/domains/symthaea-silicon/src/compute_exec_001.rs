@@ -73,7 +73,7 @@ pub struct HardwareIdentity {
     pub manufacturer: String,
     pub board_model: String,
     pub board_revision: String,
-    pub fpga_part: String,
+    pub device_part: String,
     pub som_ordering_code: Option<String>,
 }
 
@@ -1743,7 +1743,7 @@ mod tests {
             manufacturer: "test".into(),
             board_model: "test".into(),
             board_revision: "A".into(),
-            fpga_part: "test-part".into(),
+            device_part: "test-part".into(),
             som_ordering_code: None,
         });
         capabilities.dma_isolation = "none".into();
