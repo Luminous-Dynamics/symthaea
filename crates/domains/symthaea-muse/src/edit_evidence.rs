@@ -847,6 +847,26 @@ mod tests {
     }
 
     #[test]
+    fn pitch_transposition_beyond_midi_range_fails_target_gate() {
+        let mut source = score(false);
+        source.notes[0].pitch = Pitch::from_midi(126);
+        let mut candidate = source.clone();
+        candidate.notes[0].pitch = Pitch::from_midi(127); // Saturation is not a valid +2 edit.
+        candidate.notes[1].pitch = candidate.notes[1].pitch.transpose(2);
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("pitch");
+        case["edit_contract"]["parameters"] = json!({"semitones": 2});
+        case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "pitch_accuracy"]);
+        let result = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
+    }
+
+    #[test]
     fn unsupported_edit_family_abstains() {
         let source = score(false);
         let candidate = score(true);
