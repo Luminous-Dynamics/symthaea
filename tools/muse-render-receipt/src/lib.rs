@@ -927,9 +927,12 @@ fn inc<K: Ord>(m: &mut BTreeMap<K, usize>, k: K) { *m.entry(k).or_insert(0) += 1
 fn verify_instrument_channel_assignments(
     tracks: &[MidiPerformanceTrackReceiptV1],
 ) -> Result<(), String> {
+    const EXPORTER_CHANNELS: [u8; 15] = [0,1,2,3,4,5,6,7,8,10,11,12,13,14,15];
     let mut channel_by_instrument = BTreeMap::<&str, u8>::new();
     let mut instrument_by_channel = BTreeMap::<u8, &str>::new();
+    let mut instrument_ids = std::collections::BTreeSet::<&str>::new();
     for track in tracks {
+        instrument_ids.insert(track.instrument_id.as_str());
         if let Some(previous) = channel_by_instrument.insert(
             track.instrument_id.as_str(),
             track.midi_channel,
@@ -951,6 +954,16 @@ fn verify_instrument_channel_assignments(
                     track.midi_channel, previous, track.instrument_id
                 ));
             }
+        }
+    }
+    if instrument_ids.len() > EXPORTER_CHANNELS.len() {
+        return Err("MIDI manifest exceeds the exporter’s 15 instrument-channel capacity".into());
+    }
+    for (instrument_id, expected_channel) in instrument_ids.iter().zip(EXPORTER_CHANNELS) {
+        if channel_by_instrument.get(instrument_id).copied() != Some(expected_channel) {
+            return Err(format!(
+                "instrument {instrument_id} does not use its deterministic exporter channel {expected_channel}"
+            ));
         }
     }
     Ok(())
@@ -1792,6 +1805,11 @@ mod tests {
         second.midi_channel = 1;
         assert!(verify_instrument_channel_assignments(&[tracks[0].clone(), second])
             .unwrap_err().contains("split across MIDI channels"));
+
+        let mut reserved = tracks[0].clone();
+        reserved.midi_channel = 9;
+        assert!(verify_instrument_channel_assignments(&[reserved])
+            .unwrap_err().contains("deterministic exporter channel"));
 
         // Repeated timeline segments for one instrument instance retain one channel.
         assert!(verify_instrument_channel_assignments(&[tracks[0].clone(), {
