@@ -26,7 +26,10 @@
           "lower": -0.8,
           "upper": -0.6
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "competitor_route": {
         "route_id": "competitor_a_only",
@@ -37,10 +40,14 @@
           "lower": -0.4,
           "upper": -0.2
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "thermodynamic_selectivity_margin_eV": 0.05,
-      "observation_status": "unknown_not_reported"
+      "observation_status": "unknown_not_reported",
+      "thermodynamic_conditions_id": "thermodynamic_conditions_800K"
     },
     {
       "case_id": "negative_cross_correlation_long_hold_competitor_takes_over",
@@ -63,7 +70,10 @@
           "lower": -0.8,
           "upper": -0.6
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "competitor_route": {
         "route_id": "competitor_a_only",
@@ -74,10 +84,14 @@
           "lower": -0.4,
           "upper": -0.2
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "thermodynamic_selectivity_margin_eV": 0.05,
-      "observation_status": "unknown_not_reported"
+      "observation_status": "unknown_not_reported",
+      "thermodynamic_conditions_id": "thermodynamic_conditions_800K"
     },
     {
       "case_id": "positive_cross_correlation_target_co_transport_wins",
@@ -100,7 +114,10 @@
           "lower": -0.8,
           "upper": -0.6
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "competitor_route": {
         "route_id": "competitor_a_only",
@@ -111,10 +128,14 @@
           "lower": -0.4,
           "upper": -0.2
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "thermodynamic_selectivity_margin_eV": 0.05,
-      "observation_status": "unknown_not_reported"
+      "observation_status": "unknown_not_reported",
+      "thermodynamic_conditions_id": "thermodynamic_conditions_800K"
     },
     {
       "case_id": "diagonal_transport_baseline",
@@ -137,7 +158,10 @@
           "lower": -0.8,
           "upper": -0.6
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "competitor_route": {
         "route_id": "competitor_a_only",
@@ -148,10 +172,14 @@
           "lower": -0.4,
           "upper": -0.2
         },
-        "availability_fraction": 1
+        "availability_fraction": 1,
+        "thermodynamic_conditions_id": "thermodynamic_conditions_800K",
+        "reaction_extent_basis_id": "per_shared_route_extent",
+        "standard_state_id": "standard_state_reference_001"
       },
       "thermodynamic_selectivity_margin_eV": 0.05,
-      "observation_status": "unknown_not_reported"
+      "observation_status": "unknown_not_reported",
+      "thermodynamic_conditions_id": "thermodynamic_conditions_800K"
     }
   ],
   "claim_ceiling": "Synthetic two-route transport-coupled kinetic-selectivity model only; no measured diffusion coefficient, reaction rate, phase yield, superconducting material or laboratory procedure is established."
