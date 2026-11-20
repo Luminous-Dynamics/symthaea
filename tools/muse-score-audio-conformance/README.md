@@ -29,4 +29,4 @@ A passing pitch result is one bounded conformance claim. It is not a complete Sc
 
 ## Tests and qualification
 
-Nine Rust unit tests are authored at initial implementation, including exact pitch, semitone and octave corruption, silence, polyphonic overlap, multiple parts, unassigned identity, short notes, unknown fields and receipt tampering. They have not been compiled or executed yet. The focused workflow runs format, tests and Clippy on the exact PR head.
+Fifteen Rust unit tests are authored, including exact pitch, semitone and octave corruption, silence, polyphonic overlap, multiple parts, unassigned identity, short notes, unknown fields and receipt tampering. They have not been compiled or executed yet. The focused workflow runs format, tests and Clippy on the exact PR head.
