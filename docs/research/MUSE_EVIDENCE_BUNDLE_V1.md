@@ -1,6 +1,6 @@
 # MUSE Evidence Bundle v1 — cross-layer verification manifest
 
-**Status:** manifest schema, synthetic fixtures and integration contract drafted. No executable bundle verifier or qualification result is claimed yet.
+**Status:** manifest schema, synthetic fixtures, standalone verifier and CLI are implemented in draft PR #12985. Rust qualification is still pending; no compile/test/Clippy pass is claimed.
 
 **Tracking:** [MUSE-EVIDENCE-BUNDLE-001 / #12981](https://github.com/Luminous-Dynamics/symthaea/issues/12981)
 
@@ -120,7 +120,7 @@ The library:
 
 **Current status is deliberately fail-closed:** Score-to-audio and human receipts have no registered public verifier, so those gates remain abstain even when a file is supplied. Render byte/MIDI/WAV integrity is rechecked through the public verifier, but render execution also remains abstain until trusted executor/input-consumption attestation exists. Isolated-stem acoustic claims remain abstain until independently verified stem/material lineage is present. Consequently v0.1 is not able to produce a full overall pass; this is intentional.
 
-Seven unit tests are authored for outcome precedence, required-gate abstention, seal tampering, cross-binding mismatches, missing receipt rejection and canonical key-order stability. They have **not** been compiled or executed. No Cargo/rustc/rustfmt is available locally and no exact-head CI pass is claimed. The schema and five shape-valid fixtures remain structural contract artifacts; placeholder digests are not cryptographic test receipts.
+Thirteen unit tests are authored for outcome precedence, required-gate abstention, seal tampering, cross-binding mismatches, missing receipt rejection, canonical key-order stability, render-channel failure precedence, declared-status monotonicity, unknown-field rejection and inconsistent gate counts. They have **not** been compiled or executed. No Cargo/rustc/rustfmt is available locally and no exact-head CI pass is claimed. The schema and five shape-valid fixtures remain structural contract artifacts; placeholder digests are not cryptographic test receipts.
 
 ## Implementation order
 
@@ -129,7 +129,7 @@ Seven unit tests are authored for outcome precedence, required-gate abstention, 
 3. Add exact cross-bindings and derive the non-compensating outcome lattice.
 4. Use render verifier's full \`verify_bundle\` on the artifact directory; receipt-only validation is insufficient for a full integrity claim.
 5. Register the score-to-audio and human receipt validators before allowing their component statuses to pass.
-6. Add a CLI after the library API is stable, plus pinned JSON Schema Draft 2020-12 and exact-head Rust tests.
+6. Add pinned JSON Schema Draft 2020-12 validation, negative schema fixtures and exact-head Rust format/test/Clippy qualification.
 
 ## Claim boundary
 
