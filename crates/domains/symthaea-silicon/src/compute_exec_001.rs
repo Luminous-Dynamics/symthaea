@@ -655,8 +655,7 @@ impl ExecutionLedger {
             } if command_id == verified.command_id
                 && device_epoch == verified.device_epoch
                 && sequence == verified.sequence
-                && self.device_id == verified.device_id
-                && self.device_epoch == verified.device_epoch =>
+                && self.device_id == verified.device_id =>
             {
                 registry.set_ownership(&key, BufferOwnership::HostOwned);
                 Ok(())
@@ -723,25 +722,10 @@ impl ExecutionLedger {
                 );
             }
         }
-        let mut unverified_output_interrupted = false;
-        for buffer in registry.buffers.values_mut() {
-            if let BufferOwnership::OutputUnverified {
-                device_epoch,
-                sequence,
-                ..
-            } = buffer.ownership.clone()
-            {
-                if device_epoch == old_epoch {
-                    unverified_output_interrupted = true;
-                    buffer.ownership = BufferOwnership::Quarantined {
-                        device_epoch: old_epoch.clone(),
-                        sequence,
-                    };
-                }
-            }
-        }
+        // OutputUnverified is already host-owned after a valid completion;
+        // preserve its verification gate across reset without pretending DMA
+        // is still active. It can be verified against its original command.
         if reset_interrupted_work
-            || unverified_output_interrupted
             || registry.buffers.values().any(|buffer| {
                 matches!(
                     &buffer.ownership,
@@ -1937,11 +1921,11 @@ mod tests {
         );
         assert!(matches!(
             registry.ownership("fixture-result", 1),
-            Some(BufferOwnership::Quarantined { .. })
+            Some(BufferOwnership::OutputUnverified { .. })
         ));
         assert_eq!(
             ledger.confirm_dma_quiescent("00112233445566778899aabbccddeeff", &mut registry),
-            4
+            0
         );
         assert_eq!(registry.ownership("fixture-result", 1), Some(&BufferOwnership::HostOwned));
     }
@@ -2005,7 +1989,7 @@ mod tests {
     }
 
     #[test]
-    fn reset_quarantines_outputs_that_have_not_passed_oracle_verification() {
+    fn reset_preserves_verification_gate_for_completed_unverified_output() {
         let (capabilities, command, completion, mut registry, mut ledger) = setup();
         ledger.submit(&command, &capabilities, &mut registry).unwrap();
         ledger.accept_completion(&completion, &capabilities, &mut registry).unwrap();
