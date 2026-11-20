@@ -603,6 +603,15 @@ pub fn evaluate_symbolic_case(
         .as_array().ok_or("target_metrics must be an array")?;
     let requested_preservation = required(evaluation, "preservation_metrics", "evaluation")?
         .as_array().ok_or("preservation_metrics must be an array")?;
+    for required_metric in [
+        "protected_event_agreement",
+        "outside_scope_event_agreement",
+        "collateral_change_rate",
+    ] {
+        if !requested_preservation.iter().any(|entry| entry.as_str() == Some(required_metric)) {
+            return Err(format!("evaluation.preservation_metrics must include {required_metric}"));
+        }
+    }
     let primary_metric = if operation == "velocity" { "velocity_accuracy" } else { "pitch_accuracy" };
     let has_primary_metric = requested_targets.iter().any(|request| request.as_str() == Some(primary_metric));
     if !has_primary_metric && !requested_targets.iter().any(|request| request.as_str() == Some("exact_event_accuracy")) {
@@ -922,6 +931,24 @@ mod tests {
             None,
         ).unwrap_err();
         assert!(error.contains("preservation_metrics must not be empty"));
+    }
+
+    #[test]
+    fn omitted_protected_metric_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["evaluation"]["preservation_metrics"] = json!([
+            "outside_scope_event_agreement",
+            "collateral_change_rate"
+        ]);
+        let error = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("must include protected_event_agreement"));
     }
 
     #[test]
