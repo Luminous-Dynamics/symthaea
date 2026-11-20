@@ -225,7 +225,7 @@ mod tests {
         });
         (schema, holdout, serde_json::to_vec(&cohort).unwrap())
     }
-    fn audit_mutated(mut data: Value) -> Result<Value, String> {
+    fn audit_mutated(data: Value) -> Result<Value, String> {
         let (schema, holdout, _) = inputs();
         audit(&schema, &holdout, &serde_json::to_vec(&data).unwrap())
     }
