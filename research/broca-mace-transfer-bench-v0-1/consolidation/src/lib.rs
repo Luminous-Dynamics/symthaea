@@ -14,7 +14,10 @@ use broca_mace_ingress::{
     ActionConsolidationEvidenceSummaryV1, AsKnownQuery, ConsolidationEvidencePackV1,
     ConsolidationPackReject, ConsolidationSourceBindingV1, SourceTrustStatus,
 };
-use broca_mace_policy::{Action, Experience, Scope};
+use broca_mace_policy::{
+    Action, CausalIdentificationV1, EvidenceDigest256, Experience,
+    IdentificationMethodV1, Scope,
+};
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -208,6 +211,37 @@ fn digest_fields(domain: &[u8], fields: &[String]) -> String {
         .collect()
 }
 
+fn identification_method_code(method: IdentificationMethodV1) -> &'static str {
+    match method {
+        IdentificationMethodV1::RandomizedControlledTrial => "randomized_controlled_trial",
+        IdentificationMethodV1::QuasiExperimental => "quasi_experimental",
+        IdentificationMethodV1::Observational => "observational",
+        IdentificationMethodV1::Unknown => "unknown",
+    }
+}
+
+fn evidence_digest_code(digest: EvidenceDigest256) -> String {
+    digest
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Canonical serialization of every causal-identification field. These values
+/// are part of the source evidence binding, not optional policy annotations.
+fn causal_identification_fields(identification: CausalIdentificationV1) -> Vec<String> {
+    vec![
+        identification_method_code(identification.method).to_owned(),
+        evidence_digest_code(identification.design_digest),
+        evidence_digest_code(identification.estimand_digest),
+        identification.propensity_min_bps.to_string(),
+        identification.propensity_max_bps.to_string(),
+        identification.max_standardized_mean_difference_micros.to_string(),
+        identification.interference_controlled.to_string(),
+    ]
+}
+
 fn binding_fields(binding: &ConsolidationSourceBindingV1) -> Vec<String> {
     let receipt = &binding.receipts;
     vec![
@@ -240,6 +274,7 @@ fn binding_fields(binding: &ConsolidationSourceBindingV1) -> Vec<String> {
         receipt.calibration_method_id.clone(),
         receipt.calibration_revision.clone(),
         receipt.causal_assessment_digest.clone(),
+        causal_identification_fields(receipt.causal_identification),
         receipt.outcome_success.to_string(),
         receipt.outcome_observed_utility_bits.to_string(),
         receipt.outcome_utility_unit.clone(),
@@ -594,6 +629,103 @@ mod tests {
             scope_matches: true,
             all_trusted_predictions_pre_registered: true,
         }
+    }
+
+    #[test]
+    fn canonical_source_binding_covers_every_causal_identification_field() {
+        let mut bytes_a = [0_u8; 32];
+        let mut bytes_b = [0_u8; 32];
+        let mut bytes_c = [0_u8; 32];
+        bytes_a[0] = 1;
+        bytes_b[0] = 2;
+        bytes_c[0] = 3;
+        let base = CausalIdentificationV1::new(
+            IdentificationMethodV1::RandomizedControlledTrial,
+            EvidenceDigest256::from_bytes(bytes_a),
+            EvidenceDigest256::from_bytes(bytes_b),
+            5_000,
+            5_000,
+            50_000,
+            true,
+        );
+        let base_digest = digest_fields(
+            b"mycelix:mace:causal-identification:v1\0",
+            &causal_identification_fields(base),
+        );
+        let variants = [
+            CausalIdentificationV1::new(
+                IdentificationMethodV1::QuasiExperimental,
+                base.design_digest,
+                base.estimand_digest,
+                base.propensity_min_bps,
+                base.propensity_max_bps,
+                base.max_standardized_mean_difference_micros,
+                base.interference_controlled,
+            ),
+            CausalIdentificationV1::new(
+                base.method,
+                EvidenceDigest256::from_bytes(bytes_c),
+                base.estimand_digest,
+                base.propensity_min_bps,
+                base.propensity_max_bps,
+                base.max_standardized_mean_difference_micros,
+                base.interference_controlled,
+            ),
+            CausalIdentificationV1::new(
+                base.method,
+                base.design_digest,
+                EvidenceDigest256::from_bytes(bytes_c),
+                base.propensity_min_bps,
+                base.propensity_max_bps,
+                base.max_standardized_mean_difference_micros,
+                base.interference_controlled,
+            ),
+            CausalIdentificationV1::new(
+                base.method,
+                base.design_digest,
+                base.estimand_digest,
+                4_000,
+                base.propensity_max_bps,
+                base.max_standardized_mean_difference_micros,
+                base.interference_controlled,
+            ),
+            CausalIdentificationV1::new(
+                base.method,
+                base.design_digest,
+                base.estimand_digest,
+                base.propensity_min_bps,
+                6_000,
+                base.max_standardized_mean_difference_micros,
+                base.interference_controlled,
+            ),
+            CausalIdentificationV1::new(
+                base.method,
+                base.design_digest,
+                base.estimand_digest,
+                base.propensity_min_bps,
+                base.propensity_max_bps,
+                60_000,
+                base.interference_controlled,
+            ),
+            CausalIdentificationV1::new(
+                base.method,
+                base.design_digest,
+                base.estimand_digest,
+                base.propensity_min_bps,
+                base.propensity_max_bps,
+                base.max_standardized_mean_difference_micros,
+                false,
+            ),
+        ];
+
+        for variant in variants {
+            let digest = digest_fields(
+                b"mycelix:mace:causal-identification:v1\0",
+                &causal_identification_fields(variant),
+            );
+            assert_ne!(digest, base_digest);
+        }
+        assert_eq!(causal_identification_fields(base).len(), 7);
     }
 
     #[test]
