@@ -60,9 +60,9 @@ Do not require bit-identical audio when an operation regenerates an entire mix. 
 
 ### 2.3 Correspondence
 
-Mappings must be explicit or independently verified. A nearest-pitch/nearest-onset heuristic may propose matches, but cannot silently declare event identity.
+Mappings must be explicit or independently verified. In the v1 symbolic case schema, source and target note ordinals are scoped to their exact Score digests; they are not persistent IDs. A nearest-pitch/nearest-onset heuristic may propose matches, but cannot silently declare event identity.
 
-Each mapping records source event IDs, target event IDs, relation (preserve, modify, split, merge, delete, insert) and evidence provenance. Report coverage as:
+Each mapping records source note ordinals, target note ordinals, relation (preserve, modify, split, merge, delete, insert) and evidence provenance. Report coverage as:
 
 \[
 C = \frac{N_{\mathrm{mapped}}}{N_{\mathrm{expected}}}
