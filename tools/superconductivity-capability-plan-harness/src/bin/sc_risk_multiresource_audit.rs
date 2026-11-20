@@ -500,6 +500,16 @@ impl Instance {
         let prior = vec![self.worlds.iter().map(|world| world.prior).collect::<Vec<_>>()];
         let (prior_expected, _) = expected_policy_risk(&prior, &self.decisions);
         let (prior_cvar, _, _) = precommitment_cvar(&prior, &self.decisions, self.alpha)?;
+        // Independently verify the no-observation baseline by minimizing each
+        // decision's finite-support CVaR under the prior.
+        let prior_probabilities: Vec<f64> = self.worlds.iter().map(|world| world.prior).collect();
+        let direct_prior_cvars: Vec<f64> = self.decisions.iter()
+            .map(|decision| weighted_cvar(&decision.losses, &prior_probabilities, self.alpha))
+            .collect::<Result<Vec<_>, _>>()?;
+        let direct_prior_cvar = direct_prior_cvars.into_iter().fold(f64::INFINITY, f64::min);
+        if (prior_cvar - direct_prior_cvar).abs() > 1.0e-9 {
+            return Err("precommitment baseline CVaR disagrees with direct decision CVaR".to_owned());
+        }
         let expected_evsi = prior_expected - expected_risk;
         let cvar_evsi = prior_cvar - cvar_risk;
         if expected_evsi < -1.0e-8 || cvar_evsi < -1.0e-8 {
