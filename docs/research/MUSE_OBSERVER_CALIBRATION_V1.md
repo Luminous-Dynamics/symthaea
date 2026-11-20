@@ -43,8 +43,8 @@ Rows whose observer measurement is `no_measurable_spectral_energy`, `insufficien
 
 - Isotonic regression provides a monotone mapping. It is not a multi-feature classifier and does not solve harmonic attribution.
 - The model hash binds only the fit split, observer/version, feature and protocol/rights receipts. The threshold-selection split and held-out split have separate hashes in the output.
-- The output reports Brier score, fixed-bin ECE, ROC-AUC, average precision, support precision, event recall, false-support rates, measurement coverage, support coverage and abstention rate.
-- A deterministic, seeded cluster bootstrap resamples whole source groups—not individual note rows—and reports percentile 95% intervals for support precision, false-support rate, event recall, support coverage and Brier score. The contract freezes the seed, replicate count and minimum held-out group count.
+- The output reports Brier score, fixed-bin ECE, ROC-AUC, average precision, support precision, event recall, false-support rates over all and measured negatives, measurement coverage, support coverage and abstention rate.
+- A deterministic, seeded cluster bootstrap resamples whole source groups—not individual note rows—and reports percentile 95% intervals for support precision, both false-support rates (all negatives and measured negatives), event recall, support coverage and Brier score. The contract freezes the seed, replicate count and minimum held-out group count; a work cap bounds the resampling computation.
 - `verify_calibration_bundle_v1` deterministically re-runs fitting, threshold selection and held-out scoring from the exact sealed dataset and contract; it rejects a modified model, threshold or metric report.
 - If no threshold satisfies the false-support ceiling, the result emits no support threshold and all cases abstain. It never relaxes the ceiling to obtain a positive coverage number.
 
@@ -86,7 +86,7 @@ SMEBench's human validation is an additional warning against equating automatic 
 - Schemas: `docs/research/schemas/muse-observer-calibration-*.schema.json`
 - Exact-head workflow: `.github/workflows/muse-observer-calibration.yml`
 
-Thirteen unit tests are authored for monotonic isotonic fitting, threshold selection, unmeasured abstention, group leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, bundle tampering, and checked-in fixture replay. They have **not** been compiled or executed. The local environment has no Cargo, rustc or rustfmt. No exact-head Rust formatting, compilation, test or Clippy pass is claimed.
+Fourteen unit tests are authored for monotonic isotonic fitting, threshold selection, unmeasured abstention, group leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, bundle tampering, and checked-in fixture replay. They have **not** been compiled or executed. The local environment has no Cargo, rustc or rustfmt. No exact-head Rust formatting, compilation, test or Clippy pass is claimed.
 
 ## Next
 
