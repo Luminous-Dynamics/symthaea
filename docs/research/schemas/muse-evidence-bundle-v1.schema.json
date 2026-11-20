@@ -477,6 +477,14 @@
                   },
                   "receipt_sha256": {
                     "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               },
@@ -487,6 +495,14 @@
                   },
                   "receipt_sha256": {
                     "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               },
@@ -497,6 +513,14 @@
                   },
                   "receipt_sha256": {
                     "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               },
@@ -507,6 +531,14 @@
                   },
                   "receipt_sha256": {
                     "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               },
@@ -517,6 +549,14 @@
                   },
                   "receipt_sha256": {
                     "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }
