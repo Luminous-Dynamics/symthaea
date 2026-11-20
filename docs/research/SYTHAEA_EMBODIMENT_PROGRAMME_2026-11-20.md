@@ -221,7 +221,7 @@ The replay CLI measures event reduction only. It does **not** measure browser pa
 
 Export the rendered presence from the same trace:
 
-`cargo run -p symthaea-canvas --example mycelial_presence_demo -- --trace crates/domains/symthaea-canvas/tests/fixtures/embodiment_trace_v1.json --output /tmp/symthaea-presence.svg --reduced-motion`
+`cargo run -p symthaea-canvas --example mycelial_presence_demo -- --trace crates/domains/symthaea-canvas/tests/fixtures/embodiment_trace_v1.json --through-sequence 8 --output /tmp/symthaea-presence.svg --reduced-motion`
 
 Repository source inspection found that `src/cognitive_loop/voice_channel.rs` returns synthesized PCM in `VoiceResponse`, while `src/voice/repl_voice.rs` contains separate playback paths (Rodio queueing and an optional live-voice backend). A returned PCM buffer or a successful queue append is not proof that audio is actually playing. This branch therefore defines the lifecycle contract but does not yet falsely wire synthesis completion to `Playing`.
 
