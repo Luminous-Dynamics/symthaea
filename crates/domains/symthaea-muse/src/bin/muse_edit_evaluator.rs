@@ -18,7 +18,7 @@ fn run() -> Result<(), String> {
         println!("{}", concat!(
             "muse_edit_evaluator --case FILE --source-score FILE --candidate-score FILE ",
             "[--candidate-audio FILE] [--output FILE]\n",
-            "Scores the deterministic v1 symbolic velocity/pitch edit slice; unsupported families abstain."
+            "Scores deterministic v1 symbolic velocity, pitch and duration edits; unsupported families abstain."
         ));
         return Ok(());
     }
