@@ -25,6 +25,16 @@ Keep correctness / retrieval quality, tail latency, throughput, power, energy/qu
 ### H3 — co-design dataflow, not just datapath width
 
 After the current stream interfaces are qualified, compare lane width together with query batching, local-memory residency, pipelining, backpressure, and fusion of adjacent already-qualified operations. Lane width alone is not an architecture conclusion.
+A specific, falsifiable schedule comparison is now part of the host baseline:
+
+- **Query-major:** scan the complete candidate store for query 1, then query 2, and so on.
+- **Candidate-major:** read each candidate once in the outer loop and compare it against every query in the batch before advancing. Maintain one independent exact `(minimum distance, lowest stable ID)` accumulator per query.
+
+Both schedules perform the same number of Hamming comparisons and use identical frozen query/candidate bytes. Candidate-major tests cache/data reuse; it does not reduce the mathematical comparison count. Alternate schedule order across repetitions, report complete-batch latency and throughput separately, and retain query-major single-query p50/p95/p99 as a separate diagnostic. Candidate-major batch completion is not the same metric as single-request latency.
+
+The receipt schema names query-major and candidate-major throughput, batch p50/p95, and paired speedup-ratio p50/p95 explicitly. A speedup ratio is the paired query-major batch time divided by candidate-major batch time (>1 means candidate-major was faster); it is descriptive until repeated multi-host runs establish uncertainty and generality.
+
+The experiment must include batch size 1 as a negative control, plus 4/16/64. A candidate-major throughput win is useful only if it survives larger stores, resource/working-set pressure, and the application's tail-latency constraints. Any claimed memory-traffic reduction needs physical memory-controller counters or a declared, independently validated traffic model; source loop order alone is not a measured DRAM-read reduction.
 
 ### H4 — heterogeneous compute is allowed to win
 
@@ -164,7 +174,7 @@ Missing metrics are absent—not zero. A successful schema parse verifies only r
 
 ### Runnable software-only first slice
 
-The initial retrieval baseline is implemented in `crates/domains/symthaea-silicon/examples/hdc_retrieval_host_benchmark.rs`. It uses the canonical `BinaryHV::random` and `BinaryHV::hamming_distance` APIs, fixes the data-generation recipe, hashes generated store/query material, writes raw per-query and per-batch observations, emits a schema-shaped receipt, and preflights artifact hashes plus status/claim invariants.
+The initial retrieval baseline is implemented in `crates/domains/symthaea-silicon/examples/hdc_retrieval_host_benchmark.rs`. It uses the canonical `BinaryHV::random` and `BinaryHV::hamming_distance` APIs, fixes the data-generation recipe, hashes generated store/query material, compares query-major and candidate-major schedules on the same frozen inputs, alternates their order across repetitions, writes raw per-query and per-batch observations, emits a schema-shaped receipt, and preflights artifact hashes plus status/claim invariants. Both schedules must match the synthetic target ID and expected Hamming distance; the receipt remains incomplete for the full system benchmark.
 
 From a clean checkout at the repository root:
 
