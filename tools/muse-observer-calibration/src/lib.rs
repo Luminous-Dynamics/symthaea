@@ -301,8 +301,8 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
 
     let mut sample_ids = std::collections::BTreeSet::new();
     let mut group_splits = std::collections::BTreeMap::new();
-    let mut audio_splits = std::collections::BTreeMap::new();
-    let mut midi_splits = std::collections::BTreeMap::new();
+    let mut audio_lineage = std::collections::BTreeMap::new();
+    let mut midi_lineage = std::collections::BTreeMap::new();
     for (index, observation) in dataset.observations.iter().enumerate() {
         if observation.sample_id.trim().is_empty()
             || observation.sample_id.len() > 256
@@ -360,12 +360,15 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
             }
         }
         for (map, digest, label) in [
-            (&mut audio_splits, observation.source_audio_sha256.as_str(), "source_audio"),
-            (&mut midi_splits, observation.source_midi_sha256.as_str(), "source_midi"),
+            (&mut audio_lineage, observation.source_audio_sha256.as_str(), "source_audio"),
+            (&mut midi_lineage, observation.source_midi_sha256.as_str(), "source_midi"),
         ] {
-            if let Some(split) = map.insert(digest.to_string(), observation.split) {
-                if split != observation.split {
-                    return Err(format!("{label} digest leaks across dataset splits"));
+            let lineage = (observation.split, observation.source_group_id.clone());
+            if let Some(previous) = map.insert(digest.to_string(), lineage.clone()) {
+                if previous != lineage {
+                    return Err(format!(
+                        "{label} digest is assigned to multiple splits or source groups"
+                    ));
                 }
             }
         }
@@ -1078,6 +1081,15 @@ mod tests {
         let mut data = dataset();
         data.observations[0].source_group_id = data.observations[20].source_group_id.clone();
         seal_calibration_dataset_v1(&mut data).unwrap_err();
+    }
+
+    #[test]
+    fn identical_audio_cannot_be_split_into_multiple_source_groups() {
+        let mut data = dataset();
+        data.observations[0].source_audio_sha256 =
+            data.observations[2].source_audio_sha256.clone();
+        data.observations[0].source_group_id = "other-work".into();
+        assert!(seal_calibration_dataset_v1(&mut data).is_err());
     }
 
     #[test]
