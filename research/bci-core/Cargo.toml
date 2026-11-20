@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-bci-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics"]
+license = "AGPL-3.0-or-later"
+description = "Hardware-independent, fail-closed neural signal contracts for Symthaea BCI research"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
+
+# Keep the first R&D contract independently buildable until its dependencies and
+# workspace integration have been reviewed. This package intentionally has no deps.
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
