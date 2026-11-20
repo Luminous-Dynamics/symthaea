@@ -69,7 +69,7 @@ fn validate_score(score: &Score, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn required(value: &Value, key: &str, label: &str) -> Result<&Value, String> {
+fn required<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a Value, String> {
     value.get(key).ok_or_else(|| format!("{label} is missing {key}"))
 }
 
@@ -303,6 +303,7 @@ pub fn evaluate_velocity_case(
     let mappings = required(target, "event_correspondence", "target")?
         .as_array().ok_or("event_correspondence must be an array")?;
     let mut source_to_target = vec![None; source.notes.len()];
+    let mut source_relation_modify = vec![None; source.notes.len()];
     let mut target_to_source = vec![None; candidate.notes.len()];
     for (index, mapping) in mappings.iter().enumerate() {
         let relation = string_field(mapping, "relation", &format!("mapping[{index}]"))?;
@@ -324,6 +325,7 @@ pub fn evaluate_velocity_case(
         if source_to_target[si].replace(ti).is_some() || target_to_source[ti].replace(si).is_some() {
             return Err("duplicate source or target event correspondence".into());
         }
+        source_relation_modify[si] = Some(relation == "modify");
     }
 
     let mapped_sources = source_to_target.iter().filter(|item| item.is_some()).count();
@@ -361,13 +363,9 @@ pub fn evaluate_velocity_case(
             continue;
         };
         let candidate_note = &candidate.notes[ti];
-        let expected_relation = if in_target { "modify" } else { "preserve" };
-        let declared_relation = mappings.iter().find_map(|mapping| {
-            let ordinals = mapping.get("source_note_ordinals")?.as_array()?;
-            (ordinals.len() == 1 && ordinals[0].as_u64() == Some(si as u64))
-                .then(|| mapping.get("relation")?.as_str()).flatten()
-        });
-        if declared_relation != Some(expected_relation) { scope_pass = false; }
+        if source_relation_modify[si] != Some(in_target) {
+            scope_pass = false;
+        }
 
         if in_target {
             target_expected += 1;
