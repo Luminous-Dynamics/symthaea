@@ -71,10 +71,26 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "case_sha256",
+        "case_digest_schema",
+        "source_score_sha256",
+        "score_digest_schema",
         "candidate_audio_sha256",
         "candidate_score_sha256"
       ],
       "properties": {
+        "case_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "case_digest_schema": {
+          "const": "muse-edit-evidence-case-serde-json-sha256-v1"
+        },
+        "source_score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "score_digest_schema": {
+          "const": "muse-score-serde-json-sha256-v1"
+        },
         "candidate_audio_sha256": {
           "oneOf": [
             {
