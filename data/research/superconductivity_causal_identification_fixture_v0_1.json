@@ -101,7 +101,7 @@
           "material_family": "family_alpha",
           "treatment_assigned": true,
           "assignment_probability": 0.5,
-          "delivered_dose_fraction": 1,
+          "delivered_dose_fraction": 0.6,
           "outcome_observed": true,
           "observed_outcome": 8
         },
@@ -406,5 +406,6 @@
       "outcome_under_treatment": -2
     }
   ],
-  "claim_ceiling": "Synthetic causal identification benchmark only; no empirical superconductivity treatment effect or laboratory claim is established."
+  "claim_ceiling": "Synthetic causal identification benchmark only; no empirical superconductivity treatment effect or laboratory claim is established.",
+  "treatment_receipt_semantics": "Primary estimand is intention-to-treat under assignment policy. Delivered dose is separately recorded for compliance auditing; v0.1 does not estimate a dose-response effect."
 }
