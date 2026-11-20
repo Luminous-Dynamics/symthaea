@@ -83,6 +83,7 @@ impl EmbodimentTrace {
 
         let mut activity_changes = 0usize;
         let mut completed_activity_intervals = 0usize;
+        let mut activity_duration_ns = 0u128;
         let mut speech_output_transitions = 0usize;
         let mut completed_playback_intervals = 0usize;
         let mut playback_duration_ns = 0u128;
@@ -102,7 +103,9 @@ impl EmbodimentTrace {
                 if let Some((previous, started_at)) = previous_activity {
                     if previous != activity {
                         activity_changes = activity_changes.saturating_add(1);
-                        let _duration = event.monotonic_ns.saturating_sub(started_at);
+                        let duration = event.monotonic_ns.saturating_sub(started_at);
+                        activity_duration_ns =
+                            activity_duration_ns.saturating_add(u128::from(duration));
                         completed_activity_intervals =
                             completed_activity_intervals.saturating_add(1);
                         previous_activity = Some((activity, event.monotonic_ns));
@@ -156,6 +159,7 @@ impl EmbodimentTrace {
             event_count: self.events.len(),
             activity_changes,
             completed_activity_intervals,
+            activity_duration_ns,
             speech_output_transitions,
             completed_playback_intervals,
             playback_duration_ns,
@@ -213,6 +217,7 @@ pub struct EmbodimentTraceSummary {
     pub event_count: usize,
     pub activity_changes: usize,
     pub completed_activity_intervals: usize,
+    pub activity_duration_ns: u128,
     pub speech_output_transitions: usize,
     pub completed_playback_intervals: usize,
     pub playback_duration_ns: u128,
@@ -375,6 +380,7 @@ mod tests {
         assert_eq!(summary.event_count, 11);
         assert_eq!(summary.activity_changes, 2);
         assert_eq!(summary.completed_activity_intervals, 1);
+        assert_eq!(summary.activity_duration_ns, 2_600_000);
         assert_eq!(summary.speech_output_transitions, 5);
         assert_eq!(summary.completed_playback_intervals, 1);
         assert_eq!(summary.playback_duration_ns, 1_700_000);
@@ -412,6 +418,7 @@ mod tests {
         assert_eq!(summary.event_count, 9);
         assert_eq!(summary.activity_changes, 3);
         assert_eq!(summary.completed_activity_intervals, 2);
+        assert_eq!(summary.activity_duration_ns, 160);
         assert_eq!(summary.speech_output_transitions, 5);
         assert_eq!(summary.completed_playback_intervals, 1);
         assert_eq!(summary.playback_duration_ns, 70);
