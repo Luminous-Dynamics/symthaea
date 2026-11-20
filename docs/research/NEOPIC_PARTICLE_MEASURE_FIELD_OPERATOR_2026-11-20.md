@@ -195,7 +195,29 @@ Measure the complete particle-field step:
 | exact paper reproduction | Not performed |
 | head-to-head tournament | Not performed |
 
-## 8. Source identity and prior-art update (20 November 2026)
+## 8. Normalization, topology and NUFFT qualification
+
+The paper's own implementation details expose an important experiment that should be elevated to a first-class reproduction gate:
+
+- Section 4.2 normalizes positions per sample and every timestep with an unpadded min–max bounding box.
+- Section 4.3 uses a single linear lifting on normalized coordinates. The paper explicitly states this lifting is not periodic.
+- Appendix A.1 says the error analysis is written for a fixed normalization; the min–max bounding-box dependence on the configuration and on particle count is an additional effect not covered by the analysis.
+- Remark 16 states that a linear lifting of raw periodic coordinates is discontinuous across the periodic boundary, and that the Lipschitz lemma applies only away from the seam. A periodic embedding such as (sin x, cos x) satisfies the stated periodic Lipschitz assumption for periodic problems, but is not appropriate for open-boundary inputs without additional non-periodic information.
+- The NUFFT path uses an oversampled uniform internal grid for spreading, FFT and interpolation. Its complexity is O(N_p) only for fixed mode count, architecture and tolerance, with a nonzero fixed cost term. Record the actual oversampling, kernel width, tolerance, mode count, planning and amortisation.
+
+These are not speculative critiques: the normalization and lifting caveats are explicitly acknowledged in the paper. Their practical impact on the reported experiments still requires independent reproduction. An additional Pith T0 review flags them as major theoretical issues, but its page states that no human expert review had occurred; treat that report as an independent AI-generated audit hypothesis, not peer-reviewed confirmation.
+
+Tracking: [NEOPIC periodic topology and normalization audit #12980](https://github.com/Luminous-Dynamics/symthaea/issues/12980).
+
+### Required falsification experiments
+
+1. Move a particle through x=0/L while holding the other particles fixed; measure field/force jumps at fixed probe particles, local derivative jumps and resulting trajectory divergence.
+2. Perturb one extremal particle by epsilon; record the change to every normalized coordinate and the field output at unaffected particles.
+3. Repeat across N_p and independent seeds; estimate operator Lipschitz ratios under both max-displacement and average-displacement metrics.
+4. Compare the exact source implementation with fixed domain normalization plus periodic feature lifting. Keep open-boundary variants separate and use an explicitly padded domain / free-space treatment where appropriate.
+5. Re-run teacher-forced and in-loop particle-count scaling on independent teacher trajectories; do not claim the theorem transfers to a modified architecture without redoing the proof or qualifying the claim.
+
+## 9. Source identity and prior-art update (20 November 2026)
 
 The immutable tag targets were resolved directly from the public Git references:
 
@@ -207,6 +229,6 @@ The immutable tag targets were resolved directly from the public Git references:
 
 These are annotated tags dereferenced to their commit targets. Dataset/checkpoint/HDF5 provenance and usage/redistribution rights still need independent admission.
 
-## 9. Claim ceiling
+## 10. Claim ceiling
 
 This is a reproduction protocol and source admission record. It does not claim NEOPIC was reproduced, trained, beaten, integrated into Symthaea or validated for plasma control.
