@@ -19,6 +19,9 @@ on:
       - "data/research/precursor_genome_source_manifest_v0_1.json"
       - "data/research/sc_onset_in_situ_validation_v0_1.json"
       - "data/research/sc_onset_pair_holdout_manifest_v0_1.json"
+      - "data/schemas/sc_onset_training_cohort_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/onset_training_cohort_smoke_v0_1.json"
+      - "tools/superconductivity-discovery-harness/fixtures/onset_holdout_leakage_suite_v0_1.json"
       - "research/superconductivity/capability_experiment_planning/precursor_genome/**"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
@@ -42,6 +45,9 @@ on:
       - "data/research/precursor_genome_source_manifest_v0_1.json"
       - "data/research/sc_onset_in_situ_validation_v0_1.json"
       - "data/research/sc_onset_pair_holdout_manifest_v0_1.json"
+      - "data/schemas/sc_onset_training_cohort_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/onset_training_cohort_smoke_v0_1.json"
+      - "tools/superconductivity-discovery-harness/fixtures/onset_holdout_leakage_suite_v0_1.json"
       - "research/superconductivity/capability_experiment_planning/precursor_genome/**"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
@@ -84,6 +90,7 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/spatial_reaction_diffusion_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/precursor_genome_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/onset_holdout_leakage_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -120,6 +127,18 @@ jobs:
 
       - name: Test source-locked Precursor Genome cohort auditor
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_audit
+
+      - name: Test pair-level onset holdout leakage auditor
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_holdout_leakage_audit
+
+      - name: Run synthetic pair-level onset holdout leakage audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_holdout_leakage_audit -- \\
+            --schema data/schemas/sc_onset_training_cohort_v0_1.schema.json \\
+            --holdout data/research/sc_onset_pair_holdout_manifest_v0_1.json \\
+            --cohort tools/superconductivity-discovery-harness/fixtures/onset_training_cohort_smoke_v0_1.json \\
+            --out "$RUNNER_TEMP/sc-onset-holdout-leakage-smoke.json"
+          cat "$RUNNER_TEMP/sc-onset-holdout-leakage-smoke.json"
 
       - name: Exercise Precursor Genome audit CLI
         run: cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_audit -- --help
@@ -265,6 +284,7 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_spatial_reaction_diffusion_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_holdout_leakage_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -308,6 +328,10 @@ jobs:
             sha256sum data/research/precursor_genome_source_manifest_v0_1.json
             sha256sum data/research/sc_onset_in_situ_validation_v0_1.json
             sha256sum data/research/sc_onset_pair_holdout_manifest_v0_1.json
+            sha256sum data/schemas/sc_onset_training_cohort_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/onset_training_cohort_smoke_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/onset_holdout_leakage_suite_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/onset_holdout_leakage_audit.rs
             sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_audit.rs
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_smoke_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_suite_v0_1.json
@@ -340,6 +364,7 @@ jobs:
             ${{ runner.temp }}/sc-transport-kinetic-smoke.json
             ${{ runner.temp }}/sc-spatial-reaction-diffusion-smoke.json
             ${{ runner.temp }}/sc-onset-prediction-smoke.json
+            ${{ runner.temp }}/sc-onset-holdout-leakage-smoke.json
             ${{ runner.temp }}/sc-thermochemical-unbalanced-negative.log
             ${{ runner.temp }}/sc-thermochemical-charge-negative.log
             ${{ runner.temp }}/sc-thermochemical-disconnected-negative.log
