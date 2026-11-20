@@ -95,7 +95,6 @@ fn run() -> Result<(), String> {
 
 fn print_usage() {
     println!(
-        "Usage: mycelial_presence_demo --trace PATH [--output PATH] [--reduced-motion]\n\
-         Replays a validated trace and exports a self-contained Mycelial Presence SVG."
+        "Usage: mycelial_presence_demo --trace PATH [--output PATH] [--reduced-motion]\nReplays a validated trace and exports a self-contained Mycelial Presence SVG."
     );
 }
