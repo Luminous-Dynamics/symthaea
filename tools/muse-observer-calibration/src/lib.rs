@@ -158,6 +158,17 @@ pub struct BootstrapIntervalV1 {
     pub valid_replicates: u16,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NegativeFamilyMetricsV1 {
+    pub negative_family: String,
+    pub total_negative_examples: u64,
+    pub measured_negative_examples: u64,
+    pub false_support_count: u64,
+    pub false_support_rate_all_negatives: Option<f64>,
+    pub false_support_rate_measured_negatives: Option<f64>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClusterBootstrapMetricsV1 {
@@ -194,6 +205,7 @@ pub struct HeldOutMetricsV1 {
     pub false_support_rate_all_negatives: Option<f64>,
     pub false_support_rate_measured_negatives: Option<f64>,
     pub event_recall: Option<f64>,
+    pub negative_family_metrics: Vec<NegativeFamilyMetricsV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -662,6 +674,33 @@ fn held_out_metrics(
     let true_support = supported.iter().filter(|row| row.event_present).count() as u64;
     let false_support = supported.len() as u64 - true_support;
     let measured_negatives = measured.iter().filter(|row| !row.event_present).count() as u64;
+    let mut negative_family_rows = std::collections::BTreeMap::<String, Vec<&CalibrationObservationV1>>::new();
+    for row in rows.iter().filter(|row| !row.event_present) {
+        let family = row.negative_family.as_deref().unwrap_or("unclassified_negative");
+        negative_family_rows.entry(family.to_string()).or_default().push(*row);
+    }
+    let negative_family_metrics = negative_family_rows.into_iter().map(|(family, family_rows)| {
+        let family_measured = family_rows.iter()
+            .filter(|row| row.measurement_state == MeasurementStateV1::Measured)
+            .collect::<Vec<_>>();
+        let family_false_support = family_measured.iter()
+            .filter(|row| threshold_value.is_some_and(|t|
+                predict(model, row.raw_score_db.expect("measured row has score")) >= t
+            ))
+            .count() as u64;
+        NegativeFamilyMetricsV1 {
+            negative_family: family,
+            total_negative_examples: family_rows.len() as u64,
+            measured_negative_examples: family_measured.len() as u64,
+            false_support_count: family_false_support,
+            false_support_rate_all_negatives: (!family_rows.is_empty()).then_some(
+                family_false_support as f64 / family_rows.len() as f64
+            ),
+            false_support_rate_measured_negatives: (!family_measured.is_empty()).then_some(
+                family_false_support as f64 / family_measured.len() as f64
+            ),
+        }
+    }).collect::<Vec<_>>();
     HeldOutMetricsV1 {
         held_out_dataset_sha256: held_out_dataset_sha256.into(),
         cluster_bootstrap: ClusterBootstrapMetricsV1::default(),
@@ -685,6 +724,7 @@ fn held_out_metrics(
         false_support_rate_all_negatives: (negative_total > 0).then_some(false_support as f64 / negative_total as f64),
         false_support_rate_measured_negatives: (measured_negatives > 0).then_some(false_support as f64 / measured_negatives as f64),
         event_recall: (positive_total > 0).then_some(true_support as f64 / positive_total as f64),
+        negative_family_metrics,
     }
 }
 
@@ -1116,6 +1156,34 @@ mod tests {
         row.raw_score_db = Some(7.0);
         data.dataset_sha256 = dataset_digest(&data).unwrap();
         assert!(validate_dataset_v1(&data).is_err());
+    }
+
+    #[test]
+    fn held_out_false_support_is_reported_by_negative_family() {
+        let mut data = dataset();
+        let negatives = data.observations.iter_mut().filter(|row|
+            row.split == SplitV1::HeldOut && !row.event_present
+        ).collect::<Vec<_>>();
+        for (index, row) in negatives.iter_mut().enumerate() {
+            row.negative_family = Some(if index < 3 {
+                "octave_collision".into()
+            } else {
+                "cross_part_contamination".into()
+            });
+        }
+        // One held-out cross-part negative is deliberately assigned a
+        // high-salience feature to exercise family-specific false support.
+        negatives[3].raw_score_db = Some(16.0);
+        seal_calibration_dataset_v1(&mut data).unwrap();
+        let bundle = run_calibration_v1(&data, &contract()).unwrap();
+        let metrics = &bundle.held_out.negative_family_metrics;
+        assert_eq!(metrics.len(), 2);
+        let octave = metrics.iter().find(|m| m.negative_family == "octave_collision").unwrap();
+        let cross_part = metrics.iter().find(|m| m.negative_family == "cross_part_contamination").unwrap();
+        assert_eq!(octave.false_support_count, 0);
+        assert_eq!(cross_part.false_support_count, 1);
+        assert_eq!(cross_part.measured_negative_examples, 3);
+        assert!((cross_part.false_support_rate_measured_negatives.unwrap() - 1.0 / 3.0).abs() < 1e-9);
     }
 
     #[test]
