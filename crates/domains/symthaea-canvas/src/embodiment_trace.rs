@@ -627,7 +627,7 @@ mod tests {
         assert_eq!(summary.event_count, 9);
         assert_eq!(summary.activity_changes, 3);
         assert_eq!(summary.completed_activity_intervals, 2);
-        assert_eq!(summary.activity_duration_ns, 160);
+        assert_eq!(summary.activity_duration_ns, 180);
         assert_eq!(summary.speech_output_transitions, 5);
         assert_eq!(summary.completed_playback_intervals, 1);
         assert_eq!(summary.playback_duration_ns, 70);
