@@ -69,6 +69,17 @@ The paper defines the reference temperature as the first thermally accessible tr
 
 The reported dwell setpoint is calculated by rounding the Tammann estimate down to 100 °C increments and clipping it to 200–1,100 °C. The audit preserves `synthesis.heating_temperature` as recorded, reports its missingness and histogram, and never recomputes a missing value from `melting_point_c`. It does not claim that the recorded setpoint alone is the specimen's complete thermal history.
 
+## Comparison with the 2026 frontier
+
+The adjacent literature is solving related but different tasks. These comparisons should be treated as separate benchmark tracks:
+
+- **Reaction onset:** Walters et al. (2026-11-17) report 88 °C MAE for a three-feature log-normal AFT model on 26 held-out in-situ measurements, against 131 °C for Tammann's rule. This is the directly comparable onset benchmark. The 32-feature variant reports 84 °C MAE but 122 °C RMSE, worse than the compact model's 101 °C RMSE, and does not establish a statistically clear paired improvement.
+- **Spatial kinetic selectivity:** Karan et al., *Nature Materials* (28 April 2026), combine first-principles thermodynamics with Onsager transport coefficients derived from ML-potential molecular dynamics and a 3D cellular reaction framework (ReactCA). In Ba–Ti–O they compare time/temperature-dependent phase formation against carefully characterized experiments; cross-ion transport terms are important to quantitative phase selectivity. The Symthaea reduced competing-route model and fixed-domain 1D finite-volume reference are not ReactCA reproductions. A fair next comparison requires matched Ba–Ti–O precursor ratios, thermal profiles, phase-fraction trajectories and the published source data.
+- **Thermodynamic synthesizability:** Schlesinger et al. (2026) evaluate four synthesis prediction models against convex-hull stability and reaction thermodynamic selectivity, finding that models generally overpredict synthesis likelihood. This motivates measuring false-positive rates, calibration and thermodynamic consistency—not just ranking successful synthesis examples.
+- **Superconductor screening:** BEE-NET reports 0.87 K MAE relative to DFT-based Allen–Dynes calculations, a 99.4% true-negative rate and a pipeline screening more than 1.3 million structures to 741 stable candidates, with two newly synthesized superconductors experimentally confirmed. Its 0.87 K error is against computed labels, not experimental (T_c), and is not comparable to reaction-onset MAE in °C. It is relevant as a model of how computation, uncertainty and experimental confirmation can be connected.
+
+**Where Symthaea should aim to differentiate:** not another isolated candidate ranker, but an evidence-carrying decision stack that links censored onset distributions, balanced thermochemical pathways, correlated-ion transport, spatial reaction kinetics and cost-constrained next-experiment selection. This is the target architecture; the current code establishes evidence and benchmark contracts, not an achieved advantage over any of these systems.
+
 ## Competitive benchmark ladder
 
 ### Reproduction before beating SOTA
