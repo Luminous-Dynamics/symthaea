@@ -1,4 +1,4 @@
-//! CLI for the deterministic MUSE v1 velocity edit evaluator.
+//! CLI for the deterministic MUSE v1 symbolic edit evaluator.
 
 use std::{env, fs, path::PathBuf};
 use symthaea_muse::edit_evidence::evaluate_symbolic_case;
@@ -32,7 +32,7 @@ fn run() -> Result<(), String> {
     let source = fs::read(source_path).map_err(|error| format!("read source Score: {error}"))?;
     let candidate = fs::read(candidate_path).map_err(|error| format!("read candidate Score: {error}"))?;
     let audio = audio_path.map(fs::read).transpose().map_err(|error| format!("read candidate audio: {error}"))?;
-    let result = evaluate_velocity_case(&case, &source, &candidate, audio.as_deref())?;
+    let result = evaluate_symbolic_case(&case, &source, &candidate, audio.as_deref())?;
     let rendered = serde_json::to_vec_pretty(&result)
         .map_err(|error| format!("serialize result: {error}"))?;
     if let Some(path) = output_path {
