@@ -15,6 +15,10 @@ on:
       - "data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json"
       - "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json"
       - "data/schemas/superconductivity_onset_prediction_v0_1.schema.json"
+      - "data/schemas/precursor_genome_source_manifest_v0_1.schema.json"
+      - "data/research/precursor_genome_source_manifest_v0_1.json"
+      - "data/research/sc_onset_in_situ_validation_v0_1.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome/**"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
@@ -33,6 +37,10 @@ on:
       - "data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json"
       - "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json"
       - "data/schemas/superconductivity_onset_prediction_v0_1.schema.json"
+      - "data/schemas/precursor_genome_source_manifest_v0_1.schema.json"
+      - "data/research/precursor_genome_source_manifest_v0_1.json"
+      - "data/research/sc_onset_in_situ_validation_v0_1.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome/**"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
@@ -73,6 +81,7 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/transport_kinetic_selectivity_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/spatial_reaction_diffusion_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/precursor_genome_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -106,6 +115,12 @@ jobs:
 
       - name: Test censoring-aware onset prediction evaluation
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit
+
+      - name: Test source-locked Precursor Genome cohort auditor
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_audit
+
+      - name: Exercise Precursor Genome audit CLI
+        run: cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_audit -- --help
 
       - name: Run metrics runner on synthetic plumbing fixture
         run: |
@@ -247,6 +262,7 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_transport_kinetic_selectivity_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_spatial_reaction_diffusion_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -286,6 +302,10 @@ jobs:
             sha256sum tools/superconductivity-discovery-harness/fixtures/spatial_reaction_diffusion_suite_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/src/bin/spatial_reaction_diffusion_audit.rs
             sha256sum data/schemas/superconductivity_onset_prediction_v0_1.schema.json
+            sha256sum data/schemas/precursor_genome_source_manifest_v0_1.schema.json
+            sha256sum data/research/precursor_genome_source_manifest_v0_1.json
+            sha256sum data/research/sc_onset_in_situ_validation_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_audit.rs
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_smoke_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_suite_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
