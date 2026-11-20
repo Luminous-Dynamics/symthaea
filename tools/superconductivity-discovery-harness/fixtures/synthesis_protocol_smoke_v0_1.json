@@ -1,0 +1,172 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_id": "fixture-pqp-metastable-demo",
+  "protocol_revision": "fixture-v0",
+  "fixture_only": true,
+  "target_material": {
+    "material_id": "fixture-hg1223",
+    "formula_as_reported": "HgBa2Ca2Cu3O8+delta",
+    "target_state": "synthetic pressure-retained phase",
+    "target_structure": "tetragonal synthetic target",
+    "target_properties": [
+      "resistive_onset_Tc"
+    ]
+  },
+  "protocol_source": {
+    "document_id": "synthetic fixture",
+    "source_revision": "fixture-v0",
+    "source_locator": "fixture only",
+    "source_sha256": null
+  },
+  "precursors": [
+    {
+      "precursor_id": "fixture-starting-crystal",
+      "formula_as_reported": "HgBa2Ca2Cu3O8+delta",
+      "source_lot_id": "fixture-lot-1",
+      "purity_percent": null,
+      "quantity_value": null,
+      "quantity_unit": null,
+      "identity_status": "reported"
+    }
+  ],
+  "planned_steps": [
+    {
+      "step_id": "s1",
+      "sequence": 0,
+      "operation": "pressure_hold",
+      "inputs": [
+        "fixture-starting-crystal"
+      ],
+      "outputs": [
+        "pressure-conditioned-state"
+      ],
+      "setpoints": {
+        "temperature_k": 4.2,
+        "pressure_gpa": 18.9,
+        "duration_s": null,
+        "heating_rate_k_min": null,
+        "cooling_rate_k_min": null,
+        "pressure_rate_gpa_s": null,
+        "atmosphere": null,
+        "flow_rate": null,
+        "pH": null,
+        "geometry": "synthetic DAC fixture",
+        "notes": "abstract condition only"
+      },
+      "safety_review_required": true
+    },
+    {
+      "step_id": "s2",
+      "sequence": 1,
+      "operation": "decompress",
+      "inputs": [
+        "pressure-conditioned-state"
+      ],
+      "outputs": [
+        "ambient-pressure-metastable-state"
+      ],
+      "setpoints": {
+        "temperature_k": 4.2,
+        "pressure_gpa": 0,
+        "duration_s": null,
+        "heating_rate_k_min": null,
+        "cooling_rate_k_min": null,
+        "pressure_rate_gpa_s": null,
+        "atmosphere": null,
+        "flow_rate": null,
+        "pH": null,
+        "geometry": "synthetic DAC fixture",
+        "notes": "abstract pressure-release target"
+      },
+      "safety_review_required": true
+    }
+  ],
+  "execution_runs": [
+    {
+      "run_id": "fixture-run-1",
+      "status": "completed",
+      "instrument_ids": [
+        "fixture-DAC"
+      ],
+      "automation_revision": null,
+      "operator_role": "synthetic",
+      "started_at": null,
+      "completed_at": null,
+      "steps": [
+        {
+          "step_id": "s1",
+          "execution_state": "sensor_verified",
+          "actual": {
+            "temperature_k": 4.2,
+            "pressure_gpa": 18.9,
+            "duration_s": null,
+            "heating_rate_k_min": null,
+            "cooling_rate_k_min": null,
+            "pressure_rate_gpa_s": null,
+            "atmosphere": null,
+            "flow_rate": null,
+            "pH": null,
+            "notes": "synthetic readback"
+          },
+          "actual_evidence": {
+            "evidence_kind": "sensor_trace",
+            "source_id": "fixture-source-only",
+            "source_locator": "fixture page 3",
+            "digest_sha256": null
+          },
+          "failure_reason": null
+        },
+        {
+          "step_id": "s2",
+          "execution_state": "sensor_verified",
+          "actual": {
+            "temperature_k": 4.2,
+            "pressure_gpa": 0,
+            "duration_s": null,
+            "heating_rate_k_min": null,
+            "cooling_rate_k_min": null,
+            "pressure_rate_gpa_s": null,
+            "atmosphere": null,
+            "flow_rate": null,
+            "pH": null,
+            "notes": "synthetic readback"
+          },
+          "actual_evidence": {
+            "evidence_kind": "controller_log",
+            "source_id": "fixture-source-only",
+            "source_locator": "fixture page 3",
+            "digest_sha256": null
+          },
+          "failure_reason": null
+        }
+      ]
+    }
+  ],
+  "outcome_records": [
+    {
+      "outcome_id": "fixture-outcome-1",
+      "run_id": "fixture-run-1",
+      "sample_id": "fixture-hg1223-s4",
+      "realized_phases": [
+        {
+          "phase_id": "fixture-retained-phase",
+          "identity_status": "tentative",
+          "formula": "HgBa2Ca2Cu3O8+delta",
+          "structure": "tetragonal",
+          "phase_fraction_percent": null,
+          "microstructure_notes": "synthetic only"
+        }
+      ],
+      "yield_fraction": null,
+      "characterization_event_ids": [
+        "fixture-hg1223-pqp-onset-ambient"
+      ],
+      "failure_mode": null,
+      "rights_review": "cleared_for_metadata"
+    }
+  ],
+  "rights_review": "cleared_for_metadata",
+  "source_ids": [
+    "fixture-source-only"
+  ]
+}

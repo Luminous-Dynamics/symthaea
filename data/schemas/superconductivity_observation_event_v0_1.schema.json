@@ -1,0 +1,1307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_observation_event_v0_1.schema.json",
+  "title": "Superconductivity Observation Event v0.1",
+  "description": "One condition-bound assertion, not a material-level aggregate.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "observation_id",
+    "material",
+    "sample",
+    "source",
+    "assertion",
+    "conditions",
+    "provenance",
+    "fixture_only"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "material": {
+      "type": "object",
+      "required": [
+        "material_id",
+        "formula_as_reported",
+        "identity_status"
+      ],
+      "properties": {
+        "material_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formula_as_reported": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formula_normalized": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity_status": {
+          "enum": [
+            "resolved",
+            "alias_unresolved",
+            "composition_only",
+            "unresolved"
+          ]
+        },
+        "state_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "structure_prototype": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "space_group": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "sample": {
+      "type": "object",
+      "required": [
+        "identity_status",
+        "sample_form"
+      ],
+      "properties": {
+        "identity_status": {
+          "enum": [
+            "matched_specimen",
+            "matched_batch",
+            "ambiguous",
+            "unresolved",
+            "not_applicable"
+          ]
+        },
+        "sample_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "batch_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sample_form": {
+          "enum": [
+            "single_crystal",
+            "polycrystal",
+            "thin_film",
+            "powder",
+            "wire",
+            "tape",
+            "bulk_unspecified",
+            "device",
+            "not_reported",
+            "not_applicable"
+          ]
+        },
+        "substrate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase_fraction_percent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "purity_percent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "stoichiometry_status": {
+          "enum": [
+            "measured",
+            "nominal",
+            "refined",
+            "unknown",
+            "not_applicable"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "document_id",
+        "source_revision",
+        "locator"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document_id": {
+          "type": "object",
+          "required": [
+            "kind",
+            "identifier"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "doi",
+                "arxiv",
+                "isbn",
+                "report_id",
+                "repository_commit",
+                "dataset_id",
+                "other"
+              ]
+            },
+            "identifier": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_content_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "locator": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "table": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "figure": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "figure_panel": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "supplementary_file": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "row_or_record_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_span_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          },
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": [
+                "page"
+              ],
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "section"
+              ],
+              "properties": {
+                "section": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "table"
+              ],
+              "properties": {
+                "table": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "figure"
+              ],
+              "properties": {
+                "figure": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "supplementary_file"
+              ],
+              "properties": {
+                "supplementary_file": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "row_or_record_id"
+              ],
+              "properties": {
+                "row_or_record_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        },
+        "rights_scope": {
+          "enum": [
+            "metadata_only",
+            "derived_data_reuse",
+            "open_source_passage",
+            "restricted_source",
+            "unknown"
+          ]
+        },
+        "source_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "external_catalog": {
+          "type": "object",
+          "required": [
+            "library_id",
+            "external_record_id",
+            "api_version",
+            "data_version",
+            "snapshot_id"
+          ],
+          "properties": {
+            "library_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "external_record_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "api_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "data_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "snapshot_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retrieved_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "etag": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "x_data_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "external_parent_ids": {
+              "type": "object",
+              "properties": {
+                "paper_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "material_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sample_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "result_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "event_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "query_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "assertion": {
+      "type": "object",
+      "required": [
+        "property_code",
+        "origin",
+        "detection_status",
+        "unit",
+        "measurement_scope"
+      ],
+      "properties": {
+        "property_code": {
+          "enum": [
+            "Tc",
+            "Hc",
+            "Hc1",
+            "Hc2",
+            "Jc",
+            "Je",
+            "gap",
+            "coherence_length",
+            "penetration_depth",
+            "electron_phonon_lambda",
+            "omega_log",
+            "energy_above_hull",
+            "other",
+            "pairing_energy",
+            "pair_transfer_effective_charge",
+            "superfluid_stiffness",
+            "superfluid_density",
+            "phase_correlation_length",
+            "phase_correlation_time",
+            "josephson_coupling_energy",
+            "vortex_density",
+            "kinetic_inductance"
+          ]
+        },
+        "origin": {
+          "enum": [
+            "observed",
+            "calculated",
+            "predicted",
+            "inferred"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detection_status": {
+          "enum": [
+            "detected",
+            "not_detected",
+            "ambiguous",
+            "not_applicable"
+          ]
+        },
+        "tc_criterion": {
+          "enum": [
+            "onset",
+            "midpoint",
+            "zero_resistance",
+            "diamagnetic_onset",
+            "meissner_response",
+            "heat_capacity_anomaly",
+            "thermodynamic_transition",
+            "spectroscopic_gap",
+            "reported_unspecified",
+            "not_applicable"
+          ]
+        },
+        "measurement_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tested_window": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "temperature_min_k",
+            "temperature_max_k"
+          ],
+          "properties": {
+            "temperature_min_k": {
+              "type": "number",
+              "minimum": 0
+            },
+            "temperature_max_k": {
+              "type": "number",
+              "minimum": 0
+            },
+            "field_max_t": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "method": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "uncertainty": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "standard_deviation",
+                "standard_error",
+                "confidence_interval",
+                "credible_interval",
+                "range",
+                "unknown"
+              ]
+            },
+            "lower": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "upper": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "coverage": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "measurement_scope": {
+          "type": "string",
+          "enum": [
+            "local_probe",
+            "mesoscopic",
+            "bulk",
+            "device",
+            "theoretical_model",
+            "unknown"
+          ],
+          "description": "Spatial/physical scope of this assertion. A local pairing signature is not a bulk superconducting transition."
+        },
+        "measurement_scope_description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "conditions": {
+      "type": "object",
+      "required": [
+        "pressure"
+      ],
+      "properties": {
+        "pressure": {
+          "type": "object",
+          "required": [
+            "semantics",
+            "value_gpa"
+          ],
+          "properties": {
+            "semantics": {
+              "enum": [
+                "explicit_ambient",
+                "applied",
+                "chemical",
+                "unknown"
+              ]
+            },
+            "value_gpa": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "pressure_method": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "chemical_pressure_description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "measurement_temperature_k": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "magnetic_field_t": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "field_orientation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_density_a_m2": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "geometry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "doping_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "strain_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "extraction_method",
+        "review_status",
+        "independence_group_id"
+      ],
+      "properties": {
+        "extraction_method": {
+          "enum": [
+            "human_transcription",
+            "human_review",
+            "model_extraction",
+            "database_import",
+            "calculation_pipeline",
+            "manual_curated",
+            "unknown"
+          ]
+        },
+        "extraction_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "extraction_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "extraction_confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "review_status": {
+          "enum": [
+            "unreviewed",
+            "model_checked",
+            "human_source_checked",
+            "independently_adjudicated",
+            "disputed",
+            "pending"
+          ]
+        },
+        "reviewer_independence": {
+          "enum": [
+            "independent_domain_review",
+            "same_team_review",
+            "model_only",
+            "not_recorded",
+            "not_applicable"
+          ]
+        },
+        "independence_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "duplicate_of": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_group_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rights_review": {
+          "enum": [
+            "cleared_for_metadata",
+            "cleared_for_derived_data",
+            "restricted",
+            "pending",
+            "unknown"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "process_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "step_id",
+          "sequence",
+          "operation",
+          "execution_state",
+          "target",
+          "actual",
+          "actual_source"
+        ],
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation": {
+            "enum": [
+              "pressure_load",
+              "pressure_hold",
+              "decompression",
+              "temperature_ramp",
+              "temperature_hold",
+              "heat",
+              "cool",
+              "quench",
+              "anneal",
+              "thermal_cycle",
+              "mix",
+              "mill",
+              "deposit",
+              "sinter",
+              "other"
+            ]
+          },
+          "execution_state": {
+            "enum": [
+              "planned",
+              "commanded",
+              "executed_unverified",
+              "sensor_verified",
+              "failed",
+              "aborted"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "pressure_gpa": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "temperature_k": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "pressure_change_rate_gpa_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "temperature_ramp_k_min": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "atmosphere": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "actual": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "pressure_gpa": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "temperature_k": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "pressure_change_rate_gpa_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "temperature_ramp_k_min": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "atmosphere": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "actual_source": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "measurement_status": {
+                "enum": [
+                  "sensor_measured",
+                  "controller_readback",
+                  "operator_recorded",
+                  "unknown"
+                ]
+              },
+              "locator": {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "section": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "table": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "figure": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "row_or_record_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "source_id",
+              "measurement_status",
+              "locator"
+            ],
+            "additionalProperties": false
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "enum": [
+                    "planned",
+                    "commanded"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actual": {
+                  "type": "null"
+                },
+                "actual_source": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "const": "sensor_verified"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actual": {
+                  "type": "object"
+                },
+                "actual_source": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "const": "executed_unverified"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actual": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "enum": [
+                    "failed",
+                    "aborted"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "failure_reason"
+              ],
+              "properties": {
+                "failure_reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "Tc"
+              },
+              "measurement_scope": {
+                "const": "local_probe"
+              }
+            },
+            "required": [
+              "property_code",
+              "measurement_scope"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "measurement_scope": {
+                "enum": [
+                  "mesoscopic",
+                  "bulk",
+                  "device",
+                  "theoretical_model",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "Tc"
+              },
+              "tc_criterion": {
+                "const": "spectroscopic_gap"
+              }
+            },
+            "required": [
+              "property_code",
+              "tc_criterion"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "tc_criterion": {
+                "not": {
+                  "const": "spectroscopic_gap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "pairing_energy"
+              },
+              "origin": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "property_code",
+              "origin"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "unit": {
+                "const": "meV"
+              },
+              "measurement_scope": {
+                "enum": [
+                  "local_probe",
+                  "mesoscopic",
+                  "bulk"
+                ]
+              }
+            },
+            "required": [
+              "measurement_scope"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "Tc"
+              },
+              "origin": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "property_code",
+              "origin"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "measurement_scope": {
+                "enum": [
+                  "mesoscopic",
+                  "bulk",
+                  "device"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
