@@ -54,17 +54,30 @@ fn validate_score(score: &Score, label: &str) -> Result<(), String> {
         || score.key.tonic.value() > 11
         || score.total_beats.den() <= 0
         || score.total_beats.num() < 0
+        || score.total_beats.num() > 1_000_000_000
+        || score.total_beats.den() > 1_000_000
     {
-        return Err(format!("{label} has invalid tempo, key, meter or total duration"));
+        return Err(format!("{label} has invalid tempo, key, meter or bounded total duration"));
     }
     for (index, note) in score.notes.iter().enumerate() {
         if note.pitch.midi() > 127
             || note.onset.den() <= 0 || note.onset.num() < 0
+            || note.onset.num() > 1_000_000_000 || note.onset.den() > 1_000_000
             || note.duration.den() <= 0 || note.duration.num() <= 0
+            || note.duration.num() > 1_000_000_000 || note.duration.den() > 1_000_000
             || !note.velocity.is_finite() || !(0.0..=1.0).contains(&note.velocity)
             || !note.section_intensity.is_finite() || note.section_intensity < 0.0
         {
-            return Err(format!("{label}.notes[{index}] has invalid MIDI pitch, rational timing or dynamics"));
+            return Err(format!("{label}.notes[{index}] has invalid MIDI pitch, bounded rational timing or dynamics"));
+        }
+        let note_end = note.onset + note.duration;
+        if cmp_fraction(
+            note_end.num(),
+            note_end.den(),
+            score.total_beats.num(),
+            score.total_beats.den(),
+        ) == Ordering::Greater {
+            return Err(format!("{label}.notes[{index}] ends beyond Score.total_beats"));
         }
     }
     Ok(())
@@ -275,10 +288,13 @@ fn parse_scopes(value: &Value, label: &str) -> Result<Vec<Scope>, String> {
         let start_den = integer_field(start, "denominator", "scope.start")?;
         let end_num = integer_field(end, "numerator", "scope.end")?;
         let end_den = integer_field(end, "denominator", "scope.end")?;
-        if !(0..=65534).contains(&part) || start_num < 0 || end_num < 0
+        if !(0..=65534).contains(&part)
+            || start_num < 0 || end_num < 0
+            || start_num > 1_000_000_000 || end_num > 1_000_000_000
             || start_den <= 0 || end_den <= 0
+            || start_den > 1_000_000 || end_den > 1_000_000
         {
-            return Err(format!("{item} has an invalid part or rational time"));
+            return Err(format!("{item} has an invalid part or bounded rational time"));
         }
         if cmp_fraction(start_num, start_den, end_num, end_den) != Ordering::Less {
             return Err(format!("{item} must have start < end"));
@@ -294,16 +310,41 @@ fn parse_scopes(value: &Value, label: &str) -> Result<Vec<Scope>, String> {
     Ok(scopes)
 }
 
-fn scope_contains(scope: Scope, note: &ScoreNote) -> bool {
-    note.part.0 == scope.part
-        && cmp_fraction(scope.start_num, scope.start_den, note.onset.num(), note.onset.den())
-            != Ordering::Greater
-        && cmp_fraction(note.onset.num(), note.onset.den(), scope.end_num, scope.end_den)
-            == Ordering::Less
+fn scope_intersects(scope: Scope, note: &ScoreNote) -> bool {
+    if note.part.0 != scope.part {
+        return false;
+    }
+    let note_end = note.onset + note.duration;
+    cmp_fraction(note.onset.num(), note.onset.den(), scope.end_num, scope.end_den)
+        == Ordering::Less
+        && cmp_fraction(note_end.num(), note_end.den(), scope.start_num, scope.start_den)
+            == Ordering::Greater
 }
 
-fn in_scopes(scopes: &[Scope], note: &ScoreNote) -> bool {
-    scopes.iter().copied().any(|scope| scope_contains(scope, note))
+fn scope_contains(scope: Scope, note: &ScoreNote) -> bool {
+    if !scope_intersects(scope, note) {
+        return false;
+    }
+    let note_end = note.onset + note.duration;
+    cmp_fraction(scope.start_num, scope.start_den, note.onset.num(), note.onset.den())
+        != Ordering::Greater
+        && cmp_fraction(note_end.num(), note_end.den(), scope.end_num, scope.end_den)
+            != Ordering::Greater
+}
+
+/// A note must be wholly contained in a matching scope or wholly outside it.
+/// Boundary-crossing events are ambiguous and fail closed.
+fn in_scopes(scopes: &[Scope], note: &ScoreNote, label: &str) -> Result<bool, String> {
+    let mut contained = false;
+    for scope in scopes.iter().copied() {
+        if scope_intersects(scope, note) {
+            if !scope_contains(scope, note) {
+                return Err(format!("{label}: note crosses an authorized time-scope boundary"));
+            }
+            contained = true;
+        }
+    }
+    Ok(contained)
 }
 
 fn scopes_overlap(a: Scope, b: Scope) -> bool {
@@ -446,7 +487,7 @@ pub fn evaluate_symbolic_case(
     let case_digest = case_sha256(&case)?;
     let instruction = required(&case, "instruction", "case")?;
     let operation = string_field(instruction, "operation_family", "instruction")?;
-    if !matches!(operation.as_str(), "velocity" | "pitch") {
+    if !matches!(operation.as_str(), "velocity" | "pitch" | "duration") {
         return Err(format!("abstain: operation family {operation} is not implemented"));
     }
 
@@ -561,8 +602,8 @@ pub fn evaluate_symbolic_case(
     let mut edit_pass = true;
 
     for (si, source_note) in source.notes.iter().enumerate() {
-        let in_target = in_scopes(&target_scopes, source_note);
-        let in_protected = in_scopes(&protected_scopes, source_note);
+        let in_target = in_scopes(&target_scopes, source_note, "target scope")?;
+        let in_protected = in_scopes(&protected_scopes, source_note, "protected scope")?;
         if in_target && in_protected {
             return Err("source note falls inside both target and protected scopes".into());
         }
@@ -587,7 +628,11 @@ pub fn evaluate_symbolic_case(
 
         if in_target {
             target_expected += 1;
-            let operation_ok = match operation.as_str() {
+            // The candidate event must also remain wholly inside its authorized
+            // scope, especially for duration edits that can move a note-off.
+            let candidate_scope_ok = in_scopes(&target_scopes, candidate_note, "candidate target scope")?
+                && !in_scopes(&protected_scopes, candidate_note, "candidate protected scope")?;
+            let operation_ok = candidate_scope_ok && match operation.as_str() {
                 "velocity" => {
                     let (numerator, denominator) = scale_parameters.expect("velocity scale validated");
                     let expected_velocity = source_note.velocity * numerator as f32 / denominator as f32;
@@ -1119,6 +1164,28 @@ mod tests {
         ).unwrap();
         assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
         assert!(!result["outcome"]["preservation_pass"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn duration_edit_crossing_target_boundary_is_rejected() {
+        let mut source = score(false);
+        source.notes[0].duration = Duration::new(3, 2);
+        source.notes[1].duration = Duration::quarter();
+        source.total_beats = Duration::new(2, 1);
+        let mut candidate = source.clone();
+        candidate.notes[0].duration = Duration::new(3, 4);
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("duration");
+        case["edit_contract"]["target_scopes"][0]["end"] = json!({"numerator": 1, "denominator": 1});
+        case["edit_contract"]["parameters"] = json!({"scale_numerator": 1, "scale_denominator": 2});
+        case["evaluation"]["target_metrics"] = json!(["duration_accuracy"]);
+        let error = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("crosses an authorized time-scope boundary"));
     }
 
     #[test]
