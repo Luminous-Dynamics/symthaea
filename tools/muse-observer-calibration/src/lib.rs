@@ -13,7 +13,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
-use std::cmp::Ordering;
 
 pub const DATASET_SCHEMA_V1: &str = "muse-observer-calibration-dataset-v1";
 pub const CONTRACT_SCHEMA_V1: &str = "muse-observer-calibration-contract-v1";
@@ -452,7 +451,6 @@ fn select_support_threshold(
         .collect::<Vec<_>>();
     let threshold_negative_count = measured.iter().filter(|row| !row.event_present).count() as u64;
     let threshold_positive_count = measured.iter().filter(|row| row.event_present).count() as u64;
-    let all_negative_count = rows.iter().filter(|row| !row.event_present).count() as u64;
     let mut candidates = measured.iter()
         .map(|row| predict(model, row.raw_score_db.expect("measured row has score")))
         .collect::<Vec<_>>();
@@ -465,10 +463,13 @@ fn select_support_threshold(
             .filter(|row| predict(model, row.raw_score_db.expect("measured row has score")) >= threshold)
             .collect::<Vec<_>>();
         let false_supports = supported.iter().filter(|row| !row.event_present).count() as u64;
-        let false_rate = if all_negative_count == 0 {
+        // Threshold selection uses measured negatives only. Unmeasured
+        // negatives remain abstentions and must not dilute the false-support
+        // denominator.
+        let false_rate = if threshold_negative_count == 0 {
             1.0
         } else {
-            false_supports as f64 / all_negative_count as f64
+            false_supports as f64 / threshold_negative_count as f64
         };
         if false_rate <= maximum_false_support_rate {
             selected = Some((threshold, supported.len() as u64, false_supports));
@@ -486,8 +487,8 @@ fn select_support_threshold(
                 threshold_negative_count,
                 supported_count,
                 false_support_count,
-                false_support_rate: (all_negative_count > 0).then_some(
-                    false_support_count as f64 / all_negative_count as f64
+                false_support_rate: (threshold_negative_count > 0).then_some(
+                    false_support_count as f64 / threshold_negative_count as f64
                 ),
                 true_support_rate: (threshold_positive_count > 0).then_some(
                     true_support_count as f64 / threshold_positive_count as f64
@@ -837,6 +838,8 @@ mod tests {
         assert_eq!(bundle.threshold_selection.selection_status, "threshold_selected");
         assert!(bundle.held_out.false_support_rate_all_negatives.unwrap() <= 0.01);
         assert!(bundle.held_out.abstention_rate >= 0.0);
+        assert_eq!(bundle.model.fit_example_count, 12);
+        assert_eq!(bundle.model.fit_unmeasured_count, 1);
     }
 
     #[test]
@@ -857,6 +860,33 @@ mod tests {
         let bundle = run_calibration_v1(&data, &contract()).unwrap();
         assert_eq!(bundle.threshold_selection.selection_status, "no_safe_threshold_all_abstain");
         assert_eq!(bundle.held_out.supported_examples, 0);
+    }
+
+    #[test]
+    fn unmeasured_negative_cases_cannot_dilute_the_false_support_budget() {
+        let mut data = dataset();
+        for offset in 0..1_000 {
+            data.observations.push(row(
+                10_000 + offset,
+                SplitV1::ThresholdSelection,
+                false,
+                None,
+                MeasurementStateV1::InsufficientFrequencyResolution,
+            ));
+        }
+        // All measured tuning rows receive the same calibrated score. The
+        // measured false-support rate is therefore 50%, regardless of how
+        // many unmeasured negative rows are appended.
+        for observation in data.observations.iter_mut().filter(|row|
+            row.split == SplitV1::ThresholdSelection
+                && row.measurement_state == MeasurementStateV1::Measured
+        ) {
+            observation.raw_score_db = Some(0.0);
+        }
+        seal_calibration_dataset_v1(&mut data).unwrap();
+        let bundle = run_calibration_v1(&data, &contract()).unwrap();
+        assert_eq!(bundle.threshold_selection.selection_status, "no_safe_threshold_all_abstain");
+        assert_eq!(bundle.threshold_selection.selected_support_threshold, None);
     }
 
     #[test]
