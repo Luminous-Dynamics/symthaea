@@ -236,6 +236,12 @@ impl BufferRegistry {
                 "handle ID and byte length must be non-empty and bounded",
             ));
         }
+        if generation == 0 {
+            return Err(ValidationError::new(
+                "INVALID_BUFFER_GENERATION",
+                "registered buffer generations start at one",
+            ));
+        }
         let key = BufferKey {
             handle_id,
             generation,
@@ -379,10 +385,12 @@ impl ExecutionLedger {
                 "sequence must increase strictly within a device epoch",
             ));
         }
-        if self.pending.len() >= self.max_inflight_commands {
+        let capability_limit = usize::try_from(capabilities.max_inflight_commands)
+            .unwrap_or(usize::MAX);
+        if self.pending.len() >= self.max_inflight_commands.min(capability_limit) {
             return Err(ValidationError::new(
                 "QUEUE_FULL",
-                "the configured in-flight command limit has been reached",
+                "the configured/capability in-flight command limit has been reached",
             ));
         }
         if self.seen_command_ids.contains(&command.command_id) {
@@ -444,6 +452,13 @@ impl ExecutionLedger {
         capabilities: &DeviceCapabilities,
         registry: &mut BufferRegistry,
     ) -> ValidationResult<CompletionDisposition> {
+        validate_capabilities(capabilities)?;
+        if capabilities.device_id != self.device_id || capabilities.device_epoch != self.device_epoch {
+            return Err(ValidationError::new(
+                "CAPABILITY_IDENTITY_MISMATCH",
+                "completion validation requires the active device capability profile",
+            ));
+        }
         validate_completion_envelope(completion)?;
         let sequence = parse_decimal_u64(&completion.sequence, false, "sequence")?;
 
@@ -620,6 +635,12 @@ pub fn validate_capabilities(capabilities: &DeviceCapabilities) -> ValidationRes
         "hdc.hamming.exact.v1",
         "hdc.top1.exact.v1",
     ];
+    if capabilities.supported_operations.is_empty() {
+        return Err(ValidationError::new(
+            "EMPTY_SUPPORTED_OPERATIONS",
+            "a device must advertise at least one exact operation",
+        ));
+    }
     let mut seen_operations = HashSet::new();
     for operation in &capabilities.supported_operations {
         if !allowed_operations.contains(&operation.as_str())
@@ -631,10 +652,16 @@ pub fn validate_capabilities(capabilities: &DeviceCapabilities) -> ValidationRes
             ));
         }
     }
-    if !capabilities
+    let unique_representations: HashSet<&str> = capabilities
         .supported_representations
         .iter()
-        .any(|representation| representation == REPRESENTATION_ID)
+        .map(String::as_str)
+        .collect();
+    if unique_representations.len() != capabilities.supported_representations.len()
+        || !capabilities
+            .supported_representations
+            .iter()
+            .any(|representation| representation == REPRESENTATION_ID)
     {
         return Err(ValidationError::new(
             "UNSUPPORTED_REPRESENTATION",
@@ -658,6 +685,19 @@ pub fn validate_capabilities(capabilities: &DeviceCapabilities) -> ValidationRes
         return Err(ValidationError::new(
             "BACKEND_EXECUTION_CLASS_MISMATCH",
             "backend and execution class are not a supported pairing",
+        ));
+    }
+
+    if !matches!(
+        capabilities.dma_isolation.as_str(),
+        "iommu_domain" | "dedicated_bounded_pool" | "none"
+    ) || !matches!(
+        capabilities.cache_coherency.as_str(),
+        "coherent" | "explicit_flush_invalidate" | "unknown"
+    ) {
+        return Err(ValidationError::new(
+            "INVALID_MEMORY_PROFILE",
+            "DMA isolation or cache-coherency value is outside the protocol enum",
         ));
     }
 
@@ -1071,6 +1111,17 @@ fn validate_completion_envelope(completion: &HdcCompletion) -> ValidationResult<
             ));
         }
     }
+    if let Some(code) = &completion.error_code {
+        if code.is_empty() || code.len() > 128 {
+            return Err(ValidationError::new(
+                "INVALID_COMPLETION_ERROR_CODE",
+                "error_code must contain 1..=128 bytes",
+            ));
+        }
+    }
+    if let Some(profile_sha256) = &completion.device_profile_sha256 {
+        validate_sha256(profile_sha256, "device_profile_sha256")?;
+    }
     if let Some(detail) = &completion.error_detail {
         if detail.len() > 2048 {
             return Err(ValidationError::new(
@@ -1464,7 +1515,7 @@ mod tests {
 
     #[test]
     fn output_alias_with_query_is_rejected() {
-        let (capabilities, mut command, _, mut registry, _) = setup();
+        let (capabilities, mut command, _, _, _) = setup();
         let output = command
             .buffers
             .iter_mut()
@@ -1473,10 +1524,17 @@ mod tests {
         output.handle_id = "fixture-query".into();
         output.access = "write".into();
 
+        let mut registry = BufferRegistry::default();
         registry
-            .register("unused-output", 1, 16, BufferPermissions::WriteOnly)
+            .register("fixture-query", 1, 2_048, BufferPermissions::ReadWrite)
+            .unwrap();
+        registry
+            .register("fixture-candidates", 1, 4_096, BufferPermissions::ReadOnly)
+            .unwrap();
+        registry
+            .register("fixture-candidate-ids", 1, 16, BufferPermissions::ReadOnly)
             .unwrap();
         let error = validate_command(&command, &capabilities, &registry).unwrap_err();
-        assert_eq!(error.code, "REGISTERED_PERMISSION_MISMATCH");
+        assert_eq!(error.code, "OUTPUT_INPUT_ALIAS");
     }
 }
