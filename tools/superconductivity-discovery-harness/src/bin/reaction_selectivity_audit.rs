@@ -16,6 +16,7 @@ struct Interval {
 struct Reaction {
     id: String,
     role: String,
+    balanced_equation: String,
     product_phase_id: String,
     conditions_id: String,
     normalization_basis: String,
@@ -107,6 +108,7 @@ fn parse_reaction(value: &Value, context: &str) -> Result<Reaction, String> {
     Ok(Reaction {
         id: text_field(value, "reaction_id")?.to_owned(),
         role: text_field(value, "role")?.to_owned(),
+        balanced_equation: text_field(value, "balanced_equation")?.to_owned(),
         product_phase_id: text_field(value, "product_phase_id")?.to_owned(),
         conditions_id: text_field(value, "conditions_id")?.to_owned(),
         normalization_basis: text_field(value, "normalization_basis")?.to_owned(),
@@ -116,10 +118,10 @@ fn parse_reaction(value: &Value, context: &str) -> Result<Reaction, String> {
         activation_barrier,
     })
 }
-fn parse_characterization(value: &Value) -> Result<Characterization, String> {
+fn parse_characterization(value: &Value) -> Result<Option<Characterization>, String> {
     let evidence = value.get("characterization_evidence")
         .ok_or("case missing characterization_evidence")?;
-    if evidence.is_null() { return Ok(None).map_err(|e: String| e); }
+    if evidence.is_null() { return Ok(None); }
     let evidence = evidence.as_object()
         .ok_or("characterization_evidence must be an object or null")?;
     let evidence_value = Value::Object(evidence.clone());
@@ -163,7 +165,7 @@ fn parse_characterization(value: &Value) -> Result<Characterization, String> {
         raw_data_sha256: digest.to_owned(),
         detection_limit,
         phases,
-    })?)
+    }))
 }
 fn parse_case(value: &Value) -> Result<Case, String> {
     let id = text_field(value, "case_id")?.to_owned();
@@ -370,9 +372,17 @@ fn case_receipt(case: &Case) -> Value {
         "hull_screen_threshold_mev_atom": case.hull_threshold,
         "hull_source_class": case.hull_source_class,
         "reaction_selectivity_assessment": selectivity,
-        "target_delta_g_interval_eV_per_basis": {"lower":case.target.delta_g.lower,"upper":case.target.delta_g.upper},
+        "target_reaction": {
+            "reaction_id": case.target.id,
+            "balanced_equation": case.target.balanced_equation,
+            "product_phase_id": case.target.product_phase_id,
+            "delta_g_interval_eV_per_basis": {"lower":case.target.delta_g.lower,"upper":case.target.delta_g.upper},
+            "activation_barrier_interval_eV": {"lower":case.target.activation_barrier.lower,"upper":case.target.activation_barrier.upper},
+            "balance_status": case.target.balance_status
+        },
         "competing_reactions": case.competitors.iter().map(|r| json!({
             "reaction_id": r.id,
+            "balanced_equation": r.balanced_equation,
             "product_phase_id": r.product_phase_id,
             "delta_g_interval_eV_per_basis": {"lower":r.delta_g.lower,"upper":r.delta_g.upper},
             "activation_barrier_interval_eV": {"lower":r.activation_barrier.lower,"upper":r.activation_barrier.upper},
