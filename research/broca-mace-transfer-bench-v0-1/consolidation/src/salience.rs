@@ -360,7 +360,7 @@ pub struct MemorySurfacingCandidateV1 {
     historical_access_count: u32,
     observed_failure: bool,
     evidence_sha256: String,
-    prediction: Option<FutureUsePredictionV1>,
+    prediction: Option<VerifiedFutureUsePredictionV1>,
 }
 
 impl MemorySurfacingCandidateV1 {
@@ -1649,6 +1649,45 @@ mod tests {
     }
 
     #[test]
+    fn calibration_receipt_must_attest_disjoint_task_families_and_source_roots() {
+        let as_known = AsKnownQuery {
+            valid_at_ms: 100,
+            known_at_ms: 100,
+        };
+        let raw = raw_prediction(3, 9_000, 8_000, 100, digest("evidence-3"));
+
+        let mut overlapping_tasks = calibration_receipt(&raw, as_known);
+        overlapping_tasks.task_families_disjoint = false;
+        overlapping_tasks.receipt_sha256 = overlapping_tasks.canonical_digest();
+        assert_eq!(
+            verify_future_use_prediction(
+                raw.clone(),
+                scope(),
+                as_known,
+                &FixtureSaliencePredictionVerifier {
+                    receipt: Some(overlapping_tasks),
+                },
+            ),
+            Err(SalienceReject::CalibrationSplitNotIndependent)
+        );
+
+        let mut overlapping_roots = calibration_receipt(&raw, as_known);
+        overlapping_roots.source_roots_disjoint = false;
+        overlapping_roots.receipt_sha256 = overlapping_roots.canonical_digest();
+        assert_eq!(
+            verify_future_use_prediction(
+                raw,
+                scope(),
+                as_known,
+                &FixtureSaliencePredictionVerifier {
+                    receipt: Some(overlapping_roots),
+                },
+            ),
+            Err(SalienceReject::CalibrationSplitNotIndependent)
+        );
+    }
+
+    #[test]
     fn surfaced_plan_binds_the_prediction_and_independent_calibration_receipt() {
         let verified = prediction(
             5,
@@ -1671,10 +1710,13 @@ mod tests {
             8,
         )
         .unwrap();
-        assert_eq!(plan.surfaced[0].prediction_sha256.as_deref(), Some(&prediction_sha));
+        assert_eq!(
+            plan.surfaced[0].prediction_sha256.as_deref(),
+            Some(prediction_sha.as_str())
+        );
         assert_eq!(
             plan.surfaced[0].calibration_receipt_sha256.as_deref(),
-            Some(&receipt_sha)
+            Some(receipt_sha.as_str())
         );
         assert_eq!(plan.plan_sha256, plan.canonical_digest());
     }
