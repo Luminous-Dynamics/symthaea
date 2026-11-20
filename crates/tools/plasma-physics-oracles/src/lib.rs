@@ -33,6 +33,72 @@ pub struct PeriodicFourierConfig {
     pub modes: usize,
 }
 
+/// Evaluate the truncated periodic Fourier electric field at arbitrary probe points.
+///
+/// Particle charge is the effective weighted charge under the caller's declared
+/// unit convention. The field is linear in the weighted empirical measure, so
+/// permutation and co-located weight-splitting preserve the answer up to
+/// floating-point summation order. The zero Fourier mode is omitted; no
+/// neutralizing background field is represented by this routine.
+pub fn periodic_fourier_field_at_probes(
+    particles: &[Particle1d],
+    probe_positions: &[f64],
+    config: PeriodicFourierConfig,
+) -> Result<Vec<f64>, OracleError> {
+    if !config.domain_length.is_finite() || config.domain_length <= 0.0 {
+        return Err(OracleError::InvalidDomainLength);
+    }
+    if !config.permittivity.is_finite() || config.permittivity <= 0.0 {
+        return Err(OracleError::InvalidPermittivity);
+    }
+    if config.modes == 0 {
+        return Err(OracleError::ZeroFourierModes);
+    }
+
+    for (index, particle) in particles.iter().enumerate() {
+        if !particle.position.is_finite() {
+            return Err(OracleError::NonFinitePosition { particle: index });
+        }
+        if !particle.charge.is_finite() {
+            return Err(OracleError::NonFiniteParticleCharge { particle: index });
+        }
+    }
+    for (index, probe) in probe_positions.iter().enumerate() {
+        if !probe.is_finite() {
+            return Err(OracleError::NonFiniteProbePosition { probe: index });
+        }
+    }
+
+    let length = config.domain_length;
+    let epsilon = config.permittivity;
+    let source_positions: Vec<f64> = particles
+        .iter()
+        .map(|particle| particle.position.rem_euclid(length))
+        .collect();
+    let mut fields = vec![0.0; probe_positions.len()];
+
+    for mode in 1..=config.modes {
+        let wave_number = TAU * mode as f64 / length;
+        let field_scale = 2.0 / (length * epsilon * wave_number);
+        if !wave_number.is_finite() || !field_scale.is_finite() {
+            return Err(OracleError::NonFiniteOracleOutput);
+        }
+
+        for (probe_index, probe) in probe_positions.iter().enumerate() {
+            let wrapped_probe = probe.rem_euclid(length);
+            for (particle, source_position) in particles.iter().zip(source_positions.iter()) {
+                let phase = wave_number * (wrapped_probe - source_position);
+                fields[probe_index] += field_scale * particle.charge * phase.sin();
+            }
+        }
+    }
+
+    if fields.iter().any(|field| !field.is_finite()) {
+        return Err(OracleError::NonFiniteOracleOutput);
+    }
+    Ok(fields)
+}
+
 /// Energy and configuration-space forces for a particle configuration.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VariationalResult {
@@ -80,6 +146,7 @@ pub enum OracleError {
     InvalidPermittivity,
     ZeroFourierModes,
     NonFinitePosition { particle: usize },
+    NonFiniteProbePosition { probe: usize },
     NonFiniteParticleCharge { particle: usize },
     NonFiniteOracleOutput,
     TooFewCells,
@@ -100,6 +167,9 @@ impl fmt::Display for OracleError {
             Self::ZeroFourierModes => write!(f, "at least one positive Fourier mode is required"),
             Self::NonFinitePosition { particle } => {
                 write!(f, "particle {particle} has a non-finite position")
+            }
+            Self::NonFiniteProbePosition { probe } => {
+                write!(f, "probe {probe} has a non-finite position")
             }
             Self::NonFiniteParticleCharge { particle } => {
                 write!(f, "particle {particle} has a non-finite charge")
