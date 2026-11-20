@@ -49,6 +49,13 @@ impl CohortStatus {
         }
     }
 }
+fn cohort_endpoint(status: CohortStatus, category: Option<&str>) -> Option<bool> {
+    if status == CohortStatus::Analyzable {
+        category.and_then(category_label)
+    } else {
+        None
+    }
+}
 
 fn text_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value.get(key).and_then(Value::as_str).filter(|x| !x.trim().is_empty())
@@ -465,11 +472,7 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
             sample.quality_score,
             category,
         );
-        let endpoint = if status == CohortStatus::Analyzable {
-            category.and_then(category_label)
-        } else {
-            None
-        };
+        let endpoint = cohort_endpoint(status, category);
         let phases = row.get("outcome").and_then(|o| o.get("phases"))
             .cloned().unwrap_or_else(|| json!([]));
         json!({
@@ -769,6 +772,29 @@ mod tests {
         assert_eq!(nodes * (nodes - 1) / 2, 1035);
     }
 
+    #[test]
+    fn excluded_sample_records_never_receive_binary_endpoint_labels() {
+        assert_eq!(
+            cohort_endpoint(CohortStatus::PoorRefinement, Some("unreacted")),
+            None
+        );
+        assert_eq!(
+            cohort_endpoint(CohortStatus::PoorRefinement, Some("partially_reacted")),
+            None
+        );
+        assert_eq!(
+            cohort_endpoint(CohortStatus::PhysicalFailure, Some("completely_reacted")),
+            None
+        );
+        assert_eq!(
+            cohort_endpoint(CohortStatus::Analyzable, Some("transformed")),
+            Some(false)
+        );
+        assert_eq!(
+            cohort_endpoint(CohortStatus::Analyzable, Some("completely_reacted")),
+            Some(true)
+        );
+    }
     #[test]
     fn physical_failure_and_poor_refinement_are_exclusions_not_negatives() {
         assert_eq!(
