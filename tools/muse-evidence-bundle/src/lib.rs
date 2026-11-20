@@ -635,7 +635,6 @@ fn verify_symbolic(
     let Some(candidate_audio) = read_artifact(render_bundle_root, "output.wav", "candidate WAV")? else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("output.wav is missing from the render bundle".into())));
     };
-    let Some(_source_audio) = None::<Vec<u8>> else { unreachable!() };
     let reproduced = evaluate_symbolic_case(
         case_bytes,
         &source_score,
@@ -814,6 +813,7 @@ fn verify_acoustic(
     manifest: &BundleManifestV1,
     result_bytes: Option<&[u8]>,
     contract_bytes: Option<&[u8]>,
+    case_bytes: Option<&[u8]>,
     source_audio_bytes: Option<&[u8]>,
     render_bundle_root: Option<&Path>,
 ) -> Result<ComponentReportV1, String> {
@@ -852,9 +852,19 @@ fn verify_acoustic(
     let Some(contract_bytes) = contract_bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("gain-envelope contract JSON is required to reproduce the acoustic observation".into())));
     };
+    let Some(case_bytes) = case_bytes else {
+        return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("case JSON is required to bind the source audio artifact".into())));
+    };
     let Some(source_audio) = source_audio_bytes else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("source WAV bytes are required to reproduce the acoustic observation".into())));
     };
+    let case_value: Value = serde_json::from_slice(case_bytes)
+        .map_err(|error| format!("case JSON invalid for acoustic binding: {error}"))?;
+    if case_value.pointer("/source/audio/sha256").and_then(Value::as_str)
+        != Some(artifacts.source_audio_sha256.as_str())
+    {
+        return Ok(hard_binding("case source audio digest does not match the bundle source WAV"));
+    }
     let Some(candidate_audio) = read_artifact(render_bundle_root, "output.wav", "candidate WAV")? else {
         return Ok(gate_report(component.base.status, GateStatusV1::Abstain, Some("output.wav is missing from the render bundle".into())));
     };
@@ -936,6 +946,7 @@ pub fn verify_evidence_bundle_v1(
             &manifest,
             inputs.acoustic_result_json,
             inputs.gain_envelope_contract_json,
+            inputs.case_json,
             inputs.source_audio_wav,
             inputs.render_bundle_root,
         )?,
