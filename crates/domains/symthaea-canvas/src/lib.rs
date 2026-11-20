@@ -37,12 +37,12 @@ pub use animation::{FrameContext, MotionPreference};
 pub use embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
     EmbodimentIngestError, EmbodimentSnapshot, GazeTarget, Observed, SignalProvenance,
-    Viseme, VisemeSignal,
+    SpeechOutputState, Viseme, VisemeSignal,
 };
 pub use embodiment_trace::{
     EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentTrace, EmbodimentTraceError,
     EmbodimentTraceSummary, MAX_EMBODIMENT_SESSION_ID_BYTES, MAX_EMBODIMENT_TRACE_EVENTS,
-    OpenActivityInterval,
+    OpenActivityInterval, OpenPlaybackInterval,
 };
 pub use color::{Color, Palette};
 pub use geometry::build_scene;
