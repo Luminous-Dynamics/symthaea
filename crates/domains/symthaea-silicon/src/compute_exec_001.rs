@@ -1755,6 +1755,27 @@ mod tests {
     }
 
     #[test]
+    fn physical_asic_capability_uses_device_part_without_fpga_bitstream() {
+        let (mut capabilities, _, _, _, _) = setup();
+        capabilities.backend = "asic".into();
+        capabilities.execution_class = "asic_hardware".into();
+        capabilities.hardware_profile_sha256 = Some("a".repeat(64));
+        capabilities.firmware_sha256 = Some("b".repeat(64));
+        capabilities.bitstream_sha256 = None;
+        capabilities.hardware_identity = Some(HardwareIdentity {
+            manufacturer: "test-foundry".into(),
+            board_model: "accelerator-module".into(),
+            board_revision: "A".into(),
+            device_part: "test-asic-rev1".into(),
+            som_ordering_code: None,
+        });
+        capabilities.dma_isolation = "dedicated_bounded_pool".into();
+        capabilities.cache_coherency = "explicit_flush_invalidate".into();
+
+        assert!(validate_capabilities(&capabilities).is_ok());
+    }
+
+    #[test]
     fn output_alias_with_query_is_rejected() {
         let (capabilities, mut command, _, _, _) = setup();
         let output = command
