@@ -282,16 +282,52 @@ mod tests {
         trace
             .push(event(
                 1,
-                100,
+                50,
                 EmbodimentEventKind::ActivityChanged {
-                    activity: EmbodimentActivity::Speaking,
+                    activity: EmbodimentActivity::Listening,
                 },
             ))
             .unwrap();
         trace
             .push(event(
                 2,
+                100,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Synthesizing,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                3,
                 110,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Ready,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                4,
+                120,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Queued,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                5,
+                130,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                6,
+                150,
                 EmbodimentEventKind::VisemeChanged {
                     viseme: Viseme::Aa,
                     weight: 0.8,
@@ -300,8 +336,17 @@ mod tests {
             .unwrap();
         trace
             .push(event(
-                3,
+                7,
                 200,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Completed,
+                },
+            ))
+            .unwrap();
+        trace
+            .push(event(
+                8,
+                210,
                 EmbodimentEventKind::ActivityChanged {
                     activity: EmbodimentActivity::Idle,
                 },
@@ -309,8 +354,8 @@ mod tests {
             .unwrap();
         trace
             .push(event(
-                4,
-                210,
+                9,
+                230,
                 EmbodimentEventKind::ActivityChanged {
                     activity: EmbodimentActivity::Listening,
                 },
@@ -327,11 +372,13 @@ mod tests {
         let summary = trace.summarize().unwrap();
 
         assert_eq!(summary.session_id, "sefb-fixture-v1");
-        assert_eq!(summary.event_count, 6);
+        assert_eq!(summary.event_count, 11);
         assert_eq!(summary.activity_changes, 2);
         assert_eq!(summary.completed_activity_intervals, 1);
+        assert_eq!(summary.speech_output_transitions, 5);
         assert_eq!(summary.completed_playback_intervals, 1);
-        assert_eq!(summary.playback_duration_ns, 2_000_000);
+        assert_eq!(summary.playback_duration_ns, 1_700_000);
+        assert_eq!(summary.open_playback, None);
         assert_eq!(summary.viseme_event_count, 2);
         assert_eq!(summary.uncertainty_observation_count, 1);
         assert_eq!(
@@ -340,6 +387,7 @@ mod tests {
         );
         assert!(summary.final_snapshot.viseme.is_none());
         assert!(summary.final_snapshot.uncertainty.is_none());
+        assert_eq!(summary.final_snapshot.current_speech_output(), None);
     }
 
     #[test]
@@ -351,6 +399,10 @@ mod tests {
         assert_eq!(
             first.current_activity(),
             Some(EmbodimentActivity::Listening)
+        );
+        assert_eq!(
+            first.current_speech_output(),
+            Some(SpeechOutputState::Completed)
         );
     }
 
@@ -408,15 +460,15 @@ mod tests {
     fn malformed_event_fails_trace_at_exact_index() {
         let mut trace = sample_trace();
         trace.events.push(event(
-            4,
-            220,
+            10,
+            240,
             EmbodimentEventKind::ActivityChanged {
                 activity: EmbodimentActivity::Fault,
             },
         ));
         assert!(matches!(
             trace.replay(),
-            Err(EmbodimentTraceError::EventRejected { index: 4, .. })
+            Err(EmbodimentTraceError::EventRejected { index: 9, .. })
         ));
     }
 
