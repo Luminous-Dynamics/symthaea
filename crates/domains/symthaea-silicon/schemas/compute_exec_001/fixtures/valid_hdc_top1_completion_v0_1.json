@@ -1,0 +1,16 @@
+{
+  "schema": "luminous.hdc-device-completion",
+  "schema_version": "0.1.0",
+  "command_id": "fixture-top1-0001",
+  "device_id": "sim-iverilog-hdc-tile",
+  "device_epoch": "00112233445566778899aabbccddeeff",
+  "sequence": 1,
+  "status": "completed",
+  "result": {
+    "output_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "winner_stable_id": 42,
+    "hamming_distance_bits": 7,
+    "result_record_bytes": 16
+  },
+  "device_profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}
