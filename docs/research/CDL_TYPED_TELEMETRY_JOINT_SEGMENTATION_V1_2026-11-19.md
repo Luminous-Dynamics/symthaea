@@ -223,46 +223,7 @@ A separate schedule-primitive reference and runner validate the move-to-front gr
 
 The primitive reference compiled locally with GCC 14.2 and strict warnings (`-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`). It passed 1,000 randomized exact tie-group schedule round-trips and five malformed-input checks. For 64 repeated groups of eight keys, the template schedule used 67 bytes versus 192 bytes for fixed-width per-event IDs (65.10% reduction). For 20 alternating groups across 16 keys, the 16-entry dictionary used 36 bytes versus 160 bytes for fixed-width IDs (77.50% reduction).
 
-**Evidence boundary:** the primitive reference tests only the tie-schedule subgrammar. The latest mode-1/mode-2 integration into `typed_record_partitioned_runs_reference.cpp` is authored and checked in, but this newest integrated C++ frame revision has not yet been compiled locally. The previous timestamp-merge/full-schedule revision was strictly compiled and tested; do not transfer that pass claim to the latest tie-template integration.
-
-The raw and global state-delta controls use matching self-describing outer frames (magic, record count, payload length, schema and CRC32), so the Zstandard comparisons charge the basic framing on all arms.
-
-### Local strict-warning execution
-
-The checked-in C++ source was built with GCC 14.2:
-
-```sh
-g++ -O2 -std=c++20 -Wall -Wextra -Wconversion -Werror \
-  research/cdl-bench/reference/typed_record_partitioned_runs_reference.cpp \
-  -o /tmp/typed_record_partitioned_runs_reference
-/tmp/typed_record_partitioned_runs_reference --emit-dir /tmp/cdl-partitioned-streams
-```
-
-Validation passed:
-- Empty-stream encode/decode.
-- Four deterministic 65,536-record round-trips using timestamp-merge mode.
-- 100 randomized interleaved round-trips.
-- Duplicate-timestamp and out-of-order schedule-fallback round-trips.
-- Three malformed-frame rejections: corrupt magic/checksum, truncation and trailing bytes.
-
-The benchmark then compressed all three complete framed representations with Zstandard CLI 1.5.7 level 19. Each compressed output decompressed byte-for-byte to its original frame.
-
-### Results: 64 round-robin series, 65,536 records
-
-| Workload | Raw frame | Global delta frame | Partitioned frame | Zstd(raw) | Zstd(global delta) | Zstd(partitioned) |
-|---|---:|---:|---:|---:|---:|---:|
-| Sparse | 5,308,448 | 648,493 | 140,879 | 223,774 | 85,931 | 61,864 |
-| Bursty | 5,308,448 | 833,813 | 320,171 | 367,607 | 224,396 | 204,921 |
-| Mostly idle | 5,308,448 | 590,677 | 8,308 | 153,209 | 5,577 | 4,784 |
-| Noisy | 5,308,448 | 3,769,213 | 3,636,264 | 2,603,680 | 2,316,397 | 2,252,910 |
-
-Relative to Zstd on the equally framed global state-delta stream, partitioning plus Zstd was smaller by 28.01% (sparse), 8.68% (bursty), 14.22% (mostly idle) and 2.74% (noisy). Relative to Zstd on the equally framed raw representation, it was smaller by 72.35%, 44.26%, 96.88% and 13.47%, respectively.
-
-The strict timestamp-merge mode reduced the uncompressed partitioned frame from 190,030 to 140,879 bytes on sparse data, 369,322 to 320,171 on bursty, 57,459 to 8,308 on mostly idle and 3,685,415 to 3,636,264 on noisy data, relative to the earlier version that carried a fixed six-bit-per-record schedule. The Zstd impact is smaller because the repeating schedule itself was highly compressible.
-
-The reproducer is `bash scripts/research/cdl_partitioned_telemetry_reference.sh`. It compiles the checked-in source with strict warnings, tests both order modes, emits the three frames, applies identical Zstd settings and verifies exact decompression.
-
-**Evidence boundary:** independent C++ transform-plus-Zstd synthetic evidence, not Rust CDL, not the arithmetic-coded production frame, not public dataset results, and not a matched ALP/Pco/Gorilla/Chimp/ACTF/Rabbit/WZS comparison. The fixture has eight fixed lanes and 64 keys. The prototype materializes and partitions the full input in memory; it is not yet a bounded-memory streaming encoder. No throughput, peak RSS, direct random access, index, checkpoint recovery, schema-name registry or production ingestion costs have been measured. It still needs blind tests on production-derived telemetry, variable key counts, irregular per-series timestamps, timestamp disorder bursts, duplicate-time tie groups, and randomized arrival patterns.
+**Evidence boundary:** the schedule primitive tests only the tie-schedule subgrammar. The integrated three-mode PRN1 implementation has now also been compiled and run locally with GCC 14.2 under `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`. The integrated test suite passed empty input; four deterministic 65,536-record mode-0 fixtures; mode-1 duplicate-time groups with a repeated template; alternating two-template groups; mode-2 out-of-order fallback; 100 randomized interleaved round-trips; and three malformed-frame cases. The first integrated run exposed an incorrect test bound: the 65,536-row fixture has 1,024 tie groups (not 64), and the correct repeated-template schedule is 1,072 bytes / 8,576 bits. The assertion was corrected from 5,000 to 9,000 bits; the implementation then passed. The temporary local compile copy used formatting-only line breaks to avoid misleading-indentation diagnostics; the checked-in implementation logic and corrected threshold were tested. This is C++ reference validation only, not Rust CDL or CI evidence.
 
 ## Current Rust implementation status (compiler validation pending)
 
