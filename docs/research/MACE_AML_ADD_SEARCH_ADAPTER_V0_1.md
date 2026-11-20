@@ -50,6 +50,10 @@ Chunk IDs are deterministic: logical request ID plus chunk index. An in-memory i
 
 The public API guide specifies JPEG/PNG/WebP, maximum 10 MiB decoded per image, 30 MiB image data per Add request, and 30 MiB across one Search response. The adapter checks MIME, Base64 alphabet/padding and decoded-size estimates. It does not perform full image decoding, malware scanning, normalization or OCR.
 
+## Idempotency scope
+
+The Add contract core scopes a retry key by `(track, user_id, request_id)`; its payload digest is also domain-separated by track. This prevents same-ID requests from different users or different tracks from sharing an in-flight/completed response. Within one key, the exact request body is immutable: reusing the key with changed messages, session or timestamp is rejected. The current ledger is in-memory only; a hosted adapter must atomically persist the key, digest, write and final acknowledgement in its durable transaction.
+
 ## Security and privacy
 
 Use public HTTPS endpoints; never embed credentials in URLs. Keep API keys out of source, logs, traces and PRs. Treat user_id as tenant partition; do not rely on session_id for access control. Use evaluation data only for the current job, never for model training, fine-tuning, unrelated analytics, dataset reconstruction or redistribution. Delete data and derived copies within 30 days after run completion unless AML approves another period in writing. Return Add success only after persistence and Search visibility. Reuse identical request_id and payload on retry; a 409 alone is not success.

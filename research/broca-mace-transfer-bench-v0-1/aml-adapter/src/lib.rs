@@ -20,7 +20,7 @@ pub const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 pub const MAX_ADD_REQUEST_IMAGE_BYTES: usize = 30 * 1024 * 1024;
 pub const MAX_SEARCH_RESPONSE_IMAGE_BYTES: usize = 30 * 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Track {
     Textual,
     Coding,
@@ -387,9 +387,14 @@ pub fn validate_add_response(
 
 /// Request-body identity for idempotent Add retries. Length-prefixing prevents
 /// delimiter ambiguity; a request ID cannot be rebound to different content.
-pub fn add_payload_digest(request: &AddRequest) -> String {
+pub fn add_payload_digest(track: Track, request: &AddRequest) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"aml:add-request:v1\0");
+    hasher.update(b"aml:add-request:v2\0");
+    hasher.update(match track {
+        Track::Textual => b"textual\0".as_slice(),
+        Track::Coding => b"coding\0".as_slice(),
+        Track::Multimodal => b"multimodal\0".as_slice(),
+    });
     hash_field(&mut hasher, &request.request_id);
     hash_field(&mut hasher, &request.user_id);
     hash_field(&mut hasher, &request.session_id);
@@ -441,7 +446,15 @@ pub enum AddRetryState {
 /// atomically with the memory write in its durable store/transaction.
 #[derive(Clone, Debug, Default)]
 pub struct AddIdempotencyLedger {
-    entries: BTreeMap<String, (String, Option<AddResponse>)>,
+    entries: BTreeMap<(Track, String, String), (String, Option<AddResponse>)>,
+}
+
+fn idempotency_key(track: Track, request: &AddRequest) -> (Track, String, String) {
+    (
+        track,
+        request.user_id.clone(),
+        request.request_id.clone(),
+    )
 }
 
 impl AddIdempotencyLedger {
@@ -451,16 +464,16 @@ impl AddIdempotencyLedger {
         request: &AddRequest,
     ) -> Result<AddRetryState, AmlReject> {
         validate_add_request(track, request)?;
-        let digest = add_payload_digest(request);
-        match self.entries.get(&request.request_id) {
+        let digest = add_payload_digest(track, request);
+        let key = idempotency_key(track, request);
+        match self.entries.get(&key) {
             Some((existing, Some(response))) if existing == &digest => {
                 Ok(AddRetryState::Committed(response.clone()))
             }
             Some((existing, None)) if existing == &digest => Ok(AddRetryState::InFlight),
             Some(_) => Err(AmlReject::RequestIdPayloadConflict),
             None => {
-                self.entries
-                    .insert(request.request_id.clone(), (digest, None));
+                self.entries.insert(key, (digest, None));
                 Ok(AddRetryState::New)
             }
         }
@@ -475,8 +488,9 @@ impl AddIdempotencyLedger {
     ) -> Result<(), AmlReject> {
         validate_add_request(track, request)?;
         validate_add_response(request, &response, persisted_and_searchable)?;
-        let digest = add_payload_digest(request);
-        let Some((stored_digest, stored_response)) = self.entries.get_mut(&request.request_id)
+        let digest = add_payload_digest(track, request);
+        let key = idempotency_key(track, request);
+        let Some((stored_digest, stored_response)) = self.entries.get_mut(&key)
         else {
             return Err(AmlReject::UnknownRequestId);
         };
@@ -492,11 +506,16 @@ impl AddIdempotencyLedger {
 
     /// Remove only a matching in-flight reservation after a definite failure.
     /// An unknown/committed/different payload is never removed.
-    pub fn abandon(&mut self, request: &AddRequest) -> Result<(), AmlReject> {
-        let digest = add_payload_digest(request);
-        match self.entries.get(&request.request_id) {
+    pub fn abandon(
+        &mut self,
+        track: Track,
+        request: &AddRequest,
+    ) -> Result<(), AmlReject> {
+        let digest = add_payload_digest(track, request);
+        let key = idempotency_key(track, request);
+        match self.entries.get(&key) {
             Some((stored, None)) if stored == &digest => {
-                self.entries.remove(&request.request_id);
+                self.entries.remove(&key);
                 Ok(())
             }
             Some((stored, _)) if stored != &digest => {
@@ -778,11 +797,82 @@ mod tests {
     }
 
     #[test]
+    fn idempotency_keys_are_isolated_by_tenant_and_track() {
+        let mut user_one = add_request("shared-request-id");
+        let mut user_two = user_one.clone();
+        user_two.user_id = "eval:user:two".into();
+        let mut ledger = AddIdempotencyLedger::default();
+
+        assert_eq!(
+            ledger.begin(Track::Textual, &user_one),
+            Ok(AddRetryState::New)
+        );
+        assert_eq!(
+            ledger.begin(Track::Textual, &user_two),
+            Ok(AddRetryState::New)
+        );
+
+        ledger
+            .complete(
+                Track::Textual,
+                &user_one,
+                ack(&user_one),
+                true,
+            )
+            .unwrap();
+        ledger
+            .complete(
+                Track::Textual,
+                &user_two,
+                ack(&user_two),
+                true,
+            )
+            .unwrap();
+        assert_eq!(
+            ledger.begin(Track::Textual, &user_one),
+            Ok(AddRetryState::Committed(ack(&user_one)))
+        );
+        assert_eq!(
+            ledger.begin(Track::Textual, &user_two),
+            Ok(AddRetryState::Committed(ack(&user_two)))
+        );
+
+        // Identical request ID, tenant and payload on a different track is
+        // a different idempotency namespace and payload contract.
+        let same_tenant_other_track = user_one.clone();
+        assert_eq!(
+            ledger.begin(Track::Coding, &same_tenant_other_track),
+            Ok(AddRetryState::New)
+        );
+        ledger
+            .complete(
+                Track::Coding,
+                &same_tenant_other_track,
+                ack(&same_tenant_other_track),
+                true,
+            )
+            .unwrap();
+        assert_eq!(
+            ledger.begin(Track::Coding, &same_tenant_other_track),
+            Ok(AddRetryState::Committed(ack(&same_tenant_other_track)))
+        );
+    }
+
+    #[test]
+    fn payload_digest_is_track_bound() {
+        let request = add_request("track-bound-digest");
+        assert_ne!(
+            add_payload_digest(Track::Textual, &request),
+            add_payload_digest(Track::Coding, &request)
+        );
+    }
+
+    #[test]
     fn idempotency_abandon_only_removes_matching_inflight_payload() {
         let request = add_request("write-4");
         let mut ledger = AddIdempotencyLedger::default();
         ledger.begin(Track::Textual, &request).unwrap();
-        assert_eq!(ledger.abandon(&request), Ok(()));
+        assert_eq!(ledger.abandon(Track::Textual, &request), Ok(()));
         assert_eq!(
             ledger.begin(Track::Textual, &request),
             Ok(AddRetryState::New)
