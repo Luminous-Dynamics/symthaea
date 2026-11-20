@@ -66,3 +66,16 @@ Follow-on benchmark work should add cross-fitted AIPW/TMLE, cluster randomizatio
 ## Claim ceiling
 
 This is a synthetic causal-identification benchmark only. It does not identify a real intervention effect, establish a superconducting material or mechanism, authorize a specimen intervention, or establish laboratory safety. Historical evidence must have rights-cleared specimen/protocol/measurement lineage; prospective campaigns require qualified scientific collaborators, facility review and institutional safety approval.
+
+## Assignment-design receipts
+
+Every cohort now carries a typed `allocation_design` record:
+- experimental unit (`specimen`);
+- allocation algorithm (`blocked_complete_randomization_fixed_counts` or `historical_targeting_policy`);
+- blocking variable (`batch_id`);
+- randomization seed for the randomized cohort (null for historical targeting);
+- an explicit specimen-to-assignment receipt.
+
+The auditor requires the assignment receipt to match every cohort record exactly. It fails closed if an assigned treatment differs from the recorded allocation receipt, if the randomized cohort lacks its seed/design/block declaration, or if a historical cohort claims to have a randomization seed. The receipt emits a canonical SHA-256 of sorted specimen-assignment pairs, independent of HashMap iteration order. The full input fixture digest binds that assignment record to the rest of the cohort evidence.
+
+This v0.1 receipt records the seed and declared algorithm but does not regenerate the assignment from the seed. Exact inference is conditional on the declared complete-randomization-within-batch, fixed-treated-count design and enumerates every assignment compatible with the observed block counts. A future extension should pin the PRNG/version and independently replay the randomization seed to the allocation receipt.
