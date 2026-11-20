@@ -398,9 +398,9 @@ The new AML submission preflight checks the declared profile, but it is not a ru
 
 ### Learned forecasting qualification boundary
 
-The separate `salience_learning` module implements deterministic logistic regression, Platt calibration, Brier-vs-base-rate, ECE and worst-family ECE over train/calibration/held-out partitions. It requires cluster, task-family, source-root and event disjointness. The evaluator fixture uses 64/32/32 clusters and owns the hidden response function and future-reuse labels; model fitting sees only features and training labels.
+The separate `salience_learning` module implements deterministic logistic regression, Platt calibration, Brier-vs-base-rate, ECE and worst-family ECE over train/calibration/held-out partitions. Its base-rate comparator is derived from training labels only. The split manifest exposes dataset hashes plus separate task-family and source-root split digests, and requires cluster, task-family, source-root and event disjointness. The evaluator fixture uses 64/32/32 clusters and owns the hidden response function and future-reuse labels; model fitting sees only features and training labels.
 
-This is a candidate-model baseline, not a production forecast, SOTA result or proof of downstream utility. It is not yet wired into the opaque `VerifiedFutureUsePredictionV1` issuance path. Future integration must bind model, calibrator and split digests into an independently verified calibration receipt.
+This is a candidate-model baseline, not a production forecast, SOTA result or proof of downstream utility. The model now emits raw `FutureUsePredictionV1` candidates whose model-configuration digest binds the trained model and calibrator. It cannot construct the opaque `VerifiedFutureUsePredictionV1` or self-issue a calibration receipt. The independent verifier remains responsible for binding prediction/evidence, model pipeline, training/calibration/held-out dataset digests, task-family/source-root split digests, and held-out calibration metrics before any candidate is surfaced.
 
 ### Learned forecasting: next qualification gates
 
