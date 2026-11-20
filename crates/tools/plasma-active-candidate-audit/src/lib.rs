@@ -283,7 +283,10 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
         if candidate.geometry.grid_size.len() != dimension
             || candidate.geometry.grid_size.iter().any(|size| *size < 2)
         {
-            add("grid_shape_dimension_mismatch", "grid_size length must equal spatial dimension and each axis must have at least two cells.");
+            add(
+                "grid_shape_dimension_mismatch",
+                "grid_size length must equal spatial dimension and each axis must have at least two cells.",
+            );
         }
         if candidate.geometry.cell_spacing.as_ref().is_some_and(|values| {
             values.len() != dimension || values.iter().any(|value| !positive(*value))
@@ -314,15 +317,30 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
             }
         }
         KineticMethod::Vlasov | KineticMethod::Vfp => {
-            if candidate.kinetic_fidelity.phase_space_resolution.as_ref().is_none_or(|values| !numeric_values_positive(values)) {
-                add("phase_space_resolution_missing", "Vlasov/VFP candidates require a non-empty positive phase_space_resolution map.");
+            if candidate
+                .kinetic_fidelity
+                .phase_space_resolution
+                .as_ref()
+                .is_none_or(|values| !numeric_values_positive(values))
+            {
+                add(
+                    "phase_space_resolution_missing",
+                    "Vlasov/VFP candidates require a non-empty positive phase_space_resolution map.",
+                );
             }
         }
         KineticMethod::OtherDeclaredKinetic => {
             if candidate.kinetic_fidelity.particles_per_cell.is_none()
-                && candidate.kinetic_fidelity.phase_space_resolution.as_ref().is_none_or(|values| !numeric_values_positive(values))
+                && candidate
+                    .kinetic_fidelity
+                    .phase_space_resolution
+                    .as_ref()
+                    .is_none_or(|values| !numeric_values_positive(values))
             {
-                add("kinetic_fidelity_underspecified", "Other declared kinetic methods require particles_per_cell or phase_space_resolution.");
+                add(
+                    "kinetic_fidelity_underspecified",
+                    "Other declared kinetic methods require particles_per_cell or phase_space_resolution.",
+                );
             }
         }
     }
@@ -349,9 +367,23 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
         add("invalid_target_observables", "At least one non-empty target observable is required.");
     }
 
+    let unique_targets = candidate
+        .target_observables
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    if unique_targets.len() != candidate.target_observables.len() {
+        add(
+            "duplicate_target_observable",
+            "target_observables must be unique.",
+        );
+    }
+
     let cost = &candidate.cost_estimate;
     if cost.measurement_basis != "raw_resource_units" {
-        add("invalid_cost_basis", "Cost estimates must use raw_resource_units; monetary or weighted scores belong in separate fields.");
+        add(
+            "invalid_cost_basis",
+            "Cost estimates must use raw_resource_units; monetary or weighted scores belong in separate fields.",
+        );
     }
     if !finite_nonnegative(cost.cpu_core_hours) || !finite_nonnegative(cost.gpu_hours) {
         add("invalid_compute_cost", "CPU core-hours and GPU-hours must be finite and non-negative.");
@@ -363,21 +395,41 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
         add("invalid_resource_capacity", "Peak memory and expected data volume must be positive.");
     }
     if cost.cost_estimator_revision.as_ref().is_some_and(|value| !is_hex(value, 40)) {
-        add("invalid_cost_estimator_revision", "Cost estimator revision must be a 40-character hexadecimal SHA when supplied.");
+        add(
+            "invalid_cost_estimator_revision",
+            "Cost estimator revision must be a 40-character hexadecimal SHA when supplied.",
+        );
     }
 
     if !is_hex(&candidate.acquisition.policy_revision, 40) {
-        add("invalid_acquisition_revision", "Acquisition policy revision must be a 40-character hexadecimal commit SHA.");
+        add(
+            "invalid_acquisition_revision",
+            "Acquisition policy revision must be a 40-character hexadecimal commit SHA.",
+        );
     }
     if candidate.acquisition.reason_codes.is_empty() {
         add("missing_acquisition_reason", "At least one acquisition reason code is required.");
+    }
+    let unique_reasons = candidate
+        .acquisition
+        .reason_codes
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    if unique_reasons.len() != candidate.acquisition.reason_codes.len() {
+        add(
+            "duplicate_acquisition_reason",
+            "Acquisition reason codes must be unique.",
+        );
     }
     if candidate.acquisition.evidence_receipts.is_empty() {
         add("missing_acquisition_evidence", "At least one evidence receipt is required.");
     }
     for receipt in &candidate.acquisition.evidence_receipts {
         if !non_empty(&receipt.receipt_id) || !is_hex(&receipt.sha256, 64) {
-            add("invalid_acquisition_receipt", "Every acquisition evidence receipt requires a non-empty ID and a 64-character SHA-256.");
+            add(
+                "invalid_acquisition_receipt",
+                "Every acquisition evidence receipt requires a non-empty ID and a 64-character SHA-256.",
+            );
         }
     }
     if candidate.acquisition.signal_values.is_empty()
@@ -402,7 +454,10 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
     if candidate.split_role != SplitRole::Training
         && candidate.split_role != SplitRole::DevelopmentValidation
     {
-        add("forbidden_split_role", "Only training and development_validation can be proposed for acquisition; sealed test is never selectable.");
+        add(
+            "forbidden_split_role",
+            "Only training and development_validation can be proposed for acquisition; sealed test is never selectable.",
+        );
     }
 
     if candidate.notes.as_ref().is_some_and(|value| value.trim().is_empty()) {
