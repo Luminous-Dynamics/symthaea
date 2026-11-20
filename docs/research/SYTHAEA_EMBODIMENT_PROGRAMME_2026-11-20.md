@@ -44,19 +44,19 @@ Repository references:
 
 ### NVIDIA
 
-- NVIDIA's ECCV 2026 Instant4D project reports an encoder that lifts a single image to an animatable 3D representation in 20 ms and animation/pose-control throughput of 107.31 FPS. The paper's comparison uses its own hardware and production-like pipeline definition; it is not a universal hardware-independent target.
-- NVIDIA Audio2Face-3D supports audio-driven facial animation, ARKit-compatible blendshape output, real-time streaming, and optional emotion signals. The v2.0 release notes describe configurable blendshape streaming and 68 output weights when tongue blendshapes are enabled.
-- NVIDIA ACE is therefore a serious baseline for high-fidelity audio-to-face performance. It is not a substitute for Symthaea's semantic event contract.
+- NVIDIA Audio2Face-3D is a serious production baseline for audio-driven facial animation, ARKit-compatible blendshape streaming, and real-time digital-human applications.
+- Its current performance documentation uses the **1st percentile FPS** to define max stream capacity: the published stream count is chosen so that 99% of measured FPS remain above 30. The tables are tied to specific GPUs and complete server configurations. This is a better capacity reference than average FPS, but it is not directly comparable to a local SVG renderer or a Pixel device.
+- The same performance page exposes first-packet latency distributions and successful-request counts. SEFB should borrow this reporting discipline: event-to-first-visible-frame P50/P95, frame-time P1/P5, number of concurrent streams meeting a quality threshold, dropped-event counts, and a fixed hardware/software manifest.
+- NVIDIA ACE/Audio2Face is therefore a strong optional backend and comparative baseline, not a replacement for Symthaea's semantic event contract.
 
 Sources:
-- https://research.nvidia.com/labs/amri/projects/instant4d/
+- https://docs.nvidia.com/ace/audio2face-3d-microservice/latest/text/interacting/performance.html
 - https://docs.nvidia.com/nim/digital-human/a2f-3d/latest/
-- https://docs.nvidia.com/ace/latest/modules/a2f-docs/text/changelog.html
 - https://developer.nvidia.com/ace-for-games
 
 ### Epic MetaHuman
 
-Epic documents real-time MetaHuman animation from mono cameras, mobile capture, and audio sources. Its audio-driven path can synthesize facial performance, but the documentation distinguishes offline audio solving from the real-time audio solver; the latter has different motion capabilities. MetaHuman is a high-quality Unreal-centered reference, not a lightweight cross-renderer core.
+Epic documents real-time MetaHuman animation from mono cameras, mobile capture, and audio sources. The documentation makes an important distinction: the Realtime Audio Solver inside an audio-driven Performance asset is still an offline processing workflow, and differs from a live MetaHuman Audio Live Link Source. The real-time audio solver also does not produce the same head-motion controls as the broader offline solve. MetaHuman is a high-quality Unreal-centered reference, not a lightweight cross-renderer core.
 
 Sources:
 - https://dev.epicgames.com/documentation/en-us/metahuman/realtime-animation
@@ -66,7 +66,8 @@ Sources:
 ### VRM, VRMA, and Live2D
 
 - VRM 1.0 defines humanoid structure, facial expressions, and gaze controls. Its specification also defines an execution order for humanoid bones, gaze, expressions, constraints, and spring bones.
-- VRM Animation (.vrma) allows reusable humanoid bone, expression, and gaze animation to be applied across compatible VRM models.
+- VRM Animation 1.0 (.vrma) is a glTF extension for reusable humanoid bone, expression and gaze animation. Its stated goal is to let the same animation file apply across compatible VRM models and applications.
+- VRM 1.0 specifies a recommended update order for humanoid bones, gaze, expressions, constraints and spring bones. A future adapter should respect that order rather than inventing a competing skeletal evaluation pipeline.
 - Live2D Cubism provides parameter-driven animation and lip-sync input paths that are useful references for a lightweight 2D/2.5D puppet.
 
 Use these as optional adapters, not as the universal canonical model: the Mycelial Presence is not inherently humanoid.
@@ -74,6 +75,7 @@ Use these as optional adapters, not as the universal canonical model: the Myceli
 Sources:
 - https://github.com/vrm-c/vrm-specification/tree/master/specification/VRMC_vrm-1.0
 - https://vrm.dev/en/vrma/
+- https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm_animation-1.0/README.md
 - https://docs.live2d.com/en/cubism-sdk-manual/lipsync/
 
 ### Evaluation literature and interaction quality
@@ -131,17 +133,26 @@ Keep stable identity traits separate from renderer-specific assets:
 
 The identity is not the mesh. A user should be able to move from the abstract presence to a face and back without losing the conversational session or semantic state.
 
-### 5. Causal animation rules
+### 5. Causal animation rules and orthogonal lifecycle channels
+
+Cognitive activity and speech playback are deliberately separate. An internal retrieval or association can continue while audio plays; the avatar must not collapse both into one mutually exclusive "Speaking" state.
+
+The semantic contract distinguishes:
+- Cognitive activity: Listening, Perceiving, Retrieving, Associating, Predicting, Planning, ExecutingTool, AwaitingTool, Interrupted and Fault.
+- Speech output lifecycle: Synthesizing → Ready → Queued → Playing → Completed, with explicit Failed, Interrupted and Unavailable exits.
+- Articulation: viseme samples with their own timestamps and provenance; accepted only while the speech lifecycle is explicitly Playing.
+
+The reducer validates speech-state transitions and rejects impossible sequences such as Queued → Completed without an observed Playing state. The only signal that authorizes lip motion is an explicit RuntimeEvent that playback has actually started. Synthesis completion and audio queue insertion are not playback proof.
 
 Examples of acceptable mappings:
 - Listening only after the audio/input adapter emits a listening event.
 - Associating only while the relevant retrieval/association subsystem reports an active operation.
 - Predicting only when a prediction operation is underway.
-- Speaking only while an output-audio lifecycle is active.
-- VisemeChanged only while Speaking, aligned to the actual audio timeline.
+- Playing only after the playback backend confirms audio has started; the signal must not be inferred from generated PCM, an enqueued buffer, or a text response.
+- VisemeChanged only while Playing and aligned to the audio timeline.
 - ExecutingTool only while a tool invocation is active.
 - Uncertainty shown only when an explicit uncertainty signal exists; do not manufacture it from a mood estimate.
-- RendererLocal effects must remain visually distinguishable from runtime-derived evidence.
+- RendererLocal effects must remain distinguishable from runtime-derived evidence.
 
 Never map internal affect values directly to human emotions such as happiness, sadness, or affection without a separately validated and clearly labeled interpretation layer.
 
@@ -149,19 +160,26 @@ Never map internal affect values directly to human emotions such as happiness, s
 
 Added to symthaea-canvas:
 
-- embodiment.rs: typed activity, viseme, gaze, provenance, and uncertainty signals;
-- monotonic sequence/timestamp validation;
-- deterministic snapshot reduction;
-- finite [0, 1] validation for viseme weights and uncertainty;
-- viseme gating on explicit Speaking state;
-- stale-viseme clearing when leaving speech;
-- reset and transient-clear handling;
-- serialization round-trip and negative-control tests;
-- exports from symthaea-canvas::lib.
-- mycelial_presence.rs: deterministic non-humanoid branch geometry, activity-dependent palette, explicit uncertainty halo, speech-weight core modulation, and SVG rendering through the existing renderer.
+- embodiment.rs: typed cognitive activity, independent speech-output lifecycle, visemes, gaze, provenance, and uncertainty signals;
+- strict per-session sequence ordering, monotonic timestamps, provenance checks, finite [0, 1] validation and fail-closed speech-state transition validation;
+- visemes accepted only while a RuntimeEvent confirms SpeechOutputState::Playing;
+- stale visemes cleared when playback stops; reset clears transient state and speech lifecycle;
+- negative controls for invalid provenance, invalid lifecycle transitions, stale events, and visemes outside confirmed playback;
+- mycelial_presence.rs: deterministic non-humanoid branch geometry, activity-dependent palette, explicit uncertainty halo, speech-weight core modulation, and SVG rendering through the existing renderer;
+- embodiment_trace.rs: bounded, versioned event corpus, deterministic replay, activity/playback interval summaries and exact event-index failure reporting;
+- tests/fixtures/embodiment_trace_v1.json: a reference trace that covers listening, synthesis, ready, queueing, playback, visemes, completion, uncertainty and reset;
+- examples/embodiment_trace_replay.rs: a standalone CLI that validates a trace, performs warmup and repeated replay, reports P50/P95 reducer latency, and emits a BLAKE3 digest plus platform metadata;
 - reduced-motion behavior inherited from the existing SVG renderer, with adapter-level tests.
 
-**Not implemented yet:** a running frontend/session integration, runtime event producers, real audio-to-viseme inference, VRM loading, live gaze tracking, platform packaging, or benchmark measurements. The SVG adapter is a first renderable presence, not a completed conversational puppet.
+Run the semantic reducer benchmark with:
+
+`cargo run -p symthaea-canvas --example embodiment_trace_replay -- --trace crates/domains/symthaea-canvas/tests/fixtures/embodiment_trace_v1.json --iterations 500`
+
+The CLI measures event reduction only. It does **not** measure browser paint, SVG rasterization, audio playback, GPU frame time or human understanding.
+
+Repository source inspection found that `src/cognitive_loop/voice_channel.rs` returns synthesized PCM in `VoiceResponse`, while `src/voice/repl_voice.rs` contains separate playback paths (Rodio queueing and an optional live-voice backend). A returned PCM buffer or a successful queue append is not proof that audio is actually playing. This branch therefore defines the lifecycle contract but does not yet falsely wire synthesis completion to `Playing`.
+
+**Not implemented yet:** live runtime producers, actual playback-start callbacks, audio-aligned viseme inference, a running frontend/session integration, VRM loading, live gaze tracking, platform packaging, and measured benchmark results. The SVG adapter is a first renderable presence, not a completed conversational puppet.
 
 ## Benchmark programme: Symthaea Embodiment Fidelity Benchmark (SEFB)
 
@@ -184,7 +202,8 @@ I did not identify an established leaderboard that jointly measures avatar reali
 | Event-to-visible latency | Event receipt to first submitted frame, P50/P95 | P50 ≤33 ms; P95 ≤80 ms |
 | Desktop rendering | P95 frame time on fixed reference hardware | ≤16.7 ms at 60 FPS |
 | Mobile rendering | Sustained frame time on a named Android device | ≤33.3 ms at 30 FPS |
-| Audio/viseme alignment | Audio timestamp versus visible articulatory onset | P50 ≤40 ms; P95 ≤80 ms |
+| Audio/viseme alignment | Playback-clock timestamp versus visible articulatory onset | P50 ≤40 ms; P95 ≤80 ms |
+| Playback-state integrity | Attempted illegal transitions and mouth motion outside confirmed playback | 100% rejected / 0 unsupported mouth motion |
 | Queue health | Event age, backlog depth, dropped/coalesced events | No unbounded backlog |
 | Long-run stability | 30-minute thermal/memory/latency trace | No crash; bounded memory; report throttling |
 
@@ -220,7 +239,7 @@ Only run this track when the underlying runtime exports a calibrated probability
 | Dimension | NVIDIA ACE / Instant4D | Epic MetaHuman | Symthaea research objective |
 |---|---|---|---|
 | Facial fidelity | Strong specialist baseline | Strong production baseline | Use as optional backend; do not claim to beat it initially |
-| Animation throughput | Published >100 FPS in Instant4D setup; Audio2Face SDK targets real-time streaming | Real-time capture/animation workflow | Match on named hardware and fixed assets |
+| Animation throughput | Audio2Face publishes max-stream capacity using P1 FPS so 99% of samples stay above 30 FPS on named GPU/server configurations | Real-time capture/animation workflow; live and offline solvers differ | Match on named hardware, exact audio workload and fixed assets; report P1/P5 frame time and stream capacity |
 | Cognitive event semantics | Not the central published goal | Not the central published goal | First-class semantic contract |
 | Provenance and uncertainty | Emotion/animation controls exist | Solve controls exist | Preserve the source and confidence of every signal |
 | Embodiment diversity | Mostly human/digital-human pipeline | Human/digital-human pipeline | Abstract, humanoid, technical, and accessible modes |
@@ -241,8 +260,10 @@ Only run this track when the underlying runtime exports a calibrated probability
 ### P1 — real runtime signals
 - [ ] Add adapters for speech output lifecycle, tool lifecycle, perception, retrieval/association, and prediction.
 - [ ] Ensure event producers emit only from the authoritative subsystem.
-- [ ] Add trace recording and deterministic replay fixtures.
-- [ ] Add audio timestamps and a viseme adapter; retain a simple fallback if no viseme model is present.
+- [ ] Add a real playback-start observer to the Rodio/live-voice and browser playback paths; synthesis and queueing remain separate.
+- [ ] Add audio-clock timestamps and a calibrated viseme adapter; retain a static/no-mouth fallback if no viseme source is present.
+- [x] Add versioned trace recording format, deterministic replay and a reference fixture.
+- [ ] Add cross-session trace capture, redaction policy and stable corpus publication.
 
 ### P2 — first visible puppet
 - [x] Add a Mycelial Presence SVG scene adapter on the feature branch.
