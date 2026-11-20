@@ -394,6 +394,31 @@ Top commercial results:
 
 These metrics are track-specific and division-specific; do not pool them or compare MACE synthetic utility to them. For a future Open-Source Methods submission, current programme goals are **66.22 textual**, **68.33% coding resolved**, and **48.26 multimodal**, each 5 points above the relevant Cycle 2 open-source leader. Recalculate when the next cycle freezes its data/API/model rules. The official Add/Search guide also requires `text-embedding-v4` for open-source embedding components and `gpt-4o-mini` for open-source LLM-related components, with unrestricted rerankers; Commercial Products do not have those model restrictions.
 
+### Cycle 2 capability-level comparison and target deltas
+
+The official open-source winners provide diagnostic sub-scores, not only aggregate ranks:
+
+| Track / capability | Cycle 2 leader | Published sub-score | Next-cycle target (+5 pp) |
+|---|---|---:|---:|
+| Textual — explicit fact recall | Resurface | 62.98 | 67.98 |
+| Textual — relational / multi-hop | Resurface | 58.94 | 63.94 |
+| Textual — temporal / event sequencing | Resurface | 57.76 | 62.76 |
+| Textual — memory governance | Resurface | 76.55 | 81.55 |
+| Textual — personalization / care | Resurface | 38.82 | 43.82 |
+| Textual — workflow execution | Resurface | 59.67 | 64.67 |
+| Textual — epistemic safety / privacy | Resurface | 68.59 | 73.59 |
+| Textual — streaming | Resurface | 49.65 | 54.65 |
+| Coding — relevant new-feature resolution | InsightMem | 74.51% | 79.51% |
+| Coding — relevant bug-fix resolution | InsightMem | 57.58% | 62.58% |
+| Multimodal — retrieval | Khipu | 50.28 | 55.28 |
+| Multimodal — relational reasoning | Khipu | 45.82 | 50.82 |
+| Multimodal — temporal reasoning | Khipu | 34.23 | 39.23 |
+| Multimodal — continual learning | Khipu | 38.45 | 43.45 |
+| Multimodal — personalization | Khipu | 11.04 | 16.04 |
+| Multimodal — evidence governance | Khipu | 31.29 | 36.29 |
+
+The five-point targets apply to each capability in its native track and scale; they are not a claim that the overall score is the arithmetic mean of these rows. Coding uses resolved percentages, while textual/multimodal use the benchmark's score scale. Recompute when AML freezes the next cycle's data, API and model rules. Source: [official Cycle 2 results](https://agentmemoryleaderboard.ai/results/cycle-2/).
+
 The new AML submission preflight checks the declared profile, but it is not a runtime attestation and cannot replace a live, public Smoke test. Cycle 2 is closed; the next eligible cycle is the target.
 
 ### Learned forecasting qualification boundary
