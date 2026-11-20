@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-silicon/schemas/compute_exec_001/hdc_device_command_v0_1.schema.json",
   "title": "Luminous HDC device command v0.1",
-  "description": "Shape contract only. A host semantic validator must enforce operation-specific buffer roles, registered ranges, capability matching, epoch/sequence freshness and DMA safety before submission.",
+  "description": "Shape contract only. A host semantic validator must enforce operation-specific buffer roles, registered ranges, capability matching, epoch/sequence freshness and DMA safety before submission. JSON encodes u64-valued fields as decimal strings so values above 2^53 are not rounded by common JavaScript parsers; the host validator must range-check against u64::MAX.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -44,9 +44,8 @@
       "pattern": "^[0-9a-f]{32}$"
     },
     "sequence": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 18446744073709552000
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$"
     },
     "operation_id": {
       "enum": [
@@ -71,7 +70,7 @@
         },
         "contract_version": {
           "type": "string",
-          "pattern": "^[0-9]+\\\\.[0-9]+\\\\.[0-9]+$"
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
         },
         "contract_sha256": {
           "type": "string",
@@ -170,19 +169,16 @@
             "maxLength": 128
           },
           "generation": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 18446744073709552000
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$"
           },
           "offset_bytes": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 18446744073709552000
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
           },
           "length_bytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 18446744073709552000
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$"
           },
           "access": {
             "enum": [
