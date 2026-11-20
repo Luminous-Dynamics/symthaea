@@ -1196,4 +1196,18 @@ mod tests {
             .as_f64().unwrap() > 0.0);
     }
 
+    #[test]
+    fn exact_oracle_looks_ahead_through_zero_information_capability_actions() {
+        let (schema, fixture) = inputs();
+        let instance = Instance::from_bytes(&schema, &fixture).unwrap();
+        let (exact, _) = instance.exact_oracle(Objective::ExpectedValue).unwrap();
+        let greedy = instance.greedy(Objective::ExpectedValue).unwrap();
+        let exact_ids = instance.plan_ids(&exact);
+        let greedy_ids = instance.plan_ids(&greedy);
+        assert!(exact_ids.iter().any(|id| id == "qualify_synthesis_route"));
+        assert!(exact_ids.iter().any(|id| id == "synthesis_trial"));
+        assert!(!greedy_ids.iter().any(|id| id == "qualify_synthesis_route"));
+        assert!(!greedy_ids.iter().any(|id| id == "synthesis_trial"));
+    }
+
 }
