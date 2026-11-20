@@ -191,8 +191,8 @@
           "minLength": 1
         },
         "particles_per_cell": {
-          "type": "number",
-          "exclusiveMinimum": 0
+          "type": "integer",
+          "minimum": 1
         },
         "phase_space_resolution": {
           "type": "object",
@@ -444,5 +444,163 @@
     "notes": {
       "type": "string"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "selection_status": {
+            "enum": [
+              "selected",
+              "executed"
+            ]
+          }
+        },
+        "required": [
+          "selection_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rights_state": {
+            "const": "verified"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "selection_status": {
+            "const": "executed"
+          }
+        },
+        "required": [
+          "selection_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "execution_receipt_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "dimension": {
+                "const": 1
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          }
+        },
+        "required": [
+          "geometry"
+        ]
+      },
+      "then": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "grid_size": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "cell_spacing": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "domain_size": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "dimension": {
+                "const": 2
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          }
+        },
+        "required": [
+          "geometry"
+        ]
+      },
+      "then": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "grid_size": {
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "cell_spacing": {
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "domain_size": {
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "dimension": {
+                "const": 3
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          }
+        },
+        "required": [
+          "geometry"
+        ]
+      },
+      "then": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "grid_size": {
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "cell_spacing": {
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "domain_size": {
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
