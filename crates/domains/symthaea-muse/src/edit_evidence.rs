@@ -1,5 +1,5 @@
 //! Deterministic symbolic scoring for MUSE paired edit evidence v1.
-//! The initial implementation supports explicit one-to-one velocity and pitch edits.
+//! The initial implementation supports explicit one-to-one velocity, pitch and rational-duration edits.
 //! Unsupported operations and correspondence relations fail closed.
 
 use serde_json::{json, Value};
@@ -64,7 +64,7 @@ fn validate_score(score: &Score, label: &str) -> Result<(), String> {
             || !note.velocity.is_finite() || !(0.0..=1.0).contains(&note.velocity)
             || !note.section_intensity.is_finite() || note.section_intensity < 0.0
         {
-            return Err(format!("{label}.notes[{index}] has invalid rational timing or dynamics"));
+            return Err(format!("{label}.notes[{index}] has invalid MIDI pitch, rational timing or dynamics"));
         }
     }
     Ok(())
@@ -1022,7 +1022,7 @@ mod tests {
             &bytes(&candidate),
             None,
         ).unwrap_err();
-        assert!(error.contains("invalid rational timing or dynamics"));
+        assert!(error.contains("invalid MIDI pitch, rational timing or dynamics") || error.contains("invalid rational timing or dynamics"));
     }
 
     #[test]
