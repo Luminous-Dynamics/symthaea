@@ -560,6 +560,25 @@ mod tests {
     }
 
     #[test]
+    fn git_blob_sha1_matches_the_empty_git_object() {
+        assert_eq!(git_blob_sha1(&[]), "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
+    }
+
+    #[test]
+    fn duplicate_unordered_precursor_pairs_fail_closed() {
+        let (ledger, schema, manifest) = synthetic_inputs();
+        let mut data: Value = serde_json::from_slice(&ledger).unwrap();
+        let mut duplicate = data["samples"][0].clone();
+        duplicate["sample_id"] = json!("SYN-002");
+        data["samples"].as_array_mut().unwrap().push(duplicate);
+        let changed_ledger = serde_json::to_vec(&data).unwrap();
+        let mut manifest_data: Value = serde_json::from_slice(&manifest).unwrap();
+        manifest_data["ledger_git_blob_sha1"] = json!(git_blob_sha1(&changed_ledger));
+        let error = audit(&changed_ledger, &schema, &serde_json::to_vec(&manifest_data).unwrap()).unwrap_err();
+        assert!(error.contains("duplicate precursor pair"));
+    }
+
+    #[test]
     fn synthetic_ledger_is_scored_and_transformed_is_preserved() {
         let (ledger, schema, manifest) = synthetic_inputs();
         let receipt = audit(&ledger, &schema, &manifest).unwrap();
