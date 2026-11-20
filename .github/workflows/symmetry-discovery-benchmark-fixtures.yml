@@ -57,8 +57,8 @@ jobs:
           Draft202012Validator.check_schema(symfp_schema)
           Draft202012Validator(symfp_schema).validate(symfp_cases)
           expected_symfp = {
-              "SYMMFP-C2-ZERO-LEAKAGE-CS-001": ("C2", "Cs", [1,1,3,3,5,5,7,7,9,9], [1,2,3,4,5,6,7,8,9,10]),
-              "SYMMFP-TH-ZERO-LEAKAGE-D6H-001": ("Th", "D6h", [1,0,0,0,1,0,2,0,1,0], [1,0,1,0,1,0,2,0,2,0]),
+              "SYMFP-C2-ZERO-LEAKAGE-CS-001": ("C2", "Cs", [1,1,3,3,5,5,7,7,9,9], [1,2,3,4,5,6,7,8,9,10]),
+              "SYMFP-TH-ZERO-LEAKAGE-D6H-001": ("Th", "D6h", [1,0,0,0,1,0,2,0,1,0], [1,0,1,0,1,0,2,0,2,0]),
           }
           actual_symfp = {case["case_id"]: case for case in symfp_cases["cases"]}
           assert set(actual_symfp) == set(expected_symfp)
