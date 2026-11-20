@@ -724,8 +724,8 @@ pub fn verify_calibration_bundle_v1(
 mod tests {
     use super::*;
 
-    fn digest(ch: char) -> String {
-        std::iter::repeat(ch).take(64).collect()
+    fn digest(seed: usize) -> String {
+        format!("{seed:064x}")
     }
 
     fn row(
@@ -735,7 +735,12 @@ mod tests {
         score: Option<f64>,
         state: MeasurementStateV1,
     ) -> CalibrationObservationV1 {
-        let ch = char::from(b'a' + (index % 6) as u8);
+        let split_base = match split {
+            SplitV1::Fit => 10_000,
+            SplitV1::ThresholdSelection => 20_000,
+            SplitV1::HeldOut => 30_000,
+        };
+        let group_number = index / 2;
         CalibrationObservationV1 {
             sample_id: format!("sample-{index}"),
             source_group_id: format!("work-{}-{split:?}", index / 2),
@@ -748,10 +753,10 @@ mod tests {
             event_present: present,
             negative_family: (!present).then_some("octave_or_missing_fundamental".into()),
             reference_kind: ReferenceKindV1::SyntheticKnownAnswer,
-            source_audio_sha256: digest(ch),
-            source_midi_sha256: digest(char::from(b'g' + (index % 3) as u8)),
-            observation_receipt_sha256: digest('d'),
-            reference_receipt_sha256: digest('e'),
+            source_audio_sha256: digest(split_base + group_number),
+            source_midi_sha256: digest(40_000 + split_base + group_number),
+            observation_receipt_sha256: digest(50_000 + index),
+            reference_receipt_sha256: digest(60_000 + split_base + group_number),
         }
     }
 
@@ -787,8 +792,8 @@ mod tests {
             observer_id: "muse-score-audio-pitch-observer".into(),
             observer_version: "0.1.0".into(),
             feature_id: "fundamental_salience_db".into(),
-            annotation_protocol_sha256: digest('a'),
-            rights_clearance_receipt_sha256: digest('b'),
+            annotation_protocol_sha256: digest(1),
+            rights_clearance_receipt_sha256: digest(2),
             observations: rows,
             dataset_sha256: String::new(),
         };
