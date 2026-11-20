@@ -91,7 +91,8 @@
         "lower": 0.2,
         "upper": 0.3
       },
-      "source_class": "synthetic_fixture"
+      "source_class": "synthetic_fixture",
+      "standard_state_id": "standard_state_ref_001"
     },
     {
       "reaction_id": "r2_form_target",
@@ -121,7 +122,8 @@
         "lower": 0.9,
         "upper": 1.2
       },
-      "source_class": "synthetic_fixture"
+      "source_class": "synthetic_fixture",
+      "standard_state_id": "standard_state_ref_001"
     },
     {
       "reaction_id": "r3_direct_competitor",
@@ -151,7 +153,8 @@
         "lower": 0.4,
         "upper": 0.5
       },
-      "source_class": "synthetic_fixture"
+      "source_class": "synthetic_fixture",
+      "standard_state_id": "standard_state_ref_001"
     },
     {
       "reaction_id": "r4_polymorph_conversion",
@@ -177,7 +180,8 @@
         "lower": 0.1,
         "upper": 0.2
       },
-      "source_class": "synthetic_fixture"
+      "source_class": "synthetic_fixture",
+      "standard_state_id": "standard_state_ref_001"
     }
   ],
   "paths": [
@@ -230,5 +234,6 @@
       ]
     }
   ],
-  "claim_ceiling": "Synthetic stoichiometric and thermodynamic network audit only; no real synthesis route, DFT calculation, superconducting phase or laboratory authorization is established."
+  "claim_ceiling": "Synthetic stoichiometric and thermodynamic network audit only; no real synthesis route, DFT calculation, superconducting phase or laboratory authorization is established.",
+  "standard_state_id": "standard_state_ref_001"
 }
