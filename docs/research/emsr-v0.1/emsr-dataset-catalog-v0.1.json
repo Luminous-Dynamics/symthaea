@@ -1,0 +1,75 @@
+{
+  "schema": "emsr.dataset-catalog",
+  "version": "0.1.0",
+  "state": "FROZEN_DESIGN",
+  "entries": [
+    {
+      "id": "FGI-JAMMERTEST-2025-RECEIVER",
+      "kind": "recorded_receiver",
+      "version": "release-2026-09-30",
+      "source_uri": "https://etsin.fairdata.fi/dataset/095782a8-4e31-456e-8719-7021b4c96362",
+      "rights": {
+        "state": "pending",
+        "license_expression": "CC-BY-4.0",
+        "permitted_uses": [],
+        "source_terms_uri": "https://etsin.fairdata.fi/dataset/095782a8-4e31-456e-8719-7021b4c96362",
+        "reviewed_by": null,
+        "reviewed_at": null
+      },
+      "intended_use": "commercial",
+      "ingestion": "not_imported",
+      "payload_files": []
+    },
+    {
+      "id": "FRAUNHOFER-JAMMERTEST-2025-RAW-IQ",
+      "kind": "raw_iq",
+      "version": "10.5281/zenodo.21332689",
+      "source_uri": "https://zenodo.org/records/21332689",
+      "rights": {
+        "state": "pending",
+        "license_expression": "CC-BY-NC-SA-4.0",
+        "permitted_uses": [],
+        "source_terms_uri": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+        "reviewed_by": null,
+        "reviewed_at": null
+      },
+      "intended_use": "commercial",
+      "ingestion": "not_imported",
+      "payload_files": []
+    },
+    {
+      "id": "JAMMERTEST-2024-V3",
+      "kind": "recorded_receiver",
+      "version": "v3",
+      "source_uri": "https://zenodo.org/records/15911589",
+      "rights": {
+        "state": "pending",
+        "license_expression": null,
+        "permitted_uses": [],
+        "source_terms_uri": "https://zenodo.org/records/15911589",
+        "reviewed_by": null,
+        "reviewed_at": null
+      },
+      "intended_use": "commercial",
+      "ingestion": "not_imported",
+      "payload_files": []
+    },
+    {
+      "id": "JAMMERTEST-2023-RAW-IF",
+      "kind": "raw_if",
+      "version": "10.23729/fd-06d27736-45cb-3ca2-aff8-725d42c6caeb",
+      "source_uri": "https://doi.org/10.23729/fd-06d27736-45cb-3ca2-aff8-725d42c6caeb",
+      "rights": {
+        "state": "pending",
+        "license_expression": null,
+        "permitted_uses": [],
+        "source_terms_uri": "https://doi.org/10.23729/fd-06d27736-45cb-3ca2-aff8-725d42c6caeb",
+        "reviewed_by": null,
+        "reviewed_at": null
+      },
+      "intended_use": "commercial",
+      "ingestion": "not_imported",
+      "payload_files": []
+    }
+  ]
+}
