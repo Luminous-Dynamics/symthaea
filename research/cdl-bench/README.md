@@ -680,3 +680,15 @@ CDFs must start at zero, be monotonically nondecreasing, and have a positive fin
 The encoder and decoder must start from identical predictor configurations and update only after each symbol is coded/decoded. The frame includes the model ID but does not contain the custom checkpoint, configuration or initial state. Those are caller-supplied side information and must be counted separately in cold-start/amortized accounting.
 
 This makes it possible to compare HDC/CfC, context trees, transformer/SSM predictors or a causal residual model under the same arithmetic coder without changing the entropy-coding implementation. It does not by itself provide a Symthaea model adapter or prove a compression benefit.
+
+
+## Public telemetry data and query-aware storage
+
+The benchmark programme now tracks public microservice observability data separately from synthetic codec fixtures:
+
+- [CDL_PUBLIC_TELEMETRY_DATASETS_AND_QUERY_BENCH_V1_2026-11-20.md](../../docs/research/CDL_PUBLIC_TELEMETRY_DATASETS_AND_QUERY_BENCH_V1_2026-11-20.md): LO2v2 (115 runs, metrics/logs/traces) and the compact Alibaba microservice time/call-rate trace; licence, download/hash requirements, deterministic split protocol, query suite, comparator matrix and claim thresholds.
+- [CDL-Bench-015 #12970](https://github.com/Luminous-Dynamics/symthaea/issues/12970): dataset ingestion and query-trace execution.
+
+The environment used for this research could not resolve the Zenodo host, so dataset bytes were not acquired or hashed. Published record metadata/checksum values were inspected, but the archive acquisition remains explicitly pending. Do not describe the public-data benchmark as executed until actual source files, hashes and schema validation receipts exist.
+
+The benchmark is now a workload-level test: include single-series, service-cohort, host-cohort, time-window, service+time, anomaly drill-down, cross-service and full-scan queries. Compare cold/warm-cache bytes read and decompressed, groups touched, unrelated keys decoded, rows replayed, p50/p95/p99 latency, throughput, CPU and peak RSS. ALP in Parquet/Arrow is mandatory for eligible decimal-like numeric columns; Pco/Pcodec and exact-bit Gorilla/Chimp/Elf variants remain matched baselines. OpenTelemetry Arrow is a transport/dataflow comparator, not a persisted-file codec. Zstandard seekable frames are prior art, so PZG2's contribution must be measured telemetry-aware grouping and verified query semantics rather than "chunks plus an index".
