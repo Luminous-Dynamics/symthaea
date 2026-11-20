@@ -7,7 +7,7 @@
 
 ## What changes
 
-The reaction-selectivity auditor (#12996) accepts source-declared species and reaction-balance metadata. This workstream makes the next layer executable: it computes atom and charge conservation from a declared species composition map, validates path connectivity, sums reaction \(\Delta G\) intervals on a common extent basis and standard state, and checks both stoichiometric and energetic cycle closure.
+The reaction-selectivity auditor (#12996) accepts source-declared reaction-balance metadata. This workstream makes the next layer executable: it computes atom and charge conservation from a declared species-composition map, validates path connectivity, sums reaction \(\Delta G\) intervals on a common extent basis and standard state, and checks both stoichiometric and energetic cycle closure.
 
 The binary is \`sc_thermochemical_network_audit\`, implemented in the isolated \`superconductivity-discovery-harness\`.
 
@@ -52,7 +52,7 @@ An ordered path is validated for:
 - a shared intermediate hand-off between each adjacent pair of reactions;
 - final production of its declared target species.
 
-Route \(\Delta G\) is the interval sum of the reaction intervals, under the assumption that every reaction is expressed on the exact same declared extent basis and standard state. The barrier output is the maximum lower and maximum upper per-step barrier envelope. This is not an Arrhenius rate, a reaction time, or a synthesis-probability estimate.
+Route \(\Delta G\) is the interval sum of the reaction intervals, under the assumption that every reaction is expressed on the exact same declared extent basis, unit and standard state. The barrier output is the maximum lower and maximum upper per-step barrier envelope. This is not an Arrhenius rate, a reaction time, or a synthesis-probability estimate.
 
 ### Cycles
 
@@ -86,11 +86,11 @@ These values and chemical symbols are synthetic examples. They are not material 
 Registry: \`tools/superconductivity-discovery-harness/fixtures/thermochemical_network_suite_v0_1.json\`.
 
 1. **Balanced reference network** — all reaction atom/charge balances close, target route connects, competitor route connects, cycle closes in species space and its free-energy interval includes zero.
-2. **Unbalanced reaction** — the coefficient of \(C\) in the first reaction is deliberately corrupted. The auditor must reject the network and identify the nonzero \(C\) residual.
-3. **Thermodynamically inconsistent cycle** — the polymorph-conversion \(\Delta G\) is shifted so the cycle interval excludes zero. The auditor must report an energy inconsistency after verifying stoichiometric cycle closure.
-4. **Disconnected route** — the target path uses a reaction that does not produce the intermediate consumed by its next step. The auditor must reject the route.
+2. **Unbalanced reaction** — the coefficient of \(C\) in the first reaction is deliberately corrupted. The auditor rejects the network and identifies the nonzero \(C\) residual.
+3. **Thermodynamically inconsistent cycle** — the polymorph-conversion \(\Delta G\) is shifted so the cycle interval excludes zero. The auditor reports an energy inconsistency after verifying stoichiometric cycle closure.
+4. **Disconnected route** — the target path uses a reaction that does not produce the intermediate consumed by its next step. The auditor rejects the route.
 
-Additional unit tests mutate standard state, extent basis and target species to enforce fail-closed behavior.
+Additional unit tests mutate standard state, extent basis, cycle orientation and target species to enforce fail-closed behavior.
 
 ## Reproducible commands
 
@@ -103,7 +103,7 @@ cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Car
   --out /tmp/sc-thermochemical-network.json
 \`\`\`
 
-The discovery workflow also runs both fail-closed negative controls and retains the inconsistent-cycle receipt.
+The discovery workflow also runs the unbalanced and disconnected fail-closed negative controls and retains the inconsistent-cycle receipt.
 
 ## Relationship to the 2026 synthesis literature
 
