@@ -336,6 +336,37 @@ fn non_pitch_equal(a: &ScoreNote, b: &ScoreNote) -> bool {
         && a.section_intensity.to_bits() == b.section_intensity.to_bits()
 }
 
+fn non_duration_equal(a: &ScoreNote, b: &ScoreNote) -> bool {
+    a.part == b.part
+        && a.velocity.to_bits() == b.velocity.to_bits()
+        && a.pitch == b.pitch
+        && a.onset == b.onset
+        && a.role == b.role
+        && a.emphasis == b.emphasis
+        && a.section_intensity.to_bits() == b.section_intensity.to_bits()
+}
+
+fn gcd_i128(mut a: i128, mut b: i128) -> i128 {
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a.abs().max(1)
+}
+
+fn scaled_duration(value: Duration, numerator: i64, denominator: i64) -> Option<Duration> {
+    if numerator <= 0 || denominator <= 0 {
+        return None;
+    }
+    let raw_num = value.num() as i128 * numerator as i128;
+    let raw_den = value.den() as i128 * denominator as i128;
+    let divisor = gcd_i128(raw_num, raw_den);
+    let reduced_num = i64::try_from(raw_num / divisor).ok()?;
+    let reduced_den = i64::try_from(raw_den / divisor).ok()?;
+    (reduced_num > 0 && reduced_den > 0).then(|| Duration::new(reduced_num, reduced_den))
+}
+
 
 fn score_metadata_equal(a: &Score, b: &Score) -> bool {
     a.key == b.key
@@ -446,14 +477,14 @@ pub fn evaluate_symbolic_case(
     }
 
     let params = required(edit, "parameters", "edit_contract")?;
-    let velocity_scale = if operation == "velocity" {
+    let scale_parameters = if matches!(operation.as_str(), "velocity" | "duration") {
         let numerator = integer_field(params, "scale_numerator", "parameters")?;
         let denominator = integer_field(params, "scale_denominator", "parameters")?;
         if !(1..=1024).contains(&numerator)
             || !(1..=1024).contains(&denominator)
             || numerator == denominator
         {
-            return Err("velocity scale numerator/denominator must be in 1..=1024 and differ".into());
+            return Err("edit scale numerator/denominator must be in 1..=1024 and differ".into());
         }
         Some((numerator, denominator))
     } else {
@@ -558,7 +589,7 @@ pub fn evaluate_symbolic_case(
             target_expected += 1;
             let operation_ok = match operation.as_str() {
                 "velocity" => {
-                    let (numerator, denominator) = velocity_scale.expect("velocity scale validated");
+                    let (numerator, denominator) = scale_parameters.expect("velocity scale validated");
                     let expected_velocity = source_note.velocity * numerator as f32 / denominator as f32;
                     source_note.velocity.is_finite()
                         && candidate_note.velocity.is_finite()
@@ -566,6 +597,13 @@ pub fn evaluate_symbolic_case(
                         && (0.0..=1.0).contains(&expected_velocity)
                         && (candidate_note.velocity - expected_velocity).abs() <= velocity_tolerance
                         && non_velocity_equal(source_note, candidate_note)
+                }
+                "duration" => {
+                    let (numerator, denominator) = scale_parameters.expect("duration scale validated");
+                    scaled_duration(source_note.duration, numerator, denominator)
+                        .map(|expected_duration| candidate_note.duration == expected_duration)
+                        .unwrap_or(false)
+                        && non_duration_equal(source_note, candidate_note)
                 }
                 "pitch" => {
                     let semitones = pitch_shift.expect("pitch shift validated");
@@ -612,7 +650,12 @@ pub fn evaluate_symbolic_case(
             return Err(format!("evaluation.preservation_metrics must include {required_metric}"));
         }
     }
-    let primary_metric = if operation == "velocity" { "velocity_accuracy" } else { "pitch_accuracy" };
+    let primary_metric = match operation.as_str() {
+        "velocity" => "velocity_accuracy",
+        "pitch" => "pitch_accuracy",
+        "duration" => "duration_accuracy",
+        _ => unreachable!("supported operation validated above"),
+    };
     let has_primary_metric = requested_targets.iter().any(|request| request.as_str() == Some(primary_metric));
     if !has_primary_metric {
         return Err(format!("evaluation.target_metrics must include {primary_metric}"));
@@ -624,6 +667,7 @@ pub fn evaluate_symbolic_case(
             "exact_event_accuracy" => metric(id, target_correct, target_expected, 1.0, false),
             "velocity_accuracy" if operation == "velocity" => metric(id, target_correct, target_expected, 1.0, false),
             "pitch_accuracy" if operation == "pitch" => metric(id, target_correct, target_expected, 1.0, false),
+            "duration_accuracy" if operation == "duration" => metric(id, target_correct, target_expected, 1.0, false),
             "instruction_rubric_pass" => continue,
             _ => unavailable_metric(id),
         });
@@ -712,7 +756,7 @@ pub fn evaluate_symbolic_case(
         "case_id": case_id,
         "system": {
             "system_id": "muse-symbolic-edit-evaluator",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "track": "symbolic_editor",
             "compute_budget_ms": started.elapsed().as_millis(),
             "candidate_budget": 1
@@ -1075,6 +1119,50 @@ mod tests {
         ).unwrap();
         assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
         assert!(!result["outcome"]["preservation_pass"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn exact_duration_scaling_passes_symbolic_gates() {
+        let source = score(false);
+        let mut candidate = source.clone();
+        for note in candidate.notes.iter_mut().take(2) {
+            note.duration = Duration::new(1, 2);
+        }
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("duration");
+        case["instruction"]["text"] = json!("Make the part 10 notes half as long.");
+        case["edit_contract"]["parameters"] = json!({"scale_numerator": 1, "scale_denominator": 2});
+        case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "duration_accuracy"]);
+        let result = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(result["outcome"]["target_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["preservation_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["correspondence_pass"].as_bool().unwrap());
+        assert!(!result["outcome"]["strict_sample_exact_match"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn incorrect_duration_scale_fails_target_gate() {
+        let source = score(false);
+        let mut candidate = source.clone();
+        for note in candidate.notes.iter_mut().take(2) {
+            note.duration = Duration::new(1, 2);
+        }
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("duration");
+        case["edit_contract"]["parameters"] = json!({"scale_numerator": 2, "scale_denominator": 1});
+        case["evaluation"]["target_metrics"] = json!(["duration_accuracy"]);
+        let result = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap();
+        assert!(!result["outcome"]["target_pass"].as_bool().unwrap());
     }
 
     #[test]
