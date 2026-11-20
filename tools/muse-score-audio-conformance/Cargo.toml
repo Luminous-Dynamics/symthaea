@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "muse-score-audio-conformance"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent monophonic Score-to-WAV pitch conformance observer"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+hound = "=3.5.1"
+rustfft = "=6.4.1"
+symthaea-music-theory = { path = "../../crates/domains/symthaea-music-theory" }
