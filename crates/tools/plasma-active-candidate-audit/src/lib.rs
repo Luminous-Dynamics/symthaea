@@ -447,7 +447,7 @@ fn candidate_findings(candidate: &CandidateRun) -> Vec<AuditFinding> {
         _ => {}
     }
     if matches!(
-        candidate.selection_status,
+        &candidate.selection_status,
         SelectionStatus::Executed | SelectionStatus::Failed
     ) && candidate.execution_receipt_id.as_ref().is_none_or(|value| !non_empty(value))
     {
