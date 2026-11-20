@@ -119,9 +119,9 @@ For all operations, max_transfer_bytes is interpreted as the checked aggregate l
 
 ### 4.3 Completion record
 
-The device completion binds the command ID, device ID, epoch, sequence, semantic operation ID, canonical semantic-contract digest and implementation digest. A successful completion must also echo an output_buffer object containing the exact output role, opaque handle ID, generation, offset and length from the submitted command. The host compares every field before returning ownership or accepting the result. A matching command ID alone is insufficient. The host also compares the echoed operation and implementation digest with the pending command; a device/profile change while work is in flight invalidates the completion.
+The device completion binds the command ID, device ID, epoch, sequence, semantic operation ID, canonical semantic-contract digest and implementation digest. A successful completion must also echo an output_buffer object containing the exact output role, opaque handle ID, generation, offset and length from the submitted command. The host compares every field before returning ownership or accepting the result. A matching command ID alone is insufficient. The host also compares the echoed operation, canonical semantic-contract digest and implementation digest with the pending command; a device/profile change while work is in flight invalidates the completion.
 
-A successful completion includes a bounded result object and output digest. A digest is an integrity aid, not a digital signature or proof of correct computation. Qualification runs must hash the actual returned bytes and compare them with an independently generated software oracle. Physical authenticity requires a separately qualified trust chain.
+A successful completion includes a bounded result object and output digest. A digest is an integrity aid, not a digital signature or proof of correct computation. The pure state machine returns `CompletedOutputAvailable` only after the matching completion has returned buffer ownership to the host. This is **not** a verified-result status: the caller must read the actual output bytes, recompute the digest, check the operation-specific result encoding and compare against the independently generated software oracle before admitting the answer to the application. Physical authenticity requires a separately qualified trust chain.
 
 The pure host validator defines the operation contract IDs for semantic version 1.0.0 as symthaea.binaryhv.bind-xor-exact, symthaea.binaryhv.hamming-exact and symthaea.binaryhv.top1-exact.
 
@@ -208,7 +208,7 @@ Cache behavior must be explicit per hardware profile: coherent, explicit flush/i
 
 A new device initialization/reset creates a new 128-bit device epoch. Commands carry that epoch and a strictly increasing sequence number. Completions from an earlier epoch are rejected even if their command ID matches.
 
-The pure Rust host state machine reserves every referenced handle atomically before the driver is called. It enforces strictly increasing sequence numbers per epoch, bounded in-flight commands and unique command IDs. It does not perform MMIO, map DMA, pin memory, flush caches or establish physical quiescence.
+The pure Rust host state machine reserves every referenced handle atomically before the driver is called. It enforces strictly increasing sequence numbers per epoch, bounded in-flight commands and unique command IDs. A timeout, failed/cancelled device command or ambiguous outcome blocks **all new submissions in that device epoch**, not only reuse of the affected buffers. A new epoch must be established through reset/reconciliation before dispatch resumes. It does not perform MMIO, map DMA, pin memory, flush caches or establish physical quiescence.
 
 The host-side execution state is:
 
@@ -221,7 +221,7 @@ Failure paths are distinct:
 - Device failure, cancellation, timeout or **OUTCOME_UNKNOWN**: buffers enter quarantine because protocol v0.1 carries no independent DMA-quiescence assertion.
 - Reset: invalidate all prior-epoch commands, quarantine outstanding buffers, reinitialize the device and reconcile before reuse.
 
-Quarantined buffers are released only after an explicit confirm_dma_quiescent(old_epoch) call from a driver/platform layer that has independently established the old DMA context cannot write again. Calling this pure state-machine method is not itself proof of quiescence.
+Quarantined buffers are released only after an explicit confirm_dma_quiescent(old_epoch) call from a driver/platform layer that has independently established the old DMA context cannot write again. That confirmation releases eligible buffers but does not by itself unblock dispatch. The host must first record the externally completed reset/reinitialization with a distinct device epoch. Calling either pure state-machine method is not itself proof of physical quiescence or successful reset.
 
 A timeout is not proof that a command did not execute. Do not blindly resubmit a command into the same output range. Exact HDC operations are mathematically pure, but concurrent DMA writes, buffer reuse and command duplication can still corrupt memory. A replay is permitted only after the previous DMA context is quiescent and the input/output generations are reconciled.
 
@@ -284,7 +284,7 @@ Negative controls:
 - partial output and malformed reserved bytes;
 - device loss with uncertain DMA quiescence.
 
-Acceptance requires invalid descriptors to be rejected before DMA, no stale or mismatched-output completion accepted, no mutation outside registered output ranges, and no buffer reuse before quiescence. Include completion output-handle/generation/range substitution, output/input overlap, duplicate roles, non-canonical decimal u64 strings, and u64 overflow as negative controls.
+Acceptance requires invalid descriptors to be rejected before DMA, no stale or mismatched-output completion accepted, no new submissions after an uncertain outcome in the same epoch, no mutation outside registered output ranges, and no buffer reuse before quiescence. Include completion output-handle/generation/range substitution, output/input overlap, duplicate roles, non-canonical decimal u64 strings, and u64 overflow as negative controls.
 
 ### Functional parity
 
