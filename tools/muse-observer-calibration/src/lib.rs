@@ -20,6 +20,7 @@ pub const CONTRACT_SCHEMA_V1: &str = "muse-observer-calibration-contract-v1";
 pub const BUNDLE_SCHEMA_V1: &str = "muse-observer-calibration-bundle-v1";
 pub const CALIBRATOR_ID_V1: &str = "muse-isotonic-salience-calibrator";
 pub const CALIBRATOR_VERSION_V1: &str = "0.1.0";
+pub const MAX_DATASET_OBSERVATIONS_V1: usize = 2_000_000;
 const DATASET_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-dataset-v1";
 const BUNDLE_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-bundle-v1";
 
@@ -103,6 +104,8 @@ pub struct CalibrationContractV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq]
 pub struct IsotonicBlockV1 {
     pub lower_score_db: f64,
     pub upper_score_db: f64,
@@ -112,6 +115,8 @@ pub struct IsotonicBlockV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq]
 pub struct IsotonicModelV1 {
     pub schema: String,
     pub calibrator_id: String,
@@ -119,12 +124,15 @@ pub struct IsotonicModelV1 {
     pub feature_id: String,
     pub fit_dataset_sha256: String,
     pub fit_example_count: u64,
+    pub fit_unmeasured_count: u64,
     pub fit_positive_count: u64,
     pub blocks: Vec<IsotonicBlockV1>,
     pub model_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq]
 pub struct ThresholdSelectionV1 {
     pub target_maximum_false_support_rate: f64,
     pub selected_support_threshold: Option<f64>,
@@ -139,6 +147,8 @@ pub struct ThresholdSelectionV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq]
 pub struct HeldOutMetricsV1 {
     pub total_examples: u64,
     pub measured_examples: u64,
@@ -255,7 +265,7 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
         || dataset.observer_version.trim().is_empty()
         || dataset.feature_id.trim().is_empty()
         || dataset.observations.is_empty()
-        || dataset.observations.len() > 2_000_000
+        || dataset.observations.len() > MAX_DATASET_OBSERVATIONS_V1
     {
         return Err("dataset schema, identity, feature or observation count is invalid".into());
     }
@@ -274,7 +284,9 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
     let mut midi_splits = std::collections::BTreeMap::new();
     for (index, observation) in dataset.observations.iter().enumerate() {
         if observation.sample_id.trim().is_empty()
+            || observation.sample_id.len() > 256
             || observation.source_group_id.trim().is_empty()
+            || observation.source_group_id.len() > 512
             || observation.observer_id != dataset.observer_id
             || observation.observer_version != dataset.observer_version
             || observation.feature_id != dataset.feature_id
@@ -306,6 +318,9 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
                 return Err(format!("observations[{index}] non-measured row must not carry a raw score"));
             }
             _ => {}
+        }
+        if observation.negative_family.as_deref().is_some_and(|value| value.trim().is_empty() || value.len() > 128) {
+            return Err(format!("observations[{index}] negative_family is empty or too long"));
         }
         if !observation.event_present
             && observation.negative_family.as_deref().is_none_or(|value| value.trim().is_empty())
@@ -661,13 +676,18 @@ pub fn run_calibration_v1(
     }
     let blocks = fit_isotonic(&fit_rows)?;
     let fit_positive = count_class(&fit_rows, SplitV1::Fit, true) as u64;
+    let fit_measured_count = fit_rows.iter()
+        .filter(|row| row.measurement_state == MeasurementStateV1::Measured)
+        .count() as u64;
+    let fit_unmeasured_count = fit_rows.len() as u64 - fit_measured_count;
     let model_value = json!({
         "schema": "muse-isotonic-calibration-model-v1",
         "calibrator_id": CALIBRATOR_ID_V1,
         "calibrator_version": CALIBRATOR_VERSION_V1,
         "feature_id": contract.feature_id,
         "fit_dataset_sha256": dataset.dataset_sha256,
-        "fit_example_count": fit_rows.len(),
+        "fit_example_count": fit_measured_count,
+        "fit_unmeasured_count": fit_unmeasured_count,
         "fit_positive_count": fit_positive,
         "blocks": blocks
     });
