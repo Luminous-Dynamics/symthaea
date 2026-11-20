@@ -23,6 +23,11 @@
       "network_id": "adversarial_disconnected_route_001",
       "path": "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_disconnected_v0_1.json",
       "expectation": "auditor rejects a route whose second step consumes no product of the preceding step"
+    },
+    {
+      "network_id": "adversarial_unbalanced_charge_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_charge_v0_1.json",
+      "expectation": "auditor rejects reaction with nonzero computed charge residual even when element balances close"
     }
   ],
   "claim_ceiling": "Synthetic stoichiometric and thermodynamic network audit only; no real synthesis route, DFT calculation, superconducting phase or laboratory authorization is established."
