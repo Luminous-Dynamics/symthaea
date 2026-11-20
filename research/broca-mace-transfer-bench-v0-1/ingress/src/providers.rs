@@ -120,6 +120,72 @@ pub struct ProviderTraceBatch {
     pub source_capture_sha256: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProviderDataRetentionMode {
+    ProviderManaged,
+    ClientManaged,
+    ZeroDataRetention,
+    Unknown,
+}
+
+impl ProviderDataRetentionMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ProviderManaged => "provider_managed",
+            Self::ClientManaged => "client_managed",
+            Self::ZeroDataRetention => "zero_data_retention",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// Caller-declared experiment configuration, bound to exactly one trace capture.
+/// It is not proof that the provider actually executed the declared configuration.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderRunManifestV1 {
+    pub provider: Provider,
+    pub session_id: String,
+    pub run_id: String,
+    pub model_id: String,
+    pub model_release: String,
+    pub api_surface: String,
+    pub api_version: String,
+    pub endpoint: String,
+    pub harness_id: String,
+    pub harness_version: String,
+    pub harness_revision_sha256: String,
+    pub instructions_sha256: String,
+    pub tool_schema_sha256: String,
+    pub sandbox_image_sha256: String,
+    pub memory_policy_sha256: String,
+    pub memory_state_sha256: String,
+    pub runtime_config_sha256: String,
+    pub source_capture_sha256: String,
+    pub started_at_ms: i64,
+    pub ended_at_ms: i64,
+    pub retention_mode: ProviderDataRetentionMode,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProviderRunManifestReject {
+    EmptyRunOrConfigurationField,
+    InvalidDigest,
+    ProviderMismatch,
+    SessionMismatch,
+    CaptureDigestMismatch,
+    InvalidTimeRange,
+    CaptureOutsideRunWindow,
+}
+
+/// The binding establishes internal consistency only. A separate provider/runtime
+/// attestation verifier is required before these declarations can be trusted.
+#[derive(Clone, Debug)]
+pub struct BoundProviderTraceBatchV1 {
+    pub manifest: ProviderRunManifestV1,
+    pub manifest_sha256: String,
+    pub batch: ProviderTraceBatch,
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -352,6 +418,122 @@ pub fn normalize_capture_jsonl(
         events,
         duplicate_event_count,
         source_capture_sha256: sha256_hex(input.as_bytes()),
+    })
+}
+
+fn append_manifest_field(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn is_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| {
+            byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+        })
+}
+
+fn provider_run_manifest_digest(manifest: &ProviderRunManifestV1) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"mace:provider-run-manifest:v1\0");
+    append_manifest_field(&mut hasher, manifest.provider.as_str());
+    append_manifest_field(&mut hasher, &manifest.session_id);
+    append_manifest_field(&mut hasher, &manifest.run_id);
+    append_manifest_field(&mut hasher, &manifest.model_id);
+    append_manifest_field(&mut hasher, &manifest.model_release);
+    append_manifest_field(&mut hasher, &manifest.api_surface);
+    append_manifest_field(&mut hasher, &manifest.api_version);
+    append_manifest_field(&mut hasher, &manifest.endpoint);
+    append_manifest_field(&mut hasher, &manifest.harness_id);
+    append_manifest_field(&mut hasher, &manifest.harness_version);
+    append_manifest_field(&mut hasher, &manifest.harness_revision_sha256);
+    append_manifest_field(&mut hasher, &manifest.instructions_sha256);
+    append_manifest_field(&mut hasher, &manifest.tool_schema_sha256);
+    append_manifest_field(&mut hasher, &manifest.sandbox_image_sha256);
+    append_manifest_field(&mut hasher, &manifest.memory_policy_sha256);
+    append_manifest_field(&mut hasher, &manifest.memory_state_sha256);
+    append_manifest_field(&mut hasher, &manifest.runtime_config_sha256);
+    append_manifest_field(&mut hasher, &manifest.source_capture_sha256);
+    append_manifest_field(&mut hasher, &manifest.started_at_ms.to_string());
+    append_manifest_field(&mut hasher, &manifest.ended_at_ms.to_string());
+    append_manifest_field(&mut hasher, manifest.retention_mode.as_str());
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Bind the declared model/harness/memory configuration to one exact trace capture.
+/// This does not authenticate the declaration or confer execution/outcome authority.
+pub fn bind_provider_run_manifest(
+    batch: &ProviderTraceBatch,
+    manifest: ProviderRunManifestV1,
+) -> Result<BoundProviderTraceBatchV1, ProviderRunManifestReject> {
+    let required = [
+        manifest.session_id.as_str(),
+        manifest.run_id.as_str(),
+        manifest.model_id.as_str(),
+        manifest.model_release.as_str(),
+        manifest.api_surface.as_str(),
+        manifest.api_version.as_str(),
+        manifest.endpoint.as_str(),
+        manifest.harness_id.as_str(),
+        manifest.harness_version.as_str(),
+    ];
+    if required.iter().any(|value| value.trim().is_empty()) {
+        return Err(ProviderRunManifestReject::EmptyRunOrConfigurationField);
+    }
+
+    let digests = [
+        manifest.harness_revision_sha256.as_str(),
+        manifest.instructions_sha256.as_str(),
+        manifest.tool_schema_sha256.as_str(),
+        manifest.sandbox_image_sha256.as_str(),
+        manifest.memory_policy_sha256.as_str(),
+        manifest.memory_state_sha256.as_str(),
+        manifest.runtime_config_sha256.as_str(),
+        manifest.source_capture_sha256.as_str(),
+    ];
+    if digests.iter().any(|value| !is_lower_sha256(value)) {
+        return Err(ProviderRunManifestReject::InvalidDigest);
+    }
+    if manifest.provider != batch.provider {
+        return Err(ProviderRunManifestReject::ProviderMismatch);
+    }
+    if manifest.session_id != batch.session_id {
+        return Err(ProviderRunManifestReject::SessionMismatch);
+    }
+    if manifest.source_capture_sha256 != batch.source_capture_sha256 {
+        return Err(ProviderRunManifestReject::CaptureDigestMismatch);
+    }
+    if manifest.started_at_ms < 0 || manifest.ended_at_ms < manifest.started_at_ms {
+        return Err(ProviderRunManifestReject::InvalidTimeRange);
+    }
+
+    let min_capture = batch
+        .events
+        .iter()
+        .map(|event| event.captured_at_ms)
+        .min()
+        .ok_or(ProviderRunManifestReject::CaptureOutsideRunWindow)?;
+    let max_capture = batch
+        .events
+        .iter()
+        .map(|event| event.captured_at_ms)
+        .max()
+        .ok_or(ProviderRunManifestReject::CaptureOutsideRunWindow)?;
+    if min_capture < manifest.started_at_ms as u64
+        || max_capture > manifest.ended_at_ms as u64
+    {
+        return Err(ProviderRunManifestReject::CaptureOutsideRunWindow);
+    }
+
+    let manifest_sha256 = provider_run_manifest_digest(&manifest);
+    Ok(BoundProviderTraceBatchV1 {
+        manifest,
+        manifest_sha256,
+        batch: batch.clone(),
     })
 }
 
@@ -675,6 +857,144 @@ mod tests {
             &input
         ).unwrap();
         assert_eq!(batch.events[0].class, TraceClass::Unknown);
+    }
+
+    fn provider_manifest_fixture(batch: &ProviderTraceBatch) -> ProviderRunManifestV1 {
+        let digest = "a".repeat(64);
+        ProviderRunManifestV1 {
+            provider: batch.provider,
+            session_id: batch.session_id.clone(),
+            run_id: "run-2026-11-20-001".into(),
+            model_id: "gpt-6.2-astra".into(),
+            model_release: "2026-11-17".into(),
+            api_surface: "responses".into(),
+            api_version: "v1".into(),
+            endpoint: "/v1/responses".into(),
+            harness_id: "broca-harness".into(),
+            harness_version: "0.4.0".into(),
+            harness_revision_sha256: digest.clone(),
+            instructions_sha256: digest.clone(),
+            tool_schema_sha256: digest.clone(),
+            sandbox_image_sha256: digest.clone(),
+            memory_policy_sha256: digest.clone(),
+            memory_state_sha256: digest.clone(),
+            runtime_config_sha256: digest,
+            source_capture_sha256: batch.source_capture_sha256.clone(),
+            started_at_ms: batch.events[0].captured_at_ms as i64,
+            ended_at_ms: batch.events.last().unwrap().captured_at_ms as i64,
+            retention_mode: ProviderDataRetentionMode::ClientManaged,
+        }
+    }
+
+    #[test]
+    fn run_manifest_binds_model_harness_memory_and_exact_trace_capture() {
+        let input = [
+            envelope("manifest-session", 1, 100, json!({
+                "id": "evt-1",
+                "type": "agent.message",
+                "content": "hello"
+            })),
+            envelope("manifest-session", 2, 120, json!({
+                "id": "evt-2",
+                "type": "session.status_idle"
+            })),
+        ]
+        .join("\n");
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "manifest-session",
+            &input,
+        )
+        .unwrap();
+        let manifest = provider_manifest_fixture(&batch);
+        let bound = bind_provider_run_manifest(&batch, manifest.clone()).unwrap();
+        assert_eq!(bound.batch.source_capture_sha256, batch.source_capture_sha256);
+        assert_eq!(bound.manifest, manifest);
+        assert_eq!(
+            bound.manifest_sha256,
+            provider_run_manifest_digest(&bound.manifest)
+        );
+
+        let mut changed_harness = manifest;
+        changed_harness.harness_revision_sha256 = "b".repeat(64);
+        let changed = bind_provider_run_manifest(&batch, changed_harness).unwrap();
+        assert_ne!(bound.manifest_sha256, changed.manifest_sha256);
+    }
+
+    #[test]
+    fn run_manifest_rejects_provider_session_and_capture_rebinding() {
+        let input = envelope(
+            "manifest-session",
+            1,
+            100,
+            json!({"id": "evt-1", "type": "agent.message"}),
+        );
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "manifest-session",
+            &input,
+        )
+        .unwrap();
+
+        let mut wrong_provider = provider_manifest_fixture(&batch);
+        wrong_provider.provider = Provider::OpenAiAgentsSdk;
+        assert_eq!(
+            bind_provider_run_manifest(&batch, wrong_provider).unwrap_err(),
+            ProviderRunManifestReject::ProviderMismatch
+        );
+
+        let mut wrong_session = provider_manifest_fixture(&batch);
+        wrong_session.session_id = "other-session".into();
+        assert_eq!(
+            bind_provider_run_manifest(&batch, wrong_session).unwrap_err(),
+            ProviderRunManifestReject::SessionMismatch
+        );
+
+        let mut wrong_capture = provider_manifest_fixture(&batch);
+        wrong_capture.source_capture_sha256 = "b".repeat(64);
+        assert_eq!(
+            bind_provider_run_manifest(&batch, wrong_capture).unwrap_err(),
+            ProviderRunManifestReject::CaptureDigestMismatch
+        );
+    }
+
+    #[test]
+    fn run_manifest_rejects_bad_digests_and_invalid_time_windows() {
+        let input = envelope(
+            "manifest-session",
+            1,
+            100,
+            json!({"id": "evt-1", "type": "agent.message"}),
+        );
+        let batch = normalize_capture_jsonl(
+            Provider::AnthropicManagedAgents,
+            "manifest-session",
+            &input,
+        )
+        .unwrap();
+
+        let mut bad_digest = provider_manifest_fixture(&batch);
+        bad_digest.tool_schema_sha256 = "NOT-A-DIGEST".into();
+        assert_eq!(
+            bind_provider_run_manifest(&batch, bad_digest).unwrap_err(),
+            ProviderRunManifestReject::InvalidDigest
+        );
+
+        let mut before_capture = provider_manifest_fixture(&batch);
+        before_capture.started_at_ms = 101;
+        before_capture.ended_at_ms = 120;
+        assert_eq!(
+            bind_provider_run_manifest(&batch, before_capture).unwrap_err(),
+            ProviderRunManifestReject::CaptureOutsideRunWindow
+        );
+
+        let mut reversed = provider_manifest_fixture(&batch);
+        reversed.started_at_ms = 101;
+        reversed.ended_at_ms = 100;
+        assert_eq!(
+            bind_provider_run_manifest(&batch, reversed).unwrap_err(),
+            ProviderRunManifestReject::InvalidTimeRange
+        );
     }
 
     #[test]

@@ -405,3 +405,10 @@ The fixture verifier is synthetic. This validates crate composition and receipt/
 The test-only JSONL adapter no longer accepts a `verified: bool` consolidation record. It now consumes a canonical promotion proposal, receipt-preserving evidence pack and verifier-issued receipt; it calls the shared canonical release function and checks full bitemporal snapshot equality before exposing the released experience. Additional equality checks bind the legacy JSONL observation to the canonical action, scope, outcome, source-family/root digests, trust and measurement error bound.
 
 Four additional adversarial regressions cover non-promotion dispositions, output/proposal digest tampering, a substituted source event even when a matching proposal digest is supplied, and stale receipt replay against a later knowledge snapshot. This is still a synthetic fixture adapter: execution, outcome and source verifier registries are not live Mycelix/Symtropy verifiers.
+
+
+## Provider run-manifest reproducibility
+
+Provider traces can now be bound to a canonical run manifest containing model/release, API surface/version, harness revision, system-instruction digest, tool-schema digest, sandbox image, memory policy/state, runtime configuration, capture digest, run time window and retention mode. This enables matched tests for same-model/different-harness and different-model/same-harness.
+
+The manifest is self-declared metadata: it proves consistency with the captured trace, not that the provider actually executed the declared model or harness. Provider/runtime signatures and independent attestation remain future work. It is not execution or outcome authority.

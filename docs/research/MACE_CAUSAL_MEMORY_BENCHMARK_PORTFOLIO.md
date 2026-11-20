@@ -294,7 +294,7 @@ The MACE workspace now includes a separate broca-aml-adapter Rust crate. It enco
 
 The public guide requires Add success only after persistence and immediate Search visibility; retries reuse the same request_id and identical payload; Textual chunks at 20 messages or 2,000 frozen-adapter-counted words; user_id is the sole retrieval-isolation key; and Multimodal uses inline Base64 Data URIs with 10 MiB per image, 30 MiB per Add request and 30 MiB per Search response. Evaluation data is job-only and must be deleted within 30 days after run completion.
 
-**Cycle 2 snapshot, November 19, 2026:** the official page still labels results expected November 19; materials closed October 31 and Full evaluation closed November 4. No Cycle 2 rank is asserted. Cycle 1 historical Textual references are MemoraX v0.5 58.02 overall (commercial) and an open-method textual reference of 45.06 overall. These are not Cycle 2 results and are not directly comparable to MACE synthetic scores.
+**Cycle 2 official results, published November 19, 2026:** the official results page publishes nine distinct track/division leaderboards and 289 entries. Open-method leaders are Resurface Textual 61.22/100 (1/89), InsightMem Coding 63.33% resolved (1/20), and Khipu Multimodal 43.26/100 (1/18); commercial leaders are MemoraX Textual 69.26/100 (1/62), Coding 68.00% resolved (1/11), and Multimodal 53.68/100 (1/4). Textual/multimodal scores and coding resolution rates are different measures. See the [official results](https://agentmemoryleaderboard.ai/results/cycle-2/). The platform owns Answer/Eval; participants must provide hosted Add/Search endpoints. See the [competition contract](https://agentmemoryleaderboard.ai/competition/).
 
 Next-cycle targets: 100% smoke-contract compliance; zero cross-user leakage; zero premature Add acknowledgements; zero idempotency payload rebinding; exact parity with the frozen word counter; and at least +5 percentage points over the strongest same-track/division official baseline, with governance/safety gains measured separately.
 
@@ -314,3 +314,10 @@ The policy compares `mean(A) - mean(B)` across regimes, rather than separate abs
 The consolidation integration suite now has a Session-A → Session-B transport control built from raw `RawInteractionV1` records. Session A is ingested at an explicit (valid_at, known_at) snapshot, grouped into action-/scope-specific evidence packs, promoted through proposal-only consolidation, and released only after an independent receipt verifier accepts the exact source bindings. Session B contributes one receipt-verified witness per action under a shifted regime with a +0.15 common-mode baseline shift. Exact-scope policy abstains; invariant transport uses the stable A-B treatment effect.
 
 The fixture verifier is synthetic. This validates crate composition and receipt/evidence interfaces, not live Mycelix cryptographic verification or physical causal inference.
+
+
+### Provider/model/harness reproducibility contract
+
+MACE ingress now binds each provider trace capture to a canonical run manifest: provider/session/run, exact model ID/release, API surface/version/endpoint, harness revision, instructions and tool-schema digests, sandbox image, memory policy/state, runtime configuration, original capture digest, run time window and retention mode.
+
+This supports matched experiments for same-model/different-harness and different-model/same-harness. The manifest is self-declared metadata: binding proves consistency with one capture, not that the provider actually executed the declared model or harness. Provider/runtime attestation remains a separate qualification gate. This creates the experiment contract needed to distinguish improvements from the memory substrate from improvements caused by model or harness changes.

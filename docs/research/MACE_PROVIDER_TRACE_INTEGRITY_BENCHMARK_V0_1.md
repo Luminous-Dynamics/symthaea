@@ -249,3 +249,28 @@ Validation re-normalizes the original capture artifact and verifies every identi
 The first tests cover Anthropic persisted tool-result text, OpenAI RunItem tool output, whole-capture mutation, source-span mutation, non-string JSON pointers, UTF-8 boundary errors, assertion-digest mismatch, provider/thread/native-event mismatch, and invalid pointers/bounds. These are authored source tests only; no Rust runner pass is claimed.
 
 **Important boundary:** exact source-span binding proves where text came from, not that the text is true, complete, authorized or causally explanatory. A tool-output quote remains a tool-output claim.
+
+
+## Run-manifest contract (v1)
+
+Every provider trace should be bound to a run manifest that pins the exact experimental configuration:
+- provider, native session and run ID;
+- model ID and release/build;
+- API surface, API version and endpoint;
+- harness ID/version/revision digest;
+- system-instruction digest and tool-schema digest;
+- sandbox-image digest;
+- memory-policy digest and initial memory-state digest;
+- runtime-configuration digest;
+- original provider-capture digest;
+- run start/end time and declared data-retention mode.
+
+The current ingress adapter uses a canonical, length-prefixed SHA-256 digest and rejects provider/session/capture mismatches, malformed digests and captured events outside the declared run window.
+
+**Trust boundary:** a valid manifest proves internal consistency and exact configuration binding only. It does not prove the provider actually ran the declared model, that the harness binary was executed, or that the declared retention settings were honoured. These fields remain caller-declared until a provider/runtime attestation verifier authenticates them. Do not promote a run manifest into an execution, outcome or source receipt.
+
+This enables two attribution experiments:
+1. **Same model, different harness:** freeze model release/API and task/environment; vary harness revision and memory policy with equal budgets.
+2. **Different model, same harness:** freeze harness, sandbox, tool schema, memory policy and task environment; vary only the model release.
+
+Bind the initial memory-state digest and separately record each memory write/retrieval digest so a result can be replayed without treating provider-managed memory as canonical.

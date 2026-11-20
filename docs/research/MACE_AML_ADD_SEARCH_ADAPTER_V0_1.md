@@ -11,7 +11,7 @@ Mycelix owns provenance, bitemporal identity, authority, revocation and tenant i
 
 ## Official status, November 19, 2026
 
-The [official competition page](https://agentmemoryleaderboard.ai/competition/) still labels Cycle 2 results expected November 19 in the content checked for this snapshot; its public content still displays Cycle 1. No Cycle 2 rank is asserted.
+The [official Cycle 2 results](https://agentmemoryleaderboard.ai/results/cycle-2/) were published November 19, 2026. The official results page reports nine separate track/division leaderboards and 289 entries. Open-method leaders: Resurface Textual 61.22/100 (1/89), InsightMem Coding 63.33% resolved (1/20), and Khipu Multimodal 43.26/100 (1/18). Commercial leaders: MemoraX Textual 69.26/100 (1/62), Coding 68.00% resolved (1/11), and Multimodal 53.68/100 (1/4). These are separate track metrics, not one overall score.
 
 Cycle 2 materials closed October 31, 2026 at 23:59 UTC+8; Full evaluation closed November 4, 2026 at 23:59 UTC+8. New submissions are not available for this cycle.
 
@@ -76,11 +76,11 @@ A successful Add does not make a provider trace trusted memory. Preserve message
 | Governance/Safety | At least +10 points over same-track baseline without reducing legitimate-use coverage |
 | Efficiency | Report ingestion/search cost, memory bytes, p50/p95/p99 latency and cost per correct item |
 
-These are programme goals, not achieved results. Recalculate absolute thresholds after official Cycle 2 publication.
+These are programme goals, not achieved results. Next-cycle targets should use the appropriate same-track/division Cycle 2 leader as the baseline and the next cycle's frozen API/model contract.
 
 ## Implementation boundary
 
-The workspace contains broca-aml-adapter with 18 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, tenant/track-scoped SHA-256 Add idempotency with receipt-preserving replay, response-echo validation and receipt-bound write/search-visibility verification, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
+The workspace contains broca-aml-adapter with 19 authored unit tests. Implemented: typed contract core, injected-counter Textual chunking, tenant/track-scoped SHA-256 Add idempotency with receipt-preserving replay, response-echo validation and receipt-bound write/search-visibility verification, track-aware Search validation, Top-K/result-order checks and multimodal data-URI/media validation.
 
 Not implemented: HTTP service, authentication middleware, persistent store, atomic database idempotency, live signed write/search-visibility verifier, embeddings/retrieval/ranking, verified official word counter, live smoke/full evaluation, Cycle 2 submission, or end-to-end wiring from #12731 consolidation receipts into AML Add/Search.
 
