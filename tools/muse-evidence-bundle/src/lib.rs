@@ -1124,9 +1124,49 @@ mod tests {
     fn missing_required_verifiers_cannot_produce_pass() {
         let statuses = [GateStatusV1::Pass; 5];
         let report = verify_evidence_bundle_v1(&sealed_manifest(statuses), EvidenceInputsV1::default()).unwrap();
+        assert_eq!(report.declared_status, BundleStatusV1::Pass);
         assert_eq!(report.verified_status, BundleStatusV1::Abstain);
         assert_eq!(report.passed_gate_count, 0);
         assert_eq!(report.abstained_gate_count, 5);
+        assert!(report.reasons.iter().any(|reason| reason.contains("symbolic result bytes were not supplied")));
+    }
+
+    #[test]
+    fn unknown_manifest_fields_are_rejected_even_with_a_valid_reseal() {
+        let mut value: Value = serde_json::from_slice(
+            &sealed_manifest([GateStatusV1::Abstain; 5])
+        ).unwrap();
+        value["future_policy_override"] = Value::Bool(true);
+        value["receipt_sha256"] = Value::Null;
+        let digest = domain_digest(
+            BUNDLE_DIGEST_DOMAIN_V1,
+            &canonical_json_bytes(&value).unwrap(),
+        );
+        value["receipt_sha256"] = Value::String(digest);
+        let error = verify_evidence_bundle_v1(
+            &serde_json::to_vec(&value).unwrap(),
+            EvidenceInputsV1::default(),
+        ).unwrap_err();
+        assert!(error.contains("bundle field set mismatch"));
+    }
+
+    #[test]
+    fn declared_gate_counts_must_match_component_declarations() {
+        let mut value: Value = serde_json::from_slice(
+            &sealed_manifest([GateStatusV1::Pass; 5])
+        ).unwrap();
+        value["outcome"]["passed_gate_count"] = json!(4);
+        value["receipt_sha256"] = Value::Null;
+        let digest = domain_digest(
+            BUNDLE_DIGEST_DOMAIN_V1,
+            &canonical_json_bytes(&value).unwrap(),
+        );
+        value["receipt_sha256"] = Value::String(digest);
+        let error = verify_evidence_bundle_v1(
+            &serde_json::to_vec(&value).unwrap(),
+            EvidenceInputsV1::default(),
+        ).unwrap_err();
+        assert!(error.contains("declared outcome/status counts"));
     }
 
     #[test]
