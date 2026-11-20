@@ -404,7 +404,8 @@
         "false_support_rate_all_negatives",
         "event_recall",
         "support_coverage",
-        "brier_score"
+        "brier_score",
+        "false_support_rate_measured_negatives"
       ],
       "properties": {
         "support_precision": {
@@ -420,6 +421,9 @@
           "$ref": "#/$defs/bootstrapInterval"
         },
         "brier_score": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "false_support_rate_measured_negatives": {
           "$ref": "#/$defs/bootstrapInterval"
         }
       }
