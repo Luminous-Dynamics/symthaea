@@ -1404,6 +1404,46 @@ pub fn parse_decimal_u64(
 mod tests {
     use super::*;
 
+    use sha2::{Digest, Sha256};
+
+    const SEMANTIC_CONTRACT_DOCUMENT: &str =
+        include_str!("../../../../docs/research/COMPUTE_EXEC_001_HDC_DEVICE_CONTRACT_V0_1.md");
+
+    fn descriptor_block(operation_line: &str) -> &'static str {
+        let operation_position = SEMANTIC_CONTRACT_DOCUMENT
+            .find(operation_line)
+            .expect("operation must be present in the normative protocol document");
+        let prefix = &SEMANTIC_CONTRACT_DOCUMENT[..operation_position];
+        let fence = "```text\n";
+        let block_start = prefix
+            .rfind(fence)
+            .expect("operation must be inside a fenced normative descriptor")
+            + fence.len();
+        let suffix = &SEMANTIC_CONTRACT_DOCUMENT[operation_position..];
+        let closing_fence = suffix
+            .find("\n```")
+            .expect("normative descriptor must have a closing fence");
+        let block_end = operation_position + closing_fence + 1; // include final LF
+        &SEMANTIC_CONTRACT_DOCUMENT[block_start..block_end]
+    }
+
+    #[test]
+    fn documented_semantic_descriptor_bytes_match_host_pinned_sha256() {
+        let cases = [
+            ("hdc.bind_xor.exact.v1", "operation=hdc.bind_xor.exact.v1"),
+            ("hdc.hamming.exact.v1", "operation=hdc.hamming.exact.v1"),
+            ("hdc.top1.exact.v1", "operation=hdc.top1.exact.v1"),
+        ];
+        for (operation_id, operation_line) in cases {
+            let descriptor = descriptor_block(operation_line);
+            let actual = format!("{:x}", Sha256::digest(descriptor.as_bytes()));
+            let expected = expected_contract_sha256(operation_id).unwrap();
+            assert_eq!(
+                actual, expected,
+                "protocol document descriptor bytes drifted for {operation_id}"
+            );
+        }
+    }
     const CAPABILITIES: &str = include_str!(
         "../schemas/compute_exec_001/fixtures/simulator_capabilities_v0_1.json"
     );
