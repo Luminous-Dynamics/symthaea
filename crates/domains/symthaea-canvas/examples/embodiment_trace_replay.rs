@@ -166,6 +166,10 @@ fn percentile(sorted_samples: &[u64], percentile: usize) -> u64 {
 
 fn print_usage() {
     println!(
-        "Usage: embodiment_trace_replay --trace PATH [--iterations N]\nReplays one valid trace and reports semantic-reducer latency (P50/P95).\nThis excludes SVG/browser/GPU/audio/human-perception latency."
+        concat!(
+            "Usage: embodiment_trace_replay --trace PATH [--iterations N]\n",
+            "Replays one valid trace and reports semantic-reducer latency (P50/P95).\n",
+            "This excludes SVG/browser/GPU/audio/human-perception latency."
+        )
     );
 }
