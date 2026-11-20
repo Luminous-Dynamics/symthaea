@@ -38,7 +38,7 @@ Before any fitted model is scored:
 1. Identify exact sample IDs in the paper's 1,000-row analyzable cohort.
 2. Reconstruct all physical / characterization / metadata exclusion rules.
 3. Explain the nine additional categorized rows using sample-level provenance.
-4. Confirm the 26 in-situ holdout samples and remove the 218 literature rows involving the same precursor pairs from all training folds.
+4. Verify the 26 PG row exclusions against the paper's exact training table and recover the 218 PG-LIT row identifiers.
 5. Freeze a cohort manifest with source commit, ledger blob, inclusion rules and exact pair IDs.
 
 ## Outcome semantics
@@ -50,7 +50,9 @@ Before any fitted model is scored:
 
 ## Published 26-pair held-out onset reference
 
-`data/research/sc_onset_in_situ_validation_v0_1.json` records the 26 pairs and summary onset values from Supplementary Table S8 of arXiv:2611.23527v1. Every record is explicitly labelled `published_summary_only`; no sample ID, run ID or raw digest is fabricated. These data can support a score-reproduction check only if the authors' held-out split and evaluation procedure are faithfully reconstructed. They must remain excluded from training.
+`data/research/sc_onset_in_situ_validation_v0_1.json` records the 26 pairs and summary onset values from Supplementary Table S8 of arXiv:2611.23527v1. Every record is explicitly labelled `published_summary_only`; no in-situ sample ID, run ID or raw digest is fabricated. I joined the pair identities (unordered precursor formula pairs) against the pinned PG ledger: all 26 pairs map to 26 unique screening sample IDs. Those are preserved separately as `precursor_genome_screen_context`, including the screening setpoint/category and active refinement quality. They are not the in-situ onset measurements.
+
+The paper explicitly states that the 26 corresponding Precursor Genome samples and 218 PG-LIT literature rows involving those same pairs were removed from training. `data/research/sc_onset_pair_holdout_manifest_v0_1.json` now freezes the 26 PG sample IDs and pair-level exclusion rule. The public ledger provides the 26 PG row identities; the exact 218 literature-row IDs are not available in the currently inspected public source. A faithful PG-LIT reproduction still needs the authors' exact training table / row identifiers and split implementation. The 26 pairs must remain excluded from every training fold, feature-selection pass and uncertainty-calibration pass.
 
 The paper reports:
 - Tammann heuristic: 131 °C MAE, 152 °C RMSE, R² −0.59.
