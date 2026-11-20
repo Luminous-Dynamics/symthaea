@@ -6,12 +6,14 @@ set -euo pipefail
 
 readonly DEXOR_COMMIT="06128b3df57cc1e8c53681231e235e22eb508c8d"
 readonly TERSETS_COMMIT="64abd7767f8fc6ac1ef4e932f2027a74cf8fb4a0"
+readonly TPARQUET_COMMIT="d1a40f6fa5508c99ee95e9609f3c38b111e21cf6"
 readonly TARGET_TRIPLE="x86_64-linux"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${CDL_EXTERNAL_OUT:-$ROOT_DIR/target/cdl-external}"
 DEXOR_DIR="${DEXOR_DIR:-}"
 TERSETS_DIR="${TERSETS_DIR:-}"
+TPARQUET_DIR="${TPARQUET_DIR:-}"
 
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
@@ -95,6 +97,47 @@ if [[ -n "$DEXOR_DIR" ]]; then
   printf 'DeXOR reproduction completed: %s\n' "$dexor_out"
 else
   printf 'SKIP DeXOR: set DEXOR_DIR to a checkout at %s\n' "$DEXOR_COMMIT"
+fi
+
+if [[ -n "$TPARQUET_DIR" ]]; then
+  require_command cargo
+  require_command uv
+  require_command make
+  verify_revision "$TPARQUET_DIR" "$TPARQUET_COMMIT" "tparquet"
+
+  tparquet_out="$OUT_DIR/tparquet"
+  mkdir -p "$tparquet_out"
+  (
+    cd "$TPARQUET_DIR"
+    make bench
+  )
+
+  results_md="$TPARQUET_DIR/bench/RESULTS.md"
+  results_json="$TPARQUET_DIR/bench/results.json"
+  [[ -s "$results_md" ]] || fail "tparquet benchmark report missing or empty: $results_md"
+  [[ -s "$results_json" ]] || fail "tparquet benchmark JSON missing or empty: $results_json"
+  cp "$results_md" "$tparquet_out/RESULTS.md"
+  cp "$results_json" "$tparquet_out/results.json"
+  sha256sum "$tparquet_out/RESULTS.md" "$tparquet_out/results.json" > "$tparquet_out/result-sha256.txt"
+  {
+    printf 'repository=aperiodic-io/tparquet\\n'
+    printf 'commit=%s\\n' "$TPARQUET_COMMIT"
+    printf 'rustc=%s\\n' "$(rustc --version)"
+    printf 'cargo=%s\\n' "$(cargo --version)"
+    printf 'uv=%s\\n' "$(uv --version)"
+    printf 'host=%s\\n' "$(uname -a)"
+    printf 'cpu_model=%s\\n' "$(awk -F: '/model name/ {gsub(/^[ \\t]+/, "", $2); print $2; exit}' /proc/cpuinfo 2>/dev/null || true)"
+    printf 'worktree_status=\\n'
+    git -C "$TPARQUET_DIR" status --short
+  } > "$tparquet_out/reproduction.txt"
+  if [[ -d "$TPARQUET_DIR/bench/data" ]]; then
+    find "$TPARQUET_DIR/bench/data" -type f -print0 | sort -z | xargs -0 -r sha256sum > "$tparquet_out/dataset-sha256.txt"
+  else
+    printf 'dataset_directory_missing=bench/data\\n' > "$tparquet_out/dataset-sha256.txt"
+  fi
+  printf 'tparquet reproduction completed: %s\\n' "$tparquet_out"
+else
+  printf 'SKIP tparquet: set TPARQUET_DIR to a checkout at %s\\n' "$TPARQUET_COMMIT"
 fi
 
 if [[ -n "$TERSETS_DIR" ]]; then
