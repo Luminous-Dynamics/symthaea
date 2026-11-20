@@ -2096,6 +2096,7 @@ mod tests {
                     prediction_pre_registered: true,
                     confounders_controlled: true,
                     delayed_horizon_complete: true,
+                    identification: test_causal_identification(),
                     assessment_digest: "2".repeat(64),
                 })
             }
