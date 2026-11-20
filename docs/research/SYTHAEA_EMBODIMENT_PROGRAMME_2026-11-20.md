@@ -76,12 +76,21 @@ Sources:
 - https://vrm.dev/en/vrma/
 - https://docs.live2d.com/en/cubism-sdk-manual/lipsync/
 
-### Evaluation literature
+### Evaluation literature and interaction quality
 
-Audio-driven facial-animation evaluation commonly includes geometric measures such as lip vertex error and temporal/audio alignment measures such as LSE-D and LSE-C. These measure aspects of synchronization and articulation, not whether an avatar accurately communicates the real runtime state of an AI system.
+- A 2025 benchmark study of speech-driven 3D facial animation explicitly reports that the field lacks consensus on standardized datasets and evaluation methods. This is a direct reason to publish matched traces, hardware metadata, model versions, and measurement scripts rather than comparing unrelated paper numbers.
+- A 2026 IEEE Computer Graphics and Applications overview formalizes avatar interoperability as asset containers, semantic control interfaces, and streaming/transport rules. It emphasizes end-to-end latency, robustness, temporal stability, signal-domain distortion, and multi-criteria subjective assessment. This maps closely to the proposed SEFB tracks.
+- Established facial-animation metrics include LSE-D/LSE-C for lip synchronization, LVE/LMD for geometric articulation, and perceptual/video metrics for appearance. They do not measure runtime-state truthfulness.
+- Human-likeness is not automatically better. A 2025 meta-analysis finds the effects of human-like social cues depend on moderators and context. A 2026 CHI study of AI-mediated video found reduced perceived trustworthiness and confidence in judgments under some conditions. These findings are not direct evaluations of Symthaea-like companions, but they justify testing transparency, embodiment choice, and anthropomorphic over-attribution rather than assuming a more human face improves trust.
+- A commercial avatar vendor's 2026 benchmark uses live conversations, repeated within-participant comparisons, and post-session ratings. Its public methodology is a useful design reference, but its vendor sponsorship and full-pipeline scoring must be disclosed if used as a comparator.
 
-Source:
+Sources:
+- https://onlinelibrary.wiley.com/doi/10.1111/cgf.70073
+- https://pubmed.ncbi.nlm.nih.gov/42447007/
 - https://www.mdpi.com/2078-2489/15/11/675
+- https://www.nature.com/articles/s41599-025-05618-w
+- https://doi.org/10.1145/3772318.3790845
+- https://anam.ai/tools/avatar-quality-benchmark
 
 ## Proposed architecture
 
@@ -156,7 +165,7 @@ Added to symthaea-canvas:
 
 ## Benchmark programme: Symthaea Embodiment Fidelity Benchmark (SEFB)
 
-There is no single established leaderboard that jointly measures avatar realism, runtime-state fidelity, provenance honesty, accessibility, local performance, and user trust. Create a matched, reproducible evaluation suite rather than claiming a new SOTA score from unrelated papers.
+I did not identify an established leaderboard that jointly measures avatar realism, runtime-state fidelity, provenance honesty, accessibility, local performance, and user trust. A 2025 benchmark study specifically reports a lack of consensus in speech-driven 3D facial-animation evaluation. Create a matched, reproducible evaluation suite rather than claiming a new SOTA score from unrelated papers.
 
 ### Track A — semantic fidelity
 
