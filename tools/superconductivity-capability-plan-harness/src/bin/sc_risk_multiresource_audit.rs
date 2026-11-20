@@ -705,7 +705,7 @@ impl Instance {
             "precommitment_cvar_decision_regret":plan.cvar_regret,
             "expected_loss_evsi":plan.expected_evsi,
             "precommitment_cvar_evsi":plan.cvar_evsi,
-            "mutual_information_gain_nats":plan.mutual_information_nats,
+            "joint_world_state_information_gain_nats":plan.mutual_information_nats,
             "cvar_alpha":self.alpha,
             "rockafellar_uryasev_eta":plan.cvar_eta,
             "outcome_count":plan.outcome_count,
@@ -767,7 +767,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             "plan":instance.plan_receipt(&tail_oracle)
         },
         "mutual_information_oracle":{
-            "algorithm":"exact feasible subset enumeration; shared-nuisance model information",
+            "algorithm":"exact feasible subset enumeration; mutual information between joint world state and observations",
             "plan":instance.plan_receipt(&information_oracle)
         },
         "pareto_frontier":{
@@ -1019,6 +1019,26 @@ mod tests {
             assert!(plan.expected_regret.is_finite());
             assert!(plan.cvar_regret.is_finite());
         }
+    }
+
+    #[test]
+    fn regret_diagnostics_are_evaluated_under_the_reported_policy() {
+        let decisions = vec![
+            Decision { id: "d0".into(), losses: vec![0.0, 100.0] },
+            Decision { id: "d1".into(), losses: vec![40.0, 0.0] },
+        ];
+        let masses = vec![vec![0.45, 0.05], vec![0.05, 0.45]];
+        let best_loss = [0.0, 0.0];
+        let policy_always_d0 = [0, 0];
+        let policy_adaptive = [0, 1];
+        let (mean_fixed, tail_fixed) =
+            policy_regret_metrics(&masses, &decisions, &best_loss, &policy_always_d0, 0.5).unwrap();
+        let (mean_adaptive, tail_adaptive) =
+            policy_regret_metrics(&masses, &decisions, &best_loss, &policy_adaptive, 0.5).unwrap();
+        assert!((mean_fixed - 50.0).abs() < 1.0e-12);
+        assert!((tail_fixed - 100.0).abs() < 1.0e-12);
+        assert!((mean_adaptive - 7.0).abs() < 1.0e-12);
+        assert!((tail_adaptive - 14.0).abs() < 1.0e-12);
     }
 
 }
