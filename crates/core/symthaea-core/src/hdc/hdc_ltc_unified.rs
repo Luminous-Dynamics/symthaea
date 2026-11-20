@@ -2406,18 +2406,20 @@ mod tests {
     #[test]
     fn iterative_solver_rejects_invalid_tau_and_zero_budget_atomically() {
         let input = ContinuousHV::random_default(123);
-        let mut invalid_tau = HdcLtcUnifiedNeuron::new_default(42);
-        invalid_tau.config.tau_base = f32::NAN;
-        let before = invalid_tau.state().values.clone();
-        let clock = invalid_tau.evolution_clock();
-        let running = (invalid_tau.running_mean, invalid_tau.running_var);
-        assert_eq!(
-            invalid_tau
-                .evolve_closed_form_iterative(1.0, &input, 1_000)
-                .unwrap_err(),
-            IterativeEvolutionError::InvalidBaseTimeConstant
-        );
-        assert_iterative_rejection_is_atomic(&invalid_tau, &before, clock, running);
+        for tau in [0.0_f32, -0.1, f32::NAN, f32::INFINITY] {
+            let mut invalid_tau = HdcLtcUnifiedNeuron::new_default(42);
+            invalid_tau.config.tau_base = tau;
+            let before = invalid_tau.state().values.clone();
+            let clock = invalid_tau.evolution_clock();
+            let running = (invalid_tau.running_mean, invalid_tau.running_var);
+            assert_eq!(
+                invalid_tau
+                    .evolve_closed_form_iterative(1.0, &input, 1_000)
+                    .unwrap_err(),
+                IterativeEvolutionError::InvalidBaseTimeConstant
+            );
+            assert_iterative_rejection_is_atomic(&invalid_tau, &before, clock, running);
+        }
 
         let mut invalid_budget = HdcLtcUnifiedNeuron::new_default(42);
         let before = invalid_budget.state().values.clone();
@@ -2475,6 +2477,17 @@ mod tests {
                 .unwrap_err(),
             IterativeEvolutionError::WorkBudgetExceeded {
                 required_steps: 100,
+                max_steps: 10,
+            }
+        );
+        assert_iterative_rejection_is_atomic(&neuron, &before, clock, running);
+
+        assert_eq!(
+            neuron
+                .evolve_closed_form_iterative(f32::MAX, &input, 10)
+                .unwrap_err(),
+            IterativeEvolutionError::WorkBudgetExceeded {
+                required_steps: u128::MAX,
                 max_steps: 10,
             }
         );
