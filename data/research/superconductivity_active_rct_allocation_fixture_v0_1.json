@@ -11,7 +11,7 @@
   "families": [
     {
       "family_id": "family_alpha",
-      "application_weight": 0.4,
+      "application_weight": 0.3333333333333333,
       "effect_states": [
         {
           "state_id": "alpha_low",
@@ -32,7 +32,7 @@
     },
     {
       "family_id": "family_beta",
-      "application_weight": 0.35,
+      "application_weight": 0.3333333333333333,
       "effect_states": [
         {
           "state_id": "beta_low",
@@ -42,33 +42,33 @@
         {
           "state_id": "beta_mid",
           "prior_probability": 0.5,
-          "ate": 2
+          "ate": 1
         },
         {
           "state_id": "beta_high",
           "prior_probability": 0.35,
-          "ate": 5
+          "ate": 4
         }
       ]
     },
     {
       "family_id": "family_gamma",
-      "application_weight": 0.25,
+      "application_weight": 0.3333333333333333,
       "effect_states": [
         {
           "state_id": "gamma_low",
           "prior_probability": 0.2,
-          "ate": 0
+          "ate": -1
         },
         {
           "state_id": "gamma_mid",
           "prior_probability": 0.5,
-          "ate": 1.5
+          "ate": 1
         },
         {
           "state_id": "gamma_high",
           "prior_probability": 0.3,
-          "ate": 3.5
+          "ate": 4
         }
       ]
     }
@@ -91,7 +91,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": -0.75
+      "target_population_ate": -1
     },
     {
       "world_state_id": "world_alpha_low_beta_low_gamma_mid",
@@ -110,7 +110,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": -0.375
+      "target_population_ate": -0.3333333333333333
     },
     {
       "world_state_id": "world_alpha_low_beta_low_gamma_high",
@@ -129,7 +129,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 0.125
+      "target_population_ate": 0.6666666666666666
     },
     {
       "world_state_id": "world_alpha_low_beta_mid_gamma_low",
@@ -148,7 +148,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 0.29999999999999993
+      "target_population_ate": -0.3333333333333333
     },
     {
       "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
@@ -167,7 +167,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 0.6749999999999999
+      "target_population_ate": 0.3333333333333333
     },
     {
       "world_state_id": "world_alpha_low_beta_mid_gamma_high",
@@ -186,7 +186,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 1.1749999999999998
+      "target_population_ate": 1.3333333333333333
     },
     {
       "world_state_id": "world_alpha_low_beta_high_gamma_low",
@@ -205,7 +205,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 1.35
+      "target_population_ate": 0.6666666666666666
     },
     {
       "world_state_id": "world_alpha_low_beta_high_gamma_mid",
@@ -224,7 +224,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 1.725
+      "target_population_ate": 1.3333333333333333
     },
     {
       "world_state_id": "world_alpha_low_beta_high_gamma_high",
@@ -243,7 +243,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 2.225
+      "target_population_ate": 2.3333333333333335
     },
     {
       "world_state_id": "world_alpha_mid_beta_low_gamma_low",
@@ -262,7 +262,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 0.050000000000000044
+      "target_population_ate": -0.3333333333333333
     },
     {
       "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
@@ -281,7 +281,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 0.42500000000000004
+      "target_population_ate": 0.3333333333333333
     },
     {
       "world_state_id": "world_alpha_mid_beta_low_gamma_high",
@@ -300,7 +300,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 0.925
+      "target_population_ate": 1.3333333333333333
     },
     {
       "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
@@ -319,7 +319,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 1.1
+      "target_population_ate": 0.3333333333333333
     },
     {
       "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
@@ -338,7 +338,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 1.475
+      "target_population_ate": 1
     },
     {
       "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
@@ -357,7 +357,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 1.975
+      "target_population_ate": 2
     },
     {
       "world_state_id": "world_alpha_mid_beta_high_gamma_low",
@@ -376,7 +376,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 2.15
+      "target_population_ate": 1.3333333333333333
     },
     {
       "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
@@ -395,7 +395,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 2.525
+      "target_population_ate": 2
     },
     {
       "world_state_id": "world_alpha_mid_beta_high_gamma_high",
@@ -414,7 +414,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 3.025
+      "target_population_ate": 3
     },
     {
       "world_state_id": "world_alpha_high_beta_low_gamma_low",
@@ -433,7 +433,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 1.25
+      "target_population_ate": 0.6666666666666666
     },
     {
       "world_state_id": "world_alpha_high_beta_low_gamma_mid",
@@ -452,7 +452,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 1.625
+      "target_population_ate": 1.3333333333333333
     },
     {
       "world_state_id": "world_alpha_high_beta_low_gamma_high",
@@ -471,7 +471,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 2.125
+      "target_population_ate": 2.3333333333333335
     },
     {
       "world_state_id": "world_alpha_high_beta_mid_gamma_low",
@@ -490,7 +490,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 2.3
+      "target_population_ate": 1.3333333333333333
     },
     {
       "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
@@ -509,7 +509,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 2.675
+      "target_population_ate": 2
     },
     {
       "world_state_id": "world_alpha_high_beta_mid_gamma_high",
@@ -528,7 +528,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 3.175
+      "target_population_ate": 3
     },
     {
       "world_state_id": "world_alpha_high_beta_high_gamma_low",
@@ -547,7 +547,7 @@
           "family_state_id": "gamma_low"
         }
       ],
-      "target_population_ate": 3.35
+      "target_population_ate": 2.3333333333333335
     },
     {
       "world_state_id": "world_alpha_high_beta_high_gamma_mid",
@@ -566,7 +566,7 @@
           "family_state_id": "gamma_mid"
         }
       ],
-      "target_population_ate": 3.725
+      "target_population_ate": 3
     },
     {
       "world_state_id": "world_alpha_high_beta_high_gamma_high",
@@ -585,7 +585,7 @@
           "family_state_id": "gamma_high"
         }
       ],
-      "target_population_ate": 4.225
+      "target_population_ate": 4
     }
   ],
   "decisions": [
@@ -594,31 +594,31 @@
       "losses": [
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_low",
-          "loss": 8.5
+          "loss": 7.050000000000001
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_mid",
-          "loss": 7.75
+          "loss": 6.05
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_high",
-          "loss": 6.75
+          "loss": 4.55
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_low",
-          "loss": 6.4
+          "loss": 6.05
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
-          "loss": 5.65
+          "loss": 5.05
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_high",
-          "loss": 4.65
+          "loss": 3.55
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_low",
-          "loss": 4.3
+          "loss": 4.55
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_mid",
@@ -626,23 +626,23 @@
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_high",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_low",
-          "loss": 6.9
+          "loss": 6.05
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
-          "loss": 6.15
+          "loss": 5.05
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_high",
-          "loss": 5.15
+          "loss": 3.55
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
-          "loss": 4.8
+          "loss": 5.05
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
@@ -650,55 +650,55 @@
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
-          "loss": 3.05
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_low",
-          "loss": 0.6
+          "loss": 3.55
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_high",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_low",
-          "loss": 4.5
+          "loss": 4.55
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_mid",
-          "loss": 3.75
+          "loss": 3.55
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_high",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_low",
-          "loss": 0.6
+          "loss": 3.55
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_high",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_low",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_mid",
-          "loss": 0.6
+          "loss": 0.5
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_high",
-          "loss": 0.6
+          "loss": 0.5
         }
       ]
     },
@@ -707,111 +707,111 @@
       "losses": [
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_low",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_mid",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_high",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_low",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_high",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_low",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_mid",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_high",
-          "loss": 1.8562500000000002
+          "loss": 1.4949999999999999
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_low",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_high",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
-          "loss": 1.8
+          "loss": 1.4449999999999998
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_low",
-          "loss": 1.8375
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
-          "loss": 1.93125
+          "loss": 1.4449999999999998
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_high",
-          "loss": 2.05625
+          "loss": 1.595
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_low",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_mid",
-          "loss": 1.8
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_high",
-          "loss": 1.83125
+          "loss": 1.4949999999999999
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_low",
-          "loss": 1.875
+          "loss": 1.4
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
-          "loss": 1.96875
+          "loss": 1.4449999999999998
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_high",
-          "loss": 2.09375
+          "loss": 1.595
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_low",
-          "loss": 2.1375
+          "loss": 1.4949999999999999
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_mid",
-          "loss": 2.23125
+          "loss": 1.595
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_high",
-          "loss": 2.35625
+          "loss": 1.7449999999999999
         }
       ]
     },
@@ -828,103 +828,103 @@
         },
         {
           "world_state_id": "world_alpha_low_beta_low_gamma_high",
-          "loss": 1.0125
+          "loss": 1.08
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_low",
-          "loss": 1.03
+          "loss": 1
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
-          "loss": 1.0675
+          "loss": 1.04
         },
         {
           "world_state_id": "world_alpha_low_beta_mid_gamma_high",
-          "loss": 1.1175
+          "loss": 1.16
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_low",
-          "loss": 1.135
+          "loss": 1.08
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_mid",
-          "loss": 1.1725
+          "loss": 1.16
         },
         {
           "world_state_id": "world_alpha_low_beta_high_gamma_high",
-          "loss": 1.2225000000000001
+          "loss": 1.28
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_low",
-          "loss": 1.005
+          "loss": 1
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
-          "loss": 1.0425
+          "loss": 1.04
         },
         {
           "world_state_id": "world_alpha_mid_beta_low_gamma_high",
-          "loss": 1.0925
+          "loss": 1.16
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
-          "loss": 1.11
+          "loss": 1.04
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
-          "loss": 1.1475
+          "loss": 1.12
         },
         {
           "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
-          "loss": 1.1975
+          "loss": 1.24
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_low",
-          "loss": 1.215
+          "loss": 1.16
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
-          "loss": 1.2525
+          "loss": 1.24
         },
         {
           "world_state_id": "world_alpha_mid_beta_high_gamma_high",
-          "loss": 1.3025
+          "loss": 1.3599999999999999
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_low",
-          "loss": 1.125
+          "loss": 1.08
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_mid",
-          "loss": 1.1625
+          "loss": 1.16
         },
         {
           "world_state_id": "world_alpha_high_beta_low_gamma_high",
-          "loss": 1.2125
+          "loss": 1.28
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_low",
-          "loss": 1.23
+          "loss": 1.16
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
-          "loss": 1.2675
+          "loss": 1.24
         },
         {
           "world_state_id": "world_alpha_high_beta_mid_gamma_high",
-          "loss": 1.3175
+          "loss": 1.3599999999999999
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_low",
-          "loss": 1.335
+          "loss": 1.28
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_mid",
-          "loss": 1.3725
+          "loss": 1.3599999999999999
         },
         {
           "world_state_id": "world_alpha_high_beta_high_gamma_high",
-          "loss": 1.4224999999999999
+          "loss": 1.48
         }
       ]
     }
