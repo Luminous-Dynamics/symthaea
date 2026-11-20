@@ -20,6 +20,202 @@ const CENTER_Y: f32 = VIEWPORT_H / 2.0;
 const BRANCH_DEPTH: usize = 3;
 const PRIMARY_BRANCHES: usize = 8;
 
+
+fn build_activity_motif(activity: EmbodimentActivity, color: Color) -> SceneNode {
+    let mut motif = SceneNode::group(Some(match activity {
+        EmbodimentActivity::Listening => "motif-listening",
+        EmbodimentActivity::Perceiving => "motif-perceiving",
+        EmbodimentActivity::Retrieving => "motif-retrieving",
+        EmbodimentActivity::Associating => "motif-associating",
+        EmbodimentActivity::Predicting => "motif-predicting",
+        EmbodimentActivity::Planning => "motif-planning",
+        EmbodimentActivity::ExecutingTool => "motif-executing-tool",
+        EmbodimentActivity::AwaitingTool => "motif-awaiting-tool",
+        EmbodimentActivity::Interrupted => "motif-interrupted",
+        EmbodimentActivity::Fault => "motif-fault",
+        EmbodimentActivity::Idle => "motif-idle",
+    }));
+    let thin = Style {
+        fill: None,
+        stroke: Some(color.with_alpha(0.84)),
+        stroke_width: Some(1.6),
+        ..Style::default()
+    };
+    let dot = |x: f32, y: f32, radius: f32| {
+        SceneNode::circle(x, y, radius).with_style(Style {
+            fill: Some(color.with_alpha(0.92)),
+            ..Style::default()
+        })
+    };
+
+    match activity {
+        EmbodimentActivity::Idle => {}
+        EmbodimentActivity::Listening => {
+            for index in 0..3 {
+                let spread = index as f32 * 8.0;
+                motif.children.push(
+                    SceneNode::ellipse(
+                        CENTER_X,
+                        CENTER_Y - 132.0,
+                        17.0 + spread,
+                        5.0 + spread * 0.38,
+                    )
+                    .with_style(thin.clone()),
+                );
+            }
+        }
+        EmbodimentActivity::Perceiving => {
+            for offset in [-24.0, 0.0, 24.0] {
+                motif.children.push(dot(CENTER_X + offset, CENTER_Y - 132.0, 4.2));
+            }
+            motif.children.push(
+                SceneNode::line(
+                    CENTER_X - 24.0,
+                    CENTER_Y - 132.0,
+                    CENTER_X + 24.0,
+                    CENTER_Y - 132.0,
+                )
+                .with_style(thin.clone()),
+            );
+        }
+        EmbodimentActivity::Retrieving => {
+            let orbit = SceneNode::ellipse(CENTER_X, CENTER_Y, 104.0, 76.0)
+                .with_style(thin.clone());
+            motif.children.push(orbit);
+            motif.children.push(dot(CENTER_X, CENTER_Y - 76.0, 4.0));
+            motif.children.push(dot(CENTER_X - 90.0, CENTER_Y + 38.0, 4.0));
+            motif.children.push(dot(CENTER_X + 90.0, CENTER_Y + 38.0, 4.0));
+        }
+        EmbodimentActivity::Associating => {
+            motif.children.push(
+                SceneNode::path(format!(
+                    "M {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1}",
+                    CENTER_X - 92.0,
+                    CENTER_Y - 72.0,
+                    CENTER_X - 38.0,
+                    CENTER_Y - 112.0,
+                    CENTER_X + 38.0,
+                    CENTER_Y - 112.0,
+                    CENTER_X + 92.0,
+                    CENTER_Y - 72.0
+                ))
+                .with_style(thin.clone()),
+            );
+            motif.children.push(dot(CENTER_X - 92.0, CENTER_Y - 72.0, 4.0));
+            motif.children.push(dot(CENTER_X + 92.0, CENTER_Y - 72.0, 4.0));
+        }
+        EmbodimentActivity::Predicting => {
+            for offset in [-34.0, 0.0, 34.0] {
+                motif.children.push(
+                    SceneNode::path(format!(
+                        "M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1}",
+                        CENTER_X,
+                        CENTER_Y - 96.0,
+                        CENTER_X + offset * 0.45,
+                        CENTER_Y - 128.0,
+                        CENTER_X + offset,
+                        CENTER_Y - 148.0
+                    ))
+                    .with_style(thin.clone()),
+                );
+                motif.children.push(dot(
+                    CENTER_X + offset,
+                    CENTER_Y - 148.0,
+                    3.2,
+                ));
+            }
+        }
+        EmbodimentActivity::Planning => {
+            let points = (0..6)
+                .map(|index| {
+                    let angle = index as f32 * TAU / 6.0 - TAU / 4.0;
+                    (
+                        CENTER_X + angle.cos() * 25.0,
+                        CENTER_Y - 130.0 + angle.sin() * 18.0,
+                    )
+                })
+                .collect();
+            motif.children.push(
+                SceneNode::polygon(points, true).with_style(Style {
+                    fill: Some(color.with_alpha(0.12)),
+                    stroke: Some(color.with_alpha(0.90)),
+                    stroke_width: Some(1.5),
+                    ..Style::default()
+                }),
+            );
+            motif.children.push(dot(CENTER_X, CENTER_Y - 130.0, 3.0));
+        }
+        EmbodimentActivity::ExecutingTool => {
+            for offset in [-42.0, 0.0, 42.0] {
+                let x = CENTER_X + offset;
+                motif.children.push(
+                    SceneNode::line(CENTER_X, CENTER_Y - 86.0, x, CENTER_Y - 132.0)
+                        .with_style(thin.clone()),
+                );
+                motif.children.push(
+                    SceneNode::rect(x - 5.0, CENTER_Y - 137.0, 10.0, 10.0)
+                        .with_style(Style {
+                            fill: Some(color.with_alpha(0.16)),
+                            stroke: Some(color.with_alpha(0.94)),
+                            stroke_width: Some(1.3),
+                            ..Style::default()
+                        }),
+                );
+            }
+        }
+        EmbodimentActivity::AwaitingTool => {
+            motif.children.push(
+                SceneNode::circle(CENTER_X, CENTER_Y - 132.0, 11.0)
+                    .with_style(thin.clone()),
+            );
+            motif.children.push(dot(CENTER_X, CENTER_Y - 132.0, 2.8));
+        }
+        EmbodimentActivity::Interrupted => {
+            motif.children.push(
+                SceneNode::line(
+                    CENTER_X - 30.0,
+                    CENTER_Y - 132.0,
+                    CENTER_X - 7.0,
+                    CENTER_Y - 132.0,
+                )
+                .with_style(thin.clone()),
+            );
+            motif.children.push(
+                SceneNode::line(
+                    CENTER_X + 7.0,
+                    CENTER_Y - 132.0,
+                    CENTER_X + 30.0,
+                    CENTER_Y - 132.0,
+                )
+                .with_style(thin.clone()),
+            );
+            motif.children.push(dot(CENTER_X, CENTER_Y - 132.0, 3.0));
+        }
+        EmbodimentActivity::Fault => {
+            motif.children.push(
+                SceneNode::line(
+                    CENTER_X - 18.0,
+                    CENTER_Y - 150.0,
+                    CENTER_X + 18.0,
+                    CENTER_Y - 114.0,
+                )
+                .with_style(thin.clone()),
+            );
+            motif.children.push(
+                SceneNode::line(
+                    CENTER_X + 18.0,
+                    CENTER_Y - 150.0,
+                    CENTER_X - 18.0,
+                    CENTER_Y - 114.0,
+                )
+                .with_style(thin),
+            );
+        }
+    }
+
+    motif
+}
+
 /// Build the Mycelial Presence scene graph from explicit embodiment signals.
 ///
 /// Absent activity defaults to a quiet visual presentation, not an inferred
@@ -103,6 +299,8 @@ pub fn build_mycelial_presence(snapshot: &EmbodimentSnapshot) -> SceneNode {
             }),
         );
         root.children.push(activity_halo);
+        root.children
+            .push(build_activity_motif(activity, activity_color));
     }
 
     if let Some(uncertainty) = &snapshot.uncertainty {
@@ -367,6 +565,33 @@ mod tests {
         snapshot.speech_output = Some(observed(SpeechOutputState::Playing, 4));
         let playing = render_mycelial_presence(&snapshot, SvgRenderOptions::default());
         assert_ne!(still_queued, playing);
+    }
+
+
+    #[test]
+    fn semantic_activity_motifs_are_geometrically_distinct() {
+        let mut associating = EmbodimentSnapshot::default();
+        associating.activity = Some(observed(EmbodimentActivity::Associating, 1));
+        let mut predicting = EmbodimentSnapshot::default();
+        predicting.activity = Some(observed(EmbodimentActivity::Predicting, 1));
+
+        let associating_scene = build_mycelial_presence(&associating);
+        let predicting_scene = build_mycelial_presence(&predicting);
+        let motif_id = |scene: &SceneNode| {
+            scene.children.iter().find_map(|child| match &child.kind {
+                NodeKind::Group { id } if id.as_deref().is_some_and(|value| value.starts_with("motif-")) => {
+                    id.clone()
+                }
+                _ => None,
+            })
+        };
+
+        assert_eq!(motif_id(&associating_scene).as_deref(), Some("motif-associating"));
+        assert_eq!(motif_id(&predicting_scene).as_deref(), Some("motif-predicting"));
+        assert_ne!(
+            associating_scene.children.last().unwrap().node_count(),
+            predicting_scene.children.last().unwrap().node_count()
+        );
     }
 
     #[test]
