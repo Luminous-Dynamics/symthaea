@@ -11,9 +11,11 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Runtime activity that an embodiment may communicate.
+/// Runtime cognitive activity that an embodiment may communicate.
 ///
-/// These are operational states, not claims about subjective experience.
+/// Speech output is modeled independently by [SpeechOutputState] so retrieval,
+/// planning, and other cognitive activity can overlap with audio playback. These
+/// are operational states, not claims about subjective experience.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EmbodimentActivity {
@@ -24,11 +26,28 @@ pub enum EmbodimentActivity {
     Associating,
     Predicting,
     Planning,
-    Speaking,
     ExecutingTool,
     AwaitingTool,
     Interrupted,
     Fault,
+}
+
+
+/// Lifecycle of generated speech output. Only Playing authorizes viseme motion.
+///
+/// Synthesized or queued audio is not evidence that sound is currently being
+/// played. The playback backend must emit Playing after it actually starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpeechOutputState {
+    Synthesizing,
+    Ready,
+    Queued,
+    Playing,
+    Completed,
+    Interrupted,
+    Unavailable,
+    Failed,
 }
 
 /// Origin of a signal supplied to an embodiment renderer.
@@ -121,6 +140,9 @@ pub enum EmbodimentEventKind {
     ActivityChanged {
         activity: EmbodimentActivity,
     },
+    SpeechOutputChanged {
+        state: SpeechOutputState,
+    },
     VisemeChanged {
         viseme: Viseme,
         weight: f32,
@@ -143,6 +165,7 @@ pub enum EmbodimentEventKind {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct EmbodimentSnapshot {
     pub activity: Option<Observed<EmbodimentActivity>>,
+    pub speech_output: Option<Observed<SpeechOutputState>>,
     pub viseme: Option<Observed<VisemeSignal>>,
     pub gaze: Option<Observed<GazeTarget>>,
     pub uncertainty: Option<Observed<f32>>,
@@ -153,6 +176,10 @@ pub struct EmbodimentSnapshot {
 impl EmbodimentSnapshot {
     pub fn current_activity(&self) -> Option<EmbodimentActivity> {
         self.activity.as_ref().map(|observed| observed.value)
+    }
+
+    pub fn current_speech_output(&self) -> Option<SpeechOutputState> {
+        self.speech_output.as_ref().map(|observed| observed.value)
     }
 }
 
@@ -202,14 +229,17 @@ impl EmbodimentController {
             EmbodimentEventKind::ActivityChanged { .. } => {
                 validate_runtime_provenance("activity", event.provenance)?;
             }
+            EmbodimentEventKind::SpeechOutputChanged { .. } => {
+                validate_runtime_event_provenance("speech output", event.provenance)?;
+            }
             EmbodimentEventKind::Reset => {
                 validate_runtime_provenance("reset", event.provenance)?;
             }
             EmbodimentEventKind::VisemeChanged { weight, .. } => {
                 validate_runtime_provenance("viseme", event.provenance)?;
                 validate_unit_interval("viseme weight", *weight)?;
-                if self.snapshot.current_activity() != Some(EmbodimentActivity::Speaking) {
-                    return Err(EmbodimentIngestError::VisemeWithoutSpeech);
+                if self.snapshot.current_speech_output() != Some(SpeechOutputState::Playing) {
+                    return Err(EmbodimentIngestError::VisemeWithoutPlayback);
                 }
             }
             EmbodimentEventKind::UncertaintyChanged { level } => {
@@ -224,14 +254,21 @@ impl EmbodimentController {
         let monotonic_ns = event.monotonic_ns;
         match event.kind {
             EmbodimentEventKind::ActivityChanged { activity } => {
-                let changed = self.snapshot.current_activity() != Some(activity);
                 self.snapshot.activity = Some(make_observed(
                     activity,
                     provenance,
                     sequence,
                     monotonic_ns,
                 ));
-                if changed || activity != EmbodimentActivity::Speaking {
+            }
+            EmbodimentEventKind::SpeechOutputChanged { state } => {
+                self.snapshot.speech_output = Some(make_observed(
+                    state,
+                    provenance,
+                    sequence,
+                    monotonic_ns,
+                ));
+                if state != SpeechOutputState::Playing {
                     self.snapshot.viseme = None;
                 }
             }
@@ -271,6 +308,7 @@ impl EmbodimentController {
                     sequence,
                     monotonic_ns,
                 ));
+                self.snapshot.speech_output = None;
                 self.snapshot.viseme = None;
                 self.snapshot.gaze = None;
                 self.snapshot.uncertainty = None;
@@ -295,6 +333,17 @@ fn validate_runtime_provenance(
     }
 }
 
+fn validate_runtime_event_provenance(
+    field: &'static str,
+    provenance: SignalProvenance,
+) -> Result<(), EmbodimentIngestError> {
+    if provenance == SignalProvenance::RuntimeEvent {
+        Ok(())
+    } else {
+        Err(EmbodimentIngestError::SignalProvenanceNotAllowed { field, provenance })
+    }
+}
+
 fn validate_unit_interval(field: &'static str, value: f32) -> Result<(), EmbodimentIngestError> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
         Ok(())
@@ -308,7 +357,7 @@ pub enum EmbodimentIngestError {
     NonIncreasingSequence { last: u64, received: u64 },
     TimestampRegression { last: u64, received: u64 },
     InvalidUnitInterval { field: &'static str, value: f32 },
-    VisemeWithoutSpeech,
+    VisemeWithoutPlayback,
     SignalProvenanceNotAllowed {
         field: &'static str,
         provenance: SignalProvenance,
@@ -327,8 +376,8 @@ impl fmt::Display for EmbodimentIngestError {
             Self::InvalidUnitInterval { field, value } => {
                 write!(f, "{field} must be finite and within [0, 1], got {value}")
             }
-            Self::VisemeWithoutSpeech => {
-                write!(f, "viseme updates require an explicit Speaking activity")
+            Self::VisemeWithoutPlayback => {
+                write!(f, "viseme updates require confirmed speech playback")
             }
             Self::SignalProvenanceNotAllowed { field, provenance } => {
                 write!(f, "{field} cannot use {provenance:?} provenance")
@@ -372,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn viseme_requires_explicit_speaking_state() {
+    fn viseme_requires_confirmed_playback_state() {
         let mut controller = EmbodimentController::new();
         let result = controller.ingest(event(
             1,
@@ -382,19 +431,19 @@ mod tests {
                 weight: 0.8,
             },
         ));
-        assert_eq!(result, Err(EmbodimentIngestError::VisemeWithoutSpeech));
+        assert_eq!(result, Err(EmbodimentIngestError::VisemeWithoutPlayback));
         assert_eq!(controller.snapshot().last_event_sequence, None);
     }
 
     #[test]
-    fn leaving_speaking_clears_stale_viseme() {
+    fn leaving_playback_clears_stale_viseme() {
         let mut controller = EmbodimentController::new();
         controller
             .ingest(event(
                 1,
                 10,
-                EmbodimentEventKind::ActivityChanged {
-                    activity: EmbodimentActivity::Speaking,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Playing,
                 },
             ))
             .unwrap();
@@ -414,8 +463,8 @@ mod tests {
             .ingest(event(
                 3,
                 30,
-                EmbodimentEventKind::ActivityChanged {
-                    activity: EmbodimentActivity::Idle,
+                EmbodimentEventKind::SpeechOutputChanged {
+                    state: SpeechOutputState::Completed,
                 },
             ))
             .unwrap();
