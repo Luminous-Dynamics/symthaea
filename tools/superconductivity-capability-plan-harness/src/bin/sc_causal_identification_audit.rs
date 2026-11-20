@@ -40,6 +40,18 @@ struct AllocationDesign {
     randomization_seed: Option<u64>,
     assignment_receipt: HashMap<String, bool>,
 }
+impl AllocationDesign {
+    fn assignment_receipt_sha256(&self) -> String {
+        let mut entries: Vec<(&String, &bool)> = self.assignment_receipt.iter().collect();
+        entries.sort_by(|left, right| left.0.cmp(right.0));
+        let canonical = entries.into_iter().map(|(sample_id, treatment)| json!({
+            "sample_id":sample_id,
+            "treatment_assigned":treatment
+        })).collect::<Vec<_>>();
+        let bytes = serde_json::to_vec(&canonical).expect("canonical assignment receipt serializes");
+        format!("{:x}", Sha256::digest(bytes))
+    }
+}
 #[derive(Clone, Debug)]
 struct Cohort {
     id: String,
@@ -724,10 +736,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
                 "blocking_variable":cohort.allocation_design.blocking_variable,
                 "randomization_seed":cohort.allocation_design.randomization_seed,
                 "assignment_receipt_sample_count":cohort.allocation_design.assignment_receipt.len(),
-                "assignment_receipt_sha256":format!("{:x}",Sha256::digest(
-                    serde_json::to_vec(&cohort.allocation_design.assignment_receipt)
-                        .expect("assignment receipt serializes")
-                ))
+                "assignment_receipt_sha256":cohort.allocation_design.assignment_receipt_sha256()
             },
             "record_count":cohort.records.len(),
             "assignment_counts":{
@@ -1012,6 +1021,28 @@ mod tests{
         let mut value:Value=serde_json::from_slice(&fixture).unwrap();
         value["cohorts"][0]["allocation_design"]["allocation_algorithm"]=json!("random");
         assert!(Instance::from_bytes(&schema,&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn assignment_receipt_digest_is_independent_of_hash_map_iteration_order() {
+        let first = AllocationDesign {
+            randomization_unit: "specimen".to_owned(),
+            allocation_algorithm: "blocked_complete_randomization_fixed_counts".to_owned(),
+            blocking_variable: "batch_id".to_owned(),
+            randomization_seed: Some(20261120),
+            assignment_receipt: HashMap::from([
+                ("sample_b".to_owned(), false),
+                ("sample_a".to_owned(), true)
+            ]),
+        };
+        let second = AllocationDesign {
+            assignment_receipt: HashMap::from([
+                ("sample_a".to_owned(), true),
+                ("sample_b".to_owned(), false)
+            ]),
+            ..first.clone()
+        };
+        assert_eq!(first.assignment_receipt_sha256(), second.assignment_receipt_sha256());
     }
 
 }
