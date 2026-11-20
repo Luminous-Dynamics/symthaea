@@ -58,7 +58,8 @@ fn validate_score(score: &Score, label: &str) -> Result<(), String> {
         return Err(format!("{label} has invalid tempo, key, meter or total duration"));
     }
     for (index, note) in score.notes.iter().enumerate() {
-        if note.onset.den() <= 0 || note.onset.num() < 0
+        if note.pitch.midi() > 127
+            || note.onset.den() <= 0 || note.onset.num() < 0
             || note.duration.den() <= 0 || note.duration.num() <= 0
             || !note.velocity.is_finite() || !(0.0..=1.0).contains(&note.velocity)
             || !note.section_intensity.is_finite() || note.section_intensity < 0.0
@@ -71,6 +72,160 @@ fn validate_score(score: &Score, label: &str) -> Result<(), String> {
 
 fn required<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a Value, String> {
     value.get(key).ok_or_else(|| format!("{label} is missing {key}"))
+}
+
+fn check_object_shape(
+    value: &Value,
+    required_fields: &[&str],
+    allowed_fields: &[&str],
+    label: &str,
+) -> Result<(), String> {
+    let object = value.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+    for field in required_fields {
+        if !object.contains_key(*field) {
+            return Err(format!("{label} is missing required field {field}"));
+        }
+    }
+    for field in object.keys() {
+        if !allowed_fields.contains(&field.as_str()) {
+            return Err(format!("{label} contains unsupported field {field}"));
+        }
+    }
+    Ok(())
+}
+
+fn check_rational_shape(value: &Value, label: &str) -> Result<(), String> {
+    check_object_shape(value, &["numerator", "denominator"], &["numerator", "denominator"], label)
+}
+
+fn check_scope_shape(value: &Value, label: &str) -> Result<(), String> {
+    check_object_shape(value, &["part_id", "start", "end"], &["part_id", "start", "end"], label)?;
+    check_rational_shape(required(value, "start", label)?, &format!("{label}.start"))?;
+    check_rational_shape(required(value, "end", label)?, &format!("{label}.end"))
+}
+
+fn check_scope_array(value: &Value, label: &str, minimum: usize) -> Result<(), String> {
+    let entries = value.as_array().ok_or_else(|| format!("{label} must be an array"))?;
+    if entries.len() < minimum {
+        return Err(format!("{label} requires at least {minimum} entries"));
+    }
+    for (index, entry) in entries.iter().enumerate() {
+        check_scope_shape(entry, &format!("{label}[{index}]"))?;
+    }
+    Ok(())
+}
+
+/// Check all case objects against the v1 wire contract's closed-field sets
+/// before using any values. The release pipeline still validates the full
+/// JSON Schema (including ranges, patterns and enums) with a pinned validator.
+fn validate_case_wire_shape(case: &Value) -> Result<(), String> {
+    check_object_shape(
+        case,
+        &["schema", "case_id", "dataset_version", "split", "source_work_id", "rights", "source", "instruction", "edit_contract", "target", "evaluation"],
+        &["schema", "case_id", "dataset_version", "split", "source_work_id", "composer_id", "rights", "source", "instruction", "edit_contract", "target", "render_profile", "evaluation"],
+        "case",
+    )?;
+    let rights = required(case, "rights", "case")?;
+    check_object_shape(
+        rights,
+        &["basis", "license_id", "derivative_policy"],
+        &["basis", "license_id", "attribution", "consent_record_sha256", "derivative_policy"],
+        "rights",
+    )?;
+
+    let source = required(case, "source", "case")?;
+    check_object_shape(source, &["audio", "score_sha256", "stems"], &["audio", "score_sha256", "stems"], "source")?;
+    let audio = required(source, "audio", "source")?;
+    check_object_shape(audio, &["sha256", "duration_ms", "sample_rate_hz", "channels", "encoding"], &["sha256", "duration_ms", "sample_rate_hz", "channels", "encoding"], "source.audio")?;
+    let stems = required(source, "stems", "source")?.as_array()
+        .ok_or("source.stems must be an array")?;
+    for (index, stem) in stems.iter().enumerate() {
+        check_object_shape(stem, &["track_id", "audio_sha256", "score_part_id"], &["track_id", "audio_sha256", "score_part_id"], &format!("source.stems[{index}]"))?;
+    }
+
+    let instruction = required(case, "instruction", "case")?;
+    check_object_shape(instruction, &["text", "locale", "operation_family", "strength"], &["text", "locale", "operation_family", "strength"], "instruction")?;
+
+    let edit = required(case, "edit_contract", "case")?;
+    check_object_shape(edit, &["target_scopes", "protected_scopes", "parameters"], &["target_scopes", "protected_scopes", "parameters"], "edit_contract")?;
+    check_scope_array(required(edit, "target_scopes", "edit_contract")?, "edit_contract.target_scopes", 1)?;
+    check_scope_array(required(edit, "protected_scopes", "edit_contract")?, "edit_contract.protected_scopes", 0)?;
+    check_object_shape(
+        required(edit, "parameters", "edit_contract")?,
+        &[],
+        &["scale_numerator", "scale_denominator", "semitones", "offset_beats", "tempo_multiplier", "gain_db", "pan", "instrument_id", "articulation", "description"],
+        "edit_contract.parameters",
+    )?;
+
+    let target = required(case, "target", "case")?;
+    check_object_shape(target, &["target_kind", "expected_score_sha256", "expected_audio_sha256", "acceptable_audio_sha256", "event_correspondence"], &["target_kind", "expected_score_sha256", "expected_audio_sha256", "acceptable_audio_sha256", "event_correspondence"], "target")?;
+    let acceptable = required(target, "acceptable_audio_sha256", "target")?;
+    if !acceptable.is_array() {
+        return Err("target.acceptable_audio_sha256 must be an array".into());
+    }
+    let mappings = required(target, "event_correspondence", "target")?.as_array()
+        .ok_or("target.event_correspondence must be an array")?;
+    for (index, mapping) in mappings.iter().enumerate() {
+        check_object_shape(mapping, &["source_note_ordinals", "target_note_ordinals", "relation"], &["source_note_ordinals", "target_note_ordinals", "relation"], &format!("target.event_correspondence[{index}]"))?;
+    }
+
+    if let Some(profile) = case.get("render_profile") {
+        if !profile.is_null() {
+            check_object_shape(
+                profile,
+                &["renderer_id", "renderer_version", "binary_sha256", "environment_sha256", "configuration_sha256", "asset_sha256"],
+                &["renderer_id", "renderer_version", "binary_sha256", "environment_sha256", "configuration_sha256", "asset_sha256"],
+                "render_profile",
+            )?;
+        }
+    }
+
+    let evaluation = required(case, "evaluation", "case")?;
+    check_object_shape(evaluation, &["target_metrics", "preservation_metrics", "correspondence_required", "tolerances", "human_evaluation"], &["target_metrics", "preservation_metrics", "correspondence_required", "tolerances", "human_evaluation"], "evaluation")?;
+    for field in ["target_metrics", "preservation_metrics"] {
+        if !required(evaluation, field, "evaluation")?.is_array() {
+            return Err(format!("evaluation.{field} must be an array"));
+        }
+    }
+    let tolerances = required(evaluation, "tolerances", "evaluation")?;
+    check_object_shape(tolerances, &["onset_ms", "pitch_cents", "velocity_0_to_127", "minimum_correspondence_coverage"], &["onset_ms", "pitch_cents", "velocity_0_to_127", "minimum_correspondence_coverage"], "evaluation.tolerances")?;
+    let human = required(evaluation, "human_evaluation", "evaluation")?;
+    check_object_shape(human, &["required", "raters_per_item", "questions"], &["required", "raters_per_item", "questions"], "evaluation.human_evaluation")?;
+    if !required(human, "questions", "evaluation.human_evaluation")?.is_array() {
+        return Err("evaluation.human_evaluation.questions must be an array".into());
+    }
+    Ok(())
+}
+
+/// Reject unknown typed-Score fields before Serde's default permissive
+/// deserializer can silently discard them.
+fn validate_score_wire_shape(value: &Value, label: &str) -> Result<(), String> {
+    check_object_shape(value, &["key", "tempo_bpm", "meter", "notes", "total_beats"], &["key", "tempo_bpm", "meter", "notes", "total_beats"], label)?;
+    check_object_shape(required(value, "key", label)?, &["tonic", "tonality"], &["tonic", "tonality"], &format!("{label}.key"))?;
+    check_rational_shape(required(value, "total_beats", label)?, &format!("{label}.total_beats"))?;
+    let notes = required(value, "notes", label)?.as_array()
+        .ok_or_else(|| format!("{label}.notes must be an array"))?;
+    for (index, note) in notes.iter().enumerate() {
+        let note_label = format!("{label}.notes[{index}]");
+        check_object_shape(
+            note,
+            &["part", "pitch", "onset", "duration", "velocity", "role", "emphasis", "section_intensity"],
+            &["part", "pitch", "onset", "duration", "velocity", "role", "emphasis", "section_intensity"],
+            &note_label,
+        )?;
+        check_object_shape(required(note, "pitch", &note_label)?, &["midi"], &["midi"], &format!("{note_label}.pitch"))?;
+        check_rational_shape(required(note, "onset", &note_label)?, &format!("{note_label}.onset"))?;
+        check_rational_shape(required(note, "duration", &note_label)?, &format!("{note_label}.duration"))?;
+    }
+    Ok(())
+}
+
+fn deserialize_score(bytes: &[u8], label: &str) -> Result<Score, String> {
+    let value: Value = serde_json::from_slice(bytes)
+        .map_err(|error| format!("invalid {label} Score JSON: {error}"))?;
+    validate_score_wire_shape(&value, label)?;
+    serde_json::from_value(value)
+        .map_err(|error| format!("invalid typed {label} Score: {error}"))
 }
 
 fn string_field(value: &Value, key: &str, label: &str) -> Result<String, String> {
@@ -252,6 +407,7 @@ pub fn evaluate_symbolic_case(
     if string_field(&case, "schema", "case")? != CASE_SCHEMA {
         return Err("unsupported case schema".into());
     }
+    validate_case_wire_shape(&case)?;
     let case_id = string_field(&case, "case_id", "case")?;
     let case_digest = case_sha256(&case)?;
     let instruction = required(&case, "instruction", "case")?;
@@ -260,10 +416,8 @@ pub fn evaluate_symbolic_case(
         return Err(format!("abstain: operation family {operation} is not implemented"));
     }
 
-    let source: Score = serde_json::from_slice(source_score_bytes)
-        .map_err(|error| format!("invalid source Score JSON: {error}"))?;
-    let candidate: Score = serde_json::from_slice(candidate_score_bytes)
-        .map_err(|error| format!("invalid candidate Score JSON: {error}"))?;
+    let source = deserialize_score(source_score_bytes, "source")?;
+    let candidate = deserialize_score(candidate_score_bytes, "candidate")?;
     validate_score(&source, "source Score")?;
     validate_score(&candidate, "candidate Score")?;
     let source_digest = score_sha256(&source)?;
@@ -342,8 +496,10 @@ pub fn evaluate_symbolic_case(
         if sources.len() != 1 || targets.len() != 1 {
             return Err("v1 symbolic scorer requires one-to-one correspondence".into());
         }
-        let si = sources[0].as_u64().ok_or("source ordinal must be non-negative")? as usize;
-        let ti = targets[0].as_u64().ok_or("target ordinal must be non-negative")? as usize;
+        let si = usize::try_from(sources[0].as_u64().ok_or("source ordinal must be non-negative")?)
+            .map_err(|_| "source ordinal exceeds this target's addressable range")?;
+        let ti = usize::try_from(targets[0].as_u64().ok_or("target ordinal must be non-negative")?)
+            .map_err(|_| "target ordinal exceeds this target's addressable range")?;
         if si >= source_to_target.len() || ti >= target_to_source.len() {
             return Err("event correspondence ordinal is outside its bound Score".into());
         }
@@ -725,6 +881,36 @@ mod tests {
         case["source"]["score_sha256"] = json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         let error = evaluate_symbolic_case(&bytes(&case), &bytes(&source), &bytes(&candidate), None).unwrap_err();
         assert!(error.contains("source Score digest mismatch"));
+    }
+
+    #[test]
+    fn unknown_case_wire_field_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut case = case_for(&source);
+        case["unrecognized_policy"] = json!("silently ignore me");
+        let error = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("unsupported field"));
+    }
+
+    #[test]
+    fn unknown_score_wire_field_is_rejected() {
+        let source = score(false);
+        let candidate = score(true);
+        let mut score_value = serde_json::to_value(&source).unwrap();
+        score_value["notes"][0]["future_midi_control"] = json!(7);
+        let error = evaluate_symbolic_case(
+            &bytes(&case_for(&source)),
+            &bytes(&score_value),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("unsupported field"));
     }
 
     #[test]
