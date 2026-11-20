@@ -2,7 +2,7 @@ use jsonschema::validator_for;
 use serde_json::{json, Value};
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
