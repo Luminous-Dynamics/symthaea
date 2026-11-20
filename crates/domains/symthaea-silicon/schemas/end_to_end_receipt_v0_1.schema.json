@@ -543,7 +543,9 @@
                   "enum": [
                     "latency_p95",
                     "throughput",
-                    "energy_per_query"
+                    "energy_per_query",
+                    "query_major_throughput",
+                    "candidate_major_throughput"
                   ]
                 },
                 "kind": {
