@@ -119,11 +119,60 @@ For all operations, max_transfer_bytes is interpreted as the checked aggregate l
 
 ### 4.3 Completion record
 
-The device completion binds the command ID, device ID, epoch, sequence, semantic operation ID and implementation digest. A successful completion must also echo an output_buffer object containing the exact output role, opaque handle ID, generation, offset and length from the submitted command. The host compares every field before returning ownership or accepting the result. A matching command ID alone is insufficient. The host also compares the echoed operation and implementation digest with the pending command; a device/profile change while work is in flight invalidates the completion.
+The device completion binds the command ID, device ID, epoch, sequence, semantic operation ID, canonical semantic-contract digest and implementation digest. A successful completion must also echo an output_buffer object containing the exact output role, opaque handle ID, generation, offset and length from the submitted command. The host compares every field before returning ownership or accepting the result. A matching command ID alone is insufficient. The host also compares the echoed operation and implementation digest with the pending command; a device/profile change while work is in flight invalidates the completion.
 
 A successful completion includes a bounded result object and output digest. A digest is an integrity aid, not a digital signature or proof of correct computation. Qualification runs must hash the actual returned bytes and compare them with an independently generated software oracle. Physical authenticity requires a separately qualified trust chain.
 
 The pure host validator defines the operation contract IDs for semantic version 1.0.0 as symthaea.binaryhv.bind-xor-exact, symthaea.binaryhv.hamming-exact and symthaea.binaryhv.top1-exact.
+
+The host pins each semantic digest to the following canonical UTF-8 descriptors. The bytes are exactly the lines shown, separated by LF (0x0A), with one final LF; no BOM, whitespace rewriting or CRLF conversion is permitted. SHA-256 is over those exact bytes.
+
+```text
+luminous.hdc.semantic-contract
+version=1.0.0
+operation=hdc.bind_xor.exact.v1
+representation=luminous.binaryhv.bipolar.16384.v1
+dimension_bits=16384
+payload_bytes=2048
+bit_order=lsb0
+byte_order=little
+result=output_byte[i]=input_a_byte[i]^input_b_byte[i]; i=0..2047
+SHA256=156f87ae7d96cdc89cf09d84723c2f65aa80f2c0fcfc193df06f8545ed332c67
+```
+
+```text
+luminous.hdc.semantic-contract
+version=1.0.0
+operation=hdc.hamming.exact.v1
+representation=luminous.binaryhv.bipolar.16384.v1
+dimension_bits=16384
+payload_bytes=2048
+bit_order=lsb0
+byte_order=little
+result=popcount(input_a XOR input_b)
+distance_range=0..16384
+result_encoding=unsigned_u16_little_endian
+SHA256=c7e4cdcf7ee0ae962e1d4d033a125312a82e65a1aac7ce2f8d4f4d03b132712e
+```
+
+```text
+luminous.hdc.semantic-contract
+version=1.0.0
+operation=hdc.top1.exact.v1
+representation=luminous.binaryhv.bipolar.16384.v1
+dimension_bits=16384
+payload_bytes=2048
+bit_order=lsb0
+byte_order=little
+candidate_id=stable_unsigned_u64
+score=popcount(query XOR candidate)
+winner=argmin(distance, stable_candidate_id)
+tie_break=lowest_stable_candidate_id
+result_layout=16_bytes_little_endian:u64_winner_id,u16_distance,u48_reserved_zero
+SHA256=04b106f50f40963f0d2f88f9d779b83d9a55bd22d2e151f45f5211fa05c3f9cd
+```
+
+A change to any descriptor byte requires a new semantic version/digest and an explicit protocol admission update. The host validator rejects a valid-looking SHA-256 value that is not the pinned canonical digest. Successful completions echo that digest so the host can bind the returned result to the pending semantic command.
 
 ## 5. DMA, memory ownership and isolation
 
