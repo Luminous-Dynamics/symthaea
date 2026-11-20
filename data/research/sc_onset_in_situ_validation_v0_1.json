@@ -16,7 +16,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2238",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 2,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-02",
@@ -27,7 +37,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2226",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "partially_reacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-03",
@@ -38,7 +58,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2227",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "partially_reacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-04",
@@ -49,7 +79,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2228",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "partially_reacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-05",
@@ -60,7 +100,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2229",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 300,
+        "screen_reaction_category": "unreacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-06",
@@ -71,7 +121,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_1222",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "completely_reacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-07",
@@ -82,7 +142,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2248",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "partially_reacted",
+        "active_refinement_human_quality_score": 2,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-08",
@@ -93,7 +163,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_0922",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "unreacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-09",
@@ -104,7 +184,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2252",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "unreacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-10",
@@ -115,7 +205,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2246",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "unreacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-11",
@@ -126,7 +226,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2438",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 200,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-12",
@@ -137,7 +247,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2426",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 200,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-13",
@@ -148,7 +268,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2427",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 200,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-14",
@@ -159,7 +289,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2428",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 200,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-15",
@@ -170,7 +310,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2429",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 200,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-16",
@@ -181,7 +331,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_1224",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 200,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-17",
@@ -192,7 +352,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2635",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 500,
+        "screen_reaction_category": "partially_reacted",
+        "active_refinement_human_quality_score": 2,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-18",
@@ -203,7 +373,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2735",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 500,
+        "screen_reaction_category": "completely_reacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-19",
@@ -214,7 +394,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_2935",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 300,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-20",
@@ -225,7 +415,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_1235",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 500,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-21",
@@ -236,7 +436,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_3538",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 500,
+        "screen_reaction_category": "completely_reacted",
+        "active_refinement_human_quality_score": 2,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-22",
@@ -247,7 +457,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_3035",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "partially_reacted",
+        "active_refinement_human_quality_score": 2,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-23",
@@ -258,7 +478,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_3548",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "completely_reacted",
+        "active_refinement_human_quality_score": 2,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-24",
@@ -269,7 +499,17 @@
       "source_note": "Szymanski et al. 2024",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_3546",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": null,
+        "screen_reaction_category": "unreacted",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-25",
@@ -280,7 +520,17 @@
       "source_note": "McDermott et al. 2023",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_0446",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 400,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     },
     {
       "reference_id": "S8-26",
@@ -291,7 +541,17 @@
       "source_note": "McDermott et al. 2023",
       "sample_id": null,
       "execution_run_id": null,
-      "raw_data_sha256": null
+      "raw_data_sha256": null,
+      "precursor_genome_screen_context": {
+        "source_sample_id": "PG_0546",
+        "source_pair_match": "exact unordered formula-pair match",
+        "screen_heating_temperature_c": 200,
+        "screen_reaction_category": "transformed",
+        "active_refinement_human_quality_score": 1,
+        "active_refinement_accepted": true,
+        "physical_failure_recorded": false,
+        "evidence_scope": "one-temperature Precursor Genome screen row; not the published in-situ onset trace"
+      }
     }
   ],
   "paper_reported_holdout": {
@@ -299,7 +559,10 @@
     "purpose": "held-out in-situ XRD reaction-onset evaluation",
     "excluded_from_training": true,
     "literature_rows_involving_same_pairs_excluded_from_training": 218,
-    "caution": "Published summary table only. No raw in-situ traces, sample IDs, execution-run IDs or raw-data digests are attached here. Do not treat this manifest as direct source evidence or a substitute for the paper's 26-row evaluation protocol."
+    "caution": "Published summary table only. No raw in-situ traces, sample IDs, execution-run IDs or raw-data digests are attached here. Do not treat this manifest as direct source evidence or a substitute for the paper's 26-row evaluation protocol.",
+    "corresponding_precursor_genome_samples_excluded_from_training": 26,
+    "literature_rows_for_same_pairs_excluded_from_training": 218,
+    "matching_note": "All 26 Table S8 formula pairs were joined to one unique sample_id in the pinned Precursor Genome ledger by unordered formula identity. The precursor-genome_screen_context is screening evidence only; it is not the in-situ onset observation."
   },
   "claim_ceiling": "Transcribed publication summary for benchmark reproduction. Not raw observations, not a model prediction, not a new measurement."
 }
