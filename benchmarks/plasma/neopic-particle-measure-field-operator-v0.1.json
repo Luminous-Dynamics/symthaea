@@ -237,5 +237,54 @@
   },
   "related_research_issues": [
     "https://github.com/Luminous-Dynamics/symthaea/issues/12991"
-  ]
+  ],
+  "selective_risk_protocol": {
+    "schema_version": "0.1.0",
+    "status": "protocol_only_no_calibration_results",
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13010",
+    "split_policy": {
+      "unit": "complete trajectory and initial-condition family",
+      "disallow_random_timestep_split": true,
+      "separate_training_calibration_and_final_test": true,
+      "holdout_axes": [
+        "trajectory_seed",
+        "initial_condition_family",
+        "physical_parameter_ranges",
+        "time_horizon",
+        "particle_count",
+        "geometry_and_boundary_where_applicable"
+      ]
+    },
+    "calibration_outputs": [
+      "field_l2_error_upper_quantile",
+      "weighted_probe_field_error_upper_quantile",
+      "particle_force_error_upper_quantile",
+      "trajectory_distribution_error_upper_quantile",
+      "physics_diagnostic_deviation_upper_quantile"
+    ],
+    "scorecard": [
+      "nominal_vs_empirical_coverage",
+      "coverage_confidence_interval",
+      "false_safe_rate_and_confidence_interval",
+      "risk_coverage_curve_per_physics_lane",
+      "selective_risk_at_50_70_90_95_99_percent_coverage",
+      "fallback_and_correction_rate",
+      "p50_p95_end_to_end_runtime",
+      "peak_memory",
+      "energy_to_solution",
+      "subgroup_worst_case"
+    ],
+    "recalibrate_after": [
+      "model_checkpoint_change",
+      "solver_source_or_build_change",
+      "precision_change",
+      "normalization_or_preprocessing_change",
+      "physics_lane_or_metric_profile_change"
+    ],
+    "claim_limits": [
+      "statistical_calibration_is_not_a_deterministic_physics_certificate",
+      "OOD_detection_or_raw_confidence_alone_never_justifies_acceptance",
+      "missing_calibration_or_unrepresented_subgroup_requires_fallback_or_unresolved"
+    ]
+  }
 }
