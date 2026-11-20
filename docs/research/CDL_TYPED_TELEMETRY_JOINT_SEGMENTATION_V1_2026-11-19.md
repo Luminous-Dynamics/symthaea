@@ -286,6 +286,34 @@ This is synthetic C++ transform-plus-Zstd evidence, not Rust CDL, not tparquet/A
 
 The next engineering step is an adaptive **per-series/per-segment layout selector** that compares complete PRN1 row-state and PCL1 field-columnar candidates on a bounded sample, records the choice in the frame, and preserves the exact PRN1 order fallback for tied or regressing timestamps. Issue #12956 tracks this lane-layout work; issue #12935 tracks bounded-memory streaming, child indexes, checkpoints and corruption isolation.
 
+
+### Adaptive per-series selection: raw-size versus Zstd-aware child cost (2026-11-20)
+
+Two additional frames now expose the cost of adaptive layout selection:
+
+- **PAX1 raw-child selector:** stores each child uncompressed and selects PRN1 row-state or PCL1 field-columnar based on the smaller raw child length. The complete PAX1 frame is then compressed once with Zstd.
+- **PZC1 independent-child selector:** compresses both candidates with Zstd 1.5.7 level 19, selects the smaller compressed child, and stores that child as its own Zstd frame with layout tag, raw length, compressed length and raw child CRC32. The outer frame has its own CRC32. This makes series payloads independently decompressible, but resets the Zstd context for each series.
+
+Both formats are in `typed_record_partitioned_runs_reference.cpp`. The integrated C++ suite now checks empty frames, four fixture round-trips, row/columnar choice differences between idle and noisy streams, PZC1 child checksums, and corrupted/truncated frames. The local compile used GCC 14.2, `-O2 -std=c++20 -Wall -Wextra -Wconversion -Werror`, and linked libzstd 1.5.7. Tests passed.
+
+| Workload | PAX1 chosen children (row / columnar) | Zstd(PAX1 whole frame) | PZC1 independently compressed frame | Zstd(global delta) | Zstd(PRN1) | Zstd(PCL1) |
+|---|---:|---:|---:|---:|---:|---:|
+| Sparse | 64 / 0 | 61,887 B | 72,574 B | 85,931 B | 61,864 B | 59,042 B |
+| Bursty | 64 / 0 | 204,915 B | 219,720 B | 224,396 B | 204,921 B | 188,405 B |
+| Mostly idle | 64 / 0 | 4,782 B | 9,095 B | 5,577 B | 4,784 B | 5,692 B |
+| Noisy | 0 / 64 | 2,042,502 B | 2,173,924 B | 2,316,397 B | 2,252,910 B | 2,042,284 B |
+
+**PAX1 finding:** selecting the raw-smaller child is not enough. It selects row-state for sparse and bursty streams, even though whole-frame Zstd(PCL1) is 4.56% and 8.06% smaller than Zstd(PRN1) there. It picks columnar for noisy streams, where PCL1 is better. PAX1 therefore nearly reproduces PRN1 on these first three workloads and PCL1 on noisy, but does not discover the PCL1 sparse/bursty advantage.
+
+**PZC1 finding:** using actual Zstd-compressed child size changes the selection: it chooses columnar children for sparse, bursty and noisy data, and row-state for mostly idle data. Its complete independent-child frame beats Zstd(global delta) by 15.54% (sparse), 2.08% (bursty) and 6.15% (noisy), but is 63.08% larger on idle. It is still 17.31% larger than Zstd(PRN1) on sparse, 7.23% larger on bursty and 90.11% larger on idle; PCL1 whole-frame Zstd remains smaller on sparse, bursty and noisy. The per-child reset tax is visible.
+
+This creates a clear next design choice:
+- **Whole-frame/shared-context coding** wins bytes by letting Zstd exploit redundancy across series and metadata.
+- **Independent child frames** allow per-series decompression and can support selective reads, but pay frame/reset cost for each series.
+- A future frame should tune compression granularity: groups of related series, shared dictionaries, segment-level independent frames, and optional independent checkpoints. Do not assume one frame per series is the optimum.
+
+PAX1's heuristic only compares raw child size; PZC1 compares independently compressed child size. Neither is a complete online optimum after global compression, query cost, memory or indexing. The prototype remains full-memory C++ synthetic research; no Pco/ALP lane integration, no direct indexed query benchmark, no bounded-memory streaming and no Rust validation.
+
 ## Current Rust implementation status (compiler validation pending)
 
 The PR branch now contains `research/cdl-bench/src/telemetry.rs`, exported from `lib.rs`, with a `cdl-bench telemetry` synthetic command. The first frame has a fixed eight-lane schema, entity/series keys, exact u64 field payloads, explicit null/presence and changed-field masks, canonical u64 varints, deterministic bounded LRU state, segment-start checkpoints, and header/inner/raw-stream CRCs. The shared arithmetic coder is used for the transformed stream. Eight Rust tests are authored for round-trip, determinism, empty streams, truncation, single-bit mutations, resource limits, invalid field values and malformed varints.
