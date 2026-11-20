@@ -246,7 +246,7 @@
         },
         "window_rms_dbfs": {
           "type": "number",
-          "maximum": 0
+          "maximum": 24
         },
         "window_start_frame": {
           "type": "integer",
