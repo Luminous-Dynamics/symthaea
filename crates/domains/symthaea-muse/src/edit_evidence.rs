@@ -1,5 +1,5 @@
 //! Deterministic symbolic scoring for MUSE paired edit evidence v1.
-//! The first implementation supports only explicit one-to-one velocity edits.
+//! The initial implementation supports explicit one-to-one velocity and pitch edits.
 //! Unsupported operations and correspondence relations fail closed.
 
 use serde_json::{json, Value};
@@ -240,7 +240,7 @@ pub fn verify_result_seal(result: &Value) -> Result<(), String> {
 /// Evaluate a v1 velocity edit. Score bytes must deserialize as a typed
 /// symthaea_music_theory Score. Optional audio is hashed as raw artifact bytes.
 #[allow(clippy::too_many_lines)] // One v1 scoring transaction keeps all gates in one auditable path.
-pub fn evaluate_velocity_case(
+pub fn evaluate_symbolic_case(
     case_bytes: &[u8],
     source_score_bytes: &[u8],
     candidate_score_bytes: &[u8],
@@ -282,7 +282,7 @@ pub fn evaluate_velocity_case(
     let target_scopes = parse_scopes(required(edit, "target_scopes", "edit_contract")?, "target_scopes")?;
     let protected_scopes = parse_scopes(required(edit, "protected_scopes", "edit_contract")?, "protected_scopes")?;
     if target_scopes.is_empty() {
-        return Err("velocity edit requires at least one target scope".into());
+        return Err("symbolic edit requires at least one target scope".into());
     }
     if target_scopes.iter().any(|a| protected_scopes.iter().copied().any(|b| scopes_overlap(*a, b))) {
         return Err("target and protected scopes overlap".into());
@@ -454,7 +454,7 @@ pub fn evaluate_velocity_case(
     }
     if !edit_pass {
         target_metrics.push(json!({
-            "metric_id": "velocity_edit_contract",
+            "metric_id": "symbolic_edit_contract",
             "numerator": 0,
             "denominator": 1,
             "score": 0.0,
@@ -676,7 +676,7 @@ mod tests {
     fn velocity_edit_passes_symbolic_gates_but_strict_emr_remains_false() {
         let source = score(false);
         let candidate = score(true);
-        let result = evaluate_velocity_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
+        let result = evaluate_symbolic_case(&bytes(&case_for(&source)), &bytes(&source), &bytes(&candidate), None).unwrap();
         assert!(result["outcome"]["target_pass"].as_bool().unwrap());
         assert!(result["outcome"]["preservation_pass"].as_bool().unwrap());
         assert!(result["outcome"]["correspondence_pass"].as_bool().unwrap());
