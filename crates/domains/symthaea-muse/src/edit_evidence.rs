@@ -1258,6 +1258,54 @@ mod tests {
     }
 
     #[test]
+    fn inverse_duration_edit_restores_original_score_digest() {
+        let original = score(false);
+        let mut shortened = original.clone();
+        for note in shortened.notes.iter_mut().take(2) {
+            note.duration = Duration::new(1, 2);
+        }
+        let mut inverse_case = case_for(&shortened);
+        inverse_case["case_id"] = json!("synthetic.duration.inverse.001");
+        inverse_case["instruction"]["operation_family"] = json!("duration");
+        inverse_case["instruction"]["text"] = json!("Restore the target notes to their original length.");
+        inverse_case["edit_contract"]["parameters"] = json!({"scale_numerator": 2, "scale_denominator": 1});
+        inverse_case["evaluation"]["target_metrics"] = json!(["exact_event_accuracy", "duration_accuracy"]);
+        let result = evaluate_symbolic_case(
+            &bytes(&inverse_case),
+            &bytes(&shortened),
+            &bytes(&original),
+            None,
+        ).unwrap();
+        assert!(result["outcome"]["target_pass"].as_bool().unwrap());
+        assert!(result["outcome"]["preservation_pass"].as_bool().unwrap());
+        assert_eq!(
+            result["artifacts"]["candidate_score_sha256"],
+            json!(score_sha256(&original).unwrap())
+        );
+    }
+
+    #[test]
+    fn expanded_duration_crossing_target_boundary_is_rejected() {
+        let mut source = score(false);
+        source.notes[0].duration = Duration::new(1, 2);
+        source.total_beats = Duration::new(2, 1);
+        let mut candidate = source.clone();
+        candidate.notes[0].duration = Duration::new(3, 2);
+        let mut case = case_for(&source);
+        case["instruction"]["operation_family"] = json!("duration");
+        case["edit_contract"]["target_scopes"][0]["end"] = json!({"numerator": 1, "denominator": 1});
+        case["edit_contract"]["parameters"] = json!({"scale_numerator": 3, "scale_denominator": 1});
+        case["evaluation"]["target_metrics"] = json!(["duration_accuracy"]);
+        let error = evaluate_symbolic_case(
+            &bytes(&case),
+            &bytes(&source),
+            &bytes(&candidate),
+            None,
+        ).unwrap_err();
+        assert!(error.contains("candidate target scope") || error.contains("crosses an authorized time-scope boundary"));
+    }
+
+    #[test]
     fn incorrect_duration_scale_fails_target_gate() {
         let source = score(false);
         let mut candidate = source.clone();
