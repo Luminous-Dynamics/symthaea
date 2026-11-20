@@ -545,9 +545,11 @@ impl Instance {
         if first == second { return Ok(None); }
         let a = &self.actions[first];
         let b = &self.actions[second];
+        let mut available = self.capabilities.clone();
+        for capability in &a.provides { available.insert(capability.clone()); }
         if !a.eligible || !b.eligible
             || !a.requires.iter().all(|c| self.capabilities.contains(c))
-            || !b.requires.iter().all(|c| self.capabilities.contains(c)) {
+            || !b.requires.iter().all(|c| available.contains(c)) {
             return Ok(None);
         }
         let Some(total) = add_vectors(&a.consumption, &b.consumption) else {
@@ -594,15 +596,39 @@ impl Instance {
         })
     }
 
+    fn action_descriptor(&self, index: usize) -> Value {
+        let action = &self.actions[index];
+        let resource_consumption = self.resources.iter().enumerate()
+            .filter_map(|(resource_index, resource)| {
+                let quantity = action.consumption[resource_index];
+                (quantity > 0).then(|| json!({
+                    "resource_id":resource.id,
+                    "unit":resource.unit,
+                    "quantity":quantity
+                }))
+            }).collect::<Vec<_>>();
+        json!({
+            "action_id":action.id,
+            "action_kind":action.kind,
+            "specimen_id":action.specimen_id,
+            "reversibility":action.reversibility,
+            "requires_capabilities":action.requires,
+            "provides_capabilities":action.provides,
+            "resource_consumption":resource_consumption
+        })
+    }
+
     fn branch_receipt(&self, branch: &Branch) -> Value {
         let first_label = branch.first_outcome.map(|i| self.outcomes[i].as_str()).unwrap_or("no_action");
         let second_policy = branch.terminal_policy.iter().enumerate().map(|(i, decision)| json!({
             "second_outcome": if branch.second_action.is_some() { self.outcomes[i].as_str() } else { "not_applicable" },
             "terminal_decision": self.decisions[*decision].id
         })).collect::<Vec<_>>();
+        let second_details = branch.second_action.map(|index| self.action_descriptor(index));
         json!({
             "first_outcome":first_label,
             "second_action":branch.second_action.map(|i| self.actions[i].id.clone()),
+            "second_action_details":second_details,
             "expected_terminal_loss_contribution":branch.loss,
             "terminal_policy":second_policy,
             "additional_resource_consumption":branch.additional_consumption
@@ -620,8 +646,11 @@ impl Instance {
             "semantics":resource.semantics
         })).collect::<Vec<_>>();
         let action_ids = plan.first_action.map(|i| self.actions[i].id.clone());
+        let first_details = plan.first_action.map(|i| self.action_descriptor(i));
         json!({
             "first_action":action_ids,
+            "first_action_details":first_details,
+            "reference_resource_id":self.resources[self.reference_resource].id,
             "branches":plan.branches.iter().map(|b| self.branch_receipt(b)).collect::<Vec<_>>(),
             "expected_terminal_decision_loss":plan.loss,
             "action_count_on_policy_tree":self.plan_action_count(plan),
@@ -806,4 +835,27 @@ mod tests {
         value["actions"][0]["resource_consumption"][0]["unit"]=json!("hour");
         assert!(Instance::from_bytes(&schema,&serde_json::to_vec(&value).unwrap()).is_err());
     }
+    #[test]
+    fn pairing_strength_and_phase_coherence_are_not_collapsed_into_one_score() {
+        let (schema,fixture)=inputs_for("superconductivity_causal_transition_fixture_v0_1.json");
+        let instance=Instance::from_bytes(&schema,&fixture).unwrap();
+        let strain=instance.actions.iter().position(|a|a.id=="strain_step").unwrap();
+        let sham=instance.actions.iter().position(|a|a.id=="sham_control");
+        let effect=instance.action_effect_vs_sham(strain,sham);
+        let pairing=effect["pairing_strength_delta_vs_sham"].as_f64().unwrap();
+        let coherence=effect["phase_coherence_delta_vs_sham"].as_f64().unwrap();
+        assert!(pairing>0.0);
+        assert!(coherence<0.0);
+    }
+
+    #[test]
+    fn every_action_receipt_preserves_specimen_identity_and_reversibility() {
+        let (schema,fixture)=inputs_for("superconductivity_causal_transition_fixture_v0_1.json");
+        let receipt=audit(&schema,&fixture).unwrap();
+        let details=&receipt["exact_adaptive_two_step_policy"]["first_action_details"];
+        assert_eq!(details["specimen_id"],"specimen_A");
+        assert!(details["reversibility"].as_str().is_some());
+        assert!(receipt["exact_adaptive_two_step_policy"]["reference_resource_id"].as_str().is_some());
+    }
+
 }
