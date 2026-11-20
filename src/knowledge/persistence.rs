@@ -8,12 +8,14 @@
 //! 2048-byte BLOBs for efficient Hamming similarity on reload.
 //!
 //! Schema:
-//! - knowledge_facts: id, vector_blob, source_text, confidence, domain, cycle, is_causal
+//! - knowledge_facts: stable fact identity + temporal/confidence metadata
+//! - knowledge_fact_roles: role-tagged HDC sub-vectors for compositional retrieval
 //! - knowledge_causal_edges: cause, effect, strength, cycle
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Knowledge persistence layer backed by SQLite.
@@ -30,19 +32,37 @@ pub struct KnowledgePersistence {
     total_loaded: u64,
 }
 
-/// A serializable fact record for persistence
+/// A serializable fact record for persistence.
+///
+/// `role_vectors` use stable numeric semantic-role tags owned by the graph
+/// persistence boundary so the storage layer does not depend on feature-specific
+/// enum serialization.
 #[derive(Debug, Clone)]
 pub struct FactRecord {
+    /// Stable graph fact identifier.
+    pub id: u64,
     /// BinaryHV encoded as raw bytes (2048 bytes for 16,384 bits)
     pub vector_bytes: Vec<u8>,
+    /// Role-specific HDC vectors as (stable role tag, raw BinaryHV bytes).
+    pub role_vectors: Vec<(u8, Vec<u8>)>,
     /// Source text of the fact
     pub source_text: String,
-    /// Confidence score
+    /// Original encoding/extraction confidence retained by `FactEncoding`.
+    pub encoding_confidence: f32,
+    /// Current confidence score after decay/revision.
     pub confidence: f32,
+    /// Initial graph confidence at insertion.
+    pub initial_confidence: f32,
     /// Domain tag (optional)
     pub domain: Option<String>,
     /// Cycle when fact was inserted
     pub cycle: u64,
+    /// Cycle when fact was last accessed/refreshed.
+    pub last_accessed_cycle: u64,
+    /// Number of independent corroboration updates recorded by the graph.
+    pub corroboration_count: u32,
+    /// Number of contradiction updates recorded by the graph.
+    pub contradiction_count: u32,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
 }
@@ -100,10 +120,12 @@ impl KnowledgePersistence {
         !self.db_path.is_empty()
     }
 
-    /// Save a batch of fact records to the database.
+    /// Save the complete fact snapshot to the database.
     ///
-    /// Uses a single transaction for efficiency.
-    /// Returns the number of facts saved.
+    /// This is a snapshot API, not an append log: rows not present in `facts`
+    /// are removed, stable fact IDs are preserved, and role vectors are replaced
+    /// atomically with their owning facts. This prevents repeated snapshots from
+    /// multiplying semantically identical facts across restarts.
     pub fn save_facts(&mut self, facts: &[FactRecord]) -> Result<usize, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
@@ -112,31 +134,86 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        conn.execute_batch("BEGIN TRANSACTION")
-            .map_err(|e| e.to_string())?;
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Fact snapshot transaction: {e}"))?;
 
-        let mut count = 0;
-        for fact in facts {
-            conn.execute(
-                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                rusqlite::params![
-                    fact.vector_bytes,
-                    fact.source_text,
-                    fact.confidence,
-                    fact.domain,
-                    fact.cycle as i64,
-                    fact.is_causal,
-                ],
-            )
-            .map_err(|e| e.to_string())?;
-            count += 1;
+        tx.execute("DELETE FROM knowledge_fact_roles", [])
+            .map_err(|e| format!("Clear fact roles: {e}"))?;
+        tx.execute("DELETE FROM knowledge_facts", [])
+            .map_err(|e| format!("Clear fact snapshot: {e}"))?;
+
+        {
+            let mut fact_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO knowledge_facts
+                     (id, vector_blob, source_text, encoding_confidence, confidence,
+                      initial_confidence, domain, cycle, last_accessed_cycle,
+                      corroboration_count, contradiction_count, is_causal)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                )
+                .map_err(|e| format!("Prepare fact snapshot: {e}"))?;
+
+            let mut role_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO knowledge_fact_roles (fact_id, role_tag, vector_blob)
+                     VALUES (?1, ?2, ?3)",
+                )
+                .map_err(|e| format!("Prepare fact role snapshot: {e}"))?;
+
+            for fact in facts {
+                if fact.vector_bytes.len() != 2048 {
+                    return Err(format!(
+                        "Fact {} has invalid vector length {}; expected 2048",
+                        fact.id,
+                        fact.vector_bytes.len()
+                    ));
+                }
+
+                fact_stmt
+                    .execute(rusqlite::params![
+                        fact.id as i64,
+                        &fact.vector_bytes,
+                        &fact.source_text,
+                        fact.encoding_confidence,
+                        fact.confidence,
+                        fact.initial_confidence,
+                        fact.domain.as_deref(),
+                        fact.cycle as i64,
+                        fact.last_accessed_cycle as i64,
+                        fact.corroboration_count as i64,
+                        fact.contradiction_count as i64,
+                        fact.is_causal,
+                    ])
+                    .map_err(|e| format!("Insert fact {}: {e}", fact.id))?;
+
+                for (role_tag, vector_bytes) in &fact.role_vectors {
+                    if vector_bytes.len() != 2048 {
+                        return Err(format!(
+                            "Fact {} role {} has invalid vector length {}; expected 2048",
+                            fact.id,
+                            role_tag,
+                            vector_bytes.len()
+                        ));
+                    }
+                    role_stmt
+                        .execute(rusqlite::params![
+                            fact.id as i64,
+                            *role_tag as i64,
+                            vector_bytes,
+                        ])
+                        .map_err(|e| {
+                            format!("Insert fact {} role {}: {e}", fact.id, role_tag)
+                        })?;
+                }
+            }
         }
 
-        conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+        tx.commit()
+            .map_err(|e| format!("Commit fact snapshot: {e}"))?;
 
-        self.total_saved += count as u64;
-        Ok(count)
+        self.total_saved += facts.len() as u64;
+        Ok(facts.len())
     }
 
     /// Load all fact records from the database.
@@ -150,25 +227,69 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal
-                 FROM knowledge_facts ORDER BY cycle DESC",
+                "SELECT id, vector_blob, source_text,
+                        CASE WHEN encoding_confidence = 0.0 THEN confidence ELSE encoding_confidence END,
+                        confidence,
+                        CASE WHEN initial_confidence = 0.0 THEN confidence ELSE initial_confidence END,
+                        domain, cycle,
+                        CASE WHEN last_accessed_cycle = 0 THEN cycle ELSE last_accessed_cycle END,
+                        corroboration_count, contradiction_count, is_causal
+                 FROM knowledge_facts ORDER BY cycle DESC, id ASC",
             )
             .map_err(|e| e.to_string())?;
 
-        let facts: Vec<FactRecord> = stmt
+        let mut facts: Vec<FactRecord> = stmt
             .query_map([], |row| {
                 Ok(FactRecord {
-                    vector_bytes: row.get(0)?,
-                    source_text: row.get(1)?,
-                    confidence: row.get(2)?,
-                    domain: row.get(3)?,
-                    cycle: row.get::<_, i64>(4)? as u64,
-                    is_causal: row.get(5)?,
+                    id: row.get::<_, i64>(0)? as u64,
+                    vector_bytes: row.get(1)?,
+                    role_vectors: Vec::new(),
+                    source_text: row.get(2)?,
+                    encoding_confidence: row.get(3)?,
+                    confidence: row.get(4)?,
+                    initial_confidence: row.get(5)?,
+                    domain: row.get(6)?,
+                    cycle: row.get::<_, i64>(7)? as u64,
+                    last_accessed_cycle: row.get::<_, i64>(8)? as u64,
+                    corroboration_count: row.get::<_, i64>(9)? as u32,
+                    contradiction_count: row.get::<_, i64>(10)? as u32,
+                    is_causal: row.get(11)?,
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+
+        let mut roles_by_fact: HashMap<u64, Vec<(u8, Vec<u8>)>> = HashMap::new();
+        let mut role_stmt = conn
+            .prepare(
+                "SELECT fact_id, role_tag, vector_blob
+                 FROM knowledge_fact_roles ORDER BY fact_id ASC, role_tag ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let role_rows = role_stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)? as u64,
+                    row.get::<_, i64>(1)? as u8,
+                    row.get::<_, Vec<u8>>(2)?,
+                ))
+            })
+            .map_err(|e| e.to_string())?;
+
+        for row in role_rows {
+            let (fact_id, role_tag, vector_bytes) = row.map_err(|e| e.to_string())?;
+            if vector_bytes.len() == 2048 {
+                roles_by_fact
+                    .entry(fact_id)
+                    .or_default()
+                    .push((role_tag, vector_bytes));
+            }
+        }
+
+        for fact in &mut facts {
+            fact.role_vectors = roles_by_fact.remove(&fact.id).unwrap_or_default();
+        }
 
         self.total_loaded += facts.len() as u64;
         Ok(facts)
@@ -348,10 +469,22 @@ impl KnowledgePersistence {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 vector_blob BLOB NOT NULL,
                 source_text TEXT NOT NULL,
+                encoding_confidence REAL NOT NULL DEFAULT 0.0,
                 confidence REAL NOT NULL,
+                initial_confidence REAL NOT NULL DEFAULT 0.0,
                 domain TEXT,
                 cycle INTEGER NOT NULL,
+                last_accessed_cycle INTEGER NOT NULL DEFAULT 0,
+                corroboration_count INTEGER NOT NULL DEFAULT 0,
+                contradiction_count INTEGER NOT NULL DEFAULT 0,
                 is_causal INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_fact_roles (
+                fact_id INTEGER NOT NULL,
+                role_tag INTEGER NOT NULL,
+                vector_blob BLOB NOT NULL,
+                PRIMARY KEY (fact_id, role_tag),
+                FOREIGN KEY (fact_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 cause TEXT NOT NULL,
@@ -371,11 +504,73 @@ impl KnowledgePersistence {
                 is_a_parent TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
-            CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
+            CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);
+            CREATE INDEX IF NOT EXISTS idx_fact_roles_fact_id ON knowledge_fact_roles(fact_id);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
 
+        // Forward-compatible migration for databases created by persistence v1.
+        // SQLite's `CREATE TABLE IF NOT EXISTS` does not add columns to an
+        // existing table, so add the v2 metadata columns explicitly when absent.
+        Self::ensure_column(
+            conn,
+            "knowledge_facts",
+            "encoding_confidence",
+            "REAL NOT NULL DEFAULT 0.0",
+        )?;
+        Self::ensure_column(
+            conn,
+            "knowledge_facts",
+            "initial_confidence",
+            "REAL NOT NULL DEFAULT 0.0",
+        )?;
+        Self::ensure_column(
+            conn,
+            "knowledge_facts",
+            "last_accessed_cycle",
+            "INTEGER NOT NULL DEFAULT 0",
+        )?;
+        Self::ensure_column(
+            conn,
+            "knowledge_facts",
+            "corroboration_count",
+            "INTEGER NOT NULL DEFAULT 0",
+        )?;
+        Self::ensure_column(
+            conn,
+            "knowledge_facts",
+            "contradiction_count",
+            "INTEGER NOT NULL DEFAULT 0",
+        )?;
+
         self.initialized = true;
+        Ok(())
+    }
+
+    fn ensure_column(
+        conn: &rusqlite::Connection,
+        table: &str,
+        column: &str,
+        definition: &str,
+    ) -> Result<(), String> {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| format!("Inspect {table} schema: {e}"))?;
+        let names = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|e| format!("Read {table} schema: {e}"))?;
+
+        for name in names {
+            if name.map_err(|e| e.to_string())? == column {
+                return Ok(());
+            }
+        }
+
+        conn.execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"),
+            [],
+        )
+        .map_err(|e| format!("Add {table}.{column}: {e}"))?;
         Ok(())
     }
 }
@@ -383,6 +578,24 @@ impl KnowledgePersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fact_record(id: u64, byte: u8, text: &str, confidence: f32, cycle: u64) -> FactRecord {
+        FactRecord {
+            id,
+            vector_bytes: vec![byte; 2048],
+            role_vectors: Vec::new(),
+            source_text: text.into(),
+            encoding_confidence: confidence,
+            confidence,
+            initial_confidence: confidence,
+            domain: None,
+            cycle,
+            last_accessed_cycle: cycle,
+            corroboration_count: 0,
+            contradiction_count: 0,
+            is_causal: false,
+        }
+    }
 
     #[test]
     fn test_unconfigured() {
@@ -392,7 +605,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_and_load_facts() {
+    fn test_save_and_load_facts_preserves_v2_metadata() {
         let dir =
             std::env::temp_dir().join(format!("symthaea_knowledge_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
@@ -403,19 +616,33 @@ mod tests {
 
         let facts = vec![
             FactRecord {
+                id: 41,
                 vector_bytes: vec![0u8; 2048],
+                role_vectors: vec![(0, vec![2u8; 2048])],
                 source_text: "Test fact one".into(),
-                confidence: 0.9,
+                encoding_confidence: 0.95,
+                confidence: 0.72,
+                initial_confidence: 0.9,
                 domain: Some("test".into()),
                 cycle: 1,
+                last_accessed_cycle: 7,
+                corroboration_count: 3,
+                contradiction_count: 1,
                 is_causal: false,
             },
             FactRecord {
+                id: 99,
                 vector_bytes: vec![1u8; 2048],
+                role_vectors: vec![(10, vec![3u8; 2048])],
                 source_text: "Test fact two".into(),
-                confidence: 0.8,
+                encoding_confidence: 0.88,
+                confidence: 0.61,
+                initial_confidence: 0.8,
                 domain: None,
                 cycle: 2,
+                last_accessed_cycle: 9,
+                corroboration_count: 2,
+                contradiction_count: 4,
                 is_causal: true,
             },
         ];
@@ -426,10 +653,45 @@ mod tests {
 
         let loaded = p.load_facts().unwrap();
         assert_eq!(loaded.len(), 2);
-        assert_eq!(loaded[0].source_text, "Test fact two"); // DESC order
-        assert_eq!(loaded[1].source_text, "Test fact one");
+        assert_eq!(loaded[0].id, 99);
+        assert_eq!(loaded[0].source_text, "Test fact two"); // DESC cycle order
+        assert_eq!(loaded[0].role_vectors.len(), 1);
+        assert_eq!(loaded[0].role_vectors[0].0, 10);
+        assert!((loaded[0].encoding_confidence - 0.88).abs() < 0.001);
+        assert!((loaded[0].initial_confidence - 0.8).abs() < 0.001);
+        assert_eq!(loaded[0].last_accessed_cycle, 9);
+        assert_eq!(loaded[0].corroboration_count, 2);
+        assert_eq!(loaded[0].contradiction_count, 4);
+        assert_eq!(loaded[1].id, 41);
 
-        // Cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_fact_save_is_snapshot_not_append_log() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_snapshot_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[
+            fact_record(1, 1, "old one", 0.8, 1),
+            fact_record(2, 2, "old two", 0.8, 2),
+        ])
+        .unwrap();
+
+        p.save_facts(&[fact_record(2, 3, "updated two", 0.9, 3)])
+            .unwrap();
+
+        let loaded = p.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].id, 2);
+        assert_eq!(loaded[0].source_text, "updated two");
+        assert_eq!(loaded[0].vector_bytes[0], 3);
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
