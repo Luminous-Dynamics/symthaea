@@ -141,6 +141,27 @@
         "end_to_end_particle_field_cost"
       ],
       "execution_status": "source_review_protocol_only"
+    },
+    {
+      "id": "structure_preserving_plasma_closures",
+      "issues": [
+        12958
+      ],
+      "prs": [
+        12959
+      ],
+      "separate_physics_lanes": [
+        "collisionless_vlasov_poisson_hamiltonian",
+        "collisional_vlasov_poisson_landau_metriplectic"
+      ],
+      "required_outputs": [
+        "Poisson_or_metriplectic_structure_residuals",
+        "mass_momentum_energy",
+        "collisional_entropy_monotonicity_only_in_collisional_lane",
+        "time_discretisation_drift",
+        "matched_cost_accuracy_frontier"
+      ],
+      "execution_status": "mathematical_protocol_only"
     }
   ],
   "shared_infrastructure": {
