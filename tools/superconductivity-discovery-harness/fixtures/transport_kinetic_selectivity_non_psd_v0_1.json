@@ -1,0 +1,158 @@
+{
+  "contract": "SC-TRANSPORT-KINETIC-SELECTIVITY-0.1",
+  "benchmark_id": "adversarial_non_psd_transport_matrix_001",
+  "fixture_only": true,
+  "boltzmann_constant_eV_per_K": 0.00008617333262145,
+  "integration_steps": 4096,
+  "cases": [
+    {
+      "case_id": "negative_cross_correlation_short_hold_target_initially_leads",
+      "hold_time_s": 5,
+      "temperature_k": 800,
+      "product_layer_thickness_m": 0.00001,
+      "transport": {
+        "species_a_diffusivity_prefactor_m2_s": 5e-12,
+        "species_a_diffusion_activation_eV": 0,
+        "species_b_diffusivity_prefactor_m2_s": 5e-12,
+        "species_b_diffusion_activation_eV": 0,
+        "cross_correlation_coefficient": 1.1
+      },
+      "target_route": {
+        "route_id": "target_co_transport",
+        "mobile_species_requirement": "co_transport_a_b",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 20.7,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.8,
+          "upper": -0.6
+        },
+        "availability_fraction": 1
+      },
+      "competitor_route": {
+        "route_id": "competitor_a_only",
+        "mobile_species_requirement": "species_a_only",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 0.1033,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.4,
+          "upper": -0.2
+        },
+        "availability_fraction": 1
+      },
+      "thermodynamic_selectivity_margin_eV": 0.05,
+      "observation_status": "unknown_not_reported"
+    },
+    {
+      "case_id": "negative_cross_correlation_long_hold_competitor_takes_over",
+      "hold_time_s": 30,
+      "temperature_k": 800,
+      "product_layer_thickness_m": 0.00001,
+      "transport": {
+        "species_a_diffusivity_prefactor_m2_s": 5e-12,
+        "species_a_diffusion_activation_eV": 0,
+        "species_b_diffusivity_prefactor_m2_s": 5e-12,
+        "species_b_diffusion_activation_eV": 0,
+        "cross_correlation_coefficient": -0.8
+      },
+      "target_route": {
+        "route_id": "target_co_transport",
+        "mobile_species_requirement": "co_transport_a_b",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 20.7,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.8,
+          "upper": -0.6
+        },
+        "availability_fraction": 1
+      },
+      "competitor_route": {
+        "route_id": "competitor_a_only",
+        "mobile_species_requirement": "species_a_only",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 0.1033,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.4,
+          "upper": -0.2
+        },
+        "availability_fraction": 1
+      },
+      "thermodynamic_selectivity_margin_eV": 0.05,
+      "observation_status": "unknown_not_reported"
+    },
+    {
+      "case_id": "positive_cross_correlation_target_co_transport_wins",
+      "hold_time_s": 30,
+      "temperature_k": 800,
+      "product_layer_thickness_m": 0.00001,
+      "transport": {
+        "species_a_diffusivity_prefactor_m2_s": 5e-12,
+        "species_a_diffusion_activation_eV": 0,
+        "species_b_diffusivity_prefactor_m2_s": 5e-12,
+        "species_b_diffusion_activation_eV": 0,
+        "cross_correlation_coefficient": 0.8
+      },
+      "target_route": {
+        "route_id": "target_co_transport",
+        "mobile_species_requirement": "co_transport_a_b",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 20.7,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.8,
+          "upper": -0.6
+        },
+        "availability_fraction": 1
+      },
+      "competitor_route": {
+        "route_id": "competitor_a_only",
+        "mobile_species_requirement": "species_a_only",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 0.1033,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.4,
+          "upper": -0.2
+        },
+        "availability_fraction": 1
+      },
+      "thermodynamic_selectivity_margin_eV": 0.05,
+      "observation_status": "unknown_not_reported"
+    },
+    {
+      "case_id": "diagonal_transport_baseline",
+      "hold_time_s": 30,
+      "temperature_k": 800,
+      "product_layer_thickness_m": 0.00001,
+      "transport": {
+        "species_a_diffusivity_prefactor_m2_s": 5e-12,
+        "species_a_diffusion_activation_eV": 0,
+        "species_b_diffusivity_prefactor_m2_s": 5e-12,
+        "species_b_diffusion_activation_eV": 0,
+        "cross_correlation_coefficient": 0
+      },
+      "target_route": {
+        "route_id": "target_co_transport",
+        "mobile_species_requirement": "co_transport_a_b",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 20.7,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.8,
+          "upper": -0.6
+        },
+        "availability_fraction": 1
+      },
+      "competitor_route": {
+        "route_id": "competitor_a_only",
+        "mobile_species_requirement": "species_a_only",
+        "reaction_activation_barrier_eV": 0.05,
+        "reaction_prefactor_s_inverse": 0.1033,
+        "delta_g_interval_eV_per_route_extent": {
+          "lower": -0.4,
+          "upper": -0.2
+        },
+        "availability_fraction": 1
+      },
+      "thermodynamic_selectivity_margin_eV": 0.05,
+      "observation_status": "unknown_not_reported"
+    }
+  ],
+  "claim_ceiling": "Synthetic two-route transport-coupled kinetic-selectivity model only; no measured diffusion coefficient, reaction rate, phase yield, superconducting material or laboratory procedure is established."
+}
