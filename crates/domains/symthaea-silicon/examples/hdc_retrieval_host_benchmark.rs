@@ -262,6 +262,14 @@ fn run() -> Result<(), String> {
         measured_queries_per_schedule as f64 / (query_major_elapsed_ns as f64 / 1_000_000_000.0);
     let candidate_major_throughput =
         measured_queries_per_schedule as f64 / (candidate_major_elapsed_ns as f64 / 1_000_000_000.0);
+    let mut candidate_major_speedup_ratios: Vec<f64> = query_major_batch_ns
+        .iter()
+        .zip(candidate_major_batch_ns.iter())
+        .map(|(query_major_ns, candidate_major_ns)| {
+            *query_major_ns as f64 / (*candidate_major_ns).max(1) as f64
+        })
+        .collect();
+    candidate_major_speedup_ratios.sort_by(f64::total_cmp);
 
     let raw = json!({
         "raw_observation_version": "neuro-silicon-003-schedule-comparison-v0.1",
@@ -269,6 +277,7 @@ fn run() -> Result<(), String> {
         "schedule_pairing": "same frozen store and query vectors; query-major/candidate-major order alternates by repetition",
         "query_major_batch_elapsed_ns": query_major_batch_ns,
         "candidate_major_batch_elapsed_ns": candidate_major_batch_ns,
+        "candidate_major_speedup_ratio_per_pair": candidate_major_speedup_ratios,
         "paired_wall_elapsed_ns": paired_wall_elapsed_ns,
         "query_major_batches": query_major_batches,
         "candidate_major_batches": candidate_major_batches,
@@ -300,13 +309,15 @@ fn run() -> Result<(), String> {
         metric("latency_p50", percentile(&query_latency_samples, 0.50) as f64, "ns", "measured", "query-major diagnostic: individual query latency against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
         metric("latency_p95", percentile(&query_latency_samples, 0.95) as f64, "ns", "measured", "query-major diagnostic: individual query latency against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
         metric("latency_p99", percentile(&query_latency_samples, 0.99) as f64, "ns", "measured", "query-major diagnostic: individual query latency against the prebuilt host-resident store", query_major_observations.len(), "nearest-rank percentile; excluded from paired throughput timing"),
-        metric("throughput", query_major_throughput, "queries/s", "measured", "query-major paired batch runs; excludes warm-up, store/query generation and diagnostic per-query timing pass", measured_queries_per_schedule, "query count divided by sum of query-major batch elapsed time"),
-        metric("other", percentile(&query_major_batch_samples, 0.50) as f64, "ns", "measured", "query-major complete-batch completion latency; one full scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("other", percentile(&query_major_batch_samples, 0.95) as f64, "ns", "measured", "query-major complete-batch completion latency; one full scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("other", candidate_major_throughput, "queries/s", "measured", "candidate-major paired batch runs; one candidate loaded then reused across all queries in the batch", measured_queries_per_schedule, "query count divided by sum of candidate-major batch elapsed time"),
-        metric("other", percentile(&candidate_major_batch_samples, 0.50) as f64, "ns", "measured", "candidate-major complete-batch completion latency; scan candidates outside and queries inside", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("other", percentile(&candidate_major_batch_samples, 0.95) as f64, "ns", "measured", "candidate-major complete-batch completion latency; scan candidates outside and queries inside", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
-        metric("other", percentile(&candidate_major_batch_samples, 0.50) as f64 / config.batch_size as f64, "ns/query", "derived", "median candidate-major batch completion time divided by query batch size; not individual request latency", candidate_major_batch_samples.len(), "batch latency / batch size"),
+        metric("query_major_throughput", query_major_throughput, "queries/s", "measured", "query-major paired batch runs; excludes warm-up, store/query generation and diagnostic per-query timing pass", measured_queries_per_schedule, "query count divided by sum of query-major batch elapsed time"),
+        metric("query_major_batch_latency_p50", percentile(&query_major_batch_samples, 0.50) as f64, "ns", "measured", "query-major complete-batch completion latency; one full scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("query_major_batch_latency_p95", percentile(&query_major_batch_samples, 0.95) as f64, "ns", "measured", "query-major complete-batch completion latency; one full scan per query", query_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("candidate_major_throughput", candidate_major_throughput, "queries/s", "measured", "candidate-major paired batch runs; one candidate loaded then reused across all queries in the batch", measured_queries_per_schedule, "query count divided by sum of candidate-major batch elapsed time"),
+        metric("candidate_major_batch_latency_p50", percentile(&candidate_major_batch_samples, 0.50) as f64, "ns", "measured", "candidate-major complete-batch completion latency; scan candidates outside and queries inside", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("candidate_major_batch_latency_p95", percentile(&candidate_major_batch_samples, 0.95) as f64, "ns", "measured", "candidate-major complete-batch completion latency; scan candidates outside and queries inside", candidate_major_batch_samples.len(), "nearest-rank percentile over paired batch runs"),
+        metric("candidate_major_speedup_ratio_p50", percentile_f64(&candidate_major_speedup_ratios, 0.50), "ratio", "derived", "paired per-repetition query-major batch time divided by candidate-major batch time; >1 means candidate-major faster", candidate_major_speedup_ratios.len(), "nearest-rank percentile over paired ratios"),
+        metric("candidate_major_speedup_ratio_p95", percentile_f64(&candidate_major_speedup_ratios, 0.95), "ratio", "derived", "paired per-repetition query-major batch time divided by candidate-major batch time; >1 means candidate-major faster", candidate_major_speedup_ratios.len(), "nearest-rank percentile over paired ratios"),
+        metric("candidate_major_amortized_batch_ns_per_query", percentile(&candidate_major_batch_samples, 0.50) as f64 / config.batch_size as f64, "ns/query", "derived", "median candidate-major batch completion time divided by query batch size; not individual request latency", candidate_major_batch_samples.len(), "batch latency / batch size"),
         metric("working_set_bytes", working_set_bytes as f64, "bytes", "derived", "logical vector-store plus one batch of query hypervectors; excludes allocator metadata and runtime overhead", 1, "derived from canonical 2048-byte vectors"),
         metric("other", setup_ns as f64, "ns", "measured", "setup duration for deterministic store and query generation; outside retrieval latency", 1, "monotonic wall clock around generation")
     ];
@@ -695,6 +706,11 @@ fn count_cross_schedule_mismatches(
 }
 
 fn percentile(sorted_samples: &[u128], percentile: f64) -> u128 {
+    let rank = ((sorted_samples.len() as f64) * percentile).ceil() as usize;
+    sorted_samples[rank.saturating_sub(1).min(sorted_samples.len() - 1)]
+}
+
+fn percentile_f64(sorted_samples: &[f64], percentile: f64) -> f64 {
     let rank = ((sorted_samples.len() as f64) * percentile).ceil() as usize;
     sorted_samples[rank.saturating_sub(1).min(sorted_samples.len() - 1)]
 }
