@@ -14,6 +14,9 @@ use symthaea_music_theory::{
 
 const CASE_SCHEMA: &str = "muse-edit-evidence-case-v1";
 const RESULT_SCHEMA: &str = "muse-edit-evidence-result-v1";
+const CASE_DIGEST_SCHEMA: &str = "muse-edit-evidence-case-serde-json-sha256-v1";
+const SCORE_DIGEST_SCHEMA: &str = "muse-score-serde-json-sha256-v1";
+const CASE_DIGEST_DOMAIN: &[u8] = b"luminous-dynamics-muse-edit-evidence-case-v1";
 const RESULT_DIGEST_DOMAIN: &[u8] = b"luminous-dynamics-muse-edit-evidence-result-v1";
 
 #[derive(Clone, Copy)]
@@ -33,6 +36,16 @@ fn score_sha256(score: &Score) -> Result<String, String> {
     let bytes = serde_json::to_vec(score)
         .map_err(|error| format!("could not serialize typed Score: {error}"))?;
     Ok(sha256(&bytes))
+}
+
+fn case_sha256(case: &Value) -> Result<String, String> {
+    let bytes = serde_json::to_vec(case)
+        .map_err(|error| format!("could not serialize case for digest: {error}"))?;
+    let mut hash = Sha256::new();
+    hash.update(CASE_DIGEST_DOMAIN);
+    hash.update([0]);
+    hash.update(bytes);
+    Ok(format!("{:x}", hash.finalize()))
 }
 
 fn validate_score(score: &Score, label: &str) -> Result<(), String> {
@@ -228,6 +241,7 @@ pub fn evaluate_velocity_case(
         return Err("unsupported case schema".into());
     }
     let case_id = string_field(&case, "case_id", "case")?;
+    let case_digest = case_sha256(&case)?;
     let instruction = required(&case, "instruction", "case")?;
     let operation = string_field(instruction, "operation_family", "instruction")?;
     if operation != "velocity" {
@@ -486,6 +500,10 @@ pub fn evaluate_velocity_case(
             "candidate_budget": 1
         },
         "artifacts": {
+            "case_sha256": case_digest,
+            "case_digest_schema": CASE_DIGEST_SCHEMA,
+            "source_score_sha256": source_digest,
+            "score_digest_schema": SCORE_DIGEST_SCHEMA,
             "candidate_audio_sha256": audio_digest,
             "candidate_score_sha256": candidate_digest,
             "render_receipt_sha256": null,
