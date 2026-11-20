@@ -236,7 +236,10 @@ fn add_branch(
     let control_2_x = x + angle_b.cos() * length * 0.76;
     let control_2_y = y + angle_b.sin() * length * 0.76;
     let path = format!(
-        "M {x:.2} {y:.2} C {control_1_x:.2} {control_1_y:.2}, {control_2_x:.2} {control_2_y:.2}, {end_x:.2} {end_y:.2}"
+        concat!(
+            "M {x:.2} {y:.2} C {control_1_x:.2} {control_1_y:.2}, ",
+            "{control_2_x:.2} {control_2_y:.2}, {end_x:.2} {end_y:.2}"
+        )
     );
     let depth_factor = depth as f32 / BRANCH_DEPTH as f32;
     let branch_color = base_color.lerp(
@@ -359,7 +362,12 @@ mod tests {
         assert!(!scene
             .children
             .iter()
-            .any(|child| matches!(&child.kind, NodeKind::Group { id: Some(id) } if id == "uncertainty-halo")));
+            .any(|child| {
+                matches!(
+                    &child.kind,
+                    NodeKind::Group { id: Some(id) } if id == "uncertainty-halo"
+                )
+            }));
     }
 
     #[test]
