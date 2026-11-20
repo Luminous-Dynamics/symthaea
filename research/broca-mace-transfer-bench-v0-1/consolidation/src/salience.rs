@@ -53,6 +53,229 @@ pub struct FutureUsePredictionV1 {
     pub prediction_sha256: String,
 }
 
+pub const MIN_SALIENCE_TRAIN_CLUSTERS: u32 = 32;
+pub const MIN_SALIENCE_CALIBRATION_CLUSTERS: u32 = 16;
+pub const MIN_SALIENCE_HELDOUT_CLUSTERS: u32 = 16;
+pub const MAX_SALIENCE_ECE_MICROS: u32 = 50_000;
+pub const MAX_SALIENCE_GROUP_ECE_MICROS: u32 = 100_000;
+
+/// Independent calibration evidence for a future-use prediction. The receipt
+/// must be issued by a verifier that checks disjoint task-family/source-root
+/// splits and the frozen calibration protocol; a self-hash is not a signature.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SalienceCalibrationReceiptV1 {
+    pub prediction_sha256: String,
+    pub evidence_sha256: String,
+    pub target_scope: Scope,
+    pub as_known: AsKnownQuery,
+    pub model_id: String,
+    pub model_version: String,
+    pub model_config_sha256: String,
+    pub training_dataset_sha256: String,
+    pub calibration_dataset_sha256: String,
+    pub heldout_evaluation_sha256: String,
+    pub task_family_split_sha256: String,
+    pub source_root_split_sha256: String,
+    pub training_cluster_count: u32,
+    pub calibration_cluster_count: u32,
+    pub heldout_cluster_count: u32,
+    pub brier_score_micros: u32,
+    pub base_rate_brier_score_micros: u32,
+    pub expected_calibration_error_micros: u32,
+    pub worst_group_calibration_error_micros: u32,
+    pub task_families_disjoint: bool,
+    pub source_roots_disjoint: bool,
+    pub verified_at_ms: i64,
+    pub valid_until_ms: i64,
+    pub verifier_id: String,
+    pub receipt_sha256: String,
+}
+
+impl SalienceCalibrationReceiptV1 {
+    pub fn canonical_digest(&self) -> String {
+        let fields = [
+            self.prediction_sha256.clone(),
+            self.evidence_sha256.clone(),
+            scope_code(self.target_scope).to_owned(),
+            self.as_known.valid_at_ms.to_string(),
+            self.as_known.known_at_ms.to_string(),
+            self.model_id.clone(),
+            self.model_version.clone(),
+            self.model_config_sha256.clone(),
+            self.training_dataset_sha256.clone(),
+            self.calibration_dataset_sha256.clone(),
+            self.heldout_evaluation_sha256.clone(),
+            self.task_family_split_sha256.clone(),
+            self.source_root_split_sha256.clone(),
+            self.training_cluster_count.to_string(),
+            self.calibration_cluster_count.to_string(),
+            self.heldout_cluster_count.to_string(),
+            self.brier_score_micros.to_string(),
+            self.base_rate_brier_score_micros.to_string(),
+            self.expected_calibration_error_micros.to_string(),
+            self.worst_group_calibration_error_micros.to_string(),
+            self.task_families_disjoint.to_string(),
+            self.source_roots_disjoint.to_string(),
+            self.verified_at_ms.to_string(),
+            self.valid_until_ms.to_string(),
+            self.verifier_id.clone(),
+        ];
+        digest_fields(b"mycelix:mace:salience-calibration-receipt:v1\\0", &fields)
+    }
+}
+
+/// Production implementations must verify the issuer/signature, frozen
+/// evaluation protocol, held-out split lineage and metric calculations using
+/// Mycelix/SAM. Test implementations are synthetic fixtures only.
+pub trait SaliencePredictionVerifierV1 {
+    fn verify_prediction(
+        &self,
+        prediction: &FutureUsePredictionV1,
+        target_scope: Scope,
+        as_known: AsKnownQuery,
+    ) -> Option<SalienceCalibrationReceiptV1>;
+}
+
+/// Opaque prediction that has passed the independent calibration gate.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedFutureUsePredictionV1 {
+    prediction: FutureUsePredictionV1,
+    calibration: SalienceCalibrationReceiptV1,
+}
+
+impl VerifiedFutureUsePredictionV1 {
+    pub fn prediction(&self) -> &FutureUsePredictionV1 {
+        &self.prediction
+    }
+
+    pub fn calibration_receipt(&self) -> &SalienceCalibrationReceiptV1 {
+        &self.calibration
+    }
+}
+
+fn validate_calibration_receipt(
+    prediction: &FutureUsePredictionV1,
+    receipt: &SalienceCalibrationReceiptV1,
+    target_scope: Scope,
+    as_known: AsKnownQuery,
+) -> Result<(), SalienceReject> {
+    if receipt.prediction_sha256 != prediction.prediction_sha256
+        || receipt.evidence_sha256 != prediction.evidence_sha256
+        || receipt.model_id != prediction.model_id
+        || receipt.model_version != prediction.model_version
+        || receipt.model_config_sha256 != prediction.model_config_sha256
+    {
+        return Err(SalienceReject::PredictionCalibrationMismatch);
+    }
+    if receipt.target_scope != target_scope
+        || prediction.target_scope != target_scope
+    {
+        return Err(SalienceReject::PredictionScopeMismatch);
+    }
+    if receipt.as_known != as_known {
+        return Err(SalienceReject::PredictionCalibrationSnapshotMismatch);
+    }
+
+    let digests = [
+        &receipt.prediction_sha256,
+        &receipt.evidence_sha256,
+        &receipt.model_config_sha256,
+        &receipt.training_dataset_sha256,
+        &receipt.calibration_dataset_sha256,
+        &receipt.heldout_evaluation_sha256,
+        &receipt.task_family_split_sha256,
+        &receipt.source_root_split_sha256,
+        &receipt.receipt_sha256,
+    ];
+    if digests.iter().any(|digest| !is_lower_sha256(digest)) {
+        return Err(SalienceReject::InvalidCalibrationDigest);
+    }
+    if receipt.training_dataset_sha256 == receipt.calibration_dataset_sha256
+        || receipt.training_dataset_sha256 == receipt.heldout_evaluation_sha256
+        || receipt.calibration_dataset_sha256 == receipt.heldout_evaluation_sha256
+    {
+        return Err(SalienceReject::CalibrationDatasetsOverlap);
+    }
+    if !receipt.task_families_disjoint || !receipt.source_roots_disjoint {
+        return Err(SalienceReject::CalibrationSplitNotIndependent);
+    }
+    if receipt.training_cluster_count < MIN_SALIENCE_TRAIN_CLUSTERS
+        || receipt.calibration_cluster_count < MIN_SALIENCE_CALIBRATION_CLUSTERS
+        || receipt.heldout_cluster_count < MIN_SALIENCE_HELDOUT_CLUSTERS
+    {
+        return Err(SalienceReject::CalibrationEvidenceInsufficient);
+    }
+    if receipt.brier_score_micros >= receipt.base_rate_brier_score_micros
+        || receipt.expected_calibration_error_micros > MAX_SALIENCE_ECE_MICROS
+        || receipt.worst_group_calibration_error_micros
+            > MAX_SALIENCE_GROUP_ECE_MICROS
+    {
+        return Err(SalienceReject::CalibrationQualityInsufficient);
+    }
+    if receipt.verifier_id.trim().is_empty()
+        || receipt.receipt_sha256 != receipt.canonical_digest()
+    {
+        return Err(SalienceReject::InvalidCalibrationReceipt);
+    }
+    if receipt.verified_at_ms > as_known.known_at_ms
+        || receipt.valid_until_ms <= as_known.known_at_ms
+    {
+        return Err(SalienceReject::CalibrationNotValidAtSnapshot);
+    }
+    Ok(())
+}
+
+/// Convert a raw model forecast into an eligible prediction only after an
+/// independent calibration verifier attests its model, split and metrics.
+pub fn verify_future_use_prediction(
+    prediction: FutureUsePredictionV1,
+    target_scope: Scope,
+    as_known: AsKnownQuery,
+    verifier: &impl SaliencePredictionVerifierV1,
+) -> Result<VerifiedFutureUsePredictionV1, SalienceReject> {
+    if prediction.event_id == 0 {
+        return Err(SalienceReject::InvalidEventId);
+    }
+    if prediction.target_scope != target_scope {
+        return Err(SalienceReject::PredictionScopeMismatch);
+    }
+    if prediction.predicted_at_ms > as_known.known_at_ms {
+        return Err(SalienceReject::PredictionFutureLeakage);
+    }
+    if prediction.horizon_end_ms <= as_known.known_at_ms
+        || prediction.predicted_at_ms >= prediction.horizon_end_ms
+    {
+        return Err(SalienceReject::InvalidPredictionHorizon);
+    }
+    if u32::from(prediction.reuse_probability_basis_points) > REUSE_PROBABILITY_SCALE {
+        return Err(SalienceReject::InvalidReuseProbability);
+    }
+    if prediction.expected_value_gain_micros > MAX_PREDICTED_VALUE_MICROS
+        || prediction.uncertainty_penalty_micros > MAX_PREDICTED_VALUE_MICROS
+    {
+        return Err(SalienceReject::InvalidPredictedValue);
+    }
+    if prediction.model_id.trim().is_empty() || prediction.model_version.trim().is_empty() {
+        return Err(SalienceReject::MissingModelIdentity);
+    }
+    if !is_lower_sha256(&prediction.evidence_sha256)
+        || !is_lower_sha256(&prediction.model_config_sha256)
+        || !is_lower_sha256(&prediction.rationale_sha256)
+        || !is_lower_sha256(&prediction.prediction_sha256)
+        || prediction.prediction_sha256 != prediction.canonical_digest()
+    {
+        return Err(SalienceReject::InvalidPredictionDigest);
+    }
+    let calibration = verifier
+        .verify_prediction(&prediction, target_scope, as_known)
+        .ok_or(SalienceReject::PredictionCalibrationMissing)?;
+    validate_calibration_receipt(&prediction, &calibration, target_scope, as_known)?;
+    Ok(VerifiedFutureUsePredictionV1 {
+        prediction,
+        calibration,
+    })
+}
+
 impl FutureUsePredictionV1 {
     pub fn new(
         event_id: u32,
@@ -144,7 +367,7 @@ impl MemorySurfacingCandidateV1 {
     pub fn from_verified_evidence(
         evidence: &ConsolidationEvidenceRefV1,
         access: MemoryAccessTelemetryV1,
-        prediction: Option<FutureUsePredictionV1>,
+        prediction: Option<VerifiedFutureUsePredictionV1>,
         as_known: AsKnownQuery,
     ) -> Result<Self, SalienceReject> {
         if evidence.event_id() == 0 {
@@ -177,12 +400,19 @@ impl MemorySurfacingCandidateV1 {
 
         let evidence_sha256 = receipt_bound_evidence_digest(evidence);
         if let Some(value) = &prediction {
-            if value.event_id != evidence.event_id() {
+            let raw = value.prediction();
+            if raw.event_id != evidence.event_id() {
                 return Err(SalienceReject::PredictionEventMismatch);
             }
-            if value.evidence_sha256 != evidence_sha256 {
+            if raw.evidence_sha256 != evidence_sha256 {
                 return Err(SalienceReject::PredictionEvidenceMismatch);
             }
+            validate_calibration_receipt(
+                raw,
+                value.calibration_receipt(),
+                evidence.scope(),
+                as_known,
+            )?;
         }
 
         Ok(Self {
@@ -269,6 +499,16 @@ pub enum SalienceReject {
     InvalidModelDigest,
     InvalidRationaleDigest,
     InvalidPredictionDigest,
+    PredictionCalibrationMissing,
+    PredictionCalibrationMismatch,
+    PredictionCalibrationSnapshotMismatch,
+    InvalidCalibrationDigest,
+    CalibrationDatasetsOverlap,
+    CalibrationSplitNotIndependent,
+    CalibrationEvidenceInsufficient,
+    CalibrationQualityInsufficient,
+    InvalidCalibrationReceipt,
+    CalibrationNotValidAtSnapshot,
     EvidenceNotTrusted,
     EvidenceOutcomeUnreconciled,
     EvidenceScopeMismatch,
@@ -282,6 +522,8 @@ pub struct SurfacedMemoryV1 {
     pub event_id: u32,
     pub context_token_cost: u32,
     pub evidence_sha256: String,
+    pub prediction_sha256: Option<String>,
+    pub calibration_receipt_sha256: Option<String>,
     pub expected_net_value_micros: i64,
 }
 
@@ -376,48 +618,20 @@ fn validate_candidate(
     if candidate.last_accessed_at_ms > as_known.known_at_ms {
         return Err(SalienceReject::FutureAccessTimestamp);
     }
-    if let Some(prediction) = &candidate.prediction {
+    if let Some(verified) = &candidate.prediction {
+        let prediction = verified.prediction();
         if prediction.event_id != candidate.event_id {
             return Err(SalienceReject::PredictionEventMismatch);
         }
         if prediction.evidence_sha256 != candidate.evidence_sha256 {
             return Err(SalienceReject::PredictionEvidenceMismatch);
         }
-        if prediction.target_scope != target_scope {
-            return Err(SalienceReject::PredictionScopeMismatch);
-        }
-        if prediction.predicted_at_ms > as_known.known_at_ms {
-            return Err(SalienceReject::PredictionFutureLeakage);
-        }
-        if prediction.horizon_end_ms <= as_known.known_at_ms
-            || prediction.predicted_at_ms >= prediction.horizon_end_ms
-        {
-            return Err(SalienceReject::InvalidPredictionHorizon);
-        }
-        if u32::from(prediction.reuse_probability_basis_points)
-            > REUSE_PROBABILITY_SCALE
-        {
-            return Err(SalienceReject::InvalidReuseProbability);
-        }
-        if prediction.expected_value_gain_micros > MAX_PREDICTED_VALUE_MICROS
-            || prediction.uncertainty_penalty_micros > MAX_PREDICTED_VALUE_MICROS
-        {
-            return Err(SalienceReject::InvalidPredictedValue);
-        }
-        if prediction.model_id.trim().is_empty() || prediction.model_version.trim().is_empty() {
-            return Err(SalienceReject::MissingModelIdentity);
-        }
-        if !is_lower_sha256(&prediction.model_config_sha256) {
-            return Err(SalienceReject::InvalidModelDigest);
-        }
-        if !is_lower_sha256(&prediction.rationale_sha256) {
-            return Err(SalienceReject::InvalidRationaleDigest);
-        }
-        if !is_lower_sha256(&prediction.prediction_sha256)
-            || prediction.prediction_sha256 != prediction.canonical_digest()
-        {
-            return Err(SalienceReject::InvalidPredictionDigest);
-        }
+        validate_calibration_receipt(
+            prediction,
+            verified.calibration_receipt(),
+            target_scope,
+            as_known,
+        )?;
     }
     Ok(())
 }
@@ -475,10 +689,10 @@ pub fn select_for_context(
         });
 
         for (index, candidate) in candidates.iter().enumerate() {
-            let Some(prediction) = &candidate.prediction else {
+            let Some(verified) = &candidate.prediction else {
                 continue;
             };
-            let value = prediction.expected_net_value_micros();
+            let value = verified.prediction().expected_net_value_micros();
             if value <= 0 || candidate.context_token_cost > context_budget_tokens {
                 continue;
             }
@@ -567,10 +781,22 @@ pub fn select_for_context(
     let mut predicted_net_value_micros = 0_i64;
     for index in selected_indices {
         let candidate = &candidates[index];
-        let expected = candidate
-            .prediction
-            .as_ref()
-            .map_or(0, FutureUsePredictionV1::expected_net_value_micros);
+        let (expected, prediction_sha256, calibration_receipt_sha256) =
+            candidate.prediction.as_ref().map_or(
+                (0, None, None),
+                |verified| {
+                    (
+                        verified.prediction().expected_net_value_micros(),
+                        Some(verified.prediction().prediction_sha256.clone()),
+                        Some(
+                            verified
+                                .calibration_receipt()
+                                .receipt_sha256
+                                .clone(),
+                        ),
+                    )
+                },
+            );
         context_tokens_used = context_tokens_used.saturating_add(candidate.context_token_cost);
         predicted_net_value_micros =
             predicted_net_value_micros.saturating_add(expected);
@@ -578,6 +804,8 @@ pub fn select_for_context(
             event_id: candidate.event_id,
             context_token_cost: candidate.context_token_cost,
             evidence_sha256: candidate.evidence_sha256.clone(),
+            prediction_sha256,
+            calibration_receipt_sha256,
             expected_net_value_micros: expected,
         });
     }
@@ -614,6 +842,12 @@ impl MemorySurfacingPlanV1 {
             fields.push(item.event_id.to_string());
             fields.push(item.context_token_cost.to_string());
             fields.push(item.evidence_sha256.clone());
+            fields.push(item.prediction_sha256.clone().unwrap_or_default());
+            fields.push(
+                item.calibration_receipt_sha256
+                    .clone()
+                    .unwrap_or_default(),
+            );
             fields.push(item.expected_net_value_micros.to_string());
         }
         digest_fields(b"mycelix:mace:memory-surfacing-plan:v1\0", &fields)
@@ -642,7 +876,7 @@ mod tests {
         failure: bool,
         last_access: i64,
         frequency: u32,
-        prediction: Option<FutureUsePredictionV1>,
+        prediction: Option<VerifiedFutureUsePredictionV1>,
     ) -> MemorySurfacingCandidateV1 {
         MemorySurfacingCandidateV1 {
             event_id,
@@ -660,7 +894,7 @@ mod tests {
         }
     }
 
-    fn prediction(
+    fn raw_prediction(
         event_id: u32,
         probability: u16,
         gain: u32,
@@ -681,6 +915,88 @@ mod tests {
             digest(&format!("rationale-{event_id}")),
             evidence_sha256,
         )
+    }
+
+    fn calibration_receipt(
+        prediction: &FutureUsePredictionV1,
+        as_known: AsKnownQuery,
+    ) -> SalienceCalibrationReceiptV1 {
+        let mut receipt = SalienceCalibrationReceiptV1 {
+            prediction_sha256: prediction.prediction_sha256.clone(),
+            evidence_sha256: prediction.evidence_sha256.clone(),
+            target_scope: prediction.target_scope,
+            as_known,
+            model_id: prediction.model_id.clone(),
+            model_version: prediction.model_version.clone(),
+            model_config_sha256: prediction.model_config_sha256.clone(),
+            training_dataset_sha256: digest("training-dataset-v1"),
+            calibration_dataset_sha256: digest("calibration-dataset-v1"),
+            heldout_evaluation_sha256: digest("heldout-evaluation-v1"),
+            task_family_split_sha256: digest("task-family-split-v1"),
+            source_root_split_sha256: digest("source-root-split-v1"),
+            training_cluster_count: 128,
+            calibration_cluster_count: 64,
+            heldout_cluster_count: 64,
+            brier_score_micros: 80_000,
+            base_rate_brier_score_micros: 140_000,
+            expected_calibration_error_micros: 20_000,
+            worst_group_calibration_error_micros: 40_000,
+            task_families_disjoint: true,
+            source_roots_disjoint: true,
+            verified_at_ms: 95,
+            valid_until_ms: 10_000,
+            verifier_id: "fixture-independent-salience-verifier".into(),
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = receipt.canonical_digest();
+        receipt
+    }
+
+    struct FixtureSaliencePredictionVerifier {
+        receipt: Option<SalienceCalibrationReceiptV1>,
+    }
+
+    impl SaliencePredictionVerifierV1 for FixtureSaliencePredictionVerifier {
+        fn verify_prediction(
+            &self,
+            _prediction: &FutureUsePredictionV1,
+            _target_scope: Scope,
+            _as_known: AsKnownQuery,
+        ) -> Option<SalienceCalibrationReceiptV1> {
+            self.receipt.clone()
+        }
+    }
+
+    fn verify_fixture_prediction(
+        prediction: FutureUsePredictionV1,
+        as_known: AsKnownQuery,
+    ) -> Result<VerifiedFutureUsePredictionV1, SalienceReject> {
+        let receipt = calibration_receipt(&prediction, as_known);
+        verify_future_use_prediction(
+            prediction,
+            scope(),
+            as_known,
+            &FixtureSaliencePredictionVerifier {
+                receipt: Some(receipt),
+            },
+        )
+    }
+
+    fn prediction(
+        event_id: u32,
+        probability: u16,
+        gain: u32,
+        penalty: u32,
+        evidence_sha256: String,
+    ) -> VerifiedFutureUsePredictionV1 {
+        verify_fixture_prediction(
+            raw_prediction(event_id, probability, gain, penalty, evidence_sha256),
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
+        )
+        .expect("fixture calibration receipt is valid")
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -905,68 +1221,105 @@ mod tests {
     }
 
     #[test]
-    fn future_prediction_and_wrong_scope_cannot_leak_into_context() {
+    fn future_prediction_and_wrong_scope_cannot_be_calibration_verified() {
+        let as_known = AsKnownQuery {
+            valid_at_ms: 100,
+            known_at_ms: 100,
+        };
         let evidence = digest("evidence-1");
-        let mut future = prediction(1, 9_000, 8_000, 100, evidence.clone());
+        let mut future = raw_prediction(1, 9_000, 8_000, 100, evidence.clone());
         future.predicted_at_ms = 101;
         future.prediction_sha256 = future.canonical_digest();
-        let candidate = candidate(1, 8, false, 99, 1, Some(future));
         assert_eq!(
-            select_for_context(
-                &[candidate],
-                MemorySurfacingModeV1::PredictedFutureValue,
-                scope(),
-                AsKnownQuery {
-                    valid_at_ms: 100,
-                    known_at_ms: 100,
-                },
-                8,
-            ),
+            verify_fixture_prediction(future, as_known),
             Err(SalienceReject::PredictionFutureLeakage)
         );
 
-        let mut other_scope = prediction(1, 9_000, 8_000, 100, evidence);
+        let mut other_scope = raw_prediction(1, 9_000, 8_000, 100, evidence);
         other_scope.target_scope.objective = Objective::Cost;
         other_scope.prediction_sha256 = other_scope.canonical_digest();
-        let candidate = candidate(1, 8, false, 99, 1, Some(other_scope));
         assert_eq!(
-            select_for_context(
-                &[candidate],
-                MemorySurfacingModeV1::PredictedFutureValue,
-                scope(),
-                AsKnownQuery {
-                    valid_at_ms: 100,
-                    known_at_ms: 100,
-                },
-                8,
-            ),
+            verify_fixture_prediction(other_scope, as_known),
             Err(SalienceReject::PredictionScopeMismatch)
         );
     }
 
     #[test]
-    fn tampered_prediction_or_evidence_digest_is_rejected() {
-        let mut prediction = prediction(
+    fn stale_calibration_receipt_cannot_authorize_a_changed_prediction_or_evidence() {
+        let as_known = AsKnownQuery {
+            valid_at_ms: 100,
+            known_at_ms: 100,
+        };
+        let original = raw_prediction(
             1,
             9_000,
             8_000,
             100,
             digest("evidence-1"),
         );
-        prediction.reuse_probability_basis_points = 100;
-        let candidate = candidate(1, 8, false, 99, 1, Some(prediction));
+        let stale_receipt = calibration_receipt(&original, as_known);
+
+        let mut changed_prediction = original.clone();
+        changed_prediction.reuse_probability_basis_points = 100;
+        changed_prediction.prediction_sha256 = changed_prediction.canonical_digest();
         assert_eq!(
-            select_for_context(
-                &[candidate],
-                MemorySurfacingModeV1::PredictedFutureValue,
+            verify_future_use_prediction(
+                changed_prediction,
                 scope(),
-                AsKnownQuery {
-                    valid_at_ms: 100,
-                    known_at_ms: 100,
+                as_known,
+                &FixtureSaliencePredictionVerifier {
+                    receipt: Some(stale_receipt.clone()),
                 },
-                8,
             ),
-            Err(SalienceReject::InvalidPredictionDigest)
+            Err(SalienceReject::PredictionCalibrationMismatch)
+        );
+
+        let mut changed_evidence = original;
+        changed_evidence.evidence_sha256 = digest("different-evidence");
+        changed_evidence.prediction_sha256 = changed_evidence.canonical_digest();
+        assert_eq!(
+            verify_future_use_prediction(
+                changed_evidence,
+                scope(),
+                as_known,
+                &FixtureSaliencePredictionVerifier {
+                    receipt: Some(stale_receipt),
+                },
+            ),
+            Err(SalienceReject::PredictionCalibrationMismatch)
+        );
+    }
+
+    #[test]
+    fn missing_or_poorly_calibrated_receipt_fails_closed() {
+        let as_known = AsKnownQuery {
+            valid_at_ms: 100,
+            known_at_ms: 100,
+        };
+        let raw = raw_prediction(2, 9_000, 8_000, 100, digest("evidence-2"));
+        assert_eq!(
+            verify_future_use_prediction(
+                raw.clone(),
+                scope(),
+                as_known,
+                &FixtureSaliencePredictionVerifier { receipt: None },
+            ),
+            Err(SalienceReject::PredictionCalibrationMissing)
+        );
+
+        let mut poor = calibration_receipt(&raw, as_known);
+        poor.expected_calibration_error_micros = MAX_SALIENCE_ECE_MICROS + 1;
+        poor.receipt_sha256 = poor.canonical_digest();
+        assert_eq!(
+            verify_future_use_prediction(
+                raw,
+                scope(),
+                as_known,
+                &FixtureSaliencePredictionVerifier {
+                    receipt: Some(poor),
+                },
+            ),
+            Err(SalienceReject::CalibrationQualityInsufficient)
         );
     }
 
@@ -1293,6 +1646,37 @@ mod tests {
             expected_value[predicted_index] / oracle_value,
             expected_value[predicted_index] / CLUSTERS as f64
         );
+    }
+
+    #[test]
+    fn surfaced_plan_binds_the_prediction_and_independent_calibration_receipt() {
+        let verified = prediction(
+            5,
+            9_000,
+            8_000,
+            100,
+            digest("evidence-5"),
+        );
+        let prediction_sha = verified.prediction().prediction_sha256.clone();
+        let receipt_sha = verified.calibration_receipt().receipt_sha256.clone();
+        let candidate = candidate(5, 8, false, 99, 1, Some(verified));
+        let plan = select_for_context(
+            &[candidate],
+            MemorySurfacingModeV1::PredictedFutureValue,
+            scope(),
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
+            8,
+        )
+        .unwrap();
+        assert_eq!(plan.surfaced[0].prediction_sha256.as_deref(), Some(&prediction_sha));
+        assert_eq!(
+            plan.surfaced[0].calibration_receipt_sha256.as_deref(),
+            Some(&receipt_sha)
+        );
+        assert_eq!(plan.plan_sha256, plan.canonical_digest());
     }
 
     #[test]
