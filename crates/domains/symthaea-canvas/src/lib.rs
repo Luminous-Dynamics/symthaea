@@ -18,6 +18,7 @@
 pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
+pub mod embodiment;
 pub mod color;
 pub mod geometry;
 pub mod scene_features;
@@ -31,6 +32,11 @@ use serde::{Deserialize, Serialize};
 pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
+pub use embodiment::{
+    EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
+    EmbodimentIngestError, EmbodimentSnapshot, GazeTarget, Observed, SignalProvenance,
+    Viseme, VisemeSignal,
+};
 pub use color::{Color, Palette};
 pub use geometry::build_scene;
 pub use scene_features::{SceneFeatures, extract_scene_features};
