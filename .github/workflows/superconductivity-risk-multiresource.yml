@@ -5,7 +5,7 @@ on:
     paths:
       - "tools/superconductivity-capability-plan-harness/**"
       - "data/schemas/superconductivity_risk_multiresource_v0_1.schema.json"
-      - "data/research/superconductivity_risk_multiresource_fixture_v0_1.json"
+      - "data/research/superconductivity_risk_multiresource_fixture_*.json"
       - "research/superconductivity/capability_experiment_planning/risk_multiresource/**"
       - ".github/workflows/superconductivity-risk-multiresource.yml"
   workflow_dispatch:
