@@ -172,11 +172,22 @@ fn run() -> Result<(), String> {
         let _ = retrieve_batch_candidate_major(&store, &queries);
     }
 
+    let measured_queries_per_schedule = config
+        .repetitions
+        .checked_mul(config.batch_size)
+        .ok_or_else(|| "repetitions × batch size overflows usize".to_owned())?;
+    let result_checks = measured_queries_per_schedule
+        .checked_mul(2)
+        .ok_or_else(|| "two-schedule result count overflows usize".to_owned())?;
+    let all_checks = result_checks
+        .checked_add(measured_queries_per_schedule)
+        .ok_or_else(|| "cross-schedule comparison count overflows usize".to_owned())?;
+
     let mut query_major_batches = Vec::with_capacity(config.repetitions);
     let mut candidate_major_batches = Vec::with_capacity(config.repetitions);
     let mut query_major_batch_ns = Vec::with_capacity(config.repetitions);
     let mut candidate_major_batch_ns = Vec::with_capacity(config.repetitions);
-    let mut query_major_observations = Vec::with_capacity(config.repetitions * config.batch_size);
+    let mut query_major_observations = Vec::with_capacity(measured_queries_per_schedule);
     let wall_started = Instant::now();
 
     // Alternate order to reduce systematic warm/cache/thermal order bias.
@@ -226,15 +237,14 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let measured_queries_per_schedule = config.repetitions * config.batch_size;
     let query_major_mismatches = count_batch_mismatches(&query_major_batches);
     let candidate_major_mismatches = count_batch_mismatches(&candidate_major_batches);
     let cross_schedule_mismatches = count_cross_schedule_mismatches(
         &query_major_batches,
         &candidate_major_batches,
     );
-    let mismatches =
-        query_major_mismatches + candidate_major_mismatches + cross_schedule_mismatches;
+    let result_mismatches = query_major_mismatches.saturating_add(candidate_major_mismatches);
+    let mismatches = result_mismatches.saturating_add(cross_schedule_mismatches);
 
     let mut query_latency_samples: Vec<u128> = query_major_observations
         .iter()
@@ -359,11 +369,11 @@ fn run() -> Result<(), String> {
             "query_major_mismatches": query_major_mismatches,
             "candidate_major_mismatches": candidate_major_mismatches,
             "cross_schedule_mismatches": cross_schedule_mismatches,
-            "fixtures_attempted": measured_queries_per_schedule * 2,
-            "fixtures_passed": measured_queries_per_schedule * 2 - mismatches,
+            "fixtures_attempted": all_checks,
+            "fixtures_passed": all_checks.saturating_sub(mismatches),
             "mismatches": mismatches,
             "task_quality_metric": "synthetic target top-1 accuracy for both schedules",
-            "task_quality_value": (measured_queries_per_schedule * 2 - query_major_mismatches - candidate_major_mismatches) as f64 / (measured_queries_per_schedule * 2) as f64,
+            "task_quality_value": result_checks.saturating_sub(result_mismatches) as f64 / result_checks as f64,
             "task_quality_floor": 1.0,
             "malformed_frames_accepted": Value::Null
         },
@@ -551,6 +561,12 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
     }
     if config.repetitions == 0 {
         return Err("--repetitions must be greater than zero".to_owned());
+    }
+    if config.repetitions > 1_000_000 {
+        return Err("--repetitions exceeds the one-million-sample safety bound".to_owned());
+    }
+    if config.warmup > 10_000 {
+        return Err("--warmup exceeds the ten-thousand-batch safety bound".to_owned());
     }
     Ok(config)
 }
