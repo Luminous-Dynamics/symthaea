@@ -21,6 +21,7 @@ pub mod animation;
 pub mod embodiment;
 pub mod color;
 pub mod geometry;
+pub mod mycelial_presence;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
@@ -39,6 +40,7 @@ pub use embodiment::{
 };
 pub use color::{Color, Palette};
 pub use geometry::build_scene;
+pub use mycelial_presence::{build_mycelial_presence, render_mycelial_presence};
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
 pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
