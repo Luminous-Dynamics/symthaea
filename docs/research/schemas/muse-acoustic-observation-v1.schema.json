@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/schemas/muse-acoustic-observation-v1.schema.json",
   "title": "MUSE Acoustic Observation v1",
-  "description": "Independent sample-aligned WAV gain-envelope observation. This receipt is an acoustic proxy, not an instruction, musicality, or human-perceptibility verdict.",
+  "description": "Independent sample-aligned WAV gain-envelope observation. Per-channel window metrics are ordered by WAV channel index. This receipt is an acoustic proxy, not an instruction, musicality, or human-perceptibility verdict.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -198,20 +198,24 @@
                 "minimum": 1
               },
               "source_rms_dbfs": {
-                "type": [
-                  "number",
-                  "null"
-                ],
-                "minimum": -120,
-                "maximum": 24
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
               },
               "candidate_rms_dbfs": {
-                "type": [
-                  "number",
-                  "null"
-                ],
-                "minimum": -120,
-                "maximum": 24
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
               },
               "expected_gain_db": {
                 "type": [
@@ -223,19 +227,29 @@
               },
               "observed_gain_db": {
                 "type": [
-                  "number",
+                  "array",
                   "null"
                 ],
-                "minimum": -144,
-                "maximum": 144
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -324,
+                  "maximum": 324
+                }
               },
               "absolute_error_db": {
                 "type": [
-                  "number",
+                  "array",
                   "null"
                 ],
-                "minimum": 0,
-                "maximum": 168
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 420
+                }
               },
               "passed": {
                 "type": [
