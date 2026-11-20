@@ -1,0 +1,274 @@
+# Symthaea Embodiment Programme — Research and Engineering Plan
+
+**Date:** 2026-11-20  
+**Status:** Research plan + first semantic-contract increment  
+**Implementation branch:** research/symthaea-embodiment-contract-v0  
+**Scope:** Canonical identity, renderer-neutral puppet protocol, cognitive-state fidelity, evaluation, and competitive positioning.
+
+## Executive thesis
+
+Symthaea should not compete first on photorealistic digital humans. NVIDIA, Epic, and specialist avatar vendors already invest heavily in facial reconstruction, audio-driven animation, and production rendering.
+
+The stronger research opportunity is **evidence-connected embodiment**: a renderer-independent interface that lets a system communicate its actual interaction and cognitive-runtime events while preserving provenance, uncertainty, temporal order, and limitations.
+
+The avatar is a presentation layer, not the source of truth. The runtime remains authoritative.
+
+The programme has three synchronized embodiment families:
+
+1. **Mycelial Presence** — an abstract, non-human, bioluminescent identity for ambient and low-distraction interaction.
+2. **Conversational Puppet** — an optional expressive face or character for direct dialogue, with gaze, phoneme/viseme motion, and accessible controls.
+3. **Cognitive Instrument** — a transparent view of active runtime signals, memory/retrieval associations, predictions, tool lifecycle, and uncertainty.
+
+All embodiments share one semantic event contract and one identity system. They do not need to share geometry, skeletons, shaders, or rendering engines.
+
+## What exists already in Symthaea
+
+Repository inspection on 2026-11-20 found that this work should extend rather than replace existing components:
+
+- crates/domains/symthaea-canvas already defines CognitiveSnapshot, an aesthetic engine, a declarative scene graph, SVG rendering, and temporal animation helpers.
+- CognitiveSnapshot already carries selected telemetry such as prediction error, topology values, affect dimensions, harmony activations, and cycle count.
+- animation.rs already supplies a monotonic frame context and frame-rate-independent smoothing helpers.
+- symthaea-vocal-tract has speech synthesis pathways, but that is not itself a viseme/face-animation bridge.
+- Android's symthaea-soma demo already has visual embodiment components and an avatar-selection area.
+
+The existing canvas crate documents a <500µs pipeline target. That is a repository target, not an independently verified performance result. The new work should reuse its temporal contract and avoid claiming that a rendered visualization proves an underlying cognitive or experiential state.
+
+Repository references:
+- https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-canvas/src/lib.rs
+- https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-canvas/src/animation.rs
+- https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-canvas/Cargo.toml
+- https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-vocal-tract/src/speech.rs
+- https://github.com/Luminous-Dynamics/symthaea/tree/main/crates/domains/symthaea-soma/android/demo
+
+## Research landscape (checked 2026-11-20)
+
+### NVIDIA
+
+- NVIDIA's ECCV 2026 Instant4D project reports an encoder that lifts a single image to an animatable 3D representation in 20 ms and animation/pose-control throughput of 107.31 FPS. The paper's comparison uses its own hardware and production-like pipeline definition; it is not a universal hardware-independent target.
+- NVIDIA Audio2Face-3D supports audio-driven facial animation, ARKit-compatible blendshape output, real-time streaming, and optional emotion signals. The v2.0 release notes describe configurable blendshape streaming and 68 output weights when tongue blendshapes are enabled.
+- NVIDIA ACE is therefore a serious baseline for high-fidelity audio-to-face performance. It is not a substitute for Symthaea's semantic event contract.
+
+Sources:
+- https://research.nvidia.com/labs/amri/projects/instant4d/
+- https://docs.nvidia.com/nim/digital-human/a2f-3d/latest/
+- https://docs.nvidia.com/ace/latest/modules/a2f-docs/text/changelog.html
+- https://developer.nvidia.com/ace-for-games
+
+### Epic MetaHuman
+
+Epic documents real-time MetaHuman animation from mono cameras, mobile capture, and audio sources. Its audio-driven path can synthesize facial performance, but the documentation distinguishes offline audio solving from the real-time audio solver; the latter has different motion capabilities. MetaHuman is a high-quality Unreal-centered reference, not a lightweight cross-renderer core.
+
+Sources:
+- https://dev.epicgames.com/documentation/en-us/metahuman/realtime-animation
+- https://dev.epicgames.com/documentation/en-us/metahuman/audio-driven-animation
+- https://dev.epicgames.com/documentation/metahuman/metahuman-animator-in-unreal-engine
+
+### VRM, VRMA, and Live2D
+
+- VRM 1.0 defines humanoid structure, facial expressions, and gaze controls. Its specification also defines an execution order for humanoid bones, gaze, expressions, constraints, and spring bones.
+- VRM Animation (.vrma) allows reusable humanoid bone, expression, and gaze animation to be applied across compatible VRM models.
+- Live2D Cubism provides parameter-driven animation and lip-sync input paths that are useful references for a lightweight 2D/2.5D puppet.
+
+Use these as optional adapters, not as the universal canonical model: the Mycelial Presence is not inherently humanoid.
+
+Sources:
+- https://github.com/vrm-c/vrm-specification/tree/master/specification/VRMC_vrm-1.0
+- https://vrm.dev/en/vrma/
+- https://docs.live2d.com/en/cubism-sdk-manual/lipsync/
+
+### Evaluation literature
+
+Audio-driven facial-animation evaluation commonly includes geometric measures such as lip vertex error and temporal/audio alignment measures such as LSE-D and LSE-C. These measure aspects of synchronization and articulation, not whether an avatar accurately communicates the real runtime state of an AI system.
+
+Source:
+- https://www.mdpi.com/2078-2489/15/11/675
+
+## Proposed architecture
+
+### 1. Semantic control plane
+
+Runtime adapters emit typed events with:
+- strict per-session sequence number;
+- monotonic timestamp;
+- provenance (RuntimeEvent, RuntimeDerived, UserControlled, or RendererLocal);
+- a typed event payload.
+
+The event is the authority. Animation curves, facial expressions, glow, particles, and camera movement are renderer decisions.
+
+### 2. Evidence-aware reduction
+
+A small deterministic reducer turns ordered events into a renderer-facing snapshot. It rejects non-increasing sequence numbers, timestamp regression, invalid normalized values, and viseme events without an explicit speaking state.
+
+The reducer must not infer listening, retrieving, associating, predicting, speaking, or tool execution from visual timing or generic conversation text. Only the owning runtime adapter may publish those states.
+
+### 3. Presentation adapters
+
+| Adapter | First implementation | Later options |
+|---|---|---|
+| Mycelial Presence | Existing SVG scene graph + event-driven overlays | Bevy/WGPU volumetric filaments |
+| Conversational Puppet | Lightweight 2D/2.5D rig and event-driven mouth/gaze | VRM 1.0 + VRMA, Live2D, custom glTF |
+| Cognitive Instrument | Existing canvas visualization with explicit source labels | Interactive topology, retrieval and tool trace |
+| Accessibility | Text/captions, reduced motion, static representation | Spatial audio and user-controlled haptics |
+
+### 4. Identity and embodiment continuity
+
+Keep stable identity traits separate from renderer-specific assets:
+- canonical silhouette and core geometry;
+- palette and material language;
+- stable motion vocabulary;
+- naming and mode semantics;
+- user-selected embodiment preferences;
+- accessible fallback.
+
+The identity is not the mesh. A user should be able to move from the abstract presence to a face and back without losing the conversational session or semantic state.
+
+### 5. Causal animation rules
+
+Examples of acceptable mappings:
+- Listening only after the audio/input adapter emits a listening event.
+- Associating only while the relevant retrieval/association subsystem reports an active operation.
+- Predicting only when a prediction operation is underway.
+- Speaking only while an output-audio lifecycle is active.
+- VisemeChanged only while Speaking, aligned to the actual audio timeline.
+- ExecutingTool only while a tool invocation is active.
+- Uncertainty shown only when an explicit uncertainty signal exists; do not manufacture it from a mood estimate.
+- RendererLocal effects must remain visually distinguishable from runtime-derived evidence.
+
+Never map internal affect values directly to human emotions such as happiness, sadness, or affection without a separately validated and clearly labeled interpretation layer.
+
+## First engineering increment in this branch
+
+Added to symthaea-canvas:
+
+- embodiment.rs: typed activity, viseme, gaze, provenance, and uncertainty signals;
+- monotonic sequence/timestamp validation;
+- deterministic snapshot reduction;
+- finite [0, 1] validation for viseme weights and uncertainty;
+- viseme gating on explicit Speaking state;
+- stale-viseme clearing when leaving speech;
+- reset and transient-clear handling;
+- serialization round-trip and negative-control tests;
+- exports from symthaea-canvas::lib.
+
+**Not implemented yet:** a running avatar renderer, runtime event producers, audio-to-viseme inference, VRM loading, live gaze tracking, platform packaging, or benchmark measurements. The contract is the first integration boundary, not a completed digital puppet.
+
+## Benchmark programme: Symthaea Embodiment Fidelity Benchmark (SEFB)
+
+There is no single established leaderboard that jointly measures avatar realism, runtime-state fidelity, provenance honesty, accessibility, local performance, and user trust. Create a matched, reproducible evaluation suite rather than claiming a new SOTA score from unrelated papers.
+
+### Track A — semantic fidelity
+
+| Metric | Measurement | Initial acceptance target |
+|---|---|---:|
+| Event-to-state correctness | Replay labelled event traces and compare semantic snapshots | 100% contract conformance |
+| Provenance preservation | Confirm all displayed signals preserve their source class | 100% |
+| Unsupported-state rate | Count visual claims without supporting events | 0 |
+| Replay determinism | Same event trace produces byte-identical canonical JSON snapshots | 100% |
+| Stale-event rejection | Inject duplicated/reordered/out-of-window events | 100% of defined negative controls rejected |
+
+### Track B — temporal and rendering performance
+
+| Metric | Measurement | Initial target |
+|---|---|---:|
+| Event-to-visible latency | Event receipt to first submitted frame, P50/P95 | P50 ≤33 ms; P95 ≤80 ms |
+| Desktop rendering | P95 frame time on fixed reference hardware | ≤16.7 ms at 60 FPS |
+| Mobile rendering | Sustained frame time on a named Android device | ≤33.3 ms at 30 FPS |
+| Audio/viseme alignment | Audio timestamp versus visible articulatory onset | P50 ≤40 ms; P95 ≤80 ms |
+| Queue health | Event age, backlog depth, dropped/coalesced events | No unbounded backlog |
+| Long-run stability | 30-minute thermal/memory/latency trace | No crash; bounded memory; report throttling |
+
+Targets are proposed engineering gates, not current results or vendor-independent SOTA. Report hardware, renderer, model, asset complexity, resolution, thermal state, and whether preprocessing is included.
+
+For facial animation, use more than one metric: LSE-D/LSE-C for audio-visual sync where compatible, lip landmark/vertex error where ground truth exists, and blinded human ratings for expressiveness. Do not conflate these measurements.
+
+### Track C — human legibility and trust calibration
+
+| Metric | Study design | Initial target |
+|---|---|---:|
+| Runtime-state recognition | Blind participants classify idle/listening/associating/predicting/speaking/executing | ≥90% macro-F1 |
+| Provenance comprehension | Identify runtime event vs derived signal vs renderer-local effect | ≥90% accuracy |
+| Uncertainty comprehension | Participants correctly recognize absent vs present uncertainty signal | ≥90% |
+| Accessibility | Reduced-motion, static mode, captions, non-color cues | 100% required checks |
+| Anthropomorphic overclaim | Participants falsely infer unsubstantiated feelings or capabilities | No increase versus neutral-control interface |
+
+Conduct controlled comparisons against:
+1. no avatar / text-only;
+2. generic speaking orb;
+3. conventional expressive 2D puppet;
+4. audio-driven humanoid baseline;
+5. Symthaea evidence-connected embodiment.
+
+Pre-register hypotheses, separate familiarity effects from the interface effect, report confidence intervals, and publish anonymized materials and scoring scripts.
+
+### Track D — optional calibrated uncertainty
+
+Only run this track when the underlying runtime exports a calibrated probability or uncertainty estimate. Measure Brier score and expected calibration error (ECE); initial research goals are Brier ≤0.10 and ECE ≤0.05 on held-out tasks. If the runtime does not supply a calibrated value, show "not available" rather than inventing a meter.
+
+## How we compare and where to try to outperform
+
+| Dimension | NVIDIA ACE / Instant4D | Epic MetaHuman | Symthaea research objective |
+|---|---|---|---|
+| Facial fidelity | Strong specialist baseline | Strong production baseline | Use as optional backend; do not claim to beat it initially |
+| Animation throughput | Published >100 FPS in Instant4D setup; Audio2Face SDK targets real-time streaming | Real-time capture/animation workflow | Match on named hardware and fixed assets |
+| Cognitive event semantics | Not the central published goal | Not the central published goal | First-class semantic contract |
+| Provenance and uncertainty | Emotion/animation controls exist | Solve controls exist | Preserve the source and confidence of every signal |
+| Embodiment diversity | Mostly human/digital-human pipeline | Human/digital-human pipeline | Abstract, humanoid, technical, and accessible modes |
+| Offline replay and audit | Must be evaluated per integration | Must be evaluated per integration | Deterministic event-trace replay |
+
+**Competitive strategy:** integrate with the best facial renderer when appropriate, while making Symthaea's semantic embodiment protocol the thing that is open, portable, auditable, and benchmarked. A high-quality face is a replaceable backend; a truthful cognitive interface is the product-level differentiator.
+
+## Execution roadmap
+
+### P0 — contract and identity
+- [x] Inspect current canvas and speech-related crates.
+- [x] Add the first renderer-neutral event/snapshot contract.
+- [x] Add sequence, timestamp, range, and speech-state negative controls.
+- [ ] Run focused Cargo tests and workspace checks on the branch.
+- [ ] Review event provenance policy and version the schema.
+- [ ] Adopt a canonical identity sheet and design tokens.
+
+### P1 — real runtime signals
+- [ ] Add adapters for speech output lifecycle, tool lifecycle, perception, retrieval/association, and prediction.
+- [ ] Ensure event producers emit only from the authoritative subsystem.
+- [ ] Add trace recording and deterministic replay fixtures.
+- [ ] Add audio timestamps and a viseme adapter; retain a simple fallback if no viseme model is present.
+
+### P2 — first visible puppet
+- [ ] Render the Mycelial Presence from the existing SVG scene graph.
+- [ ] Build a 2D/2.5D face with separate gaze, viseme, and activity channels.
+- [ ] Add captions, static mode, reduced-motion mode, and user choice of embodiment.
+- [ ] Measure latency, frame time, and power on desktop and Pixel 8 Pro.
+
+### P3 — interoperability and quality
+- [ ] Add optional VRM 1.0/VRMA import/export for humanoid embodiments.
+- [ ] Evaluate Live2D and NVIDIA Audio2Face as comparative/adaptor backends.
+- [ ] Add cross-renderer semantic-parity tests.
+- [ ] Run the first SEFB benchmark with fixed traces, hardware metadata, and human-study protocol.
+
+### P4 — research frontier
+- [ ] Explore a non-humanoid procedural mycelial puppet with event-reactive topology.
+- [ ] Investigate low-rank motion codes / HDC-coded gesture primitives with explicit, interpretable decoding.
+- [ ] Explore causal predictive animation: pre-render likely next motion while preserving cancellation and correction when the event changes.
+- [ ] Explore on-device avatar rendering and adaptive quality under thermal/power constraints.
+- [ ] Publish benchmark results, negative results, and matched-baseline comparisons.
+
+## Research hypotheses worth testing
+
+1. **Semantic motion codes:** Can an HDC representation encode reusable gesture primitives while a small decoder preserves deterministic, bounded animation? This is exploratory; do not assume HDC is better than conventional motion embeddings.
+2. **Predictive pre-animation:** Can a renderer reduce perceived latency by preparing candidate motion from an explicitly pending operation, without displaying it as completed? The UI must visibly distinguish anticipation from a confirmed event.
+3. **Non-humanoid expressivity:** Can users identify runtime states from an organic mycelial representation as accurately as from a face, with lower anthropomorphic over-attribution?
+4. **Renderer portability:** Can identical event traces produce semantically equivalent states across SVG, Live2D, and VRM backends?
+5. **Evidence-first personalization:** Can users customize color, motion, face, and density without changing the underlying meaning of the event cues?
+
+## Governance and release gates
+
+- No avatar is allowed to authorize a tool, action, permission, payment, or system state.
+- No renderer-local animation may be promoted to a runtime fact.
+- Unknown, stale, or contradictory events must not create a new authoritative state; retain the last valid snapshot and expose the error to diagnostics.
+- User audio/video must not be retained by default for benchmark telemetry; any study collection requires explicit consent and a documented retention policy.
+- Every benchmark result must include commit SHA, event-corpus digest, asset/model versions, hardware, settings, measurement scripts, and raw aggregate data.
+- CI queued, skipped, or pending is not a pass. Separate local/static checks, CI results, and physical-device measurements.
+
+## Decision
+
+Build the **semantic embodiment layer first**, then connect renderers. Make Mycelial Presence the canonical default, a humanlike face an optional conversational skin, and Cognitive Instrument the transparent technical mode. This is the fastest route to a distinctive first release while preserving the option to adopt industry-leading facial animation backends later.
