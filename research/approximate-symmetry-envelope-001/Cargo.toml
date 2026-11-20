@@ -1,0 +1,13 @@
+[package]
+name = "approximate-symmetry-envelope-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Checked fixed-point finite-horizon error envelopes for approximate discrete symmetries"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
