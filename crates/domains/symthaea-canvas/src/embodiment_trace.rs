@@ -283,6 +283,29 @@ mod tests {
         trace
     }
 
+
+    #[test]
+    fn sefb_v1_fixture_replays_and_summarizes() {
+        let encoded = include_str!("../tests/fixtures/embodiment_trace_v1.json");
+        let trace: EmbodimentTrace = serde_json::from_str(encoded).unwrap();
+        let summary = trace.summarize().unwrap();
+
+        assert_eq!(summary.session_id, "sefb-fixture-v1");
+        assert_eq!(summary.event_count, 6);
+        assert_eq!(summary.activity_changes, 2);
+        assert_eq!(summary.completed_activity_intervals, 1);
+        assert_eq!(summary.speaking_intervals_completed, 1);
+        assert_eq!(summary.speaking_duration_ns, 2_000_000);
+        assert_eq!(summary.viseme_event_count, 2);
+        assert_eq!(summary.uncertainty_observation_count, 1);
+        assert_eq!(
+            summary.final_snapshot.current_activity(),
+            Some(EmbodimentActivity::Idle)
+        );
+        assert!(summary.final_snapshot.viseme.is_none());
+        assert!(summary.final_snapshot.uncertainty.is_none());
+    }
+
     #[test]
     fn replay_is_deterministic() {
         let trace = sample_trace();
