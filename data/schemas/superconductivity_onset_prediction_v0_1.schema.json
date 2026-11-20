@@ -18,7 +18,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["pair_id", "precursor_ids", "evidence_kind", "lower_bound_k", "upper_bound_k", "exact_onset_k", "evidence_ids", "raw_data_sha256"],
+        "required": ["pair_id", "precursor_ids", "evidence_kind", "lower_bound_k", "upper_bound_k", "exact_onset_k", "evidence_observations"],
         "properties": {
           "pair_id": {"type": "string", "minLength": 1},
           "precursor_ids": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
@@ -26,8 +26,29 @@
           "lower_bound_k": {"type": ["number", "null"], "exclusiveMinimum": 0},
           "upper_bound_k": {"type": ["number", "null"], "exclusiveMinimum": 0},
           "exact_onset_k": {"type": ["number", "null"], "exclusiveMinimum": 0},
-          "evidence_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-          "raw_data_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+          "evidence_observations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["observation_id", "sample_id", "execution_run_id", "conditions_id", "characterization_method", "outcome", "dwell_temperature_k", "observed_onset_k", "measurement_uncertainty_k", "detection_limit_wt_percent", "raw_data_sha256"],
+              "properties": {
+                "observation_id": {"type": "string", "minLength": 1},
+                "sample_id": {"type": "string", "minLength": 1},
+                "execution_run_id": {"type": "string", "minLength": 1},
+                "conditions_id": {"type": "string", "minLength": 1},
+                "characterization_method": {"type": "string", "minLength": 1},
+                "outcome": {"enum": ["cross_precursor_product_detected", "no_cross_precursor_product", "transformed_only", "uncharacterizable", "exact_onset_measured"]},
+                "dwell_temperature_k": {"type": "number", "exclusiveMinimum": 0},
+                "observed_onset_k": {"type": ["number", "null"], "exclusiveMinimum": 0},
+                "measurement_uncertainty_k": {"type": ["number", "null"], "exclusiveMinimum": 0},
+                "detection_limit_wt_percent": {"type": "number", "exclusiveMinimum": 0, "maximum": 100},
+                "raw_data_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+              }
+            }
+          }
         }
       }
     },
