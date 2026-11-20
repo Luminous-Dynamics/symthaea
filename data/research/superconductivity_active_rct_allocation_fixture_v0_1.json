@@ -1,0 +1,1609 @@
+{
+  "contract": "SC-ACTIVE-RCT-ALLOCATION-0.1",
+  "instance_id": "synthetic_family_stratified_active_rct_allocation_001",
+  "fixture_only": true,
+  "target_estimand": "application_weighted_finite_population_ate",
+  "outcome_labels": [
+    "less_than_control",
+    "approximately_neutral",
+    "greater_than_control"
+  ],
+  "families": [
+    {
+      "family_id": "family_alpha",
+      "application_weight": 0.4,
+      "effect_states": [
+        {
+          "state_id": "alpha_low",
+          "prior_probability": 0.25,
+          "ate": -1
+        },
+        {
+          "state_id": "alpha_mid",
+          "prior_probability": 0.45,
+          "ate": 1
+        },
+        {
+          "state_id": "alpha_high",
+          "prior_probability": 0.3,
+          "ate": 4
+        }
+      ]
+    },
+    {
+      "family_id": "family_beta",
+      "application_weight": 0.35,
+      "effect_states": [
+        {
+          "state_id": "beta_low",
+          "prior_probability": 0.15,
+          "ate": -1
+        },
+        {
+          "state_id": "beta_mid",
+          "prior_probability": 0.5,
+          "ate": 2
+        },
+        {
+          "state_id": "beta_high",
+          "prior_probability": 0.35,
+          "ate": 5
+        }
+      ]
+    },
+    {
+      "family_id": "family_gamma",
+      "application_weight": 0.25,
+      "effect_states": [
+        {
+          "state_id": "gamma_low",
+          "prior_probability": 0.2,
+          "ate": 0
+        },
+        {
+          "state_id": "gamma_mid",
+          "prior_probability": 0.5,
+          "ate": 1.5
+        },
+        {
+          "state_id": "gamma_high",
+          "prior_probability": 0.3,
+          "ate": 3.5
+        }
+      ]
+    }
+  ],
+  "world_states": [
+    {
+      "world_state_id": "world_alpha_low_beta_low_gamma_low",
+      "prior_probability": 0.0075,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": -0.75
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_low_gamma_mid",
+      "prior_probability": 0.01875,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": -0.375
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_low_gamma_high",
+      "prior_probability": 0.01125,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 0.125
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_mid_gamma_low",
+      "prior_probability": 0.025,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 0.29999999999999993
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
+      "prior_probability": 0.0625,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 0.6749999999999999
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_mid_gamma_high",
+      "prior_probability": 0.0375,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 1.1749999999999998
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_high_gamma_low",
+      "prior_probability": 0.017499999999999998,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 1.35
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_high_gamma_mid",
+      "prior_probability": 0.04375,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 1.725
+    },
+    {
+      "world_state_id": "world_alpha_low_beta_high_gamma_high",
+      "prior_probability": 0.02625,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_low"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 2.225
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_low_gamma_low",
+      "prior_probability": 0.013500000000000002,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 0.050000000000000044
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
+      "prior_probability": 0.03375,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 0.42500000000000004
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_low_gamma_high",
+      "prior_probability": 0.02025,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 0.925
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
+      "prior_probability": 0.045000000000000005,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 1.1
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
+      "prior_probability": 0.1125,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 1.475
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
+      "prior_probability": 0.0675,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 1.975
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_high_gamma_low",
+      "prior_probability": 0.0315,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 2.15
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
+      "prior_probability": 0.07875,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 2.525
+    },
+    {
+      "world_state_id": "world_alpha_mid_beta_high_gamma_high",
+      "prior_probability": 0.04725,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_mid"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 3.025
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_low_gamma_low",
+      "prior_probability": 0.009,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 1.25
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_low_gamma_mid",
+      "prior_probability": 0.0225,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 1.625
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_low_gamma_high",
+      "prior_probability": 0.0135,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_low"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 2.125
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_mid_gamma_low",
+      "prior_probability": 0.03,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 2.3
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
+      "prior_probability": 0.075,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 2.675
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_mid_gamma_high",
+      "prior_probability": 0.045,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_mid"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 3.175
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_high_gamma_low",
+      "prior_probability": 0.021,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_low"
+        }
+      ],
+      "target_population_ate": 3.35
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_high_gamma_mid",
+      "prior_probability": 0.0525,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_mid"
+        }
+      ],
+      "target_population_ate": 3.725
+    },
+    {
+      "world_state_id": "world_alpha_high_beta_high_gamma_high",
+      "prior_probability": 0.0315,
+      "family_state_ids": [
+        {
+          "family_id": "family_alpha",
+          "family_state_id": "alpha_high"
+        },
+        {
+          "family_id": "family_beta",
+          "family_state_id": "beta_high"
+        },
+        {
+          "family_id": "family_gamma",
+          "family_state_id": "gamma_high"
+        }
+      ],
+      "target_population_ate": 4.225
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "advance_application_validation",
+      "losses": [
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_low",
+          "loss": 8.5
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_mid",
+          "loss": 7.75
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_high",
+          "loss": 6.75
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_low",
+          "loss": 6.4
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
+          "loss": 5.65
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_high",
+          "loss": 4.65
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_low",
+          "loss": 4.3
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_mid",
+          "loss": 3.55
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_high",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_low",
+          "loss": 6.9
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
+          "loss": 6.15
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_high",
+          "loss": 5.15
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
+          "loss": 4.8
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
+          "loss": 4.05
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
+          "loss": 3.05
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_low",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_high",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_low",
+          "loss": 4.5
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_mid",
+          "loss": 3.75
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_high",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_low",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_high",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_low",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_mid",
+          "loss": 0.6
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_high",
+          "loss": 0.6
+        }
+      ]
+    },
+    {
+      "decision_id": "continue_research",
+      "losses": [
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_low",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_mid",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_high",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_low",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_high",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_low",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_mid",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_high",
+          "loss": 1.8562500000000002
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_low",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_high",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_low",
+          "loss": 1.8375
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
+          "loss": 1.93125
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_high",
+          "loss": 2.05625
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_low",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_mid",
+          "loss": 1.8
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_high",
+          "loss": 1.83125
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_low",
+          "loss": 1.875
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
+          "loss": 1.96875
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_high",
+          "loss": 2.09375
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_low",
+          "loss": 2.1375
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_mid",
+          "loss": 2.23125
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_high",
+          "loss": 2.35625
+        }
+      ]
+    },
+    {
+      "decision_id": "defer_and_preserve",
+      "losses": [
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_low",
+          "loss": 1
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_mid",
+          "loss": 1
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_low_gamma_high",
+          "loss": 1.0125
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_low",
+          "loss": 1.03
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_mid",
+          "loss": 1.0675
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_mid_gamma_high",
+          "loss": 1.1175
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_low",
+          "loss": 1.135
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_mid",
+          "loss": 1.1725
+        },
+        {
+          "world_state_id": "world_alpha_low_beta_high_gamma_high",
+          "loss": 1.2225000000000001
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_low",
+          "loss": 1.005
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_mid",
+          "loss": 1.0425
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_low_gamma_high",
+          "loss": 1.0925
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_low",
+          "loss": 1.11
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_mid",
+          "loss": 1.1475
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_mid_gamma_high",
+          "loss": 1.1975
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_low",
+          "loss": 1.215
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_mid",
+          "loss": 1.2525
+        },
+        {
+          "world_state_id": "world_alpha_mid_beta_high_gamma_high",
+          "loss": 1.3025
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_low",
+          "loss": 1.125
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_mid",
+          "loss": 1.1625
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_low_gamma_high",
+          "loss": 1.2125
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_low",
+          "loss": 1.23
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_mid",
+          "loss": 1.2675
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_mid_gamma_high",
+          "loss": 1.3175
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_low",
+          "loss": 1.335
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_mid",
+          "loss": 1.3725
+        },
+        {
+          "world_state_id": "world_alpha_high_beta_high_gamma_high",
+          "loss": 1.4224999999999999
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "financial_budget",
+      "unit": "USD_cent",
+      "capacity": 30000,
+      "semantics": "Synthetic randomized-campaign budget. Not a laboratory quote."
+    },
+    {
+      "resource_id": "cryostat_time",
+      "unit": "minute",
+      "capacity": 90,
+      "semantics": "Synthetic booked cryostat time."
+    },
+    {
+      "resource_id": "specimen_mass",
+      "unit": "microgram",
+      "capacity": 5000,
+      "semantics": "Synthetic total mass consumed across both matched aliquots."
+    },
+    {
+      "resource_id": "magnetometer_time",
+      "unit": "minute",
+      "capacity": 130,
+      "semantics": "Synthetic magnetometry time for paired outcomes."
+    }
+  ],
+  "allocation_constraints": {
+    "max_selected_blocks": 4,
+    "min_selected_blocks": 3,
+    "min_blocks_per_family": 1,
+    "max_blocks_per_family": 2,
+    "max_blocks_per_batch": 2,
+    "min_randomization_probability": 0.2,
+    "max_randomization_probability": 0.8
+  },
+  "candidate_blocks": [
+    {
+      "block_id": "family_alpha_high",
+      "family_id": "family_alpha",
+      "batch_id": "batch_1",
+      "specimen_ids": [
+        "family_alpha_high_aliquot_A",
+        "family_alpha_high_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.08,
+      "domain_discrepancy": 0.1,
+      "family_representation_weight": 0.4,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 9000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 30
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 1200
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 45
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "alpha_low",
+          "outcome_probabilities": [
+            0.82,
+            0.15,
+            0.03
+          ]
+        },
+        {
+          "family_state_id": "alpha_mid",
+          "outcome_probabilities": [
+            0.15,
+            0.7,
+            0.15
+          ]
+        },
+        {
+          "family_state_id": "alpha_high",
+          "outcome_probabilities": [
+            0.03,
+            0.15,
+            0.82
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_alpha_medium",
+      "family_id": "family_alpha",
+      "batch_id": "batch_2",
+      "specimen_ids": [
+        "family_alpha_medium_aliquot_A",
+        "family_alpha_medium_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.5,
+      "domain_discrepancy": 0.3,
+      "family_representation_weight": 0.4,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 6000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 22
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 900
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 34
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "alpha_low",
+          "outcome_probabilities": [
+            0.65,
+            0.25,
+            0.1
+          ]
+        },
+        {
+          "family_state_id": "alpha_mid",
+          "outcome_probabilities": [
+            0.22,
+            0.56,
+            0.22
+          ]
+        },
+        {
+          "family_state_id": "alpha_high",
+          "outcome_probabilities": [
+            0.1,
+            0.25,
+            0.65
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_alpha_low",
+      "family_id": "family_alpha",
+      "batch_id": "batch_3",
+      "specimen_ids": [
+        "family_alpha_low_aliquot_A",
+        "family_alpha_low_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.92,
+      "domain_discrepancy": 0.65,
+      "family_representation_weight": 0.4,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 4000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 17
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 600
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 26
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "alpha_low",
+          "outcome_probabilities": [
+            0.5,
+            0.32,
+            0.18
+          ]
+        },
+        {
+          "family_state_id": "alpha_mid",
+          "outcome_probabilities": [
+            0.3,
+            0.4,
+            0.3
+          ]
+        },
+        {
+          "family_state_id": "alpha_high",
+          "outcome_probabilities": [
+            0.18,
+            0.32,
+            0.5
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_beta_high",
+      "family_id": "family_beta",
+      "batch_id": "batch_1",
+      "specimen_ids": [
+        "family_beta_high_aliquot_A",
+        "family_beta_high_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.08,
+      "domain_discrepancy": 0.1,
+      "family_representation_weight": 0.35,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 9000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 30
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 1200
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 45
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "beta_low",
+          "outcome_probabilities": [
+            0.82,
+            0.15,
+            0.03
+          ]
+        },
+        {
+          "family_state_id": "beta_mid",
+          "outcome_probabilities": [
+            0.15,
+            0.7,
+            0.15
+          ]
+        },
+        {
+          "family_state_id": "beta_high",
+          "outcome_probabilities": [
+            0.03,
+            0.15,
+            0.82
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_beta_medium",
+      "family_id": "family_beta",
+      "batch_id": "batch_2",
+      "specimen_ids": [
+        "family_beta_medium_aliquot_A",
+        "family_beta_medium_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.5,
+      "domain_discrepancy": 0.3,
+      "family_representation_weight": 0.35,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 6000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 22
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 900
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 34
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "beta_low",
+          "outcome_probabilities": [
+            0.65,
+            0.25,
+            0.1
+          ]
+        },
+        {
+          "family_state_id": "beta_mid",
+          "outcome_probabilities": [
+            0.22,
+            0.56,
+            0.22
+          ]
+        },
+        {
+          "family_state_id": "beta_high",
+          "outcome_probabilities": [
+            0.1,
+            0.25,
+            0.65
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_beta_low",
+      "family_id": "family_beta",
+      "batch_id": "batch_3",
+      "specimen_ids": [
+        "family_beta_low_aliquot_A",
+        "family_beta_low_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.92,
+      "domain_discrepancy": 0.65,
+      "family_representation_weight": 0.35,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 4000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 17
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 600
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 26
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "beta_low",
+          "outcome_probabilities": [
+            0.5,
+            0.32,
+            0.18
+          ]
+        },
+        {
+          "family_state_id": "beta_mid",
+          "outcome_probabilities": [
+            0.3,
+            0.4,
+            0.3
+          ]
+        },
+        {
+          "family_state_id": "beta_high",
+          "outcome_probabilities": [
+            0.18,
+            0.32,
+            0.5
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_gamma_high",
+      "family_id": "family_gamma",
+      "batch_id": "batch_1",
+      "specimen_ids": [
+        "family_gamma_high_aliquot_A",
+        "family_gamma_high_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.08,
+      "domain_discrepancy": 0.1,
+      "family_representation_weight": 0.25,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 9000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 30
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 1200
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 45
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "gamma_low",
+          "outcome_probabilities": [
+            0.82,
+            0.15,
+            0.03
+          ]
+        },
+        {
+          "family_state_id": "gamma_mid",
+          "outcome_probabilities": [
+            0.15,
+            0.7,
+            0.15
+          ]
+        },
+        {
+          "family_state_id": "gamma_high",
+          "outcome_probabilities": [
+            0.03,
+            0.15,
+            0.82
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_gamma_medium",
+      "family_id": "family_gamma",
+      "batch_id": "batch_2",
+      "specimen_ids": [
+        "family_gamma_medium_aliquot_A",
+        "family_gamma_medium_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.5,
+      "domain_discrepancy": 0.3,
+      "family_representation_weight": 0.25,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 6000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 22
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 900
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 34
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "gamma_low",
+          "outcome_probabilities": [
+            0.65,
+            0.25,
+            0.1
+          ]
+        },
+        {
+          "family_state_id": "gamma_mid",
+          "outcome_probabilities": [
+            0.22,
+            0.56,
+            0.22
+          ]
+        },
+        {
+          "family_state_id": "gamma_high",
+          "outcome_probabilities": [
+            0.1,
+            0.25,
+            0.65
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_gamma_low",
+      "family_id": "family_gamma",
+      "batch_id": "batch_3",
+      "specimen_ids": [
+        "family_gamma_low_aliquot_A",
+        "family_gamma_low_aliquot_B"
+      ],
+      "matched_pair_qualified": true,
+      "treatment_available": true,
+      "control_available": true,
+      "eligible": true,
+      "exclusion_reason": "",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.92,
+      "domain_discrepancy": 0.65,
+      "family_representation_weight": 0.25,
+      "resource_consumption": [
+        {
+          "resource_id": "financial_budget",
+          "unit": "USD_cent",
+          "quantity": 4000
+        },
+        {
+          "resource_id": "cryostat_time",
+          "unit": "minute",
+          "quantity": 17
+        },
+        {
+          "resource_id": "specimen_mass",
+          "unit": "microgram",
+          "quantity": 600
+        },
+        {
+          "resource_id": "magnetometer_time",
+          "unit": "minute",
+          "quantity": 26
+        }
+      ],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "gamma_low",
+          "outcome_probabilities": [
+            0.5,
+            0.32,
+            0.18
+          ]
+        },
+        {
+          "family_state_id": "gamma_mid",
+          "outcome_probabilities": [
+            0.3,
+            0.4,
+            0.3
+          ]
+        },
+        {
+          "family_state_id": "gamma_high",
+          "outcome_probabilities": [
+            0.18,
+            0.32,
+            0.5
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "family_beta_unmatched_control",
+      "family_id": "family_beta",
+      "batch_id": "batch_4",
+      "specimen_ids": [
+        "family_beta_unmatched_treatment_only"
+      ],
+      "matched_pair_qualified": false,
+      "treatment_available": true,
+      "control_available": false,
+      "eligible": false,
+      "exclusion_reason": "No qualified control aliquot; randomization positivity cannot be satisfied.",
+      "randomization_probability": 0.5,
+      "historical_treatment_propensity": 0.99,
+      "domain_discrepancy": 0.9,
+      "family_representation_weight": 0.35,
+      "resource_consumption": [],
+      "observation_likelihoods": [
+        {
+          "family_state_id": "beta_low",
+          "outcome_probabilities": [
+            0.5,
+            0.32,
+            0.18
+          ]
+        },
+        {
+          "family_state_id": "beta_mid",
+          "outcome_probabilities": [
+            0.3,
+            0.4,
+            0.3
+          ]
+        },
+        {
+          "family_state_id": "beta_high",
+          "outcome_probabilities": [
+            0.18,
+            0.32,
+            0.5
+          ]
+        }
+      ]
+    }
+  ],
+  "held_out_world_state_id": "world_alpha_mid_beta_high_gamma_low",
+  "claim_ceiling": "Synthetic active randomized-specimen allocation benchmark only; no real specimen selection, causal effect, superconductivity result or laboratory authorization is established."
+}
