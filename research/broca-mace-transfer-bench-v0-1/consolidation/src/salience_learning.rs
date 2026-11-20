@@ -5,8 +5,10 @@
 //! Reuse labels remain evaluator-owned; inference accepts observable features.
 
 use std::collections::BTreeSet;
-use broca_mace_policy::SourceRootDigest;
+use broca_mace_policy::{Scope, SourceRootDigest};
 use sha2::{Digest, Sha256};
+
+use crate::salience::FutureUsePredictionV1;
 
 pub const MIN_TRAIN_CLUSTERS: usize = 32;
 pub const MIN_CALIBRATION_CLUSTERS: usize = 16;
@@ -73,7 +75,7 @@ pub enum Reject {
     Empty, BadId, UnknownRoot, BadFeature, DuplicateEvent, MissingClass,
     TooFewClusters, TooFewFamilies, TooFewRoots,
     ClusterOverlap, FamilyOverlap, RootOverlap, EventOverlap,
-    BadConfig, ModelMismatch,
+    BadConfig, ModelMismatch, InvalidPredictionContext, InvalidPredictionDigest,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Identity {
@@ -382,6 +384,60 @@ pub fn evaluate(
         worst_family_ece_micros: micros(worst),
     })
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RawFutureUsePredictionInputV1 {
+    pub event_id: u32,
+    pub target_scope: Scope,
+    pub predicted_at_ms: i64,
+    pub horizon_end_ms: i64,
+    pub expected_value_gain_micros: u32,
+    pub uncertainty_penalty_micros: u32,
+    pub rationale_sha256: String,
+    pub evidence_sha256: String,
+}
+
+/// Build a raw candidate prediction from the learned model and its calibrator.
+/// The returned prediction is NOT eligible for surfacing until the separate
+/// SaliencePredictionVerifierV1 issues a valid calibration receipt.
+pub fn build_raw_prediction(
+    model: &ModelV1,
+    calibrator: &CalibratorV1,
+    features: FeaturesV1,
+    input: RawFutureUsePredictionInputV1,
+) -> Result<FutureUsePredictionV1, Reject> {
+    if input.event_id == 0
+        || input.predicted_at_ms < 0
+        || input.horizon_end_ms <= input.predicted_at_ms
+        || input.rationale_sha256.len() != 64
+        || input.evidence_sha256.len() != 64
+        || !input.rationale_sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        || !input.evidence_sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(Reject::InvalidPredictionContext);
+    }
+    let probability = calibrator.predict_bps(model, features)?;
+    let mut h = Sha256::new();
+    h.update(b"mace:learned-salience-pipeline:v1\0");
+    field(&mut h, model.model_sha256.as_bytes());
+    field(&mut h, calibrator.calibration_sha256.as_bytes());
+    let pipeline_digest = sha(&h.finalize());
+
+    Ok(FutureUsePredictionV1::new(
+        input.event_id,
+        input.target_scope,
+        input.predicted_at_ms,
+        input.horizon_end_ms,
+        probability,
+        input.expected_value_gain_micros,
+        input.uncertainty_penalty_micros,
+        "mace-learned-future-use",
+        "logistic-platt-v1",
+        pipeline_digest,
+        input.rationale_sha256,
+        input.evidence_sha256,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -443,6 +499,36 @@ mod tests {
         assert_eq!(metrics.examples, heldout.len() as u32);
         assert_eq!(metrics.clusters, 32);
     }
+    #[test]
+    fn learned_output_is_raw_prediction_not_self_verified_memory() {
+        let training = rows(1, 1, 10);
+        let calibration = rows(10_000, 100, 30);
+        let model = train(&training, ModelConfigV1::default()).unwrap();
+        let calibrator = calibrate(&model, &calibration).unwrap();
+        let prediction = build_raw_prediction(
+            &model,
+            &calibrator,
+            training[0].features,
+            RawFutureUsePredictionInputV1 {
+                event_id: 77,
+                target_scope: Scope {
+                    regime: broca_mace_policy::Regime::Baseline,
+                    objective: broca_mace_policy::Objective::Quality,
+                },
+                predicted_at_ms: 100,
+                horizon_end_ms: 200,
+                expected_value_gain_micros: 500,
+                uncertainty_penalty_micros: 50,
+                rationale_sha256: "a".repeat(64),
+                evidence_sha256: "b".repeat(64),
+            },
+        )
+        .unwrap();
+        assert_eq!(prediction.prediction_sha256, prediction.canonical_digest());
+        assert_eq!(prediction.model_id, "mace-learned-future-use");
+        assert_eq!(prediction.model_version, "logistic-platt-v1");
+    }
+
     #[test]
     fn calibrator_is_bound_to_the_exact_model() {
         let train_rows = rows(1, 1, 10);
