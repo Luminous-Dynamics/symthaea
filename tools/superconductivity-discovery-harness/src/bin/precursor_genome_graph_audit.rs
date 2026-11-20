@@ -425,6 +425,90 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         return Err("cohort accounting does not close to the complete source ledger".to_owned());
     }
 
+    // Export a compact, sample-indexed dataset view so downstream benchmarks
+    // can preserve row provenance rather than attempting to reconstruct labels
+    // from aggregate category counts. Raw XRD files remain external.
+    let sample_records: Vec<Value> = rows.iter().zip(parsed_samples.iter()).map(|(row, sample)| {
+        let precursors = row.get("precursors").and_then(Value::as_array);
+        let precursor_records: Vec<Value> = precursors.into_iter().flatten().map(|precursor| {
+            json!({
+                "formula_clean": precursor.get("formula_clean").and_then(Value::as_str),
+                "formula": precursor.get("formula").and_then(Value::as_str),
+                "cas_number": precursor.get("cas_number").and_then(Value::as_str),
+                "catalog_melting_point_c": precursor.get("melting_point_c").and_then(Value::as_f64),
+                "catalog_purity_fraction": precursor.get("sa_purity").and_then(Value::as_f64)
+            })
+        }).collect();
+
+        let scan_index = row.get("active_scan_index").and_then(Value::as_u64).map(|x| x as usize);
+        let scans = row.get("characterization").and_then(|x| x.get("xrd"))
+            .and_then(|x| x.get("scans")).and_then(Value::as_array);
+        let active_scan = scan_index.and_then(|index| scans.and_then(|items| items.get(index)));
+        let active_case_index = active_scan.and_then(|scan| scan.get("active_case_index"))
+            .and_then(Value::as_u64).map(|x| x as usize);
+        let active_refinement = active_case_index.and_then(|index| {
+            active_scan.and_then(|scan| scan.get("refinement_cases"))
+                .and_then(Value::as_array).and_then(|cases| cases.get(index))
+        });
+        let verification = active_refinement.and_then(|case| case.get("verification"));
+        let synthesis = row.get("synthesis");
+        let profile = synthesis.and_then(|s| s.get("temperature_profile"));
+        let profile_times = profile.and_then(|p| p.get("time_minutes")).and_then(Value::as_array);
+        let profile_temps = profile.and_then(|p| p.get("temperature_celsius")).and_then(Value::as_array);
+        let finite_temps: Vec<f64> = profile_temps.into_iter().flatten()
+            .filter_map(Value::as_f64).filter(|x| x.is_finite()).collect();
+        let profile_min = finite_temps.iter().copied().reduce(f64::min);
+        let profile_max = finite_temps.iter().copied().reduce(f64::max);
+        let category = sample.category.as_deref();
+        let endpoint = category.and_then(category_label);
+        let status = cohort_status(
+            sample.has_physical_failure,
+            sample.quality_score,
+            category,
+        );
+        let phases = row.get("outcome").and_then(|o| o.get("phases"))
+            .cloned().unwrap_or_else(|| json!([]));
+        json!({
+            "sample_id": sample.sample_id,
+            "precursor_order_source": precursor_records,
+            "precursor_pair_canonical": [sample.pair.0, sample.pair.1],
+            "raw_reaction_category": category,
+            "cross_precursor_product_endpoint": endpoint,
+            "cohort_status": status.as_str(),
+            "physical_failure_observation": row.get("physical_failure")
+                .and_then(|failure| failure.get("observation")).and_then(Value::as_str),
+            "active_xrd": {
+                "active_scan_index": scan_index,
+                "scan_status": active_scan.and_then(|scan| scan.get("status")).and_then(Value::as_str),
+                "prep_is_good": active_scan.and_then(|scan| scan.get("prep_verification"))
+                    .and_then(|v| v.get("is_prep_good")).and_then(Value::as_bool),
+                "active_refinement_case_index": active_case_index,
+                "rwp": active_refinement.and_then(|case| case.get("rwp")).and_then(Value::as_f64),
+                "is_accepted": verification.and_then(|v| v.get("is_accepted")).and_then(Value::as_bool),
+                "human_quality_score": sample.quality_score,
+                "phase_weights": active_refinement.and_then(|case| case.get("phase_weights"))
+                    .cloned().unwrap_or_else(|| json!({}))
+            },
+            "reported_outcome_phases": phases,
+            "synthesis": {
+                "recorded_heating_temperature_c": sample.dwell_temperature_c,
+                "recorded_heating_time": synthesis.and_then(|s| s.get("heating_time")).and_then(Value::as_f64),
+                "furnace_name": synthesis.and_then(|s| s.get("furnace_name")).and_then(Value::as_str),
+                "mass_recovered_mg": synthesis.and_then(|s| s.get("mass_recovered_mg")).and_then(Value::as_f64),
+                "met_target_mass": synthesis.and_then(|s| s.get("met_target_mass")).and_then(Value::as_bool),
+                "thermal_profile": {
+                    "time_point_count": profile_times.map(Vec::len).unwrap_or(0),
+                    "temperature_point_count": profile_temps.map(Vec::len).unwrap_or(0),
+                    "minimum_recorded_temperature_c": profile_min,
+                    "maximum_recorded_temperature_c": profile_max
+                }
+            },
+            "target_compound": row.get("target_compound").and_then(Value::as_str),
+            "target_stoichiometry": row.get("target_stoichiometry").and_then(Value::as_str),
+            "reaction_energy_eV_per_atom": row.get("reaction_energy_ev_per_atom").and_then(Value::as_f64)
+        })
+    }).collect();
+
     let per_precursor: Vec<Value> = node_counts.iter().map(|(formula, counts)| {
         json!({
             "precursor_formula": formula,
@@ -465,6 +549,7 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
             "expected_degree": expected_degree,
             "per_precursor": per_precursor
         },
+        "sample_records": sample_records,
         "cohort": {
             "source_sample_count": sample_count,
             "physical_failure_exclusions": physical_failure_exclusions,
