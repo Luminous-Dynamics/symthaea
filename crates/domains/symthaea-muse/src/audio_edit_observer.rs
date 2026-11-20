@@ -360,10 +360,10 @@ fn window_value(observation: &WindowObservation) -> Value {
 }
 
 fn status(observations: &[WindowObservation]) -> &'static str {
-    if observations.iter().any(|item| item.abstention_reason.is_some()) {
-        "abstain"
-    } else if observations.iter().any(|item| item.passed == Some(false)) {
+    if observations.iter().any(|item| item.passed == Some(false)) {
         "fail"
+    } else if observations.iter().any(|item| item.abstention_reason.is_some()) {
+        "abstain"
     } else {
         "pass"
     }
@@ -433,10 +433,10 @@ pub fn observe_gain_envelope_v1(
     let preservation_status = status(&protected_observations);
     let clipping_passed =
         candidate.clipped_sample_fraction <= contract.maximum_candidate_clipped_sample_fraction;
-    let overall_status = if target_status == "abstain" || preservation_status == "abstain" {
-        "abstain"
-    } else if target_status == "fail" || preservation_status == "fail" || !clipping_passed {
+    let overall_status = if target_status == "fail" || preservation_status == "fail" || !clipping_passed {
         "fail"
+    } else if target_status == "abstain" || preservation_status == "abstain" {
+        "abstain"
     } else {
         "pass"
     };
