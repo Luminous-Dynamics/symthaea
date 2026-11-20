@@ -190,13 +190,18 @@ impl EmbodimentController {
         }
 
         match &event.kind {
+            EmbodimentEventKind::ActivityChanged { .. } => {
+                validate_runtime_provenance("activity", event.provenance)?;
+            }
             EmbodimentEventKind::VisemeChanged { weight, .. } => {
+                validate_runtime_provenance("viseme", event.provenance)?;
                 validate_unit_interval("viseme weight", *weight)?;
                 if self.snapshot.current_activity() != Some(EmbodimentActivity::Speaking) {
                     return Err(EmbodimentIngestError::VisemeWithoutSpeech);
                 }
             }
             EmbodimentEventKind::UncertaintyChanged { level } => {
+                validate_runtime_provenance("uncertainty", event.provenance)?;
                 validate_unit_interval("uncertainty", *level)?;
             }
             _ => {}
@@ -243,6 +248,18 @@ impl EmbodimentController {
     }
 }
 
+fn validate_runtime_provenance(
+    field: &'static str,
+    provenance: SignalProvenance,
+) -> Result<(), EmbodimentIngestError> {
+    match provenance {
+        SignalProvenance::RuntimeEvent | SignalProvenance::RuntimeDerived => Ok(()),
+        SignalProvenance::UserControlled | SignalProvenance::RendererLocal => {
+            Err(EmbodimentIngestError::SignalProvenanceNotAllowed { field, provenance })
+        }
+    }
+}
+
 fn validate_unit_interval(field: &'static str, value: f32) -> Result<(), EmbodimentIngestError> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
         Ok(())
@@ -257,6 +274,10 @@ pub enum EmbodimentIngestError {
     TimestampRegression { last: u64, received: u64 },
     InvalidUnitInterval { field: &'static str, value: f32 },
     VisemeWithoutSpeech,
+    SignalProvenanceNotAllowed {
+        field: &'static str,
+        provenance: SignalProvenance,
+    },
 }
 
 impl fmt::Display for EmbodimentIngestError {
@@ -273,6 +294,9 @@ impl fmt::Display for EmbodimentIngestError {
             }
             Self::VisemeWithoutSpeech => {
                 write!(f, "viseme updates require an explicit Speaking activity")
+            }
+            Self::SignalProvenanceNotAllowed { field, provenance } => {
+                write!(f, "{field} cannot use {provenance:?} provenance")
             }
         }
     }
@@ -512,6 +536,29 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(controller.snapshot().last_event_sequence, Some(2));
+    }
+
+
+    #[test]
+    fn renderer_local_effect_cannot_claim_runtime_activity() {
+        let mut controller = EmbodimentController::new();
+        let mut event = event(
+            1,
+            10,
+            EmbodimentEventKind::ActivityChanged {
+                activity: EmbodimentActivity::Predicting,
+            },
+        );
+        event.provenance = SignalProvenance::RendererLocal;
+
+        assert!(matches!(
+            controller.ingest(event),
+            Err(EmbodimentIngestError::SignalProvenanceNotAllowed {
+                field: "activity",
+                provenance: SignalProvenance::RendererLocal
+            })
+        ));
+        assert_eq!(controller.snapshot().last_event_sequence, None);
     }
 
     #[test]
