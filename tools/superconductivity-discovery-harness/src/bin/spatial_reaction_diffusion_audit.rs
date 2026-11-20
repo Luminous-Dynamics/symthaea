@@ -534,6 +534,24 @@ mod tests {
     }
 
     #[test]
+    fn nonzero_initial_mobile_inventory_is_included_in_phase_denominators() {
+        let (schema, fixture) = inputs();
+        let mut data: Value = serde_json::from_slice(&fixture).unwrap();
+        data["cases"][0]["initial_a"] = json!(0.2);
+        data["cases"][0]["initial_b"] = json!(0.3);
+        let output = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap();
+        let case = output["cases"].as_array().unwrap().iter()
+            .find(|x| x["case_id"] == "negative_cross_correlation_short_hold").unwrap();
+        let phases = &case["phase_products_per_area"];
+        let a_sum = phases["target_fraction_of_a_available"].as_f64().unwrap()
+            + phases["competitor_fraction_of_a_available"].as_f64().unwrap()
+            + phases["unreacted_a_fraction_of_a_available"].as_f64().unwrap();
+        assert!((a_sum - 1.0).abs() < 1.0e-8);
+        assert!(case["conservation"]["a"]["initial"].as_f64().unwrap() > 0.0);
+        assert!(case["conservation"]["b"]["initial"].as_f64().unwrap() > 0.0);
+    }
+
+    #[test]
     fn grid_refinement_runs_with_conservation_at_each_resolution() {
         let (schema, fixture) = inputs();
         let data: Value = serde_json::from_slice(&fixture).unwrap();
