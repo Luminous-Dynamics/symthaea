@@ -556,12 +556,172 @@ pub fn evaluate_score_audio_conformance_v1(
     Ok(result)
 }
 
-pub fn verify_score_audio_conformance_seal(result: &Value) -> Result<(), String> {
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_result_wire_shape(result: &Value) -> Result<(), String> {
+    exact_fields(
+        result,
+        &["schema", "observer", "scope", "artifacts", "alignment", "audio", "events", "outcome", "receipt_sha256"],
+        "score-audio result",
+    )?;
     if result.get("schema").and_then(Value::as_str) != Some(SCORE_AUDIO_CONFORMANCE_SCHEMA_V1) {
         return Err("unsupported score-audio conformance result schema".into());
     }
-    let recorded = result.get("receipt_sha256").and_then(Value::as_str).ok_or("score-audio result is missing receipt_sha256")?;
-    if recorded.len() != 64 || !recorded.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+    exact_fields(result.get("observer").ok_or("observer is missing")?,
+        &["observer_id", "version", "method"], "observer")?;
+    let observer = result.get("observer").unwrap();
+    if observer.get("observer_id").and_then(Value::as_str) != Some(SCORE_AUDIO_OBSERVER_ID_V1)
+        || observer.get("version").and_then(Value::as_str) != Some(SCORE_AUDIO_OBSERVER_VERSION_V1)
+        || observer.get("method").and_then(Value::as_str) != Some("harmonic_salience_fft_pitch")
+    {
+        return Err("unsupported score-audio observer identity, version or method".into());
+    }
+
+    exact_fields(result.get("scope").ok_or("scope is missing")?,
+        &["kind", "scope_id"], "scope")?;
+    let scope = result.get("scope").unwrap();
+    if scope.get("kind").and_then(Value::as_str) != Some("isolated_stem")
+        || scope.get("scope_id").and_then(Value::as_str).is_none_or(|value| value.trim().is_empty())
+    {
+        return Err("score-audio result requires an explicit isolated_stem scope".into());
+    }
+
+    exact_fields(result.get("artifacts").ok_or("artifacts are missing")?,
+        &["score_digest_schema", "score_sha256", "audio_sha256", "contract_sha256"], "artifacts")?;
+    let artifacts = result.get("artifacts").unwrap();
+    if artifacts.get("score_digest_schema").and_then(Value::as_str) != Some(SCORE_DIGEST_SCHEMA_V1) {
+        return Err("unsupported typed Score digest schema".into());
+    }
+    for field in ["score_sha256", "audio_sha256", "contract_sha256"] {
+        if artifacts.get(field).and_then(Value::as_str).is_none_or(|digest| !is_sha256(digest)) {
+            return Err(format!("artifacts.{field} is not lowercase SHA-256"));
+        }
+    }
+
+    exact_fields(result.get("alignment").ok_or("alignment is missing")?,
+        &["mode", "tempo_bpm", "offset_frames"], "alignment")?;
+    let alignment = result.get("alignment").unwrap();
+    let tempo = alignment.get("tempo_bpm").and_then(Value::as_f64).ok_or("alignment tempo is missing")?;
+    if alignment.get("mode").and_then(Value::as_str) != Some("fixed_score_tempo_no_auto_alignment")
+        || alignment.get("offset_frames").and_then(Value::as_u64) != Some(0)
+        || !tempo.is_finite() || !(1.0..=1000.0).contains(&tempo)
+    {
+        return Err("alignment claim is unsupported or invalid".into());
+    }
+
+    exact_fields(result.get("audio").ok_or("audio is missing")?,
+        &["sample_rate_hz", "channels", "frame_count", "sample_format", "bits_per_sample", "clipped_sample_fraction"], "audio")?;
+    let audio = result.get("audio").unwrap();
+    let sample_rate = audio.get("sample_rate_hz").and_then(Value::as_u64).ok_or("audio sample rate is invalid")?;
+    let channels = audio.get("channels").and_then(Value::as_u64).ok_or("audio channels are invalid")?;
+    let frames = audio.get("frame_count").and_then(Value::as_u64).ok_or("audio frame count is invalid")?;
+    let format = audio.get("sample_format").and_then(Value::as_str).unwrap_or("");
+    let bits = audio.get("bits_per_sample").and_then(Value::as_u64).unwrap_or(0);
+    let clipped = audio.get("clipped_sample_fraction").and_then(Value::as_f64).ok_or("audio clipping fraction is invalid")?;
+    let valid_encoding = (format == "pcm_integer" && matches!(bits, 16 | 24 | 32))
+        || (format == "ieee_float" && bits == 32);
+    if !(8_000..=192_000).contains(&sample_rate) || channels != 1
+        || frames == 0 || frames > MAX_INTERLEAVED_SAMPLES
+        || !valid_encoding || !clipped.is_finite() || !(0.0..=1.0).contains(&clipped)
+    {
+        return Err("audio format or metadata is outside the score-audio v1 profile".into());
+    }
+
+    let events = result.get("events").and_then(Value::as_array).ok_or("events must be an array")?;
+    for (index, event) in events.iter().enumerate() {
+        let label = format!("events[{index}]");
+        exact_fields(event,
+            &["score_note_ordinal", "expected_pitch_midi", "observed_pitch_midi", "estimated_frequency_hz",
+              "pitch_error_cents", "pitch_confidence", "window_rms_dbfs", "window_start_frame",
+              "window_end_frame", "status", "reason"], &label)?;
+        let ordinal = event.get("score_note_ordinal").and_then(Value::as_u64);
+        let expected = event.get("expected_pitch_midi").and_then(Value::as_u64);
+        let observed = event.get("observed_pitch_midi");
+        let start = event.get("window_start_frame").and_then(Value::as_u64);
+        let end = event.get("window_end_frame").and_then(Value::as_u64);
+        let level = event.get("window_rms_dbfs").and_then(Value::as_f64);
+        let event_status = event.get("status").and_then(Value::as_str).unwrap_or("");
+        let reason = event.get("reason");
+        if ordinal != Some(index as u64) || expected.is_none_or(|pitch| pitch > 127)
+            || start.is_none() || end.is_none()
+            || start.zip(end).is_some_and(|(a,b)| b < a || b > frames)
+            || level.is_none_or(|value| !value.is_finite() || !(-300.0..=24.0).contains(&value))
+            || !matches!(event_status, "pass" | "fail" | "abstain")
+        {
+            return Err(format!("{label} has invalid ordinal, pitch, window, level or status"));
+        }
+        let confidence = event.get("pitch_confidence");
+        let cents = event.get("pitch_error_cents");
+        let frequency = event.get("estimated_frequency_hz");
+        if let Some(value) = confidence.and_then(Value::as_f64) {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(format!("{label}.pitch_confidence is out of range"));
+            }
+        } else if !confidence.is_some_and(Value::is_null) {
+            return Err(format!("{label}.pitch_confidence must be numeric or null"));
+        }
+        if let Some(value) = cents.and_then(Value::as_f64) {
+            if !value.is_finite() {
+                return Err(format!("{label}.pitch_error_cents must be finite"));
+            }
+        } else if !cents.is_some_and(Value::is_null) {
+            return Err(format!("{label}.pitch_error_cents must be numeric or null"));
+        }
+        if let Some(value) = frequency.and_then(Value::as_f64) {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(format!("{label}.estimated_frequency_hz must be positive and finite"));
+            }
+        } else if !frequency.is_some_and(Value::is_null) {
+            return Err(format!("{label}.estimated_frequency_hz must be numeric or null"));
+        }
+        let observed_pitch = observed.and_then(Value::as_u64);
+        if observed_pitch.is_some_and(|pitch| pitch > 127) {
+            return Err(format!("{label}.observed_pitch_midi is outside 0..=127"));
+        }
+        if !observed.is_some_and(Value::is_null) && observed_pitch.is_none() {
+            return Err(format!("{label}.observed_pitch_midi must be integer or null"));
+        }
+        match event_status {
+            "pass" if observed_pitch.is_none() || reason.is_none_or(|value| !value.is_null()) =>
+                return Err(format!("{label} pass requires an observed pitch and null reason")),
+            "fail" | "abstain" if reason.and_then(Value::as_str).is_none_or(|value| value.trim().is_empty()) =>
+                return Err(format!("{label} fail/abstain requires a reason")),
+            _ => {}
+        }
+    }
+
+    exact_fields(result.get("outcome").ok_or("outcome is missing")?,
+        &["score_audio_status", "reasons"], "outcome")?;
+    let outcome = result.get("outcome").unwrap();
+    let declared_status = outcome.get("score_audio_status").and_then(Value::as_str).unwrap_or("");
+    let reasons = outcome.get("reasons").and_then(Value::as_array).ok_or("outcome.reasons must be an array")?;
+    if reasons.iter().any(|reason| reason.as_str().is_none_or(|value| value.len() > 2048)) {
+        return Err("outcome.reasons must contain bounded strings".into());
+    }
+    let derived_status = if events.iter().any(|event| event.get("status").and_then(Value::as_str) == Some("fail")) {
+        "fail"
+    } else if events.is_empty() || events.iter().any(|event| event.get("status").and_then(Value::as_str) == Some("abstain")) {
+        "abstain"
+    } else {
+        "pass"
+    };
+    if declared_status != derived_status {
+        return Err("outcome status does not match the per-event non-compensating result".into());
+    }
+    if (declared_status == "pass" && !reasons.is_empty()) || (declared_status != "pass" && reasons.is_empty()) {
+        return Err("outcome reasons are inconsistent with the declared status".into());
+    }
+    Ok(())
+}
+
+pub fn verify_score_audio_conformance_seal(result: &Value) -> Result<(), String> {
+    validate_result_wire_shape(result)?;
+    let recorded = result.get("receipt_sha256").and_then(Value::as_str)
+        .ok_or("score-audio result is missing receipt_sha256")?;
+    if !is_sha256(recorded) {
         return Err("score-audio receipt seal is not lowercase SHA-256".into());
     }
     let mut unsealed = result.clone();
