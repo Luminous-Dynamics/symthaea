@@ -137,8 +137,9 @@ payload_bytes=2048
 bit_order=lsb0
 byte_order=little
 result=output_byte[i]=input_a_byte[i]^input_b_byte[i]; i=0..2047
-SHA256=156f87ae7d96cdc89cf09d84723c2f65aa80f2c0fcfc193df06f8545ed332c67
 ```
+
+SHA-256 of the descriptor bytes above: `156f87ae7d96cdc89cf09d84723c2f65aa80f2c0fcfc193df06f8545ed332c67`
 
 ```text
 luminous.hdc.semantic-contract
@@ -152,8 +153,9 @@ byte_order=little
 result=popcount(input_a XOR input_b)
 distance_range=0..16384
 result_encoding=unsigned_u16_little_endian
-SHA256=c7e4cdcf7ee0ae962e1d4d033a125312a82e65a1aac7ce2f8d4f4d03b132712e
 ```
+
+SHA-256 of the descriptor bytes above: `c7e4cdcf7ee0ae962e1d4d033a125312a82e65a1aac7ce2f8d4f4d03b132712e`
 
 ```text
 luminous.hdc.semantic-contract
@@ -169,8 +171,9 @@ score=popcount(query XOR candidate)
 winner=argmin(distance, stable_candidate_id)
 tie_break=lowest_stable_candidate_id
 result_layout=16_bytes_little_endian:u64_winner_id,u16_distance,u48_reserved_zero
-SHA256=04b106f50f40963f0d2f88f9d779b83d9a55bd22d2e151f45f5211fa05c3f9cd
 ```
+
+SHA-256 of the descriptor bytes above: `04b106f50f40963f0d2f88f9d779b83d9a55bd22d2e151f45f5211fa05c3f9cd`
 
 A change to any descriptor byte requires a new semantic version/digest and an explicit protocol admission update. The host validator rejects a valid-looking SHA-256 value that is not the pinned canonical digest. Successful completions echo that digest so the host can bind the returned result to the pending semantic command.
 
