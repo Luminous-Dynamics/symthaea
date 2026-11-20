@@ -1,0 +1,57 @@
+{
+  "contract": "SC-PRECURSOR-GENOME-SOURCE-0.1",
+  "source_repository": "lauren-walters/precursor-genome",
+  "source_commit": "78cb026aa6c9b53aa0ec26ea5611d523bc3c320a",
+  "ledger_path": "ledger_precursor_genome.json",
+  "ledger_git_blob_sha1": "a8ef03cee29670b22ed04b9cebb1686fe26e1acd",
+  "license": "CC-BY-4.0",
+  "zenodo_raw_artifacts_doi": "10.5281/zenodo.21285546",
+  "expected_profile": {
+    "samples": 1035,
+    "unique_sample_ids": 1035,
+    "unique_precursor_formulas": 46,
+    "unique_precursor_pairs": 1035,
+    "synthesis_objects": 995,
+    "physical_failures": 26,
+    "samples_with_recorded_heating_temperature": 981,
+    "category_counts": {
+      "transformed": 384,
+      "unreacted": 369,
+      "partially_reacted": 113,
+      "completely_reacted": 143,
+      "unclassified": 26
+    },
+    "scans": 1351,
+    "scans_by_status": {
+      "valid": 1351
+    },
+    "refinement_cases": 1950,
+    "samples_with_active_refinement": 1030,
+    "active_refinement_quality": {
+      "score_1": 685,
+      "score_2": 320,
+      "score_3": 10,
+      "missing": 15,
+      "no_active_refinement": 5
+    },
+    "active_refinement_acceptance": {
+      "accepted": 1005,
+      "rejected": 11,
+      "missing": 19
+    },
+    "classified_with_temperature_and_no_physical_failure": 956,
+    "cohort_temperature_and_accepted_quality_1_or_2": 944
+  },
+  "publication_comparison": {
+    "source": "Walters et al., arXiv:2611.23527v1, 2026-11-17; main-text analyzable cohort",
+    "paper_analyzable_outcomes": 1000,
+    "paper_category_counts": {
+      "transformed": 380,
+      "unreacted": 367,
+      "partially_reacted": 110,
+      "completely_reacted": 143
+    },
+    "reconciliation_status": "unresolved; preserve snapshot differences and do not silently select/drop records"
+  },
+  "claim_ceiling": "Frozen identity and profile for the public Precursor Genome ledger. Counts are source-snapshot bookkeeping, not the paper's model-training cohort or raw in-situ onset measurements."
+}
