@@ -1,0 +1,121 @@
+name: Superconductivity Active Randomized Specimen Allocation
+
+on:
+  pull_request:
+    paths:
+      - "tools/superconductivity-capability-plan-harness/**"
+      - "data/schemas/superconductivity_active_rct_allocation_v0_1.schema.json"
+      - "data/research/superconductivity_active_rct_allocation_fixture_*.json"
+      - "data/research/superconductivity_active_rct_allocation_suite_v0_1.json"
+      - "research/superconductivity/capability_experiment_planning/active_rct_allocation/**"
+      - ".github/workflows/superconductivity-active-rct-allocation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-active-rct-allocation-\${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  exact-active-rct-allocation:
+    name: Exact causal acquisition, stratified RCT allocation and fail-closed gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
+        run: cargo fmt --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/superconductivity-capability-plan-harness > "$RUNNER_TEMP/sc-active-rct-rustfmt.patch"
+          sha256sum "$RUNNER_TEMP/sc-active-rct-rustfmt.patch"
+          git diff --stat -- tools/superconductivity-capability-plan-harness
+
+      - name: Generate isolated lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml
+
+      - name: Test all planner binaries
+        run: cargo test --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bins
+
+      - name: Audit exact active RCT allocation fixture
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bin sc_active_rct_allocation_audit -- \
+            --schema data/schemas/superconductivity_active_rct_allocation_v0_1.schema.json \
+            --fixture data/research/superconductivity_active_rct_allocation_fixture_v0_1.json \
+            --out "$RUNNER_TEMP/sc-active-rct-allocation-receipt.json"
+          cat "$RUNNER_TEMP/sc-active-rct-allocation-receipt.json"
+
+      - name: Verify randomization-positivity negative control is rejected
+        run: |
+          set +e
+          cargo run --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bin sc_active_rct_allocation_audit -- \
+            --schema data/schemas/superconductivity_active_rct_allocation_v0_1.schema.json \
+            --fixture data/research/superconductivity_active_rct_allocation_fixture_positivity_v0_1.json \
+            > "$RUNNER_TEMP/sc-active-rct-positivity-negative.log" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then echo "positivity violation unexpectedly accepted"; exit 1; fi
+          grep -F "violates randomized assignment positivity gate" "$RUNNER_TEMP/sc-active-rct-positivity-negative.log"
+
+      - name: Verify missing-family-support negative control has no plan
+        run: |
+          set +e
+          cargo run --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bin sc_active_rct_allocation_audit -- \
+            --schema data/schemas/superconductivity_active_rct_allocation_v0_1.schema.json \
+            --fixture data/research/superconductivity_active_rct_allocation_fixture_family_support_v0_1.json \
+            > "$RUNNER_TEMP/sc-active-rct-family-support-negative.log" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then echo "family-support violation unexpectedly accepted"; exit 1; fi
+          grep -F "no feasible RCT allocation" "$RUNNER_TEMP/sc-active-rct-family-support-negative.log"
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/superconductivity-capability-plan-harness/Cargo.toml --bins -- -D warnings
+
+      - name: Record exact-head identity and input/source digests
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            sha256sum data/schemas/superconductivity_active_rct_allocation_v0_1.schema.json
+            sha256sum data/research/superconductivity_active_rct_allocation_fixture_v0_1.json
+            sha256sum data/research/superconductivity_active_rct_allocation_fixture_positivity_v0_1.json
+            sha256sum data/research/superconductivity_active_rct_allocation_fixture_family_support_v0_1.json
+            sha256sum data/research/superconductivity_active_rct_allocation_suite_v0_1.json
+            sha256sum tools/superconductivity-capability-plan-harness/Cargo.toml
+            sha256sum tools/superconductivity-capability-plan-harness/src/bin/sc_active_rct_allocation_audit.rs
+            sha256sum "$RUNNER_TEMP/sc-active-rct-allocation-receipt.json"
+            sha256sum tools/superconductivity-capability-plan-harness/Cargo.lock
+          } > "$RUNNER_TEMP/sc-active-rct-allocation-environment.txt"
+
+      - name: Upload exact-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-active-rct-allocation-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/superconductivity-capability-plan-harness/Cargo.lock
+            \${{ runner.temp }}/sc-active-rct-allocation-environment.txt
+            \${{ runner.temp }}/sc-active-rct-allocation-receipt.json
+            \${{ runner.temp }}/sc-active-rct-positivity-negative.log
+            \${{ runner.temp }}/sc-active-rct-family-support-negative.log
+            \${{ runner.temp }}/sc-active-rct-rustfmt.patch
