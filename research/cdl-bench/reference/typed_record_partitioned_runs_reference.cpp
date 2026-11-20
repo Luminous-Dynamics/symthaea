@@ -545,19 +545,19 @@ bool decode_one_series_columnar(const std::vector<std::uint8_t>& bytes, std::siz
     out.clear();
     std::size_t cursor = 0U;
     std::uint64_t count64 = 0U;
-    if (!read_varint(bytes, cursor, count64) || count64 != expected_count ||
+    if (!get_var(bytes, cursor, count64) || count64 != expected_count ||
         count64 > SIZE_MAX || count64 == 0U) return false;
     const std::size_t count = static_cast<std::size_t>(count64);
     out.resize(count);
 
     std::uint64_t timestamp = 0U;
-    if (!read_varint(bytes, cursor, timestamp)) return false;
+    if (!get_var(bytes, cursor, timestamp)) return false;
     out[0].timestamp = timestamp;
     out[0].entity = key.first;
     out[0].series = key.second;
     for (std::size_t row = 1U; row < count; ++row) {
         std::uint64_t delta = 0U;
-        if (!read_varint(bytes, cursor, delta) || delta == 0U ||
+        if (!get_var(bytes, cursor, delta) || delta == 0U ||
             delta > UINT64_MAX - timestamp) return false;
         timestamp += delta;
         out[row].timestamp = timestamp;
