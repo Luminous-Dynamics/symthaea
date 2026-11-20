@@ -105,7 +105,6 @@ pub struct CalibrationContractV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[derive(Clone, Debug, PartialEq]
 pub struct IsotonicBlockV1 {
     pub lower_score_db: f64,
     pub upper_score_db: f64,
@@ -116,7 +115,6 @@ pub struct IsotonicBlockV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[derive(Clone, Debug, PartialEq]
 pub struct IsotonicModelV1 {
     pub schema: String,
     pub calibrator_id: String,
@@ -132,7 +130,6 @@ pub struct IsotonicModelV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[derive(Clone, Debug, PartialEq]
 pub struct ThresholdSelectionV1 {
     pub target_maximum_false_support_rate: f64,
     pub selected_support_threshold: Option<f64>,
@@ -148,7 +145,6 @@ pub struct ThresholdSelectionV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[derive(Clone, Debug, PartialEq]
 pub struct HeldOutMetricsV1 {
     pub total_examples: u64,
     pub measured_examples: u64,
