@@ -89,8 +89,9 @@ Registry: \`tools/superconductivity-discovery-harness/fixtures/thermochemical_ne
 2. **Unbalanced reaction** — the coefficient of \(C\) in the first reaction is deliberately corrupted. The auditor rejects the network and identifies the nonzero \(C\) residual.
 3. **Thermodynamically inconsistent cycle** — the polymorph-conversion \(\Delta G\) is shifted so the cycle interval excludes zero. The auditor reports an energy inconsistency after verifying stoichiometric cycle closure.
 4. **Disconnected route** — the target path uses a reaction that does not produce the intermediate consumed by its next step. The auditor rejects the route.
+5. **Charge imbalance** — the declared atom counts remain balanced but one species is assigned a nonzero charge, making a reaction's computed charge residual nonzero. The auditor rejects it independently of elemental balance.
 
-Additional unit tests mutate standard state, extent basis, cycle orientation and target species to enforce fail-closed behavior.
+Additional unit tests mutate standard state, extent basis, cycle orientation and target species to enforce fail-closed behavior. The hosted workflow separately executes the charge-imbalance negative control.
 
 ## Reproducible commands
 
