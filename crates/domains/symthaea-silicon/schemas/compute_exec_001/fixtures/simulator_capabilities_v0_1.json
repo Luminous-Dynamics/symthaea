@@ -1,0 +1,23 @@
+{
+  "schema": "luminous.hdc-device-capabilities",
+  "schema_version": "0.1.0",
+  "device_id": "sim-iverilog-hdc-tile",
+  "device_epoch": "00112233445566778899aabbccddeeff",
+  "backend": "fpga",
+  "execution_class": "rtl_simulation",
+  "supported_operations": [
+    "hdc.bind_xor.exact.v1",
+    "hdc.hamming.exact.v1",
+    "hdc.top1.exact.v1"
+  ],
+  "supported_representations": [
+    "luminous.binaryhv.bipolar.16384.v1"
+  ],
+  "max_transfer_bytes": 16777216,
+  "required_alignment_bytes": 8,
+  "max_inflight_commands": 4,
+  "dma_isolation": "none",
+  "cache_coherency": "unknown",
+  "implementation_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "qualification_ref": "fixture-only; simulation identity, not FPGA hardware evidence"
+}
