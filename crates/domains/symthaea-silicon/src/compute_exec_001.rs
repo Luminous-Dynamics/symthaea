@@ -768,7 +768,7 @@ pub fn validate_capabilities(capabilities: &DeviceCapabilities) -> ValidationRes
         if identity.manufacturer.is_empty()
             || identity.board_model.is_empty()
             || identity.board_revision.is_empty()
-            || identity.fpga_part.is_empty()
+            || identity.device_part.is_empty()
         {
             return Err(ValidationError::new(
                 "INCOMPLETE_HARDWARE_IDENTITY",
