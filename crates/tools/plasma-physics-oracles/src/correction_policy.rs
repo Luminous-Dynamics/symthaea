@@ -232,6 +232,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_certificate_with_wrong_discrete_spectral_gap() {
+        let mut certificate = certificate_with_bound(1, 1);
+        certificate.lambda_min_nonzero *= 0.5;
+        certificate.potential_error_l2_bound =
+            certificate.residual_l2 / certificate.lambda_min_nonzero;
+        certificate.electric_field_error_l2_bound =
+            certificate.residual_l2 / certificate.lambda_min_nonzero.sqrt();
+        let decision = decide_correction(Some(&certificate), 1.0, 10, true);
+        assert_eq!(decision.action, CorrectionAction::TrustedFallback);
+        assert_eq!(decision.reason, CorrectionReason::CertificateInvalid);
+    }
+
+    #[test]
     fn rejects_mutated_or_non_finite_certificate_bounds() {
         let mut certificate = certificate_with_bound(1, 1);
         certificate.electric_field_error_l2_bound = f64::NAN;
