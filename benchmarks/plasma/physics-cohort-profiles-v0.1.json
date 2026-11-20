@@ -108,6 +108,22 @@
     "execution_receipt_digest",
     "output_bundle_digest",
     "test_dataset_manifest_digest",
-    "test_initial_state_digest"
-  ]
+    "test_initial_state_digest",
+    "calibration_artifact_digest_for_selective_learned_methods"
+  ],
+  "selective_execution_policy": {
+    "applies_to": "learned_solvers_marked_selective",
+    "required_artifact": "calibration_artifact_sha256",
+    "calibration_must_bind": [
+      "solver_source_commit",
+      "build_digest",
+      "configuration_digest",
+      "checkpoint_digest",
+      "training_dataset_manifest_digest",
+      "preprocessing_and_normalization_digest",
+      "physics_lane",
+      "metric_profile"
+    ],
+    "claim_limit": "statistical_calibration_is_not_a_deterministic_physics_certificate"
+  }
 }
