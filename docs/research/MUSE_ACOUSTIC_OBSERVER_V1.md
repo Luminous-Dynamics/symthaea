@@ -24,12 +24,12 @@ It emits `muse-acoustic-observation-v1` with source/candidate/contract SHA-256 d
 
 ## V1 measurement and boundaries
 
-- Uses windowed RMS level in dBFS, calculated independently for each channel. This is a useful level-change proxy, **not** an ITU-R BS.1770 integrated loudness / LUFS meter.
+- Uses windowed RMS level in dBFS, calculated independently for each channel. This is a useful level-change proxy, **not** an ITU-R BS.1770 integrated loudness / LUFS meter. The reported numerical floor is -300 dBFS; low-source abstention is governed separately by the contract's bounded threshold.
 - Uses the exact same frame coordinates on source and candidate. It performs no alignment, sample-rate conversion, time stretching or dynamic time warping.
 - Requires identical sample rate, channel count, frame count, sample format and bit depth for the source/candidate pair.
 - Supports PCM integer 16/24/32-bit and IEEE float32 WAV input. Non-finite or grossly out-of-range float samples are refused.
-- A hard decoded-input limit of 32,000,000 interleaved samples prevents unbounded allocation. This corresponds to at most 256 MiB of decoded f64 samples per WAV, excluding input buffers.
-- Contract target windows and protected windows must each be nonempty, nonoverlapping internally, and disjoint from each other.
+- A hard decoded-input limit of 32,000,000 interleaved samples prevents unbounded allocation. This corresponds to at most 256 MiB of decoded f64 samples per WAV, excluding input buffers. Source and candidate must also use the same sample format and bit depth.
+- Contract target windows and protected windows must each be nonempty, nonoverlapping internally, and disjoint from each other. Adjacent target windows allow a piecewise gain envelope to be specified and checked one segment at a time.
 - A target or protected source channel below the configured RMS floor produces `abstain`, never a free pass.
 - Clipping is independently measured over the full candidate WAV (absolute sample magnitude >=0.999); a configured ceiling produces a separate gate.
 - A full-mix scope proves only a mix-level measurement. An `isolated_stem` scope is a caller assertion: the observer does **not** independently authenticate that a WAV is the claimed stem. Stem identity must be bound by upstream separation/material-lineage receipts, and arbitrary source separation is outside this slice.
@@ -47,18 +47,20 @@ The Hound WAV API defines `WavReader::duration()` in samples per channel, indepe
 
 ## Authored adversarial coverage
 
-Tests currently cover:
+Fifteen unit tests are authored. They currently cover:
 - expected gain edit with protected windows;
+- piecewise -2/-4/-6 dB envelope trajectory across adjacent windows;
 - 16-bit integer PCM decoding;
+- mixed sample encoding rejection;
 - every-channel target verification (one channel left unchanged must fail);
 - no-op candidate;
-- protected-region gain mutation;
+- protected-region gain mutation, including per-channel protected preservation;
 - low-signal abstention;
 - sample/frame timeline mismatch;
 - overlapping target/protected windows;
 - missing isolated-stem identity;
 - clipping as a separate gate;
-- mixed sample format/bit-depth rejection;
+- non-finite float sample rejection;
 - receipt tampering.
 
 These tests are source additions only; no Cargo/rustc/rustfmt is available in the current execution environment. The test count must be checked against the latest branch head before making any validation claim.
@@ -98,8 +100,7 @@ References:
 
 ## Next steps
 
-1. Add the piecewise envelope fixture as a Rust test and verify every target window independently.
-2. Pin JSON Schema Draft 2020-12 validation in the dedicated workflow; validate both synthetic fixtures and add negative schema fixtures.
+1. Pin JSON Schema Draft 2020-12 validation in the dedicated workflow; structurally checked synthetic contract/result fixtures are present, but no pinned schema validator or exact-head CI pass is claimed. Add negative schema fixtures.
 3. Add explicit source/candidate encoding mismatch, multichannel protected mutation, float-invalid and oversized-WAV negatives.
 4. Add a CLI only after the contract is stable; a library-only API is appropriate for the first slice.
 5. Bind isolated-stem identity to the upstream stem/separation receipt rather than trusting the caller's label.
