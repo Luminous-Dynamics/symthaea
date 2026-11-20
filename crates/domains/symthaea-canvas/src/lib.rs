@@ -42,7 +42,8 @@ pub use embodiment::{
 };
 pub use embodiment_trace::{
     EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentTrace, EmbodimentTraceError,
-    EmbodimentTraceSummary, MAX_EMBODIMENT_SESSION_ID_BYTES, MAX_EMBODIMENT_TRACE_EVENTS,
+    EmbodimentSession, EmbodimentSessionError, EmbodimentTraceSummary,
+    MAX_EMBODIMENT_SESSION_ID_BYTES, MAX_EMBODIMENT_TRACE_EVENTS,
     OpenActivityInterval, OpenPlaybackInterval,
 };
 pub use color::{Color, Palette};
