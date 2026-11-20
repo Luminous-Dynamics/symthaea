@@ -340,7 +340,16 @@
               "dsp_count",
               "fmax",
               "task_quality",
-              "other"
+              "other",
+              "query_major_batch_latency_p50",
+              "query_major_batch_latency_p95",
+              "candidate_major_batch_latency_p50",
+              "candidate_major_batch_latency_p95",
+              "query_major_throughput",
+              "candidate_major_throughput",
+              "candidate_major_speedup_ratio_p50",
+              "candidate_major_speedup_ratio_p95",
+              "candidate_major_amortized_batch_ns_per_query"
             ]
           },
           "value": {
