@@ -625,11 +625,11 @@ Selected synthetic Zstd 1.5.7 level-19 results (bytes; 65,536 records / 64 inter
 
 PCL1 is 4.56%, 8.06% and 9.35% smaller than PRN1 for sparse, bursty and noisy workloads, respectively, but 18.98% larger on mostly idle. The row-state heartbeat representation wins on idle data. This is evidence for adaptive layout selection, not a universal PCL1 win. The full byte tables, tests and evidence limitations are in `docs/research/CDL_TYPED_TELEMETRY_JOINT_SEGMENTATION_V1_2026-11-19.md`.
 
-**Adaptive per-series variants** now add two further ablations:
-- **PAX1:** choose row-state or field-columnar per series by raw child size, store the child uncompressed, and compress the complete frame with Zstd.
-- **PZC1:** compress each row/columnar candidate with libzstd, choose the smaller compressed child, and store each selected child as an independent Zstd frame with raw length and child CRC32. This enables independent per-series decompression at the cost of resetting the compressor context.
+**Adaptive per-series variants** add two further ablations:
+- **PAX1:** choose row-state or field-columnar per series by raw child size, store the child uncompressed, then compress the complete frame with Zstd.
+- **PZC1:** compress each row/columnar candidate with libzstd at the requested Zstd level, select the smaller compressed child, and store each selected child as an independent Zstd frame with raw length, compressed length and child CRC32. This enables independent per-series decompression at the cost of resetting the compressor context.
 
-The runner now requires `pkg-config` and the libzstd development library in addition to the Zstd CLI, and compiles with `-lzstd`. PZC1 is reported as its already-compressed complete frame; PRN1/PCL1/PAX1 are also reported with whole-frame Zstd.
+The runner requires `pkg-config` and the libzstd development library in addition to the Zstd CLI, links with `-lzstd`, and passes the same numeric `ZSTD_LEVEL` to PZC1's child encoder and the whole-frame Zstd controls. PZC1 is reported as its already-compressed complete frame; PRN1/PCL1/PAX1 are reported after whole-frame Zstd.
 
 Synthetic results (bytes, 65,536 records / 64 keys):
 
