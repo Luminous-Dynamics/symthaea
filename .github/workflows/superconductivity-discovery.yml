@@ -153,6 +153,18 @@ jobs:
           if [ "$status" -eq 0 ]; then echo "unbalanced reaction unexpectedly accepted"; exit 1; fi
           grep -F "fails computed conservation" "$RUNNER_TEMP/sc-thermochemical-unbalanced-negative.log"
 
+      - name: Verify charge imbalance negative control is rejected
+        run: |
+          set +e
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_thermochemical_network_audit -- \
+            --schema data/schemas/superconductivity_thermochemical_network_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_charge_v0_1.json \
+            > "$RUNNER_TEMP/sc-thermochemical-charge-negative.log" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then echo "charge-imbalanced reaction unexpectedly accepted"; exit 1; fi
+          grep -F "charge residual" "$RUNNER_TEMP/sc-thermochemical-charge-negative.log"
+
       - name: Verify disconnected route negative control is rejected
         run: |
           set +e
@@ -212,6 +224,7 @@ jobs:
             sha256sum data/schemas/superconductivity_thermochemical_network_v0_1.schema.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_smoke_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_unbalanced_charge_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_cycle_inconsistent_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_disconnected_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/thermochemical_network_suite_v0_1.json
@@ -242,5 +255,6 @@ jobs:
             ${{ runner.temp }}/sc-reaction-selectivity-smoke.json
             ${{ runner.temp }}/sc-thermochemical-network-smoke.json
             ${{ runner.temp }}/sc-thermochemical-unbalanced-negative.log
+            ${{ runner.temp }}/sc-thermochemical-charge-negative.log
             ${{ runner.temp }}/sc-thermochemical-disconnected-negative.log
             ${{ runner.temp }}/sc-thermochemical-cycle-inconsistent.json
