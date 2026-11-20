@@ -388,7 +388,8 @@ fn main() {
         comparison_path,
         observation_schema_path,
         observation_fixture_path,
-    ) else {
+    )
+    else {
         usage(&args[0]);
         process::exit(2);
     };
