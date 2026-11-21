@@ -29,14 +29,17 @@ def _text(value: Any, field: str) -> str:
     return value
 
 
-def _parse_timestamp(value: Any, field: str) -> datetime:
+def _parse_timestamp(value: Any, field: str, time_basis: str) -> datetime:
     raw = _text(value, field)
     try:
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError as exc:
         raise SplitContractError(f"{field}: expected ISO-8601 timestamp") from exc
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise SplitContractError(f"{field}: timezone offset is required")
+    has_offset = parsed.tzinfo is not None and parsed.utcoffset() is not None
+    if time_basis == "offset_aware" and not has_offset:
+        raise SplitContractError(f"{field}: timezone offset is required for offset_aware")
+    if time_basis == "source_local_naive" and has_offset:
+        raise SplitContractError(f"{field}: must be timezone-free for source_local_naive")
     return parsed
 
 
@@ -54,6 +57,15 @@ def validate_split_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     scheme = manifest.get("split_scheme")
     if scheme not in ("group_disjoint", "forward_time", "stratified_sample"):
         raise SplitContractError("split_scheme: unsupported scheme")
+
+    time_basis = None
+    clock_domain_id = None
+    if scheme == "forward_time":
+        time_basis = manifest.get("time_basis")
+        if time_basis not in ("offset_aware", "source_local_naive"):
+            raise SplitContractError("time_basis: expected offset_aware or source_local_naive")
+        if time_basis == "source_local_naive":
+            clock_domain_id = _text(manifest.get("clock_domain_id"), "clock_domain_id")
 
     rows = manifest.get("assignments")
     if not isinstance(rows, list) or not rows:
@@ -91,7 +103,11 @@ def validate_split_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
             canonical["group_id"] = group_id
             group_splits.setdefault(group_id, set()).add(split)
         elif scheme == "forward_time":
-            timestamp = _parse_timestamp(row.get("observed_at"), f"assignments[{index}].observed_at")
+            timestamp = _parse_timestamp(
+                row.get("observed_at"),
+                f"assignments[{index}].observed_at",
+                time_basis,
+            )
             canonical["observed_at"] = timestamp.isoformat()
             split_timestamps[split].append(timestamp)
         canonical_rows.append(canonical)
@@ -126,6 +142,8 @@ def validate_split_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         "dataset_id": dataset_id,
         "dataset_snapshot_sha256": snapshot_digest,
         "split_scheme": scheme,
+        "time_basis": time_basis,
+        "clock_domain_id": clock_domain_id,
         "assignments": canonical_rows,
     }
     serialized = json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -136,6 +154,8 @@ def validate_split_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         "dataset_id": dataset_id,
         "dataset_snapshot_sha256": snapshot_digest,
         "split_scheme": scheme,
+        "time_basis": time_basis,
+        "clock_domain_id": clock_domain_id,
         "split_manifest_sha256": split_digest,
         "split_counts": counts,
         "guarantees": {
@@ -147,7 +167,13 @@ def validate_split_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         "temporal_bounds": temporal_bounds if scheme == "forward_time" else None,
         "claim_limits": {
             "group_independence": "established-for-this-manifest" if scheme == "group_disjoint" else "not-established",
-            "temporal_independence": "established-for-this-manifest" if scheme == "forward_time" else "not-established",
+            "temporal_independence": (
+                "established-for-this-manifest"
+                if scheme == "forward_time" and time_basis == "offset_aware"
+                else "established-within-declared-source-clock-domain-only"
+                if scheme == "forward_time" and time_basis == "source_local_naive"
+                else "not-established"
+            ),
             "stratified_sample_split": scheme == "stratified_sample",
         },
     }
