@@ -46,6 +46,20 @@ jobs:
           done
           rustfmt --version > "$output/rustfmt-version.txt"
           sha256sum "${files[@]}" > "$output/source-sha256.txt"
+      - name: Print exact pinned rustfmt diff
+        run: |
+          git diff -- tools/superconductivity-discovery-harness/src/main.rs \
+            tools/superconductivity-discovery-harness/src/bin/discovery_metrics.rs \
+            tools/superconductivity-discovery-harness/src/bin/observation_event_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/synthesis_protocol_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/pair_coherence_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/reaction_selectivity_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/thermochemical_network_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/transport_kinetic_selectivity_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/spatial_reaction_diffusion_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs \
+            tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
+
       - uses: actions/upload-artifact@v4
         with:
           name: rustfmt-normalized-sources
