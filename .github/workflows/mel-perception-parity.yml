@@ -13,7 +13,6 @@ on:
       - "benchmarks/mel/schemas/perception-parity-v1.schema.json"
       - "benchmarks/mel/schemas/audio-frontend-evidence-v1.schema.json"
       - "docs/research/MEL_AUDIO_FRONTEND_UNCERTAINTY_V1_2026-11-21.md"
-      - ".github/workflows/mel-perception-parity.yml"
       - "Cargo.toml"
       - "Cargo.lock"
   workflow_dispatch:
