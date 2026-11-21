@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashMap};
 use std::env;
@@ -36,12 +36,9 @@ fn canonical_utc(value: &str) -> bool {
         || bytes[13] != b':'
         || bytes[16] != b':'
         || bytes[19] != b'Z'
-        || !bytes
-            .iter()
-            .enumerate()
-            .all(|(index, byte)| {
-                matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
-            })
+        || !bytes.iter().enumerate().all(|(index, byte)| {
+            matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
+        })
     {
         return false;
     }
@@ -60,7 +57,13 @@ fn canonical_utc(value: &str) -> bool {
     ) else {
         return false;
     };
-    if year == 0 || !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 || day == 0 {
+    if year == 0
+        || !(1..=12).contains(&month)
+        || hour > 23
+        || minute > 59
+        || second > 59
+        || day == 0
+    {
         return false;
     }
     let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
@@ -77,10 +80,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn get_group<'a>(
-    observations: &'a [Value],
-    field: &str,
-) -> Result<BTreeSet<&'a str>, String> {
+fn get_group<'a>(observations: &'a [Value], field: &str) -> Result<BTreeSet<&'a str>, String> {
     observations
         .iter()
         .enumerate()
@@ -120,14 +120,18 @@ fn validate_time_forward(train: &[Value], test: &[Value]) -> Result<(), String> 
     for (index, observation) in train.iter().enumerate() {
         let value = nonempty_text(observation, "timestamp_utc", &format!("train[{index}]"))?;
         if !canonical_utc(value) {
-            return Err(format!("train[{index}].timestamp_utc must use canonical UTC YYYY-MM-DDTHH:MM:SSZ"));
+            return Err(format!(
+                "train[{index}].timestamp_utc must use canonical UTC YYYY-MM-DDTHH:MM:SSZ"
+            ));
         }
         train_times.push(value);
     }
     for (index, observation) in test.iter().enumerate() {
         let value = nonempty_text(observation, "timestamp_utc", &format!("test[{index}]"))?;
         if !canonical_utc(value) {
-            return Err(format!("test[{index}].timestamp_utc must use canonical UTC YYYY-MM-DDTHH:MM:SSZ"));
+            return Err(format!(
+                "test[{index}].timestamp_utc must use canonical UTC YYYY-MM-DDTHH:MM:SSZ"
+            ));
         }
         test_times.push(value);
     }
@@ -187,7 +191,9 @@ fn validate_task(
             return Err(format!("{task_id}: duplicate test observation ID {id}"));
         }
         if train_seen.contains(id) {
-            return Err(format!("{task_id}: observation {id} occurs in both train and test"));
+            return Err(format!(
+                "{task_id}: observation {id} occurs in both train and test"
+            ));
         }
         test.push(
             observations_by_id
@@ -197,7 +203,9 @@ fn validate_task(
         );
     }
     if train.is_empty() || test.is_empty() {
-        return Err(format!("{task_id}: train and test sets must both be non-empty"));
+        return Err(format!(
+            "{task_id}: train and test sets must both be non-empty"
+        ));
     }
 
     let train_specimens = get_group(&train, "specimen_id")?;
@@ -218,7 +226,9 @@ fn validate_task(
     let test_properties = get_group(&test, "property_id")?;
 
     if train_properties != test_properties || train_properties.len() != 1 {
-        return Err(format!("{task_id}: property identity must match and be singular"));
+        return Err(format!(
+            "{task_id}: property identity must match and be singular"
+        ));
     }
 
     let paired = task
@@ -229,7 +239,9 @@ fn validate_task(
     match task_type {
         "same_specimen_repeatability" => {
             if paired {
-                return Err(format!("{task_id}: repeatability is not a cross-instrument paired transfer"));
+                return Err(format!(
+                    "{task_id}: repeatability is not a cross-instrument paired transfer"
+                ));
             }
             require_same_single(&train_specimens, &test_specimens, "specimen")?;
             require_same_single(&train_batches, &test_batches, "batch")?;
@@ -243,15 +255,21 @@ fn validate_task(
                 let replicate = observation
                     .get("replicate_index")
                     .and_then(Value::as_u64)
-                    .ok_or_else(|| format!("{task_id}: replicate_index must be positive integer"))?;
+                    .ok_or_else(|| {
+                        format!("{task_id}: replicate_index must be positive integer")
+                    })?;
                 if !replicates.insert(replicate) {
-                    return Err(format!("{task_id}: replicate_index {replicate} is repeated"));
+                    return Err(format!(
+                        "{task_id}: replicate_index {replicate} is repeated"
+                    ));
                 }
             }
         }
         "instrument_transfer" => {
             if !paired {
-                return Err(format!("{task_id}: instrument_transfer must declare paired_specimen_transfer=true"));
+                return Err(format!(
+                    "{task_id}: instrument_transfer must declare paired_specimen_transfer=true"
+                ));
             }
             require_same_single(&train_specimens, &test_specimens, "paired specimen")?;
             require_same_single(&train_batches, &test_batches, "batch")?;
@@ -263,7 +281,9 @@ fn validate_task(
         }
         "within_batch_specimen_holdout" => {
             if paired {
-                return Err(format!("{task_id}: within-batch specimen holdout must not be paired same-specimen transfer"));
+                return Err(format!(
+                    "{task_id}: within-batch specimen holdout must not be paired same-specimen transfer"
+                ));
             }
             require_disjoint(&train_specimens, &test_specimens, "specimen")?;
             require_same_single(&train_batches, &test_batches, "batch")?;
@@ -271,14 +291,18 @@ fn validate_task(
         }
         "between_batch_holdout" => {
             if paired {
-                return Err(format!("{task_id}: between-batch holdout cannot be a paired same-specimen transfer"));
+                return Err(format!(
+                    "{task_id}: between-batch holdout cannot be a paired same-specimen transfer"
+                ));
             }
             require_disjoint(&train_specimens, &test_specimens, "specimen")?;
             require_disjoint(&train_batches, &test_batches, "batch")?;
         }
         "between_campaign_holdout" => {
             if paired {
-                return Err(format!("{task_id}: between-campaign holdout cannot be a paired same-specimen transfer"));
+                return Err(format!(
+                    "{task_id}: between-campaign holdout cannot be a paired same-specimen transfer"
+                ));
             }
             require_disjoint(&train_specimens, &test_specimens, "specimen")?;
             require_disjoint(&train_batches, &test_batches, "batch")?;
@@ -298,13 +322,17 @@ fn validate_task(
         }
         "protocol_transfer" => {
             if paired {
-                return Err(format!("{task_id}: protocol transfer cannot claim a same-specimen paired transfer"));
+                return Err(format!(
+                    "{task_id}: protocol transfer cannot claim a same-specimen paired transfer"
+                ));
             }
             require_disjoint(&train_protocols, &test_protocols, "protocol")?;
         }
         "time_forward" => {
             if paired {
-                return Err(format!("{task_id}: time-forward holdout cannot declare paired specimen transfer"));
+                return Err(format!(
+                    "{task_id}: time-forward holdout cannot declare paired specimen transfer"
+                ));
             }
             require_disjoint(&train_specimens, &test_specimens, "specimen")?;
             require_disjoint(&train_batches, &test_batches, "batch")?;
@@ -338,8 +366,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema)
-        .map_err(|error| format!("schema compilation failed: {error}"))?;
+    let validator =
+        validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
     for error in validator.iter_errors(&fixture) {
         return Err(format!(
             "fixture schema validation failed: {} at {}",
@@ -387,11 +415,15 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         if nonempty_text(observation, "evidence_class", &path)? != "synthetic"
             || nonempty_text(observation, "evidence_authority", &path)? != "synthetic_measurement"
         {
-            return Err(format!("{path}: synthetic fixture cannot claim non-synthetic evidence authority"));
+            return Err(format!(
+                "{path}: synthetic fixture cannot claim non-synthetic evidence authority"
+            ));
         }
         let timestamp = nonempty_text(observation, "timestamp_utc", &path)?;
         if !canonical_utc(timestamp) {
-            return Err(format!("{path}.timestamp_utc must use canonical UTC YYYY-MM-DDTHH:MM:SSZ"));
+            return Err(format!(
+                "{path}.timestamp_utc must use canonical UTC YYYY-MM-DDTHH:MM:SSZ"
+            ));
         }
         let observation_id = nonempty_text(observation, "observation_id", &path)?.to_owned();
         if observations_by_id
@@ -542,21 +574,33 @@ mod tests {
     fn between_batch_holdout_rejects_specimen_or_batch_overlap() {
         let mut fixture = fixture_value();
         fixture["observations"][4]["batch_id"] = json!("BATCH-001");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("batch leakage"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("batch leakage")
+        );
     }
 
     #[test]
     fn between_campaign_holdout_rejects_campaign_overlap() {
         let mut fixture = fixture_value();
         fixture["observations"][5]["campaign_id"] = json!("CAMP-001");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("campaign leakage"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("campaign leakage")
+        );
     }
 
     #[test]
     fn inter_lab_transfer_requires_disjoint_labs_even_for_paired_specimen() {
         let mut fixture = fixture_value();
         fixture["observations"][6]["lab_id"] = json!("LAB-001");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("laboratory leakage"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("laboratory leakage")
+        );
     }
 
     #[test]
@@ -569,21 +613,33 @@ mod tests {
     fn inter_lab_unpaired_transfer_rejects_shared_specimen() {
         let mut fixture = fixture_value();
         fixture["tasks"][5]["paired_specimen_transfer"] = json!(false);
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("specimen leakage"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("specimen leakage")
+        );
     }
 
     #[test]
     fn protocol_transfer_rejects_protocol_overlap() {
         let mut fixture = fixture_value();
         fixture["observations"][7]["protocol_id"] = json!("PROTO-TRANSPORT-A");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("protocol leakage"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("protocol leakage")
+        );
     }
 
     #[test]
     fn time_forward_task_rejects_future_training_observation() {
         let mut fixture = fixture_value();
         fixture["observations"][0]["timestamp_utc"] = json!("2026-11-20T15:00:00Z");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("time-forward violation"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("time-forward violation")
+        );
     }
 
     #[test]
@@ -634,25 +690,38 @@ mod tests {
     fn rejects_unknown_observation_references() {
         let mut fixture = fixture_value();
         fixture["tasks"][0]["train_observation_ids"][0] = json!("MISSING");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("unknown training observation"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("unknown training observation")
+        );
     }
 
     #[test]
     fn rejects_duplicate_observation_identifiers() {
         let mut fixture = fixture_value();
         fixture["observations"][1]["observation_id"] = json!("OBS-001");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("duplicate observation_id"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("duplicate observation_id")
+        );
     }
 
     #[test]
     fn rejects_duplicate_task_identifiers() {
         let mut fixture = fixture_value();
         fixture["tasks"][1]["task_id"] = json!("TASK-REPEAT");
-        assert!(audit_fixture_value(&fixture).unwrap_err().contains("duplicate task_id"));
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("duplicate task_id")
+        );
     }
 
     fn audit_fixture_value(fixture: &Value) -> Result<Value, String> {
-        let schema = include_bytes!("../../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
+        let schema =
+            include_bytes!("../../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
         let bytes = serde_json::to_vec(fixture).expect("fixture serializes");
         audit(schema, &bytes)
     }
