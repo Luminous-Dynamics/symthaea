@@ -117,41 +117,68 @@ fn rounded(value: f64) -> f64 {
 
 fn validate(subject: &BinaryScoreSubjectV1) -> Result<(usize, usize), BinaryMetricsError> {
     if subject.schema != INPUT_SCHEMA_V1 {
-        return Err(BinaryMetricsError("schema: unsupported or missing input schema".into()));
+        return Err(BinaryMetricsError(
+            "schema: unsupported or missing input schema".into(),
+        ));
     }
-    if !subject.decision_threshold.is_finite() || !(0.0..=1.0).contains(&subject.decision_threshold) {
-        return Err(BinaryMetricsError("decision_threshold: must be finite and in [0, 1]".into()));
+    if !subject.decision_threshold.is_finite()
+        || !(0.0..=1.0).contains(&subject.decision_threshold)
+    {
+        return Err(BinaryMetricsError(
+            "decision_threshold: must be finite and in [0, 1]".into(),
+        ));
     }
     if !(2..=100).contains(&subject.calibration_bins) {
-        return Err(BinaryMetricsError("calibration_bins: expected integer in [2, 100]".into()));
+        return Err(BinaryMetricsError(
+            "calibration_bins: expected integer in [2, 100]".into(),
+        ));
     }
-    if !subject.recall_target.is_finite() || !(0.0 < subject.recall_target && subject.recall_target <= 1.0) {
-        return Err(BinaryMetricsError("recall_target: must be finite and in (0, 1]".into()));
+    if !subject.recall_target.is_finite()
+        || !(0.0 < subject.recall_target && subject.recall_target <= 1.0)
+    {
+        return Err(BinaryMetricsError(
+            "recall_target: must be finite and in (0, 1]".into(),
+        ));
     }
     if subject.samples.is_empty() {
-        return Err(BinaryMetricsError("samples: expected non-empty array".into()));
+        return Err(BinaryMetricsError(
+            "samples: expected non-empty array".into(),
+        ));
     }
 
     let mut seen = HashSet::with_capacity(subject.samples.len());
     let mut positives = 0;
     for (index, sample) in subject.samples.iter().enumerate() {
         if sample.sample_id.trim().is_empty() {
-            return Err(BinaryMetricsError(format!("samples[{index}].sample_id: expected non-empty string")));
+            return Err(BinaryMetricsError(format!(
+                "samples[{index}].sample_id: expected non-empty string"
+            )));
         }
         if !seen.insert(sample.sample_id.as_str()) {
-            return Err(BinaryMetricsError(format!("samples[{index}].sample_id: duplicate {:?}", sample.sample_id)));
+            return Err(BinaryMetricsError(format!(
+                "samples[{index}].sample_id: duplicate {:?}",
+                sample.sample_id
+            )));
         }
         if !sample.score.is_finite() {
-            return Err(BinaryMetricsError(format!("samples[{index}].score: expected finite number")));
+            return Err(BinaryMetricsError(format!(
+                "samples[{index}].score: expected finite number"
+            )));
         }
         if !(0.0..=1.0).contains(&sample.score) {
-            return Err(BinaryMetricsError(format!("samples[{index}].score: must be in [0, 1]")));
+            return Err(BinaryMetricsError(format!(
+                "samples[{index}].score: must be in [0, 1]"
+            )));
         }
-        if sample.positive { positives += 1; }
+        if sample.positive {
+            positives += 1;
+        }
     }
     let negatives = subject.samples.len() - positives;
     if positives == 0 || negatives == 0 {
-        return Err(BinaryMetricsError("samples: both positive and negative classes are required".into()));
+        return Err(BinaryMetricsError(
+            "samples: both positive and negative classes are required".into(),
+        ));
     }
     Ok((positives, negatives))
 }
@@ -191,7 +218,11 @@ pub fn score_binary_subject_v1(
     }
     let sensitivity = tp as f64 / positive_count as f64;
     let specificity = tn as f64 / negative_count as f64;
-    let precision = if tp + fp == 0 { 0.0 } else { tp as f64 / (tp + fp) as f64 };
+    let precision = if tp + fp == 0 {
+        0.0
+    } else {
+        tp as f64 / (tp + fp) as f64
+    };
     let accuracy = (tp + tn) as f64 / n as f64;
     let balanced_accuracy = (sensitivity + specificity) / 2.0;
 
@@ -209,30 +240,50 @@ pub fn score_binary_subject_v1(
         previous_recall = recall;
     }
 
-    let positive_scores: Vec<f64> = subject.samples.iter().filter(|s| s.positive).map(|s| s.score).collect();
-    let negative_scores: Vec<f64> = subject.samples.iter().filter(|s| !s.positive).map(|s| s.score).collect();
+    let positive_scores: Vec<f64> = subject
+        .samples
+        .iter()
+        .filter(|s| s.positive)
+        .map(|s| s.score)
+        .collect();
+    let negative_scores: Vec<f64> = subject
+        .samples
+        .iter()
+        .filter(|s| !s.positive)
+        .map(|s| s.score)
+        .collect();
     let mut wins = 0.0;
     for positive in &positive_scores {
         for negative in &negative_scores {
-            if positive > negative { wins += 1.0; }
-            else if positive == negative { wins += 0.5; }
+            if positive > negative {
+                wins += 1.0;
+            } else if positive == negative {
+                wins += 0.5;
+            }
         }
     }
     let auroc = wins / (positive_count * negative_count) as f64;
 
-    let brier_score = subject.samples.iter().map(|s| {
-        (s.score - if s.positive { 1.0 } else { 0.0 }).powi(2)
-    }).sum::<f64>() / n as f64;
+    let brier_score = subject
+        .samples
+        .iter()
+        .map(|s| (s.score - if s.positive { 1.0 } else { 0.0 }).powi(2))
+        .sum::<f64>()
+        / n as f64;
 
     let mut calibration_bins = Vec::with_capacity(subject.calibration_bins);
     let mut ece = 0.0;
     for index in 0..subject.calibration_bins {
         let low = index as f64 / subject.calibration_bins as f64;
         let high = (index + 1) as f64 / subject.calibration_bins as f64;
-        let members: Vec<&BinaryScoreSampleV1> = subject.samples.iter().filter(|s| {
-            (low <= s.score && s.score < high)
-                || (index + 1 == subject.calibration_bins && s.score == 1.0)
-        }).collect();
+        let members: Vec<&BinaryScoreSampleV1> = subject
+            .samples
+            .iter()
+            .filter(|s| {
+                (low <= s.score && s.score < high)
+                    || (index + 1 == subject.calibration_bins && s.score == 1.0)
+            })
+            .collect();
         let count = members.len();
         let (mean, observed, contribution) = if count == 0 {
             (None, None, None)
@@ -241,12 +292,20 @@ pub fn score_binary_subject_v1(
             let observed = members.iter().filter(|s| s.positive).count() as f64 / count as f64;
             let contribution = (mean - observed).abs() * count as f64 / n as f64;
             ece += contribution;
-            (Some(rounded(mean)), Some(rounded(observed)), Some(rounded(contribution)))
+            (
+                Some(rounded(mean)),
+                Some(rounded(observed)),
+                Some(rounded(contribution)),
+            )
         };
         calibration_bins.push(CalibrationBinV1 {
             bin: index,
             lower_inclusive: rounded(low),
-            upper_exclusive: if index + 1 < subject.calibration_bins { Some(rounded(high)) } else { None },
+            upper_exclusive: if index + 1 < subject.calibration_bins {
+                Some(rounded(high))
+            } else {
+                None
+            },
             count,
             mean_score: mean,
             observed_positive_rate: observed,
@@ -277,7 +336,10 @@ pub fn score_binary_subject_v1(
     let mut errors = 0usize;
     for (confidence, group) in groups_desc(&subject.samples, |s| s.score.max(1.0 - s.score)) {
         accepted += group.len();
-        errors += group.iter().filter(|s| (s.score >= 0.5) != s.positive).count();
+        errors += group
+            .iter()
+            .filter(|s| (s.score >= 0.5) != s.positive)
+            .count();
         risk_coverage.push(RiskCoveragePointV1 {
             minimum_confidence_inclusive: rounded(confidence),
             accepted,
@@ -291,10 +353,16 @@ pub fn score_binary_subject_v1(
         schema: OUTPUT_SCHEMA_V1.into(),
         case_id: subject.case_id.clone(),
         sample_count: n,
-        class_counts: BinaryClassCounts { positive: positive_count, negative: negative_count },
+        class_counts: BinaryClassCounts {
+            positive: positive_count,
+            negative: negative_count,
+        },
         threshold_metrics: ThresholdMetricsV1 {
             threshold: rounded(subject.decision_threshold),
-            tp, fp, tn, fn_count,
+            tp,
+            fp,
+            tn,
+            fn_count,
             sensitivity: rounded(sensitivity),
             specificity: rounded(specificity),
             precision: rounded(precision),
@@ -320,8 +388,12 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    const INPUT: &str = include_str!("../../../../../benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json");
-    const EXPECTED: &str = include_str!("../../../../../benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json");
+    const INPUT: &str = include_str!(
+        "../../../../../benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json"
+    );
+    const EXPECTED: &str = include_str!(
+        "../../../../../benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json"
+    );
 
     fn known_answer() -> BinaryScoreSubjectV1 {
         serde_json::from_str(INPUT).expect("known-answer input must deserialize")
@@ -348,21 +420,38 @@ mod tests {
     fn duplicate_sample_identity_is_rejected() {
         let mut subject = known_answer();
         subject.samples[1].sample_id = subject.samples[0].sample_id.clone();
-        assert!(score_binary_subject_v1(&subject).unwrap_err().to_string().contains("duplicate"));
+        assert!(
+            score_binary_subject_v1(&subject)
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate")
+        );
     }
 
     #[test]
     fn one_class_only_is_rejected() {
         let mut subject = known_answer();
-        for sample in &mut subject.samples { sample.positive = true; }
-        assert!(score_binary_subject_v1(&subject).unwrap_err().to_string().contains("both positive and negative"));
+        for sample in &mut subject.samples {
+            sample.positive = true;
+        }
+        assert!(
+            score_binary_subject_v1(&subject)
+                .unwrap_err()
+                .to_string()
+                .contains("both positive and negative")
+        );
     }
 
     #[test]
     fn out_of_range_probability_is_rejected_without_clipping() {
         let mut subject = known_answer();
         subject.samples[0].score = 1.01;
-        assert!(score_binary_subject_v1(&subject).unwrap_err().to_string().contains("must be in [0, 1]"));
+        assert!(
+            score_binary_subject_v1(&subject)
+                .unwrap_err()
+                .to_string()
+                .contains("must be in [0, 1]")
+        );
     }
 
     #[test]
