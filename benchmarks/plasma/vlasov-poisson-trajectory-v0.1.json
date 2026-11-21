@@ -187,9 +187,9 @@
     {
       "component": "dense_distribution_space_vlasov_poisson_reference_prototype",
       "pr": 13103,
-      "head_sha": "2c2b91ce43890b3d9175b4949b1354fd09fdc2c4",
+      "head_sha": "bdf760214dfdfae2698af5af8134edda023bcc77",
       "state_at_profile_creation": "open",
-      "claim_ceiling": "Spectral-Strang distribution-space prototype with phase-resolved electric modes and diagnostic x/v spectral-tail monitoring. Latest exact-head validation remains pending; not yet L3-admitted."
+      "claim_ceiling": "Spectral-Strang distribution-space prototype with phase-resolved Fourier modes, diagnostic x/v spectral-tail occupancy, and a periodic Fourier zero-padding interpolation oracle. Latest exact-head workflow for 19 tests and t=10 trajectory is queued; not yet L3-admitted."
     },
     {
       "component": "phase_space_spectral_tail_monitor",
@@ -197,6 +197,13 @@
       "head_sha": "2c2b91ce43890b3d9175b4949b1354fd09fdc2c4",
       "state_at_profile_creation": "implementation_in_progress",
       "claim_ceiling": "Diagnostic-only x/v high-frequency and Nyquist energy fractions. Not a truncation-error certificate and not an adaptive expansion policy."
+    },
+    {
+      "component": "periodic_fourier_zero_padding_interpolation_oracle",
+      "pr": 13103,
+      "head_sha": "bdf760214dfdfae2698af5af8134edda023bcc77",
+      "state_at_profile_creation": "implementation_committed_validation_pending",
+      "claim_ceiling": "Standalone trigonometric interpolation transfer oracle only. Does not mutate Vlasov state, choose an adaptive trigger or certify physical validity of grid expansion."
     }
   ],
   "initial_condition_suite": [
@@ -575,6 +582,22 @@
       "p50_p95_runtime_peak_memory_energy",
       "risk_coverage_fallback_and_abstention"
     ],
-    "claim_ceiling": "No universal winner or adaptive representation claim before matched-source reproduction and independent trajectory qualification."
+    "claim_ceiling": "No universal winner or adaptive representation claim before matched-source reproduction and independent trajectory qualification.",
+    "zero_padding_status": "transfer_oracle_implemented_validation_pending",
+    "zero_padding_contract": {
+      "source_periodic_line_length": "power-of-two >= 4",
+      "target_periodic_line_length": "power-of-two >= source length",
+      "nyquist": "split source Nyquist coefficient symmetrically into positive and negative target harmonics",
+      "physical_state_mutation": false,
+      "physical_transition_certificate": false,
+      "tests": [
+        "band-limited reconstruction",
+        "old-node preservation",
+        "Nyquist splitting",
+        "constant line",
+        "identity grid",
+        "invalid grid and non-finite rejection"
+      ]
+    }
   }
 }
