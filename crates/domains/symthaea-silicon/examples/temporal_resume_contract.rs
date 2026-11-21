@@ -187,6 +187,7 @@ enum ResumeError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ResumeRequest {
+    continuation_id: String,
     expected_generation: u64,
     model_id: String,
     configuration_id: String,
@@ -197,9 +198,18 @@ struct ResumeRequest {
     interpolation_policy_id: String,
 }
 
+impl std::fmt::Display for ResumeError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for ResumeError {}
+
 impl From<&SolverContinuation> for ResumeRequest {
     fn from(value: &SolverContinuation) -> Self {
         Self {
+            continuation_id: value.continuation_id.clone(),
             expected_generation: value.checkpoint_generation,
             model_id: value.model_id.clone(),
             configuration_id: value.configuration_id.clone(),
@@ -274,7 +284,8 @@ impl ContinuationRegistry {
         if continuation.state == ContinuationState::Completed {
             return Err(ResumeError::AlreadyCompleted);
         }
-        if request.model_id != continuation.model_id
+        if request.continuation_id != continuation.continuation_id
+            || request.model_id != continuation.model_id
             || request.configuration_id != continuation.configuration_id
             || request.source_revision != continuation.source_revision
             || request.solver_profile_id != continuation.solver_profile_id
@@ -563,10 +574,17 @@ mod tests {
     }
 
     #[test]
-    fn model_configuration_source_and_method_must_match() {
+    fn continuation_id_and_model_configuration_source_and_method_must_match() {
         let token = fixture();
         let mut registry = ContinuationRegistry::default();
         registry.register(&token).unwrap();
+        let mut wrong_id = ResumeRequest::from(&token);
+        wrong_id.continuation_id = "different-trajectory".to_owned();
+        assert_eq!(
+            registry.advance(&token, &wrong_id, progress(1, 1, 1, 1)),
+            Err(ResumeError::IdentityMismatch)
+        );
+
         let mut request = ResumeRequest::from(&token);
         request.configuration_id = "different-config".to_owned();
         assert_eq!(
