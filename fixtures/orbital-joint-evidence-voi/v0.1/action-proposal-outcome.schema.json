@@ -239,7 +239,9 @@
             "regime",
             "value",
             "probability_model_ref",
-            "calibration_evidence_refs"
+            "calibration_evidence_refs",
+            "metric",
+            "value_unit"
           ],
           "properties": {
             "regime": {
@@ -257,6 +259,13 @@
               "items": {
                 "$ref": "#/$defs/reference"
               }
+            },
+            "metric": {
+              "const": "EVSI"
+            },
+            "value_unit": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -266,7 +275,9 @@
           "required": [
             "regime",
             "value",
-            "uncertainty_set_ref"
+            "uncertainty_set_ref",
+            "metric",
+            "value_unit"
           ],
           "properties": {
             "regime": {
@@ -277,6 +288,13 @@
             },
             "uncertainty_set_ref": {
               "$ref": "#/$defs/reference"
+            },
+            "metric": {
+              "const": "MINIMAX_REGRET_REDUCTION"
+            },
+            "value_unit": {
+              "type": "string",
+              "minLength": 1
             }
           }
         }
@@ -643,8 +661,26 @@
           },
           "then": {
             "properties": {
+              "execution_state": {
+                "enum": [
+                  "EXECUTED",
+                  "COMPLETED",
+                  "FAILED",
+                  "ABORTED",
+                  "INVALID",
+                  "CENSORED",
+                  "OUT_OF_DOMAIN",
+                  "DISPUTED"
+                ]
+              },
               "actual_resources": {
                 "$ref": "#/$defs/resources"
+              },
+              "executing_owner": {
+                "$ref": "#/$defs/reference"
+              },
+              "execution_authority_ref": {
+                "$ref": "#/$defs/reference"
               }
             }
           }
@@ -662,15 +698,18 @@
           },
           "then": {
             "properties": {
-              "actual_resources": {
-                "oneOf": [
-                  {
-                    "$ref": "#/$defs/resources"
-                  },
-                  {
-                    "type": "null"
-                  }
+              "execution_state": {
+                "enum": [
+                  "PLANNED",
+                  "ADMITTED",
+                  "NOT_RUN"
                 ]
+              },
+              "actual_resources": {
+                "type": "null"
+              },
+              "execution_authority_ref": {
+                "type": "null"
               }
             }
           }
