@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "benchmarks/semi-bench-001/**"
+      - "crates/domains/symthaea-semiconductor/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/semi-bench-reference.yml"
   push:
     paths:
@@ -21,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
       - name: Set up Python (test-only reference)
         uses: actions/setup-python@v5
         with:
@@ -53,3 +58,20 @@ jobs:
           diff -u \
             benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json \
             /tmp/semi-bench-pair-report.json
+
+  rust-semiconductor-reference:
+    name: Rust semiconductor metric contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format semiconductor crate
+        run: cargo fmt -p symthaea-semiconductor -- --check
+      - name: Clippy semiconductor crate
+        run: cargo clippy -p symthaea-semiconductor --all-targets -- -D warnings
+      - name: Test Rust semiconductor scorer
+        run: cargo test -p symthaea-semiconductor
