@@ -69,6 +69,41 @@ def resource_fits(action, budget):
         "specimen_count", "review_hours", "external_cost_units"))
 
 
+def dominates_resources(left, right):
+    keys = ("engineering_hours", "compute_core_hours", "facility_hours",
+            "specimen_count", "review_hours", "external_cost_units")
+    no_more = all(left[key] <= right[key] + TOL for key in keys)
+    strictly_less = any(left[key] < right[key] - TOL for key in keys)
+    return no_more and strictly_less
+
+
+def select_best_action(scenario, action_results):
+    actions = {action["action_id"]: action for action in scenario["actions"]}
+    candidates = [
+        actions[action_id] for action_id, result in action_results.items()
+        if result["eligible"] and result["value"] is not None and result["value"] > TOL
+    ]
+    if not candidates:
+        return None, None, "ABSTAIN_NO_DECISION_VALUE"
+    best_value = max(action_results[action["action_id"]]["value"] for action in candidates)
+    top = [
+        action for action in candidates
+        if abs(action_results[action["action_id"]]["value"] - best_value) <= TOL
+    ]
+    frontier = [
+        candidate for candidate in top
+        if not any(
+            other["action_id"] != candidate["action_id"]
+            and dominates_resources(other["resources"], candidate["resources"])
+            for other in top
+        )
+    ]
+    if len(frontier) == 1:
+        chosen = frontier[0]
+        return chosen["action_id"], best_value, "SELECTED_MAX_VALUE_UNIQUE_PARETO_PLAN"
+    return None, best_value, "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE"
+
+
 def evaluate_action(scenario, action, baseline):
     state = action["admissibility"]["state"]
     budget_ok = resource_fits(action, scenario["budget"])
@@ -188,6 +223,9 @@ def audit_scenario(scenario):
             raise ValueError("JEV-013 facility-cost total mismatch")
     audits = {action_id: evaluate_action(scenario, action, baseline)
               for action_id, action in by_id.items()}
+    selected_action_id, selected_action_value, selection_disposition = select_best_action(
+        scenario, audits
+    )
 
     for action_id in scenario["expected"]["must_not_select"]:
         if action_id not in audits:
@@ -198,7 +236,13 @@ def audit_scenario(scenario):
 
     best_id = scenario["expected"]["best_action_id"]
     sentinel = best_id == "ABSTAIN" or best_id.startswith("REPLAN-")
+    selection_matches_oracle = (
+        selected_action_id is None if scenario["expected"]["abstain"]
+        else selected_action_id == best_id
+    )
     if sentinel:
+        if not selection_matches_oracle:
+            raise ValueError("computed selection differs from abstention oracle")
         if not scenario["expected"]["abstain"]:
             raise ValueError("abstention sentinel must set abstain")
         if any(r["eligible"] and r["value"] is not None and r["value"] > TOL
@@ -211,6 +255,8 @@ def audit_scenario(scenario):
             raise ValueError("abstention post-score differs from baseline")
         chosen = None
     else:
+        if not selection_matches_oracle:
+            raise ValueError("computed selection differs from known-answer action oracle")
         if scenario["expected"]["abstain"] or best_id not in audits:
             raise ValueError("selected action missing or abstain flag inconsistent")
         selected = audits[best_id]
@@ -230,6 +276,10 @@ def audit_scenario(scenario):
         "scenario_id": scenario["scenario_id"],
         "baseline_regret_or_loss": baseline,
         "expected_action_id": best_id,
+        "selected_action_id": selected_action_id,
+        "selected_action_value": selected_action_value,
+        "selection_disposition": selection_disposition,
+        "selection_matches_oracle": selection_matches_oracle,
         "expected_action_value": chosen,
         "eligible_action_count": sum(1 for result in audits.values() if result["eligible"]),
         "must_not_select_count": len(scenario["expected"]["must_not_select"]),
