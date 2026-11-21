@@ -584,3 +584,13 @@ Hosted run [#44935276557](https://github.com/Luminous-Dynamics/symthaea/actions/
 - The Python/reference lane passed **46/46 tests** and its three frozen report comparisons.
 
 The latest PR branch head includes later documentation/manifest/source-register updates; the verified Rust code, fixtures and workflow are unchanged from the tested code commit. The full 1,567×590 feature matrix was not retrieved in this runtime, so the parser was verified with synthetic bytes and the frozen real-source split manifest, not with a full real-file model run.
+
+
+## Deployable-model Pareto benchmark
+
+New follow-up [SEMI-PARETO-001 #13149](https://github.com/Luminous-Dynamics/symthaea/issues/13149) adds a matched accuracy/calibration/resource comparison across:
+- ViT-Tiny on WM-38K: paper-reported 98.4% accuracy with 5.7M parameters, 1.77× inference speed and 4.47× lower memory versus comparable transformers.
+- Hybrid MobileNetV2 + geometric features on WM-811K: paper-reported 98.89% accuracy, 94.41% macro-F1 and 64,967 trainable parameters; its offline StyleGAN2-ADA generator and handcrafted feature computation are separate lifecycle/inference costs.
+- GNN, FAD-Net, Symthaea HDC, deterministic geometry and frozen-LMM references.
+
+All are paper-reported and not directly rankable until source identity, labels, split, resolution, hardware and metric definitions are matched. The target is a Pareto advantage across worst-class recall, unknown rejection, p95 latency, memory, artifact bytes and measured energy—not an accuracy trophy.
