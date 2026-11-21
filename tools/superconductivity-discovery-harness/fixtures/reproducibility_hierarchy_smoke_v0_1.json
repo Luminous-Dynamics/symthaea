@@ -2,12 +2,6 @@
   "schema_version": "sc-reproducibility-design.v0.1",
   "evidence_class": "synthetic",
   "claim_ceiling": "group-split-and-reproducibility-design-semantics-only",
-  "material_state": {
-    "material_id": "SYNTH-REBCO-4MM",
-    "state_id": "SYNTH-STATE-001",
-    "property_id": "Ic_77K_self_field",
-    "property_unit": "A"
-  },
   "observations": [
     {
       "observation_id": "OBS-001",
@@ -26,7 +20,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-001",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
     },
     {
       "observation_id": "OBS-002",
@@ -45,7 +40,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-001",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
     },
     {
       "observation_id": "OBS-003",
@@ -64,7 +60,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-002",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
     },
     {
       "observation_id": "OBS-004",
@@ -83,7 +80,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-003",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
     },
     {
       "observation_id": "OBS-005",
@@ -102,7 +100,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-004",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-B",
+      "material_id": "SYNTH-REBCO-4MM"
     },
     {
       "observation_id": "OBS-006",
@@ -121,7 +120,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-005",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-C",
+      "material_id": "SYNTH-REBCO-4MM"
     },
     {
       "observation_id": "OBS-007",
@@ -140,7 +140,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-006",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
     },
     {
       "observation_id": "OBS-008",
@@ -159,7 +160,8 @@
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
       "source_id": "SYNTH-SOURCE-007",
-      "material_state_id": "SYNTH-STATE-001"
+      "material_state_id": "SYNTH-STATE-D",
+      "material_id": "SYNTH-REBCO-4MM"
     }
   ],
   "tasks": [
@@ -254,5 +256,10 @@
       ],
       "paired_specimen_transfer": false
     }
-  ]
+  ],
+  "material_profile": {
+    "material_id": "SYNTH-REBCO-4MM",
+    "property_id": "Ic_77K_self_field",
+    "property_unit": "A"
+  }
 }
