@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::env;
@@ -67,31 +67,42 @@ struct Case {
     characterization: Option<Characterization>,
 }
 fn text_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value.get(key).and_then(Value::as_str).filter(|s| !s.trim().is_empty())
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| format!("missing or empty string field {key}"))
 }
 fn number_field(value: &Value, key: &str) -> Result<f64, String> {
-    let x = value.get(key).and_then(Value::as_f64)
+    let x = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("missing numeric field {key}"))?;
-    if !x.is_finite() { return Err(format!("{key} must be finite")); }
+    if !x.is_finite() {
+        return Err(format!("{key} must be finite"));
+    }
     Ok(x)
 }
 fn interval(value: &Value, context: &str) -> Result<Interval, String> {
     let lower = number_field(value, "lower")?;
     let upper = number_field(value, "upper")?;
     if lower > upper {
-        return Err(format!("{context} interval lower bound exceeds upper bound"));
+        return Err(format!(
+            "{context} interval lower bound exceeds upper bound"
+        ));
     }
     Ok(Interval { lower, upper })
 }
 fn parse_reaction(value: &Value, context: &str) -> Result<Reaction, String> {
     let delta_g = interval(
-        value.get("delta_g_interval_eV_per_basis")
+        value
+            .get("delta_g_interval_eV_per_basis")
             .ok_or_else(|| format!("{context} missing delta_g_interval_eV_per_basis"))?,
         &format!("{context} delta_g"),
     )?;
     let activation_barrier = interval(
-        value.get("activation_barrier_interval_eV")
+        value
+            .get("activation_barrier_interval_eV")
             .ok_or_else(|| format!("{context} missing activation_barrier_interval_eV"))?,
         &format!("{context} activation barrier"),
     )?;
@@ -112,10 +123,14 @@ fn parse_reaction(value: &Value, context: &str) -> Result<Reaction, String> {
     })
 }
 fn parse_characterization(value: &Value) -> Result<Option<Characterization>, String> {
-    let evidence = value.get("characterization_evidence")
+    let evidence = value
+        .get("characterization_evidence")
         .ok_or("case missing characterization_evidence")?;
-    if evidence.is_null() { return Ok(None); }
-    let evidence = evidence.as_object()
+    if evidence.is_null() {
+        return Ok(None);
+    }
+    let evidence = evidence
+        .as_object()
         .ok_or("characterization_evidence must be an object or null")?;
     let evidence_value = Value::Object(evidence.clone());
     let detection_limit = number_field(&evidence_value, "detection_limit_phase_fraction")?;
@@ -129,7 +144,9 @@ fn parse_characterization(value: &Value) -> Result<Option<Characterization>, Str
     let mut phases = Vec::new();
     let mut phase_ids = HashSet::new();
     let mut fraction_sum = 0.0;
-    let phase_rows = evidence_value.get("realized_phases").and_then(Value::as_array)
+    let phase_rows = evidence_value
+        .get("realized_phases")
+        .and_then(Value::as_array)
         .ok_or("characterization realized_phases must be an array")?;
     for row in phase_rows {
         let phase_id = text_field(row, "phase_id")?.to_owned();
@@ -148,7 +165,9 @@ fn parse_characterization(value: &Value) -> Result<Option<Characterization>, Str
         });
     }
     if fraction_sum > 1.0 + 1.0e-9 {
-        return Err(format!("realized phase fractions sum to {fraction_sum}, exceeding one"));
+        return Err(format!(
+            "realized phase fractions sum to {fraction_sum}, exceeding one"
+        ));
     }
     Ok(Some(Characterization {
         sample_id: text_field(&evidence_value, "sample_id")?.to_owned(),
@@ -164,17 +183,22 @@ fn parse_characterization(value: &Value) -> Result<Option<Characterization>, Str
 fn parse_case(value: &Value) -> Result<Case, String> {
     let id = text_field(value, "case_id")?.to_owned();
     let conditions = value.get("conditions").ok_or("case missing conditions")?;
-    let basis = value.get("reaction_basis").ok_or("case missing reaction_basis")?;
+    let basis = value
+        .get("reaction_basis")
+        .ok_or("case missing reaction_basis")?;
     let hull = value.get("hull_screen").ok_or("case missing hull_screen")?;
     let hull_interval = interval(
-        hull.get("above_hull_interval_mev_atom").ok_or("hull_screen missing interval")?,
+        hull.get("above_hull_interval_mev_atom")
+            .ok_or("hull_screen missing interval")?,
         "above-hull",
     )?;
     if hull_interval.lower < 0.0 {
         return Err(format!("{id} above-hull interval must be non-negative"));
     }
     let target = parse_reaction(
-        value.get("target_reaction").ok_or("case missing target_reaction")?,
+        value
+            .get("target_reaction")
+            .ok_or("case missing target_reaction")?,
         &format!("{id} target reaction"),
     )?;
     if target.role != "target" {
@@ -185,13 +209,20 @@ fn parse_case(value: &Value) -> Result<Case, String> {
     if !reaction_ids.insert(target.id.clone()) {
         return Err(format!("{id} duplicate target reaction id"));
     }
-    let competitor_rows = value.get("competing_reactions").and_then(Value::as_array)
+    let competitor_rows = value
+        .get("competing_reactions")
+        .and_then(Value::as_array)
         .ok_or("competing_reactions must be an array")?;
-    if competitor_rows.is_empty() { return Err(format!("{id} requires at least one competing reaction")); }
+    if competitor_rows.is_empty() {
+        return Err(format!("{id} requires at least one competing reaction"));
+    }
     for (index, row) in competitor_rows.iter().enumerate() {
         let reaction = parse_reaction(row, &format!("{id} competitor[{index}]"))?;
         if reaction.role != "competing" {
-            return Err(format!("{id} competing reaction {} must have role=competing", reaction.id));
+            return Err(format!(
+                "{id} competing reaction {} must have role=competing",
+                reaction.id
+            ));
         }
         if !reaction_ids.insert(reaction.id.clone()) {
             return Err(format!("{id} duplicate reaction id {}", reaction.id));
@@ -206,7 +237,8 @@ fn parse_case(value: &Value) -> Result<Case, String> {
         temperature_k: number_field(conditions, "temperature_k")?,
         pressure_gpa: number_field(conditions, "pressure_gpa")?,
         atmosphere: text_field(conditions, "atmosphere")?.to_owned(),
-        chemical_potential_context: text_field(conditions, "chemical_potential_context")?.to_owned(),
+        chemical_potential_context: text_field(conditions, "chemical_potential_context")?
+            .to_owned(),
         basis: text_field(basis, "normalization_basis")?.to_owned(),
         basis_unit: text_field(basis, "basis_unit")?.to_owned(),
         standard_state: text_field(basis, "standard_state")?.to_owned(),
@@ -221,21 +253,37 @@ fn parse_case(value: &Value) -> Result<Case, String> {
         outcome_status: text_field(value, "observed_target_phase_status")?.to_owned(),
         characterization: parse_characterization(value)?,
     };
-    if case.temperature_k <= 0.0 || case.pressure_gpa < 0.0
-        || case.hull_threshold < 0.0 || case.selectivity_margin < 0.0 || case.kinetic_limit < 0.0 {
-        return Err(format!("{} has an invalid non-negative condition or threshold", case.id));
+    if case.temperature_k <= 0.0
+        || case.pressure_gpa < 0.0
+        || case.hull_threshold < 0.0
+        || case.selectivity_margin < 0.0
+        || case.kinetic_limit < 0.0
+    {
+        return Err(format!(
+            "{} has an invalid non-negative condition or threshold",
+            case.id
+        ));
     }
     let all_reactions = std::iter::once(&case.target).chain(case.competitors.iter());
     for reaction in all_reactions {
         if reaction.conditions_id != case.conditions_id {
-            return Err(format!("{} reaction {} condition ID does not match case conditions", case.id, reaction.id));
+            return Err(format!(
+                "{} reaction {} condition ID does not match case conditions",
+                case.id, reaction.id
+            ));
         }
         if reaction.normalization_basis != case.basis || reaction.basis_unit != case.basis_unit {
-            return Err(format!("{} reaction {} normalization basis/unit does not match case basis", case.id, reaction.id));
+            return Err(format!(
+                "{} reaction {} normalization basis/unit does not match case basis",
+                case.id, reaction.id
+            ));
         }
     }
     if case.target.balance_status != case.basis_balance_status {
-        return Err(format!("{} target reaction and case reaction-basis balance status disagree", case.id));
+        return Err(format!(
+            "{} target reaction and case reaction-basis balance status disagree",
+            case.id
+        ));
     }
     validate_observation(&case)?;
     Ok(case)
@@ -244,32 +292,64 @@ fn validate_observation(case: &Case) -> Result<(), String> {
     match case.outcome_status.as_str() {
         "unknown_not_reported" => {
             if case.characterization.is_some() {
-                return Err(format!("{} unknown_not_reported must not attach a characterized outcome", case.id));
+                return Err(format!(
+                    "{} unknown_not_reported must not attach a characterized outcome",
+                    case.id
+                ));
             }
         }
         "target_phase_observed" => {
-            let evidence = case.characterization.as_ref()
-                .ok_or_else(|| format!("{} target observed requires characterization evidence", case.id))?;
+            let evidence = case.characterization.as_ref().ok_or_else(|| {
+                format!(
+                    "{} target observed requires characterization evidence",
+                    case.id
+                )
+            })?;
             let phase = evidence.phases.iter().find(|p| p.phase_id == case.target.product_phase_id)
                 .ok_or_else(|| format!("{} target phase observed status lacks target phase in characterized phases", case.id))?;
             if !matches!(phase.identity_status.as_str(), "refined" | "identified") {
-                return Err(format!("{} target phase observation is not identified/refined", case.id));
+                return Err(format!(
+                    "{} target phase observation is not identified/refined",
+                    case.id
+                ));
             }
             if phase.fraction < evidence.detection_limit {
-                return Err(format!("{} target phase fraction is below the declared detection limit", case.id));
+                return Err(format!(
+                    "{} target phase fraction is below the declared detection limit",
+                    case.id
+                ));
             }
         }
         "target_phase_not_detected_under_conditions" => {
-            let evidence = case.characterization.as_ref()
-                .ok_or_else(|| format!("{} non-detection requires characterization evidence and a detection limit", case.id))?;
-            if evidence.phases.iter().any(|p| p.phase_id == case.target.product_phase_id) {
-                return Err(format!("{} non-detection cannot include the target phase in realized_phases", case.id));
+            let evidence = case.characterization.as_ref().ok_or_else(|| {
+                format!(
+                    "{} non-detection requires characterization evidence and a detection limit",
+                    case.id
+                )
+            })?;
+            if evidence
+                .phases
+                .iter()
+                .any(|p| p.phase_id == case.target.product_phase_id)
+            {
+                return Err(format!(
+                    "{} non-detection cannot include the target phase in realized_phases",
+                    case.id
+                ));
             }
             if evidence.detection_limit <= 0.0 {
-                return Err(format!("{} non-detection requires a positive detection limit", case.id));
+                return Err(format!(
+                    "{} non-detection requires a positive detection limit",
+                    case.id
+                ));
             }
         }
-        other => return Err(format!("{} has unsupported outcome status {other}", case.id)),
+        other => {
+            return Err(format!(
+                "{} has unsupported outcome status {other}",
+                case.id
+            ));
+        }
     }
     Ok(())
 }
@@ -285,7 +365,10 @@ fn hull_assessment(case: &Case) -> &'static str {
 fn reaction_selectivity(case: &Case) -> &'static str {
     let reactions_verified = case.basis_balance_status == "verified"
         && case.target.balance_status == "verified"
-        && case.competitors.iter().all(|r| r.balance_status == "verified");
+        && case
+            .competitors
+            .iter()
+            .all(|r| r.balance_status == "verified");
     if !reactions_verified {
         return "abstained_unverified_reaction_balance";
     }
@@ -312,36 +395,43 @@ fn kinetic_assessment(case: &Case) -> &'static str {
 }
 fn combined_assessment(selectivity: &str, kinetics: &str) -> &'static str {
     match (selectivity, kinetics) {
-        ("target_reaction_robustly_favored", "target_barrier_below_declared_limit") =>
-            "target_route_selective_and_below_declared_kinetic_limit",
-        ("target_reaction_robustly_favored", "target_barrier_above_declared_limit") =>
-            "target_route_selective_but_barrier_above_declared_limit",
-        ("target_reaction_robustly_favored", _) =>
-            "target_route_selective_but_kinetics_indeterminate",
-        ("at_least_one_competing_reaction_robustly_favored", _) =>
-            "competing_route_robustly_preferred",
-        ("abstained_unverified_reaction_balance", _) =>
-            "abstained_unverified_or_noncomparable_reactions",
-        _ => "route_selectivity_indeterminate"
+        ("target_reaction_robustly_favored", "target_barrier_below_declared_limit") => {
+            "target_route_selective_and_below_declared_kinetic_limit"
+        }
+        ("target_reaction_robustly_favored", "target_barrier_above_declared_limit") => {
+            "target_route_selective_but_barrier_above_declared_limit"
+        }
+        ("target_reaction_robustly_favored", _) => {
+            "target_route_selective_but_kinetics_indeterminate"
+        }
+        ("at_least_one_competing_reaction_robustly_favored", _) => {
+            "competing_route_robustly_preferred"
+        }
+        ("abstained_unverified_reaction_balance", _) => {
+            "abstained_unverified_or_noncomparable_reactions"
+        }
+        _ => "route_selectivity_indeterminate",
     }
 }
 fn case_receipt(case: &Case) -> Value {
     let selectivity = reaction_selectivity(case);
     let kinetics = kinetic_assessment(case);
-    let observed = case.characterization.as_ref().map(|evidence| json!({
-        "sample_id": evidence.sample_id,
-        "execution_run_id": evidence.execution_run_id,
-        "method": evidence.method,
-        "characterization_conditions_id": evidence.conditions_id,
-        "source_locator": evidence.source_locator,
-        "raw_data_sha256": evidence.raw_data_sha256,
-        "detection_limit_phase_fraction": evidence.detection_limit,
-        "realized_phases": evidence.phases.iter().map(|p| json!({
-            "phase_id": p.phase_id,
-            "identity_status": p.identity_status,
-            "phase_fraction": p.fraction
-        })).collect::<Vec<_>>()
-    }));
+    let observed = case.characterization.as_ref().map(|evidence| {
+        json!({
+            "sample_id": evidence.sample_id,
+            "execution_run_id": evidence.execution_run_id,
+            "method": evidence.method,
+            "characterization_conditions_id": evidence.conditions_id,
+            "source_locator": evidence.source_locator,
+            "raw_data_sha256": evidence.raw_data_sha256,
+            "detection_limit_phase_fraction": evidence.detection_limit,
+            "realized_phases": evidence.phases.iter().map(|p| json!({
+                "phase_id": p.phase_id,
+                "identity_status": p.identity_status,
+                "phase_fraction": p.fraction
+            })).collect::<Vec<_>>()
+        })
+    });
     json!({
         "case_id": case.id,
         "protocol_id": case.protocol_id,
@@ -401,9 +491,13 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema).map_err(|e| format!("schema compilation failed: {e}"))?;
+    let validator =
+        validator_for(&schema).map_err(|e| format!("schema compilation failed: {e}"))?;
     if let Some(error) = validator.iter_errors(&fixture).next() {
-        return Err(format!("reaction selectivity schema validation failed: {error} at {}", error.instance_path()));
+        return Err(format!(
+            "reaction selectivity schema validation failed: {error} at {}",
+            error.instance_path()
+        ));
     }
     if fixture.get("fixture_only").and_then(Value::as_bool) != Some(true) {
         return Err("reaction selectivity auditor accepts synthetic fixtures only".to_owned());
@@ -411,7 +505,9 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if text_field(&fixture, "contract")? != "SC-REACTION-SELECTIVITY-0.1" {
         return Err("unsupported reaction selectivity contract".to_owned());
     }
-    let rows = fixture.get("cases").and_then(Value::as_array)
+    let rows = fixture
+        .get("cases")
+        .and_then(Value::as_array)
         .ok_or_else(|| "cases must be an array".to_owned())?;
     let mut cases = Vec::with_capacity(rows.len());
     let mut ids = HashSet::new();
@@ -443,7 +539,9 @@ fn read(path: &PathBuf) -> Vec<u8> {
     })
 }
 fn usage(program: &str) {
-    eprintln!("Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]");
+    eprintln!(
+        "Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]"
+    );
 }
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -454,31 +552,43 @@ fn main() {
     while index < args.len() {
         match args[index].as_str() {
             "--schema" | "--fixture" | "--out" => {
-                if index+1 >= args.len() { usage(&args[0]); process::exit(2); }
-                let path = PathBuf::from(&args[index+1]);
+                if index + 1 >= args.len() {
+                    usage(&args[0]);
+                    process::exit(2);
+                }
+                let path = PathBuf::from(&args[index + 1]);
                 match args[index].as_str() {
-                    "--schema" => schema_path=Some(path),
-                    "--fixture" => fixture_path=Some(path),
-                    "--out" => output_path=Some(path),
+                    "--schema" => schema_path = Some(path),
+                    "--fixture" => fixture_path = Some(path),
+                    "--out" => output_path = Some(path),
                     _ => unreachable!(),
                 }
                 index += 2;
             }
-            "--help" | "-h" => { usage(&args[0]); return; }
-            other => { eprintln!("unknown argument {other}"); usage(&args[0]); process::exit(2); }
+            "--help" | "-h" => {
+                usage(&args[0]);
+                return;
+            }
+            other => {
+                eprintln!("unknown argument {other}");
+                usage(&args[0]);
+                process::exit(2);
+            }
         }
     }
     let (Some(schema_path), Some(fixture_path)) = (schema_path, fixture_path) else {
-        usage(&args[0]); process::exit(2);
+        usage(&args[0]);
+        process::exit(2);
     };
     let receipt = audit(&read(&schema_path), &read(&fixture_path)).unwrap_or_else(|e| {
         eprintln!("SC-REACTION-SELECTIVITY-FAIL: {e}");
         process::exit(1);
     });
-    let rendered = serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
+    let rendered =
+        serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
     if let Some(path) = output_path {
         if let Err(e) = fs::write(&path, format!("{rendered}\n")) {
-            eprintln!("could not write {}: {e}",path.display());
+            eprintln!("could not write {}: {e}", path.display());
             process::exit(1);
         }
     } else {
@@ -505,22 +615,51 @@ mod tests {
     #[test]
     fn low_hull_screen_does_not_override_a_competing_reaction() {
         let result = receipt();
-        let case = result["cases"].as_array().unwrap().iter()
-            .find(|c| c["case_id"] == "low_hull_wrong_reaction_route").unwrap();
-        assert_eq!(case["hull_screen_assessment"], "within_declared_hull_screen_threshold");
-        assert_eq!(case["reaction_selectivity_assessment"], "at_least_one_competing_reaction_robustly_favored");
-        assert_eq!(case["kinetic_assessment"], "target_barrier_above_declared_limit");
-        assert_eq!(case["model_route_assessment"], "competing_route_robustly_preferred");
+        let case = result["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["case_id"] == "low_hull_wrong_reaction_route")
+            .unwrap();
+        assert_eq!(
+            case["hull_screen_assessment"],
+            "within_declared_hull_screen_threshold"
+        );
+        assert_eq!(
+            case["reaction_selectivity_assessment"],
+            "at_least_one_competing_reaction_robustly_favored"
+        );
+        assert_eq!(
+            case["kinetic_assessment"],
+            "target_barrier_above_declared_limit"
+        );
+        assert_eq!(
+            case["model_route_assessment"],
+            "competing_route_robustly_preferred"
+        );
     }
 
     #[test]
     fn metastable_hull_does_not_automatically_reject_a_selective_route() {
         let result = receipt();
-        let case = result["cases"].as_array().unwrap().iter()
-            .find(|c| c["case_id"] == "metastable_hull_selective_route_unknown").unwrap();
-        assert_eq!(case["hull_screen_assessment"], "above_declared_hull_screen_threshold");
-        assert_eq!(case["reaction_selectivity_assessment"], "target_reaction_robustly_favored");
-        assert_eq!(case["kinetic_assessment"], "target_barrier_below_declared_limit");
+        let case = result["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["case_id"] == "metastable_hull_selective_route_unknown")
+            .unwrap();
+        assert_eq!(
+            case["hull_screen_assessment"],
+            "above_declared_hull_screen_threshold"
+        );
+        assert_eq!(
+            case["reaction_selectivity_assessment"],
+            "target_reaction_robustly_favored"
+        );
+        assert_eq!(
+            case["kinetic_assessment"],
+            "target_barrier_below_declared_limit"
+        );
         assert_eq!(case["observed_target_phase_status"], "unknown_not_reported");
         assert!(case["characterization_evidence"].is_null());
     }
@@ -528,34 +667,76 @@ mod tests {
     #[test]
     fn overlapping_reaction_intervals_abstain_from_selectivity() {
         let result = receipt();
-        let case = result["cases"].as_array().unwrap().iter()
-            .find(|c| c["case_id"] == "overlapping_reaction_intervals_unknown").unwrap();
-        assert_eq!(case["reaction_selectivity_assessment"], "reaction_free_energy_intervals_overlap_or_are_unresolved");
-        assert_eq!(case["kinetic_assessment"], "target_barrier_interval_overlaps_declared_limit");
-        assert_eq!(case["hull_screen_assessment"], "hull_interval_overlaps_declared_threshold");
+        let case = result["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["case_id"] == "overlapping_reaction_intervals_unknown")
+            .unwrap();
+        assert_eq!(
+            case["reaction_selectivity_assessment"],
+            "reaction_free_energy_intervals_overlap_or_are_unresolved"
+        );
+        assert_eq!(
+            case["kinetic_assessment"],
+            "target_barrier_interval_overlaps_declared_limit"
+        );
+        assert_eq!(
+            case["hull_screen_assessment"],
+            "hull_interval_overlaps_declared_threshold"
+        );
         assert_eq!(case["observed_target_phase_status"], "unknown_not_reported");
     }
 
     #[test]
     fn multiphase_target_observation_preserves_all_phase_fractions() {
         let result = receipt();
-        let case = result["cases"].as_array().unwrap().iter()
-            .find(|c| c["case_id"] == "selective_multiphase_target_observed").unwrap();
-        assert_eq!(case["observed_target_phase_status"], "target_phase_observed");
-        assert_eq!(case["characterization_evidence"]["realized_phases"].as_array().unwrap().len(), 2);
-        assert_eq!(case["characterization_evidence"]["detection_limit_phase_fraction"], 0.01);
-        assert_eq!(case["characterization_evidence"]["execution_run_id"], "run_selective_multiphase_target_observed");
-        assert_ne!(case["characterization_evidence"]["characterization_conditions_id"], case["conditions"]["conditions_id"]);
+        let case = result["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["case_id"] == "selective_multiphase_target_observed")
+            .unwrap();
+        assert_eq!(
+            case["observed_target_phase_status"],
+            "target_phase_observed"
+        );
+        assert_eq!(
+            case["characterization_evidence"]["realized_phases"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            case["characterization_evidence"]["detection_limit_phase_fraction"],
+            0.01
+        );
+        assert_eq!(
+            case["characterization_evidence"]["execution_run_id"],
+            "run_selective_multiphase_target_observed"
+        );
+        assert_ne!(
+            case["characterization_evidence"]["characterization_conditions_id"],
+            case["conditions"]["conditions_id"]
+        );
     }
 
     #[test]
     fn unknown_is_not_a_failed_synthesis() {
         let result = receipt();
-        let case = result["cases"].as_array().unwrap().iter()
-            .find(|c| c["case_id"] == "metastable_hull_selective_route_unknown").unwrap();
+        let case = result["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["case_id"] == "metastable_hull_selective_route_unknown")
+            .unwrap();
         assert_eq!(case["observed_target_phase_status"], "unknown_not_reported");
         assert!(case["characterization_evidence"].is_null());
-        assert_eq!(case["model_route_assessment"], "target_route_selective_and_below_declared_kinetic_limit");
+        assert_eq!(
+            case["model_route_assessment"],
+            "target_route_selective_and_below_declared_kinetic_limit"
+        );
     }
 
     #[test]
@@ -565,10 +746,20 @@ mod tests {
         data["cases"][1]["reaction_basis"]["balance_status"] = json!("unverified");
         data["cases"][1]["target_reaction"]["balance_status"] = json!("unverified");
         let output = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap();
-        let case = output["cases"].as_array().unwrap().iter()
-            .find(|c| c["case_id"] == "metastable_hull_selective_route_unknown").unwrap();
-        assert_eq!(case["reaction_selectivity_assessment"], "abstained_unverified_reaction_balance");
-        assert_eq!(case["model_route_assessment"], "abstained_unverified_or_noncomparable_reactions");
+        let case = output["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["case_id"] == "metastable_hull_selective_route_unknown")
+            .unwrap();
+        assert_eq!(
+            case["reaction_selectivity_assessment"],
+            "abstained_unverified_reaction_balance"
+        );
+        assert_eq!(
+            case["model_route_assessment"],
+            "abstained_unverified_or_noncomparable_reactions"
+        );
     }
 
     #[test]
@@ -579,7 +770,8 @@ mod tests {
         assert!(audit(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
 
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
-        data["cases"][0]["characterization_evidence"]["detection_limit_phase_fraction"] = json!(0.0);
+        data["cases"][0]["characterization_evidence"]["detection_limit_phase_fraction"] =
+            json!(0.0);
         assert!(audit(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
     }
 
@@ -587,7 +779,8 @@ mod tests {
     fn characterized_phase_fractions_cannot_exceed_one() {
         let (schema, fixture) = inputs();
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
-        data["cases"][3]["characterization_evidence"]["realized_phases"][1]["phase_fraction"] = json!(0.8);
+        data["cases"][3]["characterization_evidence"]["realized_phases"][1]["phase_fraction"] =
+            json!(0.8);
         assert!(audit(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
     }
 
@@ -606,17 +799,27 @@ mod tests {
     fn tentative_target_phase_identity_is_not_promoted_to_observed() {
         let (schema, fixture) = inputs();
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
-        data["cases"][3]["characterization_evidence"]["realized_phases"][0]["identity_status"] = json!("tentative");
+        data["cases"][3]["characterization_evidence"]["realized_phases"][0]["identity_status"] =
+            json!("tentative");
         assert!(audit(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
     }
 
     #[test]
     fn characterization_conditions_are_distinct_from_reaction_conditions() {
         let result = receipt();
-        let case = result["cases"].as_array().unwrap().iter()
-            .find(|c| c["case_id"] == "low_hull_wrong_reaction_route").unwrap();
-        assert_ne!(case["conditions"]["conditions_id"], case["characterization_evidence"]["characterization_conditions_id"]);
-        assert_eq!(case["characterization_evidence"]["execution_run_id"], "run_low_hull_wrong_reaction_route");
+        let case = result["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["case_id"] == "low_hull_wrong_reaction_route")
+            .unwrap();
+        assert_ne!(
+            case["conditions"]["conditions_id"],
+            case["characterization_evidence"]["characterization_conditions_id"]
+        );
+        assert_eq!(
+            case["characterization_evidence"]["execution_run_id"],
+            "run_low_hull_wrong_reaction_route"
+        );
     }
-
 }
