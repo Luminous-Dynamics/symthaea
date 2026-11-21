@@ -102,7 +102,7 @@ impl FreshnessAtUse {
             self.max_evidence_age_ns,
             self.deadline_slack_at_use_ns,
         ) {
-            (Some(age), Some(max_age), Some(deadline_slack)) => {\n                age <= max_age && deadline_slack >= 0\n            },
+            (Some(age), Some(max_age), Some(deadline_slack)) => age <= max_age && deadline_slack >= 0,
             _ => false,
         }
     }
