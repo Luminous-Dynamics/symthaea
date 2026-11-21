@@ -1,0 +1,47 @@
+{
+  "schema": "plasma-phase-space-mmd-oracle-profile-v0.1",
+  "status": "research_reference_profile_not_a_solver_acceptance_contract",
+  "cohort": {
+    "position": "one-dimensional periodic domain S^1_L",
+    "velocity": "one-dimensional unbounded real line",
+    "distribution": "finite signed weighted empirical measures"
+  },
+  "kernel": {
+    "family": "von_mises_periodic_position_times_gaussian_velocity",
+    "spatial_concentration_kappa": 2,
+    "velocity_length_scale": 1,
+    "spatial_length_scale_mapping": "ell_x = L / (2*pi*sqrt(kappa))",
+    "normalization": "k_x(x,x)=1 and k_v(v,v)=1"
+  },
+  "distance": {
+    "formula": "MMD_k^2(mu,nu) = sum_i,i' a_i a_i' k(z_i,z_i') + sum_j,j' b_j b_j' k(z_j,z_j') - 2 sum_i,j a_i b_j k(z_i,z_j)",
+    "reported_quantity": "sqrt(MMD_k^2) / max(TV(mu), TV(nu))",
+    "total_variation": "sum of absolute aggregated coefficients after exact co-located support aggregation modulo L",
+    "zero_total_variation_convention": "normalization scale is one and both zero measures have zero distance",
+    "signed_weights": "finite signed-measure coefficients; co-located positive and negative weights cancel before TV and MMD",
+    "complexity": "O(N log N + M log M + U^2 + V^2 + U*V) time and O(N+M) temporary memory; U,V are unique nonzero support atoms"
+  },
+  "numeric_contract": {
+    "arithmetic": "IEEE-754 f64",
+    "summation": "Neumaier compensated summation",
+    "negative_mmd_squared_policy": "clamp only within 128*epsilon*max(1,absolute_term_sum); otherwise error",
+    "non_finite_inputs": "reject",
+    "particle_count": "metadata only; never a distance multiplier"
+  },
+  "claim_limits": [
+    "The exact kernel is characteristic on S^1_L x R for kappa>0 and velocity_length_scale>0.",
+    "A finite empirical MMD computation is an exact-kernel finite-sample reference up to floating-point arithmetic, not an exact-arithmetic proof.",
+    "Characteristicness does not guarantee useful finite-precision sensitivity for every bandwidth or finite sample.",
+    "This is not Wasserstein distance, total-variation distance, a field-error metric, a statistical p-value, a plasma solver, or a physics certificate.",
+    "This profile applies only to the declared 1D1V periodic-position and unbounded-velocity cohort.",
+    "The unnormalized MMD is the RKHS metric; the reported pair-normalized ratio is a scale-normalized discrepancy and is not claimed to satisfy the triangle inequality."
+  ],
+  "provenance": {
+    "implementation": "standalone dependency-free Rust crate",
+    "rust_toolchain": "1.96.0",
+    "reference_sources": [
+      "https://jmlr.org/papers/v11/sriperumbudur10a.html",
+      "https://www.jmlr.org/papers/v13/gretton12a.html"
+    ]
+  }
+}
