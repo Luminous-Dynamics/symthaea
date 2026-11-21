@@ -476,6 +476,16 @@
       },
       "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
       "claim_status": "preprint-reported-not-independently-reproduced"
+    },
+    {
+      "id": "Semiconductor-Fab-Decision-Support-Review-2026",
+      "title": "Toward autonomous decision support in semiconductor manufacturing: a review of planning, scheduling, dispatching, and execution control",
+      "source": "https://doi.org/10.1007/s43684-026-00146-z",
+      "publication_date": "2026-11-06",
+      "evidence_class": "review-derived-architecture-reference",
+      "raw_dataset_available": false,
+      "benchmark_or_metrics": false,
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147"
     }
   ],
   "benchmark_reference_artifacts": {
