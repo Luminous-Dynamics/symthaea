@@ -245,9 +245,9 @@ mod tests {
 
     #[test]
     fn raw_fixed_coordinate_is_not_periodic_at_the_seam() {
-        let length = 10.0;
-        let left = (length - 1.0e-9) / length;
-        let right = 0.0 / length;
+        let length: f64 = 10.0;
+        let left: f64 = (length - 1.0e-9) / length;
+        let right: f64 = 0.0 / length;
         assert!((left - right).abs() > 0.99);
     }
 
