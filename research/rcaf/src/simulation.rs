@@ -846,4 +846,31 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn matched_estimators_represent_polarity_differences_differently() {
+        let left = vec![vec![1.0, 0.5], vec![0.5, 1.0]];
+        let right = vec![vec![1.0, -0.5], vec![-0.5, 1.0]];
+        let absolute = correlation_similarity(
+            &left,
+            &right,
+            SimilarityEstimator::AbsoluteWeightedJaccard,
+        )
+        .unwrap();
+        let signed = correlation_similarity(
+            &left,
+            &right,
+            SimilarityEstimator::SignedShiftWeightedJaccard,
+        )
+        .unwrap();
+        let mae = correlation_similarity(
+            &left,
+            &right,
+            SimilarityEstimator::NormalizedMeanAbsoluteEdgeError,
+        )
+        .unwrap();
+        assert!((absolute - 1.0).abs() < 1e-12);
+        assert!((signed - (1.0 / 3.0)).abs() < 1e-12);
+        assert!((mae - 0.5).abs() < 1e-12);
+    }
 }
