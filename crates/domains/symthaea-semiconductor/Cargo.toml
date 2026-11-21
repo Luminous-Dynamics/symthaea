@@ -9,3 +9,5 @@ description = "Semiconductor device engineering and evidence-qualified benchmark
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+chrono.workspace = true
+sha2.workspace = true
