@@ -403,7 +403,8 @@
         "claim_ceiling",
         "no_actuation",
         "authority_granted",
-        "requalification_claims_covered"
+        "requalification_claims_covered",
+        "record_revision"
       ],
       "properties": {
         "schema": {
@@ -508,6 +509,9 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "record_revision": {
+          "const": "v1"
         }
       }
     },
@@ -543,7 +547,7 @@
           "minLength": 1
         },
         "proposal_ref": {
-          "$ref": "#/$defs/reference"
+          "$ref": "#/$defs/proposal_reference"
         },
         "decision_context": {
           "$ref": "#/$defs/context"
@@ -720,6 +724,34 @@
               "execution_authority_ref": {
                 "type": "null"
               }
+            }
+          }
+        }
+      ]
+    },
+    "proposal_reference": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/reference"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "revision",
+            "sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "evidence_action_proposal"
+            },
+            "revision": {
+              "const": "v1"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
             }
           }
         }
