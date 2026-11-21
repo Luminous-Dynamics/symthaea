@@ -113,6 +113,18 @@ def evaluate_action(scenario, action, baseline):
     article_subject_ok = action["article_subject_ref"] == context["article_subject_ref"]
     configuration_ok = action["configuration_id"] == context["configuration_id"]
     icd_revision_ok = action["icd_revision"] == context["icd_revision"]
+    change_impact = scenario.get("change_impact")
+    change_frontier_complete = (
+        change_impact is None or change_impact["completeness"] == "COMPLETE"
+    )
+    required_requalification = (
+        set(change_impact["required_requalification_claims"])
+        if change_impact is not None else set()
+    )
+    requalification_covered = (
+        change_frontier_complete and
+        required_requalification.issubset(set(action.get("requalification_claims_covered", [])))
+    )
     dependencies = set(action["dependencies"])
     common_cause = False
     if scenario["requires_independent_evidence"]:
@@ -129,6 +141,7 @@ def evaluate_action(scenario, action, baseline):
                    action.get("calibration_status") == "calibrated_for_fixture_only"))
     eligible = (state == "ADMISSIBLE" and budget_ok and claim_ok and profile_ok
                 and article_subject_ok and configuration_ok and icd_revision_ok
+                and change_frontier_complete and requalification_covered
                 and not common_cause and obligations_ok and not terminal and calibrated)
     value = None
     post = None
@@ -148,6 +161,8 @@ def evaluate_action(scenario, action, baseline):
         "article_subject_matches": article_subject_ok,
         "configuration_matches": configuration_ok,
         "icd_revision_matches": icd_revision_ok,
+        "change_frontier_complete": change_frontier_complete,
+        "requalification_claims_covered": requalification_covered,
         "common_cause": common_cause,
         "obligations_covered": obligations_ok,
         "terminal": terminal,
@@ -163,6 +178,23 @@ def audit_scenario(scenario):
     if any(not isinstance(context.get(key), str) or not context[key].strip()
            for key in ("profile_ref", "article_subject_ref", "configuration_id", "icd_revision")):
         raise ValueError("decision context is incomplete")
+    impact = scenario.get("change_impact")
+    if impact is not None:
+        required = impact["required_requalification_claims"]
+        unaffected = impact["unaffected_claims"]
+        if (impact.get("source_owner") != "mycelix:6219"
+                or not impact.get("receipt_ref")
+                or not impact.get("event_frontier_ref")
+                or impact.get("completeness") not in ("COMPLETE", "INCOMPLETE")
+                or len(required) != len(set(required))
+                or len(unaffected) != len(set(unaffected))
+                or set(required).intersection(unaffected)
+                or any(not isinstance(claim, str) or not claim.strip()
+                       for claim in required + unaffected)):
+            raise ValueError("invalid owner-native change-impact receipt")
+        if (impact["completeness"] == "INCOMPLETE"
+                and not required and not unaffected):
+            raise ValueError("incomplete change receipt has no retained claim context")
     states = scenario["states"]
     if len(states) < 2 or len(set(states)) != len(states):
         raise ValueError("states must be unique and non-empty")
@@ -339,7 +371,7 @@ def main():
         "scenarios": results,
     }
     print(json.dumps(report, sort_keys=True, indent=2))
-    if len(results) != 15 or matches != 15:
+    if len(results) != 17 or matches != 17:
         raise SystemExit(1)
 
 
