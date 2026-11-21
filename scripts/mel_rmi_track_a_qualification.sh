@@ -107,19 +107,22 @@ cp "$STAGE_CRATE/src/rmi_benchmark.rs" "$EVIDENCE_DIR/rmi_benchmark.formatted.rs
 cp "$STAGE_CRATE/src/rmi_track_a_runner.rs" "$EVIDENCE_DIR/rmi_track_a_runner.formatted.rs"
 cp "$STAGE_CRATE/src/bin/rmi_track_a.rs" "$EVIDENCE_DIR/rmi_track_a.formatted.rs"
 cp "$STAGE_CRATE/tests/rmi_track_a_replay.rs" "$EVIDENCE_DIR/rmi_track_a_replay.formatted.rs"
-sha256sum \
-  "$EVIDENCE_DIR/Cargo.toml" \
-  "$EVIDENCE_DIR/Cargo.lock" \
-  "$EVIDENCE_DIR/lib.rs" \
-  "$EVIDENCE_DIR/rmi_benchmark.source.rs" \
-  "$EVIDENCE_DIR/rmi_track_a_runner.source.rs" \
-  "$EVIDENCE_DIR/rmi_track_a.source.rs" \
-  "$EVIDENCE_DIR/rmi_track_a_replay.source.rs" \
-  "$EVIDENCE_DIR/rmi_benchmark.formatted.rs" \
-  "$EVIDENCE_DIR/rmi_track_a_runner.formatted.rs" \
-  "$EVIDENCE_DIR/rmi_track_a.formatted.rs" \
-  "$EVIDENCE_DIR/rmi_track_a_replay.formatted.rs" \
-  "$REPORT" > "$EVIDENCE_DIR/SHA256SUMS"
+(
+  cd "$EVIDENCE_DIR"
+  sha256sum \
+    Cargo.toml \
+    Cargo.lock \
+    lib.rs \
+    rmi_benchmark.source.rs \
+    rmi_track_a_runner.source.rs \
+    rmi_track_a.source.rs \
+    rmi_track_a_replay.source.rs \
+    rmi_benchmark.formatted.rs \
+    rmi_track_a_runner.formatted.rs \
+    rmi_track_a.formatted.rs \
+    rmi_track_a_replay.formatted.rs \
+    melothaea-rmi-track-a.json > SHA256SUMS
+)
 printf 'exact_head=%s\ntrials_per_target=%s\nseed_root=%s\nrustc=%s\ncargo_lock_sha256=%s\nsource_rmi_benchmark_sha256=%s\nsource_runner_sha256=%s\nsource_cli_sha256=%s\nsource_replay_test_sha256=%s\nformatted_rmi_benchmark_sha256=%s\nformatted_runner_sha256=%s\nformatted_cli_sha256=%s\nformatted_replay_test_sha256=%s\n' \
   "$SOURCE_COMMIT" "$TRIALS_PER_TARGET" "$SEED_ROOT" "$RUSTC_VERSION" "$LOCK_SHA256" \
   "$SOURCE_RMI_BENCHMARK_SHA256" "$SOURCE_RMI_RUNNER_SHA256" "$SOURCE_RMI_CLI_SHA256" "$SOURCE_RMI_REPLAY_TEST_SHA256" \
