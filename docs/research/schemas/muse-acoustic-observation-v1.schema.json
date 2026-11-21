@@ -1,0 +1,434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-acoustic-observation-v1.schema.json",
+  "title": "MUSE Acoustic Observation v1",
+  "description": "Independent sample-aligned WAV gain-envelope observation. Per-channel window metrics are ordered by WAV channel index. This receipt is an acoustic proxy, not an instruction, musicality, or human-perceptibility verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observer",
+    "scope",
+    "artifacts",
+    "audio",
+    "target",
+    "preservation",
+    "clipping",
+    "outcome",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-acoustic-observation-v1"
+    },
+    "observer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observer_id",
+        "version",
+        "measurement"
+      ],
+      "properties": {
+        "observer_id": {
+          "const": "muse-windowed-rms-gain-observer"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "measurement": {
+          "const": "windowed_rms_dbfs_gain_delta"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "scope_id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "full_mix",
+            "isolated_stem"
+          ]
+        },
+        "scope_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_sha256",
+        "source_audio_sha256",
+        "candidate_audio_sha256"
+      ],
+      "properties": {
+        "contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_audio_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "candidate_audio_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_rate_hz",
+        "channels",
+        "frame_count",
+        "source_sample_format",
+        "source_bits_per_sample",
+        "candidate_sample_format",
+        "candidate_bits_per_sample",
+        "source_clipped_sample_fraction",
+        "candidate_clipped_sample_fraction"
+      ],
+      "properties": {
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 384000
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "frame_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32000000
+        },
+        "source_sample_format": {
+          "enum": [
+            "pcm_integer",
+            "ieee_float"
+          ]
+        },
+        "source_bits_per_sample": {
+          "enum": [
+            16,
+            24,
+            32
+          ]
+        },
+        "candidate_sample_format": {
+          "enum": [
+            "pcm_integer",
+            "ieee_float"
+          ]
+        },
+        "candidate_bits_per_sample": {
+          "enum": [
+            16,
+            24,
+            32
+          ]
+        },
+        "source_clipped_sample_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "candidate_clipped_sample_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "windows"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain"
+          ]
+        },
+        "windows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_frame",
+              "end_frame",
+              "source_rms_dbfs",
+              "candidate_rms_dbfs",
+              "expected_gain_db",
+              "observed_gain_db",
+              "absolute_error_db",
+              "passed",
+              "abstention_reason"
+            ],
+            "properties": {
+              "start_frame": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_frame": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "source_rms_dbfs": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
+              },
+              "candidate_rms_dbfs": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
+              },
+              "expected_gain_db": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": -96,
+                "maximum": 24
+              },
+              "observed_gain_db": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -324,
+                  "maximum": 324
+                }
+              },
+              "absolute_error_db": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 420
+                }
+              },
+              "passed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "abstention_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 1024
+              }
+            }
+          }
+        }
+      }
+    },
+    "preservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "windows"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain"
+          ]
+        },
+        "windows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_frame",
+              "end_frame",
+              "source_rms_dbfs",
+              "candidate_rms_dbfs",
+              "expected_gain_db",
+              "observed_gain_db",
+              "absolute_error_db",
+              "passed",
+              "abstention_reason"
+            ],
+            "properties": {
+              "start_frame": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_frame": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "source_rms_dbfs": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
+              },
+              "candidate_rms_dbfs": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -300,
+                  "maximum": 24
+                }
+              },
+              "expected_gain_db": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": -96,
+                "maximum": 24
+              },
+              "observed_gain_db": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": -324,
+                  "maximum": 324
+                }
+              },
+              "absolute_error_db": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 420
+                }
+              },
+              "passed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "abstention_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 1024
+              }
+            }
+          }
+        }
+      }
+    },
+    "clipping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_candidate_clipped_sample_fraction",
+        "passed"
+      ],
+      "properties": {
+        "maximum_candidate_clipped_sample_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acoustic_observation_status",
+        "abstention_reasons"
+      ],
+      "properties": {
+        "acoustic_observation_status": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain"
+          ]
+        },
+        "abstention_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-gain-envelope-contract-v1.schema.json",
+  "title": "MUSE Gain Envelope Contract v1",
+  "description": "Fixed-timeline WAV-domain gain-envelope observation contract. Target and protected windows are sample-frame ranges.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope_kind",
+    "scope_id",
+    "sample_rate_hz",
+    "channels",
+    "frame_count",
+    "minimum_source_rms_dbfs",
+    "maximum_candidate_clipped_sample_fraction",
+    "protected_max_abs_gain_delta_db",
+    "target_windows",
+    "protected_windows"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-gain-envelope-contract-v1"
+    },
+    "scope_kind": {
+      "enum": [
+        "full_mix",
+        "isolated_stem"
+      ]
+    },
+    "scope_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "sample_rate_hz": {
+      "type": "integer",
+      "minimum": 8000,
+      "maximum": 384000
+    },
+    "channels": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "frame_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32000000
+    },
+    "minimum_source_rms_dbfs": {
+      "type": "number",
+      "minimum": -120,
+      "maximum": 0
+    },
+    "maximum_candidate_clipped_sample_fraction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "protected_max_abs_gain_delta_db": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 24
+    },
+    "target_windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "range",
+          "expected_gain_db",
+          "tolerance_db"
+        ],
+        "properties": {
+          "range": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_frame",
+              "end_frame"
+            ],
+            "properties": {
+              "start_frame": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_frame": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "expected_gain_db": {
+            "type": "number",
+            "minimum": -96,
+            "maximum": 24
+          },
+          "tolerance_db": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 24
+          }
+        }
+      }
+    },
+    "protected_windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "start_frame",
+          "end_frame"
+        ],
+        "properties": {
+          "start_frame": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_frame": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scope_kind": {
+            "const": "full_mix"
+          }
+        },
+        "required": [
+          "scope_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope_kind": {
+            "const": "isolated_stem"
+          }
+        },
+        "required": [
+          "scope_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "muse-gain-envelope-contract-v1",
+  "scope_kind": "isolated_stem",
+  "scope_id": "stem-melody-001",
+  "sample_rate_hz": 48000,
+  "channels": 2,
+  "frame_count": 960000,
+  "minimum_source_rms_dbfs": -75,
+  "maximum_candidate_clipped_sample_fraction": 0.001,
+  "protected_max_abs_gain_delta_db": 0.5,
+  "target_windows": [
+    {
+      "range": {
+        "start_frame": 240000,
+        "end_frame": 360000
+      },
+      "expected_gain_db": -6,
+      "tolerance_db": 0.3
+    },
+    {
+      "range": {
+        "start_frame": 360000,
+        "end_frame": 480000
+      },
+      "expected_gain_db": -3,
+      "tolerance_db": 0.3
+    }
+  ],
+  "protected_windows": [
+    {
+      "start_frame": 0,
+      "end_frame": 240000
+    },
+    {
+      "start_frame": 480000,
+      "end_frame": 960000
+    }
+  ]
+}
