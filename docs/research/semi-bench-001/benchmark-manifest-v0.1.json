@@ -589,23 +589,42 @@
       "actual_source_manifest": {
         "path": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
         "source_snapshot_id": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+        "manifest_blob_sha1": "7b38864a07347410c5c90c6d8e248c7ad8a5e81e",
         "clock_domain_id": "uci-secom-mirror-single-source-clock",
-        "test": "frozen source-level chronology and support assertions",
-        "status": "frozen; hosted validation pending"
+        "split_support": {
+          "train": {
+            "rows": 940,
+            "fail": 76,
+            "pass": 864
+          },
+          "validation": {
+            "rows": 313,
+            "fail": 11,
+            "pass": 302
+          },
+          "test": {
+            "rows": 314,
+            "fail": 17,
+            "pass": 297
+          }
+        },
+        "tested_by_ci": true,
+        "status": "frozen-row-level-split-manifest; model-not-yet-evaluated"
       }
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550",
-      "run_id": 44890353550,
-      "tested_commit": "452374fead7e03f4c4eef5aafb4ba59db1569fef",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316",
+      "run_id": 44899113316,
+      "tested_commit": "b98ca276e416f22113e6ad3065c14380294c6b3c",
       "conclusion": "success",
-      "test_count": 31,
+      "test_count": 35,
       "passed_steps": [
         "Run reference unit tests",
         "Reproduce binary metric report byte-for-byte",
         "Reproduce inspection decision report byte-for-byte"
-      ]
+      ],
+      "details": "Includes test_frozen_secom_source_clock_manifest_has_expected_support"
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
