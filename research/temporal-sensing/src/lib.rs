@@ -337,36 +337,15 @@ fn proposed_delay(
             risk_aversion_ppm,
             ignorance_weight_ppm,
         } => {
-            let risk_premium_us = u128::from(features.opportunity_loss_stddev_us)
-                .checked_mul(u128::from(risk_aversion_ppm))
-                .ok_or(SensingError::ArithmeticOverflow)?
-                / PPM;
-
-            let confidence_shortfall = PPM
-                .checked_sub(u128::from(features.model_confidence_ppm))
-                .ok_or(SensingError::ArithmeticOverflow)?;
-            let ignorance_exposure_us = u128::from(features.prediction_horizon_us)
-                .checked_mul(confidence_shortfall)
-                .ok_or(SensingError::ArithmeticOverflow)?
-                / PPM;
-            let ignorance_penalty_us = ignorance_exposure_us
-                .checked_mul(u128::from(ignorance_weight_ppm))
-                .ok_or(SensingError::ArithmeticOverflow)?
-                / PPM;
-
-            // This is a transparent, candidate-side heuristic ablation inspired
-            // by risk/ignorance-aware VoI. It is not a reimplementation of the
-            // IEEE paper's full belief-state value function.
-            let adjusted_benefit_us = u128::from(features.predicted_ted_reduction_us)
-                .checked_add(risk_premium_us)
-                .and_then(|value| value.checked_add(ignorance_penalty_us))
-                .ok_or(SensingError::ArithmeticOverflow)?;
-            let adjusted_value_per_nj_ppm = adjusted_benefit_us
-                .checked_mul(PPM)
-                .ok_or(SensingError::ArithmeticOverflow)?
-                / u128::from(context.estimated_observation_energy_nj);
-
-            if adjusted_value_per_nj_ppm >= u128::from(minimum_adjusted_us_per_nj_ppm) {
+            let diagnostics = risk_adjusted_voi_diagnostics(
+                features,
+                context.estimated_observation_energy_nj,
+                risk_aversion_ppm,
+                ignorance_weight_ppm,
+            )?;
+            if diagnostics.adjusted_value_per_nj_ppm
+                >= u128::from(minimum_adjusted_us_per_nj_ppm)
+            {
                 (elapsed, TriggerReason::RiskAdjustedValueOfInformation)
             } else {
                 (context.maximum_gap_us, TriggerReason::MaximumGap)
@@ -376,6 +355,91 @@ fn proposed_delay(
 
     let delay = target_interval.saturating_sub(elapsed);
     Ok((delay.min(remaining_to_maximum_us), reason))
+}
+
+/// Auditable utility components for the candidate-side risk-adjusted VOI arm.
+///
+/// All inputs are candidate estimates from received history/posterior feedback.
+/// This diagnostic is not an evaluator outcome and is not the IEEE paper's exact
+/// value function. The fields are suitable for a work-ledger diagnostic record.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RiskAdjustedVoIDiagnostics {
+    pub expected_ted_reduction_us: u64,
+    pub opportunity_loss_stddev_us: u64,
+    pub model_confidence_ppm: u32,
+    pub prediction_horizon_us: u64,
+    pub risk_aversion_ppm: u32,
+    pub risk_premium_us: u128,
+    pub ignorance_exposure_us: u128,
+    pub ignorance_weight_ppm: u32,
+    pub ignorance_penalty_us: u128,
+    pub adjusted_benefit_us: u128,
+    pub estimated_observation_energy_nj: u64,
+    /// Fixed-point adjusted microseconds/nJ, scaled by 1,000,000.
+    pub adjusted_value_per_nj_ppm: u128,
+}
+
+/// Compute candidate-visible risk/ignorance-adjusted VOI diagnostics.
+///
+/// The policy uses the same function as this diagnostic, so the recorded
+/// components and scheduling threshold cannot silently drift apart.
+pub fn risk_adjusted_voi_diagnostics(
+    features: SensingFeatures,
+    estimated_observation_energy_nj: u64,
+    risk_aversion_ppm: u32,
+    ignorance_weight_ppm: u32,
+) -> Result<RiskAdjustedVoIDiagnostics, SensingError> {
+    validate_features(features)?;
+    if estimated_observation_energy_nj == 0 {
+        return Err(SensingError::ZeroObservationEnergy);
+    }
+    for (field, value) in [
+        ("risk_aversion_ppm", risk_aversion_ppm),
+        ("ignorance_weight_ppm", ignorance_weight_ppm),
+    ] {
+        if u128::from(value) > PPM {
+            return Err(SensingError::InvalidProbability { field, value });
+        }
+    }
+
+    let risk_premium_us = u128::from(features.opportunity_loss_stddev_us)
+        .checked_mul(u128::from(risk_aversion_ppm))
+        .ok_or(SensingError::ArithmeticOverflow)?
+        / PPM;
+    let confidence_shortfall = PPM
+        .checked_sub(u128::from(features.model_confidence_ppm))
+        .ok_or(SensingError::ArithmeticOverflow)?;
+    let ignorance_exposure_us = u128::from(features.prediction_horizon_us)
+        .checked_mul(confidence_shortfall)
+        .ok_or(SensingError::ArithmeticOverflow)?
+        / PPM;
+    let ignorance_penalty_us = ignorance_exposure_us
+        .checked_mul(u128::from(ignorance_weight_ppm))
+        .ok_or(SensingError::ArithmeticOverflow)?
+        / PPM;
+    let adjusted_benefit_us = u128::from(features.predicted_ted_reduction_us)
+        .checked_add(risk_premium_us)
+        .and_then(|value| value.checked_add(ignorance_penalty_us))
+        .ok_or(SensingError::ArithmeticOverflow)?;
+    let adjusted_value_per_nj_ppm = adjusted_benefit_us
+        .checked_mul(PPM)
+        .ok_or(SensingError::ArithmeticOverflow)?
+        / u128::from(estimated_observation_energy_nj);
+
+    Ok(RiskAdjustedVoIDiagnostics {
+        expected_ted_reduction_us: features.predicted_ted_reduction_us,
+        opportunity_loss_stddev_us: features.opportunity_loss_stddev_us,
+        model_confidence_ppm: features.model_confidence_ppm,
+        prediction_horizon_us: features.prediction_horizon_us,
+        risk_aversion_ppm,
+        risk_premium_us,
+        ignorance_exposure_us,
+        ignorance_weight_ppm,
+        ignorance_penalty_us,
+        adjusted_benefit_us,
+        estimated_observation_energy_nj,
+        adjusted_value_per_nj_ppm,
+    })
 }
 
 fn validate_features(features: SensingFeatures) -> Result<(), SensingError> {
