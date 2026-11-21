@@ -234,13 +234,13 @@ impl EmbodimentEventSequencer {
             .as_nanos()
             .min(u128::from(u64::MAX)) as u64;
 
-        if let Some(last) = self.last_monotonic_ns {
-            if monotonic_ns < last {
-                return Err(EmbodimentSequenceError::TimestampRegression {
-                    last,
-                    received: monotonic_ns,
-                });
-            }
+        if let Some(last) = self.last_monotonic_ns
+            && monotonic_ns < last
+        {
+            return Err(EmbodimentSequenceError::TimestampRegression {
+                last,
+                received: monotonic_ns,
+            });
         }
 
         let sequence = self
@@ -307,21 +307,21 @@ impl EmbodimentController {
     ///
     /// Rejected events leave the snapshot and sequence cursor unchanged.
     pub fn ingest(&mut self, event: EmbodimentEvent) -> Result<(), EmbodimentIngestError> {
-        if let Some(last) = self.snapshot.last_event_sequence {
-            if event.sequence <= last {
-                return Err(EmbodimentIngestError::NonIncreasingSequence {
-                    last,
-                    received: event.sequence,
-                });
-            }
+        if let Some(last) = self.snapshot.last_event_sequence
+            && event.sequence <= last
+        {
+            return Err(EmbodimentIngestError::NonIncreasingSequence {
+                last,
+                received: event.sequence,
+            });
         }
-        if let Some(last) = self.snapshot.last_event_ns {
-            if event.monotonic_ns < last {
-                return Err(EmbodimentIngestError::TimestampRegression {
-                    last,
-                    received: event.monotonic_ns,
-                });
-            }
+        if let Some(last) = self.snapshot.last_event_ns
+            && event.monotonic_ns < last
+        {
+            return Err(EmbodimentIngestError::TimestampRegression {
+                last,
+                received: event.monotonic_ns,
+            });
         }
 
         match &event.kind {
