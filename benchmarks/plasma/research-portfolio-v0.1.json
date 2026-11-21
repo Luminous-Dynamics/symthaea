@@ -1,0 +1,250 @@
+{
+  "schema_version": "0.1.0",
+  "portfolio_id": "plasma-ml-solver-research-portfolio-v0.1",
+  "created_at": "2026-11-20",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12942",
+  "status": "coordination_registry_only",
+  "scientific_lanes": [
+    {
+      "id": "structure_preserving_realizable_closure",
+      "issues": [
+        12947
+      ],
+      "prs": [
+        12948
+      ],
+      "symtropy_issue": 6306,
+      "symtropy_pr": 6311,
+      "candidates": [
+        "Levermore_maximum_entropy",
+        "positive_Gaussian_mixture",
+        "positive_exponential_family",
+        "Hamiltonian_operator",
+        "GENERIC_metriplectic_operator",
+        "discrete_gradient_kinetic_reference"
+      ],
+      "guardrail": "collisionless_and_collisional_entropy_contracts_must_remain_distinct",
+      "execution_status": "protocol_and_finite_dimensional_audit_authored_no_plasma_model_or_solver_reproduction"
+    },
+    {
+      "id": "landau_damping_memory",
+      "issues": [
+        12907,
+        12910,
+        12914,
+        12921
+      ],
+      "primary_task": "1d_electrostatic_landau_damping",
+      "separate_task_lanes": [
+        "ADEPT_original_task",
+        "online_FNO",
+        "Fourier_Hermite_reservoir"
+      ],
+      "required_outputs": [
+        "full_rollout",
+        "physical_entropy_diagnostics",
+        "OOD_abstention",
+        "solver_transfer"
+      ],
+      "execution_status": "source_admission_and_reproduction_pending"
+    },
+    {
+      "id": "magnetosheath_pressure_tensor",
+      "issues": [
+        12923
+      ],
+      "prs": [
+        12926
+      ],
+      "primary_task": "2d_3v_magnetosheath_electron_pressure_tensor",
+      "required_outputs": [
+        "componentwise_pressure",
+        "PSD_symmetry",
+        "divergence_under_exact_solver_operator",
+        "pressure_strain",
+        "energy_channels"
+      ],
+      "source_blocker": "B2_B3_B4_B5_B6_training_validation_artifact_admission",
+      "execution_status": "source_review_specification_only"
+    },
+    {
+      "id": "icf_nonlocal_heat_transport",
+      "issues": [
+        12938
+      ],
+      "prs": [
+        12940
+      ],
+      "primary_task": "PIC_trained_nonlocal_electron_heat_flux_closure",
+      "required_outputs": [
+        "coarse_to_fine_zero_shot",
+        "implicit_solver_rollout",
+        "SNB_baseline",
+        "energy_balance",
+        "temporal_extrapolation",
+        "OOD_uncertainty"
+      ],
+      "source_doi": "10.1103/9l4n-mnz6",
+      "source_blocker": "author_code_data_weights_and_record_licence_not_admitted",
+      "execution_status": "source_review_specification_only",
+      "required_comparators": [
+        "source_FNO",
+        "LINN_time_varying_theory_informed_kernel",
+        "TCNN_time_embedded_CNN",
+        "SNB_nonlocal_transport",
+        "applicable_local_transport",
+        "trusted_implicit_solver_with_neural_initial_guess"
+      ],
+      "source_cohorts_pinned": true
+    },
+    {
+      "id": "pic_residual_solver_acceleration",
+      "issues": [
+        12939
+      ],
+      "prs": [
+        12941
+      ],
+      "primary_task": "neural_initial_guess_plus_exact_classical_residual_correction",
+      "tasks": [
+        "LLD",
+        "two_stream_instability",
+        "SOL"
+      ],
+      "required_outputs": [
+        "exact_discrete_residual",
+        "same_stopping_tolerance",
+        "conservation_invariants",
+        "closed_loop_stability",
+        "end_to_end_speedup_including_fallback"
+      ],
+      "source_arxiv": "2606.17733",
+      "source_blocker": "author_code_data_solver_operator_and_licence_not_admitted",
+      "execution_status": "source_review_specification_only"
+    },
+    {
+      "id": "neopic_particle_measure_field_operator",
+      "issues": [
+        12952
+      ],
+      "prs": [
+        12954
+      ],
+      "primary_task": "particle_measure_to_electric_field_at_particle_positions",
+      "source_arxiv": "2610.40528",
+      "required_outputs": [
+        "particle_count_transfer_both_directions",
+        "teacher_forced_and_in_loop_error",
+        "noise_aliasing_and_translation_equivariance",
+        "energy_drift",
+        "multi_app_instability_diagnostics",
+        "end_to_end_particle_field_cost"
+      ],
+      "execution_status": "source_review_protocol_only"
+    },
+    {
+      "id": "structure_preserving_plasma_closures",
+      "issues": [
+        12958
+      ],
+      "prs": [
+        12959
+      ],
+      "separate_physics_lanes": [
+        "collisionless_vlasov_poisson_hamiltonian",
+        "collisional_vlasov_poisson_landau_metriplectic"
+      ],
+      "required_outputs": [
+        "Poisson_or_metriplectic_structure_residuals",
+        "mass_momentum_energy",
+        "collisional_entropy_monotonicity_only_in_collisional_lane",
+        "time_discretisation_drift",
+        "matched_cost_accuracy_frontier"
+      ],
+      "execution_status": "mathematical_protocol_only"
+    },
+    {
+      "id": "variational_particle_measure_neural_field",
+      "issues": [
+        12960
+      ],
+      "prs": [
+        12961
+      ],
+      "primary_task": "electrostatic_particle_measure_scalar_energy_and_gradient_force",
+      "required_outputs": [
+        "force_integrability",
+        "permutation_translation_symmetries",
+        "self_force_negative_control",
+        "discrete_time_energy_by_integrator",
+        "matched_NEOPIC_PIF_PIC_cost"
+      ],
+      "execution_status": "mathematical_protocol_only"
+    },
+    {
+      "id": "local_gauss_preserving_electrostatic_pic",
+      "issues": [
+        12962
+      ],
+      "prs": [
+        12963
+      ],
+      "primary_task": "electrostatic_vlasov_ampere_local_Gauss_preserving_GP_PIC",
+      "source_doi": "10.1016/j.cpc.2026.110296",
+      "required_outputs": [
+        "per_cell_Gauss_residual",
+        "charge_continuity",
+        "curl_free_residual",
+        "Landau_two_stream_Diocotron",
+        "communication_scaling"
+      ],
+      "execution_status": "source_review_protocol_only"
+    }
+  ],
+  "shared_infrastructure": {
+    "symtropy_solver_receipt_issue": 1685,
+    "native_time_alignment_pr": 6190,
+    "stream_telemetry_pr": 6252,
+    "pressure_tensor_audit_pr": 6243
+  },
+  "cross_lane_gates": [
+    "source_revision_data_hash_and_rights",
+    "paper_reproduction_before_superiority",
+    "matched_solver_boundary_and_compute_budgets",
+    "a_posteriori_rollouts",
+    "task_specific_physical_gates",
+    "calibrated_OOD_abstention",
+    "zero_shot_mesh_timestep_integrator_transfer",
+    "end_to_end_training_data_inference_solver_fallback_cost",
+    "negative_controls_and_visible_failed_unscored_states"
+  ],
+  "prohibited_comparison": "do_not_rank_different_physics_tasks_on_one_scalar_leaderboard",
+  "claim_ceiling": "coordination_registry_only",
+  "shared_research_programs": [
+    {
+      "id": "active_kinetic_design",
+      "issue": 12944,
+      "purpose": "select_expensive_kinetic_simulations_to_expand_qualified_domain_of_trust",
+      "baselines": [
+        "random",
+        "space_filling",
+        "committee_disagreement",
+        "calibrated_uncertainty",
+        "physical_residual",
+        "admissibility_failure",
+        "support_distance",
+        "cost_aware_multifidelity",
+        "hybrid_pareto"
+      ],
+      "guardrails": [
+        "sealed_test_never_acquired_from",
+        "source_and_solver_contract_required",
+        "fidelity_labels_preserved",
+        "full_acquisition_and_run_cost_accounted"
+      ],
+      "execution_status": "protocol_and_candidate_schema_authored_not_executed",
+      "pr": 12945,
+      "candidate_schema": "benchmarks/plasma/active-kinetic-candidate.schema.json"
+    }
+  ]
+}
