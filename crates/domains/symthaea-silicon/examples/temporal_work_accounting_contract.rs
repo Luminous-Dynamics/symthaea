@@ -211,6 +211,9 @@ impl TemporalWorkReceipt {
             }
         }
         if let Some(energy) = &self.system.direct_energy {
+            if self.system.wall_elapsed_ns.is_none() {
+                return Err("direct energy requires same-run wall-clock performance observation");
+            }
             if !energy.joules.is_finite() || energy.joules < 0.0 {
                 return Err("direct energy must be finite and nonnegative");
             }
@@ -262,6 +265,13 @@ impl TemporalWorkReceipt {
         Some(self.logical_duration_ns as f64 / wall_ns as f64)
     }
 
+    /// Declared state, parameter and input bytes touched per logical second.
+    /// This is accounting, not a cache- or DRAM-traffic measurement.
+    fn bytes_touched_per_logical_second(&self) -> Option<f64> {
+        let bytes = self.work.total_bytes_touched()?;
+        Some(bytes as f64 / (self.logical_duration_ns as f64 / 1.0e9))
+    }
+
     /// Primitive scalar operation count per independently verified correct decision.
     /// Undefined denominators remain None; they are never reported as zero.
     fn scalar_operations_per_correct_decision(&self) -> Option<f64> {
@@ -297,7 +307,9 @@ fn smoke_fixture() -> TemporalWorkReceipt {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let receipt = smoke_fixture();
-    receipt.validate()?;
+    receipt
+        .validate()
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
     println!("{}", serde_json::to_string_pretty(&receipt)?);
     println!("derived real_time_factor: {:?}", receipt.real_time_factor());
     println!(
@@ -354,6 +366,17 @@ mod tests {
         let receipt = observation();
         assert!(receipt.system.direct_energy.is_none());
         receipt.validate().unwrap();
+    }
+
+    #[test]
+    fn bytes_touched_rate_uses_the_logical_clock_and_checked_totals() {
+        let mut receipt = observation();
+        receipt.work.state_bytes_read = 100;
+        receipt.work.state_bytes_written = 200;
+        receipt.work.parameter_bytes_read = 300;
+        receipt.work.input_bytes_read = 400;
+        assert_eq!(receipt.work.total_bytes_touched(), Some(1000));
+        assert_eq!(receipt.bytes_touched_per_logical_second(), Some(1000.0));
     }
 
     #[test]
@@ -428,6 +451,7 @@ mod tests {
             Err("energy and performance must come from the same run")
         );
 
+        receipt.system.wall_elapsed_ns = Some(1_000_000_000);
         receipt.system.direct_energy.as_mut().unwrap().same_run_as_performance = true;
         receipt.validate().unwrap();
     }
@@ -435,6 +459,7 @@ mod tests {
     #[test]
     fn rejects_non_finite_energy_and_negative_trajectory_error() {
         let mut receipt = observation();
+        receipt.system.wall_elapsed_ns = Some(1_000_000_000);
         receipt.system.direct_energy = Some(DirectEnergyMeasurement {
             joules: f64::NAN,
             method: "meter".to_owned(),
