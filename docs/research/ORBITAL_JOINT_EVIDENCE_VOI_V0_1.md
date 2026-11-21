@@ -373,9 +373,9 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 ## 11. Deliverables
 
 P0: this contract and owner map.  
-P1: machine-readable scenario and proposal/outcome schemas, typed synthetic proposal/aborted-outcome examples, and 17 frozen synthetic scenarios.  
-P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 17 known-answer scenarios, including incomplete change-frontier abstention and complete-frontier targeted requalification. No solver or physical execution is invoked.  
-P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
+P1: machine-readable scenario and proposal/outcome schemas, typed synthetic proposal/aborted-outcome examples, 17 one-step scenarios and a separate finite-horizon sequential campaign fixture.  
+P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separate finite-horizon exact policy planner selects contingent test/stop trees using distribution-free terminal minimax regret, path-wise resource budgets and a calibrated fixture frequency model used only for expected resource consumption. Independent standard-library Python oracles check the 17 one-step cases and the sequential campaign known answer. No solver or physical execution is invoked.  
+P3: matched-budget policy tournament against fixed, random, space-filling, uncertainty/disagreement, myopic VOI, learned optimal-stopping/BOED and human-engineer baselines; include held-out scenarios, repeated seeds and external policy implementations.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
 P5: only after review, authorized human-supervised physical evidence handoff.
 
