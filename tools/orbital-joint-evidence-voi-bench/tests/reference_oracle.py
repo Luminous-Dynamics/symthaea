@@ -168,13 +168,24 @@ def audit_scenario(scenario):
             if not isinstance(actual["specimen_count"], int) or actual["specimen_count"] < 0:
                 raise ValueError("actual specimen count is invalid")
             actual_record_count += 1
-            if not resource_fits(action, actual):
+            if any(actual[key] > action["resources"][key] + TOL
+                   for key in actual_totals):
                 actual_over_plan_count += 1
             for key in actual_totals:
                 actual_totals[key] += actual[key]
     actual_over_budget = not all(
         actual_totals[key] <= scenario["budget"][key] + TOL for key in actual_totals
     )
+    if scenario["scenario_id"] == "JEV-012":
+        if actual_over_plan_count != 1 or actual_over_budget:
+            raise ValueError("JEV-012 actual-cost variance oracle mismatch")
+        if abs(actual_totals["engineering_hours"] - 1.2) > TOL:
+            raise ValueError("JEV-012 engineering-cost total mismatch")
+    if scenario["scenario_id"] == "JEV-013":
+        if actual_over_plan_count != 1 or not actual_over_budget:
+            raise ValueError("JEV-013 actual-cost budget-overrun oracle mismatch")
+        if abs(actual_totals["facility_hours"] - 2.5) > TOL:
+            raise ValueError("JEV-013 facility-cost total mismatch")
     audits = {action_id: evaluate_action(scenario, action, baseline)
               for action_id, action in by_id.items()}
 
