@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
@@ -44,11 +44,16 @@ struct Model {
 }
 
 fn text_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value.get(key).and_then(Value::as_str).filter(|x| !x.trim().is_empty())
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|x| !x.trim().is_empty())
         .ok_or_else(|| format!("missing or empty string field {key}"))
 }
 fn number_field(value: &Value, key: &str) -> Result<f64, String> {
-    let result = value.get(key).and_then(Value::as_f64)
+    let result = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("missing numeric field {key}"))?;
     if !result.is_finite() {
         return Err(format!("{key} must be finite"));
@@ -59,7 +64,9 @@ fn optional_number(value: &Value, key: &str) -> Result<Option<f64>, String> {
     match value.get(key) {
         None | Some(Value::Null) => Ok(None),
         Some(number) => {
-            let result = number.as_f64().ok_or_else(|| format!("{key} must be numeric or null"))?;
+            let result = number
+                .as_f64()
+                .ok_or_else(|| format!("{key} must be numeric or null"))?;
             if !result.is_finite() {
                 return Err(format!("{key} must be finite"));
             }
@@ -68,12 +75,16 @@ fn optional_number(value: &Value, key: &str) -> Result<Option<f64>, String> {
     }
 }
 fn string_list(value: &Value, key: &str) -> Result<Vec<String>, String> {
-    let values = value.get(key).and_then(Value::as_array)
+    let values = value
+        .get(key)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{key} must be an array"))?;
     let mut output = Vec::with_capacity(values.len());
     let mut seen = HashSet::new();
     for item in values {
-        let text = item.as_str().filter(|x| !x.trim().is_empty())
+        let text = item
+            .as_str()
+            .filter(|x| !x.trim().is_empty())
             .ok_or_else(|| format!("{key} contains a non-string or empty value"))?;
         if !seen.insert(text.to_owned()) {
             return Err(format!("{key} contains duplicate value {text}"));
@@ -101,10 +112,14 @@ fn parse_observation(value: &Value, pair_id: &str) -> Result<EvidenceObservation
     let detection_limit_wt_percent = number_field(value, "detection_limit_wt_percent")?;
     let raw_data_sha256 = text_field(value, "raw_data_sha256")?.to_owned();
     if dwell_k <= 0.0 || detection_limit_wt_percent <= 0.0 || detection_limit_wt_percent > 100.0 {
-        return Err(format!("pair {pair_id} observation {id} has invalid temperature or detection limit"));
+        return Err(format!(
+            "pair {pair_id} observation {id} has invalid temperature or detection limit"
+        ));
     }
     if !valid_sha256(&raw_data_sha256) {
-        return Err(format!("pair {pair_id} observation {id} raw_data_sha256 must be 64 hexadecimal characters"));
+        return Err(format!(
+            "pair {pair_id} observation {id} raw_data_sha256 must be 64 hexadecimal characters"
+        ));
     }
     match outcome.as_str() {
         "cross_precursor_product_detected"
@@ -112,17 +127,29 @@ fn parse_observation(value: &Value, pair_id: &str) -> Result<EvidenceObservation
         | "transformed_only"
         | "uncharacterizable" => {
             if observed_onset_k.is_some() || measurement_uncertainty_k.is_some() {
-                return Err(format!("pair {pair_id} observation {id} must not attach an exact onset to a categorical dwell result"));
+                return Err(format!(
+                    "pair {pair_id} observation {id} must not attach an exact onset to a categorical dwell result"
+                ));
             }
         }
         "exact_onset_measured" => {
-            let onset = observed_onset_k.ok_or_else(|| format!("pair {pair_id} exact observation {id} lacks observed_onset_k"))?;
-            let uncertainty = measurement_uncertainty_k.ok_or_else(|| format!("pair {pair_id} exact observation {id} lacks measurement_uncertainty_k"))?;
+            let onset = observed_onset_k.ok_or_else(|| {
+                format!("pair {pair_id} exact observation {id} lacks observed_onset_k")
+            })?;
+            let uncertainty = measurement_uncertainty_k.ok_or_else(|| {
+                format!("pair {pair_id} exact observation {id} lacks measurement_uncertainty_k")
+            })?;
             if onset <= 0.0 || uncertainty <= 0.0 || (onset - dwell_k).abs() > uncertainty {
-                return Err(format!("pair {pair_id} exact observation {id} has inconsistent measured onset and dwell temperature"));
+                return Err(format!(
+                    "pair {pair_id} exact observation {id} has inconsistent measured onset and dwell temperature"
+                ));
             }
         }
-        _ => return Err(format!("pair {pair_id} observation {id} has unsupported outcome {outcome}")),
+        _ => {
+            return Err(format!(
+                "pair {pair_id} observation {id} has unsupported outcome {outcome}"
+            ));
+        }
     }
     Ok(EvidenceObservation {
         id,
@@ -149,19 +176,28 @@ fn parse_evidence(value: &Value) -> Result<Evidence, String> {
     let exact_k = optional_number(value, "exact_onset_k")?;
     let precursors = string_list(value, "precursor_ids")?;
     if precursors.len() != 2 || precursors[0] == precursors[1] {
-        return Err(format!("pair {pair_id} must identify exactly two distinct precursor IDs"));
+        return Err(format!(
+            "pair {pair_id} must identify exactly two distinct precursor IDs"
+        ));
     }
-    let observation_rows = value.get("evidence_observations").and_then(Value::as_array)
+    let observation_rows = value
+        .get("evidence_observations")
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("pair {pair_id} evidence_observations must be an array"))?;
     if observation_rows.is_empty() {
-        return Err(format!("pair {pair_id} must contain at least one evidence observation"));
+        return Err(format!(
+            "pair {pair_id} must contain at least one evidence observation"
+        ));
     }
     let mut observations = Vec::with_capacity(observation_rows.len());
     let mut observation_ids = HashSet::new();
     for row in observation_rows {
         let observation = parse_observation(row, &pair_id)?;
         if !observation_ids.insert(observation.id.clone()) {
-            return Err(format!("pair {pair_id} contains duplicate observation ID {}", observation.id));
+            return Err(format!(
+                "pair {pair_id} contains duplicate observation ID {}",
+                observation.id
+            ));
         }
         observations.push(observation);
     }
@@ -180,15 +216,24 @@ fn parse_evidence(value: &Value) -> Result<Evidence, String> {
     };
     let valid = match kind.as_str() {
         "left_censored" => {
-            lower_k.is_none() && positive(upper_k) && exact_k.is_none()
-                && has_outcome_at("cross_precursor_product_detected", upper_k.unwrap_or_default())
+            lower_k.is_none()
+                && positive(upper_k)
+                && exact_k.is_none()
+                && has_outcome_at(
+                    "cross_precursor_product_detected",
+                    upper_k.unwrap_or_default(),
+                )
         }
         "right_censored" => {
-            positive(lower_k) && upper_k.is_none() && exact_k.is_none()
+            positive(lower_k)
+                && upper_k.is_none()
+                && exact_k.is_none()
                 && has_no_cross_product_at(lower_k.unwrap_or_default())
         }
         "interval_censored" => {
-            positive(lower_k) && positive(upper_k) && exact_k.is_none()
+            positive(lower_k)
+                && positive(upper_k)
+                && exact_k.is_none()
                 && lower_k.zip(upper_k).is_some_and(|(lower, upper)| {
                     lower < upper
                         && has_no_cross_product_at(lower)
@@ -196,7 +241,9 @@ fn parse_evidence(value: &Value) -> Result<Evidence, String> {
                 })
         }
         "exact" => {
-            lower_k.is_none() && upper_k.is_none() && positive(exact_k)
+            lower_k.is_none()
+                && upper_k.is_none()
+                && positive(exact_k)
                 && observations.iter().any(|observation| {
                     observation.outcome == "exact_onset_measured"
                         && observation.observed_onset_k.is_some_and(|onset| {
@@ -211,43 +258,78 @@ fn parse_evidence(value: &Value) -> Result<Evidence, String> {
             "pair {pair_id} has inconsistent {kind} onset bounds or lacks matching characterized evidence"
         ));
     }
-    Ok(Evidence { pair_id, kind, lower_k, upper_k, exact_k, observations })
+    Ok(Evidence {
+        pair_id,
+        kind,
+        lower_k,
+        upper_k,
+        exact_k,
+        observations,
+    })
 }
 fn parse_model(value: &Value, evaluation_ids: &HashSet<String>) -> Result<Model, String> {
     let id = text_field(value, "model_id")?.to_owned();
     let artifact_sha256 = text_field(value, "model_artifact_sha256")?.to_owned();
     if !valid_sha256(&artifact_sha256) {
-        return Err(format!("model {id} artifact digest must be 64 hexadecimal characters"));
+        return Err(format!(
+            "model {id} artifact digest must be 64 hexadecimal characters"
+        ));
     }
     let uncertainty_method = text_field(value, "uncertainty_method")?.to_owned();
     let training_ids = string_list(value, "training_pair_ids")?;
-    if let Some(overlap) = training_ids.iter().find(|pair_id| evaluation_ids.contains(*pair_id)) {
-        return Err(format!("model {id} has evaluation leakage: {overlap} appears in training_pair_ids"));
+    if let Some(overlap) = training_ids
+        .iter()
+        .find(|pair_id| evaluation_ids.contains(*pair_id))
+    {
+        return Err(format!(
+            "model {id} has evaluation leakage: {overlap} appears in training_pair_ids"
+        ));
     }
-    let rows = value.get("predictions").and_then(Value::as_array)
+    let rows = value
+        .get("predictions")
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("model {id} predictions must be an array"))?;
     let mut predictions = HashMap::new();
     for row in rows {
         let pair_id = text_field(row, "pair_id")?.to_owned();
         if !evaluation_ids.contains(&pair_id) {
-            return Err(format!("model {id} predicts unknown evaluation pair {pair_id}"));
+            return Err(format!(
+                "model {id} predicts unknown evaluation pair {pair_id}"
+            ));
         }
         let median_k = number_field(row, "median_onset_k")?;
         let log_sigma = number_field(row, "log_sigma")?;
         if median_k <= 0.0 || log_sigma <= 0.0 || log_sigma > 2.0 {
-            return Err(format!("model {id} prediction for {pair_id} requires median_onset_k > 0 and log_sigma in (0,2]"));
+            return Err(format!(
+                "model {id} prediction for {pair_id} requires median_onset_k > 0 and log_sigma in (0,2]"
+            ));
         }
-        if predictions.insert(pair_id.clone(), Prediction { median_k, log_sigma }).is_some() {
+        if predictions
+            .insert(
+                pair_id.clone(),
+                Prediction {
+                    median_k,
+                    log_sigma,
+                },
+            )
+            .is_some()
+        {
             return Err(format!("model {id} has duplicate prediction for {pair_id}"));
         }
     }
     if predictions.len() != evaluation_ids.len() {
         return Err(format!(
             "model {id} must provide exactly one prediction for each evaluation pair (expected {}, got {})",
-            evaluation_ids.len(), predictions.len()
+            evaluation_ids.len(),
+            predictions.len()
         ));
     }
-    Ok(Model { id, artifact_sha256, uncertainty_method, predictions })
+    Ok(Model {
+        id,
+        artifact_sha256,
+        uncertainty_method,
+        predictions,
+    })
 }
 
 // Abramowitz-Stegun 7.1.26 approximation; absolute error is below 8e-8.
@@ -255,10 +337,10 @@ fn normal_cdf(x: f64) -> f64 {
     const INV_SQRT_2_PI: f64 = 0.398_942_280_401_432_7;
     let absolute = x.abs();
     let t = 1.0 / (1.0 + 0.231_641_9 * absolute);
-    let polynomial = t * (0.319_381_530
-        + t * (-0.356_563_782
-        + t * (1.781_477_937
-        + t * (-1.821_255_978 + t * 1.330_274_429))));
+    let polynomial = t
+        * (0.319_381_530
+            + t * (-0.356_563_782
+                + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
     let tail = INV_SQRT_2_PI * (-0.5 * absolute * absolute).exp() * polynomial;
     if x >= 0.0 { 1.0 - tail } else { tail }
 }
@@ -278,17 +360,29 @@ fn observed_log_probability(evidence: &Evidence, prediction: Prediction) -> Resu
     let log_probability = match evidence.kind.as_str() {
         "left_censored" => {
             let probability = normal_cdf(z_for(evidence.upper_k.expect("validated upper bound")));
-            if probability > 0.0 { probability.ln() } else { f64::NEG_INFINITY }
+            if probability > 0.0 {
+                probability.ln()
+            } else {
+                f64::NEG_INFINITY
+            }
         }
         "right_censored" => {
             let probability = normal_cdf(-z_for(evidence.lower_k.expect("validated lower bound")));
-            if probability > 0.0 { probability.ln() } else { f64::NEG_INFINITY }
+            if probability > 0.0 {
+                probability.ln()
+            } else {
+                f64::NEG_INFINITY
+            }
         }
         "interval_censored" => {
             let lower = z_for(evidence.lower_k.expect("validated lower bound"));
             let upper = z_for(evidence.upper_k.expect("validated upper bound"));
             let probability = normal_interval_probability(lower, upper);
-            if probability > 0.0 { probability.ln() } else { f64::NEG_INFINITY }
+            if probability > 0.0 {
+                probability.ln()
+            } else {
+                f64::NEG_INFINITY
+            }
         }
         "exact" => {
             let observed = evidence.exact_k.expect("validated exact onset");
@@ -316,8 +410,12 @@ fn model_receipt(model: &Model, evidence: &[Evidence]) -> Result<Value, String> 
     let mut per_pair = Vec::with_capacity(evidence.len());
     const Z_90: f64 = 1.644_853_626_951_472_2;
     for row in evidence {
-        let prediction = *model.predictions.get(&row.pair_id)
-            .ok_or_else(|| format!("model {} is missing prediction for {}", model.id, row.pair_id))?;
+        let prediction = *model.predictions.get(&row.pair_id).ok_or_else(|| {
+            format!(
+                "model {} is missing prediction for {}",
+                model.id, row.pair_id
+            )
+        })?;
         let log_probability = observed_log_probability(row, prediction)?;
         let nll = -log_probability;
         total_nll += nll;
@@ -361,10 +459,13 @@ fn model_receipt(model: &Model, evidence: &[Evidence]) -> Result<Value, String> 
     }
     let mut by_kind = BTreeMap::new();
     for (kind, (sum, count)) in class_scores {
-        by_kind.insert(kind, json!({
-            "count": count,
-            "mean_negative_log_likelihood": sum / count as f64
-        }));
+        by_kind.insert(
+            kind,
+            json!({
+                "count": count,
+                "mean_negative_log_likelihood": sum / count as f64
+            }),
+        );
     }
     let exact_metrics = if exact_count > 0 {
         json!({
@@ -405,9 +506,13 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
+    let validator =
+        validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
     if let Some(error) = validator.iter_errors(&fixture).next() {
-        return Err(format!("onset-prediction schema validation failed: {error} at {}", error.instance_path()));
+        return Err(format!(
+            "onset-prediction schema validation failed: {error} at {}",
+            error.instance_path()
+        ));
     }
     if fixture.get("fixture_only").and_then(Value::as_bool) != Some(true) {
         return Err("onset-prediction auditor accepts synthetic fixtures only".to_owned());
@@ -416,9 +521,14 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         return Err("unsupported onset-prediction contract".to_owned());
     }
     if text_field(&fixture, "temperature_unit")? != "kelvin" {
-        return Err("log-normal onset likelihood requires absolute temperature in kelvin".to_owned());
+        return Err(
+            "log-normal onset likelihood requires absolute temperature in kelvin".to_owned(),
+        );
     }
-    let rows = fixture.get("pairs").and_then(Value::as_array).ok_or("pairs must be an array")?;
+    let rows = fixture
+        .get("pairs")
+        .and_then(Value::as_array)
+        .ok_or("pairs must be an array")?;
     let mut evidence = Vec::with_capacity(rows.len());
     let mut evaluation_ids = HashSet::new();
     for row in rows {
@@ -428,7 +538,10 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         }
         evidence.push(parsed);
     }
-    let models = fixture.get("models").and_then(Value::as_array).ok_or("models must be an array")?;
+    let models = fixture
+        .get("models")
+        .and_then(Value::as_array)
+        .ok_or("models must be an array")?;
     let mut model_ids = HashSet::new();
     let mut receipts = Vec::with_capacity(models.len());
     for row in models {
@@ -464,7 +577,9 @@ fn read(path: &PathBuf) -> Vec<u8> {
     })
 }
 fn usage(program: &str) {
-    eprintln!("Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]");
+    eprintln!(
+        "Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]"
+    );
 }
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -507,7 +622,8 @@ fn main() {
         eprintln!("SC-ONSET-PREDICTION-FAIL: {error}");
         process::exit(1);
     });
-    let rendered = serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
+    let rendered =
+        serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
     if let Some(path) = output_path {
         if let Err(error) = fs::write(&path, format!("{rendered}\n")) {
             eprintln!("could not write {}: {error}", path.display());
@@ -539,8 +655,12 @@ mod tests {
         assert_eq!(receipt["evidence_kind_counts"]["right_censored"], 1);
         assert_eq!(receipt["evidence_kind_counts"]["interval_censored"], 1);
         assert_eq!(receipt["evidence_kind_counts"]["exact"], 2);
-        let candidate = receipt["models"].as_array().unwrap().iter()
-            .find(|model| model["model_id"] == "synthetic_compact_aft").unwrap();
+        let candidate = receipt["models"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|model| model["model_id"] == "synthetic_compact_aft")
+            .unwrap();
         assert_eq!(candidate["exact_measurement_metrics"]["count"], 2);
         assert_eq!(candidate["exact_measurement_metrics"]["mae_c"], 30.0);
     }
@@ -550,10 +670,25 @@ mod tests {
         let (schema, fixture) = inputs();
         let receipt = audit(&schema, &fixture).unwrap();
         for model in receipt["models"].as_array().unwrap() {
-            assert!(model["mean_censored_and_exact_negative_log_likelihood"].as_f64().unwrap().is_finite());
+            assert!(
+                model["mean_censored_and_exact_negative_log_likelihood"]
+                    .as_f64()
+                    .unwrap()
+                    .is_finite()
+            );
             let by_kind = &model["negative_log_likelihood_by_evidence_kind"];
-            for kind in ["left_censored", "right_censored", "interval_censored", "exact"] {
-                assert!(by_kind[kind]["mean_negative_log_likelihood"].as_f64().unwrap().is_finite());
+            for kind in [
+                "left_censored",
+                "right_censored",
+                "interval_censored",
+                "exact",
+            ] {
+                assert!(
+                    by_kind[kind]["mean_negative_log_likelihood"]
+                        .as_f64()
+                        .unwrap()
+                        .is_finite()
+                );
             }
         }
     }
@@ -564,7 +699,12 @@ mod tests {
         let receipt = audit(&schema, &fixture).unwrap();
         for model in receipt["models"].as_array().unwrap() {
             assert_eq!(model["exact_measurement_metrics"]["count"], 2);
-            assert!(model["exact_measurement_metrics"]["scope"].as_str().unwrap().contains("exact in-situ"));
+            assert!(
+                model["exact_measurement_metrics"]["scope"]
+                    .as_str()
+                    .unwrap()
+                    .contains("exact in-situ")
+            );
         }
     }
 
@@ -572,7 +712,10 @@ mod tests {
     fn evaluation_pair_in_training_set_is_rejected() {
         let (schema, fixture) = inputs();
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
-        data["models"][0]["training_pair_ids"].as_array_mut().unwrap().push(json!("synthetic_pair_01"));
+        data["models"][0]["training_pair_ids"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("synthetic_pair_01"));
         let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
         assert!(error.contains("evaluation leakage"));
     }
@@ -582,7 +725,10 @@ mod tests {
         let (schema, fixture) = inputs();
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
         let duplicate = data["models"][0]["predictions"][0].clone();
-        data["models"][0]["predictions"].as_array_mut().unwrap().push(duplicate);
+        data["models"][0]["predictions"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicate);
         let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
         assert!(error.contains("duplicate prediction"));
     }
@@ -611,10 +757,17 @@ mod tests {
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
         data["pairs"][1]["evidence_observations"][0]["outcome"] = json!("transformed_only");
         let receipt = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap();
-        let pair = receipt["models"][0]["per_pair_scores"].as_array().unwrap().iter()
-            .find(|row| row["pair_id"] == "synthetic_pair_02").unwrap();
+        let pair = receipt["models"][0]["per_pair_scores"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["pair_id"] == "synthetic_pair_02")
+            .unwrap();
         assert_eq!(pair["evidence_kind"], "right_censored");
-        assert_eq!(pair["evidence_observations"][0]["outcome"], "transformed_only");
+        assert_eq!(
+            pair["evidence_observations"][0]["outcome"],
+            "transformed_only"
+        );
     }
 
     #[test]
@@ -634,5 +787,4 @@ mod tests {
         let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
         assert!(error.contains("lacks matching characterized evidence"));
     }
-
 }
