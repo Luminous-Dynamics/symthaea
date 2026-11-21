@@ -3,7 +3,7 @@ name: MUSE RMI Track A Qualification
 on:
   push:
     branches:
-      - research/melothaea-rmi-track-a-runner-20261121
+      - research/rmi-bench-track-a-runner-20261121
     paths:
       - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
       - "crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs"
