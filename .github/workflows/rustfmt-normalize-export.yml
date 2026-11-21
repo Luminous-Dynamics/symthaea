@@ -1,4 +1,5 @@
 name: Rustfmt normalized source export
+# Temporary export branch for exact Rustfmt 1.96 source normalization.
 
 on:
   pull_request:
