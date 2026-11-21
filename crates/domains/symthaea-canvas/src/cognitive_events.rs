@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::cognitive_topology::{
     CognitiveEdge, CognitiveEpisode, CognitiveEpisodeKind, CognitiveEpisodeState,
-    CognitiveEvidence, CognitiveNode, CognitiveNodeKind, CognitiveProvenance,
-    CognitiveRelation, CognitiveTopology, CognitiveTopologyError, EpistemicStatus,
-    MAX_COGNITIVE_EDGES, MAX_COGNITIVE_EPISODES, MAX_COGNITIVE_NODES,
+    CognitiveEvidence, CognitiveNode, CognitiveNodeKind, CognitiveProvenance, CognitiveRelation,
+    CognitiveTopology, CognitiveTopologyError, EpistemicStatus, MAX_COGNITIVE_EDGES,
+    MAX_COGNITIVE_EPISODES, MAX_COGNITIVE_NODES,
 };
 
 pub const COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION: u16 = 1;
@@ -113,18 +113,35 @@ pub enum CognitiveEventApplyOutcome {
 pub enum CognitiveEventError {
     UnsupportedSchemaVersion(u16),
     InvalidEventIdentifier,
-    SessionMismatch { expected: String, received: String },
+    SessionMismatch {
+        expected: String,
+        received: String,
+    },
     InvalidEventPayload(&'static str),
     SessionProvenanceMismatch,
     InvalidProducer,
     InvalidTraceDigest,
     InvalidSequence,
-    SequenceGap { expected: u64, received: u64 },
-    SequenceConflict { sequence: u64 },
-    ForkBeforeBase { base_sequence: u64, requested_sequence: u64 },
-    ForkBeyondLog { last_available: u64, requested_sequence: u64 },
+    SequenceGap {
+        expected: u64,
+        received: u64,
+    },
+    SequenceConflict {
+        sequence: u64,
+    },
+    ForkBeforeBase {
+        base_sequence: u64,
+        requested_sequence: u64,
+    },
+    ForkBeyondLog {
+        last_available: u64,
+        requested_sequence: u64,
+    },
     MissingCausationParent(String),
-    TimestampRegression { previous: u64, received: u64 },
+    TimestampRegression {
+        previous: u64,
+        received: u64,
+    },
     ConflictingDuplicate(String),
     BatchLimitExceeded(usize),
     EventLogLimitExceeded(usize),
@@ -157,33 +174,63 @@ impl fmt::Display for CognitiveEventError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnsupportedSchemaVersion(version) => {
-                write!(f, "unsupported cognitive topology event schema version {version}")
+                write!(
+                    f,
+                    "unsupported cognitive topology event schema version {version}"
+                )
             }
             Self::InvalidEventIdentifier => write!(f, "invalid event or session identifier"),
             Self::SessionMismatch { expected, received } => {
-                write!(f, "event session {received} does not match reducer session {expected}")
+                write!(
+                    f,
+                    "event session {received} does not match reducer session {expected}"
+                )
             }
             Self::InvalidEventPayload(field) => write!(f, "invalid event payload field {field}"),
             Self::SessionProvenanceMismatch => {
-                write!(f, "synthetic and runtime provenance cannot be mixed in one topology session")
+                write!(
+                    f,
+                    "synthetic and runtime provenance cannot be mixed in one topology session"
+                )
             }
             Self::InvalidProducer => write!(f, "invalid event producer"),
             Self::InvalidTraceDigest => write!(f, "invalid event trace digest"),
             Self::InvalidSequence => write!(f, "event sequence must be non-zero"),
             Self::SequenceGap { expected, received } => {
-                write!(f, "event sequence gap: expected {expected}, received {received}")
+                write!(
+                    f,
+                    "event sequence gap: expected {expected}, received {received}"
+                )
             }
             Self::SequenceConflict { sequence } => {
-                write!(f, "event sequence {sequence} is already owned by another event")
+                write!(
+                    f,
+                    "event sequence {sequence} is already owned by another event"
+                )
             }
-            Self::ForkBeforeBase { base_sequence, requested_sequence } => {
-                write!(f, "cannot fork at sequence {requested_sequence} before base sequence {base_sequence}")
+            Self::ForkBeforeBase {
+                base_sequence,
+                requested_sequence,
+            } => {
+                write!(
+                    f,
+                    "cannot fork at sequence {requested_sequence} before base sequence {base_sequence}"
+                )
             }
-            Self::ForkBeyondLog { last_available, requested_sequence } => {
-                write!(f, "cannot fork at sequence {requested_sequence}; log ends at {last_available}")
+            Self::ForkBeyondLog {
+                last_available,
+                requested_sequence,
+            } => {
+                write!(
+                    f,
+                    "cannot fork at sequence {requested_sequence}; log ends at {last_available}"
+                )
             }
             Self::MissingCausationParent(id) => {
-                write!(f, "causation parent event {id} is not present in the base snapshot or accepted log")
+                write!(
+                    f,
+                    "causation parent event {id} is not present in the base snapshot or accepted log"
+                )
             }
             Self::TimestampRegression { previous, received } => {
                 write!(f, "event timestamp {received} regresses behind {previous}")
@@ -192,10 +239,16 @@ impl fmt::Display for CognitiveEventError {
                 write!(f, "event ID {id} was replayed with different content")
             }
             Self::BatchLimitExceeded(count) => {
-                write!(f, "event batch size {count} exceeds limit {MAX_COGNITIVE_EVENTS_PER_BATCH}")
+                write!(
+                    f,
+                    "event batch size {count} exceeds limit {MAX_COGNITIVE_EVENTS_PER_BATCH}"
+                )
             }
             Self::EventLogLimitExceeded(count) => {
-                write!(f, "event log length {count} exceeds limit {MAX_COGNITIVE_EVENT_LOG}")
+                write!(
+                    f,
+                    "event log length {count} exceeds limit {MAX_COGNITIVE_EVENT_LOG}"
+                )
             }
             Self::DuplicateNode(id) => write!(f, "node {id} already exists"),
             Self::DuplicateEdge(id) => write!(f, "edge {id} already exists"),
@@ -213,7 +266,10 @@ impl fmt::Display for CognitiveEventError {
                 write!(f, "invalid episode transition {from:?} -> {to:?}")
             }
             Self::ProvenanceBoundaryViolation(id) => {
-                write!(f, "event {id} attempts to cross the synthetic/runtime provenance boundary")
+                write!(
+                    f,
+                    "event {id} attempts to cross the synthetic/runtime provenance boundary"
+                )
             }
             Self::RevisionExhausted => write!(f, "topology revision is exhausted"),
             Self::Topology(error) => write!(f, "resulting topology is invalid: {error}"),
@@ -261,9 +317,7 @@ pub fn diff_cognitive_topologies(
         to_snapshot_digest: to.canonical_digest_hex()?,
         node_changes: item_changes(&from.nodes, &to.nodes, |node| node.id.clone()),
         edge_changes: item_changes(&from.edges, &to.edges, |edge| edge.id.clone()),
-        episode_changes: item_changes(&from.episodes, &to.episodes, |episode| {
-            episode.id.clone()
-        }),
+        episode_changes: item_changes(&from.episodes, &to.episodes, |episode| episode.id.clone()),
     })
 }
 
@@ -272,14 +326,9 @@ fn item_changes<T: Clone + PartialEq>(
     after: &[T],
     id_of: impl Fn(&T) -> String,
 ) -> Vec<CognitiveItemDelta<T>> {
-    let before_by_id: BTreeMap<String, &T> = before
-        .iter()
-        .map(|item| (id_of(item), item))
-        .collect();
-    let after_by_id: BTreeMap<String, &T> = after
-        .iter()
-        .map(|item| (id_of(item), item))
-        .collect();
+    let before_by_id: BTreeMap<String, &T> =
+        before.iter().map(|item| (id_of(item), item)).collect();
+    let after_by_id: BTreeMap<String, &T> = after.iter().map(|item| (id_of(item), item)).collect();
     let ids: BTreeSet<String> = before_by_id
         .keys()
         .chain(after_by_id.keys())
@@ -389,7 +438,10 @@ impl CognitiveTopologyReducer {
             });
         }
         if let Some(parent_id) = &event.caused_by_event_id
-            && !self.events.iter().any(|accepted| accepted.evidence.event_id == *parent_id)
+            && !self
+                .events
+                .iter()
+                .any(|accepted| accepted.evidence.event_id == *parent_id)
             && !topology_contains_event(&self.base_snapshot, parent_id)
         {
             return Err(CognitiveEventError::MissingCausationParent(
@@ -522,16 +574,15 @@ fn validate_event(event: &CognitiveTopologyEvent) -> Result<(), CognitiveEventEr
             ..
         } => {
             validate_event_identifier(node_id)?;
-            if label.is_empty()
-                || label.len() > 256
-                || label.chars().any(char::is_control)
-            {
+            if label.is_empty() || label.len() > 256 || label.chars().any(char::is_control) {
                 return Err(CognitiveEventError::InvalidEventPayload("node label"));
             }
             validate_event_activation(*activation)?;
         }
         CognitiveTopologyChange::NodeStatusChanged {
-            node_id, activation, ..
+            node_id,
+            activation,
+            ..
         } => {
             validate_event_identifier(node_id)?;
             validate_event_activation(*activation)?;
@@ -549,7 +600,9 @@ fn validate_event(event: &CognitiveTopologyEvent) -> Result<(), CognitiveEventEr
             validate_event_activation(*activation)?;
         }
         CognitiveTopologyChange::EdgeStatusChanged {
-            edge_id, activation, ..
+            edge_id,
+            activation,
+            ..
         } => {
             validate_event_identifier(edge_id)?;
             validate_event_activation(*activation)?;
@@ -561,9 +614,7 @@ fn validate_event(event: &CognitiveTopologyEvent) -> Result<(), CognitiveEventEr
             ..
         } => {
             validate_event_identifier(episode_id)?;
-            if node_ids.len() > MAX_COGNITIVE_NODES
-                || edge_ids.len() > MAX_COGNITIVE_EDGES
-            {
+            if node_ids.len() > MAX_COGNITIVE_NODES || edge_ids.len() > MAX_COGNITIVE_EDGES {
                 return Err(CognitiveEventError::InvalidEventPayload(
                     "episode membership exceeds topology bounds",
                 ));
@@ -704,7 +755,11 @@ fn apply_change(
             node_ids,
             edge_ids,
         } => {
-            if topology.episodes.iter().any(|episode| episode.id == *episode_id) {
+            if topology
+                .episodes
+                .iter()
+                .any(|episode| episode.id == *episode_id)
+            {
                 return Err(CognitiveEventError::DuplicateEpisode(episode_id.clone()));
             }
             if topology.episodes.len() >= MAX_COGNITIVE_EPISODES {
@@ -763,7 +818,12 @@ fn validate_topology_provenance(topology: &CognitiveTopology) -> Result<(), Cogn
         .iter()
         .map(|node| node.evidence.provenance)
         .chain(topology.edges.iter().map(|edge| edge.evidence.provenance))
-        .chain(topology.episodes.iter().map(|episode| episode.evidence.provenance))
+        .chain(
+            topology
+                .episodes
+                .iter()
+                .map(|episode| episode.evidence.provenance),
+        )
     {
         let current = provenance_is_synthetic(provenance);
         if synthetic_class.is_some_and(|previous| previous != current) {
@@ -784,7 +844,12 @@ fn ensure_session_provenance(
         .iter()
         .map(|node| node.evidence.provenance)
         .chain(topology.edges.iter().map(|edge| edge.evidence.provenance))
-        .chain(topology.episodes.iter().map(|episode| episode.evidence.provenance))
+        .chain(
+            topology
+                .episodes
+                .iter()
+                .map(|episode| episode.evidence.provenance),
+        )
         .next();
     if existing.is_some_and(|value| provenance_is_synthetic(value) != next_is_synthetic) {
         return Err(CognitiveEventError::SessionProvenanceMismatch);
@@ -1126,7 +1191,9 @@ mod tests {
         assert_ne!(initial_snapshot, initial_log);
 
         assert_eq!(
-            reducer.apply_event(add_node(1, "memory:a")).expect("apply node"),
+            reducer
+                .apply_event(add_node(1, "memory:a"))
+                .expect("apply node"),
             CognitiveEventApplyOutcome::Applied
         );
         assert_eq!(reducer.snapshot().nodes.len(), 1);
@@ -1182,7 +1249,7 @@ mod tests {
             CognitiveTopologyEvent {
                 schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
                 session_id: "event-reducer-test".to_string(),
-            caused_by_event_id: None,
+                caused_by_event_id: None,
                 evidence: evidence(2, "event:2"),
                 change: CognitiveTopologyChange::EdgeAdded {
                     edge_id: "edge:missing".to_string(),
@@ -1210,7 +1277,7 @@ mod tests {
             CognitiveTopologyEvent {
                 schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
                 session_id: "event-reducer-test".to_string(),
-            caused_by_event_id: None,
+                caused_by_event_id: None,
                 evidence: evidence(3, "event:3"),
                 change: CognitiveTopologyChange::EdgeAdded {
                     edge_id: "edge:a-b".to_string(),
@@ -1244,18 +1311,12 @@ mod tests {
             add_node(2, "memory:original-branch"),
         ];
 
-        let mut left = CognitiveTopologyReducer::fork_at_sequence(
-            base_snapshot.clone(),
-            &complete_log,
-            1,
-        )
-        .expect("fork at common prefix");
-        let mut right = CognitiveTopologyReducer::fork_at_sequence(
-            base_snapshot.clone(),
-            &complete_log,
-            1,
-        )
-        .expect("second fork at common prefix");
+        let mut left =
+            CognitiveTopologyReducer::fork_at_sequence(base_snapshot.clone(), &complete_log, 1)
+                .expect("fork at common prefix");
+        let mut right =
+            CognitiveTopologyReducer::fork_at_sequence(base_snapshot.clone(), &complete_log, 1)
+                .expect("second fork at common prefix");
 
         left.apply_event(add_node(2, "concept:left-hypothesis"))
             .unwrap();
@@ -1264,8 +1325,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(left.snapshot().nodes[0], right.snapshot().nodes[0]);
-        assert_ne!(left.snapshot_digest_hex().unwrap(), right.snapshot_digest_hex().unwrap());
-        assert_ne!(left.event_log_digest_hex().unwrap(), right.event_log_digest_hex().unwrap());
+        assert_ne!(
+            left.snapshot_digest_hex().unwrap(),
+            right.snapshot_digest_hex().unwrap()
+        );
+        assert_ne!(
+            left.event_log_digest_hex().unwrap(),
+            right.event_log_digest_hex().unwrap()
+        );
         assert_eq!(base_snapshot.nodes.len(), 0);
         assert_eq!(complete_log.len(), 2);
     }
@@ -1394,7 +1461,10 @@ mod tests {
             reducer.apply_event(invalid),
             Err(CognitiveEventError::InvalidEpisodeTransition { .. })
         ));
-        assert_eq!(reducer.snapshot().episodes[0].state, CognitiveEpisodeState::Started);
+        assert_eq!(
+            reducer.snapshot().episodes[0].state,
+            CognitiveEpisodeState::Started
+        );
 
         let complete = CognitiveTopologyEvent {
             schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
@@ -1408,7 +1478,10 @@ mod tests {
             },
         };
         reducer.apply_event(complete).unwrap();
-        assert_eq!(reducer.snapshot().episodes[0].state, CognitiveEpisodeState::Completed);
+        assert_eq!(
+            reducer.snapshot().episodes[0].state,
+            CognitiveEpisodeState::Completed
+        );
     }
 
     #[test]
@@ -1434,7 +1507,10 @@ mod tests {
             reducer.apply_event(runtime_update),
             Err(CognitiveEventError::ProvenanceBoundaryViolation(_))
         ));
-        assert_eq!(reducer.snapshot().nodes[0].status, EpistemicStatus::Observed);
+        assert_eq!(
+            reducer.snapshot().nodes[0].status,
+            EpistemicStatus::Observed
+        );
         assert_eq!(reducer.snapshot().last_sequence, 1);
     }
 
@@ -1535,6 +1611,9 @@ mod tests {
         let before = first.snapshot_digest_hex().unwrap();
         // Renderer changes are intentionally not accepted by this API.
         assert_eq!(first.snapshot_digest_hex().unwrap(), before);
-        assert_eq!(first.event_log_digest_hex().unwrap(), second.event_log_digest_hex().unwrap());
+        assert_eq!(
+            first.event_log_digest_hex().unwrap(),
+            second.event_log_digest_hex().unwrap()
+        );
     }
 }
