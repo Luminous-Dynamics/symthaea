@@ -47,7 +47,7 @@ pub struct Scenario {
     pub expected: Expected,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionContext {
     pub profile_ref: String,
