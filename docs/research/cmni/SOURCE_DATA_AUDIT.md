@@ -107,3 +107,40 @@ Use only:
 - DOI cited by the 2025 article: https://doi.org/10.5281/zenodo.13830012
 - 2026 paper: https://doi.org/10.1038/s41467-026-74421-1
 - 2026 data record (embargoed until 2026-12-01): https://zenodo.org/records/20435774
+
+
+## 7. Supplementary-information audit: 2025 neutron diagnostics and controls
+
+The 10.9 MB Supplementary Information was inspected alongside the main paper:
+https://assets-eu.researchsquare.com/files/rs-5046357/v1/267adeeb10150099b6fa9938.pdf
+
+### Detector and signal processing
+
+The Thunderbird neutron diagnostic is described as a single EJ-309 liquid-scintillator detector:
+- 12.7 × 12.7 cm cylindrical scintillator and Hamamatsu R1250 PMT.
+- CAEN DT5730S 14-bit / 500 MHz waveform digitizer with DPP-PSD firmware.
+- Pulse-shape discrimination using tail/total charge-integral ratio.
+- Gamma PSD distribution fitted in 5-keVee light-output slices; neutron-window lower boundary set at gamma mean + 5 standard deviations, upper boundary another 0.2 PSD units higher; 50-keVee lower light-output threshold.
+- Pileup contribution reported below 2% after the specified rejection and geometry.
+- Magnetic shielding reduces the detector-front field from about 40 G to below 0.3 G.
+- Light-output calibration with 60Co, 137Cs and 152Eu.
+- Detector response compared with MCNP6.2 + DRiFT and Geant4 simulations for 2.45-MeV D-D neutrons; spectrum unfolded with a Geant4 response matrix and GRAVEL.
+
+The article reports exclusion of more than 99.9999% of gamma rays under its stated PSD method. Treat this as source-reported, setup-specific performance, not a universal false-positive guarantee or independent detector replication. The SI reports best response agreement mainly over 200–1000 keVee; the lower acquisition threshold truncates part of the response.
+
+### Controls that must become first-class evidence
+
+- **Background:** 0.21(9) neutrons/s; the article also reports stable background over 24 hours.
+- **Repeatability:** seven beam-loading experiments using different Pd targets reached about 69.3(2) neutrons/s after 120 minutes at -30 kV / 0.2 mA. Keep this separate from the three electrochemical Phase I/II campaigns, which use different conditions.
+- **Sheath-voltage ON/OFF:** turning off the -30 kV sheath after steady beam loading returned the neutron rate to about 0.2 neutrons/s; restoring voltage restored the signal. This is a beam-excitation control.
+- **H2O isotope control:** 2 M K2CO3 in H2O instead of D2O produced an 88.3(3)% reduction in neutron production rate. This supports isotope-specific fuel loading in this apparatus; it does not exclude every possible artifact.
+- **Electrochemical-cell OFF/ON:** with beam conditions otherwise maintained, the paper reports no more than 2% variation during the cell-off interval and a smaller increase (~6%) on reactivation than the initial (~20%) increase. This tests persistence of previously loaded fuel; it is not the same as sheath-voltage-off.
+- **D/Pd measurement limitation:** the article explicitly states that D/Pd was not measured directly during the fusion runs. The ~0.7 ratio is inferred from separate in-situ XRD characterization and assumed to be similar in the fusion apparatus.
+
+### Campaign-rate transcription cross-check
+
+The full article text and Fig. 3 confirm Phase I saturation rates of 135.5(5), 142.9(5), and **138.6(3)** n/s, and Phase II rates of 156.7(4), 159.2(5), and 164.3(13) n/s. The third Phase I uncertainty is **0.3**, not 1.3. The published campaign percentage increases (15.1(1)%, 11.3(1)%, 18.5(2)%) remain separate source claims; direct division of the rounded plateau rates does not reproduce all three percentages. Preserve both and resolve the estimator from source time-series and analysis code.
+
+### Archive limits
+
+The public 14.7-GB archive remains uninspected. Do not assume it contains complete raw waveforms or infer its internal structure from its filename. Begin with the accessible published summaries and SI; inspect the archive manifest before selective download.
