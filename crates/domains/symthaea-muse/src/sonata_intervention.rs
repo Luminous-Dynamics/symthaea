@@ -721,6 +721,7 @@ mod tests {
         SymbolicMusicObservation,
     };
     use crate::musical_inference::MusicAction;
+    use crate::score_transaction::verify_score_patch_receipt;
     use symthaea_music_theory::{MusicalIntent, Style, compose_sonata_with_plan};
 
     fn return_trace(realization: &SonataRealization) -> CognitiveDecisionTrace {
@@ -818,6 +819,30 @@ mod tests {
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
         assert_eq!(batch.candidates.len(), 5);
+        let source_digest = batch.candidates[0].patch_receipt.source_score_sha256.clone();
+        let protected_digest = batch.candidates[0]
+            .patch_receipt
+            .protected_complement_sha256
+            .clone();
+        for candidate in &batch.candidates {
+            verify_score_patch_receipt(
+                &realization.score,
+                &candidate.score,
+                &candidate.patch_receipt,
+            )
+            .unwrap();
+            assert_eq!(candidate.patch_receipt.source_score_sha256, source_digest);
+            assert_eq!(
+                candidate.patch_receipt.protected_complement_sha256,
+                protected_digest
+            );
+            assert!(candidate.patch_receipt.changed_events.iter().all(|event| {
+                candidate
+                    .patch_receipt
+                    .target_event_indices
+                    .contains(&event.event.source_index)
+            }));
+        }
         assert_eq!(
             batch.cognitive_subintent.schema,
             SONATA_RETURN_SUBINTENT_SCHEMA_V1
