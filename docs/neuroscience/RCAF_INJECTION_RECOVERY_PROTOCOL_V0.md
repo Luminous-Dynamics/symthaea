@@ -148,3 +148,14 @@ The simulation harness exposes a matched-input estimator tournament:
 All three consume the same simulated matrices using the same random seed. A known sign-flip fixture returns absolute WJ=1, signed-shift WJ=1/3, and normalized mean-absolute similarity=0.5. This demonstrates that the estimators are not interchangeable; any "winner" must first be tied to a declared construct and then evaluated for null calibration and injection sensitivity.
 
 Run `cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament`. The output schema is `research/rcaf/estimator-tournament.schema.json`.
+
+
+## 12. Execution receipts and archived outputs
+
+The focused research workflow records all three simulation JSON outputs and creates a content-addressed execution receipt:
+- exact Git commit;
+- Rust compiler, Cargo and Python versions;
+- hash of every tracked file under the RCAF research package;
+- file digests and sizes for the single-point, dose-response and estimator-tournament reports.
+
+The artifact name includes the exact checked-out commit SHA. This provides an independently inspectable CI record; it does not prove independent replay, validate a biological pipeline or upgrade a synthetic result to empirical evidence.
