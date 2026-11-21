@@ -1,0 +1,21 @@
+{
+  "schema": "luminous.semi-bench.contrastive-pair-manifest.v1",
+  "dataset_id": "synthetic-wafer-contrastive-fixture-v1",
+  "split_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "time_basis": "source_local_naive",
+  "clock_domain_id": "wafer-demo-source-clock",
+  "time_embargo_minutes": 60,
+  "sample_assignments": [
+    {"sample_id": "T01", "split": "train", "group_id": "LOT-A", "observed_at": "2008-07-19T10:00:00"},
+    {"sample_id": "T02", "split": "train", "group_id": "LOT-A", "observed_at": "2008-07-19T10:40:00"},
+    {"sample_id": "V01", "split": "validation", "group_id": "LOT-B", "observed_at": "2008-07-19T12:00:00"},
+    {"sample_id": "V02", "split": "validation", "group_id": "LOT-B", "observed_at": "2008-07-19T12:30:00"},
+    {"sample_id": "E01", "split": "test", "group_id": "LOT-C", "observed_at": "2008-07-19T14:00:00"},
+    {"sample_id": "E02", "split": "test", "group_id": "LOT-D", "observed_at": "2008-07-19T14:45:00"}
+  ],
+  "pairs": [
+    {"pair_id": "P-TRAIN-01", "left_sample_id": "T01", "right_sample_id": "T02", "pair_scope": "train", "relation": "positive", "basis": ["spatial", "production_proximity"], "proximity_reason": "same_lot"},
+    {"pair_id": "P-VAL-01", "left_sample_id": "V01", "right_sample_id": "V02", "pair_scope": "validation", "relation": "negative", "basis": ["density"]},
+    {"pair_id": "P-TEST-01", "left_sample_id": "E01", "right_sample_id": "E02", "pair_scope": "test", "relation": "positive", "basis": ["structure", "production_proximity"], "proximity_reason": "time_near"}
+  ]
+}
