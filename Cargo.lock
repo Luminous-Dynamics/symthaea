@@ -12229,7 +12229,7 @@ dependencies = [
 [[package]]
 name = "mycelix-positioning-v2"
 version = "0.1.0"
-source = "git+https://github.com/Luminous-Dynamics/mycelix?rev=9bd90984e57cee2a6c239f3809d68024db648928#9bd90984e57cee2a6c239f3809d68024db648928"
+source = "git+https://github.com/Luminous-Dynamics/mycelix?rev=85d09458ba05d5da68b2702b1e13ee6692330f9f#85d09458ba05d5da68b2702b1e13ee6692330f9f"
 dependencies = [
  "serde",
 ]
