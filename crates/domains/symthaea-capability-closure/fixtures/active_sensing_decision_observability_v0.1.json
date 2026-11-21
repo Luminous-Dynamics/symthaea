@@ -1,0 +1,42 @@
+{
+  "schema": "symthaea.active_sensing_decision_observability",
+  "version": "0.1.0",
+  "tracking_issue": 9563,
+  "evaluator_package": "research/temporal-evaluator",
+  "evaluator_module": "research/temporal-evaluator/src/decision_observability.rs",
+  "composes_with": {
+    "transient_observability_pr": 9637,
+    "candidate_policy_pr": 9616,
+    "common_temporal_decision_benchmark_issue": 9954
+  },
+  "status": "source_authored_not_executed",
+  "equivalence_identity": [
+    "observation_history_sha256",
+    "recurrent_state_sha256",
+    "model_configuration_sha256",
+    "policy_seed"
+  ],
+  "evaluator_only_fields": [
+    "evaluator_world_id",
+    "hidden_world_sha256",
+    "action_losses_ppm"
+  ],
+  "candidate_requirement": "same_action_for_identical_candidate_view_and_frozen_seed",
+  "loss_scale_ppm": 1000000,
+  "metrics": [
+    "decision_identifiable",
+    "common_optimal_action_ids",
+    "minimax_loss_action_id",
+    "minimax_worst_case_loss_ppm",
+    "minimax_regret_action_id",
+    "unavoidable_worst_case_regret_ppm",
+    "candidate_worst_case_regret_ppm",
+    "avoidable_worst_case_regret_ppm"
+  ],
+  "tests_authored": 10,
+  "tests_executed": false,
+  "candidate_hidden_world_exposure": false,
+  "deterministic_policy_only": true,
+  "no_universal_impossibility_claim": true,
+  "no_sota_or_energy_claim": true
+}
