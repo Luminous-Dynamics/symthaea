@@ -39,16 +39,16 @@
 
 ## Sequential campaign result (SEQ-001)
 
-This separate finite-horizon evaluator catches a failure mode the one-step selector cannot: neither test by itself improves worst-case minimax regret, but a contingent two-test policy can.
+This separate finite-horizon evaluator catches a failure mode the one-step selector cannot: neither test by itself improves worst-case minimax regret, but a contingent two-test policy can. The terminal model separates ACCEPT, REJECT and HOLD; no evidence defaults to HOLD.
 
 | Policy | Worst-case minimax regret | Expected engineering hours | Expected facility hours |
 |---|---:|---:|---:|
-| Stop now | 5 | 0.00 | 0.00 |
-| Myopic one-step | 5 | 0.00 | 0.00 |
+| Stop now (HOLD) | 2 | 0.00 | 0.00 |
+| Myopic one-step | 2 | 0.00 | 0.00 |
 | Fixed screen + thermal inspection | 0 | 1.50 | 2.00 |
 | Adaptive: screen; thermal only on PASS | 0 | 1.20 | 1.55 |
 
-For SEQ-001, the adaptive policy runs the combined-load screen first, terminates at REJECT on FAIL, and runs thermal inspection only on PASS. Its expected resource use is 20% lower in engineering hours and 22.5% lower in facility hours than the fixed campaign. SEQ-002 changes only the synthetic state-frequency profile; the exact planner reverses the order, running thermal inspection first and the combined-load screen only on CLEAR. Both policies preserve zero worst-case regret and improve every expected resource dimension versus the fixed campaign.
+For SEQ-001, the adaptive policy runs the combined-load screen first, terminates at REJECT on FAIL when that observation produces a rejection basis, and runs thermal inspection only on PASS. Its expected resource use is 20% lower in engineering hours and 22.5% lower in facility hours than the fixed campaign. SEQ-002 changes only the synthetic state-frequency profile; the exact planner reverses the order, running thermal inspection first and the combined-load screen only on CLEAR. Both policies preserve zero worst-case regret and improve every expected resource dimension versus the fixed campaign.
 
 The weights are synthetic and used only to calculate expected cost; the terminal structural decision remains distribution-free. These numbers are fixture calculations, not physical or industry results. The sequential oracle is a proof-of-concept, not a full held-out policy tournament.
 
@@ -89,4 +89,4 @@ The known-answer example is intentionally constructed so both single tests indiv
 These are calculated outcomes of one synthetic fixture, not empirical aerospace savings or SOTA results. Its frequency weights are used exclusively for expected resource accounting; worst-case structural decision regret remains distribution-free over the full state set.
 
 
-**Acceptance obligation rule:** a terminal ACCEPT requires every obligation declared for ACCEPT to have been accumulated along the selected action path. REJECT here means the proposed configuration is *not accepted under the declared claim*; it is not by itself a finding that a physical defect exists. Production workflows must preserve separate HOLD/INDETERMINATE and proven-defect/reject dispositions. REJECT may terminate earlier when its own (possibly empty) evidence obligation set is satisfied. Missing or undeclared action obligations are rejected by both the Rust evaluator and its independent Python oracle.
+**Terminal disposition rule:** no evidence defaults to HOLD. A terminal ACCEPT requires both affirmative obligations to be accumulated along the exact action path. A terminal REJECT requires an outcome-specific rejection-basis obligation. HOLD/INDETERMINATE remains distinct from a proven-defect rejection. Missing or undeclared action obligations are rejected by both the Rust evaluator and its independent Python oracle.
