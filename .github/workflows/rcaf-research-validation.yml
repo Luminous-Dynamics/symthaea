@@ -179,8 +179,16 @@ jobs:
           assert [row["common_mode_nuisance_loading"] for row in rows] == expected
           assert rows[0]["nuisance_only_rejection_rate"] == rows[0]["null_false_positive_rate"]
           assert rows[0]["median_nuisance_only_paired_gap"] == rows[0]["median_null_paired_gap"]
+          assert rows[0]["signal_plus_nuisance_detection_power"] == rows[0]["injection_detection_power"]
+          assert rows[0]["signal_plus_nuisance_directional_detection_power"] == rows[0]["injection_directional_detection_power"]
+          assert rows[0]["signal_plus_nuisance_wrong_direction_rejection_rate"] == rows[0]["injection_wrong_direction_rejection_rate"]
+          assert rows[0]["median_signal_plus_nuisance_paired_gap"] == rows[0]["median_injected_paired_gap"]
+          for row in rows:
+              # The combined signal+nuisance cell must expose direction-qualified outcomes.
+              assert row["signal_plus_nuisance_detection_power"]["trials"] == row["monte_carlo_replicates"]
+              assert row["signal_plus_nuisance_directional_detection_power"]["successes"] + row["signal_plus_nuisance_wrong_direction_rejection_rate"]["successes"] == row["signal_plus_nuisance_detection_power"]["successes"]
           for row in rows[1:]:
-              # The nuisance RNG is domain-separated: only nuisance dose changes.
+              # Clean signal/null streams are fixed across doses; the combined cell intentionally varies with nuisance dose.
               assert row["null_false_positive_rate"] == rows[0]["null_false_positive_rate"]
               assert row["injection_detection_power"] == rows[0]["injection_detection_power"]
               assert row["injection_directional_detection_power"] == rows[0]["injection_directional_detection_power"]
