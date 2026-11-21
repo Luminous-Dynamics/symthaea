@@ -529,3 +529,7 @@ Textual Add lifecycle entry points require the frozen word counter at reservatio
 ### Integrated memory-dose and salience qualification
 
 The evaluator composes raw Session-A ingress evidence with per-model memory-dose calibration on one set of clusters, held-out budget qualification on disjoint clusters, and independently calibrated future-use salience. It verifies that matching target-model forecasts are surfaced within the qualified token budget, while forecasts for a different model are rejected. The evidence-digest helper is read-only and accepts only an already admitted evidence reference.
+
+## HDC/HDC-LTC retrieval arm
+
+The `broca-mace-hdc-retrieval` package supplies static ContinuousHV and HDC-LTC zero-input candidate indexes using the existing `symthaea-hdc-ltc` crate. It returns event IDs and ranking diagnostics only; consumers resolve IDs and rerun unchanged MACE qualification. No retrieval, utility or SOTA gain is claimed. See the [adapter README](hdc-retrieval/README.md) and [protocol](../../docs/research/HDC_LTC_MACE_TEMPORAL_RETRIEVAL_ARM_V0_1.md).

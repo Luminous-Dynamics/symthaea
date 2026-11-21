@@ -12,6 +12,7 @@ serde_json = "1.0"
 
 [dev-dependencies]
 broca-mace-consolidation = { path = "../consolidation" }
+broca-mace-hdc-retrieval = { path = "../hdc-retrieval" }
 broca-mace-ingress = { path = "../ingress" }
 serde_json = "1.0"
 sha2 = "0.10"

@@ -1,3 +1,3 @@
 [workspace]
-members = ["policy", "evaluator", "ingress", "consolidation", "aml-adapter"]
+members = ["policy", "evaluator", "ingress", "consolidation", "aml-adapter", "hdc-retrieval"]
 resolver = "3"

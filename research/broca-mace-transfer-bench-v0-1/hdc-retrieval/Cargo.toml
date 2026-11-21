@@ -1,0 +1,12 @@
+[package]
+name = "broca-mace-hdc-retrieval"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Candidate-only HDC/HDC-LTC retrieval index over MACE evidence IDs"
+
+[dependencies]
+broca-mace-policy = { path = "../policy" }
+symthaea-hdc-ltc = { path = "../../../crates/core/symthaea-hdc-ltc" }
+sha2 = "0.10"
