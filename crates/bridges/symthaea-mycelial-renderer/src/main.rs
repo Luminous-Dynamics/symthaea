@@ -93,7 +93,7 @@ fn setup_presence(
     commands.spawn((
         DirectionalLight {
             illuminance: 3_200.0,
-            shadows_enabled: false,
+            shadow_maps_enabled: false,
             ..default()
         },
         Transform::from_xyz(-4.0, 7.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -101,7 +101,7 @@ fn setup_presence(
     commands.spawn((
         DirectionalLight {
             illuminance: 1_250.0,
-            shadows_enabled: false,
+            shadow_maps_enabled: false,
             ..default()
         },
         Transform::from_xyz(4.0, -2.0, -5.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -249,7 +249,7 @@ fn animate_presence(
     mut pulse_query: Query<&mut Transform, With<CorePulse>>,
     mut orbit_query: Query<(&mut Transform, &OrbitalMotion)>,
 ) {
-    let elapsed = time.elapsed_secs();
+    let elapsed = time.elapsed_secs_wrapped();
     for mut transform in &mut pulse_query {
         let scale = 1.0 + 0.018 * (elapsed * 0.62).sin();
         transform.scale = Vec3::splat(scale);
