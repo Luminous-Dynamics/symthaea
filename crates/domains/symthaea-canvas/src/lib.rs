@@ -20,6 +20,7 @@ pub mod aesthetic_score;
 pub mod animation;
 pub mod cognitive_events;
 pub mod cognitive_layout;
+pub mod cognitive_morphology;
 pub mod cognitive_svg;
 pub mod cognitive_topology;
 pub mod color;
@@ -51,6 +52,11 @@ pub use cognitive_layout::{
     COGNITIVE_PROJECTION_SCHEMA_VERSION, CognitiveAnchor, CognitiveLayoutConfig,
     CognitiveLayoutError, CognitiveSpatialLink, CognitiveSpatialProjection,
     layout_cognitive_topology, project_cognitive_topology,
+};
+pub use cognitive_morphology::{
+    COGNITIVE_MORPHOLOGY_SCHEMA_VERSION, CognitiveHypha, CognitiveMorphologyConfig,
+    CognitiveMorphologyError, CognitiveMorphologyNode, CognitiveMorphologyProjection,
+    build_cognitive_morphology,
 };
 pub use cognitive_svg::{CognitiveSvgError, CognitiveSvgOptions, render_cognitive_projection_svg};
 pub use cognitive_topology::{
