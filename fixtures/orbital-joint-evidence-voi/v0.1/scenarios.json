@@ -237,8 +237,10 @@
           "icd_revision": "R3",
           "method_ref": "synthetic-method://A-UNCALIBRATED-LABEL",
           "admissibility": {
-            "state": "ADMISSIBLE",
-            "reason_codes": []
+            "state": "INADMISSIBLE",
+            "reason_codes": [
+              "UNCALIBRATED_PROBABILITY_MODEL"
+            ]
           },
           "resources": {
             "engineering_hours": 0.1,
@@ -854,15 +856,17 @@
         {
           "action_id": "A-FIRST-CYCLE-ONLY",
           "action_class": "single_mating_test",
-          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "target_claim_id": "INITIAL-MATE-COMPATIBILITY",
           "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
           "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
           "configuration_id": "CFG-R7",
           "icd_revision": "R3",
           "method_ref": "synthetic-method://A-FIRST-CYCLE-ONLY",
           "admissibility": {
-            "state": "ADMISSIBLE",
-            "reason_codes": []
+            "state": "INADMISSIBLE",
+            "reason_codes": [
+              "CLAIM_SCOPE_MISMATCH"
+            ]
           },
           "resources": {
             "engineering_hours": 0.25,
