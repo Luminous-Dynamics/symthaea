@@ -174,7 +174,7 @@ def evaluate_design_manifest(manifest: Mapping[str, object], tolerance: float = 
         raise DesignValidationError("manifest status must identify synthetic or preregistered input")
     prior = manifest.get("theory_prior")
     designs = manifest.get("designs")
-    if not isinstance(prior, dict) or not isinstance(designs, list) or not designs:
+    if not isinstance(prior, Mapping) or not isinstance(designs, list) or not designs:
         raise DesignValidationError("manifest requires theory_prior and at least one design")
     results = []
     seen_ids: set[str] = set()
@@ -192,13 +192,18 @@ def evaluate_design_manifest(manifest: Mapping[str, object], tolerance: float = 
             raise DesignValidationError(f"design {design_id!r} requires nuisance_scenarios")
         scenario_values = []
         for scenario_index, scenario in enumerate(scenarios):
-            if not isinstance(scenario, dict):
+            if not isinstance(scenario, Mapping):
                 raise DesignValidationError(
                     f"design {design_id!r} scenario {scenario_index} must be an object"
                 )
+            likelihoods = scenario.get("likelihoods")
+            if not isinstance(likelihoods, Mapping) or not likelihoods:
+                raise DesignValidationError(
+                    f"design {design_id!r} scenario {scenario_index} requires theory likelihoods"
+                )
             scenario_values.append((
                 scenario.get("weight"),
-                scenario.get("likelihoods"),
+                likelihoods,
             ))
         cost = design.get("cost")
         q = design.get("lower_quantile", 0.10)
