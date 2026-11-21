@@ -565,6 +565,13 @@
           "A-UNCALIBRATED-NDE"
         ],
         "notes": "Inspection action has expired calibration and a declared common-cause dependency with the existing reference. Do not count as independent corroboration."
+      },
+      "current_evidence_dependency_groups": {
+        "structural-profile://P1": [
+          "DAQ-CALIBRATION-ROOT-01",
+          "REFERENCE-LAB-01"
+        ],
+        "requirement-profile://C1": []
       }
     },
     {
@@ -818,7 +825,10 @@
           "A-INFORMATION-ONLY"
         ],
         "notes": "The action must both distinguish the decision states and cover the pre-registered combined load × temperature × end-of-life obligation. A high-information mass-only action does not satisfy the campaign."
-      }
+      },
+      "required_obligations": [
+        "LOAD-X-TEMP-X-EOL-001"
+      ]
     },
     {
       "scenario_id": "JEV-010",
@@ -929,7 +939,10 @@
           "A-FIRST-CYCLE-ONLY"
         ],
         "notes": "A first-mating test does not resolve wear/requalification claims. The repeated-mating action covers the declared lifecycle claim; the first-cycle action is source-event-only."
-      }
+      },
+      "required_obligations": [
+        "WEAR-LIFECYCLE-001"
+      ]
     },
     {
       "scenario_id": "JEV-011",
