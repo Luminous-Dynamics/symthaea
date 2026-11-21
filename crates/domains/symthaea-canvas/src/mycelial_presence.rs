@@ -10,15 +10,12 @@ use std::f32::consts::TAU;
 
 use crate::color::Color;
 use crate::embodiment::{EmbodimentActivity, EmbodimentSnapshot, SpeechOutputState};
-use crate::mycelial_model::{build_mycelial_model, PresenceMode, SpatialPoint3};
+use crate::mycelial_model::{PresenceMode, SpatialPoint3, build_mycelial_model};
 use crate::scene_graph::{FilterType, GradientStop, NodeKind, SceneNode, Style};
-use crate::svg_renderer::{
-    SvgRenderOptions, VIEWPORT_H, VIEWPORT_W, render_svg_with_options,
-};
+use crate::svg_renderer::{SvgRenderOptions, VIEWPORT_H, VIEWPORT_W, render_svg_with_options};
 
 const CENTER_X: f32 = VIEWPORT_W / 2.0;
 const CENTER_Y: f32 = VIEWPORT_H / 2.0;
-
 
 fn build_activity_motif(activity: EmbodimentActivity, color: Color) -> SceneNode {
     // Every state glyph sits in the same compact seal above the organism.
@@ -39,22 +36,22 @@ fn build_activity_motif(activity: EmbodimentActivity, color: Color) -> SceneNode
         EmbodimentActivity::Idle => "motif-idle",
     }));
 
-    motif.children.push(
-        SceneNode::circle(glyph_x, glyph_y, 27.0).with_style(Style {
+    motif
+        .children
+        .push(SceneNode::circle(glyph_x, glyph_y, 27.0).with_style(Style {
             fill: Some(Color::from_hsla(224.0, 0.42, 0.075, 0.94)),
             stroke: Some(color.with_alpha(0.48)),
             stroke_width: Some(1.1),
             ..Style::default()
-        }),
-    );
-    motif.children.push(
-        SceneNode::circle(glyph_x, glyph_y, 22.0).with_style(Style {
+        }));
+    motif
+        .children
+        .push(SceneNode::circle(glyph_x, glyph_y, 22.0).with_style(Style {
             fill: None,
             stroke: Some(color.with_alpha(0.24)),
             stroke_width: Some(0.7),
             ..Style::default()
-        }),
-    );
+        }));
 
     let thin = Style {
         fill: None,
@@ -77,13 +74,8 @@ fn build_activity_motif(activity: EmbodimentActivity, color: Color) -> SceneNode
             for index in 0..3 {
                 let spread = index as f32 * 4.5;
                 motif.children.push(
-                    SceneNode::ellipse(
-                        glyph_x,
-                        glyph_y,
-                        7.0 + spread,
-                        4.0 + spread * 0.48,
-                    )
-                    .with_style(thin.clone()),
+                    SceneNode::ellipse(glyph_x, glyph_y, 7.0 + spread, 4.0 + spread * 0.48)
+                        .with_style(thin.clone()),
                 );
             }
         }
@@ -92,20 +84,14 @@ fn build_activity_motif(activity: EmbodimentActivity, color: Color) -> SceneNode
                 motif.children.push(dot(glyph_x + offset, glyph_y, 2.8));
             }
             motif.children.push(
-                SceneNode::line(
-                    glyph_x - 15.0,
-                    glyph_y,
-                    glyph_x + 15.0,
-                    glyph_y,
-                )
-                .with_style(thin.clone()),
+                SceneNode::line(glyph_x - 15.0, glyph_y, glyph_x + 15.0, glyph_y)
+                    .with_style(thin.clone()),
             );
         }
         EmbodimentActivity::Retrieving => {
-            motif.children.push(
-                SceneNode::ellipse(glyph_x, glyph_y, 14.0, 9.0)
-                    .with_style(thin.clone()),
-            );
+            motif
+                .children
+                .push(SceneNode::ellipse(glyph_x, glyph_y, 14.0, 9.0).with_style(thin.clone()));
             for index in 0..4 {
                 let angle = index as f32 * TAU / 4.0;
                 motif.children.push(dot(
@@ -149,27 +135,26 @@ fn build_activity_motif(activity: EmbodimentActivity, color: Color) -> SceneNode
                     ))
                     .with_style(thin.clone()),
                 );
-                motif.children.push(dot(glyph_x + offset, glyph_y - 15.0, 2.4));
+                motif
+                    .children
+                    .push(dot(glyph_x + offset, glyph_y - 15.0, 2.4));
             }
         }
         EmbodimentActivity::Planning => {
             let points = (0..6)
                 .map(|index| {
                     let angle = index as f32 * TAU / 6.0 - TAU / 4.0;
-                    (
-                        glyph_x + angle.cos() * 14.0,
-                        glyph_y + angle.sin() * 12.0,
-                    )
+                    (glyph_x + angle.cos() * 14.0, glyph_y + angle.sin() * 12.0)
                 })
                 .collect();
-            motif.children.push(
-                SceneNode::polygon(points, true).with_style(Style {
+            motif
+                .children
+                .push(SceneNode::polygon(points, true).with_style(Style {
                     fill: Some(color.with_alpha(0.12)),
                     stroke: Some(color.with_alpha(0.96)),
                     stroke_width: Some(1.35),
                     ..Style::default()
-                }),
-            );
+                }));
             motif.children.push(dot(glyph_x, glyph_y, 2.8));
         }
         EmbodimentActivity::ExecutingTool => {
@@ -180,68 +165,52 @@ fn build_activity_motif(activity: EmbodimentActivity, color: Color) -> SceneNode
             for offset in [-12.0, 0.0, 12.0] {
                 let x = glyph_x + offset;
                 motif.children.push(
-                    SceneNode::line(x, glyph_y - 3.0, x, glyph_y - 11.0)
-                        .with_style(thin.clone()),
+                    SceneNode::line(x, glyph_y - 3.0, x, glyph_y - 11.0).with_style(thin.clone()),
                 );
                 motif.children.push(
-                    SceneNode::rect(x - 3.0, glyph_y - 16.0, 6.0, 6.0)
-                        .with_style(Style {
-                            fill: Some(color.with_alpha(0.20)),
-                            stroke: Some(color.with_alpha(0.98)),
-                            stroke_width: Some(1.1),
-                            ..Style::default()
-                        }),
+                    SceneNode::rect(x - 3.0, glyph_y - 16.0, 6.0, 6.0).with_style(Style {
+                        fill: Some(color.with_alpha(0.20)),
+                        stroke: Some(color.with_alpha(0.98)),
+                        stroke_width: Some(1.1),
+                        ..Style::default()
+                    }),
                 );
             }
         }
         EmbodimentActivity::AwaitingTool => {
-            motif.children.push(
-                SceneNode::circle(glyph_x, glyph_y, 12.0)
-                    .with_style(thin.clone()),
-            );
+            motif
+                .children
+                .push(SceneNode::circle(glyph_x, glyph_y, 12.0).with_style(thin.clone()));
             motif.children.push(dot(glyph_x, glyph_y, 3.2));
         }
         EmbodimentActivity::Interrupted => {
             motif.children.push(
-                SceneNode::rect(glyph_x - 7.0, glyph_y - 12.0, 4.0, 24.0)
-                    .with_style(Style {
-                        fill: Some(color.with_alpha(0.94)),
-                        ..Style::default()
-                    }),
+                SceneNode::rect(glyph_x - 7.0, glyph_y - 12.0, 4.0, 24.0).with_style(Style {
+                    fill: Some(color.with_alpha(0.94)),
+                    ..Style::default()
+                }),
             );
             motif.children.push(
-                SceneNode::rect(glyph_x + 3.0, glyph_y - 12.0, 4.0, 24.0)
-                    .with_style(Style {
-                        fill: Some(color.with_alpha(0.94)),
-                        ..Style::default()
-                    }),
+                SceneNode::rect(glyph_x + 3.0, glyph_y - 12.0, 4.0, 24.0).with_style(Style {
+                    fill: Some(color.with_alpha(0.94)),
+                    ..Style::default()
+                }),
             );
         }
         EmbodimentActivity::Fault => {
             motif.children.push(
-                SceneNode::line(
-                    glyph_x - 9.0,
-                    glyph_y - 9.0,
-                    glyph_x + 9.0,
-                    glyph_y + 9.0,
-                )
-                .with_style(thin.clone()),
+                SceneNode::line(glyph_x - 9.0, glyph_y - 9.0, glyph_x + 9.0, glyph_y + 9.0)
+                    .with_style(thin.clone()),
             );
             motif.children.push(
-                SceneNode::line(
-                    glyph_x + 9.0,
-                    glyph_y - 9.0,
-                    glyph_x - 9.0,
-                    glyph_y + 9.0,
-                )
-                .with_style(thin),
+                SceneNode::line(glyph_x + 9.0, glyph_y - 9.0, glyph_x - 9.0, glyph_y + 9.0)
+                    .with_style(thin),
             );
         }
     }
 
     motif
 }
-
 
 fn blur_filter(id: &str, std_dev: f32) -> SceneNode {
     SceneNode {
@@ -273,13 +242,13 @@ fn build_starfield() -> SceneNode {
         } else {
             Color::from_hsl(188.0, 0.58, 0.76)
         };
-        stars.children.push(
-            SceneNode::circle(x, y, size).with_style(Style {
+        stars
+            .children
+            .push(SceneNode::circle(x, y, size).with_style(Style {
                 fill: Some(tint.with_alpha(alpha)),
-            css_class: Some(format!("spore-phase-{}", index % 5)),
-            ..Style::default()
-            }),
-        );
+                css_class: Some(format!("spore-phase-{}", index % 5)),
+                ..Style::default()
+            }));
     }
     stars
 }
@@ -313,24 +282,22 @@ fn build_core(speech_weight: f32, activity_color: Color) -> SceneNode {
         } else {
             activity_color
         };
-        core.children.push(
-            SceneNode::circle(x, y, radius).with_style(Style {
+        core.children
+            .push(SceneNode::circle(x, y, radius).with_style(Style {
                 fill: Some(cell_color.with_alpha(0.86)),
                 stroke: Some(Color::from_hsla(186.0, 0.50, 0.94, 0.55)),
                 stroke_width: Some(0.55),
                 ..Style::default()
-            }),
-        );
+            }));
     }
 
     core.children.push(
-        SceneNode::circle(CENTER_X, CENTER_Y, 27.0 + speech_weight * 5.0)
-            .with_style(Style {
-                fill_url: Some("mycelium-core".to_string()),
-                stroke: Some(Color::from_hsl(182.0, 0.82, 0.84).with_alpha(0.80)),
-                stroke_width: Some(1.7),
-                ..Style::default()
-            }),
+        SceneNode::circle(CENTER_X, CENTER_Y, 27.0 + speech_weight * 5.0).with_style(Style {
+            fill_url: Some("mycelium-core".to_string()),
+            stroke: Some(Color::from_hsl(182.0, 0.82, 0.84).with_alpha(0.80)),
+            stroke_width: Some(1.7),
+            ..Style::default()
+        }),
     );
     core.children.push(
         SceneNode::circle(CENTER_X, CENTER_Y, 16.0 + speech_weight * 2.0).with_style(Style {
@@ -401,20 +368,18 @@ pub fn build_mycelial_presence_with_mode(
         }),
     );
     root.children.push(
-        SceneNode::ellipse(CENTER_X - 38.0, CENTER_Y + 28.0, 208.0, 152.0)
-            .with_style(Style {
-                fill_url: Some("mycelium-nebula".to_string()),
-                opacity: Some(0.52),
-                ..Style::default()
-            }),
+        SceneNode::ellipse(CENTER_X - 38.0, CENTER_Y + 28.0, 208.0, 152.0).with_style(Style {
+            fill_url: Some("mycelium-nebula".to_string()),
+            opacity: Some(0.52),
+            ..Style::default()
+        }),
     );
     root.children.push(
-        SceneNode::ellipse(CENTER_X + 104.0, CENTER_Y - 92.0, 176.0, 126.0)
-            .with_style(Style {
-                fill_url: Some("mycelium-nebula-cyan".to_string()),
-                opacity: Some(0.44),
-                ..Style::default()
-            }),
+        SceneNode::ellipse(CENTER_X + 104.0, CENTER_Y - 92.0, 176.0, 126.0).with_style(Style {
+            fill_url: Some("mycelium-nebula-cyan".to_string()),
+            opacity: Some(0.44),
+            ..Style::default()
+        }),
     );
     root.children.push(build_starfield());
 
@@ -426,19 +391,16 @@ pub fn build_mycelial_presence_with_mode(
     });
     // Preserve the signature teal identity while letting the current runtime
     // activity tint the organism's branches in a restrained, coherent way.
-    let base_color =
-        Color::from_hsl(184.0, 0.82, 0.62).lerp(&activity_color, 0.18);
+    let base_color = Color::from_hsl(184.0, 0.82, 0.62).lerp(&activity_color, 0.18);
     for filament in &model.filaments {
         let (start_x, start_y) = project_spatial(filament.start);
         let (control_a_x, control_a_y) = project_spatial(filament.control_a);
         let (control_b_x, control_b_y) = project_spatial(filament.control_b);
         let (end_x, end_y) = project_spatial(filament.end);
-        let path = format!(
-            concat!(
-                "M {start_x:.2} {start_y:.2} C {control_a_x:.2} {control_a_y:.2}, ",
-                "{control_b_x:.2} {control_b_y:.2}, {end_x:.2} {end_y:.2}"
-            )
-        );
+        let path = format!(concat!(
+            "M {start_x:.2} {start_y:.2} C {control_a_x:.2} {control_a_y:.2}, ",
+            "{control_b_x:.2} {control_b_y:.2}, {end_x:.2} {end_y:.2}"
+        ));
         let generation_factor = (filament.generation as f32 / 4.0).clamp(0.0, 1.0);
         let branch_color = base_color.lerp(
             &Color::from_hsl(274.0, 0.58, 0.70),
@@ -446,38 +408,40 @@ pub fn build_mycelial_presence_with_mode(
         );
 
         if filament.generation == 0 {
-            hyphae.children.push(SceneNode::path(path.clone()).with_style(Style {
-                fill: None,
-                stroke: Some(branch_color.with_alpha(0.16)),
-                stroke_width: Some(filament.radius_start * 5.0),
-                filter: Some("mycelium-soft-glow".to_string()),
-                ..Style::default()
-            }));
+            hyphae
+                .children
+                .push(SceneNode::path(path.clone()).with_style(Style {
+                    fill: None,
+                    stroke: Some(branch_color.with_alpha(0.16)),
+                    stroke_width: Some(filament.radius_start * 5.0),
+                    filter: Some("mycelium-soft-glow".to_string()),
+                    ..Style::default()
+                }));
         }
 
-        hyphae.children.push(SceneNode::path(path).with_style(Style {
-            fill: None,
-            stroke: Some(branch_color.with_alpha(0.44 + (1.0 - generation_factor) * 0.42)),
-            stroke_width: Some((filament.radius_start + filament.radius_end) * 0.72),
-            ..Style::default()
-        }));
+        hyphae
+            .children
+            .push(SceneNode::path(path).with_style(Style {
+                fill: None,
+                stroke: Some(branch_color.with_alpha(0.44 + (1.0 - generation_factor) * 0.42)),
+                stroke_width: Some((filament.radius_start + filament.radius_end) * 0.72),
+                ..Style::default()
+            }));
 
         if filament.terminal {
             hyphae.children.push(
-                SceneNode::circle(end_x, end_y, filament.radius_end * 1.8)
-                    .with_style(Style {
-                        fill: Some(branch_color.with_alpha(0.22)),
-                        ..Style::default()
-                    }),
+                SceneNode::circle(end_x, end_y, filament.radius_end * 1.8).with_style(Style {
+                    fill: Some(branch_color.with_alpha(0.22)),
+                    ..Style::default()
+                }),
             );
             hyphae.children.push(
-                SceneNode::circle(end_x, end_y, filament.radius_end * 0.9)
-                    .with_style(Style {
-                        fill: Some(branch_color.with_alpha(0.94)),
-                        stroke: Some(Color::from_hsla(186.0, 0.36, 0.96, 0.66)),
-                        stroke_width: Some(0.5),
-                        ..Style::default()
-                    }),
+                SceneNode::circle(end_x, end_y, filament.radius_end * 0.9).with_style(Style {
+                    fill: Some(branch_color.with_alpha(0.94)),
+                    stroke: Some(Color::from_hsla(186.0, 0.36, 0.96, 0.66)),
+                    stroke_width: Some(0.5),
+                    ..Style::default()
+                }),
             );
         }
     }
@@ -487,18 +451,14 @@ pub fn build_mycelial_presence_with_mode(
     for ring in 0..3 {
         let offset = ring as f32 * 17.0;
         rings.children.push(
-            SceneNode::ellipse(
-                CENTER_X,
-                CENTER_Y,
-                58.0 + offset,
-                43.0 + offset,
-            )
-            .with_style(Style {
-                fill: None,
-                stroke: Some(activity_color.with_alpha(0.10 + ring as f32 * 0.035)),
-                stroke_width: Some(0.8 + ring as f32 * 0.25),
-                ..Style::default()
-            }),
+            SceneNode::ellipse(CENTER_X, CENTER_Y, 58.0 + offset, 43.0 + offset).with_style(
+                Style {
+                    fill: None,
+                    stroke: Some(activity_color.with_alpha(0.10 + ring as f32 * 0.035)),
+                    stroke_width: Some(0.8 + ring as f32 * 0.25),
+                    ..Style::default()
+                },
+            ),
         );
     }
     root.children.push(rings);
@@ -512,13 +472,12 @@ pub fn build_mycelial_presence_with_mode(
     for cell in &model.orbital_cells {
         let (x, y) = project_spatial(cell.position);
         orbital_cells.children.push(
-            SceneNode::circle(x, y, cell.radius * cell_scale)
-                .with_style(Style {
-                    fill: Some(activity_color.with_alpha(0.46)),
-                    stroke: Some(Color::from_hsla(187.0, 0.46, 0.94, 0.42)),
-                    stroke_width: Some(0.45),
-                    ..Style::default()
-                }),
+            SceneNode::circle(x, y, cell.radius * cell_scale).with_style(Style {
+                fill: Some(activity_color.with_alpha(0.46)),
+                stroke: Some(Color::from_hsla(187.0, 0.46, 0.94, 0.42)),
+                stroke_width: Some(0.45),
+                ..Style::default()
+            }),
         );
     }
     root.children.push(orbital_cells);
@@ -546,11 +505,10 @@ pub fn build_mycelial_presence_with_mode(
             }),
         );
         gaze_marker.children.push(
-            SceneNode::circle(CENTER_X + dx * 77.0, CENTER_Y + dy * 62.0, 3.0)
-                .with_style(Style {
-                    fill: Some(Color::from_hsl(188.0, 0.72, 0.86)),
-                    ..Style::default()
-                }),
+            SceneNode::circle(CENTER_X + dx * 77.0, CENTER_Y + dy * 62.0, 3.0).with_style(Style {
+                fill: Some(Color::from_hsl(188.0, 0.72, 0.86)),
+                ..Style::default()
+            }),
         );
         root.children.push(gaze_marker);
     }
@@ -577,13 +535,7 @@ pub fn build_mycelial_presence_with_mode(
     {
         let mut speech_ring = SceneNode::group(Some("speech-output"));
         speech_ring.children.push(
-            SceneNode::ellipse(
-                CENTER_X,
-                CENTER_Y,
-                75.0,
-                58.0,
-            )
-            .with_style(Style {
+            SceneNode::ellipse(CENTER_X, CENTER_Y, 75.0, 58.0).with_style(Style {
                 fill: None,
                 stroke: Some(activity_color.with_alpha(0.44)),
                 stroke_width: Some(1.4),
@@ -596,14 +548,16 @@ pub fn build_mycelial_presence_with_mode(
     if activity != EmbodimentActivity::Idle {
         let mut activity_halo = SceneNode::group(Some("activity-halo"));
         activity_halo.style.opacity = Some(0.25);
-        activity_halo.children.push(
-            SceneNode::circle(CENTER_X, CENTER_Y, 104.0).with_style(Style {
-                fill: None,
-                stroke: Some(activity_color),
-                stroke_width: Some(2.0),
-                ..Style::default()
-            }),
-        );
+        activity_halo
+            .children
+            .push(
+                SceneNode::circle(CENTER_X, CENTER_Y, 104.0).with_style(Style {
+                    fill: None,
+                    stroke: Some(activity_color),
+                    stroke_width: Some(2.0),
+                    ..Style::default()
+                }),
+            );
         root.children.push(activity_halo);
         root.children
             .push(build_activity_motif(activity, activity_color));
@@ -632,7 +586,8 @@ pub fn build_mycelial_presence_with_mode(
         .map(|observed| finite_unit(observed.value.weight))
         .unwrap_or(0.0);
 
-    root.children.push(build_core(speech_weight, activity_color));
+    root.children
+        .push(build_core(speech_weight, activity_color));
 
     let mut particles = SceneNode::group(Some("particles"));
     for particle in 0..12 {
@@ -740,7 +695,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn presence_uses_layered_glow_nebula_and_deterministic_starfield() {
         let scene = build_mycelial_presence(&EmbodimentSnapshot::default());
@@ -755,10 +709,12 @@ mod tests {
         assert!(ids.contains(&"starfield"));
         assert!(ids.contains(&"bloom"));
         assert!(ids.contains(&"orbital-cells"));
-        assert!(scene
-            .children
-            .iter()
-            .any(|node| matches!(node.kind, NodeKind::Filter { .. })));
+        assert!(
+            scene
+                .children
+                .iter()
+                .any(|node| matches!(node.kind, NodeKind::Filter { .. }))
+        );
     }
 
     #[test]
@@ -787,30 +743,22 @@ mod tests {
         }
     }
 
-
     #[test]
     fn full_motion_svg_has_staggered_spores_and_biomimetic_hyphae_pulse() {
-        let svg = render_mycelial_presence(
-            &EmbodimentSnapshot::default(),
-            SvgRenderOptions::default(),
-        );
+        let svg =
+            render_mycelial_presence(&EmbodimentSnapshot::default(), SvgRenderOptions::default());
         assert!(svg.contains("spore-phase-0"));
         assert!(svg.contains("spore-phase-4"));
         assert!(svg.contains("hyphae-pulse"));
         assert!(svg.contains("mycelium-soft-glow"));
     }
 
-
     #[test]
     fn primary_hyphae_use_deterministic_non_uniform_growth() {
-        let first = render_mycelial_presence(
-            &EmbodimentSnapshot::default(),
-            SvgRenderOptions::default(),
-        );
-        let second = render_mycelial_presence(
-            &EmbodimentSnapshot::default(),
-            SvgRenderOptions::default(),
-        );
+        let first =
+            render_mycelial_presence(&EmbodimentSnapshot::default(), SvgRenderOptions::default());
+        let second =
+            render_mycelial_presence(&EmbodimentSnapshot::default(), SvgRenderOptions::default());
         assert_eq!(first, second);
         assert!(first.matches("filter=\"url(#mycelium-soft-glow)\"").count() < 16);
     }
@@ -849,7 +797,6 @@ mod tests {
         assert!(speaking_svg.contains("activity-halo"));
     }
 
-
     #[test]
     fn viseme_modulates_the_core_only_during_confirmed_playback() {
         let mut snapshot = EmbodimentSnapshot::default();
@@ -871,7 +818,6 @@ mod tests {
         let playing = render_mycelial_presence(&snapshot, SvgRenderOptions::default());
         assert_ne!(still_queued, playing);
     }
-
 
     #[test]
     fn semantic_activity_motifs_are_geometrically_distinct() {
@@ -895,13 +841,19 @@ mod tests {
             })
         };
 
-        assert_eq!(motif_id(&associating_scene).as_deref(), Some("motif-associating"));
-        assert_eq!(motif_id(&predicting_scene).as_deref(), Some("motif-predicting"));
+        assert_eq!(
+            motif_id(&associating_scene).as_deref(),
+            Some("motif-associating")
+        );
+        assert_eq!(
+            motif_id(&predicting_scene).as_deref(),
+            Some("motif-predicting")
+        );
         let motif_node = |scene: &SceneNode| {
             scene.children.iter().find(|child| match &child.kind {
-                NodeKind::Group { id } => {
-                    id.as_deref().is_some_and(|value| value.starts_with("motif-"))
-                }
+                NodeKind::Group { id } => id
+                    .as_deref()
+                    .is_some_and(|value| value.starts_with("motif-")),
                 _ => false,
             })
         };
@@ -928,15 +880,12 @@ mod tests {
         let mut snapshot = EmbodimentSnapshot::default();
         snapshot.uncertainty = Some(observed(0.0_f32, 1));
         let scene = build_mycelial_presence(&snapshot);
-        assert!(!scene
-            .children
-            .iter()
-            .any(|child| {
-                matches!(
-                    &child.kind,
-                    NodeKind::Group { id: Some(id) } if id == "uncertainty-halo"
-                )
-            }));
+        assert!(!scene.children.iter().any(|child| {
+            matches!(
+                &child.kind,
+                NodeKind::Group { id: Some(id) } if id == "uncertainty-halo"
+            )
+        }));
     }
 
     #[test]
@@ -950,7 +899,7 @@ mod tests {
             },
         );
         assert!(svg.contains("animation: none"));
-    } 
+    }
     #[test]
     fn renderer_modes_share_one_model_but_offer_distinct_presentations() {
         let snapshot = EmbodimentSnapshot::default();
@@ -960,12 +909,14 @@ mod tests {
             build_mycelial_presence_with_mode(&snapshot, PresenceMode::Conversational);
         assert_ne!(ambient.node_count(), cognitive.node_count());
         assert_ne!(ambient.node_count(), conversational.node_count());
-        let cognitive_ids: Vec<&str> = cognitive.children.iter().filter_map(|node| {
-            match &node.kind {
+        let cognitive_ids: Vec<&str> = cognitive
+            .children
+            .iter()
+            .filter_map(|node| match &node.kind {
                 NodeKind::Group { id: Some(id) } => Some(id.as_str()),
                 _ => None,
-            }
-        }).collect();
+            })
+            .collect();
         assert!(cognitive_ids.contains(&"signal-inspector-guide-rings"));
     }
 
@@ -973,24 +924,17 @@ mod tests {
     fn observed_gaze_and_confirmed_playback_have_separate_visual_layers() {
         let mut snapshot = EmbodimentSnapshot::default();
         snapshot.gaze = Some(observed(crate::embodiment::GazeTarget::Content, 3));
-        let with_gaze = build_mycelial_presence_with_mode(
-            &snapshot,
-            PresenceMode::Conversational,
-        );
+        let with_gaze = build_mycelial_presence_with_mode(&snapshot, PresenceMode::Conversational);
         assert!(with_gaze.children.iter().any(|node| matches!(
             &node.kind,
             NodeKind::Group { id: Some(id) } if id == "gaze-indicator"
         )));
 
         snapshot.speech_output = Some(observed(SpeechOutputState::Playing, 4));
-        let playing = build_mycelial_presence_with_mode(
-            &snapshot,
-            PresenceMode::Conversational,
-        );
+        let playing = build_mycelial_presence_with_mode(&snapshot, PresenceMode::Conversational);
         assert!(playing.children.iter().any(|node| matches!(
             &node.kind,
             NodeKind::Group { id: Some(id) } if id == "speech-output"
         )));
     }
-
 }
