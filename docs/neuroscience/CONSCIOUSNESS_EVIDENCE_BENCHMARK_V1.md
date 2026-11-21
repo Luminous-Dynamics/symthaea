@@ -232,3 +232,12 @@ For candidate design d, the primary criterion is mutual information between theo
 The utility must include missing, ambiguous and failed measurement outcomes; it must report prior and nuisance sensitivity and acquisition cost separately. A conservative lower quantile over predeclared nuisance scenarios can be reported alongside expected EIG, but it is not a worst-case guarantee.
 
 A pure-standard-library reference calculator and synthetic tests are in `research/cetb/theory_design/`. It does not author theory predictions, select priors or establish theory truth. Prediction cards must be frozen by independent theory owners/evaluators before design selection. See `CETB_THEORY_DISCRIMINATION_DESIGN_V0.md`.
+
+
+## 16. Synthetic RCAF calibration layer
+
+CETB adds an executable null and injection–recovery benchmark to the standalone RCAF crate. The Gaussian-factor model generates finite-sample correlation matrices from a positive-semidefinite construction. It compares an independent within-state repeat against both an exchangeable same-state null sample and a known module-level perturbation.
+
+The benchmark reports null false-positive rate, injection-detection power, Wilson Monte-Carlo intervals and participant-level paired-gap distributions. This catches a failure mode that known-answer unit tests cannot: a metric that computes correctly but is over-sensitive under noise or insensitive to a controlled network change.
+
+The current default fixture and its limits are described in `RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`. It is not an empirical simulation of consciousness or a substitute for NSI, test–retest data, or independent cohort validation.
