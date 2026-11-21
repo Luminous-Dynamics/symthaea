@@ -19,12 +19,12 @@ use crate::cognitive_bridge::{
 };
 use crate::intervention::{InterventionDescriptor, InterventionStrategy, ObligationClass};
 use crate::musical_inference::MusicAction;
-use crate::score_transaction::{
-    ScorePatchErrorV1, ScorePatchReceiptV1, create_score_patch_receipt,
-};
 use crate::musical_policy::{
     MusicalPolicyPreference, MusicalPolicySelection, PolicyCandidateEvidence,
     passes_universal_theory_gate, select_by_musical_policy,
+};
+use crate::score_transaction::{
+    ScorePatchErrorV1, ScorePatchReceiptV1, create_score_patch_receipt,
 };
 use serde::{Deserialize, Serialize};
 use symthaea_music_theory::{
@@ -247,9 +247,8 @@ pub fn generate_and_rank_sonata_return_with_model(
     let mut candidates = Vec::with_capacity(generated.len());
     let mut policy_evidence = Vec::with_capacity(generated.len());
     for (alternative_id, strategy, score) in generated {
-        let patch_receipt =
-            create_score_patch_receipt(&realization.score, &score, &target_indices)
-                .map_err(SonataInterventionError::ScorePatchRejected)?;
+        let patch_receipt = create_score_patch_receipt(&realization.score, &score, &target_indices)
+            .map_err(SonataInterventionError::ScorePatchRejected)?;
         let motif_return = compare_melodic_regions(
             &score,
             source.start,
@@ -826,7 +825,10 @@ mod tests {
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
         assert_eq!(batch.candidates.len(), 5);
-        let source_digest = batch.candidates[0].patch_receipt.source_score_sha256.clone();
+        let source_digest = batch.candidates[0]
+            .patch_receipt
+            .source_score_sha256
+            .clone();
         let protected_digest = batch.candidates[0]
             .patch_receipt
             .protected_complement_sha256
