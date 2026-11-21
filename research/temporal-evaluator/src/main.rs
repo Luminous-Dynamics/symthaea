@@ -1,5 +1,3 @@
-pub mod sensing;
-
 //! Evaluator-side counterfactual retention primitives.
 //!
 //! This is intentionally a separate package from the candidate benchmark
@@ -9,6 +7,8 @@ pub mod sensing;
 //! storage, evaluator-owned signing keys and replay-resistant receipts.
 //!
 //! No function here supplies evaluator outcomes to candidate-side policies.
+
+pub mod sensing;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
