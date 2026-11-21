@@ -185,3 +185,40 @@ jobs:
           assert all(0.0 <= item["injection_detection_power"]["estimate"] <= 1.0 for item in results)
           print("PASS: matched-input RCAF estimator tournament")
           PY
+
+      - name: Build content-addressed simulation execution receipt
+        run: |
+          python research/rcaf/tools/build_execution_receipt.py \
+            --root . \
+            --output "$RUNNER_TEMP/rcaf-execution-receipt.json" \
+            --reports \
+              "$RUNNER_TEMP/rcaf-injection-report.json" \
+              "$RUNNER_TEMP/rcaf-injection-sweep.json" \
+              "$RUNNER_TEMP/rcaf-estimator-tournament.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/execution-receipt.schema.json").read_text())
+          receipt = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-execution-receipt.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(receipt, schema)
+          assert receipt["source_commit"] == os.environ["GITHUB_SHA"]
+          assert len(receipt["simulation_reports"]) == 3
+          assert len(receipt["source_files"]) > 0
+          print("PASS: content-addressed RCAF execution receipt")
+          PY
+
+      - name: Archive simulation reports and execution receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: rcaf-simulation-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/rcaf-injection-report.json
+            ${{ runner.temp }}/rcaf-injection-sweep.json
+            ${{ runner.temp }}/rcaf-estimator-tournament.json
+            ${{ runner.temp }}/rcaf-execution-receipt.json
+          if-no-files-found: error
+          retention-days: 30
