@@ -18,7 +18,10 @@ pub struct InjectionRecoveryConfig {
     pub global_loading: f64,
     pub module_loading: f64,
     pub loading_jitter: f64,
+    /// Stationary AR(1) coefficient applied to factors and residuals.
+    pub temporal_autocorrelation: f64,
     pub injection_loading_delta: f64,
+    pub temporal_autocorrelation: f64,
     pub alpha: f64,
     pub seed: u64,
 }
@@ -35,6 +38,7 @@ impl Default for InjectionRecoveryConfig {
             global_loading: 0.20,
             module_loading: 0.18,
             loading_jitter: 0.06,
+            temporal_autocorrelation: 0.30,
             injection_loading_delta: 0.40,
             alpha: 0.05,
             seed: 0xC37B_2026_1121,
@@ -184,6 +188,7 @@ impl InjectionRecoveryReport {
                 "  \"samples_per_segment\": {},\n",
                 "  \"monte_carlo_replicates\": {},\n",
                 "  \"injection_loading_delta\": {:.12},\n",
+                "  \"temporal_autocorrelation\": {:.12},\n",
                 "  \"alpha\": {:.12},\n",
                 "  \"null_false_positive_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"injection_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
@@ -206,6 +211,7 @@ impl InjectionRecoveryReport {
             self.samples_per_segment,
             self.monte_carlo_replicates,
             self.injection_loading_delta,
+            self.temporal_autocorrelation,
             self.alpha,
             self.null_false_positive_rate.successes,
             self.null_false_positive_rate.trials,
@@ -279,24 +285,28 @@ pub fn run_injection_recovery(
                 config.samples_per_segment,
                 &global_loadings,
                 &module_loadings,
+                config.temporal_autocorrelation,
             );
             let repeat_b = sample_correlation_matrix(
                 &mut rng,
                 config.samples_per_segment,
                 &global_loadings,
                 &module_loadings,
+                config.temporal_autocorrelation,
             );
             let null_c = sample_correlation_matrix(
                 &mut rng,
                 config.samples_per_segment,
                 &global_loadings,
                 &module_loadings,
+                config.temporal_autocorrelation,
             );
             let injected_c = sample_correlation_matrix(
                 &mut rng,
                 config.samples_per_segment,
                 &global_loadings,
                 &injected_loadings,
+                config.temporal_autocorrelation,
             );
 
             let within_similarity = weighted_jaccard_correlation_matrices(
@@ -401,6 +411,13 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "loading_jitter must be finite and non-negative",
         });
     }
+    if !config.temporal_autocorrelation.is_finite()
+        || config.temporal_autocorrelation.abs() >= 1.0
+    {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "temporal_autocorrelation must be finite and strictly between -1 and 1",
+        });
+    }
     if !config.global_loading.is_finite()
         || !config.module_loading.is_finite()
         || config.global_loading < 0.0
@@ -426,14 +443,24 @@ fn sample_correlation_matrix(
     samples: usize,
     global_loadings: &[f64],
     module_loadings: &[f64],
+    temporal_autocorrelation: f64,
 ) -> Vec<Vec<f64>> {
     let regions = global_loadings.len();
     let mut sums = vec![0.0; regions];
     let mut cross_products = vec![0.0; regions * regions];
+    let innovation_scale =
+        (1.0 - temporal_autocorrelation * temporal_autocorrelation).sqrt();
+    let mut previous_global = rng.normal();
+    let mut previous_module = rng.normal();
+    let mut previous_residuals: Vec<f64> = (0..regions).map(|_| rng.normal()).collect();
 
     for _ in 0..samples {
-        let global_factor = rng.normal();
-        let module_factor = rng.normal();
+        previous_global =
+            temporal_autocorrelation * previous_global + innovation_scale * rng.normal();
+        previous_module =
+            temporal_autocorrelation * previous_module + innovation_scale * rng.normal();
+        let global_factor = previous_global;
+        let module_factor = previous_module;
         let mut observation = Vec::with_capacity(regions);
         for ((_, (&global, &module)), sum) in global_loadings
             .iter()
@@ -442,7 +469,10 @@ fn sample_correlation_matrix(
             .zip(sums.iter_mut())
         {
             let residual = (1.0 - global * global - module * module).sqrt();
-            let value = global * global_factor + module * module_factor + residual * rng.normal();
+            previous_residuals[region] = temporal_autocorrelation * previous_residuals[region]
+                + innovation_scale * rng.normal();
+            let value =
+                global * global_factor + module * module_factor + residual * previous_residuals[region];
             observation.push(value);
             *sum += value;
         }
