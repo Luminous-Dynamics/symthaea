@@ -57,9 +57,8 @@ fn fixture_causal_identification(
     seed: u32,
 ) -> broca_mace_policy::CausalIdentificationV1 {
     let mut design = [0_u8; 32];
-    let mut estimand = [0_u8; 32];
+    let estimand = [0xA5_u8; 32];
     design[..4].copy_from_slice(&seed.to_be_bytes());
-    estimand[..4].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
     broca_mace_policy::CausalIdentificationV1::new(
         broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,
         broca_mace_policy::EvidenceDigest256::from_bytes(design),
@@ -162,7 +161,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 20);
+    let mut cases = Vec::with_capacity(clusters as usize * 21);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -557,6 +556,44 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             baseline,
             0.90,
             0.40,
+            Some(Action::A),
+            false,
+        ));
+
+        let mut estimand_shift = pair(
+            baseline,
+            id + 270,
+            family + 40,
+            0.92,
+            0.32,
+        );
+        estimand_shift.push(exp(
+            id + 274,
+            family + 44,
+            shifted,
+            Action::A,
+            0.91,
+        ));
+        estimand_shift.push(exp(
+            id + 275,
+            family + 45,
+            shifted,
+            Action::B,
+            0.33,
+        ));
+        for item in &mut estimand_shift {
+            if item.scope.regime == Regime::Shifted {
+                item.causal_identification.estimand_digest =
+                    EvidenceDigest256::from_bytes([0xCC; 32]);
+            }
+        }
+        cases.push(case(
+            cluster,
+            "estimand_mismatch_across_regimes",
+            estimand_shift,
+            shifted,
+            1.0,
+            0.0,
             Some(Action::A),
             false,
         ));
@@ -999,6 +1036,18 @@ mod tests {
     }
 
     #[test]
+    fn generated_estimand_mismatch_is_not_transportable() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "estimand_mismatch_across_regimes")
+            .expect("estimand mismatch fixture exists");
+        let decision = decide(Policy::InvariantTransport, &item.memory, item.query);
+        assert_eq!(decision.action, None);
+        assert!(decision.evidence_ids.is_empty());
+    }
+
+    #[test]
     fn high_reward_observational_and_quasi_experimental_claims_do_not_transfer() {
         let cases = generated_worlds(1);
         for family_name in [
@@ -1053,12 +1102,12 @@ mod tests {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 160);
+        assert_eq!(first.len(), 168);
         assert_eq!(first[0].cluster, 1);
-        assert_eq!(first[20].cluster, 2);
+        assert_eq!(first[21].cluster, 2);
         assert_ne!(
             first[0].memory[0].source_family,
-            first[20].memory[0].source_family
+            first[21].memory[0].source_family
         );
     }
 
@@ -1080,7 +1129,7 @@ mod tests {
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 320);
+        assert_eq!(score.count, 336);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);

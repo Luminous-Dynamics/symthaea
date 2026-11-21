@@ -37,7 +37,7 @@ This is a stronger compile-time boundary than placing the oracle in another Rust
 
 ## Scenario families
 
-The deterministic fixed corpus includes twenty-one two-session cases:
+The deterministic fixed corpus includes twenty-two two-session cases:
 
 1. Identified interventional effect transfer.
 2. Confounded observational association decoy.
@@ -60,6 +60,7 @@ The deterministic fixed corpus includes twenty-one two-session cases:
 19. High-reward observational causal decoy.
 20. Unsupported quasi-experimental causal decoy.
 21. One-sided qualified evidence: the supported action is inferior, so active probing is required.
+22. Estimand mismatch: apparently stable treatment effects target different populations/outcomes/horizons and must not transport.
 
 ## Compared policies
 
@@ -122,9 +123,9 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 - [#8265](https://github.com/Luminous-Dynamics/symthaea/issues/8265): claim identity versus similarity.
 - [#11816](https://github.com/Luminous-Dynamics/symthaea/issues/11816): evaluator and oracle independence.
 
-## Generated stress tranche (MACE v0.13 research)
+## Generated stress tranche (MACE v0.14 research)
 
-A second evaluator binary adds **256 deterministic clusters × 20 scenario families = 5,120 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, a common-mode baseline-shift positive control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, an unseen-target case that triggers active probing, and high-reward observational / unsupported quasi-experimental causal decoys, and one-sided evidence requiring active probing.
+A second evaluator binary adds **256 deterministic clusters × 21 scenario families = 5,376 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, a shared-common-root attack, an error-interval negative control, a common-mode baseline-shift positive control, qualified negative experience, few-shot invariant transport, a mechanism-break negative control, an unseen-target case that triggers active probing, and high-reward observational / unsupported quasi-experimental causal decoys, and one-sided evidence requiring active probing, and estimand mismatch across regimes.
 
 Run it independently:
 
@@ -363,7 +364,7 @@ See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_A
 
 ## Current end-to-end integration inventory (2026-11-19)
 
-The MACE branch has five Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation and AML Add/Search contract core. Current authored source counts are 23 policy tests, 14 fixed-evaluator tests, 13 generated-stress tests, 26 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 7 consolidation unit tests plus 5 raw-session integration tests, 1 evaluator-level ingress→consolidation→MACE integration test, and 14 AML adapter tests. These are source counts, **not executed test results**.
+The MACE branch has five Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation and AML Add/Search contract core. Current authored source counts are 25 policy tests, 15 fixed-evaluator tests, 14 generated-stress tests, 26 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 7 consolidation unit tests plus 5 raw-session integration tests, 1 evaluator-level ingress→consolidation→MACE integration test, and 14 AML adapter tests. These are source counts, **not executed test results**.
 
 The new cross-package regression is `evaluator/tests/ingress_consolidation_transfer.rs`. It admits six raw Session-A interactions through `EvidenceVerifier`, builds the canonical `ConsolidationEvidencePackV1`, obtains action-specific procedure proposals for A and B, binds source/input/output digests into receipt proposals, releases experiences only after an independent fixture verifier accepts the proposal digests, and makes the Session-B causal-qualified choice. Session C retracts two A sources, rejects the retracted events at the later `known_at`, rebuilds the evidence pack, rejects replay of the stale consolidation receipt against the new snapshot, refuses to mint a replacement Action-A procedure from the one remaining qualified source, and verifies that the next candidate decision abstains and requests a bounded probe.
 
@@ -491,3 +492,5 @@ The canonical consolidation source-binding digest now includes all seven causal-
 
 
 The one-sided-evidence control is deliberately asymmetric: only Action B has two qualified independent sources, but the hidden target environment makes Action A better. The causal-qualified policy must abstain rather than infer that B is better from missing A evidence. Active probing then obtains target-scope observations for both actions, pays the declared probe cost, and can choose A from the new evidence.
+
+MACE v0.14 additionally requires the receipt-bound estimand digest to remain consistent across all observations in each action group, between the two actions, and between source and target regimes. Different randomized designs may estimate the same declared estimand; a changed population, outcome, treatment contrast or horizon must carry a different digest and cannot be transported by the current policy.

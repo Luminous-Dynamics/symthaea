@@ -375,6 +375,8 @@ struct QualifiedGroup {
     source_families: BTreeSet<u16>,
     source_root_digests: BTreeSet<SourceRootDigest>,
     source_events: BTreeSet<u32>,
+    estimand_digest: Option<EvidenceDigest256>,
+    mixed_estimands: bool,
     sum: f64,
     error_bound_sum: f64,
     count: usize,
@@ -388,6 +390,15 @@ impl QualifiedGroup {
         }
         self.source_families.insert(item.source_family);
         self.source_root_digests.insert(item.source_root_digest);
+        match self.estimand_digest {
+            None => {
+                self.estimand_digest = Some(item.causal_identification.estimand_digest);
+            }
+            Some(existing) if existing != item.causal_identification.estimand_digest => {
+                self.mixed_estimands = true;
+            }
+            Some(_) => {}
+        }
         self.sum += item.observed_utility;
         self.error_bound_sum += item.measurement_error_bound;
         self.count += 1;
@@ -414,8 +425,13 @@ impl QualifiedGroup {
         }
     }
 
+    fn has_single_estimand(&self) -> bool {
+        self.estimand_digest.is_some() && !self.mixed_estimands
+    }
+
     fn is_qualified(&self) -> bool {
-        self.independent_support() >= 2
+        self.has_single_estimand()
+            && self.independent_support() >= 2
             && self.source_families.len() >= 2
             && self.source_events.len() >= 2
             && self.count >= 2
@@ -439,6 +455,9 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
+    if a_ok && b_ok && a.estimand_digest != b.estimand_digest {
+        return Decision::abstain();
+    }
 
     match (a_ok, b_ok) {
         // A comparison cannot be made from one-sided evidence. Unknown is
@@ -512,6 +531,16 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
     if target_a.count == 0 || target_b.count == 0 {
         return Decision::abstain();
     }
+    let Some(target_estimand) = target_a.estimand_digest.filter(|_| {
+        !target_a.mixed_estimands
+    }) else {
+        return Decision::abstain();
+    };
+    if target_b.estimand_digest != Some(target_estimand)
+        || target_b.mixed_estimands
+    {
+        return Decision::abstain();
+    }
 
     let target_effect = target_a.mean() - target_b.mean();
     let target_effect_error =
@@ -553,6 +582,16 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
         };
         if !source_a.is_qualified() || !source_b.is_qualified() {
             continue;
+        }
+        let Some(source_estimand) = source_a.estimand_digest else {
+            return Decision::abstain();
+        };
+        if source_a.mixed_estimands
+            || source_b.estimand_digest != Some(source_estimand)
+            || source_b.mixed_estimands
+            || source_estimand != target_estimand
+        {
+            return Decision::abstain();
         }
 
         let source_families: BTreeSet<u16> = source_a
@@ -654,9 +693,8 @@ mod tests {
 
     fn fixture_causal_identification(seed: u32) -> CausalIdentificationV1 {
         let mut design = [0_u8; 32];
-        let mut estimand = [0_u8; 32];
+        let estimand = [0xA5_u8; 32];
         design[..4].copy_from_slice(&seed.to_be_bytes());
-        estimand[..4].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
         CausalIdentificationV1::new(
             IdentificationMethodV1::RandomizedControlledTrial,
             EvidenceDigest256::from_bytes(design),
@@ -1139,6 +1177,53 @@ mod tests {
         unknown_estimand.causal_identification.estimand_digest =
             EvidenceDigest256::UNKNOWN;
         assert!(!is_qualified(&unknown_estimand, Query { scope }));
+    }
+
+    #[test]
+    fn causal_comparison_rejects_different_estimands_between_actions() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let mut memory = vec![
+            sample(80, 10, Action::A, 0.92, scope),
+            sample(81, 11, Action::A, 0.90, scope),
+            sample(82, 20, Action::B, 0.32, scope),
+            sample(83, 21, Action::B, 0.34, scope),
+        ];
+        memory[2].causal_identification.estimand_digest =
+            EvidenceDigest256::from_bytes([0xCC; 32]);
+        memory[3].causal_identification.estimand_digest =
+            EvidenceDigest256::from_bytes([0xCC; 32]);
+        let decision = decide(Policy::CausalQualified, &memory, Query { scope });
+
+        assert_eq!(decision.action, None);
+        assert!(decision.evidence_ids.is_empty());
+    }
+
+    #[test]
+    fn invariant_transport_rejects_estimand_change_between_regimes() {
+        let mut memory = vec![
+            transport_case(90, 10, Regime::Baseline, Action::A, 0.92),
+            transport_case(91, 11, Regime::Baseline, Action::A, 0.90),
+            transport_case(92, 20, Regime::Baseline, Action::B, 0.32),
+            transport_case(93, 21, Regime::Baseline, Action::B, 0.34),
+            transport_case(94, 30, Regime::Shifted, Action::A, 0.91),
+            transport_case(95, 31, Regime::Shifted, Action::B, 0.33),
+        ];
+        let shifted_estimand = EvidenceDigest256::from_bytes([0xCC; 32]);
+        memory[4].causal_identification.estimand_digest = shifted_estimand;
+        memory[5].causal_identification.estimand_digest = shifted_estimand;
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+
+        let decision = decide(Policy::InvariantTransport, &memory, query);
+        assert_eq!(decision.action, None);
+        assert!(decision.evidence_ids.is_empty());
     }
 
     #[test]

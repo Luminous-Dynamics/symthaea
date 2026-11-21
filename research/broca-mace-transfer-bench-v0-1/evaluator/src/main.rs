@@ -59,9 +59,8 @@ fn fixture_causal_identification(
     seed: u32,
 ) -> broca_mace_policy::CausalIdentificationV1 {
     let mut design = [0_u8; 32];
-    let mut estimand = [0_u8; 32];
+    let estimand = [0xA5_u8; 32];
     design[..4].copy_from_slice(&seed.to_be_bytes());
-    estimand[..4].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
     broca_mace_policy::CausalIdentificationV1::new(
         broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,
         broca_mace_policy::EvidenceDigest256::from_bytes(design),
@@ -235,6 +234,17 @@ fn cases() -> Vec<Scenario> {
         experience(184, 350, shifted_quality, Action::A, 0.95),
         experience(185, 351, shifted_quality, Action::B, 0.55),
     ];
+
+    let mut estimand_shift = valid_pair(baseline_quality, 200, 0.92, 0.32);
+    estimand_shift.push(experience(204, 304, shifted_quality, Action::A, 0.91));
+    estimand_shift.push(experience(205, 305, shifted_quality, Action::B, 0.33));
+    for item in estimand_shift
+        .iter_mut()
+        .filter(|item| item.scope.regime == Regime::Shifted)
+    {
+        item.causal_identification.estimand_digest =
+            broca_mace_policy::EvidenceDigest256::from_bytes([0xCC; 32]);
+    }
 
     let mut wide_intervals = valid_pair(baseline_quality, 170, 0.92, 0.32);
     wide_intervals.push(experience(174, 304, shifted_quality, Action::A, 0.91));
@@ -419,6 +429,15 @@ fn cases() -> Vec<Scenario> {
         scenario(
             "common_mode_baseline_shift_same_effect",
             common_mode_shift,
+            Query { scope: shifted_quality },
+            1.0,
+            0.0,
+            Some(Action::A),
+            false,
+        ),
+        scenario(
+            "estimand_mismatch_across_regimes",
+            estimand_shift,
             Query { scope: shifted_quality },
             1.0,
             0.0,
@@ -861,6 +880,21 @@ mod tests {
         assert_eq!(decision.action, Some(Action::A));
         assert_eq!(memory.len(), case.session_a.len() + 4);
         assert!((cost - PROBE_COST).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn transport_rejects_a_different_estimand_even_when_the_effect_matches() {
+        let case = cases()
+            .into_iter()
+            .find(|item| item.name == "estimand_mismatch_across_regimes")
+            .expect("estimand mismatch fixture exists");
+        let decision = decide(
+            Policy::InvariantTransport,
+            &case.session_a,
+            case.session_b,
+        );
+        assert_eq!(decision.action, None);
+        assert!(decision.evidence_ids.is_empty());
     }
 
     #[test]
