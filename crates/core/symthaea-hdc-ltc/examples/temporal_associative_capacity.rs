@@ -68,6 +68,7 @@ enum OutputRecord {
 #[derive(Serialize)]
 struct QueryRecord {
     schema_version: &'static str,
+    source_revision: Option<String>,
     cohort_id: String,
     seed: u64,
     dimension: usize,
@@ -666,6 +667,7 @@ fn run_cohort(
             writer,
             &OutputRecord::Query(QueryRecord {
                 schema_version: SCHEMA_VERSION,
+                source_revision: source_revision.map(str::to_owned),
                 cohort_id: id.clone(),
                 seed,
                 dimension: dim,
