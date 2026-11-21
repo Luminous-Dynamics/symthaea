@@ -44,6 +44,34 @@ jobs:
       - name: Run theory-design EIG reference tests
         run: python -m unittest discover -s research/cetb/theory_design -p 'test_*.py' -v
 
+      - name: Validate theory-design manifest and execute synthetic ranking
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/cetb/theory_design/design-run.schema.json").read_text())
+          manifest = json.loads(Path("research/cetb/theory_design/fixtures/synthetic-design-run.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(manifest, schema)
+          PY
+          python research/cetb/theory_design/eig.py \
+            research/cetb/theory_design/fixtures/synthetic-design-run.json \
+            --output "$RUNNER_TEMP/cetb-eig-result.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          result = json.loads(Path(os.environ["RUNNER_TEMP"] + "/cetb-eig-result.json").read_text())
+          assert result["source_status"] == "synthetic_fixture"
+          assert len(result["results"]) == 2
+          assert [row["rank"] for row in result["results"]] == [1, 2]
+          assert all(row["lower_quantile_eig_bits"] >= 0.0 for row in result["results"])
+          print("PASS: synthetic theory-design manifest and EIG ranking")
+          PY
+
       - name: Validate synthetic fixture against schema and semantic invariants
         run: |
           python research/rcaf/tools/validate_report.py \
