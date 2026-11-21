@@ -27,7 +27,10 @@ pub fn build_bevy_filament_mesh(
 
 /// Convert a validated renderer-neutral tube mesh into a Bevy 3D mesh.
 pub fn into_bevy_mesh(source: MycelialTubeMesh) -> Mesh {
-    debug_assert!(source.validate(), "only validated tube meshes may be uploaded");
+    debug_assert!(
+        source.validate(),
+        "only validated tube meshes may be uploaded"
+    );
     let mut vertex_colors = vec![[0.16, 0.80, 0.86, 1.0]; source.positions.len()];
     let root_color = [0.10, 0.82, 0.87];
     let tip_color = [0.62, 0.40, 0.88];
@@ -75,10 +78,16 @@ mod tests {
 
         let positions = mesh.attribute(Mesh::ATTRIBUTE_POSITION);
         let normals = mesh.attribute(Mesh::ATTRIBUTE_NORMAL);
-        assert!(matches!(positions, Some(VertexAttributeValues::Float32x3(values)) if !values.is_empty()));
-        assert!(matches!(normals, Some(VertexAttributeValues::Float32x3(values)) if !values.is_empty()));
+        assert!(
+            matches!(positions, Some(VertexAttributeValues::Float32x3(values)) if !values.is_empty())
+        );
+        assert!(
+            matches!(normals, Some(VertexAttributeValues::Float32x3(values)) if !values.is_empty())
+        );
         let colors = mesh.attribute(Mesh::ATTRIBUTE_COLOR);
-        assert!(matches!(colors, Some(VertexAttributeValues::Float32x4(values)) if !values.is_empty()));
+        assert!(
+            matches!(colors, Some(VertexAttributeValues::Float32x4(values)) if !values.is_empty())
+        );
         assert!(mesh.indices().is_some());
         assert_eq!(mesh.primitive_topology(), PrimitiveTopology::TriangleList);
     }
