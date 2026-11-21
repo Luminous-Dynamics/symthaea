@@ -29,7 +29,8 @@
       ],
       "decisions": [
         "ACCEPT",
-        "REJECT"
+        "REJECT",
+        "HOLD"
       ],
       "loss_matrix": {
         "ACCEPT": {
@@ -43,6 +44,12 @@
           "AXIAL_CAPACITY_DEFECT": 0,
           "THERMAL_WEAR_DEFECT": 0,
           "JOINT_RETENTION_DEFECT": 0
+        },
+        "HOLD": {
+          "HEALTHY": 2,
+          "AXIAL_CAPACITY_DEFECT": 2,
+          "THERMAL_WEAR_DEFECT": 2,
+          "JOINT_RETENTION_DEFECT": 2
         }
       },
       "resource_frequency_model": {
@@ -95,9 +102,14 @@
             "THERMAL_WEAR_DEFECT": "PASS",
             "JOINT_RETENTION_DEFECT": "FAIL"
           },
-          "obligations_covered": [
-            "COMBINED-LOAD-CAPABILITY-001"
-          ]
+          "obligations_by_observation": {
+            "PASS": [
+              "COMBINED-LOAD-CAPABILITY-001"
+            ],
+            "FAIL": [
+              "REJECTION-BASIS-001"
+            ]
+          }
         },
         {
           "action_id": "B-THERMAL-INSPECTION",
@@ -124,14 +136,19 @@
             "THERMAL_WEAR_DEFECT": "INDICATION",
             "JOINT_RETENTION_DEFECT": "CLEAR"
           },
-          "obligations_covered": [
-            "THERMAL-WEAR-INSPECTABILITY-001"
-          ]
+          "obligations_by_observation": {
+            "CLEAR": [
+              "THERMAL-WEAR-INSPECTABILITY-001"
+            ],
+            "INDICATION": [
+              "REJECTION-BASIS-001"
+            ]
+          }
         }
       ],
       "expected": {
-        "baseline_worst_case_regret": 5,
-        "myopic_worst_case_regret": 5,
+        "baseline_worst_case_regret": 2,
+        "myopic_worst_case_regret": 2,
         "myopic_stops_without_action": true,
         "fixed_campaign_worst_case_regret": 0,
         "adaptive_worst_case_regret": 0,
@@ -160,7 +177,10 @@
           "COMBINED-LOAD-CAPABILITY-001",
           "THERMAL-WEAR-INSPECTABILITY-001"
         ],
-        "REJECT": []
+        "REJECT": [
+          "REJECTION-BASIS-001"
+        ],
+        "HOLD": []
       }
     },
     {
@@ -181,7 +201,8 @@
       ],
       "decisions": [
         "ACCEPT",
-        "REJECT"
+        "REJECT",
+        "HOLD"
       ],
       "loss_matrix": {
         "ACCEPT": {
@@ -195,6 +216,12 @@
           "AXIAL_CAPACITY_DEFECT": 0,
           "THERMAL_WEAR_DEFECT": 0,
           "JOINT_RETENTION_DEFECT": 0
+        },
+        "HOLD": {
+          "HEALTHY": 2,
+          "AXIAL_CAPACITY_DEFECT": 2,
+          "THERMAL_WEAR_DEFECT": 2,
+          "JOINT_RETENTION_DEFECT": 2
         }
       },
       "resource_frequency_model": {
@@ -247,9 +274,14 @@
             "THERMAL_WEAR_DEFECT": "PASS",
             "JOINT_RETENTION_DEFECT": "FAIL"
           },
-          "obligations_covered": [
-            "COMBINED-LOAD-CAPABILITY-001"
-          ]
+          "obligations_by_observation": {
+            "PASS": [
+              "COMBINED-LOAD-CAPABILITY-001"
+            ],
+            "FAIL": [
+              "REJECTION-BASIS-001"
+            ]
+          }
         },
         {
           "action_id": "B-THERMAL-INSPECTION",
@@ -276,14 +308,19 @@
             "THERMAL_WEAR_DEFECT": "INDICATION",
             "JOINT_RETENTION_DEFECT": "CLEAR"
           },
-          "obligations_covered": [
-            "THERMAL-WEAR-INSPECTABILITY-001"
-          ]
+          "obligations_by_observation": {
+            "CLEAR": [
+              "THERMAL-WEAR-INSPECTABILITY-001"
+            ],
+            "INDICATION": [
+              "REJECTION-BASIS-001"
+            ]
+          }
         }
       ],
       "expected": {
-        "baseline_worst_case_regret": 5,
-        "myopic_worst_case_regret": 5,
+        "baseline_worst_case_regret": 2,
+        "myopic_worst_case_regret": 2,
         "myopic_stops_without_action": true,
         "fixed_campaign_worst_case_regret": 0,
         "adaptive_worst_case_regret": 0,
@@ -312,7 +349,10 @@
           "COMBINED-LOAD-CAPABILITY-001",
           "THERMAL-WEAR-INSPECTABILITY-001"
         ],
-        "REJECT": []
+        "REJECT": [
+          "REJECTION-BASIS-001"
+        ],
+        "HOLD": []
       }
     }
   ]
