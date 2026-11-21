@@ -99,7 +99,7 @@ Report each dimension independently. Do not collapse them into a single quality,
 | Dimension | Primary output |
 |---|---|
 | Type-I calibration | Empirical rejection rate, Monte-Carlo interval, nominal alpha and deviation |
-| Detection | Power/sensitivity versus effect dose at fixed Type-I error |
+| Detection | Directional power in the preregistered expected direction, two-sided rejection frequency, and wrong-direction significant rejection rate, versus effect dose at fixed Type-I error |
 | Estimation | Bias, RMSE and signed error against known latent effect |
 | Uncertainty | Confidence-interval coverage and interval width |
 | Dose response | Estimated effect and detection curve; uncertainty for adjacent-dose contrasts |
@@ -114,12 +114,15 @@ Report each dimension independently. Do not collapse them into a single quality,
 
 For a nominal 5% test, a proposed engineering target is an empirical Type-I rate within 0.01 of nominal across the predeclared primary null cells, with Monte-Carlo uncertainty reported. This is a calibration target, not a universal scientific standard. Power should be assessed at a prospectively defined minimally meaningful effect; 80% or 90% may be adopted as a design target only when justified by the intended inference and error costs. A high-power cell cannot compensate for a failed nuisance-only null.
 
+**Direction-of-effect audit:** the current `research/rcaf/src/simulation.rs::run_injection_recovery` increments `injection_detection_power` whenever the *two-sided* exact sign-test p-value is below alpha; it does not require the expected positive paired gap for the declared positive module-loading injection. A significant negative gap could therefore be counted as a successful detection. Until the kernel records expected-direction power and wrong-direction rejection separately, interpret the current field as two-sided difference-detection, not directional recovery. The adversarial plan requires both new outputs.
+
 ## 6. Statistical safeguards
 
 - Participants are the inferential unit. Windows, segments, trials and edges are nested observations, not independent participants.
 - Use paired participant-level estimands; preserve within-person pairing and condition order.
 - Use exchangeability-respecting permutations and participant/site-clustered uncertainty. Do not shuffle time points as if they were independent.
 - Use common random numbers for paired estimator comparisons, but disjoint development and confirmatory seed sets.
+- For known-direction injections, preregister the expected sign; count directional recovery only when the test rejects in that direction, and report two-sided rejection and wrong-direction rejection separately.
 - Keep ground-truth latent networks and injection labels out of the analysis API until scoring.
 - Freeze preprocessing, estimator, comparator, thresholds, exclusions and model-selection choices before confirmatory evaluation.
 - If a method is selected from candidates, selection occurs inside training data/nested folds; the outer test fold is used once.
