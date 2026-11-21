@@ -20,7 +20,7 @@ Unknown calibration/configuration/provenance and unresolved frames remain Unknow
 
 ## Exact real-dependency adapter test
 
-The production SOMA manifest now pins Mycelix commit 9bd90984e57cee2a6c239f3809d68024db648928 through the uniquely named Git package `mycelix-positioning-v2`. Its library name remains `positioning`, so the adapter retains its existing import paths. The facade manifest points directly to the canonical `mycelix-position/lib/positioning/src/lib.rs`; it does not duplicate or fork the implementation. This avoids ambiguous package discovery caused by mirrored `positioning` manifests in the Mycelix repository.
+The production SOMA manifest now pins Mycelix commit 85d09458ba05d5da68b2702b1e13ee6692330f9f through the uniquely named Git package `mycelix-positioning-v2`. Its library name remains `positioning`, so the adapter retains its existing import paths. The facade manifest points directly to the canonical `mycelix-position/lib/positioning/src/lib.rs`; it does not duplicate or fork the implementation. This avoids ambiguous package discovery caused by mirrored `positioning` manifests in the Mycelix repository.
 
 The dedicated workflow extracts the immutable revision from the production SOMA manifest and builds a temporary adapter harness against that exact Git dependency. It runs feature-disabled `cargo check`, then feature-enabled Clippy and all-target tests. Cargo fetches the package from the same public Git URL and immutable revision used by production.
 
