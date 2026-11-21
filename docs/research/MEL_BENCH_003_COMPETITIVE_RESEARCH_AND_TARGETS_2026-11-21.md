@@ -110,6 +110,26 @@ Source: [JAM_BOT — Enhancing Expressive Musical Conversation](https://nime.org
 
 The implication: "real-time" and "call-and-response" are not themselves novelty claims. A serious comparison must measure actual end-to-end response time, beat-phase error, tempo-following, recovery and the musical meaning of the response.
 
+### 1.7 Reward-model judges — CMI-RewardBench (ICML 2026)
+
+CMI-RewardBench is not another music generator leaderboard. It evaluates reward models that judge whether generated music is musical and follows compositional multimodal instructions using text, lyrics and/or reference audio. The paper introduces 110k pseudo-labelled preference samples and a separately human-annotated CMI-Pref corpus.
+
+The official release reports selected musicality results:
+
+| Reward model | MusicEval SRCC | Music Arena accuracy | CMI-Pref accuracy |
+|---|---:|---:|---:|
+| CMI-RM | 0.8266 | 73.43% | 78.20% |
+| SongEval-RM | 0.6949 | 73.88% | 72.40% |
+| Gemini 3 Pro | 0.6018 | 68.85% | 65.80% |
+
+For compositional alignment, CMI-RM reports 67.6% (text), 72.8% (text+lyrics), 76.4% (text+audio), and 79.2% (text+lyrics+audio) on CMI-Pref; Gemini 3 Pro reports 67.2%, 60.8%, 68.8%, and 64.8% respectively. Gemini still leads CMI-RM on the reported PAM alignment SRCC (0.5373 vs 0.4321). Reward-model rankings therefore depend on which dataset and property are being judged.
+
+**Implication for Melothaea:** use specialized reward models as independent, calibrated candidate-evaluation signals, not as the authority for a score mutation. Keep musicality, instruction adherence, formal theory, preserved material and artist preference separate. Pseudo-labelled pairs are not gold human preference labels, and no reward score can authorize a commit or override an explicit artist choice.
+
+Sources:
+- [ICML 2026 / PMLR paper](https://proceedings.mlr.press/v306/ma26am.html)
+- [Official CMI-RewardBench release and result tables](https://github.com/Haiwen-Xia/CMI-RewardBench)
+
 ## 2. Paradigm shifts for Melothaea
 
 ### A. From audio-first generation to score-authoritative collaboration
