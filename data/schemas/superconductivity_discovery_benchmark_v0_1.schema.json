@@ -1,0 +1,417 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_discovery_benchmark_v0_1.schema.json",
+  "title": "Superconductivity discovery benchmark contract 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "benchmark_id",
+    "dataset",
+    "task",
+    "split_regimes",
+    "observations",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-DISCOVERY-BENCHMARK-0.1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_version",
+        "authority",
+        "record_count",
+        "notes"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority": {
+          "enum": [
+            "synthetic_test_fixture",
+            "external_data_pinned"
+          ]
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "licence_review": {
+          "enum": [
+            "not_applicable_synthetic",
+            "reviewed",
+            "pending"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "target_property",
+        "target_unit",
+        "label_authority",
+        "available_features",
+        "measurement_classes"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_property": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label_authority": {
+          "enum": [
+            "measured_experiment",
+            "calculated_first_principles",
+            "calculated_semiempirical"
+          ]
+        },
+        "available_features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "measurement_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "resistive_onset",
+              "zero_resistance",
+              "diamagnetic_onset",
+              "bulk_thermodynamic_transition",
+              "spectroscopic_gap",
+              "critical_field",
+              "critical_current",
+              "theoretical_transition",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "split_regimes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "split_id",
+          "kind",
+          "group_keys",
+          "notes"
+        ],
+        "properties": {
+          "split_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "family_held_out",
+              "source_paper_held_out",
+              "pressure_regime_held_out",
+              "time_forward",
+              "prototype_held_out"
+            ]
+          },
+          "group_keys": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "material_state_id",
+                "normalized_formula",
+                "family_id",
+                "source_id",
+                "prototype_id"
+              ]
+            }
+          },
+          "held_out_family_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "held_out_source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "held_out_prototype_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "train_pressure_max_gpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "test_pressure_min_gpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "train_source_date_end": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "test_source_date_start": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "material_id",
+          "material_state_id",
+          "normalized_formula",
+          "family_id",
+          "prototype_id",
+          "property_id",
+          "value",
+          "unit",
+          "label_authority",
+          "measurement_method",
+          "measurement_class",
+          "sample_form",
+          "field_orientation",
+          "pressure_gpa",
+          "measurement_temperature_k",
+          "source_id",
+          "source_date",
+          "source_locator",
+          "extraction_method",
+          "reported_or_derived",
+          "uncertainty_value",
+          "assignments"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "normalized_formula": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prototype_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "property_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label_authority": {
+            "enum": [
+              "measured_experiment",
+              "calculated_first_principles",
+              "calculated_semiempirical"
+            ]
+          },
+          "measurement_method": {
+            "enum": [
+              "resistivity",
+              "magnetic_susceptibility",
+              "heat_capacity",
+              "tunneling",
+              "magnetization",
+              "first_principles",
+              "semiempirical_model",
+              "other"
+            ]
+          },
+          "measurement_class": {
+            "enum": [
+              "resistive_onset",
+              "zero_resistance",
+              "diamagnetic_onset",
+              "bulk_thermodynamic_transition",
+              "spectroscopic_gap",
+              "critical_field",
+              "critical_current",
+              "theoretical_transition",
+              "other"
+            ]
+          },
+          "sample_form": {
+            "enum": [
+              "bulk",
+              "single_crystal",
+              "polycrystal",
+              "thin_film",
+              "powder",
+              "wire",
+              "tape",
+              "unknown"
+            ]
+          },
+          "field_orientation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pressure_gpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "measurement_temperature_k": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "source_locator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extraction_method": {
+            "enum": [
+              "manual_curation",
+              "llm_extraction",
+              "structured_database",
+              "synthetic_fixture"
+            ]
+          },
+          "reported_or_derived": {
+            "enum": [
+              "directly_reported",
+              "converted_units",
+              "digitized",
+              "derived"
+            ]
+          },
+          "uncertainty_value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "assignments": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "split_id",
+                "partition"
+              ],
+              "properties": {
+                "split_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "partition": {
+                  "enum": [
+                    "train",
+                    "test",
+                    "excluded"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

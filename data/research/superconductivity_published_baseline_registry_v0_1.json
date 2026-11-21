@@ -1,0 +1,284 @@
+{
+  "contract": "SC-DISCOVERY-BASELINE-REGISTRY-0.1",
+  "status": "literature_and_repository_inventory_only",
+  "model_training_performed": false,
+  "external_datasets_downloaded": false,
+  "baselines": [
+    {
+      "baseline_id": "autosupercon-2026",
+      "title": "Machine-accelerated extraction of experimental superconducting parameters for physical insight and prediction across thousands of materials",
+      "source": "https://arxiv.org/abs/2611.15627",
+      "source_version": "arXiv:2611.15627v1",
+      "source_date": "2026-11-11",
+      "label_authority": "measured_experiment",
+      "dataset": {
+        "observation_entries": 20354,
+        "unique_superconductors": 6793,
+        "property_count": 8,
+        "source_corpus_preprints": 47000,
+        "preprint_corpus_cutoff": "2026-03",
+        "notes": "Sources include open-access arXiv preprints plus a digitized Roberts (1976) survey. Entries preserve experimental method and relevant pressure, sample form, field orientation or measurement temperature when available. The paper describes data and method but no direct downloadable machine-readable dataset URL was confirmed in this inventory."
+      },
+      "published_metrics": {
+        "tc": {
+          "population": "bulk samples at ambient pressure",
+          "n": 5843,
+          "r2_log": 0.83,
+          "median_absolute_error_k": 1.6
+        },
+        "hc2": {
+          "population": "orientation-averaged Hc2",
+          "n": 1204,
+          "r2_log": 0.69
+        },
+        "family_holdout": {
+          "cuprate_tc_r2_log": -10.2,
+          "cuprate_tc_in_family_r2_log": 0.78,
+          "cuprate_hc2_r2_log": -9,
+          "cuprate_hc2_r2_log_when_measured_tc_available": 0.4,
+          "iron_based": "severe degradation reported"
+        }
+      },
+      "validation": {
+        "reference_dataset": "NIMS SuperCon",
+        "overlap_materials": 2439,
+        "tc_r2": 0.96,
+        "median_absolute_deviation_k": 0.25,
+        "notes": "The paper identifies isolated extraction errors, including transient photoinduced or theoretical values misread as equilibrium experimental measurements."
+      },
+      "split_characterization": "Five-fold cross-validation with every evaluated family represented in training, plus explicit leave-one-family-out experiments.",
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published experimental-property extraction and model baseline; not independently replayed by this repository."
+    },
+    {
+      "baseline_id": "bee-net-2026",
+      "title": "Developing a complete AI-accelerated workflow for superconductor discovery",
+      "paper_doi": "10.1038/s41524-026-01964-8",
+      "repository": "https://github.com/henniggroup/BEE-NET",
+      "repository_snapshot_commit": "f21c260a9117830f2d74f2c5ac844ab671c0c606",
+      "repository_readme_blob": "f9fcdecd25fe0e3561180ae58434168f0ceeb4e7",
+      "test_index_path": "indices/idx_test_full_cpd_id.txt",
+      "test_index_blob": "c994f720c0df0341b029cc7a84a1e0a9ec48434a",
+      "test_index_count": 1049,
+      "test_index_unique_count": 1049,
+      "label_authority": "calculated_first_principles",
+      "label_definition": "DFT-derived Eliashberg spectral function and Allen-Dynes Tc",
+      "dataset": {
+        "bee_net_entries": 5241,
+        "training_pool_entries": 4192,
+        "test_entries": 1049,
+        "ensemble_models_per_variant": 100,
+        "variants": [
+          "CSO_crystal_structure_only",
+          "CPD_crystal_structure_plus_coarse_phonon_DOS"
+        ],
+        "upstream_data_archive": "https://archive.materialscloud.org/records/3kbt5-r3n56",
+        "upstream_data_doi": "10.24435/materialscloud:qv-bq",
+        "upstream_archive_size_gib": 48.1,
+        "data_archive_rights_metadata": "CC-BY-4.0 reported by B2FIND catalogue; verify archive's own record terms before redistribution",
+        "notes": "The BEE-NET Git snapshot documents database.json and model checkpoints as untracked/not included. The archive contains around 7,000 electron-phonon calculations; BEE-NET states 5,241 entries in its selected database. The public GitHub repository snapshot has no LICENSE file discoverable through the contents endpoint; code reuse needs author/rights review."
+      },
+      "published_test_metrics": {
+        "CSO_EMD": {
+          "tc_mae_k": 1.2,
+          "tc_r2": 0.66,
+          "true_negative_rate": 0.97
+        },
+        "CPD_EMD": {
+          "tc_mae_k": 0.87,
+          "tc_r2": 0.79,
+          "true_negative_rate": 0.991
+        }
+      },
+      "split_characterization": "Documented 20% held-out test set. No leave-one-family-out result is reported in the pinned README snapshot. The README warns that train/validation indices are DataFrame row labels while the test file contains Alexandria IDs; using the CIF index column rather than DataFrame labels would contaminate the test.",
+      "downstream_workflow": "The paper reports a multi-stage pipeline from more than 1.3 million candidates to 741 computationally stable candidates and experimental synthesis/confirmation of two new superconductors.",
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Calculated-label spectral-function prediction and candidate screening baseline. Its MAE must not be compared as if it were measured experimental Tc."
+    },
+    {
+      "baseline_id": "nemad-llm-2026",
+      "title": "Large language models for superconductor discovery",
+      "doi": "10.1016/j.jmmm.2026.174189",
+      "source_preprint": "https://arxiv.org/abs/2512.10847",
+      "publication_date": "2026-08-15",
+      "data_url": "https://www.nemad.org",
+      "code_repository": "https://github.com/sumanitani/LLM_for_Superconductors",
+      "model_adapter_index": "https://huggingface.co/sumanitani",
+      "label_authority": "experimental_literature_extraction",
+      "dataset": {
+        "reported_records": 78203,
+        "unique_compositions": 19058,
+        "record_count_discrepancy": "The paper abstract reports 78,203 records; a methods description has been reported as 78,204. Resolve from immutable released row IDs before reproduction.",
+        "coverage": [
+          "superconductors",
+          "experimentally reported non-superconductors"
+        ],
+        "fields": [
+          "chemical composition",
+          "critical temperature",
+          "measurement pressure",
+          "structural descriptors",
+          "critical fields where available"
+        ],
+        "sources": "APS and Elsevier literature plus domain handbooks, as described by the paper",
+        "rights": "Dataset, code and checkpoint-specific terms have not yet been fully admitted by this repository; verify before copying, redistribution, or retraining."
+      },
+      "published_findings": {
+        "tasks": [
+          "superconductor/non-superconductor classification",
+          "composition or structure-informed Tc prediction",
+          "inverse design conditioned on target Tc"
+        ],
+        "inverse_design_novelty_fraction": 0.28,
+        "unreported_candidate_claim": "GNoME screening produced candidates with predicted Tc > 10 K; predictions are unverified and are not discoveries."
+      },
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published LLM extraction/prediction/inverse-design baseline; the 28% novelty fraction is relative to the paper's training set and does not establish physical novelty or synthesizability."
+    },
+    {
+      "baseline_id": "geisler-hcfield-2026",
+      "title": "Towards the discovery of high critical magnetic field superconductors",
+      "source": "https://doi.org/10.1038/s41524-026-02266-9",
+      "source_preprint": "https://arxiv.org/abs/2601.21044",
+      "source_version": "npj Computational Materials accepted article (published 2026-08-12); arXiv:2601.21044",
+      "source_date": "2026-08-12",
+      "label_authority": "calculated_first_principles",
+      "dataset": {
+        "approximate_superconductors": 7300,
+        "pairing_scope": "electron-phonon-mediated",
+        "calculated_properties": [
+          "Hc",
+          "Hc1",
+          "Hc2",
+          "coherence_length",
+          "London_penetration_depth",
+          "Ginzburg-Landau_parameter"
+        ],
+        "method": "alpha2F(omega) spectral functions and DFT Fermi surfaces combined with clean-limit Eliashberg theory; strong-coupling and electron-phonon mass-renormalization effects included",
+        "notes": "The article reports a consistent computational database covering approximately 7,300 superconductors. The accessible abstract identifies a Supplementary Information file, but this inventory has not yet verified a public machine-readable bulk data archive, immutable artifact digest, or code snapshot. Exact row count and conditions must be pinned before reproduction."
+      },
+      "published_findings": {
+        "qualitative": [
+          "unexpectedly large number of Type-I superconductors",
+          "larger unit cells generically support higher critical fields and Type-II behaviour",
+          "strong-coupling and electron-phonon mass-renormalization corrections are important for critical-field predictions"
+        ],
+        "numerical_prediction_metrics": "not transcribed into this registry; no unsupported score is inferred from the abstract"
+      },
+      "comparison_rules": {
+        "calculated_vs_measured": "Keep clean-limit Eliashberg outputs separate from measured Hc/Hc1/Hc2 observations.",
+        "material_state": "Retain structure, Fermi-surface provenance, spectral-function version, pressure, temperature, field orientation and clean/dirty-limit assumptions.",
+        "derived_quantities": "Do not silently equate microscopic xi0 with near-Tc xi_GL or mix independent penetration-depth estimators."
+      },
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published first-principles / clean-limit Eliashberg critical-field database and qualitative findings; not an experimental Hc2 predictor and not independently replayed by this repository."
+    },
+    {
+      "baseline_id": "htsc-2025",
+      "title": "HTSC-2025: A benchmark dataset of ambient-pressure high-temperature superconductors for AI-driven critical temperature prediction",
+      "doi": "10.1088/1674-1056/adf042",
+      "data_url": "https://huggingface.co/datasets/xiao-qi/HTSC-2025",
+      "dataset_doi": "10.57760/sciencedb.j00113.00259",
+      "label_authority": "theoretical_prediction",
+      "dataset": {
+        "materials": 155,
+        "scope": "Ambient-pressure, 2023-2025, predominantly conventional BCS-type theoretical predictions",
+        "families_or_systems": [
+          "X2YH6",
+          "MXH3",
+          "M3XH8",
+          "LaH10-derived clathrates",
+          "MgB2-like 2D honeycomb systems"
+        ]
+      },
+      "split_characterization": "Paper describes exclusion of test materials from training based on structural similarity and reports system-specific MAE. It is a useful structural/system-level theoretical benchmark, not a measured experimental family-OOD benchmark.",
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Small, theory-focused, ambient-pressure benchmark; complementary to measured-property evaluation."
+    },
+    {
+      "baseline_id": "hierarchical-feasibility-tc-2026",
+      "title": "Hierarchical inference separates superconducting feasibility from critical-temperature optimization",
+      "doi": "10.1103/bg57-bjdk",
+      "source": "https://journals.aps.org/prmaterials/abstract/10.1103/bg57-bjdk",
+      "publication_date": "2026-08-25",
+      "label_authority": "mixed_superconductor_feasibility_and_Tc_dataset",
+      "dataset": {
+        "reported_materials": "more than 26,000 inorganic materials",
+        "class_coverage": [
+          "superconductors",
+          "non-superconductors"
+        ],
+        "class_balance": "described as balanced in the abstract; exact class counts not independently verified here",
+        "descriptor_groups": [
+          "electronic-compositional backbone",
+          "structural",
+          "magnetic/orbital"
+        ],
+        "notes": "The paper frames superconductivity as conditional inference: first estimate feasibility, then predict Tc using an expanded descriptor set. The accessible abstract reports reduced end-to-end Tc prediction error but does not expose the exact score, split manifest, dataset artifact, or checkpoint."
+      },
+      "method": {
+        "architecture": "two-stage hierarchical inference with task-dependent reweighting in a shared descriptor space",
+        "stage_1": "superconducting feasibility using an electronic-compositional backbone",
+        "stage_2": "conditional Tc optimization with additional structural and magnetic/orbital descriptors"
+      },
+      "published_findings": {
+        "reported": "The two-stage framework reduces end-to-end Tc prediction error relative to a single homogeneous inference task.",
+        "numeric_metrics": "not transcribed; no unsupported numeric improvement is inferred from the abstract"
+      },
+      "split_characterization": "Exact random/group/family/source/temporal split definitions and leakage controls require full-method and artifact audit before reproduction.",
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published feasibility-first hierarchical ML baseline; not a verified new superconducting material and not independently reproduced by this repository."
+    },
+    {
+      "baseline_id": "datag-non-sc-extrapolation-2026",
+      "title": "Genome-inspired AI for extrapolative discovery of high-temperature superconductors",
+      "doi": "10.1038/s41598-026-76977-w",
+      "source": "https://www.nature.com/articles/s41598-026-76977-w",
+      "publication_date": "2026-10-29",
+      "article_status": "early-access accepted article; version of record may replace this version",
+      "label_authority": "negative-class-literature-dataset_and_model_prediction",
+      "dataset": {
+        "negative_control_materials": 53196,
+        "dataset_name": "DataG Non-Sc",
+        "dataset_role": "reported non-superconductor control data addressing the scarcity of negative examples",
+        "candidate_search_sources": [
+          "ICSD",
+          "COD",
+          "Materials Project"
+        ],
+        "notes": "The abstract reports a 53,196-material DataG Non-Sc dataset. The exact row manifest, label criteria for non-superconducting status, class matching, split manifest, and downloadable dataset/checkpoint artifacts still require audit."
+      },
+      "method": {
+        "models_evaluated": {
+          "machine_learning_models": 10,
+          "neural_network_models": 9
+        },
+        "reported_extrapolative_architectures": [
+          "functional convolutional neural network",
+          "long short-term memory"
+        ],
+        "framework": "AI-integrated high-throughput screening using elemental/material descriptors and existing crystallographic entries"
+      },
+      "published_candidate_predictions": {
+        "plutonium_based_candidates": 22,
+        "reported_candidate_threshold_k": 50,
+        "example": "Pu2Co17 is reported with predicted Tc approximately 89 K",
+        "hydride_candidates_over_40": true,
+        "reported_hydride_prediction_ceiling_k": 100,
+        "status": "unverified computational predictions; no synthesis or superconductivity confirmation is claimed here"
+      },
+      "reproduction_status": "not_reproduced",
+      "claim_ceiling": "Published extrapolative candidate-generation baseline. Candidate predictions are not observations, and radioactive actinide candidates remain computational-only absent qualified institutional review."
+    }
+  ],
+  "cross_baseline_rule": "Never pool or directly rank metrics with different label authority, sample population, target definition, pressure/temperature conditions, structure inputs, or split regime.",
+  "next_reproduction_requirements": [
+    "Pin exact source archive versions, licence/terms, data manifest and file hashes.",
+    "Reconstruct and verify the BEE-NET row-label versus Alexandria-ID join; assert train/validation/test disjointness.",
+    "Acquire the missing selected database and released checkpoints through permitted channels; do not infer access rights from repository visibility.",
+    "Reproduce published in-distribution metrics before running new family/prototype/source/pressure holdouts.",
+    "Report alpha2F spectral and derived Tc metrics separately from experimentally measured properties.",
+    "Qualify the August 2026 Geisler et al. clean-limit Eliashberg Hc/Hc1/Hc2 database as a separate calculated-first-principles baseline; pin its supporting information, source artifacts, method settings and exact row count before attempting replay.",
+    "Keep high-field clean-limit calculations separate from measured AutoSuperCon/NIMS values; join only on verified material state, sample form, pressure, temperature, orientation and measurement criterion."
+  ]
+}
