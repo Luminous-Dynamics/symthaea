@@ -22,6 +22,7 @@ concurrency:
 jobs:
   verifier:
     name: Typed claim schema, path semantics and non-laundering
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

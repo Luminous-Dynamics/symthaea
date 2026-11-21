@@ -1,0 +1,431 @@
+# Luminous Aqua — Competitor and Evidence Ledger v0.1
+
+**Status:** research baseline; not a certification, product specification, or claim of superiority  
+**Snapshot date:** 2026-11-18  
+**Parent work:** [AQUA-BATHING-SERVICE-001 #12660](https://github.com/Luminous-Dynamics/symthaea/issues/12660)  
+**Purpose:** freeze current comparators, system boundaries, and falsifiable design targets before optimizing fixtures. The source-classified claims are also published in a machine-readable [JSON corpus](research/aqua-evidence-corpus-v0.1.json) with a synchronized [human-readable rendering](research/AQUA_EVIDENCE_CORPUS_V0_1.md); neither replaces exact-source review.
+
+## 1. Evaluation principle
+
+Compare the same completed service, not just the visible fixture mode.
+
+For a shower, the functional unit is a declared 10-minute bathing task under controlled inlet temperature, pressure, room conditions, user configuration, and output-quality criteria. The measurement window starts at the request and ends only when the fixture is ready for the next user.
+
+Count:
+- cold-start or standby warm-up, priming and reservoir fill;
+- all fresh water admitted during active use;
+- recirculated volume separately from fresh make-up;
+- purge, rinse, drain-down, post-use cleaning and disinfection water;
+- heater fuel/electricity, pumps, controls, UV/ozone and room-conditioning energy;
+- filters, chemicals, waste, rejected water and maintenance labour;
+- task completion, temperature stability, spray force/coverage, pressure envelope, noise and user comfort.
+
+A feature-mode percentage is not a whole-service resource result. A sensor estimate is not a hygiene outcome. A vendor declaration is not an independent test.
+
+## 2. Shower market and technical reference points
+
+| Comparator | Published / specified value | What it establishes | What it does not establish |
+|---|---|---|---|
+| US EPA WaterSense showerhead programme | Maximum 2.0 US gpm = 7.6 L/min | Efficient-shower reference with minimum-flow, spray-force, spray-coverage and pressure-compensation criteria | Not a South African legal flow limit; not a recirculating system; not a full bathroom service benchmark |
+| KOHLER Anthem EvoCycle, Cycle Mode | Manufacturer advertises up to 80% water saving; 0.5 gpm fresh water blended into a 2.5 gpm total shower stream | A current high-end recirculating-shower incumbent with fresh-water refresh during one active session | Manufacturer figure is not independent hygiene evidence or a complete all-in lifecycle comparison |
+| Orbital Shower | Manufacturer says a long shower can use about 20 L | A second commercial recirculating-shower comparator | The public claim is not normalized here for exact duration, user task, startup, cleaning, purge or service life |
+| Shower drain-water heat recovery | 14-month in-situ study: 66% overall exchanger efficiency after fouling/unsteady effects; 52% overall system efficiency after showerhead-to-drain heat loss; fouling reduced nominal efficiency by 8% | A field-informed comparator for long-term, whole-system thermal recovery | Not a universal device efficiency; result depends on exchanger, geometry, water profile, fouling and installation |
+| CLASP South African sample / WRC 2025 synthesis | Pressure-compensating models averaged ~6.6 L/min at 300 kPa; fixed-orifice models ~24–27 L/min | A locally relevant market benchmark from a 19-product sample and later WRC summary | Not a 2026 exhaustive market census or an exact named-SKU result |
+| Hansgrohe Activera Select S shower system, SKU 28087000 | Official SA datasheet: Rain 7.2 L/min, ImpactRain 6.5 L/min, maximum system flow 8 L/min at 3 bar; 0.5 bar minimum flow pressure; 10 bar maximum operating pressure; ShowerTablet Select 360 thermostat and SafetyStop at 40°C | Exact local-market low-head shower-system comparator with integrated thermostat | Manufacturer declaration; compare its shower modes separately from the system's 8 L/min maximum; not an independent matched test |
+| Hansgrohe Activera Select S shower set, SKU 28048000 | Official SA product page: Rain 7.2 L/min and ImpactRain 6.5 L/min at 3 bar; 7.2 L/min maximum; 0.5–6 bar operating range; function from 3 L/min | Exact local-market handheld shower-set comparator without the ShowerTablet system configuration | Manufacturer declaration; do not transfer SKU 28087000 thermostat / 10 bar system attributes to this set |
+| Hansgrohe Raindance Select E 120 3jet PowderRain EcoSmart+, SKU 28729000 | Official SA datasheet: PowderRain 5.2 L/min, Rain 5.4 L/min and massage 5.2 L/min at 3 bar; maximum 6 L/min; minimum flow pressure 1.5 bar | Strong exact-SKU premium low-flow local comparator | Manufacturer datasheet, not independent matched test; reproduce each mode at matched pressures |
+| Brondell Nebia Corre, N400RO model family | Manufacturer sheet: 1.5 gpm (5.7 L/min) in Angel Hair, Hard and Soft; 1.2 gpm (4.5 L/min) in Super Saver; stated inlet range 20–80 psi (1.4–5.5 bar) | Exact lower-flow commercial mode comparator with a broad stated inlet-pressure range | Manufacturer specification; the sheet does not provide a matched pressure/flow/coverage/force curve or prove equal performance at every pressure |
+| Hansgrohe Activera Select S Hand Shower 95 2jet EcoSmart+ with WaterBoost, SKU 28036000 | Official SA page: base Rain/ImpactRain 2.9 L/min at 3 bar; ImpactRain + Booster 6.6 L/min; Rain + Booster 9.4 L/min; user presses/holds side button. Same page lists 4 L/min flow regulator / maximum and 0.8 bar minimum. | Commercial precedent for manual hold-to-boost / task-selective flow | Manufacturer page has unresolved scope ambiguity between 4 L/min regulator/maximum and 6.6 / 9.4 L/min boost claims. Boost flow figures are not eligible as validated comparison points until clarified or independently reproduced |
+| Consumer Reports 2026 test population | Publicly listed top-performing examples include 1.5–1.6 gpm (5.68–6.06 L/min) heads; tests include coverage, force, water use and temperature drop | Global independent consumer-lab comparator | Exact model/market variant and test protocol must be reproduced before head-to-head claims |
+
+### Sources and evidence class
+
+1. **Hansgrohe Activera Select S shower system, SKU 28087000 — manufacturer declaration.** Exact South African page / datasheet describes the exposed system with ShowerTablet Select 360, Rain 7.2 L/min, ImpactRain 6.5 L/min, 8 L/min maximum system flow at 3 bar, minimum pressure 0.5 bar, maximum operating pressure 10 bar, CoolContact and SafetyStop at 40°C. Source: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000 and https://pro.hansgrohe.com/articledetail-activera-select-s-shower-system-for-exposed-installation-95-2jet-ecosmart-with-showertablet-select-360-and-shower-bar-65-cm-28087000
+
+2. **Hansgrohe Activera Select S shower set, SKU 28048000 — manufacturer declaration.** Exact South African set with Varia 72 cm bar and no ShowerTablet; Rain 7.2 L/min, ImpactRain 6.5 L/min, maximum 7.2 L/min at 3 bar, function from 3 L/min, 0.5–6 bar operating pressure. Source: https://pro.hansgrohe.co.za/articledetail-activera-select-s-shower-set-95-2jet-ecosmart-with-shower-bar-varia-72-cm-28048000
+
+3. **EPA WaterSense — primary programme specification and performance overview.** The programme caps a labelled showerhead at 2.0 gpm and tests minimum flow at multiple pressure points, spray force and spray coverage. It is a US reference programme, not an assertion about South African law.  
+   https://www.epa.gov/watersense/showerheads  
+   https://www.epa.gov/system/files/documents/2022-05/ws-products-perfomance-showerheads.pdf
+
+4. **KOHLER Anthem EvoCycle — manufacturer statement.** KOHLER's published explanation describes Standard Mode with fresh water and Cycle Mode blending 0.5 gpm fresh water with recirculated water to deliver a 2.5 gpm stream. Its illustrative 10-minute comparison is 5 US gallons (18.9 L) fresh water in Cycle Mode versus 25 US gallons (94.6 L) at 2.5 gpm in a once-through shower. The claimed 80% refers to Cycle Mode's operating comparison.  
+   https://www.kohler.com/en/products/showers/anthem-evocycle
+
+5. **KOHLER cleaning-cycle boundary — manufacturer statement.** The same product page describes a Rapid Clean cycle using 0.75 US gallons (2.84 L), with a five-minute cycle recommended after each shower, and a separate periodic Deep Clean. The all-in water use for the illustrative 10-minute shower is therefore at least 5.75 US gallons (21.7 L) when the stated Rapid Clean water is added. This arithmetic is our boundary normalization, not a KOHLER-reported all-in saving. The exact current installation manual and operating instructions must be captured before formal testing.  
+   https://www.kohler.com/en/products/showers/anthem-evocycle
+
+6. **Orbital Systems — manufacturer statement.** Orbital reports about 20 L for a long shower. Record the duration and complete operating/cleaning boundary as unknown until the manufacturer supplies enough detail or a controlled test is performed.  
+   https://www.orbital-systems.com/orbital-shower-hiw
+
+7. **Bouvenot & Beaudet, Energy and Buildings (2025), DOI 10.1016/j.enbuild.2025.115341 — peer-reviewed in-situ study.** The study reports 14 months of operation and separates exchanger-level efficiency from system-level recovery after shower heat losses. Its 52% system result is the relevant initial benchmark for claims at the shower-system boundary.  
+   https://doi.org/10.1016/j.enbuild.2025.115341
+
+## 3. South African standards and labelling status
+
+The CLASP report recommended that South Africa establish a showerhead SANS aligned with international performance methods; it proposed assessing flow at 150 and 300 kPa and identified 4.5–6 L/min as a candidate highest-efficiency band for future WELS. Those CLASP flow-band and product-label proposals are distinct from existing installation requirements.
+
+**Interpretation note:** amended clause 5.3.3.2 states that showers must operate effectively at the manufacturer's recommended internal pressure and sets a maximum discharge flow rate of 10 L/min. Table 3 separately lists, for a water-saving showerhead, a 12 L/min "likely maximum", 6 L/min likely minimum, 10 L/min design flow and 50–100 kPa design flow pressure. Table 3 footnote (a) defines "likely maximum" as the flow a user would normally allow the fitting to discharge, not necessarily the maximum attainable; footnote (b) says the design-flow pressure values are used where a manufacturer's flow-pressure curve is unavailable. These are different demand/design columns, not a product performance curve or permission to exceed the clause-level 10 L/min discharge limit. For Aqua, retain 10 L/min as the conservative clause-level maximum pending controlled SABS interpretation. Treat 50–100 kPa as a local design-flow reference that motivates testing, not a guaranteed minimum-pressure rating for every showerhead. Confirm exact controlled-edition applicability with SABS / the responsible technical committee and registered plumbing professional.
+
+**Low-pressure implication:** Table 3's 50–100 kPa design-flow pressure range is materially below Aqua's previous 150 kPa research point. Aqua should add 50, 75 and 100 kPa dynamic-pressure tests as local low-head research points, while retaining 140 kPa for WaterSense spray-force comparison and 150 / 300 kPa for the existing South African matched-comparator protocol. These are distinct endpoints, not interchangeable test pressures. Table 3's design pressure is a pipe/fitting design reference, not proof that every showerhead or installation achieves a qualified bathing task at all pressures in that range.
+
+**Existing installation standard:** the IOPSA notice quotes SANS 10252-1:2018 Edition 3.2 clause 5.3.3.2 as requiring showers to operate effectively at the manufacturer's recommended internal water pressure and setting maximum discharge at 10 L/min (Amendment 2). The accessible standard text also carries this shower provision. SANS 10252-1 is a building water-installation standard; this clause must not be mislabeled as a WaterSense-style product certification, an efficiency rating, or proof that a proposed WELS label is in force. Confirm the controlled current edition/amendments, interpretation and project applicability with SABS, the relevant authority and a registered local plumbing professional before making a compliance claim.
+
+**Johannesburg deployment note:** the City of Johannesburg Water Services By-laws 2023 are a separate local instrument. Sections 57 and 59–60 set compliance / demand-management obligations, allow intervention against equipment judged wasteful and prohibit wasteful water use. Sections 69–71 establish a fitness-for-purpose and alternative-source framework. Section 73 requires professional installation of rainwater harvesting, prohibits potable use unless drinking-water requirements are met, prohibits blending with municipal water and requires cross-connection safeguards for indoor dual-source use. Section 74 governs greywater reuse for non-drinking uses; if stored, greywater must be filtered and disinfected to a written specification by a water specialist, and storage overflow is directed to sewer. These clauses do not authorize greywater or rainwater for bathing. They support Aqua's physically separate water circuits and jurisdiction-specific source/use-class review. Source: [City of Johannesburg Water Services By-laws 2023, Local Authority Notice 980 of 2023](https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf).
+
+WRC's 2025 reporting describes the national Water Efficiency Labelling Scheme as under development after stakeholder consultation in May 2025. That is a separate programme; the source does not establish its current 2026 launch or final mandatory/voluntary status. Verify the current SABS catalogue and DWS/WELS publications before any compliance claim.
+
+The 2026 Consumer Reports results provide another useful performance comparator: shower coverage, force, flow, temperature drop and usability are assessed together. The highest-value research question for Aqua is whether an integrated product can retain equivalent or better task outcome, force distribution, coverage, temperature stability and post-fouling recovery at 4.5–5.5 L/min across a declared operating envelope. Brondell already specifies a 4.5 L/min mode and a 1.4–5.5 bar supply range; Aqua must compete on matched performance, robustness and all-in service rather than claim novelty from that flow number. The stated inlet range is a manufacturer specification, not a validated performance curve at every point.
+
+## 4. Reproducible arithmetic for the initial comparator
+
+Use US gallons only as the vendor's declared unit, convert exactly for analysis:
+
+- 1 US gallon = 3.785411784 L.
+- 2.5 US gpm = 9.46352946 L/min.
+- 0.5 US gpm = 1.892705892 L/min.
+
+For a 10-minute once-through reference at 2.5 gpm:
+
+- fresh water = 25 US gal = 94.6353 L.
+
+For the KOHLER Cycle Mode example:
+
+- fresh make-up during the 10-minute session = 5 US gal = 18.9271 L;
+- nominal in-session fresh-water reduction = 80% against the 25 US gal reference;
+- stated Rapid Clean water = 0.75 US gal = 2.83906 L;
+- illustrative fresh water including one Rapid Clean = 5.75 US gal = 21.7662 L;
+- boundary-normalized reduction including this cleaning water = 77.0% against 25 US gal.
+
+This does not yet include any unreported warm-up, commissioning, periodic Deep Clean, maintenance flush, failed attempt, filter/media or standby burden. Those must be measured or explicitly recorded as unknown. Do not imply the above is independently verified KOHLER field performance.
+
+## 5. Candidate Luminous Aqua research targets
+
+These are hypotheses to test, not achieved results or frozen engineering requirements.
+
+| Dimension | Proposed target | Required qualification |
+|---|---|---|
+| Direct-flow primary target | ≤6.0 L/min at 300 kPa reference | Meet the selected spray coverage, force and pressure-compensation criteria; test at 150 and 300 kPa; user comfort non-inferior to the matched control |
+| Direct-flow stretch target | ≤4.5 L/min at 300 kPa | Preserve non-inferior spray coverage, force, temperature stability and user task outcome; a research stretch, not a binding South African standard |
+| Within-session recirculation | ≤18 L fresh water per standardized 10-minute service | Include warm-up/priming, active use, refresh, complete recommended after-session cleaning and purge; never store recirculated water for later users |
+| Water savings | ≥80% versus a matched 2.5 gpm once-through control only if the all-in boundary passes | Include all fresh water and failed attempts; compare the same duration, task, comfort and coverage |
+| Shower heat recovery | ≥60% useful system-level recovery after a declared fouling/maintenance sequence | Count heat actually delivered to incoming water, parasitic electricity, pressure loss, heat lost between head and drain, and uncertainty |
+| Other fixtures | ≥20% reduction in whole-task water or energy as a product-specific stretch target | Compare equal tasks, output quality, accessibility and cleaning burden; do not transfer a shower result to a bath, bidet or basin |
+| Lifecycle | ≥20% lower lifecycle cost per qualified service as a stretch target | Include purchase, installation, energy, water, filters, chemicals, labour, repair, downtime and end-of-life; no burden shifting |
+
+The 18 L target intentionally sits below both the arithmetic KOHLER example including its stated Rapid Clean water (21.8 L) and the public Orbital long-shower claim (~20 L). This is only a target-setting comparison: a superiority claim requires equal test duration, use profile and full system boundary for each incumbent.
+
+The 6.0 L/min direct-flow target is 21% below the WaterSense 7.6 L/min maximum, but this alone is not a global SOTA claim: independent 2026 consumer testing lists showerheads at 1.5–1.6 gpm (5.68–6.06 L/min), and Hansgrohe advertises ≤6 L/min on some EcoSmart+ models. The 4.5 L/min stretch point is already present in a commercial manufacturer specification. It is an aggressive test point, not a novelty claim. Aqua's differentiator must be demonstrably better task-region coverage, standard force/coverage endpoints, low-pressure behavior, temperature stability, scale tolerance, cleaning recovery and lifecycle burden under matched conditions.
+
+The 60% heat-recovery target is a stretch above the cited 52% in-situ system result. It is not a permissible design assumption. Test long-term fouling, service interval and parasitic losses before evaluating it.
+
+## 6. Safety, room engineering and South African deployment context
+
+### Pool and hot-tub systems
+- CDC's 2024 fifth-edition Model Aquatic Health Code is model guidance for public aquatic venues; it only becomes binding when adopted by a jurisdiction.
+- CDC guidance associates hot tubs with Legionella exposure and calls for appropriate disinfectant residual and pH controls; public hot tubs should use automatic feed/control systems.
+- Ozone or UV must not be treated as a substitute for a validated primary disinfection strategy or a completed water-quality assessment.
+- Official guidance:  
+  https://www.cdc.gov/model-aquatic-health-code/php/our-work/index.html  
+  https://www.cdc.gov/control-legionella/php/toolkit/hot-tub-module.html
+
+### Indoor pool, steam and sauna rooms
+ASHRAE's natatorium guidance describes a high-dew-point design problem. Humidity, ventilation, pressure, air distribution, evaporation, water chemistry and building-envelope condensation must be engineered together. A dehumidifier alone is not a complete design. Steam rooms and dry saunas are distinct moisture/thermal environments and must not share an unqualified ventilation design.  
+https://handbook.ashrae.org/Handbooks/A23/IP/A23_Ch06/A23_Ch06_ip.aspx
+
+### Johannesburg by-law context
+The City of Johannesburg Water Services By-laws 2023 section 74 states that greywater tank installations must comply with applicable building requirements and that stored greywater must be filtered and disinfected to a water specialist's written specification. Section 106A controls pool backwash discharge and prohibits pool-water discharge to roads, gutters, storm-water drains, watercourses and other properties. These provisions do not by themselves establish a treatment recipe or a blanket approval for any reuse application. Qualified local plumbing/building/water specialists must verify the applicable current requirements before any installation.  
+https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf
+
+## 7. Architecture consequences
+
+1. Treat clean-water direct-flow and within-session recirculation as two separate shower modes with an explicit safe transition and independent water accounting.
+2. Keep in-session recirculation physically separate from household greywater storage/reuse, pools, bidets, toilets and rainwater/non-potable circuits.
+3. Design recirculation wet paths for drain-down, inspection, cleanout, filter replacement, validated post-use cleaning and no cross-user stored water.
+4. Use indirect heat recovery; do not mix drain water, recirculation water, pool water or potable supply.
+5. Keep local manual operation and deterministic safety interlocks. Symthaea may observe, personalize and recommend inside a qualified envelope; it does not control primary disinfection, safety limits or isolation authority.
+6. Use Mycelix-admitted metrology and water-quality assessment for claims; use Symtropy's existing physical owners and Sol-Atlas pool thermal work rather than creating duplicate solvers.
+7. Make repairability and cleaning time part of the benchmark, not an afterthought.
+
+## 8. Minimum matched-test protocol
+
+For every comparator, freeze exact model/market variant, installed options, software/firmware, installation geometry, supply pressure, inlet temperature, ambient temperature/RH, task duration and user-selected mode.
+
+Measure with independently calibrated instruments:
+- fresh-water flow and volume;
+- recirculated volume and residence-time trace;
+- supply and delivered-water temperature;
+- pressure at defined points;
+- heater, pump, control and cleaning electricity/fuel;
+- post-use cleaning water and chemical/consumable use;
+- temperature stability, spray force and coverage by the chosen method;
+- fouling condition, filter differential pressure, cleaning time and replacement interval.
+
+Run cold-start, warm-start, 5/10/15-minute durations, low/nominal/high pressure, repeated sessions, blocked/loaded filter, sensor fault, pump degradation, power loss, stuck valve, interrupted cleaning and maintenance states. A failed or aborted attempt remains in the accounting population.
+
+For recirculating systems, independent microbiological and aerosol-exposure specialists must define sampling methods, challenge organisms/indicators, detection limits, sampling points and acceptance criteria before a bench can advance. A turbidity, conductivity, ORP, UV-intensity or ozone sensor reading alone is not proof of pathogen control.
+
+## 9. Claim and evidence rules
+
+- A vendor statement stays a vendor statement until independently tested.
+- Standards-based product qualification, analytical calculation, synthetic simulation, unoccupied bench result, human-factors result and field result are separate evidence classes.
+- All missing boundaries remain unknown; do not fill them with favourable estimates.
+- Water and energy balances must close within declared uncertainty. Include all purge, cleaning, reject and loss streams.
+- No performance number transfers from shower to bath, basin, bidet, steam room, sauna or pool.
+- No medical, therapeutic, pathogen-free, regulatory-compliance or consumer-superiority claim is permitted without the relevant independent evidence.
+
+## 10. Next actions
+
+1. Obtain current installation, maintenance, filter and cleaning documentation for each named shower comparator.
+2. Build a matched comparison worksheet with one row per configuration and explicit unknown fields.
+3. Draft the shower service contract and 10-minute benchmark protocol under issue #12660.
+4. Compose Mycelix metrology/quality, Symtropy WaterLoop and Sol-Atlas pool-thermal dependencies.
+5. Only then select a test-article architecture and freeze an unoccupied bench protocol.
+
+## 11. References
+
+- US EPA WaterSense showerheads: https://www.epa.gov/watersense/showerheads
+- KOHLER Anthem EvoCycle product description and operating boundary: https://www.kohler.com/en/products/showers/anthem-evocycle
+- Orbital Systems shower description: https://www.orbital-systems.com/orbital-shower-hiw
+- Bouvenot & Beaudet (2025), DOI: https://doi.org/10.1016/j.enbuild.2025.115341
+- CDC 2024 MAHC edition: https://www.cdc.gov/model-aquatic-health-code/php/our-work/index.html
+- CDC hot-tub Legionella guidance: https://www.cdc.gov/control-legionella/php/toolkit/hot-tub-module.html
+- ASHRAE Handbook, Chapter 6: Indoor Swimming Pools: https://handbook.ashrae.org/Handbooks/A23/IP/A23_Ch06/A23_Ch06_ip.aspx
+- City of Johannesburg Water Services By-laws 2023: https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf
+
+
+## 12. Additional sources added in v0.2
+
+- CLASP, *South African Shower Heads Testing Report*: https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/
+- WRC / Water Wheel 2025, South African showerhead testing and WELS development: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
+- Hansgrohe South Africa shower range / EcoSmart+: https://www.hansgrohe.co.za/bathroom/products/showers
+- GROHE South Africa Euphoria system specifications: https://www.groheonline.co.za/collections/shower-systems
+- Consumer Reports 2026 best showerheads and test methods: https://www.consumerreports.org/home-garden/showerheads/best-showerheads-of-the-year-a7580523069/
+- Consumer Reports public showerhead ratings: https://www.consumerreports.org/home-garden/showerheads/c33121/
+- Pérez Guillemette & Albrechtsen (2025), microbial indicators for recirculating shower technology, *Science of the Total Environment* 965, 178610: https://doi.org/10.1016/j.scitotenv.2025.178610
+- Ren et al. (2026), opportunistic pathogens in shower systems, *Journal of Environmental Sciences*, DOI: https://doi.org/10.1016/j.jes.2026.02.034
+
+
+## 13. Exact comparator updates — current vendor documentation
+
+### Hansgrohe South Africa: exact once-through shower system
+
+The Hansgrohe South African Pro datasheet for **Activera Select S Shower system, SKU 28087000** states:
+- 95 mm hand shower, two spray types Rain and ImpactRain;
+- Rain flow 7.2 L/min at 3 bar;
+- ImpactRain flow 6.5 L/min at 3 bar;
+- 8 L/min regulator (with stated tolerance);
+- minimum flow pressure 0.5 bar;
+- FlexPower pressure-responsive nozzle adjustment;
+- ShowerTablet Select 360 thermostat with SafetyStop at 40°C, adjustable hot-water limitation and stated intrinsic backflow protection.
+
+This exact SKU is a better comparator than a generic brand-family claim. The design challenge is now clearer: a 6.0 L/min AQS-1 primary target would be about 8% below this SKU's 6.5 L/min ImpactRain mode, but only a matched coverage / force / temperature / task test can tell whether it is better. Its 7.2 L/min Rain mode is a direct reference for the wider spray profile. Do not treat the datasheet as independent test evidence.
+
+Primary source: [Hansgrohe South Africa product datasheet, SKU 28087000](https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000).
+
+### Orbital Shower: installation and service constraints
+
+Orbital's current support documentation provides a much more specific operational boundary than its approximate 20 L long-shower marketing statement:
+
+- incoming pressure range published as 2–10 bar, with listed system flows of 8.7 L/min at 1.5 bar, 10.2 L/min at 2 bar, 11.7 L/min at 3 bar and 12 L/min at 4 bar and above;
+- hot and cold inlets each require specified supply capacity (e.g. 9 L/min per inlet for a 12 L/min system flow);
+- a 230 VAC, single-phase, 16 A supply is the stated design supply; the core must remain powered even when not in use;
+- the core requires a warm, temperature-controlled service environment and is not to be installed where ambient temperature may fall below 4°C;
+- its maintenance guide describes filter-capsule replacement on average every three months (assuming one shower daily), weekly descaling or when prompted (typically every 20 showers on the cited guide), and monthly drain cleaning (~3 minutes). The product documentation states filter and descaling consumables are provided through its Care / Optimization Plan.
+
+These are manufacturer installation and maintenance instructions, not independently measured reliability or operating-cost data. **Documentation discrepancy to resolve:** the same installation page states a 2 bar minimum incoming-pressure range while its flow table also lists 8.7 L/min at 1.5 bar. Do not interpret that 1.5 bar row as an approved operating point until Orbital confirms its applicability for the exact regional model. The declared minimum remains 2 bar for comparator admission. They nevertheless make several benchmark variables explicit: minimum supply pressure, both inlet capacities, electrical availability/continuous standby, service-space/temperature constraints, recurring consumables, maintenance labor and local support dependence. Aqua must measure these burdens for the exact South African configuration rather than infer them from the advertised water figure.
+
+Primary sources:
+- [Orbital installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html)
+- [Orbital Home maintenance intervals](https://support.orbital-systems.com/user-guide/en/16856-maintenance-routines---notifications.html)
+- [Orbital Business maintenance intervals](https://support.orbital-systems.com/user-guide/en/9466-maintenance-overview---notifications.html)
+- [Orbital long-shower water claim](https://www.orbital-systems.com/orbital-shower-hiw)
+
+### Competitive implications for Aqua
+
+1. **Do not compete on one headline litre figure.** Recirculation remains the water-volume frontier, but direct-flow may have a superior deployment envelope where supply pressure, electrical availability, installation footprint, always-on standby, service contract, proprietary consumables or local repair access are limiting.
+2. **Treat the exact local shower as the control.** Test Hansgrohe SKU 28087000 at 150 / 300 kPa and any additional standards / product-specific points. Capture both Rain and ImpactRain; compare like spray profiles rather than averaging the two.
+3. **Make low-pressure operation a first-class differentiator.** Orbital's published 2 bar minimum system inlet pressure is materially above some household supply conditions. Verify on the exact regional installation; do not extrapolate from nominal pressure ratings.
+4. **Count system dependencies.** Recirculating products must be compared with electrical continuity, standby power, source pressure/flow, warm service-space requirements, consumables, cleaning, maintenance, downtime and service response—not only shower-session make-up water.
+5. **Measure serviceability rather than assuming simplicity.** A direct-flow design still needs scale-resistant nozzles, accessible strainers, reliable thermostatic mixing, backflow protection, safe temperatures and a proven cleaning/service path. Fewer parts are not automatically safer or easier to maintain.
+
+
+## 6. Comparator update — 2026-11-18
+
+The low-flow landscape has been expanded with two exact commercial references:
+
+- **Brondell Nebia Corre, model family N400RO:** manufacturer specification sheet lists 1.5 gpm in three modes and 1.2 gpm (approximately 4.5 L/min) in Super Saver mode. The published sheet does not establish matched Aqua bather-plane coverage/force at 300 kPa; this is a manufacturer-declared comparator, not an independent test. Source: https://www.brondell.com/content/Nebia_Corre_Fixed_Showerhead_Spec_Sheet_web_010623.pdf
+- **Hansgrohe Raindance Select E 120 3jet PowderRain EcoSmart+, SKU 28729000:** South African professional datasheet lists PowderRain 5.2 L/min, Rain 5.4 L/min and massage 5.2 L/min at 3 bar, maximum 6 L/min, and minimum flow pressure 1.5 bar. Source: https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28729000
+- **Consumer Reports 2026 ratings:** publicly listed independently measured examples include 1.4–1.6 gpm (approximately 5.3–6.1 L/min); exact model/mode and method must be frozen before a head-to-head replication. Sources: https://www.consumerreports.org/home-garden/showerheads/best-showerheads-of-the-year-a7580523069/ and https://www.consumerreports.org/home-garden/showerheads/c33121/
+
+### Revised spray-field research claim
+
+Aqua does not claim to invent the 4.5 L/min shower mode. The research challenge is to outperform the best matched incumbent on a multi-dimensional, preregistered result: pressure envelope, standardized spray-force and coverage, supplementary task-region deposition map, bather-plane temperature, scale/partial-blockage behavior, cleanability and whole-service resource burden.
+
+The supplementary spatial-map method and deterministic analysis helper are in [AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md](AQUA_SPRAY_FIELD_METROLOGY_PROTOCOL_V0_1.md). The new service continuity benchmark is [AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md](AQUA_ESSENTIAL_SERVICE_CONTINUITY_PROTOCOL_V0_1.md).
+
+
+### South African standards source register
+
+- IOPSA notice identifying SANS 10252-1:2018 Edition 3.2, clause 5.3.3.2 and quoting the shower operating-pressure / 10 L/min discharge provision (industry-association notice, not the controlled standard): https://www.iopsa.org/news/7216337
+- SABS webstore reference for SANS 10252-1:2018 (Ed. 3.02) and SANS 10252-2:1993, listed by PIRB: https://legacytwo.pirb.co.za/sabs-webstore/
+- City of Johannesburg Water Services By-laws 2023 (Local Authority Notice 980 of 2023): https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf
+- CLASP South African showerhead report: https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/
+- WRC 2025 report / WELS development context: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
+
+The IOPSA notice is useful for clause identification but is not the controlled standard. Confirm the current controlled SABS edition and amendments, and the exact clause applicability, with SABS and a registered local plumbing professional before design release or a compliance claim.
+
+### SANS 10252-1:2018 Table 3 — low-pressure reference
+
+The accessible Edition 3.2 Table 3 gives a water-saving showerhead design flow of 10 L/min at a design flow pressure of 50–100 kPa, compared with the standard showerhead design flow of 15 L/min at 20–50 kPa. Footnote (b) says these design-pressure values are used where a manufacturer's flow-pressure curve is unavailable. They are installation/design references—not product minimum operating-pressure ratings, efficiency-label pass criteria or a replacement for product-specific flow curves. The likely-maximum column is a demand-planning quantity defined by footnote (a), not an authorized product discharge limit.
+
+Primary accessible text: https://www.uj.ac.za/wp-content/uploads/2022/11/sans-10252-1-water-supply-and-drainage-for-buildings-part-1-water-supply-installations-for-buildings-2018.pdf (SANS 10252-1:2018 Edition 3.2, Table 3 and clause 5.3.3.2). The document itself states it is copyright-protected SABS material; use the controlled official copy for formal compliance interpretation.
+
+
+### Activera SKU identity note — 2026-11-18
+
+Two different South African Activera Select S configurations are now separated:
+- **28087000** is the exposed shower system with ShowerTablet Select 360 thermostat and shower bar. Its datasheet states a 10 bar maximum operating pressure and SafetyStop at 40°C.
+- **28048000** is the Shower Set 95 2jet EcoSmart with Varia 72 cm bar and no ShowerTablet; its product page states a 6 bar maximum operating pressure.
+
+Both publish Rain 7.2 and ImpactRain 6.5 L/min at 3 bar and minimum pressure 0.5 bar. Do not transfer the 28087000 thermostat / 10 bar properties to 28048000, or vice versa. These two SKUs are separate test articles, not a single merged comparator.
+
+
+## Machine-readable evidence register
+
+The current frozen source snapshot is available as:
+- [Aqua evidence corpus v0.1 (JSON)](research/aqua-evidence-corpus-v0.1.json)
+- [Aqua evidence corpus v0.1 (rendered Markdown)](research/AQUA_EVIDENCE_CORPUS_V0_1.md)
+- [JSON Schema (Draft 2020-12)](research/aqua-evidence-corpus-v0.1.schema.json)
+
+Snapshot 2026-11-18 contains nine entries and 41 claims, including separate Activera 28087000 shower-system and 28048000 shower-set identities. The GitHub Aqua workflow validates schema, source-class compatibility, units, pressure/mode disclosures, derivation requirements and negative controls, and checks the Markdown rendering against the JSON source. The corpus is not an Aqua performance claim; it is a source-classified baseline.
+
+
+## Task-selective delivery — existing commercial precedent
+
+Hansgrohe's Activera Select S WaterBoost, South African SKU 28036000, already provides a user-held temporary flow increase. The official product page lists base Rain / ImpactRain at 2.9 L/min, boosted ImpactRain at 6.6 L/min and boosted Rain at 9.4 L/min at 3 bar, while also listing a 4 L/min flow regulator / maximum and 0.8 bar minimum. The relationship between the 4 L/min values and the boosted figures is not explained; Aqua records this as an unresolved manufacturer specification-scope ambiguity rather than choosing a convenient interpretation. The page says the boost is initiated by pressing and holding the side button.
+
+This makes a temporary boost button a commercial precedent, not an Aqua novelty. Aqua's differentiation must be a complete task-phase plan, measured resource accounting, independent task outcome, pressure/temperature robustness, explicit user authority and verified return-to-base behavior—not merely an extra flow mode.
+
+See [AQUA-TASK-SELECTIVE-DELIVERY-001 #12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798) and [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md).
+
+Source: https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000
+
+
+## 14. UK Energy Technology List — non-domestic pressure-independence comparator
+
+The UK government's Energy Technology List (ETL) shower criteria provide a useful external pressure-response benchmark for non-domestic products. The current published criteria page states:
+- Shower heads, shower valves and shower systems: maximum available flow of 9 L/min without user-behaviour features (UBFs), or 10.6 L/min with UBFs.
+- Pressure independence: lowest flow at 1.5 bar must be at least 60% of maximum available flow at 3 bar, for products with the 3-bar reference flow at or below 8.0 L/min.
+- Spray coverage: tested using the Unified Water Label scheme published in January 2023.
+
+Source: UK Department for Energy Security and Net Zero, Energy Technology List — Showers, sections 1.1–1.4: https://etl.energysecurity.gov.uk/products/showers/showers
+
+**Scope warning:** the ETL shower category is explicitly for non-domestic applications. It is not a South African legal requirement, not a domestic shower certification and not an Aqua performance result. It is a strong comparative reference for pressure retention and the principle that maximum flow, pressure independence and spray coverage should be evaluated together.
+
+Aqua research targets for exact 150 / 300 kPa paired runs:
+- 60%: external ETL-style reference only when its product category, reference-flow and UWL-method conditions apply;
+- 70%: proposed Aqua internal initial target, measured conservative bound;
+- 80%: proposed Aqua stretch hypothesis, measured conservative bound.
+
+Do not apply these percentages indiscriminately to a product or mode outside the ETL's scope. Flow retention does not establish task quality, comfort, spray force, coverage, hygiene or certification. The paired exact-point comparison is implemented in `symthaea-aqua-bench::pressure_curve::compare_flow_retention` and reports central ratio plus measurement-uncertainty bounds; it does not interpolate a curve or produce a confidence interval over specimens.
+
+
+## 15. UK ETL 2025/26 electric-shower / DWHR integration pathway
+
+The UK ETL published its 2025/26 annual criteria update on 15 September 2026. The current non-domestic electric-shower criteria specify:
+- standard maximum available flow: 4.5 L/min;
+- conditional maximum up to 9 L/min when electrical input is modulated to minimize electricity while maintaining stable output temperature with an ETL-compliant wastewater heat-recovery system;
+- conditional maximum up to 10.6 L/min where the qualifying DWHR / power-modulation system also includes a user-behaviour feature.
+
+This is a non-domestic UK programme pathway, not South African law or domestic product certification. It does not prove a particular product achieves useful task quality or energy savings. The full system must be assessed, including heater input, recovered heat at the actual receiver, fouling, static/standby loss, parasitics, pressure, outlet-temperature stability and completed-task outcomes.
+
+Sources:
+- [Current ETL shower criteria](https://etl.energysecurity.gov.uk/products/showers/showers), sections 1.1–1.4
+- [2025/26 Annual Research Programme update, 15 September 2026](https://etl.energysecurity.gov.uk/news-events/news/202526-annual-research-programme-updated-criteria-now-live)
+
+The associated peer-reviewed evidence corpus now includes:
+- 2025, 14-month DWHR fouling study: 66% overall exchanger efficiency after fouling / unsteady effects and 52% system efficiency after showerhead-to-drain losses (study-specific).
+- October 2026 DWHR coupling study: global DHW COP up to 6.3 experimentally and 8.0 in simulation in its studied configurations; mixer-side unbalanced DWHR gave the best tested overall topology, while some configurations increased static loss and reduced heat-pump COP.
+
+Aqua's response is a new complete-system workstream, [#12816](https://github.com/Luminous-Dynamics/symthaea/issues/12816), and the [power-coupled shower / DWHR benchmark](AQUA_POWER_COUPLED_SHOWER_DWHR_BENCHMARK_V0_1.md). No study value is promoted to an Aqua result or universal target.
+
+
+## 16. Current functional-performance method references — EN 18021:2025 and UWL 2023
+
+EN 18021:2025 is a current European laboratory type-test standard for taps, shower outlets, shower sets and shower systems (in force from 2 July 2025 in the UNI catalogue). It is not production QC. Its scope distinguishes PN5 shower outlets/sets from PN10 taps/systems; it excludes shower taps alone and bath-filling functions. Its accessible summary gives outlets/sets a 0.5 bar dynamic operating lower limit, 5 bar static maximum, and 1–3 bar recommended dynamic range (42°C recommended outlet temperature). Taps/systems have a separate table: 0.5 bar dynamic lower limit, 10 bar static maximum, recommended 1–5 bar dynamic (the table footnote describes measurement at point of discharge), 65°C recommended. The full controlled standard is required for formal test methods.
+
+Sources:
+- [UNI official catalogue — EN 18021:2025](https://store.uni.com/en/en-18021-2025)
+- [SIS national adoption listing](https://www.sis.se/en/produkter/testing/ss-en-180212025/)
+- [BS EN 18021:2025 listing](https://tienda.aenor.com/p/norma-bsi-bs-en-18021-2025-000000000030479514)
+
+UWL 2023 applies P1/P2/P3 as dynamic pressures **to each inlet**: 150 kPa +10/-0 and 300 kPa +20/-0 for Type 1; 10 kPa +2/-0 for Type 2. ETL also requires P2 at the centre of the faceplate for its maximum-flow procedure. These method datums cannot be collapsed into one upstream or terminal-inlet gauge point. The complete crosswalk is in [AQUA_METHOD_CROSSWALK_V0_1.md](AQUA_METHOD_CROSSWALK_V0_1.md), tracked by [#12817](https://github.com/Luminous-Dynamics/symthaea/issues/12817).
+
+Aqua's generic pressure retention helper is now explicit about pressure datum and rejects cross-datum comparisons. It supports general terminal-fitting-inlet or point-of-discharge engineering channels only. It does not model the UWL simultaneous inlet channels or ETL faceplate-centre P2 and therefore cannot produce an ETL/UWL compliance claim.
+
+
+## 17. Task-selective delivery and temporary boost — UWL 2023 Clause 12.1
+
+Temporary boost is not a new category by itself. Commercial hold-to-boost controls already exist, so Aqua must compete on the complete task result and reset behavior rather than a button or a peak-flow claim.
+
+### Exact commercial case: Hansgrohe Activera Select S WaterBoost, SKU 28036000
+
+The South African manufacturer page / datasheet states, at 3 bar:
+- Regular Rain: 2.9 L/min.
+- Regular ImpactRain: 2.9 L/min.
+- ImpactRain + Booster: 6.6 L/min.
+- Rain + Booster: 9.4 L/min.
+- Flow regulator: 4 L/min (possible tolerance −20%).
+- Maximum flow: 4 L/min.
+- Minimum flow pressure: 0.8 bar.
+- WaterBoost is a press-and-hold side control.
+
+This contains an unresolved manufacturer documentation-scope contradiction: the boosted flows exceed the same page's declared 4 L/min regulator / maximum. Aqua does not assume that boost bypasses the restrictor, that the maximum applies only to regular modes, or that the boosted values are erroneous. Obtain manufacturer clarification and independently measure the exact SKU, mode, supply conditions, regulator and delivered flow before using these values as a verified boost baseline.
+
+Source:
+- https://pro.hansgrohe.co.za/articledetail-activera-select-s-hand-shower-95-2jet-ecosmart-with-booster-28036000
+- https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28036000
+
+### Formal UWL boost-function benchmark
+
+The Unified Water Label Taps & Showers Technical Criteria (January 2023), definition 3.12 and clause 12.1, is a stronger reference than product marketing. It defines a boost function as temporary flow increase that automatically cancels on closure of the flow control.
+
+Under Type 1 P2 (dynamic 300 kPa +20/-0 applied to each inlet separately), the method records:
+1. Regular flow Qreg.
+2. Boosted flow Qboost.
+3. Flow-control closure.
+4. Reopening without boost and post-close flow Qmax.
+
+The criteria require automatic return to regular flow (Qmax = Qreg), Qboost < 2 × Qreg, and Qreg listed on the scheme label. These are method requirements; manufacturer specifications are not a pass result. Aqua's Rust validator additionally records declared flow-measurement uncertainty and a scheme-label evidence receipt. Equality within combined measurement uncertainty is an Aqua screening rule for its software record, not a replacement for formal UWL method interpretation.
+
+Source: https://uwla.eu/wp-content/uploads/2023/05/TAPS-Showers-Technical-2023.pdf
+
+### Nominal WaterBoost ratios — screening signal only
+
+If the listed regular and boosted manufacturer flows are directly comparable at the same method conditions:
+- ImpactRain: 6.6 / 2.9 ≈ **2.28×** regular.
+- Rain: 9.4 / 2.9 ≈ **3.24×** regular.
+
+Those nominal ratios exceed UWL's Qboost < 2 × Qreg criterion. This is not a finding of non-conformity: the product-page regulator/maximum conflict remains unresolved, and the exact SKU has not been reproduced under the complete UWL P2 test. The proper next step is manufacturer clarification plus an independent exact-SKU test, not an assumption about bypass or a marketing allegation.
+
+### Aqua research target
+
+Aqua should aim for:
+- a very low-flow base mode that is task-qualified;
+- a task-specific boost only where the task benefits from it;
+- exact user hold / automatic reset and a qualified duration ceiling;
+- measured Qreg, Qboost and Qmax at the UWL method datum;
+- Qboost below the UWL 2× regular-flow criterion where claiming method compatibility;
+- at least **20% lower fresh water per completed task** versus a matched always-high-flow control, with independent task-quality endpoints non-inferior, including startup, pause, rinse, failed attempts, cleaning and purge.
+
+The 20% is a research hypothesis, not a result or certification claim. A hold-to-boost button alone is not an ETL user-behaviour feature (UBF); ETL UBF status depends on whether the built-in feature demonstrably reduces total shower duration / volume under the ETL method.
+
+### Evidence / implementation references
+
+- Machine-readable UWL boost criteria are in [AQUA_EVIDENCE_CORPUS_V0_1.md](research/AQUA_EVIDENCE_CORPUS_V0_1.md), 15 entries / 77 claims.
+- Exact method channel and flow-sequence validator: `standard_methods::UwlBoostFunctionObservation`.
+- Exact-SKU, configuration-, delivery-condition- and qualification-bound task-phase plan: `task_phase::validate_task_phase_plan`.
+- Full test and research protocol: [AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md](AQUA_TASK_SELECTIVE_DELIVERY_PROTOCOL_V0_1.md).
+- Workstream: [#12798](https://github.com/Luminous-Dynamics/symthaea/issues/12798).
+
+No Aqua boost product, task-quality benefit, water saving, energy saving or UWL conformity result is claimed.
