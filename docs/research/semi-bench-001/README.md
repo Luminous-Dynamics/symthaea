@@ -415,3 +415,14 @@ The benchmark scope also maps to NIST's TIDAL manufacturing-intelligence program
 ## Split-manifest admission gate
 
 An independent split validator has been added alongside the metric scorer. It distinguishes group-disjoint, forward-time and stratified sample splits, rejects leakage/identity errors and hashes canonical assignments. This prevents a benchmark report from implying lot independence or temporal generalization when the available dataset only supports a random stratified split. See `benchmarks/semi-bench-001/reference/python/semi_split_manifest_reference.py` and its frozen synthetic known-answer fixture.
+
+
+## New 2026 inspection, metrology and packaging work
+
+See [2026-inspection-metrology-packaging-frontier.md](2026-inspection-metrology-packaging-frontier.md). New follow-up workstreams:
+
+- [SEMI-INSPECT-001 #13083](https://github.com/Luminous-Dynamics/symthaea/issues/13083): budget-aware adaptive inspection, delayed labels, noisy annotations and latent risk in uninspected wafers.
+- [SEMI-MET-002 #13084](https://github.com/Luminous-Dynamics/symthaea/issues/13084): physics-bounded AI SEM dimensional metrology, detection limits and sparse scanning.
+- [SEMI-PKG-TEST-001 #13085](https://github.com/Luminous-Dynamics/symthaea/issues/13085): known-good-die, chiplet package test coverage and lifecycle observability.
+
+These extend the programme from classifying inspected examples to optimizing inspection decisions, measuring AI detection limits and engineering package testability.
