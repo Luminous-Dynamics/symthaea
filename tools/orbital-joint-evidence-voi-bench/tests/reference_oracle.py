@@ -108,6 +108,11 @@ def evaluate_action(scenario, action, baseline):
     state = action["admissibility"]["state"]
     budget_ok = resource_fits(action, scenario["budget"])
     claim_ok = action["target_claim_id"] == scenario["target_claim_id"]
+    context = scenario["decision_context"]
+    profile_ok = action["profile_ref"] == context["profile_ref"]
+    article_subject_ok = action["article_subject_ref"] == context["article_subject_ref"]
+    configuration_ok = action["configuration_id"] == context["configuration_id"]
+    icd_revision_ok = action["icd_revision"] == context["icd_revision"]
     dependencies = set(action["dependencies"])
     common_cause = False
     if scenario["requires_independent_evidence"]:
@@ -122,8 +127,9 @@ def evaluate_action(scenario, action, baseline):
     calibrated = (scenario["decision_regime"] != "calibrated_probability" or
                   (action.get("probability_model_ref") and
                    action.get("calibration_status") == "calibrated_for_fixture_only"))
-    eligible = (state == "ADMISSIBLE" and budget_ok and claim_ok and
-                not common_cause and obligations_ok and not terminal and calibrated)
+    eligible = (state == "ADMISSIBLE" and budget_ok and claim_ok and profile_ok
+                and article_subject_ok and configuration_ok and icd_revision_ok
+                and not common_cause and obligations_ok and not terminal and calibrated)
     value = None
     post = None
     if eligible and scenario["decision_regime"] == "distribution_free":
@@ -138,6 +144,10 @@ def evaluate_action(scenario, action, baseline):
         "eligible": eligible,
         "budget_fits": budget_ok,
         "target_matches": claim_ok,
+        "profile_matches": profile_ok,
+        "article_subject_matches": article_subject_ok,
+        "configuration_matches": configuration_ok,
+        "icd_revision_matches": icd_revision_ok,
         "common_cause": common_cause,
         "obligations_covered": obligations_ok,
         "terminal": terminal,
@@ -149,6 +159,10 @@ def evaluate_action(scenario, action, baseline):
 def audit_scenario(scenario):
     if scenario["evidence_class"] != "synthetic" or scenario["claim_ceiling"] != CLAIM:
         raise ValueError("unsupported evidence/claim ceiling")
+    context = scenario["decision_context"]
+    if any(not isinstance(context.get(key), str) or not context[key].strip()
+           for key in ("profile_ref", "article_subject_ref", "configuration_id", "icd_revision")):
+        raise ValueError("decision context is incomplete")
     states = scenario["states"]
     if len(states) < 2 or len(set(states)) != len(states):
         raise ValueError("states must be unique and non-empty")
@@ -325,7 +339,7 @@ def main():
         "scenarios": results,
     }
     print(json.dumps(report, sort_keys=True, indent=2))
-    if len(results) != 14 or matches != 14:
+    if len(results) != 15 or matches != 15:
         raise SystemExit(1)
 
 
