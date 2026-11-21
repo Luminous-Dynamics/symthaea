@@ -56,7 +56,7 @@ At the default 16 seeds, this is 640 receipts.
 From the repository root, after a Rust toolchain is installed:
 
 \`\`\`bash
-cargo fmt --manifest-path Cargo.toml --package symthaea-muse -- --check
+rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs
 cargo test -p symthaea-muse --bin rmi_bench_track_a
 cargo run -p symthaea-muse --bin rmi_bench_track_a -- \\
   --source-commit "$(git rev-parse HEAD)" \\
