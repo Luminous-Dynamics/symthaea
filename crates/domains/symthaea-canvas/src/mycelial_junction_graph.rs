@@ -33,6 +33,10 @@ pub const MAX_JUNCTION_GRAPH_SEGMENTS: usize = 16_384;
 pub const PARAMETER_SCALE: u32 = 1_000_000;
 const ARC_LENGTH_SUBDIVISIONS: usize = 64;
 const MAX_MODEL_COORDINATE: f32 = 1_024.0;
+const MAX_GRAPH_COORDINATE: f32 = MAX_MODEL_COORDINATE + 1.0;
+const MAX_SEGMENT_ARC_LENGTH_MODEL_UNITS: f64 = 12_000.0;
+const MAX_SEGMENT_WELD_OFFSET_MODEL_UNITS: f64 = 1.0;
+const MAX_GRAPH_ID_BYTES: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -699,7 +703,7 @@ impl MycelialJunctionHyphaGraph {
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
             || !self.maximum_junction_gap_model_units.is_finite()
-            || self.maximum_junction_gap_model_units < 0.0
+            || !(0.0..=1.0).contains(&self.maximum_junction_gap_model_units)
         {
             return Err(MycelialJunctionGraphError::InvalidGraph(
                 "invalid schema, digest, or junction-gap metadata",
@@ -707,13 +711,67 @@ impl MycelialJunctionHyphaGraph {
         }
         let mut node_index = HashMap::with_capacity(self.junctions.len());
         for (index, junction) in self.junctions.iter().enumerate() {
+            let bounded_position = junction.position.is_finite()
+                && junction.position.x.abs() <= MAX_GRAPH_COORDINATE
+                && junction.position.y.abs() <= MAX_GRAPH_COORDINATE
+                && junction.position.z.abs() <= MAX_GRAPH_COORDINATE;
             if junction.id.is_empty()
-                || !junction.position.is_finite()
+                || junction.id.len() > MAX_GRAPH_ID_BYTES
+                || junction.id.chars().any(char::is_control)
+                || !bounded_position
+                || junction
+                    .incident_filament_ids
+                    .windows(2)
+                    .any(|pair| pair[0] >= pair[1])
+                || junction
+                    .terminal_filament_ids
+                    .windows(2)
+                    .any(|pair| pair[0] >= pair[1])
+                || junction
+                    .anastomosis_ids
+                    .windows(2)
+                    .any(|pair| pair[0] >= pair[1])
+                || junction
+                    .terminal_filament_ids
+                    .iter()
+                    .any(|id| !junction.incident_filament_ids.contains(id))
+                || junction.incident_filament_ids.iter().any(|id| {
+                    !self.source_filament_ids.contains(id)
+                })
                 || node_index.insert(junction.id.as_str(), index).is_some()
             {
                 return Err(MycelialJunctionGraphError::InvalidGraph(
-                    "duplicate or invalid junction",
+                    "duplicate, unbounded, or internally inconsistent junction",
                 ));
+            }
+            match junction.kind {
+                JunctionKind::Origin | JunctionKind::Branch => {
+                    if !junction.terminal_filament_ids.is_empty()
+                        || !junction.anastomosis_ids.is_empty()
+                    {
+                        return Err(MycelialJunctionGraphError::InvalidGraph(
+                            "origin/branch junction has terminal or fusion metadata",
+                        ));
+                    }
+                }
+                JunctionKind::Tip => {
+                    if junction.terminal_filament_ids.is_empty()
+                        || !junction.anastomosis_ids.is_empty()
+                    {
+                        return Err(MycelialJunctionGraphError::InvalidGraph(
+                            "tip junction has invalid terminal/fusion metadata",
+                        ));
+                    }
+                }
+                JunctionKind::Anastomosis => {
+                    if junction.terminal_filament_ids.is_empty()
+                        || junction.anastomosis_ids.is_empty()
+                    {
+                        return Err(MycelialJunctionGraphError::InvalidGraph(
+                            "anastomosis junction has no explicit fusion/terminal identity",
+                        ));
+                    }
+                }
             }
         }
         if self.junctions.len() > MAX_JUNCTION_GRAPH_JUNCTIONS
@@ -732,19 +790,37 @@ impl MycelialJunctionHyphaGraph {
         let mut segment_ids = HashSet::with_capacity(self.segments.len());
         let mut intervals = BTreeMap::<u32, Vec<(u32, u32)>>::new();
         for segment in &self.segments {
+            let start_index = node_index.get(segment.start_junction_id.as_str());
+            let end_index = node_index.get(segment.end_junction_id.as_str());
+            let endpoints_are_incident = start_index.is_some_and(|index| {
+                self.junctions[*index]
+                    .incident_filament_ids
+                    .contains(&segment.filament_id)
+            }) && end_index.is_some_and(|index| {
+                self.junctions[*index]
+                    .incident_filament_ids
+                    .contains(&segment.filament_id)
+            });
             if segment.id.is_empty()
+                || segment.id.len() > MAX_GRAPH_ID_BYTES
+                || segment.id.chars().any(char::is_control)
                 || !segment_ids.insert(segment.id.as_str())
                 || segment.t_start_micros >= segment.t_end_micros
                 || segment.t_end_micros > PARAMETER_SCALE
-                || !node_index.contains_key(segment.start_junction_id.as_str())
-                || !node_index.contains_key(segment.end_junction_id.as_str())
+                || start_index.is_none()
+                || end_index.is_none()
+                || !endpoints_are_incident
+                || segment.start_junction_id == segment.end_junction_id
                 || !source_filaments.contains(&segment.filament_id)
                 || !segment.arc_length_model_units.is_finite()
                 || segment.arc_length_model_units <= 0.0
+                || segment.arc_length_model_units > MAX_SEGMENT_ARC_LENGTH_MODEL_UNITS
                 || !segment.start_junction_offset_model_units.is_finite()
                 || !segment.end_junction_offset_model_units.is_finite()
                 || segment.start_junction_offset_model_units < 0.0
                 || segment.end_junction_offset_model_units < 0.0
+                || segment.start_junction_offset_model_units > MAX_SEGMENT_WELD_OFFSET_MODEL_UNITS
+                || segment.end_junction_offset_model_units > MAX_SEGMENT_WELD_OFFSET_MODEL_UNITS
                 || !segment.radius_start_model_units.is_finite()
                 || !segment.radius_end_model_units.is_finite()
                 || !(0.005..=128.0).contains(&segment.radius_start_model_units)
