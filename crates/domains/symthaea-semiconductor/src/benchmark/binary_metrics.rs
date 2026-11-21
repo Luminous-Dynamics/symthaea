@@ -121,7 +121,8 @@ fn validate(subject: &BinaryScoreSubjectV1) -> Result<(usize, usize), BinaryMetr
             "schema: unsupported or missing input schema".into(),
         ));
     }
-    if !subject.decision_threshold.is_finite() || !(0.0..=1.0).contains(&subject.decision_threshold) {
+    if !subject.decision_threshold.is_finite() || !(0.0..=1.0).contains(&subject.decision_threshold)
+    {
         return Err(BinaryMetricsError(
             "decision_threshold: must be finite and in [0, 1]".into(),
         ));
