@@ -92,3 +92,22 @@ jobs:
 
       - name: Lint standalone kernel
         run: cargo clippy --manifest-path research/rcaf/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run RCAF synthetic injection-recovery calibration
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery -- "$RUNNER_TEMP/rcaf-injection-report.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/injection-recovery.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-injection-report.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["null_false_positive_rate"]["estimate"] <= 0.15
+          assert report["injection_detection_power"]["estimate"] >= 0.80
+          assert report["median_injected_paired_gap"] > report["median_null_paired_gap"] + 0.035
+          print("PASS: RCAF synthetic null calibration and injection recovery")
+          PY
