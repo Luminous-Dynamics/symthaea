@@ -1152,6 +1152,92 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_event_fixture_replays_to_a_complete_retrieval_episode() {
+        let events: Vec<CognitiveTopologyEvent> = serde_json::from_str(include_str!(
+            "../tests/fixtures/cognitive_topology_events_v1.json"
+        ))
+        .expect("event fixture must deserialize");
+        let mut base = base();
+        base.session_id = "synthetic-event-fixture".to_string();
+        let reducer = CognitiveTopologyReducer::replay(base, &events).expect("event replay");
+        assert_eq!(reducer.snapshot().nodes.len(), 2);
+        assert_eq!(reducer.snapshot().edges.len(), 1);
+        assert_eq!(reducer.snapshot().episodes.len(), 1);
+        assert_eq!(reducer.snapshot().last_sequence, 5);
+        assert_eq!(
+            reducer.snapshot().episodes[0].state,
+            CognitiveEpisodeState::Completed
+        );
+        assert!(
+            reducer
+                .snapshot()
+                .nodes
+                .iter()
+                .all(|node| node.evidence.provenance == CognitiveProvenance::SyntheticFixture)
+        );
+        assert_eq!(reducer.events().len(), 5);
+        assert_eq!(reducer.event_log_digest_hex().unwrap().len(), 64);
+    }
+
+    #[test]
+    fn session_and_schema_are_bound_to_each_event() {
+        let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
+        let mut wrong_session = add_node(1, "memory:a");
+        wrong_session.session_id = "another-session".to_string();
+        assert!(matches!(
+            reducer.apply_event(wrong_session),
+            Err(CognitiveEventError::SessionMismatch { .. })
+        ));
+
+        let mut wrong_schema = add_node(1, "memory:a");
+        wrong_schema.schema_version += 1;
+        assert!(matches!(
+            reducer.apply_event(wrong_schema),
+            Err(CognitiveEventError::UnsupportedSchemaVersion(_))
+        ));
+        assert!(reducer.events().is_empty());
+        assert!(reducer.snapshot().nodes.is_empty());
+    }
+
+    #[test]
+    fn one_session_cannot_mix_synthetic_and_runtime_evidence() {
+        let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
+        let mut synthetic = add_node(1, "memory:fixture");
+        synthetic.evidence.provenance = CognitiveProvenance::SyntheticFixture;
+        reducer.apply_event(synthetic).unwrap();
+
+        let runtime = add_node(2, "memory:runtime");
+        assert_eq!(
+            reducer.apply_event(runtime),
+            Err(CognitiveEventError::SessionProvenanceMismatch)
+        );
+        assert_eq!(reducer.snapshot().nodes.len(), 1);
+        assert_eq!(reducer.snapshot().last_sequence, 1);
+    }
+
+    #[test]
+    fn episode_payload_limits_are_checked_before_mutation() {
+        let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
+        let event = CognitiveTopologyEvent {
+            schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+            session_id: "event-reducer-test".to_string(),
+            evidence: evidence(1, "event:oversized-episode"),
+            change: CognitiveTopologyChange::EpisodeStarted {
+                episode_id: "episode:oversized".to_string(),
+                kind: CognitiveEpisodeKind::Retrieval,
+                node_ids: vec!["node".to_string(); MAX_COGNITIVE_NODES + 1],
+                edge_ids: Vec::new(),
+            },
+        };
+        assert!(matches!(
+            reducer.apply_event(event),
+            Err(CognitiveEventError::InvalidEventPayload(_))
+        ));
+        assert!(reducer.snapshot().episodes.is_empty());
+        assert!(reducer.events().is_empty());
+    }
+
+    #[test]
     fn renderer_configuration_is_not_part_of_event_or_snapshot_identity() {
         let mut first = CognitiveTopologyReducer::new(base()).unwrap();
         let mut second = CognitiveTopologyReducer::new(base()).unwrap();
