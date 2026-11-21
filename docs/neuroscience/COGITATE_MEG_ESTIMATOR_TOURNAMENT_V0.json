@@ -1,0 +1,114 @@
+{
+  "schema_version": "cetb.estimator-tournament/0.1.0",
+  "status": "protocol_only_no_data_analysis",
+  "created": "2026-11-21",
+  "source_paper": {
+    "title": "A data-driven approach to identifying and evaluating connectivity-based neural correlates of conscious visual perception",
+    "authors": [
+      "Annie G. Bryant",
+      "Christopher J. Whyte"
+    ],
+    "journal": "Neuroscience of Consciousness",
+    "issue": "2026(1), niag029",
+    "doi": "10.1093/nc/niag029",
+    "correction": {
+      "date": "2026-10-15",
+      "doi": "10.1093/nc/niag071",
+      "requirements": [
+        "use corrected supplementary PDF",
+        "use corrected Eq. 1",
+        "use corrected Table 1 and Table 2"
+      ]
+    }
+  },
+  "source_data": {
+    "provider": "COGITATE",
+    "doi": "10.17617/1.wqa3-wk71",
+    "preprocessing_data_doi": "10.5281/zenodo.18294156",
+    "code_repository": "https://github.com/anniegbryant/MEG_functional_connectivity",
+    "software": {
+      "name": "pyspi",
+      "version": "1.1.0"
+    },
+    "participant_counts": {
+      "bids_meg": 100,
+      "source_localization_with_anatomy": 94
+    },
+    "candidate_statistics": {
+      "initial": 262,
+      "retained_after_qc": 246,
+      "qc_minimum_available_participants": 85,
+      "qc_coverage_fraction": 0.9
+    },
+    "reported_primary_model_fits": 35280,
+    "reported_accuracy_ranges": {
+      "stimulus_type": "approximately 0.60-0.67 across many candidate configurations",
+      "task_relevance": "none of the candidate measures exceeded 0.56 in the reported analysis"
+    },
+    "status": "published_same_dataset_analysis_not_independent_replication"
+  },
+  "reproduction_lanes": [
+    {
+      "id": "reference-replay",
+      "kind": "historical-reproduction",
+      "requires_exact_paper_pipeline": true
+    },
+    {
+      "id": "nested-selection",
+      "kind": "selection-aware-evaluation",
+      "outer_split": "grouped-by-participant",
+      "inner_split": "grouped-by-participant",
+      "all_feature_and_model_selection_inside_inner_fold": true
+    },
+    {
+      "id": "frozen-family-confirmation",
+      "kind": "independent-confirmation",
+      "requires_untouched_cohort_or_site": true
+    }
+  ],
+  "estimators": [
+    "pearson",
+    "spearman",
+    "covariance",
+    "regularized_precision",
+    "pairwise_phase_consistency",
+    "amplitude_envelope_measures",
+    "barycenter_family_pyspi_1_1_0",
+    "weighted_jaccard_on_declared_nonnegative_representation",
+    "hdc_candidate",
+    "cfc_ltc_candidate",
+    "hdc_cfc_hybrid_candidate"
+  ],
+  "selection_policy": {
+    "report_all_candidates": true,
+    "no_peak_score_without_nested_outer_evaluation": true,
+    "fixed_qc_filter_must_not_use_classification_performance": true,
+    "all_transformations_fit_within_training_fold": true,
+    "participant_all_runs_sessions_and_trials_stay_in_one_outer_fold": true,
+    "publish_selection_frequency_and_winner_runner_up_margin": true,
+    "preserve_failed_and_nonfinite_candidates": true
+  },
+  "required_metrics": [
+    "balanced_accuracy",
+    "auroc",
+    "auprc",
+    "mcc",
+    "sensitivity",
+    "specificity",
+    "log_loss",
+    "brier_score_declared_convention",
+    "calibration_slope",
+    "calibration_intercept",
+    "participant_clustered_ci",
+    "risk_coverage",
+    "abstention_rate",
+    "compute_cost"
+  ],
+  "claim_limits": [
+    "not_a_new_consciousness_label",
+    "same_COGITATE_source_cohort_not_independent_replication",
+    "cross_task_within_participant_transfer_not_unseen_participant_generalization",
+    "published_top_candidate_is_hypothesis_generating_until_nested_selection_and_independent_confirmation",
+    "no_superiority_claim_without_matched_protocol"
+  ]
+}
