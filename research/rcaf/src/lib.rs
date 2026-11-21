@@ -992,13 +992,7 @@ mod tests {
             "ROI-A".to_string(),
         ];
         assert_eq!(
-            summarize_edge_sign_transitions_labeled(
-                &labels,
-                &a,
-                &mismatched_labels,
-                &b,
-                0.05,
-            ),
+            summarize_edge_sign_transitions_labeled(&labels, &a, &mismatched_labels, &b, 0.05,),
             Err(MetricError::RoiOrderMismatch)
         );
     }
@@ -1105,13 +1099,17 @@ mod tests {
         for scale in [1e-6, 0.25, 3.0, 1e6] {
             let scaled_left: Vec<f64> = left.iter().map(|value| value * scale).collect();
             let scaled_right: Vec<f64> = right.iter().map(|value| value * scale).collect();
-            assert!((weighted_jaccard(&scaled_left, &scaled_right).unwrap() - baseline).abs() < 1e-12);
+            assert!(
+                (weighted_jaccard(&scaled_left, &scaled_right).unwrap() - baseline).abs() < 1e-12
+            );
         }
 
         let permutation = [2, 0, 3, 1];
         let permuted_left: Vec<f64> = permutation.iter().map(|&index| left[index]).collect();
         let permuted_right: Vec<f64> = permutation.iter().map(|&index| right[index]).collect();
-        assert!((weighted_jaccard(&permuted_left, &permuted_right).unwrap() - baseline).abs() < 1e-12);
+        assert!(
+            (weighted_jaccard(&permuted_left, &permuted_right).unwrap() - baseline).abs() < 1e-12
+        );
     }
 
     #[test]
