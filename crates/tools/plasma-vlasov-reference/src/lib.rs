@@ -222,7 +222,7 @@ impl VlasovPoisson1d1v {
         self.advect_x(0.5 * dt);
         self.refresh_electric_field()?;
         self.advect_velocity(dt);
-        self.advect_x(0.5 * dt)?;
+        self.advect_x(0.5 * dt);
         self.time += dt;
         if !self.time.is_finite() { return Err(SolverError::NonFiniteState); }
         self.refresh_electric_field()?;
