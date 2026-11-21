@@ -48,12 +48,6 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache Cargo artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            /tmp/mycelial-renderer-validation -> target
-
       - name: Assemble isolated validation workspace
         shell: bash
         run: |
@@ -81,6 +75,12 @@ jobs:
           blake3 = "1.5"
           EOF
           cargo generate-lockfile --manifest-path "$scratch/Cargo.toml"
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            /tmp/mycelial-renderer-validation -> target
 
       - name: Check formatting
         run: cargo fmt --manifest-path /tmp/mycelial-renderer-validation/Cargo.toml --all -- --check
