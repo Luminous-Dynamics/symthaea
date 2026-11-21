@@ -114,10 +114,8 @@ mod tests {
     use super::*;
 
     fn fixture() -> CognitiveTopology {
-        serde_json::from_str(include_str!(
-            "../tests/fixtures/cognitive_topology_v1.json"
-        ))
-        .expect("checked-in cognitive topology fixture")
+        serde_json::from_str(include_str!("../tests/fixtures/cognitive_topology_v1.json"))
+            .expect("checked-in cognitive topology fixture")
     }
 
     #[test]
@@ -129,14 +127,22 @@ mod tests {
         assert_eq!(first.anchors.len(), topology.nodes.len());
         assert_eq!(first.links.len(), topology.edges.len());
         for anchor in &first.anchors {
-            let node = topology.nodes.iter().find(|node| node.id == anchor.node_id).unwrap();
+            let node = topology
+                .nodes
+                .iter()
+                .find(|node| node.id == anchor.node_id)
+                .unwrap();
             assert_eq!(anchor.source_event_id, node.evidence.event_id);
             assert_eq!(anchor.source_sequence, node.evidence.sequence);
             assert_eq!(anchor.provenance, node.evidence.provenance);
             assert!(anchor.position.is_finite());
         }
         for link in &first.links {
-            let edge = topology.edges.iter().find(|edge| edge.id == link.edge_id).unwrap();
+            let edge = topology
+                .edges
+                .iter()
+                .find(|edge| edge.id == link.edge_id)
+                .unwrap();
             assert_eq!(link.source_event_id, edge.evidence.event_id);
             assert_eq!(link.provenance, edge.evidence.provenance);
         }
@@ -149,24 +155,29 @@ mod tests {
         let mut extended = topology;
         extended.last_sequence += 1;
         extended.revision += 1;
-        extended.nodes.push(crate::cognitive_topology::CognitiveNode {
-            id: "concept:additional".to_string(),
-            kind: crate::cognitive_topology::CognitiveNodeKind::Concept,
-            label: "Additional concept".to_string(),
-            status: EpistemicStatus::Observed,
-            evidence: crate::cognitive_topology::CognitiveEvidence {
-                event_id: "event:additional".to_string(),
-                producer: "synthetic-fixture".to_string(),
-                sequence: 4,
-                monotonic_ns: 4_000,
-                provenance: CognitiveProvenance::SyntheticFixture,
-                trace_digest: None,
-            },
-            activation: None,
-        });
+        extended
+            .nodes
+            .push(crate::cognitive_topology::CognitiveNode {
+                id: "concept:additional".to_string(),
+                kind: crate::cognitive_topology::CognitiveNodeKind::Concept,
+                label: "Additional concept".to_string(),
+                status: EpistemicStatus::Observed,
+                evidence: crate::cognitive_topology::CognitiveEvidence {
+                    event_id: "event:additional".to_string(),
+                    producer: "synthetic-fixture".to_string(),
+                    sequence: 4,
+                    monotonic_ns: 4_000,
+                    provenance: CognitiveProvenance::SyntheticFixture,
+                    trace_digest: None,
+                },
+                activation: None,
+            });
         let after = project_cognitive_topology(&extended).expect("valid extended topology");
         for anchor in &before.anchors {
-            let matching = after.anchors.iter().find(|value| value.node_id == anchor.node_id);
+            let matching = after
+                .anchors
+                .iter()
+                .find(|value| value.node_id == anchor.node_id);
             assert_eq!(matching.map(|value| value.position), Some(anchor.position));
         }
     }
