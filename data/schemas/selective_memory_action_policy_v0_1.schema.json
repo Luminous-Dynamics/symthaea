@@ -324,6 +324,9 @@
         },
         "canonical_revalidation_receipt_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "candidate_reported_deadline_enforced": {
+          "type": "boolean"
         }
       },
       "allOf": [
@@ -479,6 +482,44 @@
               "canonical_revalidation_receipt_sha256"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_action": {
+                "const": "use"
+              }
+            },
+            "required": [
+              "declared_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "canonical_revalidation_receipt_sha256",
+              "freshness_assessment_sha256",
+              "candidate_reported_evidence_age_at_use_ns",
+              "candidate_reported_max_evidence_age_ns",
+              "candidate_reported_deadline_enforced"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "candidate_reported_deadline_enforced": {
+                "const": true
+              }
+            },
+            "required": [
+              "candidate_reported_deadline_enforced"
+            ]
+          },
+          "then": {
+            "required": [
+              "candidate_reported_deadline_slack_at_use_ns"
+            ]
+          }
         }
       ]
     },
@@ -509,7 +550,8 @@
         "freshness_valid_at_use",
         "fresh_correct_on_time",
         "hard_resource_violation_count",
-        "canonical_revalidation_receipt_valid"
+        "canonical_revalidation_receipt_valid",
+        "deadline_enforced"
       ],
       "properties": {
         "schema_version": {
@@ -689,6 +731,9 @@
             "boolean",
             "null"
           ]
+        },
+        "deadline_enforced": {
+          "type": "boolean"
         }
       },
       "allOf": [
@@ -779,6 +824,28 @@
             "required": [
               "clarification_resolved"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "deadline_enforced": {
+                "const": true
+              }
+            },
+            "required": [
+              "deadline_enforced"
+            ]
+          },
+          "then": {
+            "required": [
+              "deadline_slack_at_use_ns"
+            ],
+            "properties": {
+              "deadline_slack_at_use_ns": {
+                "type": "integer"
+              }
+            }
           }
         }
       ]
