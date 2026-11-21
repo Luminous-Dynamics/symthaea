@@ -10,7 +10,7 @@
 
 Create a source-pinned, machine-readable reference for the systems and benchmarks that Muse should compare itself against. The ledger distinguishes measured results from documented product/API capabilities and from dataset-size facts. It does not manufacture a single cross-industry ranking.
 
-The first snapshot has nine sources and eleven observations, dated 21 November 2026.
+The dated snapshot now has ten sources and sixteen observations (21 November 2026), including a separate temporal-control benchmark.
 
 ## Snapshot highlights
 
@@ -31,6 +31,26 @@ The observed MIREX symbolic-generation results list DAMN at 3.68 coherence, 3.39
 The reported study is small (8 prompts, 12 participants and 38 ratings per model) and uses selected outputs from a pool of eight candidates. These numbers are useful reproduction targets, not a universal music-quality metric and not comparable to audio Elo.
 
 Source: https://futuremirex.com/mirex/wiki/2026%3ASymbolic_Music_Generation_Results
+
+### Temporal controllability — TimingBench
+
+TimingBench (August 2026) measures whether timestamped musical events occur when requested, rather than whether the overall audio merely resembles a prompt. Its 250 30-second instrumental prompts are split into 100 single-event, 100 timed-sequence and 50 global-tempo requests; the corpus defines 399 timed events.
+
+Published benchmark snapshot:
+
+| System | Overall instruction success (95% CI) | Timed events within ±500 ms | Tempo accuracy | FAD |
+|---|---:|---:|---:|---:|
+| Taan | 96.1% (93.3–99.2) | 91.3% | 92.0% | 4.8 |
+| ElevenLabs Music v2 | 28.9% (25.3–32.5) | 12.8% | 87.0% | 3.5 |
+| Google Lyria | 23.9% (20.3–27.5) | 8.6% | 89.7% | 2.6 |
+| ElevenLabs Music v1 | 25.4% (21.9–29.2) | 8.0% | 93.0% | 3.5 |
+| Suno | 22.0% (18.7–25.6) | 6.8% | 86.7% | 3.1 |
+
+The result creates a new, distinct competitive dimension. It also illustrates why timing, tempo and audio fidelity must not be collapsed into one number: Taan leads the reported timing measures, while Google Lyria has the lowest reported FAD (lower is better).
+
+**Evidence caveat:** TimingBench is published by Taan, one of the evaluated systems; independent replication is not established by this snapshot. The public paper reports a 128-event development/calibration validation sample with false credits and false positives, family-specific onset-localization floors, and an unfinished separate 300-clip annotation study at its evaluation cutoff. The ±500 ms metric is not a claim of sub-100-ms live timing or exact MIDI beat-phase control. Use the benchmark's measurement-error profile and reproduce the cohort before claiming parity or superiority.
+
+Source: https://taan.ai/research/rushing-or-dragging/
 
 ### Editing — SMEBench
 
