@@ -1,4 +1,3 @@
-pub mod sensing;
 
 //! Evaluator-side counterfactual retention primitives.
 //!
@@ -9,6 +8,9 @@ pub mod sensing;
 //! storage, evaluator-owned signing keys and replay-resistant receipts.
 //!
 //! No function here supplies evaluator outcomes to candidate-side policies.
+
+pub mod sensing;
+pub mod decision_observability;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
