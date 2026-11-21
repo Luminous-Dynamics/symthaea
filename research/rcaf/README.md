@@ -27,3 +27,14 @@ No such command has been run in the current environment because rustc/cargo are 
 For each participant, first collapse repeated segment placements using the prespecified within-condition and between-condition summaries. Then pass equal-length participant vectors to summarize_rcaf. The participant is the inferential unit; repeated windows must never be passed as independent participants.
 
 Positive paired gap means between-state similarity is lower than the within-state reference. The normalized excess-distance fraction is descriptive only; it is not a variance decomposition or causal attribution.
+
+
+## v1.1 diagnostics
+
+- `exact_sign_test` computes a two-sided exact participant-level sign test on paired gaps. Exact-zero gaps are ties and excluded from the binomial denominator. This is a distribution-free supplement to the effect distribution and participant bootstrap; it is not a randomization or causal test.
+- `summarize_edge_sign_transitions` counts polarity reversals and transitions to/from a neutral correlation band. Evaluate a neutral-threshold grid frozen before inspecting state contrasts.
+- Pair-aware positive/negative WJ still excludes polarity-reversed edges from that selected-edge denominator. Therefore report direct sign transitions beside sign-filtered WJ; do not interpret either metric alone.
+
+The report contract is `rcaf-report.schema.json`. The accompanying `fixtures/synthetic-rcaf-report.json` contains synthetic values only and must never be presented as a biological observation.
+
+The kernel now has eleven authored unit-test cases. They are not yet compiled or executed in this environment.
