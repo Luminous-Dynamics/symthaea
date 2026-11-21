@@ -619,7 +619,7 @@
         "detection_status": "detected",
         "measurement_scope": "local_probe",
         "measurement_scope_description": "synthetic local shot-noise spectroscopy example",
-        "tc_criterion": null,
+        "tc_criterion": "not_applicable",
         "measurement_method": "synthetic local shot-noise spectroscopy",
         "model_id": null,
         "model_revision": null,
