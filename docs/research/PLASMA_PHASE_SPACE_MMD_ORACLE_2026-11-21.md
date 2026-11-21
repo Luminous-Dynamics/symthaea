@@ -361,3 +361,17 @@ The implementation consumes one continuous deterministic SplitMix64 feature stre
 Five additional tests cover early pass, early fail, unresolved maximum-budget abstention, exact seeded-prefix equivalence, and invalid alpha/tolerance/budget rejection. The controller records each checkpoint's feature count, per-look alpha, cumulative alpha, estimate and interval.
 
 This controller is tracked separately in [#13046](https://github.com/Luminous-Dynamics/symthaea/issues/13046). Its competitive target is lower feature work on clearly safe or unsafe comparisons without compromising the simultaneous coverage guarantee; near-boundary outcomes must consume more compute or abstain.
+
+## 13. Competing approximation and sequential-calibration baselines
+
+The present sampler is a standard random-feature Monte Carlo estimator specialized to the exact mixed spectral law of this periodic × Gaussian kernel. It should not be presented as a new general random-feature family or as better than SOTA without direct comparison.
+
+Relevant baselines:
+- **Standard RFF / Bochner sampling:** the direct comparator. Match the same feature count, spectral law, PRNG/seed protocol and output functional. This crate's Skellam × Gaussian sampler is an explicit sampler for the target product spectrum.
+- **Data-driven RFF error estimation (Yao, Erichson & Lopes, AISTATS 2023):** their bootstrap error estimator supports adaptive feature allocation for kernel-matrix approximation. Reproduce it or a mathematically justified adaptation for the scalar signed-measure MMD functional. Do not transfer its matrix-approximation guarantee to this MMD estimator without a proof. Source: https://proceedings.mlr.press/v206/yao23a.html
+- **Orthogonal / Structured Orthogonal Random Features (Yu et al., NeurIPS 2016):** orthogonalization can reduce Gaussian-kernel approximation error and structured transforms can reduce feature-generation cost. The present spectrum is mixed discrete × one-dimensional Gaussian, not an isotropic multivariate Gaussian; direct ORF/SORF application is not automatic. Test only a derivation valid for this product measure. Sources: https://proceedings.neurips.cc/paper_files/paper/2016/hash/53adaf494dc89ef7196d73636eb2451b-Abstract.html and https://arxiv.org/abs/1610.09072
+- **Time-uniform confidence sequences (Howard et al., Annals of Statistics 2021):** general confidence-sequence methods can give tighter anytime-valid intervals than simple checkpoint-wise alpha spending. The current controller is the transparent union-bound baseline over a preregistered geometric schedule, not the final word. Source: https://doi.org/10.1214/20-AOS1991
+
+The next comparison matrix should include: fixed-D standard RFF; RFF with the Yao-style bootstrap error estimator adapted and validated for this functional; current alpha-spending geometric checkpoint controller; and a proven empirical-Bernstein / mixture confidence sequence. Hold physics cases, kernel scales, seeds, error target and hardware constant. Report achieved coverage across all looks, false-safe rate, mean and p95 feature count, absolute and relative MMD² error versus exact oracle, wall time and memory.
+
+Our credible claim ceiling is narrower and stronger: the implementation provides a measure-aware, full-spectrum sampler for this specific periodic × Gaussian kernel, an exact small-N reference, and a checkpointed optional-stopping-safe budget controller. Competitive superiority remains an empirical question.
