@@ -7,6 +7,7 @@ pub const CORPUS_SCHEMA: &str = "luminous.orbital-joint-evidence-voi.scenarios.v
 pub const RECEIPT_SCHEMA: &str = "luminous.orbital-joint-evidence-voi.receipt.v0.1";
 pub const CLAIM_CEILING: &str = "synthetic_decision_value_semantics_only";
 const EPSILON: f64 = 1.0e-10;
+type ObservationLikelihoods = BTreeMap<String, BTreeMap<String, f64>>;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -398,7 +399,7 @@ fn expected_post_action_loss(
 
 fn parse_likelihoods(
     action: &Action,
-) -> Result<Option<BTreeMap<String, BTreeMap<String, f64>>>, String> {
+) -> Result<Option<ObservationLikelihoods>, String> {
     let Some(value) = action.metadata.get("observation_likelihoods") else {
         return Ok(None);
     };
@@ -662,13 +663,11 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         }
         if scenario.decision_regime == "calibrated_probability"
             && action.admissibility.state == "ADMISSIBLE"
-        {
-            if metadata_string(action, "probability_model_ref").is_none()
+            && (metadata_string(action, "probability_model_ref").is_none()
                 || metadata_string(action, "calibration_status")
-                    != Some("calibrated_for_fixture_only")
-            {
-                reasons.push("PROBABILITY_MODEL_UNCALIBRATED".to_owned());
-            }
+                    != Some("calibrated_for_fixture_only"))
+        {
+            reasons.push("PROBABILITY_MODEL_UNCALIBRATED".to_owned());
         }
         reasons.sort();
         reasons.dedup();
@@ -827,25 +826,23 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             .iter()
             .find(|audit| audit.action_id == expected_action_id)
             .and_then(|audit| audit.post_action_regret_or_loss)
+            && (actual_post - expected_post).abs() > 1.0e-9
         {
-            if (actual_post - expected_post).abs() > 1.0e-9 {
-                return Err(format!(
-                    "{} expected post-action score differs from oracle",
-                    scenario.scenario_id
-                ));
-            }
+            return Err(format!(
+                "{} expected post-action score differs from oracle",
+                scenario.scenario_id
+            ));
         }
     }
 
-    if scenario.decision_regime == "calibrated_probability" {
-        if let Some(expected_evsi) = scenario.expected.evsi {
-            if expected_action_value.is_none_or(|value| (value - expected_evsi).abs() > 1.0e-9) {
-                return Err(format!(
-                    "{} EVSI differs from independent one-step oracle",
-                    scenario.scenario_id
-                ));
-            }
-        }
+    if scenario.decision_regime == "calibrated_probability"
+        && let Some(expected_evsi) = scenario.expected.evsi
+        && expected_action_value.is_none_or(|value| (value - expected_evsi).abs() > 1.0e-9)
+    {
+        return Err(format!(
+            "{} EVSI differs from independent one-step oracle",
+            scenario.scenario_id
+        ));
     }
 
     let action_count = audits.len();
