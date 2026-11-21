@@ -310,6 +310,33 @@ pub fn generate_and_rank_sonata_return_with_model(
         MusicalPolicyPreference::for_action(trace.proposal.action),
         &policy_evidence,
     );
+
+    // A bound formal obligation is a hard gate, not merely a ranking feature.
+    // The generic musical policy exposes obligation status in its assessments,
+    // but this Sonata adapter must never recommend a candidate that misses the
+    // exact obligation that authorized this intervention.
+    if trace.proposal.driving_obligation_id.is_some() {
+        for assessment in &mut selection.assessments {
+            if assessment.target_obligation_verified != Some(true) {
+                assessment.eligible = false;
+            }
+        }
+        selection.recommended_id = selection
+            .assessments
+            .iter()
+            .find(|assessment| assessment.eligible)
+            .map(|assessment| assessment.alternative_id.clone());
+        if selection.recommended_id.is_none() {
+            selection.rationale = vec![
+                "no candidate passed the bound Sonata obligation, canonical theory, and protected-score gates".into(),
+            ];
+        } else {
+            selection.rationale.push(
+                "the bound Sonata obligation was applied as a hard eligibility gate before cognitive subintent selection".into(),
+            );
+        }
+    }
+
     let cognitive_subintent =
         apply_return_subintent_v1(trace, &candidates, &mut selection);
 
@@ -880,6 +907,27 @@ mod tests {
         assert_eq!(
             supported.selection.recommended_id,
             unsupported.selection.recommended_id
+        );
+    }
+
+    #[test]
+    fn unknown_driving_obligation_fails_closed_with_no_recommended_candidate() {
+        let intent = MusicalIntent {
+            seed: 59,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let realization =
+            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let mut trace = return_trace(&realization);
+        trace.proposal.driving_obligation_id = Some(u64::MAX);
+
+        let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
+        assert_eq!(batch.selection.recommended_id, None);
+        assert!(batch.selection.assessments.iter().all(|item| !item.eligible));
+        assert_eq!(
+            batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::RejectedByFormalGates
         );
     }
 
