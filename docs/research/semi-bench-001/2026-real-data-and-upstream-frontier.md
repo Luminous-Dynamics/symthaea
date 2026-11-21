@@ -120,3 +120,10 @@ This creates a realistic path to add semiconductor capability without claiming w
 - [SEMI-WM-HDC-001 #13068](https://github.com/Luminous-Dynamics/symthaea/issues/13068): multiscale relational HDC/CfC challenger.
 
 All are research workstreams. The public baseline projects and paper-reported results are comparison material, not reproduced Luminous results.
+
+
+## SECOM chronological split now frozen
+
+The audited mirror's per-file SHA-256 values and canonical two-file snapshot-manifest digest are now recorded in `secom-source-integrity-audit-v0.1.json`. A row-level chronological split manifest is frozen at `splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json`.
+
+It contains 1,567 assignments and uses a declared source-local naive clock domain. Its chronological 60/20/20 support is 76/11/17 failures. The manifest was constructed from the public mirror commit, not from a verified byte-identical official UCI download. It has not yet been used to train or evaluate a model.
