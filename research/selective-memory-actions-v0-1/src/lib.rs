@@ -498,6 +498,33 @@ mod tests {
     }
 
     #[test]
+    fn late_correction_blocks_use_even_when_memory_age_is_fresh() {
+        let gates = AdmissionSnapshot {
+            verification_authorized: true,
+            verifier_available: true,
+            source_qualified: true,
+            scope_qualified: true,
+            freshness_at_use: FreshnessAtUse {
+                evidence_age_at_retrieval_ns: Some(10),
+                evidence_age_at_use_ns: Some(20),
+                max_evidence_age_ns: Some(100),
+                deadline_slack_at_use_ns: Some(500),
+            },
+            // The current bitemporal ledger reports a correction/retraction.
+            not_revoked_or_erased: false,
+            canonical_revalidation_at_use: true,
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::Use, &LOW_LOSS, 0, 0, 0),
+            option(Action::Verify, &HIGH_LOSS, 0, 0, 1),
+            option(Action::Abstain, &HIGH_LOSS, 0, 0, 2),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::Verify);
+    }
+
+    #[test]
     fn use_is_available_after_current_source_receipt_revalidation() {
         let gates = AdmissionSnapshot {
             source_qualified: true,
