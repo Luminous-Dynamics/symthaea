@@ -203,10 +203,7 @@ pub fn adept_shifted_fourier_to_real_space(
             let shifted_k_index = (raw_k_index + half) % spatial_count;
             let input_index = mode_index * spatial_count + shifted_k_index;
             let coefficient = fields.coefficients[input_index];
-            row.push(super::Complex::new(
-                coefficient.real,
-                coefficient.imaginary,
-            ));
+            row.push(super::Complex::new(coefficient.real, coefficient.imaginary));
         }
 
         // The local inverse divides by N. ADEPT's norm="forward" inverse is
@@ -223,10 +220,8 @@ pub fn adept_shifted_fourier_to_real_space(
                 });
             }
 
-            maximum_imaginary_residual =
-                maximum_imaginary_residual.max(reconstructed.im.abs());
-            maximum_real_magnitude =
-                maximum_real_magnitude.max(reconstructed.re.abs());
+            maximum_imaginary_residual = maximum_imaginary_residual.max(reconstructed.im.abs());
+            maximum_real_magnitude = maximum_real_magnitude.max(reconstructed.re.abs());
 
             output[mode_index * spatial_count + spatial_index] = reconstructed.re;
         }
@@ -284,8 +279,7 @@ mod tests {
             0.5 * amplitude * phase.cos(),
             0.5 * amplitude * phase.sin(),
         );
-        let negative =
-            ComplexFourierCoefficient::new(positive.real, -positive.imaginary);
+        let negative = ComplexFourierCoefficient::new(positive.real, -positive.imaginary);
         set_shifted_mode(values, mode_index, spatial_count, signed_mode, positive);
         set_shifted_mode(values, mode_index, spatial_count, -signed_mode, negative);
     }
@@ -300,8 +294,7 @@ mod tests {
     #[test]
     fn constant_row_reproduces_source_forward_normalization() {
         let spatial_count = 8;
-        let mut coefficients =
-            vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
         set_shifted_mode(
             &mut coefficients,
             0,
@@ -390,10 +383,7 @@ mod tests {
     #[test]
     fn multiple_modes_and_rows_preserve_superposition_and_row_major_order() {
         let spatial_count = 16;
-        let mut coefficients = vec![
-            ComplexFourierCoefficient::new(0.0, 0.0);
-            2 * spatial_count
-        ];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); 2 * spatial_count];
         add_real_cosine(&mut coefficients, 0, spatial_count, 1, 1.1, 0.2);
         add_real_cosine(&mut coefficients, 0, spatial_count, 4, 0.3, -0.4);
         add_real_cosine(&mut coefficients, 1, spatial_count, -2, 0.7, 0.6);
@@ -410,8 +400,7 @@ mod tests {
 
         for x in 0..spatial_count {
             let theta = TAU * x as f64 / spatial_count as f64;
-            let expected_first = 1.1 * (theta + 0.2).cos()
-                + 0.3 * (4.0 * theta - 0.4).cos();
+            let expected_first = 1.1 * (theta + 0.2).cos() + 0.3 * (4.0 * theta - 0.4).cos();
             let expected_second = 0.7 * (-2.0 * theta + 0.6).cos();
             close(real.get(0, x).unwrap(), expected_first, 3.0e-13);
             close(real.get(1, x).unwrap(), expected_second, 3.0e-13);
@@ -539,8 +528,7 @@ mod tests {
 
     #[test]
     fn non_finite_inputs_and_invalid_tolerances_are_rejected() {
-        let mut coefficients =
-            vec![ComplexFourierCoefficient::new(0.0, 0.0); 8];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); 8];
         coefficients[3] = ComplexFourierCoefficient::new(f64::NAN, 0.0);
         let non_finite = adept_shifted_fourier_to_real_space(
             ShiftedFourierCoefficientFields {
