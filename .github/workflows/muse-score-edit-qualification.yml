@@ -1,0 +1,56 @@
+name: Muse Score Edit Qualification
+
+on:
+  push:
+    branches:
+      - 'research/melothaea-score-edit-plan-v1'
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'scripts/check-workspace-targets.sh'
+      - 'crates/domains/symthaea-music-theory/Cargo.toml'
+      - 'crates/domains/symthaea-music-theory/src/lib.rs'
+      - 'crates/domains/symthaea-music-theory/src/score_edit.rs'
+      - '.github/workflows/muse-score-edit-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-score-edit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Validate workspace target declarations
+        run: bash scripts/check-workspace-targets.sh
+
+      - name: Format-check score edit module
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-music-theory/src/score_edit.rs
+
+      - name: Test score edit and independent preservation verifier
+        run: cargo test -p symthaea-music-theory --lib
+
+      - name: Verify no accidental production dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          if sed -n '/^\[dependencies\]/,/^\[/p' crates/domains/symthaea-music-theory/Cargo.toml | grep -q 'sha2'; then
+            echo "unexpected production sha2 dependency"
+            exit 1
+          fi
+          echo "score edit transaction remains dependency-light"
