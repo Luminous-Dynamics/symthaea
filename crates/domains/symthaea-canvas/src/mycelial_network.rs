@@ -82,6 +82,10 @@ pub struct MycelialNetworkMetrics {
     pub connected_components: usize,
     pub cycle_rank: usize,
     pub maximum_degree: usize,
+    /// Number of filament vertices whose removal increases component count.
+    pub articulation_filament_count: usize,
+    /// Worst connected-component count after removing any single filament.
+    pub max_components_after_single_filament_failure: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -105,6 +109,8 @@ pub enum MycelialNetworkError {
     MissingSourceFilament(u32),
     MissingTargetFilament(u32),
     SelfFusion(u32),
+    SourceIsNotTerminalTip(u32),
+    TargetIsNotTerminalTip(u32),
     InvalidFusionParameter(u32),
     InvalidJunctionPosition(u32),
     FusionTooFar {
@@ -141,6 +147,12 @@ impl fmt::Display for MycelialNetworkError {
                 write!(f, "anastomosis target filament {id} does not exist")
             }
             Self::SelfFusion(id) => write!(f, "anastomosis {id} connects a filament to itself"),
+            Self::SourceIsNotTerminalTip(id) => {
+                write!(f, "anastomosis {id} source is not a terminal hyphal tip")
+            }
+            Self::TargetIsNotTerminalTip(id) => {
+                write!(f, "anastomosis {id} target is not a terminal hyphal tip")
+            }
             Self::InvalidFusionParameter(id) => {
                 write!(f, "anastomosis {id} has invalid parameter values for its fusion kind")
             }
@@ -232,6 +244,9 @@ pub fn build_mycelial_network_graph(
             .ok_or(MycelialNetworkError::MissingTargetFilament(
                 fusion.target_filament_id,
             ))?;
+        if !source.terminal {
+            return Err(MycelialNetworkError::SourceIsNotTerminalTip(fusion.id));
+        }
 
         if !fusion.source_t.is_finite()
             || !fusion.target_t.is_finite()
@@ -243,6 +258,9 @@ pub fn build_mycelial_network_graph(
         }
         match fusion.kind {
             AnastomosisKind::TipToTip => {
+                if !target.terminal {
+                    return Err(MycelialNetworkError::TargetIsNotTerminalTip(fusion.id));
+                }
                 if (fusion.target_t - 1.0).abs() > TIP_PARAMETER_EPSILON {
                     return Err(MycelialNetworkError::InvalidFusionParameter(fusion.id));
                 }
@@ -352,6 +370,8 @@ impl MycelialNetworkGraph {
             .saturating_add(connected_components)
             .saturating_sub(vertex_count);
         let maximum_degree = degree.values().copied().max().unwrap_or(0);
+        let (articulation_filament_count, max_components_after_single_filament_failure) =
+            single_filament_failure_metrics(&self.filament_ids, &self.connections);
 
         MycelialNetworkMetrics {
             filament_count: vertex_count,
@@ -361,6 +381,8 @@ impl MycelialNetworkGraph {
             connected_components,
             cycle_rank,
             maximum_degree,
+            articulation_filament_count,
+            max_components_after_single_filament_failure,
         }
     }
 
@@ -400,6 +422,68 @@ impl MycelialNetworkGraph {
         }
         output
     }
+}
+
+/// Count single-filament articulation points and worst-case component
+/// count after deleting one vertex. This is a graph-theoretic stress indicator,
+/// not a claim about biological recovery or organism viability.
+fn single_filament_failure_metrics(
+    filament_ids: &[u32],
+    connections: &[MycelialNetworkConnection],
+) -> (usize, usize) {
+    if filament_ids.is_empty() {
+        return (0, 0);
+    }
+    let mut adjacency = HashMap::<u32, Vec<u32>>::with_capacity(filament_ids.len());
+    for id in filament_ids {
+        adjacency.insert(*id, Vec::new());
+    }
+    for connection in connections {
+        if let Some(neighbours) = adjacency.get_mut(&connection.source_filament_id) {
+            neighbours.push(connection.target_filament_id);
+        }
+        if let Some(neighbours) = adjacency.get_mut(&connection.target_filament_id) {
+            neighbours.push(connection.source_filament_id);
+        }
+    }
+
+    let baseline_components = count_components_without(&adjacency, None);
+    let mut articulation_count = 0;
+    let mut worst_components = baseline_components;
+    for removed in filament_ids {
+        let components = count_components_without(&adjacency, Some(*removed));
+        worst_components = worst_components.max(components);
+        if components > baseline_components {
+            articulation_count += 1;
+        }
+    }
+    (articulation_count, worst_components)
+}
+
+fn count_components_without(
+    adjacency: &HashMap<u32, Vec<u32>>,
+    excluded: Option<u32>,
+) -> usize {
+    let mut visited = BTreeSet::new();
+    let mut components = 0;
+    for start in adjacency.keys().copied() {
+        if Some(start) == excluded || visited.contains(&start) {
+            continue;
+        }
+        components += 1;
+        let mut stack = vec![start];
+        visited.insert(start);
+        while let Some(current) = stack.pop() {
+            if let Some(neighbours) = adjacency.get(&current) {
+                for neighbour in neighbours {
+                    if Some(*neighbour) != excluded && visited.insert(*neighbour) {
+                        stack.push(*neighbour);
+                    }
+                }
+            }
+        }
+    }
+    components
 }
 
 fn find_component(parent: &mut HashMap<u32, u32>, id: u32) -> u32 {
@@ -514,6 +598,8 @@ mod tests {
         assert_eq!(metrics.anastomosis_count, 0);
         assert_eq!(metrics.connected_components, 8);
         assert_eq!(metrics.cycle_rank, 0);
+        assert_eq!(metrics.connected_components, 8);
+        assert_eq!(metrics.max_components_after_single_filament_failure, 9);
     }
 
     #[test]
@@ -541,6 +627,8 @@ mod tests {
         assert_eq!(metrics.anastomosis_count, 1);
         assert_eq!(metrics.connected_components, 1);
         assert_eq!(metrics.cycle_rank, 1);
+        assert_eq!(metrics.articulation_filament_count, 1);
+        assert_eq!(metrics.max_components_after_single_filament_failure, 2);
         assert_eq!(model, original);
     }
 
