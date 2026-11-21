@@ -10,7 +10,7 @@ A dependency-free Rust research crate for repeatability-calibrated comparison of
 - Participant-keyed within/between similarity summaries.
 - Participant-level bootstrap confidence intervals and exact two-sided sign tests.
 - Direct edge-polarity transition counts, including neutral-band transitions.
-- Synthetic Gaussian-factor null and injection-recovery calibration in `src/simulation.rs`.
+- Synthetic Gaussian-factor null/injection calibration plus a shared observation-only common-mode nuisance challenge in `src/simulation.rs`.
 - Draft 2020-12 schemas and semantic validation for RCAF result receipts.
 
 ## Run the kernel tests
@@ -38,7 +38,7 @@ The first example outputs a JSON report conforming to `injection-recovery.schema
 - 95% Wilson Monte-Carlo confidence intervals;
 - median participant-paired gaps and positive-gap fractions.
 
-The generator creates valid correlation matrices from a Gaussian two-factor model and finite time series. Its factors and region residuals use stationary AR(1) dependence (default rho=0.30), making this more demanding than independent time-point sampling. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
+The generator creates time-series observations from participant-specific global/module factors and region residuals, then estimates correlation matrices. Latent factors and region residuals use stationary AR(1) dependence (default rho=0.30). A separate common-mode nuisance factor can be injected into one observed repeat while holding latent global/module loadings fixed. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
 
 This is a software calibration world, not a model of biological consciousness. A passed injection test cannot establish that an empirical network shift is real, causal or clinically meaningful. A single Gaussian factor model does not characterize the full range of acquisition artifacts, autocorrelation, nonstationarity or preprocessing choices.
 
@@ -122,10 +122,10 @@ python -m unittest discover -s research/rcaf/tools -p 'test_validate_adversarial
 The validator checks the Draft 2020-12 schema plus semantic controls for separated seeds, exact nulls, positive-dose effects, matrix-level and pre-estimation signal-level injections, nuisance-only nulls, and required evidence outputs. It uses the existing `jsonschema` dependency in `requirements-validation.txt`.
 
 
-## Direction-aware injection recovery
+## Direction-aware and nuisance-only calibration
 
-Injection-recovery reports use schema version `rcaf.injection-recovery/0.2.0`. The legacy `injection_detection_power` remains the two-sided significant-difference rate. It is decomposed into:
+Injection-recovery reports use schema version `rcaf.injection-recovery/0.3.0`. The separate `nuisance_only_rejection_rate` measures rejection under a common-mode observation artifact with unchanged latent loadings; it is not the exact same-observation Type-I error. The legacy `injection_detection_power` remains the two-sided significant-difference rate. It is decomposed into:
 - `injection_directional_detection_power`: significant paired gaps in the preregistered positive direction of the module-loading injection;
 - `injection_wrong_direction_rejection_rate`: significant paired gaps in the opposite direction.
 
-The two directional rates partition the two-sided detections under the exact sign test. A wrong-direction rejection is never counted as successful recovery. The same fields are carried through the sweep and both estimator tournament reports.
+The two directional rates partition the two-sided detections under the exact sign test. A wrong-direction rejection is never counted as successful recovery. The same fields are carried through the sweep and both estimator tournament reports. The report also records `common_mode_nuisance_loading` and `median_nuisance_only_paired_gap`. At zero nuisance strength, the nuisance control reuses the exact null sample and must match the null rejection rate and median gap exactly. A nonzero nuisance-only rejection rate is evidence of artifact sensitivity, not proof that the latent network changed.
