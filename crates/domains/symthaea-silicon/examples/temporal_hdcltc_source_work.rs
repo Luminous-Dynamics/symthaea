@@ -40,11 +40,28 @@ const ADAPTER_VERSION: &str = "0.1.0";
 // Git blob object ID of the inspected main-branch source file. This is an
 // identity for the exact source file, not a SHA-256 digest or a build attestation.
 const PINNED_SOURCE_BLOB_OID: &str = "40c3b0e75845a20b3ef2dbbe0ea3a0af0068f4b7";
+const PINNED_SOURCE_COMMIT_SHA: &str = "36eb3adc1dc2d5ad1ae643863fee828d594472d4";
 const PINNED_SOURCE_PATH: &str = "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs";
 
 const FOURIER_ENABLED: bool = false;
 const WARMUP_SAMPLES: usize = 4;
 const MEASURED_SAMPLES: usize = 32;
+
+fn simd_runtime_path() -> &'static str {
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            return "x86_64_avx2_fma";
+        }
+        return "x86_64_scalar_fallback";
+    }
+    #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+    {
+        return "aarch64_neon";
+    }
+    #[allow(unreachable_code)]
+    "scalar_fallback"
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -263,8 +280,15 @@ struct BenchmarkReceipt {
     schema_version: String,
     adapter_version: String,
     source_path: String,
+    source_commit_sha: String,
     source_blob_oid: String,
     evidence_boundary: String,
+    architecture: String,
+    operating_system: String,
+    release_build: bool,
+    simd_feature_enabled: bool,
+    simd_runtime_path: String,
+    activation: String,
     fourier_enabled: bool,
     dimension: usize,
     tau_base_seconds: f32,
@@ -433,8 +457,15 @@ fn run_case(dimension: usize, dt: f32) -> Result<BenchmarkReceipt, Box<dyn Error
         schema_version: SCHEMA_VERSION.to_owned(),
         adapter_version: ADAPTER_VERSION.to_owned(),
         source_path: PINNED_SOURCE_PATH.to_owned(),
+        source_commit_sha: PINNED_SOURCE_COMMIT_SHA.to_owned(),
         source_blob_oid: PINNED_SOURCE_BLOB_OID.to_owned(),
         evidence_boundary: "public neuron evolution call including state bounds and update_stats; excludes construction, cloning, input creation, serialization, process startup".to_owned(),
+        architecture: std::env::consts::ARCH.to_owned(),
+        operating_system: std::env::consts::OS.to_owned(),
+        release_build: !cfg!(debug_assertions),
+        simd_feature_enabled: cfg!(feature = "simd"),
+        simd_runtime_path: simd_runtime_path().to_owned(),
+        activation: "tanh".to_owned(),
         fourier_enabled: FOURIER_ENABLED,
         dimension,
         tau_base_seconds: TAU_BASE,
