@@ -358,13 +358,20 @@ fn disposition(candidate: &Candidate, thresholds: &Thresholds) -> Disposition {
         .iter()
         .map(|run| run.convergence_profile_id.as_str())
         .collect::<BTreeSet<_>>();
-    let distinct_mesh_supercell_settings = candidate
+    let distinct_convergence_settings = candidate
         .runs
         .iter()
-        .map(|run| (run.q_mesh, run.supercell))
+        .map(|run| {
+            (
+                run.q_mesh,
+                run.supercell,
+                run.electronic_cutoff_ev.to_bits(),
+                run.displacement_amplitude_angstrom.to_bits(),
+            )
+        })
         .collect::<BTreeSet<_>>();
     if distinct_convergence_profiles.len() < thresholds.minimum_converged_runs
-        || distinct_mesh_supercell_settings.len() < thresholds.minimum_converged_runs
+        || distinct_convergence_settings.len() < thresholds.minimum_converged_runs
     {
         return Disposition::UnderconvergedUnknown;
     }
