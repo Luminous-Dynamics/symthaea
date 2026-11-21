@@ -459,10 +459,7 @@ fn accumulate_resources(total: &mut Resources, actual: &Resources) -> Result<(),
 fn valid_contract_reference(reference: &ContractReference) -> bool {
     !reference.id.trim().is_empty()
         && !reference.kind.trim().is_empty()
-        && reference
-            .sha256
-            .as_deref()
-            .is_none_or(valid_sha256)
+        && reference.sha256.as_deref().is_none_or(valid_sha256)
 }
 
 fn validate_change_impact_receipt(impact: &ChangeImpact) -> Result<(), String> {
