@@ -525,3 +525,7 @@ The learned future-use model is trained, calibrated and evaluated against one ex
 This is a qualification-boundary improvement, not a measured performance gain. The next experiment compares pooled, model-conditioned and hierarchical predictors under leave-one-model-family-out evaluation, using measured no-memory baselines and complete memory dose-response curves. Parameter count alone is not a capability metric.
 
 Textual Add lifecycle entry points require the frozen word counter at reservation, visibility verification, completion and abandonment; the counter version is bound into idempotency state.
+
+### Integrated memory-dose and salience qualification
+
+The evaluator composes raw Session-A ingress evidence with per-model memory-dose calibration on one set of clusters, held-out budget qualification on disjoint clusters, and independently calibrated future-use salience. It verifies that matching target-model forecasts are surfaced within the qualified token budget, while forecasts for a different model are rejected. The evidence-digest helper is read-only and accepts only an already admitted evidence reference.

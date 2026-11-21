@@ -21,6 +21,17 @@ use broca_mace_ingress::{
 use broca_mace_policy::{
     decide, Action, Objective, Policy, Query, Regime, Scope, SourceRootDigest,
 };
+use broca_mace_consolidation::memory_budget::{
+    fit_model_memory_budget, qualify_model_memory_budget,
+    select_for_qualified_model_budget, MemoryDoseTrialReceiptV1,
+    MemoryDoseTrialVerifierV1, MemoryDoseTrialV1, ModelBudgetSurfacingReject,
+};
+use broca_mace_consolidation::salience::{
+    future_use_prediction_evidence_digest, verify_future_use_prediction,
+    FutureUsePredictionV1, MemoryAccessTelemetryV1, MemorySurfacingCandidateV1,
+    MemorySurfacingModeV1, SalienceCalibrationReceiptV1, SaliencePredictionVerifierV1,
+};
+use broca_mace_policy::AsKnownQuery as PolicyAsKnownQuery;
 
 fn fixture_semantic_estimand() -> broca_mace_policy::SemanticEstimandV1 {
     broca_mace_policy::SemanticEstimandV1::new(
@@ -259,6 +270,158 @@ impl ConsolidationReceiptVerifierV1 for FixtureConsolidationVerifier {
     }
 }
 
+const MEMORY_DOSE_BUDGETS: [u32; 4] = [0, 128, 512, 1_024];
+const DOSE_AS_KNOWN_AT_MS: i64 = 250;
+
+struct FixtureMemoryDoseVerifier;
+
+impl MemoryDoseTrialVerifierV1 for FixtureMemoryDoseVerifier {
+    fn verify_trial(
+        &self,
+        trial: &MemoryDoseTrialV1,
+        as_known_at_ms: i64,
+    ) -> Option<MemoryDoseTrialReceiptV1> {
+        let mut receipt = MemoryDoseTrialReceiptV1 {
+            trial_sha256: trial.canonical_digest(),
+            episode_sha256: trial.episode_sha256.clone(),
+            environment_sha256: trial.environment_sha256.clone(),
+            evaluation_protocol_sha256: trial.evaluation_protocol_sha256.clone(),
+            target_model_sha256: trial.target_model_sha256.clone(),
+            memory_pipeline_sha256: trial.memory_pipeline_sha256.clone(),
+            verified_at_ms: as_known_at_ms.saturating_sub(1),
+            valid_until_ms: as_known_at_ms.saturating_add(10_000),
+            verifier_id: "fixture-independent-dose-verifier".into(),
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = receipt.canonical_digest();
+        Some(receipt)
+    }
+}
+
+fn memory_dose_rows(
+    target_model_sha256: &str,
+    memory_pipeline_sha256: &str,
+    cluster_start: u64,
+    event_start: u32,
+    family_start: u32,
+    root_start: u32,
+    uplifts: [i64; 4],
+) -> Vec<MemoryDoseTrialV1> {
+    let mut rows = Vec::with_capacity(48 * MEMORY_DOSE_BUDGETS.len());
+    for cluster_offset in 0..48_u64 {
+        let cluster_id = cluster_start + cluster_offset + 1;
+        let task_family_id = family_start + cluster_offset as u32;
+        let source_root = root_digest(root_start + cluster_offset as u32 + 1);
+        let episode_sha256 = hex_digest(200_000 + cluster_id as u32);
+        let baseline = 500_000 + (cluster_offset % 5) as i64 * 500;
+        for (arm, context_budget_tokens) in MEMORY_DOSE_BUDGETS.iter().enumerate() {
+            rows.push(MemoryDoseTrialV1 {
+                event_id: event_start
+                    + (cluster_offset as u32) * MEMORY_DOSE_BUDGETS.len() as u32
+                    + arm as u32
+                    + 1,
+                cluster_id,
+                task_family_id,
+                source_root,
+                episode_sha256: episode_sha256.clone(),
+                environment_sha256: hex_digest(300_001),
+                evaluation_protocol_sha256: hex_digest(300_002),
+                target_model_sha256: target_model_sha256.to_owned(),
+                memory_pipeline_sha256: memory_pipeline_sha256.to_owned(),
+                context_budget_tokens: *context_budget_tokens,
+                net_utility_micros: baseline + uplifts[arm],
+            });
+        }
+    }
+    rows
+}
+
+struct FixtureSalienceVerifier;
+
+impl SaliencePredictionVerifierV1 for FixtureSalienceVerifier {
+    fn verify_prediction(
+        &self,
+        prediction: &FutureUsePredictionV1,
+        target_scope: Scope,
+        as_known: PolicyAsKnownQuery,
+    ) -> Option<SalienceCalibrationReceiptV1> {
+        let mut receipt = SalienceCalibrationReceiptV1 {
+            prediction_sha256: prediction.prediction_sha256.clone(),
+            evidence_sha256: prediction.evidence_sha256.clone(),
+            target_model_sha256: prediction.target_model_sha256.clone(),
+            target_scope,
+            as_known,
+            model_id: prediction.model_id.clone(),
+            model_version: prediction.model_version.clone(),
+            model_config_sha256: prediction.model_config_sha256.clone(),
+            training_dataset_sha256: hex_digest(310_001),
+            calibration_dataset_sha256: hex_digest(310_002),
+            heldout_evaluation_sha256: hex_digest(310_003),
+            task_family_split_sha256: hex_digest(310_004),
+            source_root_split_sha256: hex_digest(310_005),
+            training_cluster_count: 32,
+            calibration_cluster_count: 16,
+            heldout_cluster_count: 16,
+            brier_score_micros: 100_000,
+            base_rate_brier_score_micros: 200_000,
+            expected_calibration_error_micros: 20_000,
+            worst_group_calibration_error_micros: 30_000,
+            task_families_disjoint: true,
+            source_roots_disjoint: true,
+            verified_at_ms: as_known.known_at_ms.saturating_sub(1),
+            valid_until_ms: as_known.known_at_ms.saturating_add(10_000),
+            verifier_id: "fixture-independent-salience-verifier".into(),
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = receipt.canonical_digest();
+        Some(receipt)
+    }
+}
+
+fn verified_salience_candidate(
+    evidence: &broca_mace_ingress::ConsolidationEvidenceRefV1,
+    target_model_sha256: &str,
+    known_at: PolicyAsKnownQuery,
+) -> MemorySurfacingCandidateV1 {
+    let ingress_as_known = AsKnownQuery {
+        valid_at_ms: known_at.valid_at_ms,
+        known_at_ms: known_at.known_at_ms,
+    };
+    let prediction = FutureUsePredictionV1::new(
+        evidence.event_id(),
+        target_model_sha256,
+        evidence.scope(),
+        known_at.known_at_ms.saturating_sub(5),
+        known_at.known_at_ms.saturating_add(500),
+        9_500,
+        200_000,
+        100,
+        "fixture-salience-model",
+        "1",
+        hex_digest(320_001),
+        hex_digest(320_002),
+        future_use_prediction_evidence_digest(evidence),
+    );
+    let verified_prediction = verify_future_use_prediction(
+        prediction,
+        evidence.scope(),
+        known_at,
+        &FixtureSalienceVerifier,
+    )
+    .expect("fixture forecast must pass independent calibration");
+    MemorySurfacingCandidateV1::from_verified_evidence(
+        evidence,
+        MemoryAccessTelemetryV1 {
+            context_token_cost: 64,
+            last_accessed_at_ms: known_at.known_at_ms.saturating_sub(20),
+            historical_access_count: 0,
+        },
+        Some(verified_prediction),
+        ingress_as_known,
+    )
+    .expect("candidate must retain the admitted evidence receipt")
+}
+
 fn promotion_context(action: Action) -> ConsolidationReceiptContextV1 {
     ConsolidationReceiptContextV1 {
         consolidation_run_id: format!("session-a-consolidation-{}", action.name()),
@@ -295,6 +458,111 @@ fn propose_and_release(
     .expect("independent receipt should release source-linked experiences");
     assert_eq!(released.len(), 3);
     released
+}
+
+#[test]
+fn qualified_memory_dose_and_salience_compose_over_verified_session_a_evidence() {
+    let events = vec![
+        raw_event(51, Action::A, 0.91),
+        raw_event(52, Action::A, 0.89),
+        raw_event(53, Action::A, 0.90),
+        raw_event(54, Action::B, 0.42),
+        raw_event(55, Action::B, 0.40),
+        raw_event(56, Action::B, 0.41),
+    ];
+    let verifier = FixtureVerifier {
+        outcomes: BTreeMap::from([
+            (51, 0.91),
+            (52, 0.89),
+            (53, 0.90),
+            (54, 0.42),
+            (55, 0.40),
+            (56, 0.41),
+        ]),
+        retracted_events: BTreeSet::new(),
+        retracted_at_ms: 260,
+    };
+    let known = as_known(DOSE_AS_KNOWN_AT_MS);
+    let batch = ingest_batch_as_known(&events, known, &verifier)
+        .expect("Session-A events must pass raw-ingress receipts");
+    let pack = build_consolidation_evidence_pack(&batch, &[51, 52, 53, 54, 55, 56])
+        .expect("evidence pack must preserve verified source lineage");
+    let admitted = pack.events().first().expect("admitted evidence reference");
+
+    let target_model = hex_digest(400_001);
+    let memory_pipeline = hex_digest(400_002);
+    let calibration_rows = memory_dose_rows(
+        &target_model,
+        &memory_pipeline,
+        0,
+        500_000,
+        10_000,
+        20_000,
+        [0, 10_000, 30_000, 5_000],
+    );
+    let heldout_rows = memory_dose_rows(
+        &target_model,
+        &memory_pipeline,
+        10_000,
+        600_000,
+        30_000,
+        40_000,
+        [0, 9_000, 29_000, 4_000],
+    );
+    let profile = fit_model_memory_budget(
+        &calibration_rows,
+        &MEMORY_DOSE_BUDGETS,
+        DOSE_AS_KNOWN_AT_MS,
+        &FixtureMemoryDoseVerifier,
+    )
+    .expect("dose profile should fit independent calibration clusters");
+    assert_eq!(profile.selected_context_budget_tokens, 512);
+    let qualified_budget = qualify_model_memory_budget(
+        &profile,
+        &calibration_rows,
+        &heldout_rows,
+        DOSE_AS_KNOWN_AT_MS,
+        &FixtureMemoryDoseVerifier,
+    )
+    .expect("512-token arm should beat zero-memory on held-out clusters");
+    assert_eq!(qualified_budget.context_budget_tokens(), 512);
+    assert!(qualified_budget.heldout_ci95_lower_micros() > 0);
+
+    let known_for_policy = PolicyAsKnownQuery {
+        valid_at_ms: known.valid_at_ms,
+        known_at_ms: known.known_at_ms,
+    };
+    let candidate = verified_salience_candidate(admitted, &target_model, known_for_policy);
+    let expected_evidence_digest = candidate.evidence_sha256().to_owned();
+    let plan = select_for_qualified_model_budget(
+        &[candidate],
+        MemorySurfacingModeV1::PredictedFutureValue,
+        scope(),
+        known_for_policy,
+        &target_model,
+        &qualified_budget,
+    )
+    .expect("matching model budget and calibrated salience should compose");
+    assert_eq!(plan.plan.context_budget_tokens, 512);
+    assert_eq!(plan.plan.context_tokens_used, 64);
+    assert_eq!(plan.plan.surfaced.len(), 1);
+    assert_eq!(plan.plan.surfaced[0].event_id, admitted.event_id());
+    assert_eq!(plan.plan.surfaced[0].evidence_sha256, expected_evidence_digest);
+    assert_eq!(plan.target_model_sha256, target_model);
+
+    let other_model = hex_digest(400_003);
+    let mismatched = verified_salience_candidate(admitted, &other_model, known_for_policy);
+    assert!(matches!(
+        select_for_qualified_model_budget(
+            &[mismatched],
+            MemorySurfacingModeV1::PredictedFutureValue,
+            scope(),
+            known_for_policy,
+            &target_model,
+            &qualified_budget,
+        ),
+        Err(ModelBudgetSurfacingReject::SalienceTargetModelMismatch)
+    ));
 }
 
 #[test]

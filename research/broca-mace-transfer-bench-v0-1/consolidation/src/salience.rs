@@ -458,6 +458,14 @@ impl MemorySurfacingCandidateV1 {
     }
 }
 
+/// Return the receipt-bound evidence digest required by future-use
+/// predictions. This cannot admit or manufacture an evidence reference.
+pub fn future_use_prediction_evidence_digest(
+    evidence: &ConsolidationEvidenceRefV1,
+) -> String {
+    receipt_bound_evidence_digest(evidence)
+}
+
 fn receipt_bound_evidence_digest(evidence: &ConsolidationEvidenceRefV1) -> String {
     let receipt = evidence.receipts();
     let fields = vec![
