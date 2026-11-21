@@ -1,103 +1,154 @@
-# Melothaea RMI-Bench Track A — offline runner v1
+# Melothaea RMI-Bench Track A — snapshot-isolated offline runner v1
 
 **Date:** 21 November 2026  
 **Parent protocol:** [#10088 — causal reciprocal musical interaction benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/10088)  
-**Runner gap:** [#10159 — offline Track A fixture runner and replayable reports](https://github.com/Luminous-Dynamics/symthaea/issues/10159)  
-**Implementation:** \`crates/domains/symthaea-muse/src/rmi_benchmark.rs\` and \`src/bin/rmi_bench_track_a.rs\`
+**Runner:** [#10159 — offline Track A fixture runner and replayable reports](https://github.com/Luminous-Dynamics/symthaea/issues/10159)  
+**Paired-state blocker:** [#10155 — isolate policy state across paired counterfactual arms](https://github.com/Luminous-Dynamics/symthaea/issues/10155)  
+**Immutable-model identity follow-up:** [#10206](https://github.com/Luminous-Dynamics/symthaea/issues/10206)  
+**Implementation:** \`src/rmi_benchmark.rs\`, \`src/rmi_track_a_runner.rs\`, \`src/bin/rmi_track_a.rs\`
 
 ## Purpose
 
-Make the existing symbolic RMI intervention oracle executable as a small, reproducible, offline Rust benchmark. Track A measures whether a policy's next symbolic action changes when one controlled musical feature in the partner's current observation changes, and whether a controlled partner policy changes its next symbolic action in response to the agent's intervention.
+Execute the synthetic symbolic Track A protocol offline with counterfactual state isolation, registered baselines, exact raw trial records and independent fresh-process replay. Track A tests whether an agent's symbolic action changes in response to a controlled partner intervention, and whether a controlled partner's next symbolic response changes as a function of the agent's action.
 
-This is a benchmark mechanism check. It does not run the production Melothaea planner, use audio, prove musical relevance, or measure human collaboration.
+This is a mechanism/evaluator qualification suite. It does not run a production Melothaea policy, render audio, adjudicate musical relevance, or establish human collaboration.
 
-## Frozen trial design
+## Counterfactual state integrity
 
-The runner enumerates:
+The original evaluator had a serious confound: it invoked one mutable policy instance in this order:
 
-- four intervention dimensions: motif intervals, an eight-step onset mask, tempo in milli-BPM, and symbolic ensemble role;
-- five agent policies: fixed response, one-way prompt, yoked replay, imitation-only, and a synthetic target-contingent positive control;
-- two partner policies: fixed partner and a synthetic target-responsive positive control;
-- a deterministic seed schedule \`0..N\`, where \`N\` is selected by \`--seed-count\` (default 16, maximum 1,024).
+1. control;
+2. control replay;
+3. treatment;
+4. treatment replay.
 
-Each pair uses the same pre-intervention history and source-event identity in both arms. Exactly one declared feature changes between control and treatment. The input validator rejects changed source identity, a no-op target intervention, out-of-range values, stale/invalid history digests, and uncontrolled changes to another feature.
+An input-insensitive policy with an internal counter could emit A/A then B/B and appear treatment-sensitive. This was documented in #10155. Repeating each arm twice does not solve state contamination.
 
-For each agent/partner combination the report stores:
-- the complete intervention pair, not merely its label;
-- the paired agent evaluation envelope and digest;
-- the reciprocal evaluation envelope and digest;
-- the agent and partner policy identities;
-- a unique receipt ID, pair digest, seed and target feature.
+The updated policy contracts require:
+- a versioned, serializable mutable episode snapshot;
+- a content digest over that exact snapshot;
+- independent restores for control, control replay, treatment and treatment replay;
+- policy ID/version equality and exact restored-snapshot equality before invocation;
+- arm-specific output and post-state digests;
+- a reverse-order probe (treatment, then control) that must reproduce the original arm-specific actions and post-state digests.
 
-The output also includes the exact source commit supplied to the runner and SHA-256 of the workspace \`Cargo.lock\`. The commit is operator-supplied; the runner does not independently query Git to authenticate it. Invoke it using \`git rev-parse HEAD\` from the checkout being evaluated.
+The partner policy uses the same snapshot/restore, deterministic replay and arm-order requirements. Regressions cover a two-call mutable counter that ignores input, plus an untracked thread-local counter that cannot be recovered from the declared snapshot and must be rejected by the reverse-order pass.
 
-## Baselines and falsifiers
+The snapshot contract is a declared purity/state boundary, not proof against every conceivable external side effect. A production adapter must prohibit or account for shared global state, remote hidden state, external mutations and nondeterministic infrastructure.
 
-| Policy | Expected property | What a positive result means |
-|---|---|---|
-| Fixed response | No partner-to-agent sensitivity | Negative control |
-| One-way prompt | No current-input sensitivity | Negative control |
-| Yoked replay | Same replay in both arms | Negative control |
-| Imitation-only | Surface input sensitivity may be present | Sensitivity is not collaboration quality |
-| Synthetic contingent | Target sensitivity, zero collateral feature changes | Positive control for the evaluator |
-| Fixed partner | No agent-to-partner sensitivity | Negative control |
-| Synthetic responsive partner | Target sensitivity to changed agent actions | Positive control for the reciprocal evaluator |
+## Frozen suite
 
-The runner reports both directions independently. It does not combine them into a scalar. It records exact counts and collateral-change totals; it intentionally does not attach inferential confidence intervals to a small deterministic synthetic suite.
+The runner enumerates four intervention dimensions:
 
-A failed intervention, invalid policy response, or inconsistent reciprocal evaluation aborts the run. Trial receipts are not silently dropped. The expected denominator is:
+- motif: signed semitone-interval tuple;
+- rhythm: eight-step onset/rest mask;
+- tempo: integer milli-BPM;
+- role: one of four symbolic ensemble roles.
 
-\`seed_count × 4 targets × 5 agent policies × 2 partner policies\`
+The default run uses eight trials per target (32 paired trials). Each paired trial runs nine registered evaluations:
 
-At the default 16 seeds, this is 640 receipts.
+| Evaluation | Purpose |
+|---|---|
+| Fixed-response agent | Negative control for partner-to-agent sensitivity |
+| One-way prompt agent | Negative control for current-input contingency |
+| Yoked replay agent | Replays a distinct donor fixture; tests replay confounding |
+| Unrelated-feature agent | Responds to a non-manipulated dimension; must not pass target sensitivity |
+| Imitation-only agent | Input-sensitive control; copying is not collaboration |
+| Synthetic contingent agent | Positive control for the manipulated target only |
+| Fixed agent + responsive partner | Negative control for agent-to-partner influence |
+| Synthetic agent + fixed partner | Negative control for partner response |
+| Synthetic agent + responsive partner | Positive control for the two-direction evaluator |
 
-## Run locally without the monorepo workspace
+Every paired fixture uses the same frozen history and source-event identity in both arms. Exactly one declared musical feature changes. Trial seeds are disjoint by target and bounded by the runner contract. Yoked replay binds its donor trial ID and fixture digest; the donor cannot be the active trial itself.
 
-The root workspace currently contains a wildcard member glob that also matches a retired \`crates/core/symthaea\` path with no \`Cargo.toml\`. Because Cargo loads the workspace before honoring \`-p symthaea-muse\`, a normal package-scoped Cargo command cannot currently start. Do not add a fake workspace member or weaken the repository-wide workspace gate to work around this.
+The runner records all raw evaluation results or explicit errors. It does not silently drop a failed case. The manifest records suite/version identity, target and policy inventory, seed schedule, source revision (when supplied), Rust compiler version (when supplied), target OS/architecture and claim ceiling. It also binds the isolated dependency lockfile digest.
 
-The focused qualification script stages the exact two production source files into a temporary, isolated Rust 2024 package with only the required \`serde\`, \`serde_json\` and \`sha2\` dependencies. It then generates and preserves a dedicated lockfile, checks formatting, runs evaluator tests, runner tests, warnings-denied Clippy, executes the fixture suite and verifies a fresh-process replay.
+## Report and replay
 
-From a clean repository checkout on the pinned Rust 1.96.0 toolchain:
+The JSON report contains:
+- frozen manifest and manifest digest;
+- one record per paired trial;
+- exact intervention-pair digest;
+- yoked donor identity and digest;
+- all nine registered evaluation outcomes/errors;
+- separate negative/positive-control counts;
+- collateral-change counts;
+- agent and partner arm-order verification counts;
+- synthetic fixture expectation result;
+- domain-local payload SHA-256.
+
+The standalone integration test launches the compiled CLI twice in fresh processes with identical trial count, seed root and output destination, then requires byte-identical JSON reports.
+
+No inferential confidence intervals are attached to these small deterministic synthetic controls. They are known-answer tests, not a representative sample of music or people.
+
+## Run locally
+
+The root workspace currently contains a wildcard member glob that also matches a retired \`crates/core/symthaea\` path with no \`Cargo.toml\`. Cargo loads the workspace before honoring \`-p symthaea-muse\`, so a normal package-scoped command cannot currently start. Do not add a fake member or weaken the repository-wide workspace rule to work around this.
+
+The focused qualification script stages the exact production RMI module, runner, CLI and replay test into a temporary isolated Rust 2024 package with only \`serde\`, \`serde_json\` and \`sha2\`. It generates a lockfile, hashes it, embeds the exact source revision/compiler/lock identity into the runner manifest, then runs formatting, evaluator tests, runner tests, CLI tests, fresh-process replay, warnings-denied Clippy and the fixture suite.
+
+From a clean checkout on the pinned Rust 1.96.0 toolchain:
 
 \`\`\`bash
 bash scripts/mel_rmi_track_a_qualification.sh "$(git rev-parse HEAD)"
 \`\`\`
 
-Use a larger run and preserve output explicitly:
+The default run is eight trials per target (32 total). A larger run can be requested:
 
 \`\`\`bash
-MEL_RMI_SEED_COUNT=16 \\
+MEL_RMI_TRIALS_PER_TARGET=32 \\
+MEL_RMI_SEED_ROOT=42 \\
 MEL_RMI_EVIDENCE_DIR=/tmp/mel-rmi-track-a-evidence \\
 bash scripts/mel_rmi_track_a_qualification.sh "$(git rev-parse HEAD)"
 \`\`\`
 
-The script refuses a dirty checkout or a supplied source SHA that does not equal the exact checked-out \`HEAD\`. Its report contains the exact source commit and the staged dependency-lock digest. The runner's \`--self-check\` invokes the same compiled executable in a fresh process with the same seed schedule and source commit, then compares the independently produced report digest.
+The script rejects a dirty checkout or any source SHA that does not equal the exact checked-out \`HEAD\`. It preserves the isolated manifest, generated lockfile, exact copied source files, JSON report, and SHA-256 evidence list.
 
-**Qualification boundary:** this isolates and tests the exact RMI module and runner source, but it does not compile all of \`symthaea-muse\` or the full monorepo workspace. The root \`lib.rs\` / Cargo binary registration remains an integration seam until the unrelated workspace-member defect is repaired and the real package can be compiled. The generated standalone lockfile is uploaded with every qualification artifact; no missing dependency identity is silently omitted.
+**Qualification boundary:** this validates the exact RMI sources and runner in an isolated crate. It does not compile all of \`symthaea-muse\` or the full monorepo workspace, because the unrelated missing workspace member currently prevents Cargo from loading the main package. The actual package module/bin registration remains an integration seam until that workspace issue is repaired and full-package compilation succeeds.
 
-## Interpretation and claim ceiling
+## Remaining limitation: immutable policy identity
 
-A successful run would establish only that:
-1. the frozen synthetic intervention fixtures satisfy the pair contract;
-2. the evaluator distinguishes the registered synthetic positive and negative controls;
-3. paired records and aggregation replay deterministically in a fresh process.
+#10155's mutable episode-state isolation is implemented in the updated oracle. #10206 remains a distinct requirement before a production or external model adapter is evaluated.
+
+The current RMI trait records policy ID and human-readable version, but these labels are not by themselves proof of exact immutable model identity. A production adapter must bind, separately from mutable episode state:
+- checkpoint/weights or immutable executable artifact digest;
+- adapter and configuration digest;
+- tokenizer, grammar, prompt template or other static assets that affect behavior;
+- runtime/build identity and device/backend mode;
+- deterministic/stochastic source and seed authority;
+- independently resolvable evidence for each digest.
+
+Missing model artifacts must make replay unavailable; no silent replacement by a newer model under the same label is permitted. The synthetic controls in Track A have no external model weights, so their current qualification does not resolve #10206.
+
+## Claim ceiling
+
+A successful exact-head run would establish only that:
+1. registered synthetic interventions are valid and isolated to one declared feature;
+2. the evaluator forks each arm from the same declared mutable state and catches registered state/order confounds;
+3. known fixed, one-way, yoked and unrelated-feature negatives do not pass target sensitivity;
+4. imitation can be input-sensitive without being labelled collaboration;
+5. synthetic target-specific positive controls pass without collateral feature changes;
+6. the reciprocal synthetic partner controls are distinguished;
+7. the frozen report replays byte-identically in fresh processes.
 
 It would **not** establish that:
 - a live Melothaea policy is reciprocally adaptive;
-- its responses are musically appropriate, novel, complementary or preferred;
-- a musician changes their behavior because of Muse;
-- the system performs reliably on live audio, MIDI devices or acoustic instruments;
-- a generated piece is artistically superior to Suno, Lyria, Mureka, JAM_BOT or another system;
-- a person has granted consent, authorship, or export authority;
+- response changes are musically relevant, valuable, original or preferred;
+- a human musician is causally influenced by Muse;
+- the system performs reliably on live audio, MIDI hardware or acoustic instruments;
+- a generated work is better than Suno, Lyria, Mureka, JAM_BOT or another system;
+- model/checkpoint identity has been independently qualified under #10206;
+- any consent, authorship, publication or export authority exists;
 - the system has consciousness or subjective experience.
 
-## Next research increments
+## Next sequence
 
-1. **Production adapter:** bind the real Melothaea observation/action boundary to the RMI traits without letting the evaluator inject the intervention label or synthetic target.
-2. **Musical relevance:** score response relevance and preservation with source-bound score/event relations and blinded musician annotations. Keep this distinct from input sensitivity.
-3. **Streaming track:** combine RMI with #10307's WAIT / RESPOND / CONTINUE / YIELD semantics, chunk coverage, no-lookahead and event-clock constraints.
-4. **Recovery track:** combine with #10390's interruption, veto, tempo/meter-shift, renderer-failure and output-underrun interventions.
-5. **Human reciprocal study:** preregister randomized/counterbalanced performer sessions and participant/ensemble-clustered statistics. Simulator influence must never be represented as human causal evidence.
-6. **Agency track:** connect #11319's proposal/preview/approval/reversal states and explicit protection of user-authored material.
+1. Complete exact-head qualification of the isolated state-aware evaluator and report.
+2. Implement the immutable model/checkpoint/config/adapter identity receipt from #10206 before adding a live or proprietary policy.
+3. Define a production Muse adapter over the actual observation/action boundaries; do not synthesize missing music-theory state from the small RMI feature tuple.
+4. Bind the adapter's proposals to source Score/event identity, preservation contracts and candidate-specific receipts.
+5. Add blinded musician relevance annotations and held-out material; keep musical quality separate from raw sensitivity.
+6. Combine with #10307 streaming WAIT/RESPOND/CONTINUE/YIELD and #10390 timing/recovery/grounded outcomes.
+7. Only then run randomized, ethically approved human reciprocal interaction under #10088 and agency/consent checks under #11319.
 
-Do not report a synthetic positive-control result as a Melothaea result. Report each cohort (synthetic symbolic, rendered audio, MIDI device, acoustic performance and human study) separately with its own evidence ceiling.
+No synthetic result should be represented as a Melothaea result.
