@@ -119,3 +119,12 @@ Keep these control types separate:
 - **Seven-target beam-loading set:** repeatability at 0.2 mA / 120 min; not part of the 0.5 mA three-campaign Phase I/II comparison.
 
 Source: Chen et al. (2025) and Supplementary Information, https://doi.org/10.1038/s41586-025-09042-7
+
+
+## H10 — spatially nonuniform beam fluence and irradiation history
+
+| ID | Hypothesis | Distinguishing predictions | Measurements that discriminate | Falsifier / weakening evidence |
+|---|---|---|---|---|
+| H10 | Voltage-dependent beam focusing and nonuniform local fluence alter the near-surface defect/D state and can contribute to energy-dependent yields independently of total charge | At matched total charge and material average, yield/state changes with spot size, radial profile, target alignment, beam drift and peak current density; a spatial state model predicts held-out profiles better than a uniform beam/depth-only model | 2-D beam profile at target plane for each bias; Faraday-cup aperture/collection calibration; spot translation/drift; local dose/implantation mapping; pre/post spatial material and defect characterization | Yield is invariant within uncertainty across controlled profile changes at matched charge and local state, or spatial model does not improve held-out prediction |
+
+The 2026 Methods report an approximately 1 cm² spot and voltage-dependent electrostatic focusing above 5 kV. This makes total incident charge insufficient to fully characterize the local irradiation field unless the spot profile is stable and verified. The 2026 paper also reports very shallow implantation depths compared with 250 µm foil thickness. H10 is an alternative contributor to test, not an explanation established by the paper.
