@@ -14,7 +14,7 @@ use crate::rmi_benchmark::{
     RmiAgentActionV1, RmiEvaluationEnvelopeV1, RmiHistoryActorV1, RmiHistoryEventV1,
     YokedReplayPolicyV1,
     RmiInterventionPairV1, RmiMusicalFeaturesV1, RmiPartnerObservationV1,
-    RmiPartnerResponseV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1,
+    RmiPartnerResponseV1, RmiPolicyV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1,
     RmiTargetFeatureV1,
     SyntheticContingentPolicyV1, SyntheticResponsivePartnerPolicyV1,
 };
@@ -302,6 +302,63 @@ fn contingent_agent_v1(target: RmiTargetFeatureV1) -> SyntheticContingentPolicyV
     }
 }
 
+/// Frozen negative control that performs a fixed transformation on an
+/// unrelated feature while ignoring the current partner observation. It is
+/// initialized from the control-arm features only, so a changed input target
+/// cannot pass through by copying the treatment observation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct UnrelatedFeatureAgentV1 {
+    id: String,
+    version: String,
+    frozen_features: RmiMusicalFeaturesV1,
+    transform: RmiTargetFeatureV1,
+}
+
+impl RmiPolicyV1 for UnrelatedFeatureAgentV1 {
+    type Snapshot = Self;
+
+    fn snapshot_state(&self) -> Result<Self::Snapshot, String> {
+        Ok(self.clone())
+    }
+
+    fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+        Ok(snapshot.clone())
+    }
+
+    fn policy_id(&self) -> &str {
+        &self.id
+    }
+
+    fn policy_version(&self) -> &str {
+        &self.version
+    }
+
+    fn respond(
+        &mut self,
+        _history: &[RmiHistoryEventV1],
+        _observation: &RmiPartnerObservationV1,
+        _seed: u64,
+    ) -> RmiAgentActionV1 {
+        let mut features = self.frozen_features.clone();
+        mutate_target_v1(&mut features, self.transform, 0);
+        RmiAgentActionV1 {
+            action_id: format!("{}:frozen-unrelated", self.id),
+            features,
+        }
+    }
+}
+
+fn unrelated_feature_agent_v1(
+    pair: &RmiInterventionPairV1,
+) -> UnrelatedFeatureAgentV1 {
+    UnrelatedFeatureAgentV1 {
+        id: "unrelated-feature-agent-v1".into(),
+        version: "1".into(),
+        frozen_features: pair.control_observation.features.clone(),
+        transform: unrelated_target_v1(pair.target),
+    }
+}
+
 fn fixed_partner_v1() -> FixedPartnerResponsePolicyV1 {
     FixedPartnerResponsePolicyV1 {
         id: "fixed-response-partner-v1".into(),
@@ -404,7 +461,7 @@ pub fn run_rmi_track_a_suite_v1(
             let yoked_replay_agent =
                 capture(evaluate_rmi_pair(&yoked_policy, &pair));
             let unrelated_feature_agent = capture(evaluate_rmi_pair(
-                &contingent_agent_v1(unrelated_target_v1(target)),
+                &unrelated_feature_agent_v1(&pair),
                 &pair,
             ));
             let imitation_agent = capture(evaluate_rmi_pair(&imitation_agent_v1(), &pair));
@@ -592,11 +649,8 @@ mod tests {
     fn wrong_feature_agent_is_not_counted_as_target_sensitive() {
         for target in targets_v1() {
             let pair = make_rmi_track_a_fixture_v1(target, 3, 42).unwrap();
-            let result = evaluate_rmi_pair(
-                &contingent_agent_v1(unrelated_target_v1(target)),
-                &pair,
-            )
-            .unwrap();
+            let result =
+                evaluate_rmi_pair(&unrelated_feature_agent_v1(&pair), &pair).unwrap();
             assert!(!result.payload.targeted_input_sensitivity);
         }
     }
