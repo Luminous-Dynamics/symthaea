@@ -84,10 +84,10 @@ jobs:
       - name: Deterministic CLI and receipt assertions
         shell: bash
         run: |
-          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml -- \
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin orbital-joint-evidence-voi-bench -- \
             fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
             --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-a.json
-          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml -- \
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin orbital-joint-evidence-voi-bench -- \
             fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
             --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-b.json
           cmp /tmp/evidence-voi-a.json /tmp/evidence-voi-b.json
