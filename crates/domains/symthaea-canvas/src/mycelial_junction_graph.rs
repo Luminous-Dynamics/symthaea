@@ -756,7 +756,7 @@ impl MycelialJunctionHyphaGraph {
                     }
                 }
                 JunctionKind::Tip => {
-                    if junction.terminal_filament_ids.is_empty()
+                    if junction.terminal_filament_ids.len() != 1
                         || !junction.anastomosis_ids.is_empty()
                     {
                         return Err(MycelialJunctionGraphError::InvalidGraph(
@@ -765,7 +765,8 @@ impl MycelialJunctionHyphaGraph {
                     }
                 }
                 JunctionKind::Anastomosis => {
-                    if junction.terminal_filament_ids.is_empty()
+                    if junction.incident_filament_ids.len() < 2
+                        || junction.terminal_filament_ids.is_empty()
                         || junction.anastomosis_ids.is_empty()
                     {
                         return Err(MycelialJunctionGraphError::InvalidGraph(
@@ -1514,6 +1515,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(graph.metrics().unwrap().connected_components, 2);
+        let global = graph.global_geometric_efficiency().unwrap();
+        assert_eq!(global.eligible_pairs, 6);
+        assert_eq!(global.reachable_pairs, 2);
+        assert_eq!(global.unreachable_pairs, 4);
+        let root = graph
+            .root_directed_geometric_efficiency(&[
+                "origin:4".to_string(),
+                "origin:5".to_string(),
+            ])
+            .unwrap();
+        assert_eq!(root.eligible_pairs, 2);
+        assert_eq!(root.reachable_pairs, 2);
+        assert_eq!(root.unreachable_pairs, 0);
     }
 
     #[test]
