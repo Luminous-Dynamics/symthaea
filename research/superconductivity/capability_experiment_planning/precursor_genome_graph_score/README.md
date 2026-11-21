@@ -11,8 +11,8 @@ The released Precursor Genome contains 1,035 unique unordered precursor pairs ov
 
 A random edge split is not an out-of-distribution test in this graph. The same two precursor identities can appear in train and test. The graph's natural transfer tests are:
 
-- **LOPO (46 folds):** hold out one precursor and every edge incident to it. Each fold tests 45 edges and trains on 990 edges.
-- **Double-node holdout (1,035 folds):** hold out two precursor nodes and all 89 edges incident to either one. Each fold trains only on the 946 edges among the other 44 nodes.
+- **LOPO (46 folds):** hold out one precursor and every edge incident to it. Each fold isolates 45 structural edges and leaves 990 structural edges among the other 45 nodes. Excluded specimens remain in the graph but never enter training or scoring; therefore the eligible train/test record counts vary by held-out node.
+- **Double-node holdout (1,035 folds):** hold out two precursor nodes and all 89 structural edges incident to either one. Each fold leaves 946 structural edges among the other 44 nodes. Eligible counts again vary with the source exclusions.
 
 These fold geometries are fixed by graph structure. They test the ability to predict reactions involving unseen precursor identities rather than memorizing node frequencies.
 
@@ -26,7 +26,7 @@ The Rust auditor accepts a complete undirected graph with one row per unordered 
 4. Every eligible held-out edge is predicted exactly once, and no training or excluded edge is scored as a test prediction.
 5. Every probability is finite and in [0,1], and the decision threshold is fixed in the model manifest.
 
-Each receipt includes deterministic SHA-256 identities for the training and test edge ID sets. Those hashes make fold membership reproducible; they are not proof that an opaque model was honestly trained on those rows. A production runner should additionally emit a signed training trace or a verifiable artifact manifest.
+Each receipt includes deterministic SHA-256 identities for the *eligible* training and test edge ID sets. Source-excluded specimens remain part of the complete structural graph but are neither scored nor counted as training data. Those hashes make fold membership reproducible; they are not proof that an opaque model was honestly trained on those rows. A production runner should additionally emit a signed training trace or a verifiable artifact manifest.
 
 Metrics per fold:
 - Brier score and log loss for probability quality;
