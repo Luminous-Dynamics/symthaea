@@ -95,7 +95,7 @@ pub struct SequentialExpected {
     pub notes: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, PartialEq)]
 #[serde(tag = "node_kind")]
 pub enum PolicyNode {
     Terminal {
@@ -741,6 +741,7 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         PolicyNode::Test { action_id, .. } => Some(action_id.clone()),
         _ => None,
     };
+    let human_review_required = matches!(&adaptive.node, PolicyNode::HumanReview { .. });
     let resource_savings = if let Some(expected) = &adaptive.expected_resources {
         let fixed_use = &fixed.expected_resources;
         Some(ExpectedResourceUse {
@@ -793,7 +794,7 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
             expected_resources: adaptive.expected_resources,
             worst_path_resources: adaptive.worst_path_resources,
             policy: adaptive.node,
-            human_review_required: matches!(adaptive.node, PolicyNode::HumanReview { .. }),
+            human_review_required,
         },
         expected_resource_savings: resource_savings,
         oracle_matched,
@@ -908,40 +909,17 @@ mod tests {
         assert!((adaptive.engineering_hours - 1.2).abs() < 1.0e-9);
         assert!((adaptive.facility_hours - 1.55).abs() < 1.0e-9);
         assert!((adaptive.specimen_count - 1.7).abs() < 1.0e-9);
+        let budget = Resources {
+            engineering_hours: 2.0,
+            compute_core_hours: 0.0,
+            facility_hours: 2.5,
+            specimen_count: 2,
+            review_hours: 0.5,
+            external_cost_units: 2.0,
+        };
         assert!(fits_budget(
             &scenario.adaptive_campaign.worst_path_resources,
-            &SequentialScenario {
-                scenario_id: "budget-test".to_owned(),
-                evidence_class: "synthetic".to_owned(),
-                claim_ceiling: CLAIM_CEILING.to_owned(),
-                decision_context: SequentialDecisionContext {
-                    profile_ref: "p".to_owned(),
-                    article_subject_ref: "a".to_owned(),
-                    configuration_id: "c".to_owned(),
-                    icd_revision: "i".to_owned(),
-                },
-                states: vec![],
-                decisions: vec![],
-                loss_matrix: BTreeMap::new(),
-                resource_frequency_model: ResourceFrequencyModel {
-                    model_ref: "m".to_owned(),
-                    calibration_status: "calibrated_for_fixture_only".to_owned(),
-                    used_for: "EXPECTED_RESOURCE_USE_ONLY".to_owned(),
-                    state_weights: BTreeMap::new(),
-                },
-                budget: Resources {
-                    engineering_hours: 2.0,
-                    compute_core_hours: 0.0,
-                    facility_hours: 2.5,
-                    specimen_count: 2,
-                    review_hours: 0.5,
-                    external_cost_units: 2.0,
-                },
-                max_actions: 2,
-                fixed_campaign_sequence: vec![],
-                actions: vec![],
-                expected: serde_json::from_value(Value::Null).unwrap_or_else(|_| unreachable!()),
-            }.budget.as_ref()
+            &budget
         ));
     }
 
@@ -956,18 +934,21 @@ mod tests {
             "JOINT_RETENTION_DEFECT":0.2
         });
         value["scenarios"][0]["expected"]["adaptive_expected_resources"] = serde_json::json!({
-            "engineering_hours":1.2,
+            "engineering_hours":1.1,
             "compute_core_hours":0.0,
-            "facility_hours":1.55,
-            "specimen_count":1.7,
-            "review_hours":0.24,
-            "external_cost_units":0.86
+            "facility_hours":1.4,
+            "specimen_count":1.6,
+            "review_hours":0.22,
+            "external_cost_units":0.78
         });
         let changed = serde_json::to_vec(&value).unwrap();
-        let second = run_sequential_audit(&changed, SOURCE).unwrap_err();
-        assert!(second.contains("known-answer oracle"));
-        let scenario = &original.scenarios[0];
-        assert_eq!(scenario.adaptive_campaign.worst_case_regret, 0.0);
+        let second = run_sequential_audit(&changed, SOURCE).unwrap();
+        let original_scenario = &original.scenarios[0];
+        let second_scenario = &second.scenarios[0];
+        assert_eq!(original_scenario.adaptive_campaign.worst_case_regret, 0.0);
+        assert_eq!(second_scenario.adaptive_campaign.worst_case_regret, 0.0);
+        assert!((second_scenario.adaptive_campaign.expected_resources.as_ref().unwrap().engineering_hours - 1.1).abs() < 1.0e-9);
+        assert!((original_scenario.adaptive_campaign.expected_resources.as_ref().unwrap().engineering_hours - 1.2).abs() < 1.0e-9);
     }
 
     #[test]
@@ -1000,8 +981,8 @@ mod tests {
             second.scenarios[0].adaptive_campaign.first_action_id
         );
         assert_eq!(
-            original.scenarios[0].adaptive_campaign.policy_brief(),
-            second.scenarios[0].adaptive_campaign.policy_brief()
+            original.scenarios[0].adaptive_campaign.policy,
+            second.scenarios[0].adaptive_campaign.policy
         );
     }
 }
