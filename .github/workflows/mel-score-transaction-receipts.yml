@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   qualify:
-    if: ${{ hashFiles('crates/domains/symthaea-muse/src/score_transaction.rs') != '' }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'research/mel-score-transaction-receipts-v2-20261121' }}
     name: Exact-head score transaction qualification
     runs-on: ubuntu-latest
     timeout-minutes: 90
