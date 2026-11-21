@@ -191,3 +191,29 @@ These are hypotheses for controlled ablation, not established mechanisms or perf
 This file and its JSON Schema define the intended adapter and result contract. No HDC-to-MACE source adapter or executable benchmark package is included in this protocol-only slice. No Rust compilation, tests, CI, hardware measurement, MACE utility gain or SOTA comparison is claimed here.
 
 The first implementation should be kept on a separate research branch, with all test outcomes and exact-head workflow states reported literally. A skipped runner is not a pass.
+
+
+## 12. External industry targets (Agent Memory Challenge Cycle 2)
+
+The official Cycle 2 results were published on **2026-11-19**. Preserve track and division identities:
+
+| Track / division | Published leader | Score | Proposed open-method stretch target |
+|---|---|---:|---:|
+| Textual / open-source | Resurface | 61.22 / 100 | 66.22 / 100 |
+| Coding / open-source | InsightMem | 63.33% resolved | 68.33% resolved |
+| Multimodal / open-source | Khipu | 43.26 / 100 | 48.26 / 100 |
+| Textual / commercial or closed-source | MemoraX | 69.26 / 100 | reference only |
+| Coding / commercial or closed-source | MemoraX | 68.00% resolved | reference only |
+| Multimodal / commercial or closed-source | MemoraX | 53.68 / 100 | reference only |
+
+The five-point targets are proposed stretch goals, not measured Symthaea results. The commercial/closed-source references remain distinct divisions; do not describe an internal MACE score, K95/T90 capacity point or synthetic utility as a Cycle 2 leaderboard score.
+
+The category breakdown suggests where new research can matter: the published textual leader scores 57.76 on temporal/event sequencing, 38.82 on personalization/care and 49.65 on streaming; the multimodal leader scores 34.23 on temporal reasoning, 38.45 on continual learning, 11.04 on personalization and 31.29 on evidence governance. The coding leader reports 74.51% on relevant new-feature work but 57.58% on relevant bug-fix work. These are diagnostic opportunity areas, not a guarantee that one architecture will transfer across tracks.
+
+Strategic response:
+- **Textual:** improve time-aware relational memory, decision-use relevance and streaming updates while retaining provenance closure.
+- **Coding:** encode task/repository scope, dependency graph, exact commit/patch lineage, regression evidence and failure memory; measure noisy-task and bug-fix robustness separately.
+- **Multimodal:** retain spatial, temporal and procedural evidence from observations/actions instead of caption-only compression; qualify write, maintain, retrieve and use separately against WorldMemArena.
+- **All tracks:** use model-conditioned memory dose-response, selective retrieval/abstention, calibration and complete lifecycle cost. A win is a matched Pareto improvement, not a larger vector or more aggressive compression.
+
+Official source: https://agentmemoryleaderboard.ai/results/cycle-2/ (published 2026-11-19; separate track/division leaderboards).
