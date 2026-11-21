@@ -125,7 +125,7 @@ impl MycelialTubeMesh {
     /// Basic structural validation suitable before a renderer uploads buffers.
     pub fn validate(&self) -> bool {
         self.positions.len() == self.normals.len()
-            && self.indices.len() % 3 == 0
+            && self.indices.len().is_multiple_of(3)
             && self
                 .positions
                 .iter()
