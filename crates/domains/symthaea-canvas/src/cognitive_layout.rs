@@ -13,8 +13,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::cognitive_topology::{
-    CognitiveProvenance, CognitiveRelation, CognitiveTopology, CognitiveTopologyError,
-    EpistemicStatus,
+    CognitiveNodeKind, CognitiveProvenance, CognitiveRelation, CognitiveTopology,
+    CognitiveTopologyError, EpistemicStatus,
 };
 use crate::mycelial_model::SpatialPoint3;
 
@@ -24,6 +24,9 @@ const ANCHOR_SCALE: f32 = 6.0;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CognitiveAnchor {
     pub node_id: String,
+    pub node_kind: CognitiveNodeKind,
+    pub label: String,
+    pub status: EpistemicStatus,
     pub position: SpatialPoint3,
     pub source_event_id: String,
     pub source_sequence: u64,
@@ -139,6 +142,9 @@ pub fn project_cognitive_topology(
         .into_iter()
         .map(|node| CognitiveAnchor {
             node_id: node.id.clone(),
+            node_kind: node.kind,
+            label: node.label.clone(),
+            status: node.status,
             position: stable_anchor(&node.id),
             source_event_id: node.evidence.event_id.clone(),
             source_sequence: node.evidence.sequence,
@@ -429,6 +435,9 @@ mod tests {
                 .iter()
                 .find(|node| node.id == anchor.node_id)
                 .unwrap();
+            assert_eq!(anchor.node_kind, node.kind);
+            assert_eq!(anchor.label, node.label);
+            assert_eq!(anchor.status, node.status);
             assert_eq!(anchor.source_event_id, node.evidence.event_id);
             assert_eq!(anchor.source_sequence, node.evidence.sequence);
             assert_eq!(anchor.provenance, node.evidence.provenance);
