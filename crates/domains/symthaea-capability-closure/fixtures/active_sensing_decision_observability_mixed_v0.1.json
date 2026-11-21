@@ -38,7 +38,9 @@
     "max_actions": 64,
     "float_optimizer_with_integer_outward_rounded_final_bounds": true,
     "output": "primal_upper_and_dual_lower_bound_with_measured_gap",
-    "approximate_not_exact": true
+    "approximate_not_exact": true,
+    "common_optimal_action_fast_path": true,
+    "common_optimal_action_fast_path_iterations": 0
   },
   "metrics": [
     "candidate_worst_case_expected_regret_lower_bound_ppm",
