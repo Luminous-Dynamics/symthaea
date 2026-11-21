@@ -79,7 +79,7 @@ Coupled space/velocity and independent timestep refinement probe:
 cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example refinement_probe
 ```
 
-The refinement example reports electric fundamental-mode amplitude, mass and Poisson residual at a common final time. It is an initial convergence probe, not a complete L3 admission study. A full reference admission still requires separate spatial, velocity-grid, velocity-domain and timestep studies; comparison with an independent second formulation; long-horizon drift; and explicit reference uncertainty.
+The refinement example independently varies spatial grid size, velocity grid size, velocity-domain extent, and timestep at a common final time. It reports electric fundamental-mode amplitude, mass, total energy, Poisson residual, velocity-endpoint ratio and minimum distribution. It is an initial convergence probe, not a complete L3 admission study. A full reference admission still requires separate spatial, velocity-grid, velocity-domain and timestep studies; comparison with an independent second formulation; long-horizon drift; and explicit reference uncertainty.
 
 ## Relationship to the rest of the plasma stack
 
