@@ -466,3 +466,14 @@ The next experiment should vary population, outcome definition, treatment versio
 - decision regret after transport and after a correctly scoped probe.
 
 The candidate's digest comparison is only as trustworthy as the independent verifier's canonical estimand definition. It must not accept model-authored labels as the estimand oracle.
+
+
+### E. Model-conditioned memory dose response
+
+The November 19, 2026 IBM Research study *How Much Should an Agent Remember? Deployment Lessons from Self-Distilled Memory for LLM Agents* reports that useful memory quantity depends on the target model: DeepSeek-V3.2 gained +9.5 task-completion points with 191 guidelines, while gpt-oss-120b reached 55.4% with a selected set of about 29 versus 51.2% with all 199. The authors also report failure modes including a high-support harmful guideline and provenance loss during consolidation. These are AppWorld results from the authors' study, not a universal scaling law. ([Paper](https://arxiv.org/abs/2611.26361))
+
+MACE now has a per-target-model dose-response protocol. For each target-model digest and frozen memory-pipeline digest, it evaluates a preregistered set of context budgets (including zero memory) on paired calibration clusters, selects the highest-mean-net-utility budget with a smaller-budget tie break, then requires a positive paired cluster-bootstrap 95% lower bound on disjoint held-out clusters before qualifying a nonzero budget. The qualification binds task-family, source-root, event, model and pipeline digests and can feed the existing evidence-bound knapsack selector.
+
+The next experiment is a two-dimensional surface: **target-model capability × memory token budget**, with separate measurements for task completion, scenario completion, steps, tokens, latency, stale/poisoned activation and governance violations. Require at least five model families/versions, multiple memory-policy families, at least five independent environment seeds per cell, paired cluster bootstrap, and one external held-out environment. Do not infer model capability from parameter count alone; the model digest and measured no-memory baseline are the operative strata.
+
+Target qualification: each model's selected budget must improve held-out paired net utility over zero-memory with a 95% lower bound greater than zero, while no hard governance/safety metric regresses. Publish the full dose-response curve, not only the winning point. The prototype uses deterministic synthetic paired episodes; it does not establish an empirical relationship across production models.
