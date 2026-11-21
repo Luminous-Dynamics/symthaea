@@ -11,7 +11,7 @@
 
 use chrono::{DateTime, FixedOffset, NaiveDateTime, SecondsFormat};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 
@@ -183,7 +183,7 @@ fn canonical_manifest_digest(
     // serde_json::Map is key-sorted unless the preserve_order feature is
     // enabled. The repository workspace uses the default sorted map, matching
     // the independent Python oracle's json.dumps(sort_keys=True).
-    let mut root = Map::new();
+    let mut root = BTreeMap::<String, Value>::new();
     root.insert("schema".into(), Value::String(INPUT_SCHEMA.to_owned()));
     root.insert(
         "dataset_id".into(),
@@ -200,7 +200,7 @@ fn canonical_manifest_digest(
 
     let mut canonical_rows = Vec::with_capacity(ordered_assignments.len());
     for assignment in ordered_assignments {
-        let mut row = Map::new();
+        let mut row = BTreeMap::<String, Value>::new();
         row.insert(
             "sample_id".into(),
             Value::String(assignment.sample_id.clone()),
@@ -227,7 +227,9 @@ fn canonical_manifest_digest(
             "stratified_sample" => {}
             other => return Err(SplitManifestError::UnsupportedSplitScheme(other.to_owned())),
         }
-        canonical_rows.push(Value::Object(row));
+        let row_value = serde_json::to_value(row)
+            .map_err(|error| SplitManifestError::Canonicalization(error.to_string()))?;
+        canonical_rows.push(row_value);
     }
     canonical_rows.sort_by(|left, right| {
         left.get("sample_id")
@@ -254,7 +256,7 @@ fn canonical_manifest_digest(
         }
     }
 
-    let bytes = serde_json::to_vec(&Value::Object(root))
+    let bytes = serde_json::to_vec(&root)
         .map_err(|error| SplitManifestError::Canonicalization(error.to_string()))?;
     let digest = Sha256::digest(bytes);
     let mut hex = String::with_capacity(64);
