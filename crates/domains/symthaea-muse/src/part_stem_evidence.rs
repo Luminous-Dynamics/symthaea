@@ -1870,16 +1870,22 @@ mod tests {
     fn combined_receipt_replay_rejects_resealed_fabricated_spectral_measurement() {
         let (bundle, midi, wavs) = fixture();
         let mut receipt = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
-        assert!(validate_part_stem_audio_evidence_receipt_v1(
-            &receipt, &bundle, &midi, &wavs, 1
-        ).is_empty());
+        assert!(
+            validate_part_stem_audio_evidence_receipt_v1(&receipt, &bundle, &midi, &wavs, 1)
+                .is_empty()
+        );
 
-        receipt.audio_observation.note_observations[0].fundamental_salience_db =
-            Some(receipt.audio_observation.note_observations[0].fundamental_salience_db.unwrap_or(0.0) + 12.0);
+        receipt.audio_observation.note_observations[0].fundamental_salience_db = Some(
+            receipt.audio_observation.note_observations[0]
+                .fundamental_salience_db
+                .unwrap_or(0.0)
+                + 12.0,
+        );
         receipt.audio_observation.receipt_sha256 =
             crate::audio_event_observation::audio_stem_event_observation_commitment_v1(
-                &receipt.audio_observation
-            ).unwrap();
+                &receipt.audio_observation,
+            )
+            .unwrap();
 
         // Reseal the outer combined receipt as well. A validator that checks
         // only nested SHA-256 commitments would accept this forged measurement.
@@ -1894,9 +1900,8 @@ mod tests {
             &bytes,
         );
 
-        let issues = validate_part_stem_audio_evidence_receipt_v1(
-            &receipt, &bundle, &midi, &wavs, 1
-        );
+        let issues =
+            validate_part_stem_audio_evidence_receipt_v1(&receipt, &bundle, &midi, &wavs, 1);
         assert!(issues.contains(&PartStemAudioEvidenceIssueV1::Observation(
             AudioEventObservationIssueV1::ObservationReplayMismatch { track_index: 1 }
         )));
