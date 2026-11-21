@@ -1256,7 +1256,7 @@ mod tests {
         }
         let json = sweep.to_json_pretty();
         assert!(json.contains("rcaf.common-mode-nuisance-sweep/0.1.0"));
-        assert!(json.contains("\\"nuisance_only_rejection_rate\\""));
+        assert!(json.contains("\"nuisance_only_rejection_rate\""));
     }
 
     #[test]
