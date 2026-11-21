@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/common-mode-nuisance-sweep.schema.json",
+  "title": "RCAF common-mode nuisance dose-response sweep",
+  "description": "Synthetic matched-input nuisance calibration; latent loadings are held fixed while one observation-only common-mode factor is swept.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "nuisance_strengths",
+    "strength_points",
+    "reports",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.common-mode-nuisance-sweep/0.1.0"
+    },
+    "nuisance_strengths": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "strength_points": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "reports": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/injection-recovery.schema.json",
+        "title": "RCAF synthetic injection-recovery report",
+        "description": "Simulation-only calibration report. It is not a biological observation or clinical validation.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "seed",
+          "participants_per_replicate",
+          "regions",
+          "samples_per_segment",
+          "monte_carlo_replicates",
+          "injection_loading_delta",
+          "alpha",
+          "null_false_positive_rate",
+          "injection_detection_power",
+          "median_null_paired_gap",
+          "median_injected_paired_gap",
+          "median_null_positive_gap_fraction",
+          "median_injected_positive_gap_fraction",
+          "claim_limits",
+          "temporal_autocorrelation",
+          "estimator",
+          "module_start",
+          "module_size",
+          "global_loading",
+          "module_loading",
+          "loading_jitter",
+          "injection_directional_detection_power",
+          "injection_wrong_direction_rejection_rate",
+          "common_mode_nuisance_loading",
+          "nuisance_only_rejection_rate",
+          "median_nuisance_only_paired_gap"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "rcaf.injection-recovery/0.3.0"
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "participants_per_replicate": {
+            "type": "integer",
+            "minimum": 8
+          },
+          "regions": {
+            "type": "integer",
+            "minimum": 4
+          },
+          "samples_per_segment": {
+            "type": "integer",
+            "minimum": 30
+          },
+          "monte_carlo_replicates": {
+            "type": "integer",
+            "minimum": 20
+          },
+          "injection_loading_delta": {
+            "type": "number",
+            "minimum": 0
+          },
+          "alpha": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 0.5
+          },
+          "null_false_positive_rate": {
+            "$ref": "#/$defs/binomialRate"
+          },
+          "injection_detection_power": {
+            "$ref": "#/$defs/binomialRate"
+          },
+          "median_null_paired_gap": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "median_injected_paired_gap": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "median_null_positive_gap_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "median_injected_positive_gap_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "claim_limits": {
+            "type": "array",
+            "minItems": 4,
+            "items": {
+              "type": "string"
+            }
+          },
+          "temporal_autocorrelation": {
+            "type": "number",
+            "exclusiveMinimum": -1,
+            "exclusiveMaximum": 1
+          },
+          "estimator": {
+            "enum": [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error"
+            ]
+          },
+          "module_start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "module_size": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "global_loading": {
+            "type": "number",
+            "minimum": 0
+          },
+          "module_loading": {
+            "type": "number",
+            "minimum": 0
+          },
+          "loading_jitter": {
+            "type": "number",
+            "minimum": 0
+          },
+          "injection_directional_detection_power": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "successes",
+              "trials",
+              "estimate",
+              "ci95_lower",
+              "ci95_upper"
+            ],
+            "properties": {
+              "successes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trials": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "estimate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_lower": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_upper": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "injection_wrong_direction_rejection_rate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "successes",
+              "trials",
+              "estimate",
+              "ci95_lower",
+              "ci95_upper"
+            ],
+            "properties": {
+              "successes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trials": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "estimate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_lower": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_upper": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "common_mode_nuisance_loading": {
+            "type": "number",
+            "minimum": 0
+          },
+          "nuisance_only_rejection_rate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "successes",
+              "trials",
+              "estimate",
+              "ci95_lower",
+              "ci95_upper"
+            ],
+            "properties": {
+              "successes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trials": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "estimate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_lower": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_upper": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "median_nuisance_only_paired_gap": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          }
+        },
+        "$defs": {
+          "binomialRate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "successes",
+              "trials",
+              "estimate",
+              "ci95_lower",
+              "ci95_upper"
+            ],
+            "properties": {
+              "successes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trials": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "estimate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_lower": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci95_upper": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
