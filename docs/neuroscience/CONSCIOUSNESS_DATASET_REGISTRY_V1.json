@@ -153,17 +153,12 @@
       "paper_doi": "10.1038/s41586-025-08888-1",
       "data_url": "https://cogitate-consortium.github.io/cogitate-data/03_cogdataset/",
       "participants_total": 256,
-      "paper_analysis_counts": {
-        "fmri": 120,
-        "meg": 102,
-        "ieeg": 34
-      },
       "release_documentation_counts": {
         "fmri": 118,
-        "meg": 100,
+        "meg_eeg": 100,
         "ieeg": 38
       },
-      "denominator_status": "RECONCILE_PARTICIPANT_LEVEL_QC_AND_RELEASE_PHASE_FLAGS",
+      "denominator_status": "modality_level_counts_reconciled; endpoint_specific_iEEG_and_release_manifest_reconciliation_required",
       "modalities": [
         "fMRI",
         "MEG",
@@ -176,11 +171,41 @@
       "best_use": "reproduce the preregistered theory-discrimination analysis and test prediction-card/receipt infrastructure",
       "holdout_status": "published_results_are_public; not a new blind holdout",
       "limitations": [
-        "the release cohort counts and paper analysis denominators differ by modality",
-        "optimization and final-test phase proportions must be read from participant-level flags and supplements, not inferred from summary prose",
-        "published outcomes have been inspected; subsequent analysis is a reproduction or secondary analysis"
+        "acquisition/cohort counts, quality-controlled paper analysis counts and current public release counts are distinct denominators",
+        "paper quality-controlled fMRI and MEG cohorts are 108 and 97; optimization/replication subsets are 35/73 and 32/65 respectively",
+        "paper iEEG cohort is endpoint-dependent: 34 recruited, two excluded for incomplete data, and a specific identity-RDM analysis reports 29 after further completion filtering",
+        "public release documentation reports 118 fMRI, 100 MEG/EEG and 38 iEEG records; release presence does not imply inclusion in the primary published analysis",
+        "optimization and replication phase membership must be frozen from participant-level metadata or the exact supplementary mapping, never inferred by random repartition",
+        "published outcomes have been inspected; subsequent analysis is reproduction or secondary analysis, not a blind holdout"
       ],
-      "acquisition_status": "public_release_documentation_reviewed; data_access_terms_to_be_checked"
+      "acquisition_status": "public_release_documentation_reviewed; data_access_terms_to_be_checked",
+      "paper_cohort_counts": {
+        "fmri": 120,
+        "meg": 102,
+        "ieeg": 34
+      },
+      "paper_quality_controlled_analysis_counts": {
+        "fmri": 108,
+        "meg": 97,
+        "ieeg_main_patient_cohort": 32,
+        "ieeg_specific_identity_rdm_cohort": 29
+      },
+      "paper_phase_counts": {
+        "fmri_optimization": 35,
+        "fmri_replication": 73,
+        "meg_optimization": 32,
+        "meg_replication": 65,
+        "ieeg": "no optimization-versus-replication split; analyse endpoint-specific participant flow"
+      },
+      "access": {
+        "license": "CC BY 4.0 as stated by COGITATE data release",
+        "access_methods": [
+          "XNAT account",
+          "versioned archival data bundles"
+        ],
+        "access_note": "Data are openly licensed but download portal access requires a user account; verify exact bundle DOI/version and terms at intake",
+        "current_documentation": "COGITATE Data Release wiki V1.3"
+      }
     },
     {
       "id": "sleep-edf-hypnos",
