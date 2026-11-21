@@ -697,8 +697,8 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         let mandatory_obligations_covered = obligations_covered(scenario, action);
         let terminal_nonresult = is_terminal_nonresult(action);
         let actual = actual_resources(action)?;
-        let execution_state = metadata_string(action, "observed_execution_state")
-            .map(str::to_owned);
+        let execution_state =
+            metadata_string(action, "observed_execution_state").map(str::to_owned);
         let actual_exceeds_plan = actual
             .as_ref()
             .is_some_and(|resources| !fits_budget(resources, &action.resources));
@@ -1158,7 +1158,9 @@ mod tests {
     #[test]
     fn execution_state_without_actual_cost_is_rejected() {
         let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
-        let action = value["scenarios"][10]["actions"][0].as_object_mut().unwrap();
+        let action = value["scenarios"][10]["actions"][0]
+            .as_object_mut()
+            .unwrap();
         action.remove("actual_resources");
         let changed = serde_json::to_vec(&value).unwrap();
         assert!(run_audit(&changed, SOURCE).is_err());
