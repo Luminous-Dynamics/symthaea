@@ -11,6 +11,7 @@ on:
       - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
       - "data/schemas/sc_reproducibility_design_v0_1.schema.json"
+      - "data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
@@ -24,6 +25,7 @@ on:
       - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
       - "data/schemas/sc_reproducibility_design_v0_1.schema.json"
+      - "data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
@@ -59,6 +61,7 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/synthesis_protocol_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/pair_coherence_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/reproducibility_hierarchy_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/rebco_local_tape_frame_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -80,6 +83,17 @@ jobs:
 
       - name: Test specimen, batch, campaign and laboratory split auditor
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reproducibility_audit
+
+      - name: Test REBCO global-to-local tape-frame transform auditor
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_rebco_local_tape_frame_audit
+
+      - name: Run synthetic REBCO local tape-frame audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_rebco_local_tape_frame_audit -- \
+            --schema data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/rebco_local_tape_frame_smoke_v0_1.json \
+            > "$RUNNER_TEMP/sc-rebco-local-tape-frame-smoke.json"
+          cat "$RUNNER_TEMP/sc-rebco-local-tape-frame-smoke.json"
 
       - name: Run synthetic reproducibility hierarchy audit
         run: |
@@ -141,6 +155,7 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reproducibility_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_rebco_local_tape_frame_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -158,6 +173,8 @@ jobs:
             sha256sum tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json
             sha256sum data/schemas/sc_reproducibility_design_v0_1.schema.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/reproducibility_hierarchy_smoke_v0_1.json
+            sha256sum data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/rebco_local_tape_frame_smoke_v0_1.json
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
@@ -182,3 +199,4 @@ jobs:
             ${{ runner.temp }}/sc-synthesis-protocol-smoke.json
             ${{ runner.temp }}/sc-pair-coherence-smoke.json
             ${{ runner.temp }}/sc-reproducibility-smoke.json
+            ${{ runner.temp }}/sc-rebco-local-tape-frame-smoke.json

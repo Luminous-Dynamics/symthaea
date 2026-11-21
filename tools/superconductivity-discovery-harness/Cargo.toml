@@ -39,3 +39,7 @@ path = "src/bin/pair_coherence_audit.rs"
 [[bin]]
 name = "sc_reproducibility_audit"
 path = "src/bin/reproducibility_hierarchy_audit.rs"
+
+[[bin]]
+name = "sc_rebco_local_tape_frame_audit"
+path = "src/bin/rebco_local_tape_frame_audit.rs"
