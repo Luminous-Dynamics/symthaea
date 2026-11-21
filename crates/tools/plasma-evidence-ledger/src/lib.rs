@@ -220,10 +220,9 @@ impl MetricObservation {
                 validate_optional_finite(self.acceptance_tolerance, true)?;
 
                 if let (Some(lower), Some(upper)) = (self.lower_error_bound, self.upper_error_bound)
+                    && lower > upper
                 {
-                    if lower > upper {
-                        return Err(LedgerError::InvalidErrorInterval);
-                    }
+                    return Err(LedgerError::InvalidErrorInterval);
                 }
                 if let (Some(estimate), Some(lower), Some(upper)) = (
                     self.error_estimate,
