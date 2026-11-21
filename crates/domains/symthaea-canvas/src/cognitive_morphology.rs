@@ -15,12 +15,10 @@ use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
 
-use crate::cognitive_layout::{
-    CognitiveLayoutError, CognitiveSpatialProjection,
-};
+use crate::cognitive_layout::{CognitiveLayoutError, CognitiveSpatialProjection};
 use crate::cognitive_topology::{
-    CognitiveEdge, CognitiveEvidence, CognitiveNodeKind, CognitiveProvenance,
-    CognitiveRelation, CognitiveTopology, CognitiveTopologyError, EpistemicStatus,
+    CognitiveEdge, CognitiveEvidence, CognitiveNodeKind, CognitiveProvenance, CognitiveRelation,
+    CognitiveTopology, CognitiveTopologyError, EpistemicStatus,
 };
 use crate::mycelial_model::SpatialPoint3;
 
@@ -100,12 +98,18 @@ impl fmt::Display for CognitiveMorphologyError {
         match self {
             Self::InvalidConfig => write!(f, "invalid cognitive morphology configuration"),
             Self::ProjectionMismatch => {
-                write!(f, "spatial projection does not exactly match the semantic topology")
+                write!(
+                    f,
+                    "spatial projection does not exactly match the semantic topology"
+                )
             }
             Self::DuplicateAnchor(id) => write!(f, "duplicate spatial anchor for node {id}"),
             Self::MissingAnchor(id) => write!(f, "missing spatial anchor for node {id}"),
             Self::InvalidGeometry(id) => {
-                write!(f, "generated cognitive morphology geometry is invalid for {id}")
+                write!(
+                    f,
+                    "generated cognitive morphology geometry is invalid for {id}"
+                )
             }
             Self::Topology(error) => write!(f, "cognitive topology validation failed: {error}"),
             Self::Layout(error) => write!(f, "cognitive spatial projection failed: {error}"),
@@ -172,7 +176,10 @@ pub fn build_cognitive_morphology(
 
     let mut anchor_by_id = HashMap::with_capacity(spatial.anchors.len());
     for anchor in &spatial.anchors {
-        if anchor_by_id.insert(anchor.node_id.as_str(), anchor).is_some() {
+        if anchor_by_id
+            .insert(anchor.node_id.as_str(), anchor)
+            .is_some()
+        {
             return Err(CognitiveMorphologyError::DuplicateAnchor(
                 anchor.node_id.clone(),
             ));
@@ -237,9 +244,7 @@ pub fn build_cognitive_morphology(
             if !within_bounds(control_a, config.coordinate_limit)
                 || !within_bounds(control_b, config.coordinate_limit)
             {
-                return Err(CognitiveMorphologyError::InvalidGeometry(
-                    edge.id.clone(),
-                ));
+                return Err(CognitiveMorphologyError::InvalidGeometry(edge.id.clone()));
             }
             hyphae.push(CognitiveHypha {
                 edge_id: edge.id.clone(),
@@ -298,9 +303,17 @@ fn edge_controls(
         stable_direction(&edge.id)
     };
     let reference = if direction.z.abs() < 0.8 {
-        SpatialPoint3 { x: 0.0, y: 0.0, z: 1.0 }
+        SpatialPoint3 {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+        }
     } else {
-        SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 }
+        SpatialPoint3 {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        }
     };
     let perpendicular = direction.cross(reference).normalized();
 
@@ -321,12 +334,8 @@ fn edge_controls(
         offset
     };
     let bend = perpendicular.scale(effective_offset);
-    let control_a = start
-        .add(chord.scale(1.0 / 3.0))
-        .add(bend);
-    let control_b = start
-        .add(chord.scale(2.0 / 3.0))
-        .add(bend);
+    let control_a = start.add(chord.scale(1.0 / 3.0)).add(bend);
+    let control_b = start.add(chord.scale(2.0 / 3.0)).add(bend);
     (control_a, control_b)
 }
 
@@ -343,10 +352,7 @@ fn stable_direction(id: &str) -> SpatialPoint3 {
 }
 
 fn within_bounds(point: SpatialPoint3, limit: f32) -> bool {
-    point.is_finite()
-        && point.x.abs() <= limit
-        && point.y.abs() <= limit
-        && point.z.abs() <= limit
+    point.is_finite() && point.x.abs() <= limit && point.y.abs() <= limit && point.z.abs() <= limit
 }
 
 impl CognitiveMorphologyProjection {
@@ -368,7 +374,9 @@ impl CognitiveMorphologyProjection {
         for node in &self.nodes {
             if node.node_id.is_empty()
                 || !within_bounds(node.position, 128.0)
-                || node_positions.insert(node.node_id.as_str(), node.position).is_some()
+                || node_positions
+                    .insert(node.node_id.as_str(), node.position)
+                    .is_some()
             {
                 return Err(CognitiveMorphologyError::ProjectionMismatch);
             }
@@ -446,10 +454,7 @@ fn hash_point(
     Ok(())
 }
 
-fn hash_quantized(
-    hasher: &mut blake3::Hasher,
-    value: f32,
-) -> Result<(), CognitiveMorphologyError> {
+fn hash_quantized(hasher: &mut blake3::Hasher, value: f32) -> Result<(), CognitiveMorphologyError> {
     if !value.is_finite() || value.abs() > 128.0 {
         return Err(CognitiveMorphologyError::ProjectionMismatch);
     }
@@ -512,69 +517,68 @@ mod tests {
     use crate::cognitive_layout::{CognitiveLayoutConfig, layout_cognitive_topology};
 
     fn fixture_topology() -> CognitiveTopology {
-        serde_json::from_str(include_str!(
-            "../tests/fixtures/cognitive_topology_v1.json"
-        ))
-        .expect("checked-in topology fixture")
+        serde_json::from_str(include_str!("../tests/fixtures/cognitive_topology_v1.json"))
+            .expect("checked-in topology fixture")
     }
 
     fn fixture_projection() -> (CognitiveTopology, CognitiveSpatialProjection) {
         let topology = fixture_topology();
-        let spatial = layout_cognitive_topology(
-            &topology,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("fixture layout");
+        let spatial = layout_cognitive_topology(&topology, None, CognitiveLayoutConfig::default())
+            .expect("fixture layout");
         (topology, spatial)
     }
 
     #[test]
     fn each_semantic_node_and_edge_maps_to_exactly_one_morphology_element() {
         let (topology, spatial) = fixture_projection();
-        let morphology = build_cognitive_morphology(
-            &topology,
-            &spatial,
-            CognitiveMorphologyConfig::default(),
-        )
-        .expect("morphology projection");
+        let morphology =
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default())
+                .expect("morphology projection");
         assert_eq!(morphology.nodes.len(), topology.nodes.len());
         assert_eq!(morphology.hyphae.len(), topology.edges.len());
         assert_eq!(
-            morphology.nodes.iter().map(|node| node.node_id.as_str()).collect::<Vec<_>>(),
-            spatial.anchors.iter().map(|anchor| anchor.node_id.as_str()).collect::<Vec<_>>()
+            morphology
+                .nodes
+                .iter()
+                .map(|node| node.node_id.as_str())
+                .collect::<Vec<_>>(),
+            spatial
+                .anchors
+                .iter()
+                .map(|anchor| anchor.node_id.as_str())
+                .collect::<Vec<_>>()
         );
         let mut semantic_edge_ids: Vec<_> =
             topology.edges.iter().map(|edge| edge.id.as_str()).collect();
         semantic_edge_ids.sort_unstable();
         assert_eq!(
-            morphology.hyphae.iter().map(|hypha| hypha.edge_id.as_str()).collect::<Vec<_>>(),
+            morphology
+                .hyphae
+                .iter()
+                .map(|hypha| hypha.edge_id.as_str())
+                .collect::<Vec<_>>(),
             semantic_edge_ids
         );
-        assert!(morphology.hyphae.iter().all(|hypha| {
-            hypha.evidence.provenance == CognitiveProvenance::SyntheticFixture
-        }));
+        assert!(
+            morphology.hyphae.iter().all(|hypha| {
+                hypha.evidence.provenance == CognitiveProvenance::SyntheticFixture
+            })
+        );
     }
 
     #[test]
     fn candidate_prediction_and_relation_status_are_preserved() {
         let (topology, spatial) = fixture_projection();
-        let morphology = build_cognitive_morphology(
-            &topology,
-            &spatial,
-            CognitiveMorphologyConfig::default(),
-        )
-        .expect("morphology projection");
+        let morphology =
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default())
+                .expect("morphology projection");
         let prediction = morphology
             .hyphae
             .iter()
             .find(|hypha| hypha.relation == CognitiveRelation::Predicts)
             .expect("prediction hypha");
         assert_eq!(prediction.status, EpistemicStatus::Candidate);
-        assert_eq!(
-            prediction.source_node_id,
-            "concept:mycelium".to_string()
-        );
+        assert_eq!(prediction.source_node_id, "concept:mycelium".to_string());
         assert_eq!(
             prediction.target_node_id,
             "prediction:resilience".to_string()
@@ -602,18 +606,11 @@ mod tests {
             },
             activation: None,
         });
-        let spatial = layout_cognitive_topology(
-            &topology,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("layout with parallel edge");
-        let morphology = build_cognitive_morphology(
-            &topology,
-            &spatial,
-            CognitiveMorphologyConfig::default(),
-        )
-        .expect("parallel morphology");
+        let spatial = layout_cognitive_topology(&topology, None, CognitiveLayoutConfig::default())
+            .expect("layout with parallel edge");
+        let morphology =
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default())
+                .expect("parallel morphology");
         let first = morphology
             .hyphae
             .iter()
@@ -632,18 +629,12 @@ mod tests {
     fn semantic_digest_is_unchanged_by_morphology_and_geometry_digest_is_stable() {
         let (topology, spatial) = fixture_projection();
         let semantic_before = topology.canonical_digest_hex().unwrap();
-        let first = build_cognitive_morphology(
-            &topology,
-            &spatial,
-            CognitiveMorphologyConfig::default(),
-        )
-        .unwrap();
-        let second = build_cognitive_morphology(
-            &topology,
-            &spatial,
-            CognitiveMorphologyConfig::default(),
-        )
-        .unwrap();
+        let first =
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default())
+                .unwrap();
+        let second =
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default())
+                .unwrap();
         assert_eq!(
             first.geometry_digest_hex().unwrap(),
             second.geometry_digest_hex().unwrap()
@@ -656,11 +647,7 @@ mod tests {
         let (topology, mut spatial) = fixture_projection();
         spatial.topology_digest = "0".repeat(64);
         assert_eq!(
-            build_cognitive_morphology(
-                &topology,
-                &spatial,
-                CognitiveMorphologyConfig::default()
-            ),
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default()),
             Err(CognitiveMorphologyError::ProjectionMismatch)
         );
     }
@@ -671,11 +658,7 @@ mod tests {
         let existing_node = topology.nodes[0].id.clone();
         spatial.links[0].target_node_id = existing_node;
         assert_eq!(
-            build_cognitive_morphology(
-                &topology,
-                &spatial,
-                CognitiveMorphologyConfig::default()
-            ),
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default()),
             Err(CognitiveMorphologyError::ProjectionMismatch)
         );
     }
@@ -683,12 +666,9 @@ mod tests {
     #[test]
     fn malformed_deserialized_morphology_with_dangling_hypha_is_rejected() {
         let (topology, spatial) = fixture_projection();
-        let mut morphology = build_cognitive_morphology(
-            &topology,
-            &spatial,
-            CognitiveMorphologyConfig::default(),
-        )
-        .unwrap();
+        let mut morphology =
+            build_cognitive_morphology(&topology, &spatial, CognitiveMorphologyConfig::default())
+                .unwrap();
         morphology.hyphae[0].target_node_id = "missing-node".to_string();
         assert_eq!(
             morphology.geometry_digest_hex(),
