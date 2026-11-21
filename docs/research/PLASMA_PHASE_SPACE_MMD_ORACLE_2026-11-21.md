@@ -1,7 +1,7 @@
 # Characteristic-kernel MMD oracle for phase-space measures
 
 **Date:** 2026-11-21  
-**Status:** standalone reference implementation authored; Rust compile/test/format/Clippy evidence pending  
+**Status:** exact small-N oracle, full-spectrum approximation and adaptive controller implemented; focused Rust 1.96 validation passed on their respective exact PR heads; metric sweep runner added and awaiting its own workflow evidence  
 **Tracking:** [Issue #13022](https://github.com/Luminous-Dynamics/symthaea/issues/13022)  
 **Separate implementation:** [PR #13021](https://github.com/Luminous-Dynamics/symthaea/pull/13021) adds the fast finite-feature diagnostic; this work does not modify that PR.
 
@@ -375,3 +375,17 @@ Relevant baselines:
 The next comparison matrix should include: fixed-D standard RFF; RFF with the Yao-style bootstrap error estimator adapted and validated for this functional; current alpha-spending geometric checkpoint controller; and a proven empirical-Bernstein / mixture confidence sequence. Hold physics cases, kernel scales, seeds, error target and hardware constant. Report achieved coverage across all looks, false-safe rate, mean and p95 feature count, absolute and relative MMD² error versus exact oracle, wall time and memory.
 
 Our credible claim ceiling is narrower and stronger: the implementation provides a measure-aware, full-spectrum sampler for this specific periodic × Gaussian kernel, an exact small-N reference, and a checkpointed optional-stopping-safe budget controller. Competitive superiority remains an empirical question.
+
+
+## 14. Reproducible metric-level scaling experiment
+
+The new spectral_mmd_sweep Rust example compares the O(D(U+V)) spectral estimator against the exact small-N oracle on four fixed negative/positive controls:
+- finite Fourier aliasing;
+- changed joint position/velocity correlation;
+- co-located signed cancellation;
+- high spatial concentration.
+
+It runs 9 feature counts (64 through 16,384) and 10 preregistered seeds, yielding 360 CSV rows. Every row records exact/approximate normalized MMD², absolute and relative error, empirical feature standard error, fixed-D Hoeffding radius, particle-feature evaluation count, runtime in microseconds, architecture and OS.
+
+The focused workflow now runs this example after format, tests and strict Clippy and uploads the result as the plasma-phase-space-mmd-sweep artifact. This is a metric-level microbenchmark on a GitHub runner. It is not an end-to-end PIC solver benchmark, not evidence of physical speedup, and not an industry SOTA comparison. A later matched-budget tournament must measure the complete kinetic pipeline on named hardware and include field solve, particle push, communication, corrections, diagnostics and fallback.
+
