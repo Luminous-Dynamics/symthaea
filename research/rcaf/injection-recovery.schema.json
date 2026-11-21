@@ -21,7 +21,8 @@
     "median_null_positive_gap_fraction",
     "median_injected_positive_gap_fraction",
     "claim_limits",
-    "temporal_autocorrelation"
+    "temporal_autocorrelation",
+    "estimator"
   ],
   "properties": {
     "schema_version": {
@@ -93,6 +94,13 @@
       "type": "number",
       "exclusiveMinimum": -1,
       "exclusiveMaximum": 1
+    },
+    "estimator": {
+      "enum": [
+        "absolute_weighted_jaccard",
+        "signed_shift_weighted_jaccard",
+        "normalized_mean_absolute_edge_error"
+      ]
     }
   },
   "$defs": {
