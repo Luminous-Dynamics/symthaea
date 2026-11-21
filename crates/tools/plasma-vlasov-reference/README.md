@@ -35,7 +35,7 @@ The in-house radix-2 FFT has no external dependencies. The time integrator is se
 
 ## Diagnostics
 
-The solver reports mass, momentum, kinetic energy, field energy, total energy, integrated net charge, maximum collocation spectral Poisson residual, minimum distribution value and velocity-endpoint occupancy ratio. For a requested spatial mode it also exposes the complex Fourier coefficient (real part, imaginary part, magnitude and principal phase), so oscillatory field modes are not reduced to a magnitude-only time trace.
+The solver reports mass, momentum, kinetic energy, field energy, total energy, integrated net charge, maximum collocation spectral Poisson residual, minimum distribution value and velocity-endpoint occupancy ratio. For a requested spatial mode it also exposes the complex Fourier coefficient (real part, imaginary part, magnitude and principal phase), so oscillatory field modes are not reduced to a magnitude-only time trace. The spectral-tail diagnostic separately reports high-frequency and Nyquist energy fractions along x and v for a frozen mode-band threshold.
 
 These are raw observations. In particular:
 
@@ -47,7 +47,7 @@ These are raw observations. In particular:
 
 ## Verification tests
 
-The unit suite contains 12 tests:
+The unit suite contains 14 tests:
 - radix-2 FFT forward/inverse round-trip;
 - homogeneous Maxwellian equilibrium;
 - manufactured free-streaming characteristic solution;
@@ -57,7 +57,9 @@ The unit suite contains 12 tests:
 - observed second-order timestep-convergence ratio on a coupled trajectory;
 - phase-space grid-size overflow rejection;
 - invalid grid, non-finite input and invalid timestep rejection;
-- complex electric-mode coefficient, phase and amplitude consistency.
+- complex electric-mode coefficient, phase and amplitude consistency;
+- spectral-tail axis separation for high x-only and v-only modes;
+- invalid spectral-tail threshold rejection.
 
 Run with Rust 1.96:
 
@@ -69,7 +71,7 @@ cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo
 
 ## Reproducible probes
 
-Phase-resolved Landau-damping diagnostic trace (complex Fourier coefficient, magnitude and phase):
+Phase-resolved Landau-damping and spectral-tail trace (complex Fourier coefficient, magnitude, phase, x/v tail fractions and Nyquist fractions):
 
 ```sh
 cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_reference
@@ -81,9 +83,9 @@ Coupled space/velocity and independent timestep refinement probe:
 cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example refinement_probe
 ```
 
-The refinement example independently varies spatial grid size, velocity grid size, velocity-domain extent, and timestep at a common final time. It reports electric fundamental-mode amplitude, mass, total energy, Poisson residual, velocity-endpoint ratio and minimum distribution. It is an initial convergence probe, not a complete L3 admission study. A full reference admission still requires separate spatial, velocity-grid, velocity-domain and timestep studies; comparison with an independent second formulation; long-horizon drift; and explicit reference uncertainty.
+The refinement example independently varies spatial grid size, velocity grid size, velocity-domain extent, and timestep at a common final time. It reports electric fundamental-mode amplitude, mass, total energy, Poisson residual, velocity-endpoint ratio, minimum distribution, and independent x/v high-frequency tail fractions. It is an initial convergence probe, not a complete L3 admission study. A full reference admission still requires separate spatial, velocity-grid, velocity-domain and timestep studies; comparison with an independent second formulation; long-horizon drift; and explicit reference uncertainty.
 
-The focused GitHub workflow executes both examples on its exact head after formatting, unit tests and strict Clippy pass, then uploads the generated CSV traces as a workflow artifact. These hosted-runner traces are reproducible measurements for that build, not a substitute for independent physical validation or a matched external baseline.
+The focused GitHub workflow executes both examples on its exact head after formatting, unit tests and strict Clippy pass, then uploads the generated CSV traces as a workflow artifact. These hosted-runner traces are reproducible measurements for that build, not a substitute for independent physical validation or a matched external baseline. Spectral-tail fractions are warning indicators only; they are not residual-to-error certificates and do not by themselves authorise grid growth.
 
 ## Relationship to the rest of the plasma stack
 
