@@ -1152,7 +1152,7 @@ mod tests {
     use std::cell::Cell;
 
     thread_local! {
-        static UNTRACKED_PROCESS_CALLS: Cell<u32> = Cell::new(0);
+        static UNTRACKED_PROCESS_CALLS: Cell<u32> = const { Cell::new(0) };
     }
 
     fn base_features() -> RmiMusicalFeaturesV1 {
