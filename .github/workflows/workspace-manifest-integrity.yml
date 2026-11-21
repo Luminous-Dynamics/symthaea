@@ -119,8 +119,12 @@ jobs:
           set -euo pipefail
           evidence="$RUNNER_TEMP/workspace-manifest-evidence"
           mkdir -p "$evidence"
+          cp Cargo.toml "$evidence/Cargo.toml"
           cp "$RUNNER_TEMP/workspace-metadata.json" "$evidence/workspace-metadata.json"
-          sha256sum Cargo.toml "$evidence/workspace-metadata.json" > "$evidence/SHA256SUMS"
+          (
+            cd "$evidence"
+            sha256sum Cargo.toml workspace-metadata.json > SHA256SUMS
+          )
           printf 'exact_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identities.txt"
 
       - name: Upload workspace qualification evidence
