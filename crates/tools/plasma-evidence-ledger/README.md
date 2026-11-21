@@ -4,7 +4,7 @@ This standalone, dependency-free Rust crate qualifies recorded evidence for one 
 
 ## Fail-closed metric qualification
 
-Each metric record carries its equation cohort, units, time interval, applicability state, raw observable, error estimate and interval, acceptance tolerance, bound kind, and source/input/config/operator provenance.
+Each metric record carries its equation cohort, units, time interval, applicability state, raw observable, error estimate and interval, acceptance tolerance, bound kind, and run identity, input/configuration digests, and per-observation source revision/operator provenance.
 
 - Missing observations, raw values, estimates, bounds or tolerances are unresolved.
 - An unavailable metric is unresolved; it is never a zero.
@@ -19,7 +19,7 @@ There is deliberately no universal required-metric set. Each equation cohort and
 
 ## Error-budget aggregation
 
-Only bounds for the same cohort, target metric, units, trajectory segment and provenance may be aggregated.
+Only bounds for the same cohort, target metric, units, trajectory segment and run identity may be aggregated. Every component keeps its own source receipt.
 
 - Deterministic upper bounds sum conservatively.
 - Probabilistic upper bounds sum with the union-bound confidence lower bound 1 - sum(alpha_i), with no independence assumption.
