@@ -10,6 +10,7 @@ on:
       - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
       - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
+      - "data/schemas/sc_reproducibility_design_v0_1.schema.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
@@ -22,6 +23,7 @@ on:
       - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
       - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
       - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
+      - "data/schemas/sc_reproducibility_design_v0_1.schema.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
@@ -56,6 +58,7 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/observation_event_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/synthesis_protocol_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/pair_coherence_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/reproducibility_hierarchy_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -74,6 +77,17 @@ jobs:
 
       - name: Test paired same-specimen coherence comparison and negative controls
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit
+
+      - name: Test specimen, batch, campaign and laboratory split auditor
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reproducibility_audit
+
+      - name: Run synthetic reproducibility hierarchy audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reproducibility_audit -- \
+            --schema data/schemas/sc_reproducibility_design_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/reproducibility_hierarchy_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-reproducibility-smoke.json"
+          cat "$RUNNER_TEMP/sc-reproducibility-smoke.json"
 
       - name: Run metrics runner on synthetic plumbing fixture
         run: |
@@ -126,6 +140,7 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reproducibility_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -141,6 +156,8 @@ jobs:
             sha256sum tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json
             sha256sum data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json
+            sha256sum data/schemas/sc_reproducibility_design_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/reproducibility_hierarchy_smoke_v0_1.json
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
@@ -164,3 +181,4 @@ jobs:
             ${{ runner.temp }}/sc-observation-event-smoke.json
             ${{ runner.temp }}/sc-synthesis-protocol-smoke.json
             ${{ runner.temp }}/sc-pair-coherence-smoke.json
+            ${{ runner.temp }}/sc-reproducibility-smoke.json
