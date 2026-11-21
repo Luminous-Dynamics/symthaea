@@ -633,7 +633,7 @@
         {
           "action_id": "A-AXIAL-ONLY",
           "action_class": "single_axis_coupon_test",
-          "target_claim_id": "COMBINED-LOAD-CAPABILITY-001",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
           "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
           "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
           "configuration_id": "CFG-R7",
