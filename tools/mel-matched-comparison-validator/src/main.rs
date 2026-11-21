@@ -547,7 +547,8 @@ fn validate_run_inner(run: &Value) -> Result<(), String> {
 
 fn default_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benchmarks/mel/matched-comparison-run-v1.example.json")
+        .join("../../benchmarks/mel")
+        .join(DEFAULT_FILE)
 }
 
 fn run() -> Result<(), String> {
