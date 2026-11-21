@@ -177,3 +177,10 @@ JSON Schema validates structure; it does not prove these cross-record and derive
 The preferred empirical kernel entry points implement participant-key and ROI-order checks before comparison. The report validator remains responsible for cross-row arithmetic and source-to-output provenance.
 
 The committed `research/rcaf/tools/validate_report.py` checks the Draft 2020-12 report schema when supplied and recomputes semantic invariants (participant count, paired-gap arithmetic, medians, positive-gap fraction, exact sign-test counts/p-value, dataset flow and claim ceilings). It is an isolated research helper, not a production dependency. Nine Python unit tests were run locally and passed; this is separate from the Rust kernel tests, which remain uncompiled here.
+
+
+## 8. Power and cohort design
+
+The new exact sign-test power note (`RCAF_SIGN_TEST_POWER_V0.md`) quantifies how weak small cohorts can be for moderate participant-level consistency. Under a two-sided alpha of 0.05 and no ties, N=23 yields only about 44% power if 70% of participant gaps are positive; approximately 49 non-tied participants are required for 80% power under that alternative. For q=0.65, the approximate requirement is 90; for q=0.60, about 199.
+
+These are exact-binomial planning calculations for a sign test only. They do not power the median-gap effect estimate or account for hierarchical variance, missingness, site structure or effect magnitude. Use design-specific simulation before new acquisition; do not use repeated segments to inflate participant N.
