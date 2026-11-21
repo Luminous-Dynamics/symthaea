@@ -143,6 +143,7 @@ pub struct AdaptiveCampaignAudit {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SequentialScenarioAudit {
     pub scenario_id: String,
+    pub baseline_terminal_disposition: String,
     pub baseline_worst_case_regret: f64,
     pub myopic: MyopicAudit,
     pub fixed_campaign: FixedCampaignAudit,
@@ -817,8 +818,18 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     }
 
     let no_obligations = BTreeSet::new();
-    let baseline =
-        terminal_plan(scenario, &scenario.states, &no_obligations)?.worst_case_regret;
+    let baseline_plan = terminal_plan(scenario, &scenario.states, &no_obligations)?;
+    let baseline_terminal_disposition = match &baseline_plan.node {
+        PolicyNode::Terminal { decision, .. } => decision.clone(),
+        _ => return Err("baseline policy must terminate immediately".to_owned()),
+    };
+    if baseline_terminal_disposition != "HOLD" {
+        return Err(format!(
+            "{} no-evidence baseline must be HOLD, not {baseline_terminal_disposition}",
+            scenario.scenario_id
+        ));
+    }
+    let baseline = baseline_plan.worst_case_regret;
     let myopic = myopic_policy(scenario, baseline)?;
     let fixed = fixed_policy(scenario)?;
     let adaptive = solve(
@@ -886,6 +897,7 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     }
     Ok(SequentialScenarioAudit {
         scenario_id: scenario.scenario_id.clone(),
+        baseline_terminal_disposition,
         baseline_worst_case_regret: baseline,
         myopic,
         fixed_campaign: fixed,
@@ -971,6 +983,7 @@ mod tests {
     fn exact_finite_horizon_policy_beats_myopic_stop_rule() {
         let result = receipt();
         let scenario = &result.scenarios[0];
+        assert_eq!(scenario.baseline_terminal_disposition, "HOLD");
         assert_eq!(scenario.baseline_worst_case_regret, 2.0);
         assert_eq!(scenario.myopic.worst_case_regret, 2.0);
         assert!(scenario.myopic.stops_without_action);
@@ -989,10 +1002,18 @@ mod tests {
             panic!("adaptive policy must start with a test");
         };
         assert_eq!(action_id, "A-COMBINED-LOAD-SCREEN");
-        assert!(matches!(
-            branches.get("FAIL"),
-            Some(PolicyNode::Terminal { decision, .. }) if decision == "REJECT"
-        ));
+        let Some(PolicyNode::Terminal {
+            decision,
+            covered_obligations,
+            ..
+        }) = branches.get("FAIL") else {
+            panic!("FAIL observation must terminate with rejection basis");
+        };
+        assert_eq!(decision, "REJECT");
+        assert_eq!(
+            covered_obligations,
+            &vec!["REJECTION-BASIS-001".to_owned()]
+        );
         let Some(PolicyNode::Test {
             action_id,
             branches,
@@ -1005,10 +1026,15 @@ mod tests {
             branches.get("CLEAR"),
             Some(PolicyNode::Terminal { decision, .. }) if decision == "ACCEPT"
         ));
-        assert!(matches!(
-            branches.get("INDICATION"),
-            Some(PolicyNode::Terminal { decision, .. }) if decision == "REJECT"
-        ));
+        let Some(PolicyNode::Terminal {
+            decision,
+            covered_obligations,
+            ..
+        }) = branches.get("INDICATION") else {
+            panic!("INDICATION observation must terminate with rejection basis");
+        };
+        assert_eq!(decision, "REJECT");
+        assert!(covered_obligations.contains(&"REJECTION-BASIS-001".to_owned()));
     }
 
     #[test]
