@@ -48,7 +48,7 @@ This separate finite-horizon evaluator catches a failure mode the one-step selec
 | Fixed screen + thermal inspection | 0 | 1.50 | 2.00 |
 | Adaptive: screen; thermal only on PASS | 0 | 1.20 | 1.55 |
 
-The adaptive policy terminates at REJECT when the first screen returns FAIL, because all remaining states are defective. On PASS, it runs the thermal inspection; CLEAR maps to ACCEPT and INDICATION to REJECT. Its expected resource use is 20% lower in engineering hours and 22.5% lower in facility hours than the fixed campaign, while maintaining the same worst-case decision quality.
+For SEQ-001, the adaptive policy runs the combined-load screen first, terminates at REJECT on FAIL, and runs thermal inspection only on PASS. Its expected resource use is 20% lower in engineering hours and 22.5% lower in facility hours than the fixed campaign. SEQ-002 changes only the synthetic state-frequency profile; the exact planner reverses the order, running thermal inspection first and the combined-load screen only on CLEAR. Both policies preserve zero worst-case regret and improve every expected resource dimension versus the fixed campaign.
 
 The weights are synthetic and used only to calculate expected cost; the terminal structural decision remains distribution-free. These numbers are fixture calculations, not physical or industry results. The sequential oracle is a proof-of-concept, not a full held-out policy tournament.
 
@@ -72,7 +72,7 @@ The Rust preflight and Python oracle audit the scenario catalogue's admissibilit
 
 ## Finite-horizon sequential campaign proof-of-concept
 
-- `sequential-campaign.schema.json` and `sequential-campaign.synthetic.json` define one four-state/two-action example.
+- `sequential-campaign.schema.json` and `sequential-campaign.synthetic.json` define two frequency variants of the same four-state/two-action example.
 - `tools/orbital-joint-evidence-voi-bench/src/sequential.rs` implements exact finite-horizon minimax-regret planning with observation-contingent branches, stop decisions, exact profile/article/configuration/ICD binding and full path budgets.
 - `src/bin/sequential-campaign.rs` emits a deterministic receipt; `tests/sequential_reference_oracle.py` independently recomputes the policy.
 
