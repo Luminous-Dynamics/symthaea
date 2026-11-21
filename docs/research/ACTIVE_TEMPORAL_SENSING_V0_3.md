@@ -184,7 +184,7 @@ No schedule should be called "energy-efficient" based on fewer samples alone. Me
 - No production model or default changed.
 
 
-## Risk- and ignorance-adjusted VOI research arm (v0.2 extension)
+## Legacy v0.2 risk/ignorance arm (superseded by v0.3)
 
 The candidate policy package adds \`RiskAdjustedValueOfInformation\` as a separate ablation alongside the existing plain expected-VOI policy.
 
@@ -195,12 +195,15 @@ Candidate features added in v0.2:
 - \`model_confidence_ppm\`: candidate predictive-model confidence after posterior feedback and age/horizon decay;
 - \`prediction_horizon_us\`: candidate-visible horizon for the future exposure estimate.
 
+The v0.3 field `predicted_ignorance_resolution_ppm` is candidate-estimated and must be prospectively calibrated against evaluator-owned outcomes. If it is zero, the ignorance surcharge is zero regardless of model confidence.
+
 The prototype's declared fixed-point heuristic is:
 
 \`\`\`text
 risk_premium_us       = stddev_us × risk_aversion_ppm / 1,000,000
 ignorance_exposure_us = horizon_us × (1,000,000 - confidence_ppm) / 1,000,000
-ignorance_penalty_us  = ignorance_exposure_us × ignorance_weight_ppm / 1,000,000
+resolvable_ignorance_exposure_us = ignorance_exposure_us × predicted_ignorance_resolution_ppm / 1,000,000
+ignorance_penalty_us             = resolvable_ignorance_exposure_us × ignorance_weight_ppm / 1,000,000
 adjusted_benefit_us   = predicted_ted_reduction_us
                       + risk_premium_us
                       + ignorance_penalty_us
@@ -221,6 +224,6 @@ Reference:
 - https://doi.org/10.1109/TSMC.2026.3745855
 - https://www.repository.cam.ac.uk/items/886c107c-7c63-4a48-b307-f22abb1fa3bd
 
-The v0.2 implementation adds five candidate-side tests (19 total); none has been executed. No paper reproduction, candidate comparison, SOTA or energy result is claimed.
+The v0.2 implementation added five candidate-side tests (19 total); none has been executed. Version 0.3 adds three tests for zero resolvability, partial resolvability and invalid resolvability values, bringing the source-authored test count to 22. None has been executed. No paper reproduction, candidate comparison, SOTA or energy result is claimed.
 
-The 19 authored tests include exact component-value checks for the exported diagnostics helper. The candidate can persist those values into a per-opportunity run receipt for paired policy analysis; no receipt adapter or real run has yet been executed.
+The 22 authored tests include exact component-value checks for the exported diagnostics helper and negative controls for uninformative observations. The candidate can persist those values into a per-opportunity run receipt for paired policy analysis; no receipt adapter or real run has yet been executed.
