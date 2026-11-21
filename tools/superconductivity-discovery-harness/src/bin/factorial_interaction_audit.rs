@@ -380,8 +380,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         let block_id = string_field(block_value, "block_id", &path)?.to_owned();
         let batch_id = string_field(block_value, "batch_id", &path)?.to_owned();
         let campaign_id = string_field(block_value, "campaign_id", &path)?.to_owned();
-        let laboratory_id = string_field(block_value, "laboratory_id", &path)?;
-        let instrument_id = string_field(block_value, "instrument_id", &path)?;
+        string_field(block_value, "laboratory_id", &path)?;
+        string_field(block_value, "instrument_id", &path)?;
         let protocol_id = string_field(block_value, "protocol_id", &path)?;
         if !block_ids.insert(block_id.clone()) {
             return Err(format!("duplicate block_id {block_id}"));
@@ -401,10 +401,6 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         if protocol_id != measurement_protocol {
             return Err(format!("{path}: block protocol differs from declared measurement protocol"));
         }
-        if laboratory_id.is_empty() || instrument_id.is_empty() {
-            return Err(format!("{path}: laboratory/instrument identity is missing"));
-        }
-
         let arms_value = array(
             block_value
                 .get("arms")
@@ -604,13 +600,19 @@ mod tests {
     fn requires_complete_factorial_arms() {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"].as_array_mut().expect("array").pop();
-        assert!(audit_fixture(&fixture).unwrap_err().contains("exactly four factorial arms"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("fixture schema validation failed")
+        );
     }
 
     #[test]
     fn rejects_duplicate_factorial_arm() {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"][3]["arm_id"] = json!("control");
+        fixture["blocks"][0]["arms"][3]["factor_a_on"] = json!(false);
+        fixture["blocks"][0]["arms"][3]["factor_b_on"] = json!(false);
         assert!(audit_fixture(&fixture).unwrap_err().contains("duplicate factorial arm"));
     }
 
