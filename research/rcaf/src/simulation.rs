@@ -745,8 +745,7 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "loading_jitter must be finite and non-negative",
         });
     }
-    if !config.common_mode_nuisance_loading.is_finite()
-        || config.common_mode_nuisance_loading < 0.0
+    if !config.common_mode_nuisance_loading.is_finite() || config.common_mode_nuisance_loading < 0.0
     {
         return Err(MetricError::InvalidSimulationConfig {
             reason: "common_mode_nuisance_loading must be finite and non-negative",
@@ -806,8 +805,8 @@ fn sample_correlation_matrix(
         previous_module =
             temporal_autocorrelation * previous_module + innovation_scale * rng.normal();
         if common_mode_nuisance_loading > 0.0 {
-            previous_nuisance = temporal_autocorrelation * previous_nuisance
-                + innovation_scale * rng.normal();
+            previous_nuisance =
+                temporal_autocorrelation * previous_nuisance + innovation_scale * rng.normal();
         }
         let global_factor = previous_global;
         let module_factor = previous_module;
@@ -995,8 +994,7 @@ mod tests {
             "two-sided detections must partition into expected- and wrong-direction results"
         );
         assert_eq!(
-            result.injection_wrong_direction_rejection_rate.successes,
-            0,
+            result.injection_wrong_direction_rejection_rate.successes, 0,
             "strong positive loading injection produced wrong-direction rejection"
         );
         let json = result.to_json_pretty();
@@ -1033,8 +1031,14 @@ mod tests {
             negative_test.p_two_sided_exact,
             alpha,
         );
-        assert!(!correct, "opposite-direction rejection must not count as recovery");
-        assert!(wrong, "opposite-direction rejection must be recorded separately");
+        assert!(
+            !correct,
+            "opposite-direction rejection must not count as recovery"
+        );
+        assert!(
+            wrong,
+            "opposite-direction rejection must be recorded separately"
+        );
 
         let (correct, wrong) = classify_expected_positive_injection(
             non_significant_test.positive_count,
@@ -1042,7 +1046,10 @@ mod tests {
             non_significant_test.p_two_sided_exact,
             alpha,
         );
-        assert!(!correct, "non-significant positive imbalance is not recovery");
+        assert!(
+            !correct,
+            "non-significant positive imbalance is not recovery"
+        );
         assert!(!wrong);
     }
 
@@ -1066,7 +1073,10 @@ mod tests {
     fn common_mode_nuisance_is_reported_separately_from_latent_injection() {
         let report = run_injection_recovery(&test_config()).unwrap();
         assert_eq!(report.common_mode_nuisance_loading, 0.20);
-        assert_eq!(report.nuisance_only_rejection_rate.trials, report.monte_carlo_replicates);
+        assert_eq!(
+            report.nuisance_only_rejection_rate.trials,
+            report.monte_carlo_replicates
+        );
         assert!(report.median_nuisance_only_paired_gap.is_finite());
         let json = report.to_json_pretty();
         assert!(json.contains("\"nuisance_only_rejection_rate\""));
