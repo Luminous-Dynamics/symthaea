@@ -487,4 +487,40 @@ mod tests {
         );
     }
 
+    #[test]
+    fn nonfinite_or_unbounded_spatial_values_are_rejected() {
+        let mut model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        model.filaments[0].end.x = MAX_FILAMENT_COORDINATE + 1.0;
+        assert_eq!(
+            tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
+            TubeTessellationError::InvalidFilamentGeometry(0)
+        );
+    }
+
+    #[test]
+    fn cyclic_or_out_of_order_parent_references_are_rejected() {
+        let mut model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        model.filaments[0].parent_id = Some(model.filaments[0].id);
+        assert_eq!(
+            tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
+            TubeTessellationError::InvalidFilamentTopology
+        );
+
+        let mut model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        model.filaments[1].parent_id = Some(u32::MAX);
+        assert_eq!(
+            tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
+            TubeTessellationError::InvalidFilamentTopology
+        );
+    }
+
 }
