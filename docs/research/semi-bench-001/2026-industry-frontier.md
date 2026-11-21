@@ -116,3 +116,20 @@ The strongest near-term claims to pursue are:
 - easier independent reproduction and audit of manufacturing decisions.
 
 No physical fab-yield improvement, fabricated-silicon superiority or equipment qualification follows from these benchmark results alone.
+
+
+## 6. Wafer-map graph learning and unseen-lot evaluation
+
+Awais et al. (4 July 2026) report WM-811K GNN results using 8-connectivity, GIN and production-context contrastive pairs: ARI 0.89/NMI 0.87 for unsupervised clustering, 98.6% fine-tuned accuracy, macro-F1 0.975, 95.7% accuracy with 25% labels and LOCO OOD detection 89.3% at 95% ID retention (AUROC 0.927). The benchmark sampled 30% of 811,457 maps and used stratified sample-level 60/20/20 splits. This does not establish unseen-lot transfer. Source: https://doi.org/10.1007/s10845-026-02906-3.
+
+The released implementation uses lotName/production proximity in pair construction but stratified splitting. Its OOD script appears to calibrate the threshold from test_in although the article describes validation calibration. Treat this as a paper/repository reproduction mismatch until resolved. Do not claim the paper itself used test calibration.
+
+New benchmark: [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122), which separates exact sample-level reproduction, lot-disjoint evaluation, time-forward evaluation with embargo, split-local contrastive pair construction and validation-only OOD calibration.
+
+## 7. Industrial CP/DFC multi-view wafer maps
+
+Wu et al. (1 July 2026), https://doi.org/10.1016/j.eswa.2026.131994, describe item-wise CP Map and DFC Map semantics with M3Net known-class recognition and Parallel SVM novel-class review. Public raw data access, sample provenance and data rights remain unverified. New benchmark: [SEMI-MULTIVIEW-001 #13123](https://github.com/Luminous-Dynamics/symthaea/issues/13123). It benchmarks CP-only, DFC-only, multi-view fusion, missing-view robustness and open-world disagreement without treating absent views as zero-valued measurements.
+
+## 8. PPAPlace-5000 is an actionable reference corpus, subject to rights review
+
+The PPAPlace-5000 release describes 5,000 complete placements on 10 ChiPBench circuits with post-global-routing WNS/TNS, power and area labels; the compressed archives total 8.47 GiB. Its Hugging Face dataset card exposes a license field of other, so exact terms must be reviewed before copying, caching or redistribution. The PPAPlace source docs pin ChiPBench and OpenROAD commits and distinguish within-circuit from leave-one-circuit-out evaluation. Dataset: https://huggingface.co/datasets/ValleyC/PPAPlace-5000.
