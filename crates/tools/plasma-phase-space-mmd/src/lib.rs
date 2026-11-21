@@ -1115,7 +1115,9 @@ pub fn compare_phase_space_measures_mmd_mixture(
     } else {
         total_variation_scale
     };
-    let pair_evaluations = pair_count(candidate_atoms.len(), reference_atoms.len())?;
+    let pair_evaluations = pair_count(candidate_atoms.len(), reference_atoms.len())?
+        .checked_mul(config.components.len() as u128)
+        .ok_or(MmdError::PairCountOverflow)?;
 
     let (candidate_self, candidate_abs) = quadratic_sum_mixture(
         &candidate_atoms,
