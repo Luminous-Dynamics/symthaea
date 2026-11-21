@@ -36,7 +36,7 @@ The first example outputs a JSON report conforming to `injection-recovery.schema
 - 95% Wilson Monte-Carlo confidence intervals;
 - median participant-paired gaps and positive-gap fractions.
 
-The generator creates valid correlation matrices from a Gaussian two-factor model and finite time series. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
+The generator creates valid correlation matrices from a Gaussian two-factor model and finite time series. Its factors and region residuals use stationary AR(1) dependence (default rho=0.30), making this more demanding than independent time-point sampling. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
 
 This is a software calibration world, not a model of biological consciousness. A passed injection test cannot establish that an empirical network shift is real, causal or clinically meaningful. A single Gaussian factor model does not characterize the full range of acquisition artifacts, autocorrelation, nonstationarity or preprocessing choices.
 
