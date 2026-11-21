@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/cetb/theory_design/design-run.schema.json",
+  "title": "CETB theory-discriminating design manifest",
+  "description": "Versioned predictive distributions for prospective experiment design. This schema does not validate calibration or scientific fairness of theory predictions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "theory_prior",
+    "designs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cetb.theory-design-run/0.1.0"
+    },
+    "status": {
+      "enum": [
+        "synthetic_fixture",
+        "preregistered_design_input"
+      ]
+    },
+    "theory_prior": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "designs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "design_id",
+          "cost",
+          "nuisance_scenarios"
+        ],
+        "properties": {
+          "design_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cost": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "lower_quantile": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "nuisance_scenarios": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "weight",
+                "likelihoods"
+              ],
+              "properties": {
+                "weight": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "likelihoods": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$comment": "The runner also checks that priors, scenario weights and every theory's outcome likelihoods sum to one and that outcome support is stable across all nuisance scenarios."
+}
