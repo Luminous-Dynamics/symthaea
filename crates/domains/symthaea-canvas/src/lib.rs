@@ -80,10 +80,11 @@ pub use mycelial_model::{
     SpatialPoint3, build_mycelial_model,
 };
 pub use mycelial_network::{
-    AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MycelialAnastomosis, MycelialConnectionKind,
-    MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError,
-    MycelialNetworkGraph, MycelialNetworkMetrics, MYCELIAL_NETWORK_SCHEMA_VERSION,
-    build_mycelial_network_graph,
+    AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MycelialAnastomosis,
+    MycelialAnastomosisCandidate, MycelialConnectionKind, MycelialNetworkConfig,
+    MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
+    MycelialNetworkMetrics, MYCELIAL_NETWORK_SCHEMA_VERSION,
+    build_mycelial_network_graph, detect_anastomosis_candidates,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
