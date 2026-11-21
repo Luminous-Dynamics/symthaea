@@ -1083,6 +1083,21 @@ mod tests {
     }
 
     #[test]
+    fn invalid_common_mode_nuisance_loading_fails_closed() {
+        let mut config = test_config();
+        config.common_mode_nuisance_loading = f64::NAN;
+        assert!(matches!(
+            run_injection_recovery(&config),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        config.common_mode_nuisance_loading = 1.2;
+        assert!(matches!(
+            run_injection_recovery(&config),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+    }
+
+    #[test]
     fn invalid_factor_model_fails_closed() {
         let mut config = test_config();
         config.injection_loading_delta = 1.2;
