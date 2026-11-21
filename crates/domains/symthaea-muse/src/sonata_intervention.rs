@@ -337,8 +337,7 @@ pub fn generate_and_rank_sonata_return_with_model(
         }
     }
 
-    let cognitive_subintent =
-        apply_return_subintent_v1(trace, &candidates, &mut selection);
+    let cognitive_subintent = apply_return_subintent_v1(trace, &candidates, &mut selection);
 
     Ok(SonataInterventionBatch {
         source_section: source_kind,
@@ -405,9 +404,10 @@ fn apply_return_subintent_v1(
         candidate.strategy == requested_strategy
             && candidate.theory_validation.valid
             && candidate.preserved_invariants
-            && candidate.verification.iter().any(|evidence| {
-                evidence.obligation_id == obligation_id && evidence.verified
-            })
+            && candidate
+                .verification
+                .iter()
+                .any(|evidence| evidence.obligation_id == obligation_id && evidence.verified)
             && selection.assessments.iter().any(|assessment| {
                 assessment.alternative_id == candidate.alternative_id
                     && assessment.eligible
@@ -842,13 +842,8 @@ mod tests {
             bars: 4,
             ..MusicalIntent::default()
         };
-        let mut realization =
-            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
-        let target = section(
-            &realization.plan,
-            SonataSectionKind::RecapitulationPrimary,
-        )
-        .unwrap();
+        let mut realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let target = section(&realization.plan, SonataSectionKind::RecapitulationPrimary).unwrap();
         let target_indices =
             melody_indices(&realization.score, target.start.beats(), target.end.beats());
         for index in &target_indices {
@@ -862,8 +857,7 @@ mod tests {
 
         let mut repeat_trace = return_trace(&realization);
         repeat_trace.inference.source_action = MusicAction::RepeatMotif;
-        let repeat_batch =
-            generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
+        let repeat_batch = generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
 
         let mut maintain_trace = repeat_trace.clone();
         maintain_trace.inference.source_action = MusicAction::Maintain;
@@ -893,7 +887,10 @@ mod tests {
                 .unwrap()
                 .score
         };
-        assert_ne!(selected_score(&repeat_batch), selected_score(&maintain_batch));
+        assert_ne!(
+            selected_score(&repeat_batch),
+            selected_score(&maintain_batch)
+        );
         for batch in [&repeat_batch, &maintain_batch] {
             let selected_id = batch.selection.recommended_id.as_deref().unwrap();
             let selected = batch
@@ -903,10 +900,7 @@ mod tests {
                 .unwrap();
             assert!(selected.theory_validation.valid);
             assert!(selected.preserved_invariants);
-            assert!(selected.verification.iter().any(|evidence| {
-                evidence.obligation_id == batch.driving_obligation_id.unwrap()
-                    && evidence.verified
-            }));
+            assert!(selected.verification.iter().any(|evidence| evidence.obligation_id == batch.driving_obligation_id.unwrap() && evidence.verified));
         }
     }
 
@@ -917,8 +911,7 @@ mod tests {
             bars: 4,
             ..MusicalIntent::default()
         };
-        let realization =
-            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
         let mut first_trace = return_trace(&realization);
         first_trace.inference.source_action = MusicAction::AddCountermelody;
         let first = generate_and_rank_sonata_return(&realization, &first_trace).unwrap();
@@ -937,7 +930,10 @@ mod tests {
         );
         assert_eq!(first.cognitive_subintent.request, None);
         assert_eq!(second.cognitive_subintent.request, None);
-        assert_eq!(first.selection.recommended_id, second.selection.recommended_id);
+        assert_eq!(
+            first.selection.recommended_id,
+            second.selection.recommended_id
+        );
         assert_eq!(
             first
                 .candidates
@@ -999,7 +995,13 @@ mod tests {
 
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
         assert_eq!(batch.selection.recommended_id, None);
-        assert!(batch.selection.assessments.iter().all(|item| !item.eligible));
+        assert!(
+            batch
+                .selection
+                .assessments
+                .iter()
+                .all(|item| !item.eligible)
+        );
         assert_eq!(
             batch.cognitive_subintent.disposition,
             SonataReturnSubintentDispositionV1::RejectedByFormalGates
