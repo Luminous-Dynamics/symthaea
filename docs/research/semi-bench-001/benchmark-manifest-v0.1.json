@@ -8,7 +8,8 @@
     "measured_fab_yield_improvement": false,
     "production_fab_capability": false,
     "production_pdk_qualification": false,
-    "physical_process_authority": false
+    "physical_process_authority": false,
+    "no_autonomous_process_authority": "All learning-based or LMM-assisted recommendations remain bounded by validated offline/simulation evidence, explicit hard constraints, safe fallback and human approval; no process recipe execution is authorized by classifier output."
   },
   "benchmark_families": [
     {
@@ -614,6 +615,80 @@
         "per-item-transfer"
       ],
       "claim_ceiling": "no industrial-data or physical deployment claim until rights, sample lineage and exact test protocol are verified"
+    },
+    {
+      "id": "frozen-lmm-rule-ordered-wafer-map-zero-shot",
+      "source": "https://arxiv.org/abs/2610.35080",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
+      "reference_paper": {
+        "title": "Zero-Shot Multi-Class Wafer Map Classification with Rule-Ordered Prompts for Large Multimodal Models",
+        "authors": [
+          "Tianjian Cao",
+          "Jun Tao"
+        ],
+        "publication_date": "2026-10-26",
+        "status": "arxiv-preprint",
+        "model": "gpt-4o-2024-08-06",
+        "method": [
+          "connected-component-visual-highlighting",
+          "morphology-spatial-anchor-exclusion-rules",
+          "fixed-rule-presentation-order"
+        ],
+        "training_or_finetuning": "none",
+        "results": {
+          "MixedWM38_subset": {
+            "samples": 6866,
+            "classes": 6,
+            "macro_accuracy": 0.929,
+            "overall_accuracy": 0.938
+          },
+          "WM811K_subset": {
+            "samples": 9000,
+            "classes": 6,
+            "macro_accuracy": 0.791,
+            "overall_accuracy": 0.813
+          },
+          "tested_alternative_rule_order_overall_accuracy_range": [
+            0.901,
+            0.919
+          ],
+          "reported_api_latency_seconds_per_image": [
+            0.5,
+            1
+          ]
+        },
+        "scope_limits": [
+          "Only six single-pattern classes are evaluated, not all 38 MixedWM38 categories.",
+          "WM-811K sample is selected by class, not lot-disjoint or time-forward.",
+          "One API call per map does not characterize repeatability.",
+          "Selected order is a fixed condition, not globally optimized."
+        ],
+        "claim_status": "preprint-reported-not-independently-reproduced"
+      },
+      "tasks": [
+        "exact-six-class-reproduction",
+        "prompt-order-permutation",
+        "paraphrase-sensitivity",
+        "deterministic-geometry-evidence",
+        "evidence-grounding",
+        "full-38-way-composition",
+        "leave-combination-out",
+        "open-set-abstention",
+        "group-time-transfer",
+        "LMM-HDC-CNN-GNN-pareto"
+      ],
+      "metrics": [
+        "macro-accuracy",
+        "per-class-recall",
+        "exact-set-match",
+        "order-flip-rate",
+        "worst-order-degradation",
+        "unsupported-claim-rate",
+        "unknown-false-acceptance",
+        "risk-coverage",
+        "latency-cost",
+        "query-repeatability"
+      ]
     }
   ],
   "cross_cutting_protocol": {
@@ -730,6 +805,13 @@
         },
         "caveat": "bit-wise evaluation only; exact 38-way whole-composition accuracy and cross-data protocol are separate"
       }
+    },
+    "semiconductor_closed_loop_decision_support_2026": {
+      "title": "Toward autonomous decision support in semiconductor manufacturing: a review of planning, scheduling, dispatching, and execution control",
+      "url": "https://doi.org/10.1007/s43684-026-00146-z",
+      "publication_date": "2026-11-06",
+      "core_finding": "human-supervised closed-loop AIS across state sensing, planning, scheduling, dispatching, execution and feedback; hard constraints, bounded authority, safe fallback and auditability remain central",
+      "claim_status": "review-derived-architecture-reference-not-performance-benchmark"
     }
   },
   "reference_evaluator": {
@@ -892,7 +974,8 @@
     "open_world_wafer_defects": "https://github.com/Luminous-Dynamics/symthaea/issues/13121",
     "secom_missingness_drift": "https://github.com/Luminous-Dynamics/symthaea/issues/13115",
     "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
-    "rust_semiconductor_metrics": "https://github.com/Luminous-Dynamics/symthaea/issues/13129"
+    "rust_semiconductor_metrics": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
+    "frozen_lmm_rule_ordered_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13146"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
@@ -910,7 +993,10 @@
     "ppaplace_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
     "fad_net_2026": "https://doi.org/10.1002/qre.70321",
     "semi_rust_core_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
-    "semi_rust_core_path": "crates/domains/symthaea-semiconductor"
+    "semi_rust_core_path": "crates/domains/symthaea-semiconductor",
+    "frozen_lmm_rule_ordered_preprint": "https://arxiv.org/abs/2610.35080",
+    "frozen_lmm_rule_ordered_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
+    "semiconductor_closed_loop_decision_support_review": "https://doi.org/10.1007/s43684-026-00146-z"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
