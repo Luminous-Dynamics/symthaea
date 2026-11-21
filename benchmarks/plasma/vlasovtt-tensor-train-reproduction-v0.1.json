@@ -219,11 +219,13 @@
   "representation_tournament": {
     "tracking_issue": 13104,
     "alternatives": [
-      "dense_spectral",
-      "tensor_train_mps",
-      "fourier_hermite",
-      "particle_measure",
-      "learned_particle_field"
+      "dense_spectral_fixed_grid",
+      "adaptive_fourier_spectral_zero_padding",
+      "tensor_train_mps_quantics",
+      "positivity_preserving_dynamical_low_rank",
+      "fourier_hermite_velocity",
+      "weighted_particle_measure",
+      "learned_particle_measure_field"
     ],
     "transition_receipt_required": true,
     "transition_metrics": [
@@ -235,12 +237,35 @@
       "conversion_runtime",
       "peak_memory"
     ],
-    "abstain_allowed": true
+    "abstain_allowed": true,
+    "adaptive_fourier": {
+      "paper": "https://arxiv.org/abs/2607.12368",
+      "method": "high-order splitting with spectral-tail-triggered Fourier wavenumber-domain expansion by zero-padding",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13106",
+      "required_diagnostics": [
+        "x_spectral_tail_fraction",
+        "v_spectral_tail_fraction",
+        "x_nyquist_energy_fraction",
+        "v_nyquist_energy_fraction",
+        "transition_mass_and_L2_change",
+        "full_expansion_cost"
+      ]
+    },
+    "positivity_preserving_low_rank": {
+      "paper": "https://arxiv.org/abs/2606.31662",
+      "method": "minimal positivity correction via constrained quadratic programming; one scheme also preserves mass and momentum",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "applicability": "nonnegative distribution f only; signed delta-f requires a different contract"
+    }
   },
   "references": [
     "https://arxiv.org/abs/2602.13092",
     "https://github.com/erikasgrim/VlasovTT.jl/tree/99aa077b6f5e4ae4dfc8330590e502267caf298b",
     "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/13072"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13072",
+    "https://arxiv.org/abs/2607.12368",
+    "https://arxiv.org/abs/2606.31662",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13106"
   ]
 }
