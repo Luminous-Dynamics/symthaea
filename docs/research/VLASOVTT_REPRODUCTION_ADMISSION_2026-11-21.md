@@ -120,6 +120,20 @@ The new opportunity is not “TT always beats dense.” It is to learn when a re
 
 Dense↔TT↔Hermite↔particle conversion must be treated as a numerical operation with its own error, positivity, moment, energy and runtime receipt. A no-qualified-representation decision is permitted.
 
+## Additional 2026 representation comparators
+
+### Adaptive Fourier spectral expansion
+
+Cho & Russo, [*An Adaptive Fourier Spectral Method for the Vlasov–Poisson system*](https://arxiv.org/abs/2607.12368) (14 July 2026), describe a high-order splitting method that monitors spectral tails and expands the wavenumber domain with adaptive zero-padding when phase-space filamentation emerges. The authors report avoiding artificial smoothing from conventional filters while preserving mass and the (L^2) norm within dynamically resolved scales.
+
+This is a direct comparator to the Symthaea fixed-grid dense Fourier prototype and TT compression. It suggests that the next architectural choice is not merely dense versus compressed: **fixed versus dynamically expanded spectral support**. This is paper-reported, not reproduced here. Its source-faithful reproduction and spectral-tail/zero-padding transition oracle are tracked in [#13106](https://github.com/Luminous-Dynamics/symthaea/issues/13106).
+
+### Positivity-preserving dynamical low-rank correction
+
+Kormann, Nazarov & Wen, [*Positivity-preserving dynamical low-rank methods for the Vlasov equation*](https://arxiv.org/abs/2606.31662) (30 June 2026), formulate minimal constrained corrections to low-rank approximations as quadratic programmes. One proposed scheme additionally preserves total mass and momentum, with Vlasov–Poisson and Vlasov–Poisson–BGK examples.
+
+This is a comparator against TT truncation and any future low-rank Symthaea representation. Positivity is relevant only for nonnegative physical (f); do not transfer it to signed (delta f) without a separate mathematical contract. It is paper-reported, not independently reproduced.
+
 ## Claim ceiling
 
 No claim that TT/MPS is faster or more accurate than Symthaea's dense spectral prototype, no claim that the current repository default is an exact paper reproduction, no universal compression advantage, and no adaptive representation claim until the source mismatch is resolved and the matched trajectory suite is independently reproduced.
