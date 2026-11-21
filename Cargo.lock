@@ -19850,16 +19850,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "symthaea-sensors"
-version = "0.1.0"
-dependencies = [
- "nalgebra 0.34.2",
- "rand 0.8.6",
- "symtropy-math 0.2.1",
- "symtropy-physics 0.2.1",
-]
-
-[[package]]
 name = "symthaea-semiconductor"
 version = "0.1.0"
 dependencies = [
@@ -19868,6 +19858,16 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "symthaea-sensors"
+version = "0.1.0"
+dependencies = [
+ "nalgebra 0.34.2",
+ "rand 0.8.6",
+ "symtropy-math 0.2.1",
+ "symtropy-physics 0.2.1",
 ]
 
 [[package]]
