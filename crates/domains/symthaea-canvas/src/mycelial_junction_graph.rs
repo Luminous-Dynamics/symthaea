@@ -1088,7 +1088,9 @@ fn source_model_digest(model: &MycelialModel) -> String {
                 hasher.update(&[1]);
                 hasher.update(&parent.to_le_bytes());
             }
-            None => hasher.update(&[0]),
+            None => {
+                hasher.update(&[0]);
+            }
         }
         hasher.update(&[filament.generation, u8::from(filament.terminal)]);
         for point in [
@@ -1144,7 +1146,6 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 mod tests {
     use super::*;
     use crate::mycelial_model::{OrbitalCell, PresenceMode};
-    use crate::mycelial_network::AnastomosisKind;
 
     fn filament(
         id: u32,
