@@ -43,6 +43,7 @@ jobs:
             .schema == "EvidenceActionProposalOutcomeV1" and
             .record_kind == "PROPOSAL" and
             .no_actuation == true and .authority_granted == false and
+            .record_revision == "v1" and
             .change_impact.completeness == "COMPLETE" and
             (.requalification_claims_covered | index("STRUCTURAL-INTERFACE-CAPABILITY-001") != null)
           ' fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json
@@ -50,6 +51,9 @@ jobs:
             .schema == "EvidenceActionProposalOutcomeV1" and
             .record_kind == "OUTCOME" and
             .execution_attempted == true and .execution_state == "ABORTED" and
+            .proposal_ref.kind == "evidence_action_proposal" and
+            .proposal_ref.revision == "v1" and
+            (.proposal_ref.sha256 | test("^[0-9a-f]{64}$")) and
             .actual_resources != null and .verification.state == "INDETERMINATE" and
             .authority_granted == false
           ' fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json
