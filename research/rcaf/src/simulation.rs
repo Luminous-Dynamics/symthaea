@@ -37,7 +37,7 @@ impl Default for InjectionRecoveryConfig {
             loading_jitter: 0.06,
             injection_loading_delta: 0.40,
             alpha: 0.05,
-            seed: 0xC37B_2026_11_21,
+            seed: 0xC37B_2026_1121,
         }
     }
 }
