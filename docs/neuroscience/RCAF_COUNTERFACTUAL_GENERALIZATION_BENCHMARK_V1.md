@@ -122,6 +122,22 @@ These are **stretch targets for a future preregistered qualification protocol**,
 
 For a nominal 5% error rate, 10,000 replicates are a starting point, not a substitute for an interval or a power calculation. Small exploratory grids must not be used to claim precise tail calibration.
 
+## 6.1 Separate participant power from Monte-Carlo precision
+
+The existing `research/rcaf/tools/sign_test_power.py` computes exact two-sided sign-test power under an independent participant-level sign model. Let q be the probability of a positive non-tied participant gap under the alternative. At alpha 0.05, approximate minimum effective non-tied participant counts for at least 80% power are:
+
+| q = P(positive gap) | Minimum effective N | Achieved exact power |
+|---:|---:|---:|
+| 0.55 | 786 | 0.801 |
+| 0.60 | 199 | 0.804 |
+| 0.65 | 90 | 0.812 |
+| 0.70 | 49 | 0.810 |
+| 0.75 | 30 | 0.803 |
+| 0.80 | 20 | 0.804 |
+
+This is an analytical design calculation for a simple sign-probability alternative, not a power calculation for effect magnitude, the median-gap confidence interval, clustered/site effects, missingness or clinical decisions. The relevant N is the number of independent, non-tied participants; repeated segments do not increase it, and ties/missingness reduce it.
+
+Keep that N distinct from the Monte-Carlo replicate count M used to estimate simulation calibration. M=40 or M=100 is useful for software debugging but produces wide uncertainty for a nominal 5% tail. A reasonable programme is M≥1,000 for exploratory screening and M≥10,000 for primary confirmatory null and nuisance families, with exact binomial/Wilson intervals and independent confirmation seeds. More replicates do not compensate for too few independent participants, and more participants do not compensate for an incorrectly specified observation model.
 ## 7. Competitive comparison: what the field has already achieved
 
 The benchmark should compare against the right public baselines, not manufacture a single leaderboard.
