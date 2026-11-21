@@ -33,7 +33,6 @@ pub enum EmbodimentActivity {
     Fault,
 }
 
-
 /// Lifecycle of generated speech output. Only Playing authorizes viseme motion.
 ///
 /// Synthesized or queued audio is not evidence that sound is currently being
@@ -98,12 +97,7 @@ pub struct Observed<T> {
 }
 
 impl<T> Observed<T> {
-    fn new(
-        value: T,
-        provenance: SignalProvenance,
-        sequence: u64,
-        monotonic_ns: u64,
-    ) -> Self {
+    fn new(value: T, provenance: SignalProvenance, sequence: u64, monotonic_ns: u64) -> Self {
         Self {
             value,
             provenance,
@@ -189,7 +183,6 @@ pub struct VisemeSignal {
     pub viseme: Viseme,
     pub weight: f32,
 }
-
 
 /// Session-scoped producer for a single strictly ordered embodiment event stream.
 ///
@@ -295,7 +288,6 @@ impl fmt::Display for EmbodimentSequenceError {
 
 impl std::error::Error for EmbodimentSequenceError {}
 
-
 /// Stateful, deterministic event reducer for a single embodiment session.
 #[derive(Debug, Clone, Default)]
 pub struct EmbodimentController {
@@ -365,20 +357,12 @@ impl EmbodimentController {
         let monotonic_ns = event.monotonic_ns;
         match event.kind {
             EmbodimentEventKind::ActivityChanged { activity } => {
-                self.snapshot.activity = Some(make_observed(
-                    activity,
-                    provenance,
-                    sequence,
-                    monotonic_ns,
-                ));
+                self.snapshot.activity =
+                    Some(make_observed(activity, provenance, sequence, monotonic_ns));
             }
             EmbodimentEventKind::SpeechOutputChanged { state } => {
-                self.snapshot.speech_output = Some(make_observed(
-                    state,
-                    provenance,
-                    sequence,
-                    monotonic_ns,
-                ));
+                self.snapshot.speech_output =
+                    Some(make_observed(state, provenance, sequence, monotonic_ns));
                 if state != SpeechOutputState::Playing {
                     self.snapshot.viseme = None;
                 }
@@ -392,20 +376,12 @@ impl EmbodimentController {
                 ));
             }
             EmbodimentEventKind::GazeChanged { target } => {
-                self.snapshot.gaze = Some(make_observed(
-                    target,
-                    provenance,
-                    sequence,
-                    monotonic_ns,
-                ));
+                self.snapshot.gaze =
+                    Some(make_observed(target, provenance, sequence, monotonic_ns));
             }
             EmbodimentEventKind::UncertaintyChanged { level } => {
-                self.snapshot.uncertainty = Some(make_observed(
-                    level,
-                    provenance,
-                    sequence,
-                    monotonic_ns,
-                ));
+                self.snapshot.uncertainty =
+                    Some(make_observed(level, provenance, sequence, monotonic_ns));
             }
             EmbodimentEventKind::ClearTransient => {
                 self.snapshot.viseme = None;
@@ -443,7 +419,6 @@ fn validate_runtime_provenance(
         }
     }
 }
-
 
 fn validate_speech_transition(
     current: Option<SpeechOutputState>,
@@ -525,9 +500,18 @@ fn validate_unit_interval(field: &'static str, value: f32) -> Result<(), Embodim
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EmbodimentIngestError {
-    NonIncreasingSequence { last: u64, received: u64 },
-    TimestampRegression { last: u64, received: u64 },
-    InvalidUnitInterval { field: &'static str, value: f32 },
+    NonIncreasingSequence {
+        last: u64,
+        received: u64,
+    },
+    TimestampRegression {
+        last: u64,
+        received: u64,
+    },
+    InvalidUnitInterval {
+        field: &'static str,
+        value: f32,
+    },
     VisemeWithoutPlayback,
     InvalidSpeechTransition {
         from: SpeechOutputState,
@@ -579,7 +563,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn sequencer_assigns_strictly_increasing_sequences_and_timestamps() {
         let mut sequencer = EmbodimentEventSequencer::new();
@@ -611,7 +594,6 @@ mod tests {
         assert!(second.monotonic_ns >= first.monotonic_ns);
     }
 
-
     #[test]
     fn sequencer_reports_sequence_exhaustion_without_wrapping() {
         let mut sequencer = EmbodimentEventSequencer::new();
@@ -638,7 +620,6 @@ mod tests {
             Err(EmbodimentSequenceError::SequenceExhausted)
         );
     }
-
 
     #[test]
     fn sequencer_rejects_regressing_observation_without_consuming_sequence() {
@@ -703,7 +684,6 @@ mod tests {
         ));
         assert_eq!(*controller.snapshot(), before);
     }
-
 
     #[test]
     fn explicit_runtime_activity_is_preserved_with_provenance() {
@@ -944,7 +924,6 @@ mod tests {
         assert_eq!(controller.snapshot().last_event_sequence, Some(2));
     }
 
-
     #[test]
     fn renderer_local_effect_cannot_claim_runtime_activity() {
         let mut controller = EmbodimentController::new();
@@ -966,8 +945,6 @@ mod tests {
         ));
         assert_eq!(controller.snapshot().last_event_sequence, None);
     }
-
-
 
     #[test]
     fn derived_signal_cannot_reset_the_authoritative_runtime_state() {
@@ -1020,8 +997,6 @@ mod tests {
         ));
         assert_eq!(*controller.snapshot(), before);
     }
-
-
 
     #[test]
     fn queued_audio_cannot_jump_to_completed_without_playback() {
