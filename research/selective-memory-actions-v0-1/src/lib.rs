@@ -90,8 +90,11 @@ pub struct FreshnessAtUse {
     pub evidence_age_at_use_ns: Option<u64>,
     /// Frozen task-specific maximum evidence age, inclusive.
     pub max_evidence_age_ns: Option<u64>,
-    /// Remaining time at consumption before the task deadline.
-    /// Zero means consumed exactly at the deadline; None means unknown.
+    /// Whether the frozen task profile declares an enforced deadline.
+    /// None means the deadline policy itself is unknown.
+    pub deadline_enforced: Option<bool>,
+    /// Signed time remaining at consumption. Zero is exactly on deadline;
+    /// negative means late. Required only when deadline_enforced is Some(true).
     pub deadline_slack_at_use_ns: Option<i64>,
 }
 
@@ -102,9 +105,13 @@ impl FreshnessAtUse {
         match (
             self.evidence_age_at_use_ns,
             self.max_evidence_age_ns,
+            self.deadline_enforced,
             self.deadline_slack_at_use_ns,
         ) {
-            (Some(age), Some(max_age), Some(deadline_slack)) => age <= max_age && deadline_slack >= 0,
+            (Some(age), Some(max_age), Some(false), None) => age <= max_age,
+            (Some(age), Some(max_age), Some(true), Some(deadline_slack)) => {
+                age <= max_age && deadline_slack >= 0
+            }
             _ => false,
         }
     }
@@ -477,6 +484,7 @@ mod tests {
             evidence_age_at_retrieval_ns: Some(10),
             evidence_age_at_use_ns: Some(20),
             max_evidence_age_ns: Some(100),
+            deadline_enforced: Some(true),
             deadline_slack_at_use_ns: Some(500),
         };
         let gates = AdmissionSnapshot {
@@ -602,9 +610,31 @@ mod tests {
             evidence_age_at_retrieval_ns: None,
             evidence_age_at_use_ns: Some(50),
             max_evidence_age_ns: Some(100),
+            deadline_enforced: Some(true),
             deadline_slack_at_use_ns: Some(-1),
         };
         assert!(!freshness.is_qualified());
+    }
+
+    #[test]
+    fn explicit_no_deadline_profile_is_distinct_from_unknown_deadline() {
+        let no_deadline = FreshnessAtUse {
+            evidence_age_at_retrieval_ns: Some(10),
+            evidence_age_at_use_ns: Some(20),
+            max_evidence_age_ns: Some(100),
+            deadline_enforced: Some(false),
+            deadline_slack_at_use_ns: None,
+        };
+        assert!(no_deadline.is_qualified());
+
+        let unknown_deadline = FreshnessAtUse {
+            evidence_age_at_retrieval_ns: Some(10),
+            evidence_age_at_use_ns: Some(20),
+            max_evidence_age_ns: Some(100),
+            deadline_enforced: None,
+            deadline_slack_at_use_ns: None,
+        };
+        assert!(!unknown_deadline.is_qualified());
     }
 
     #[test]
@@ -613,6 +643,7 @@ mod tests {
             evidence_age_at_retrieval_ns: None,
             evidence_age_at_use_ns: Some(100),
             max_evidence_age_ns: Some(100),
+            deadline_enforced: Some(true),
             deadline_slack_at_use_ns: Some(0),
         };
         assert!(freshness.is_qualified());
