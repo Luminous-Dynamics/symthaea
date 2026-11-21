@@ -73,7 +73,7 @@ jobs:
           report="$RUNNER_TEMP/melothaea-rmi-track-a-real-workspace.json"
           cargo run --locked -p symthaea-muse --bin rmi_track_a -- 8 42 "$report"
           test -s "$report"
-          cp "$report" "$RUNNER_TEMP/melothaea-rmi-track-a-real-workspace.json"
+          echo "real_workspace_report=$report"
 
       - name: Record exact merge-head integration evidence
         shell: bash
