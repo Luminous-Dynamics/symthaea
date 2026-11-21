@@ -1,0 +1,55 @@
+name: SEMI-BENCH-001 Reference Oracle
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/semi-bench-001/**"
+      - ".github/workflows/semi-bench-reference.yml"
+  push:
+    paths:
+      - "benchmarks/semi-bench-001/**"
+      - ".github/workflows/semi-bench-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  binary-metrics-reference:
+    name: Binary metric known answers and adversarial controls
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python (test-only reference)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run reference unit tests
+        run: |
+          python -m unittest discover \
+            -s benchmarks/semi-bench-001/reference/python \
+            -p 'test_*.py' -v
+      - name: Reproduce binary metric report byte-for-byte
+        run: |
+          python benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py \
+            > /tmp/semi-bench-binary-report.json
+          diff -u \
+            benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json \
+            /tmp/semi-bench-binary-report.json
+      - name: Reproduce inspection decision report byte-for-byte
+        run: |
+          python benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py \
+            > /tmp/semi-bench-inspection-report.json
+          diff -u \
+            benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json \
+            /tmp/semi-bench-inspection-report.json
+
+      - name: Reproduce contrastive-pair validation report byte-for-byte
+        run: |
+          python benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py \
+            benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json \
+            > /tmp/semi-bench-pair-report.json
+          diff -u \
+            benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json \
+            /tmp/semi-bench-pair-report.json

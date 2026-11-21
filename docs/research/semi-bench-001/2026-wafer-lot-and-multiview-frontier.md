@@ -1,0 +1,149 @@
+# SEMI-BENCH-001 — 2026 lot generalization, open-world and multi-view wafer-map frontier
+
+**Review date:** 2026-11-21  
+**New workstreams:** [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122), [SEMI-MULTIVIEW-001 #13123](https://github.com/Luminous-Dynamics/symthaea/issues/13123), [SEMI-WBM-COMP-001 #13113](https://github.com/Luminous-Dynamics/symthaea/issues/13113), [SEMI-OPENSET-001 #13121](https://github.com/Luminous-Dynamics/symthaea/issues/13121)
+
+This update adds a sharper benchmark hierarchy for wafer maps: sample interpolation, unseen-lot transfer, open-set defect rejection, compositional mixed-defect recognition and multi-view test-item fusion. These are separate capabilities and must not collapse into a single wafer-classification score.
+
+## 1. Graph contrastive learning: strong reported results, but random-split is not lot transfer
+
+Awais, Postolache and Oliveira, *Graph-based contrastive learning for self-supervised semiconductor wafer defect detection*, Journal of Intelligent Manufacturing, published 4 July 2026:
+- https://doi.org/10.1007/s10845-026-02906-3
+- Full text: https://link.springer.com/article/10.1007/s10845-026-02906-3
+- Released implementation: https://github.com/irjawais/wafer-gnn-contrastive
+
+The paper reports WM-811K as 811,457 maps across 46,293 production lots, 25×25 maps, 3 die states and 9 pattern classes. It uses a 30% stratified sample (243,437 wafers), then 60/20/20 stratified train/validation/test partitions (146,062 / 48,687 / 48,688). The GNN uses 8-connectivity, a GIN with jumping-knowledge connections and a contrastive similarity that combines spatial pattern, defect density, structural descriptors and production context.
+
+Paper-reported results include:
+- unsupervised clustering: ARI 0.89, NMI 0.87;
+- supervised fine-tuning: 98.6% accuracy, ARI 0.98, NMI 0.96;
+- 95.7% accuracy with 25% labelled data;
+- macro-F1 0.975, with Near-full F1 0.91 on 149 labelled examples and Donut F1 0.93 on 555;
+- LOCO OOD: mean detection 89.3% at 95% ID retention, mean AUROC 0.927;
+- reported inference latency 8.3 ms and memory 387 MB on the paper's hardware.
+
+These are paper-reported figures, not Luminous reproductions. The primary paper's evaluation split is sample-level and stratified by defect type. It therefore does not itself establish transfer to wholly unseen lots, campaigns, tools or factories, even though lot and time context are used in pair construction.
+
+### A useful artifact audit
+
+The public implementation's data loader uses stratified train_test_split to produce 60/20/20 splits. Its OOD script appears to compute the MSP rejection threshold from test_in, while the paper's OOD method text says the threshold is calibrated on the ID validation set to retain 95% of ID samples.
+
+This could be a repository/paper implementation mismatch; it does not prove that the published manuscript's results use test data for calibration. Our replication should preserve the released-script behavior as an audit track, but the faithful protocol must calibrate only on validation and leave test untouched. See [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122).
+
+### Paradigm shift: test production-context value under actual group independence
+
+The key experiment is not simply "add lotName to the model." It is whether production context improves transfer after entire lots and their near-time neighborhoods are excluded from training and validation.
+
+Required comparisons:
+1. exact published stratified reproduction;
+2. lot-disjoint held-out generalization;
+3. source-time-forward or campaign-forward evaluation with a declared embargo;
+4. same spatial GNN with and without the production-proximity term;
+5. pair generation restricted to training-only lots and windows;
+6. explicit context-blind vs context-aware inference;
+7. HDC / multiscale relational HDC and CNN challengers under identical splits.
+
+Report per-lot and worst-decile lot outcomes, rare-class support, confidence intervals and degradation versus the random-split track. Do not call random-split results contaminated unless overlap is directly measured; say instead that they do not establish unseen-lot transfer.
+
+### OOD calibration integrity
+
+The paper's OOD result is 89.3% detection at 95% ID retention (AUROC 0.927). The validation threshold must be frozen before scoring test rows. A robust challenger should compare maximum-softmax probability against energy, distance/prototype, conformal or HDC-based novelty scores, and report:
+- FPR at 95% known/ID TPR;
+- unknown recall and AUROC/AUPR;
+- OSCR;
+- known-class accuracy at fixed rejection;
+- calibration and confidence intervals;
+- per-held-out-pattern performance, especially visually similar class pairs.
+
+Do not report the 89.3% as reproduced until the threshold protocol, splits and exact implementation are independently matched.
+
+## 2. Industrial CP and DFC maps: preserve test-item semantics
+
+Wu et al., *Adaptive open-world learning for analyzing wafer map variations*, Expert Systems with Applications, Volume 318, article 131994, published 1 July 2026:
+- https://doi.org/10.1016/j.eswa.2026.131994
+
+The paper describes item-wise layered processing and semantic analysis for two wafer-map types:
+- Chip Probe (CP) maps;
+- Delta Fuse Count (DFC) maps.
+
+Its open-world architecture uses M3Net for known-class recognition (multi-task learning, multi-scale feature fusion and multi-label loss) and Parallel SVM (PSVM) to flag potential novel classes for expert review. The abstract reports evaluation on an industrial dataset; public access, licensing, sample lineage, complete label schema and exact metrics must be verified before direct reproduction.
+
+### Paradigm shift: multi-view wafer evidence
+
+A wafer is not necessarily one bitmap. Preserve a structured observation bundle:
+- exact wafer and lot/campaign identity;
+- test program and test-item identity;
+- CP-map state/mask/coordinate semantics;
+- DFC-map count/delta semantics;
+- alignment and cross-view consistency evidence;
+- missing/stale/contradictory view status;
+- instrument/calibration context and review disposition.
+
+Benchmark CP-only, DFC-only and multi-view fusion separately. Test what happens when one view is absent, delayed, corrupted, stale or contradictory. An absent map must not be represented as an all-zero map; that would confuse unavailable evidence with observed absence of defects.
+
+See [SEMI-MULTIVIEW-001 #13123](https://github.com/Luminous-Dynamics/symthaea/issues/13123).
+
+## 3. MixedWM38 and open-world research: separate interpolation from composition
+
+MixedWM38 comprises 1 normal, 8 single-defect and 29 mixed-defect categories and includes GAN-generated samples to compensate for pattern imbalance. Random splits can therefore measure pipeline correctness while overstating real manufacturing generalization.
+
+Yang, Jang and Kim, *Classifying mixed-defect from single-defect training in imbalanced wafer maps via diffusion and attention*, Expert Systems with Applications 299, article 130127, published 1 March 2026:
+- https://doi.org/10.1016/j.eswa.2025.130127
+
+The paper frames mixed-pattern recognition as generalized zero-shot learning and reports harmonic-mean accuracy of 74.3% in its most imbalanced setting, with a 3.92 percentage-point improvement over its strongest compared diffusion classifier. This is a paper-reported reference, not a reproduced result.
+
+The correct hierarchy is:
+1. sample-level interpolation reproduction;
+2. leave-combination-out compositional recognition;
+3. leave-component-out novelty rejection;
+4. synthetic-to-real with sample-level source provenance;
+5. cross-dataset transfer with a reviewed partial label mapping;
+6. few-shot introduction and continual-learning retention.
+
+See [SEMI-WBM-COMP-001 #13113](https://github.com/Luminous-Dynamics/symthaea/issues/13113) and [SEMI-OPENSET-001 #13121](https://github.com/Luminous-Dynamics/symthaea/issues/13121).
+
+## 4. PPAPlace-5000: an actionable EDA benchmark artifact, with license gate
+
+The official [PPAPlace-5000 Hugging Face dataset card](https://huggingface.co/datasets/ValleyC/PPAPlace-5000) describes:
+- 5,000 complete mixed-size DREAMPlace placements;
+- 10 open ChiPBench circuits, 500 placement samples each;
+- matching post-global-routing WNS, TNS, power and area labels;
+- 8.47 GiB compressed archives;
+- a dataset card license field of other.
+
+The [PPAPlace implementation](https://github.com/ValleyC/PPAPlace) publishes feature preparation, training, leave-one-circuit-out evaluation, refinement and audit scripts. Its docs pin ChiPBench commit ea28bebab06977b348a74d3fd07275bb828ca68e and OpenROAD v2.0-17198-g8396d0866.
+
+The repository states that it does not include trained checkpoints or experiment outputs. Its documentation distinguishes within-circuit testing from unseen-circuit generalization and says surrogate PPA is not a physical timing measurement; baseline and refined placements require identical OpenROAD evaluation.
+
+The dataset's other license metadata is not a blanket redistribution grant. Verify the dataset card's exact terms and any tool/design restrictions before copying, caching or redistributing archives. A local benchmark can use permitted metadata and licensed artifacts without committing the 8.47 GiB release.
+
+See [SEMI-EDA-001 #13069](https://github.com/Luminous-Dynamics/symthaea/issues/13069).
+
+## 5. Benchmark targets
+
+| Track | Strongest current reference | Next claim we should pursue |
+|---|---|---|
+| GNN wafer-map classification | 98.6% accuracy / macro-F1 0.975 on sample-level WM-811K | Maintain performance on unseen lots and future windows |
+| GNN open-set | 89.3% OOD detection at 95% ID retention | Improve OOD recall and keep FPR/threshold calibration honest |
+| Mixed-defect composition | 74.3% harmonic mean under a generalized zero-shot protocol | Better unseen combinations without synthetic-to-real confusion |
+| CP/DFC multi-view | M3Net + PSVM paper reference | Robust fusion and safe abstention when views are missing or contradictory |
+| EDA | PPAPlace-5000 post-GRT labels | Better final routed PPA on held-out circuits, not merely surrogate score |
+| SECOM | DCBBC 80.16% balanced accuracy and 2026 RF/LightGBM references | Time-forward + missingness-aware generalization |
+
+Every result must be split- and protocol-specific. A higher random-split accuracy is not automatically a better engineering system.
+
+## 6. Luminous integration
+
+- **Symthaea:** spatial/relational representation, HDC prototypes, GNN/CNN/transformer challengers, open-set calibration, multi-view learning and experiment selection.
+- **Symtropy:** deterministic process/inspection replay, scenario and uncertainty analysis; no conversion from an image score to a physical root cause.
+- **Mycelix:** identity, provenance and lineage for wafer, lot, test item, map view, raw measurement, model run and review outcome.
+- **Sol-Atlas:** canonical literature, standards, source snapshots, dataset rights and method/version traceability.
+
+## Claim boundaries
+
+- A lot-disjoint benchmark establishes transfer only across the declared lot identities present in that dataset.
+- A sample-level split does not establish lot or campaign transfer.
+- CP/DFC paper results do not grant raw industrial data access.
+- A class-heldout WM-811K task is an open-set proxy, not proof of discovering a new physical defect mechanism.
+- A surrogate EDA score is not final detailed-route or fabricated-silicon performance.
+- None of these public benchmark results establishes yield improvement, fab process qualification or physical equipment capability.

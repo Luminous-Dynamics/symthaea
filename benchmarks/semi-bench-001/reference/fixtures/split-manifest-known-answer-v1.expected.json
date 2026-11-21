@@ -1,0 +1,36 @@
+{
+  "claim_limits": {
+    "group_independence": "established-for-this-manifest",
+    "stratified_sample_split": false,
+    "temporal_independence": "not-established"
+  },
+  "dataset_id": "synthetic-wafer-fixture-v1",
+  "dataset_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "guarantees": {
+    "all_splits_non_empty": true,
+    "group_disjoint": true,
+    "strict_forward_time": false,
+    "unique_sample_identity": true
+  },
+  "schema": "luminous.semi-bench.split-validation-report.v1",
+  "split_counts": {
+    "test": {
+      "negative": 2,
+      "positive": 1,
+      "samples": 3
+    },
+    "train": {
+      "negative": 1,
+      "positive": 2,
+      "samples": 3
+    },
+    "validation": {
+      "negative": 2,
+      "positive": 1,
+      "samples": 3
+    }
+  },
+  "split_manifest_sha256": "85efd56eb3658b089b26f8a362d8851d64761311ac6227ad677fcd90c4453c1d",
+  "split_scheme": "group_disjoint",
+  "temporal_bounds": null
+}

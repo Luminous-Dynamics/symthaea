@@ -1,0 +1,549 @@
+{
+  "schema": "luminous.semi-bench.data-source-register.v0.1",
+  "version": "0.1.0",
+  "review_date": "2026-11-21",
+  "rule": "A source metadata record is not a dataset acquisition record. Raw data is not vendored. Every actual dataset snapshot requires file-level digests, licence review and a frozen split manifest.",
+  "datasets": [
+    {
+      "id": "UCI-SECOM-179",
+      "title": "SECOM",
+      "official_source": "https://archive.ics.uci.edu/dataset/179/secom",
+      "doi": "10.24432/C54305",
+      "citation": "McCann, M. & Johnston, A. (2008). SECOM [Dataset]. UCI Machine Learning Repository.",
+      "license": {
+        "expression": "CC-BY-4.0",
+        "status": "verified-from-official-UCI-metadata",
+        "source": "https://archive.ics.uci.edu/dataset/179/secom"
+      },
+      "metadata": {
+        "instances": 1567,
+        "uci_reported_features": 591,
+        "failures": 104,
+        "missing_values": true,
+        "source_files": [
+          "secom.data",
+          "secom_labels.data",
+          "secom.names"
+        ]
+      },
+      "source_semantics": {
+        "pass_label": -1,
+        "fail_label": 1,
+        "timestamp": "provided-in-label-file-for-each-test-point",
+        "positive_class_for_risk_benchmarks": "fail",
+        "preserve_official_feature_count_and_raw_file_schema": true
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_file_sha256": null,
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "recent_reference": {
+        "paper": "https://www.mdpi.com/2075-1702/14/7/716",
+        "doi": "10.3390/machines14070716",
+        "publication_date": "2026-06-24",
+        "protocol_role": "supplementary-SECOM-experiment-in-a-Bosch-manufacturing-paper",
+        "reported_split": "stratified-60-20-20",
+        "reported_pr_auc_reference": 0.2207,
+        "caveat": "Only 21 defective observations in each validation and test partition; high-precision validation threshold yielded zero test recall."
+      },
+      "mirror_integrity_audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+      "third_party_mirror_audit": {
+        "repository": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+        "commit": "0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+        "feature_git_blob_sha1": "69fbabe279b3a1a04a51cfa3d8382078cab50c45",
+        "labels_git_blob_sha1": "3465abe5f7975bcc61d040e75860160873feb0bf",
+        "feature_rows": 1567,
+        "feature_columns": 590,
+        "missing_values": 41951,
+        "rows_with_missing": 1567,
+        "fail_count": 104,
+        "timestamp_order": "non-decreasing-source-row-order",
+        "timezone_offset_present": false,
+        "byte_identity_to_official_uci": "not-verified",
+        "audit_file": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+        "feature_sha256": "4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf",
+        "labels_sha256": "2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef",
+        "canonical_snapshot_manifest_sha256": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+        "canonical_snapshot_digest_convention": "SHA256 of UTF-8 canonical string: 'SECOM-MIRROR-SNAPSHOT-v1\\n' + 'data/secom.data\\\\0' + feature-file SHA256 hex + '\\n' + 'data/secom_labels.data\\\\0' + labels-file SHA256 hex + '\\n'. This identifies the two-file mirror snapshot; it is not a claim that the mirror bytes are identical to official UCI files.",
+        "chronological_split_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+        "chronological_split_support": {
+          "train": {
+            "rows": 940,
+            "fail": 76,
+            "pass": 864
+          },
+          "validation": {
+            "rows": 313,
+            "fail": 11,
+            "pass": 302
+          },
+          "test": {
+            "rows": 314,
+            "fail": 17,
+            "pass": 297
+          }
+        },
+        "missingness_profile": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json#integrity_results.missingness_distribution"
+      }
+    },
+    {
+      "id": "WM-811K",
+      "title": "Wafer Map 811K dataset",
+      "primary_paper_doi": "10.1109/TSM.2014.2364237",
+      "recent_reference": "https://www.mdpi.com/2227-9717/14/7/1134",
+      "recent_reference_doi": "10.3390/pr14071134",
+      "metadata": {
+        "total_maps": 811457,
+        "labeled_maps": 172950,
+        "unlabeled_maps": 638507,
+        "single_pattern_classes": [
+          "Center",
+          "Donut",
+          "Edge-Loc",
+          "Edge-Ring",
+          "Loc",
+          "Random",
+          "Scratch",
+          "Near-full"
+        ],
+        "mixed_or_none_maps": 147431
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_distributor_snapshot": null,
+        "exact_file_sha256": null,
+        "license_status": "must-be-verified-against-exact-distributor-before-copy-or-redistribution",
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "recent_baseline": {
+        "model": "PSS-HNet",
+        "split": "stratified-80-20-sample-level",
+        "seeds": 3,
+        "macro_f1_mean": 0.9098,
+        "macro_f1_std": 0.0008,
+        "macro_recall_mean": 0.8954,
+        "macro_recall_std": 0.0034,
+        "parameter_count": 4381000,
+        "flops_giga": 0.754,
+        "reported_latency_ms": 7.682,
+        "latency_hardware": "NVIDIA RTX 3060 Ti",
+        "training_hardware": "NVIDIA H100",
+        "caveat": "Single public dataset; no cross-dataset or different-process-condition generalization demonstrated; per-sample latency does not establish batch throughput."
+      }
+    },
+    {
+      "id": "CircuitNet",
+      "title": "CircuitNet EDA dataset",
+      "official_source": "https://circuitnet.github.io/intro/intro.html",
+      "variants": [
+        "CircuitNet-N28",
+        "CircuitNet-N14",
+        "CircuitNet-ISPD15"
+      ],
+      "metadata": {
+        "sample_count": "more-than-20000",
+        "supported_tasks": [
+          "congestion",
+          "DRC-violations",
+          "IR-drop",
+          "net-delay"
+        ],
+        "technology_and_task_coverage_varies_by_variant": true
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_release_ref": null,
+        "exact_file_sha256": null,
+        "license_status": "verify-exact-release-terms-before-caching-or-redistribution",
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "evaluation_rule": "Hold out complete designs. Do not mix technology variants or task definitions into a single pooled score without explicit normalization and separate reporting."
+    },
+    {
+      "id": "OpenROAD-Flow-PDK",
+      "title": "OpenROAD RTL-to-GDS reference flow",
+      "official_source": "https://openroad-flow-scripts.readthedocs.io/en/latest/contrib/Metrics.html",
+      "candidate_pdks": [
+        {
+          "name": "SKY130",
+          "source": "https://github.com/google/skywater-pdk",
+          "status_note": "public release documented as experimental preview/alpha; not production qualified",
+          "exact_commit": null
+        },
+        {
+          "name": "IHP-SG13G2",
+          "source": "https://github.com/IHP-GmbH/IHP-Open-PDK",
+          "status_note": "early access; IHP states open release is not intended for production use at this time",
+          "exact_commit": null
+        },
+        {
+          "name": "GF180MCU",
+          "source": "https://github.com/google/gf180mcu-pdk",
+          "status_note": "verify current release status and exact commit for each experiment",
+          "exact_commit": null
+        }
+      ],
+      "acquisition": {
+        "tool_version": null,
+        "pdk_versions": "not-yet-pinned",
+        "constraints_digest": null,
+        "flow_config_digest": null
+      },
+      "evaluation_rule": "Compare only runs with matching designs, constraints, PDK, libraries, corners, tool versions and activity assumptions."
+    },
+    {
+      "id": "NIST-AI-SEM-DETECTION-LIMITS",
+      "title": "Detection Limits of AI Segmentation Models Applied to SEM Image-Based Detection",
+      "official_source": "https://pages.nist.gov/detection_limits/web/index.html",
+      "related_publication": "https://www.nist.gov/publications/detection-limits-ai-based-sem-dimensional-metrology",
+      "related_ongoing_project": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
+      "metadata": {
+        "simulated_image_sets": 6,
+        "images_per_set": 567,
+        "image_dimensions": [
+          512,
+          512
+        ],
+        "trained_unet_models": 3,
+        "approximate_parameters_per_model": 7900000,
+        "visualization_graphs": 540,
+        "compared_observers": [
+          "human",
+          "numerical",
+          "AI"
+        ]
+      },
+      "code_references": [
+        "https://github.com/usnistgov/WIPP-unet-train-plugin",
+        "https://github.com/usnistgov/WIPP-unet-inference-plugin"
+      ],
+      "code_status": "both NIST plugin repositories archived/read-only on 2026-06-12",
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_image_artifact_sha256": null,
+        "exact_model_artifact_sha256": null,
+        "access_status": "public web visualization and metadata reviewed; raw artifact acquisition not completed",
+        "redistribution_status": "verify exact artifact/license terms before caching or redistribution",
+        "dataset_snapshot_status": "not-yet-frozen"
+      },
+      "evidence_class": "public simulated SEM images and reported AI detection-limit visualizations; no independent physical instrument measurement"
+    },
+    {
+      "id": "MixedWM38",
+      "title": "Mixed-type Wafer Map Dataset",
+      "official_source": "https://github.com/Junliangwangdhu/WaferMap",
+      "primary_citation": "Wang et al. (2020), Deformable Convolutional Networks for Efficient Mixed-type Wafer Defect Pattern Recognition, IEEE Transactions on Semiconductor Manufacturing, DOI 10.1109/TSM.2020.3020985",
+      "metadata": {
+        "maps": 38015,
+        "resolution": [
+          52,
+          52
+        ],
+        "base_defect_components": 8,
+        "observed_combination_classes": 38,
+        "label_semantics": "8-dimensional multi-hot over basic defect components; all-zero vector is normal",
+        "pixel_semantics": {
+          "0": "outside-or-blank",
+          "1": "passing-die",
+          "2": "failing-die"
+        },
+        "upstream_synthetic_augmentation": "upstream README states GAN-generated wafer maps were added to balance mixed-pattern classes",
+        "third_party_audit": {
+          "repository": "https://github.com/ALEX8642/wafer-mixed",
+          "undocumented_pixel_value_3": 214,
+          "maps_containing_value_3": 105,
+          "near_full_single_support": 149,
+          "random_single_support": 866,
+          "note": "Third-party audit reports label ordering was visually established because upstream ordering is undocumented. Verify on an exact dataset snapshot before adopting these values."
+        }
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_distributor_snapshot": null,
+        "exact_file_sha256": null,
+        "license_status": "not-explicitly-established-by-original-upstream-repository; verify original data permissions before copying or redistribution",
+        "sample_level_real_vs_gan_provenance": "not-established-from-public-upstream-interface",
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "benchmark_rules": [
+        "Do not describe whole dataset as real-origin when GAN-augmented examples are included",
+        "Do not claim synthetic-to-real transfer without per-sample provenance or an independently identified real-origin test set",
+        "Use leave-combination-out splits for compositional generalization",
+        "Treat third-party repository code license as distinct from source dataset rights"
+      ]
+    },
+    {
+      "id": "MixedWM38-VQA",
+      "title": "Derived multimodal wafer-map VQA annotation set",
+      "source": "https://huggingface.co/datasets/wafervqaanon/MixedWM38-VQA",
+      "derived_from": "MixedWM38",
+      "metadata": {
+        "images": 38015,
+        "annotation_styles": [
+          "tuple_generation",
+          "stepwise_reasoning"
+        ],
+        "questions_per_image": 5,
+        "image_resolution": [
+          416,
+          416
+        ],
+        "train_val_test_counts": {
+          "train": 7602,
+          "validation": 3800,
+          "test": 26613
+        },
+        "dataset_card_says": "synthetic-or-semi-synthetic/benchmark-structured supervision; derived visual style is cleaner than real manufacturing environments"
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_dataset_revision": null,
+        "exact_artifact_sha256": null,
+        "declared_dataset_card_license": "MIT",
+        "source_image_rights": "must be checked independently against MixedWM38 original source",
+        "data_snapshot_status": "not-yet-frozen"
+      },
+      "evaluation_rule": "Treat as a derived reasoning/annotation benchmark sharing MixedWM38 image lineage, not an independent physical wafer corpus. Audit image-ID leakage and answer/reference contamination."
+    },
+    {
+      "id": "WM811K-GNN-Contrastive-2026",
+      "title": "Graph-based contrastive learning for self-supervised semiconductor wafer defect detection",
+      "paper": "https://doi.org/10.1007/s10845-026-02906-3",
+      "implementation": "https://github.com/irjawais/wafer-gnn-contrastive",
+      "metadata": {
+        "source_dataset": "WM-811K",
+        "wafer_maps": 811457,
+        "lots": 46293,
+        "sample_fraction": 0.3,
+        "sampled_maps": 243437,
+        "published_split": "stratified-60-20-20-sample-level",
+        "graph_connectivity": 8,
+        "labels": 9
+      },
+      "reported_results": {
+        "unsupervised_clustering_ari": 0.89,
+        "unsupervised_clustering_nmi": 0.87,
+        "fine_tuned_accuracy": 0.986,
+        "macro_f1": 0.975,
+        "accuracy_at_25_percent_labels": 0.957,
+        "loco_ood_detection_at_95_percent_id_retention": 0.893,
+        "loco_ood_auroc": 0.927,
+        "inference_latency_ms": 8.3,
+        "memory_mb": 387
+      },
+      "integrity_notes": [
+        "Paper split is sample-level stratified; no lot-disjoint or campaign-held-out claim follows.",
+        "Public code uses lotName for production proximity but does not implement lot-disjoint splitting.",
+        "Public OOD script appears to derive threshold from test_in while paper text describes validation calibration; resolve before claiming faithful reproduction.",
+        "Source-code license has not been verified; do not copy implementation until verified."
+      ],
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_WM811K_snapshot_sha256": null,
+        "exact_split_manifest_sha256": null,
+        "source_rights": "verify exact WM-811K distributor and license before acquisition"
+      }
+    },
+    {
+      "id": "Industrial-CP-DFC-Wafer-Maps-2026",
+      "title": "Adaptive open-world learning for analyzing wafer map variations",
+      "paper": "https://doi.org/10.1016/j.eswa.2026.131994",
+      "observation_views": [
+        "CP-map",
+        "DFC-map"
+      ],
+      "reported_methods": [
+        "M3Net",
+        "Parallel-SVM"
+      ],
+      "acquisition": {
+        "raw_data_available_publicly": "not-verified",
+        "source_license": "not-verified",
+        "sample_provenance": "not-verified",
+        "raw_data_in_repository": false
+      },
+      "evidence_class": "paper-reported-industrial-dataset; raw source access and licensing not established"
+    },
+    {
+      "id": "PPAPlace-5000",
+      "title": "PPAPlace training dataset",
+      "official_source": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+      "related_code": "https://github.com/ValleyC/PPAPlace",
+      "metadata": {
+        "placement_samples": 5000,
+        "circuits": 10,
+        "placements_per_circuit": 500,
+        "compressed_archive_size_gib": 8.47,
+        "targets": [
+          "post-GRT-WNS",
+          "post-GRT-TNS",
+          "power",
+          "area"
+        ]
+      },
+      "license": {
+        "dataset_card_field": "other",
+        "exact_terms": "must be reviewed before downloading, caching or redistribution",
+        "status": "not-yet-cleared-for-redistribution"
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_dataset_revision": null,
+        "exact_archive_sha256": null,
+        "split_manifest_status": "not-yet-frozen"
+      }
+    }
+  ],
+  "benchmark_reference_artifacts": {
+    "independent_binary_metrics_scorer": {
+      "input_schema": "luminous.semi-bench.binary-scores.v1",
+      "output_schema": "luminous.semi-bench.binary-metrics.v1",
+      "source": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_binary_metrics_reference.py",
+      "known_answer_input": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+      "known_answer_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+      "implementation_class": "test-only-independent-standard-library-reference; production implementation remains Rust-first",
+      "local_test_count": 11,
+      "local_test_result": "PASS",
+      "physical_or_dataset_claim": false,
+      "test_count": 46,
+      "test_result": "PASS-in-hosted-GitHub-Actions",
+      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962",
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
+      "hosted_ci_test_count": 46
+    },
+    "independent_inspection_decision_oracle": {
+      "input_schema": "luminous.semi-bench.inspection-decision.v1",
+      "output_schema": "luminous.semi-bench.inspection-decision-report.v1",
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_inspection_decision_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json",
+      "algorithm": "exact-exhaustive-selection-for-at-most-18-candidates-under-cash-time-and-group-capacity",
+      "comparator": "matched-budget-risk-only-greedy",
+      "test_count": 10,
+      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550",
+      "claim_ceiling": "synthetic expected-net-value only; not measured inspection savings or authorization",
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
+      "hosted_ci_test_count": 46
+    },
+    "contrastive_pair_manifest_validator": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_pair_manifest_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
+      "test_count": 11,
+      "hosted_ci_status": "success",
+      "claim_ceiling": "pair-manifest-integrity-only",
+      "local_verification": {
+        "tests_passed": 11,
+        "tests_total": 11,
+        "result": "PASS",
+        "cli_report_byte_for_byte": true
+      },
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
+      "hosted_ci_test_count": 46
+    }
+  },
+  "reproducibility_artifacts": [
+    {
+      "id": "external-UCI-SECOM-random-split-baseline",
+      "repository": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+      "status": "source-and-metrics-reviewed; not independently executed by Luminous",
+      "split": "stratified-random-60-20-20-two-stage-train_test_split-random_state-42",
+      "preprocessing": "training-only-missingness-selection-and-median-imputation",
+      "threshold_selection": "validation-only-F2-selection",
+      "reported_test_metrics": {
+        "threshold": 0.11,
+        "tp": 11,
+        "fp": 56,
+        "fn": 10,
+        "tn": 237,
+        "recall": 0.5238,
+        "precision": 0.1642,
+        "balanced_accuracy": 0.6663,
+        "pr_auc": 0.2192,
+        "review_rate": 0.2134
+      },
+      "caveat": "not time-held-out; exact UCI data/split hashes are not frozen in Symthaea; external model-card labels this a screening prototype, not production",
+      "chronological_audit": {
+        "audit_file": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+        "proposed_split": {
+          "train_fail": 76,
+          "validation_fail": 11,
+          "test_fail": 17,
+          "train_rows": 940,
+          "validation_rows": 313,
+          "test_rows": 314
+        },
+        "claim": "source-local chronology only; not a model result, not group-disjoint, not UTC, limited positive support"
+      }
+    },
+    {
+      "id": "external-MixedWM38-multilabel-baseline",
+      "repository": "https://github.com/ALEX8642/wafer-mixed",
+      "status": "source/report reviewed; not independently executed by Luminous",
+      "split": "stratified-by-full-combination-70-10-20-sample-level",
+      "reported_test_metrics": {
+        "macro_f1": 0.9846,
+        "exact_match": 0.9696
+      },
+      "caveat": "project explicitly reports dataset is largely GAN-synthesized and saturates quickly; not fab generalization"
+    },
+    {
+      "id": "external-UCI-SECOM-source-clock-chronological-split",
+      "source_snapshot": "Be1an001/semiconductor-pass-fail-prediction-python@0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+      "split_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+      "status": "frozen-row-level-split-manifest; CI-validated; model-not-yet-evaluated",
+      "method": "contiguous-60-20-20-source-row-order",
+      "clock_domain_id": "uci-secom-mirror-single-source-clock",
+      "time_basis": "source_local_naive",
+      "support": {
+        "train": {
+          "rows": 940,
+          "fail": 76,
+          "pass": 864
+        },
+        "validation": {
+          "rows": 313,
+          "fail": 11,
+          "pass": 302
+        },
+        "test": {
+          "rows": 314,
+          "fail": 17,
+          "pass": 297
+        }
+      },
+      "claim_limit": "temporal ordering within one source clock only; no timezone, lot/tool/site identity, or temporal model result",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316"
+    },
+    {
+      "id": "external-UCI-SECOM-missingness-observation-drift-audit",
+      "status": "source-profile-computed; classifier baselines not yet run",
+      "source_snapshot": "Be1an001/semiconductor-pass-fail-prediction-python@0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+      "audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+      "key_findings": {
+        "overall_missing_fraction": 0.04537548808583821,
+        "rows_with_any_missing": 1567,
+        "train_missing_fraction": 0.05142084385142445,
+        "validation_missing_fraction": 0.034185303514377,
+        "test_missing_fraction": 0.038432473280794556,
+        "august_missing_fraction": 0.053260039700717667,
+        "october_missing_fraction": 0.037651668948585994,
+        "zero_missing_features": 52,
+        "over50pct_missing_features": 28,
+        "mean_missing_fail": 25.46153846153846,
+        "mean_missing_pass": 26.86466165413534
+      },
+      "caveat": "descriptive drift only; missingness-only shortcut classifier and matched ablations remain to be run"
+    }
+  ]
+}

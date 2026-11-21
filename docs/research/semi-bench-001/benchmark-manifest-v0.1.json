@@ -1,0 +1,841 @@
+{
+  "schema": "luminous.semi-bench.manifest.v0.1",
+  "version": "0.1.0",
+  "status": "proposed-reference-manifest",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13058",
+  "evidence_ceiling": "public_datasets_and_synthetic_or_reproducible_eda_only",
+  "claims": {
+    "measured_fab_yield_improvement": false,
+    "production_fab_capability": false,
+    "production_pdk_qualification": false,
+    "physical_process_authority": false
+  },
+  "benchmark_families": [
+    {
+      "id": "secom-process-diagnostics",
+      "source": "https://archive.ics.uci.edu/dataset/179/secom",
+      "modality": "tabular-process-sensor-data",
+      "known_facts": {
+        "instances": 1567,
+        "uci_listed_attributes": 591,
+        "commonly_represented_sensor_columns": 590,
+        "failed_examples": 104,
+        "missing_values_present": true
+      },
+      "tasks": [
+        "pass-fail-risk-ranking",
+        "missingness-aware-feature-screening",
+        "calibrated-abstention"
+      ],
+      "split_policy": "forward-chaining-or-time-aware-where-timestamp-semantics-permit; freeze-split-ids-before-fitting; random-stratified-splits-secondary-only",
+      "baselines": [
+        "prevalence-only",
+        "logistic-regression",
+        "ridge",
+        "tree-ensemble",
+        "simple-anomaly-detector"
+      ],
+      "metrics": [
+        "balanced-error-rate",
+        "balanced-accuracy",
+        "auprc",
+        "minority-recall",
+        "false-alarm-at-fixed-recall",
+        "brier-score",
+        "calibration",
+        "risk-coverage",
+        "confidence-intervals"
+      ],
+      "limitations": [
+        "small-and-old-dataset",
+        "anonymized-sensors",
+        "limited-process-context",
+        "not-representative-of-current-leading-edge-fabs"
+      ],
+      "evidence_class": "historical-real-production-data"
+    },
+    {
+      "id": "wm-811k-wafer-map-defects",
+      "source": "https://doi.org/10.1007/s10845-024-02390-7",
+      "modality": "wafer-map-images",
+      "known_facts": {
+        "total_maps": 811457,
+        "labeled_maps": 172950,
+        "single_pattern_maps": 25519,
+        "mixed_none_maps": 147431,
+        "single_pattern_classes": [
+          "Center",
+          "Donut",
+          "Edge-Loc",
+          "Edge-Ring",
+          "Loc",
+          "Random",
+          "Scratch",
+          "Near-full"
+        ]
+      },
+      "tasks": [
+        "eight-class-single-pattern-recognition",
+        "separate-mixed-none-handling",
+        "rare-class-recognition",
+        "low-label-learning",
+        "calibrated-rejection",
+        "deployment-cost-comparison"
+      ],
+      "split_policy": "deduplicate-exact-image-content-before-splitting; use-wafer-lot-group-disjoint-splits-if-identifiers-support-them; otherwise-explicitly-disclose-no-group-generalization-claim",
+      "baselines": [
+        "classical-image-features",
+        "compact-cnn",
+        "residual-cnn",
+        "small-transformer",
+        "symthaea-hdc-cfc-candidate"
+      ],
+      "metrics": [
+        "macro-f1",
+        "balanced-accuracy",
+        "per-class-precision-recall-support",
+        "rare-class-auprc",
+        "calibration",
+        "risk-coverage",
+        "parameter-count",
+        "inference-latency",
+        "peak-memory",
+        "energy-only-if-instrumented"
+      ],
+      "limitations": [
+        "majority-mixed-none-class",
+        "label-coverage-limited",
+        "published-selected-subset-accuracy-not-comparable-to-full-distribution"
+      ],
+      "evidence_class": "public-labeled-wafer-map-data"
+    },
+    {
+      "id": "circuitnet-eda-physical-design",
+      "source": "https://circuitnet.github.io/intro/intro.html",
+      "modality": "eda-derived-spatial-and-tabular-data",
+      "known_facts": {
+        "reported_sample_count": "more_than_20000",
+        "variants": {
+          "CircuitNet-N28": [
+            "congestion",
+            "drc",
+            "ir-drop",
+            "net-delay"
+          ],
+          "CircuitNet-N14": [
+            "congestion",
+            "ir-drop",
+            "net-delay"
+          ],
+          "CircuitNet-ISPD15": [
+            "congestion"
+          ]
+        }
+      },
+      "tasks": [
+        "congestion-prediction",
+        "ir-drop-prediction",
+        "net-delay-prediction",
+        "unseen-design-transfer"
+      ],
+      "split_policy": "hold-out-complete-designs; preserve-technology-node-and-task-boundaries; record-design-lineage-overlap",
+      "baselines": [
+        "published-dataset-baselines",
+        "simple-regression",
+        "cnn-or-unet-family",
+        "residual-model"
+      ],
+      "metrics": [
+        "mae",
+        "rmse",
+        "normalized-error",
+        "critical-tail-recall",
+        "calibration",
+        "out-of-domain-abstention",
+        "per-design-results",
+        "compute-and-memory"
+      ],
+      "limitations": [
+        "commercial-tool-generated-data",
+        "technology-and-task-coverage-differs-by-variant",
+        "not-a-fabrication-outcome"
+      ],
+      "evidence_class": "eda-generated-public-benchmark-data"
+    },
+    {
+      "id": "openroad-rtl-to-gds-ppa",
+      "source": "https://openroad-flow-scripts.readthedocs.io/en/latest/contrib/Metrics.html",
+      "modality": "reproducible-eda-flow",
+      "candidate_pdks": [
+        {
+          "name": "SKY130",
+          "source": "https://github.com/google/skywater-pdk",
+          "reported_status": "experimental-preview-alpha"
+        },
+        {
+          "name": "GF180MCU",
+          "source": "https://github.com/google/gf180mcu-pdk",
+          "reported_status": "verify-current-project-status-and-version"
+        },
+        {
+          "name": "IHP-SG13G2",
+          "source": "https://github.com/IHP-GmbH/IHP-Open-PDK",
+          "reported_status": "early-access-not-production-intended"
+        }
+      ],
+      "tasks": [
+        "rtl-to-gds-reproduction",
+        "ppa-regression",
+        "cross-design-transfer"
+      ],
+      "split_policy": "fixed-design-pdk-constraints-and-tool-version; compare-only-like-for-like-runs",
+      "metrics": [
+        "area",
+        "wns",
+        "tns",
+        "power-under-explicit-activity-assumptions",
+        "congestion",
+        "wirelength",
+        "drc-lvs",
+        "runtime",
+        "peak-memory",
+        "reproducibility"
+      ],
+      "limitations": [
+        "open-pdk-model-and-rule-status-varies",
+        "different-pdks-and-constraints-are-not-directly-comparable",
+        "rtl-to-gds-does-not-prove-fabricated-silicon-performance"
+      ],
+      "industry_reference": {
+        "name": "IEEE CEDA First Commercial Benchmarking — Siemens EDA Aprisa",
+        "source": "https://github.com/ieee-ceda-datc/First-Commercial-Benchmarking-SiemensEDA",
+        "use_policy": "compare-only-where-design-pdk-constraints-and-tool-version-match; respect-proprietary-tool-script-and-artifact-permissions"
+      },
+      "evidence_class": "reproducible-software-eda-results"
+    },
+    {
+      "id": "device-analytical-tcad-spice-measurement",
+      "source": "https://github.com/Luminous-Dynamics/symthaea/issues/5868",
+      "modality": "multiphysics-reference-chain",
+      "tasks": [
+        "analytical-known-answer",
+        "devsim-tcad-reference",
+        "compact-model-fit",
+        "ngspice-projection",
+        "low-voltage-physical-iv-observation"
+      ],
+      "split_policy": "separate-oracle-known-answers-from-fit-data-and-physical-measurement-holdouts",
+      "metrics": [
+        "analytical-tcad-residual",
+        "mesh-refinement-sensitivity",
+        "fit-holdout-residual",
+        "circuit-prediction-residual",
+        "measurement-residual",
+        "uncertainty"
+      ],
+      "limitations": [
+        "bounded-benign-diode-profile-only-for-v1",
+        "solver-convergence-not-mesh-independence",
+        "model-fit-not-independent-validation"
+      ],
+      "evidence_class": "analytical-and-simulation-until-physical-observation-is-added"
+    },
+    {
+      "id": "inspection-positioning-calibration-bench",
+      "source": "https://github.com/Luminous-Dynamics/symthaea/issues/5912",
+      "reuse_existing_contract": "https://github.com/Luminous-Dynamics/symthaea/issues/5914",
+      "modality": "synthetic-then-physical-reference-measurement",
+      "tasks": [
+        "scale-calibration",
+        "position-discrepancy",
+        "revisit-repeatability",
+        "absolute-accuracy",
+        "remount-sensitivity",
+        "raw-image-lineage",
+        "coverage"
+      ],
+      "metrics": [
+        "calibration-currentness",
+        "repeatability",
+        "absolute-error",
+        "uncertainty",
+        "field-of-view-coverage",
+        "lineage-integrity"
+      ],
+      "limitations": [
+        "synthetic-corpus-does-not-qualify-a-physical-instrument",
+        "local-field-observation-not-whole-wafer-evidence"
+      ],
+      "evidence_class": "synthetic-until-traceable-physical-reference-campaign"
+    },
+    {
+      "id": "chip-placement-end-to-end-routed-ppa",
+      "source": "https://proceedings.neurips.cc/paper_files/paper/2025/hash/1cba8502063fab9df252a63968691768-Abstract-Datasets_and_Benchmarks_Track.html",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+      "latest_method_reference": {
+        "name": "PPAPlace",
+        "source": "https://arxiv.org/abs/2608.13790",
+        "doi": "10.1145/3831252.3834172",
+        "reported_test_circuits": 5,
+        "reported_average_wns_improvement_percent": 22,
+        "reported_average_tns_improvement_percent": 51,
+        "reported_preserves_power_and_routability": true,
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "tasks": [
+        "reproduce-hierarchical-baseline",
+        "compare-ai-placement-algorithms",
+        "validate-surrogate-to-final-timing-fidelity",
+        "optimize-final-routed-wns-tns-ppa"
+      ],
+      "split_policy": "hold-out-entire-circuits; freeze-design-pdk-library-corner-constraints-flow-tools-and-seeds",
+      "final_metrics": [
+        "routed-wns",
+        "routed-tns",
+        "area",
+        "power-under-declared-activity-and-extraction",
+        "congestion",
+        "wirelength",
+        "drc-routability",
+        "full-flow-completion",
+        "runtime",
+        "memory"
+      ],
+      "intermediate_metrics": [
+        "hpwl",
+        "pre-route-timing",
+        "global-route-timing",
+        "surrogate-predictions"
+      ],
+      "negative_controls": [
+        "proxy-ranking-disagrees-with-final-wns",
+        "placement-looks-better-but-route-fails",
+        "held-out-design-leakage",
+        "mismatched-pdk-or-constraints"
+      ],
+      "claim_ceiling": "end-to-end software-flow result for exact design/PDK/constraints only; no fabricated-silicon or foundry-yield claim",
+      "training_data_reference": {
+        "name": "PPAPlace-5000",
+        "url": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+        "placements": 5000,
+        "circuits": 10,
+        "placements_per_circuit": 500,
+        "compressed_archive_size_gib": 8.47,
+        "labels": [
+          "post-global-routing-WNS",
+          "post-global-routing-TNS",
+          "power",
+          "area"
+        ],
+        "license_metadata": "other",
+        "rights_gate": "review exact dataset card and associated design/tool restrictions before caching or redistribution",
+        "claim_status": "public-release-described; exact license terms and dataset snapshot digest not yet frozen"
+      }
+    },
+    {
+      "id": "adaptive-wafer-inspection-and-latent-risk",
+      "sources": [
+        "https://doi.org/10.1016/j.aei.2026.104621",
+        "https://doi.org/10.1016/j.cie.2026.112291"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
+      "tasks": [
+        "budget-aware-inspection-policy",
+        "value-of-information",
+        "latent-risk-in-uninspected-wafers",
+        "noisy-label-active-learning",
+        "missing-not-at-random-inspection"
+      ],
+      "metrics": [
+        "cost-weighted-defect-discovery",
+        "time-to-detection",
+        "residual-latent-risk",
+        "defects-per-100-inspections",
+        "inspection-turnaround",
+        "policy-regret-synthetic",
+        "operator-burden"
+      ],
+      "claim_ceiling": "public/synthetic decision-policy results only; no fab-impact claim without controlled site measurements"
+    },
+    {
+      "id": "physics-bounded-ai-sem-detection-limits",
+      "sources": [
+        "https://pages.nist.gov/detection_limits/web/index.html",
+        "https://www.nist.gov/publications/detection-limits-ai-based-sem-dimensional-metrology",
+        "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
+      "reported_reference_metadata": {
+        "simulated_image_sets": 6,
+        "images_per_set": 567,
+        "image_dimensions": [
+          512,
+          512
+        ],
+        "trained_unet_models": 3,
+        "approximate_parameters_per_unet": 7900000,
+        "published_visualization_graphs": 540
+      },
+      "tasks": [
+        "dimensional-measurement-bias",
+        "probability-of-detection",
+        "false-alarm-probability",
+        "noise-and-contrast-detection-limit",
+        "observer-comparison",
+        "sparse-scan-throughput"
+      ],
+      "metrics": [
+        "dimensional-bias",
+        "absolute-error",
+        "uncertainty-calibration",
+        "detection-limit-surface",
+        "false-alarm",
+        "missed-feature-risk",
+        "scan-time"
+      ],
+      "acquisition_status": "metadata-reviewed; raw image/model artifact availability and rights still require verification",
+      "claim_ceiling": "public NIST reference/synthetic image results only; no physical SEM metrology capability without traceable calibration"
+    },
+    {
+      "id": "chiplet-package-testability",
+      "source": "https://doi.org/10.1109/MDAT.2026.3706448",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13085",
+      "tasks": [
+        "prebond-known-good-die-test",
+        "die-to-die-interface-test",
+        "postbond-package-test",
+        "system-bringup",
+        "infield-monitoring",
+        "fault-localization"
+      ],
+      "metrics": [
+        "per-fault-family-coverage",
+        "escaped-defect-probability",
+        "diagnostic-localization",
+        "test-time",
+        "test-access-overhead",
+        "repair-and-containment"
+      ],
+      "claim_ceiling": "synthetic fault coverage only until qualified package test vehicles and independent reliability evidence exist"
+    },
+    {
+      "id": "mixedwm38-compositional-zero-shot-and-synthetic-to-real",
+      "source": "https://github.com/Junliangwangdhu/WaferMap",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+      "reference_paper": {
+        "title": "Classifying mixed-defect from single-defect training in imbalanced wafer maps via diffusion and attention",
+        "doi": "10.1016/j.eswa.2025.130127",
+        "publication_date": "2026-03-01",
+        "method": [
+          "class-mixing-diffusion-model",
+          "prompt-wise-attention-score-similarity"
+        ],
+        "reported_harmonic_mean_accuracy_most_imbalanced": 0.743,
+        "reported_gain_vs_compared_diffusion_classifier_percentage_points": 3.92,
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "dataset_caveats": [
+        "upstream states GAN-generated maps were added to balance mixed combinations",
+        "original source has no clear per-sample synthetic-vs-real provenance in the published interface",
+        "third-party data audit reports undocumented pixel value 3 and visual mapping required for label column order",
+        "Near-full (149) and Random (866) are sparse single classes and absent from mixtures according to one independent data audit",
+        "source data license must be verified independently; downstream code repository MIT license does not establish raw dataset rights"
+      ],
+      "tasks": [
+        "standard-multilabel-interpolation",
+        "leave-combination-out-zero-shot",
+        "leave-component-out-open-set",
+        "cross-dataset-partial-label-transfer",
+        "synthetic-to-real-only-if-provenance-supports"
+      ],
+      "metrics": [
+        "per-component-macro-f1",
+        "exact-set-match",
+        "harmonic-mean-seen-unseen",
+        "open-set-false-acceptance",
+        "risk-coverage",
+        "per-cardinality-performance"
+      ],
+      "claim_ceiling": "synthetic/unknown-origin benchmark results are not real-fab generalization or process-root-cause proof"
+    },
+    {
+      "id": "upstream-silicon-substrate-material-to-wafer",
+      "source": "https://doi.org/10.1016/j.ijmachtools.2025.104345",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+      "reference_publication_date": "2026-01",
+      "scope": [
+        "crystal-growth",
+        "ingot-shaping-and-slicing",
+        "grinding-lapping-polishing",
+        "surface-quality",
+        "tool-wear"
+      ],
+      "tasks": [
+        "material-lot-provenance",
+        "crystal-growth-modelling",
+        "kerf-and-slicing-quality",
+        "wafer-geometry",
+        "surface-and-subsurface-quality",
+        "metrology-uncertainty",
+        "downstream-compatibility"
+      ],
+      "metrics": [
+        "accepted-wafer-yield",
+        "TTV",
+        "bow-warp",
+        "flatness",
+        "roughness",
+        "defect-density",
+        "material-utilization",
+        "kerf-loss",
+        "cycle-time",
+        "tool-wear",
+        "water-energy-chemical-intensity-per-accepted-wafer"
+      ],
+      "claim_ceiling": "literature/simulation or exact measured substrate test only; no electronic-grade purification or qualified substrate production claim"
+    },
+    {
+      "id": "wm811k-graph-contrastive-lot-time-generalization",
+      "sources": [
+        "https://doi.org/10.1007/s10845-026-02906-3",
+        "https://github.com/irjawais/wafer-gnn-contrastive"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+      "published_protocol": {
+        "maps": 811457,
+        "lots": 46293,
+        "sample_fraction": 0.3,
+        "sampled_maps": 243437,
+        "split": "stratified-60-20-20-sample-level",
+        "train": 146062,
+        "validation": 48687,
+        "test": 48688,
+        "reported_metrics": {
+          "clustering_ari": 0.89,
+          "clustering_nmi": 0.87,
+          "fine_tuned_accuracy": 0.986,
+          "fine_tuned_ari": 0.98,
+          "fine_tuned_nmi": 0.96,
+          "accuracy_at_25_percent_labels": 0.957,
+          "macro_f1": 0.975,
+          "loco_ood_detection_at_95_percent_id_retention": 0.893,
+          "loco_ood_auroc": 0.927,
+          "inference_latency_ms": 8.3,
+          "memory_mb": 387
+        },
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "implementation_audit": {
+        "repo": "https://github.com/irjawais/wafer-gnn-contrastive",
+        "uses_lot_name_for_production_proximity": true,
+        "stratified_sample_split_not_lot_disjoint": true,
+        "ood_script_threshold_source": "public script appears to compute MSP 5th percentile from test_in; paper text says validation ID",
+        "discrepancy_status": "paper-versus-released-script-requires-resolution",
+        "source_code_license": "not-yet-verified; do not copy code until checked"
+      },
+      "tasks": [
+        "exact-stratified-paper-reproduction",
+        "lot-disjoint-holdout",
+        "time-forward-with-embargo",
+        "split-local-contrastive-pairs",
+        "context-aware-vs-context-blind",
+        "leave-one-class-out-ood"
+      ],
+      "metrics": [
+        "per-lot-macro-f1",
+        "worst-decile-lot-performance",
+        "temporal-degradation",
+        "ood-auroc-aupr",
+        "fpr-at-95-percent-id-tpr",
+        "oscr",
+        "calibration",
+        "confidence-intervals"
+      ],
+      "integrity_gates": [
+        "cross-split-lot-overlap-zero",
+        "cross-split-source-identity-overlap-zero",
+        "training-pairs-only-from-training-lots-and-time-windows",
+        "validation-only-ood-threshold",
+        "test-set-untouched"
+      ],
+      "claim_ceiling": "sample-level and group/time-held-out results are separate; no fab-transfer, yield or root-cause claim"
+    },
+    {
+      "id": "industrial-cp-dfc-multiview-open-world-wafer-maps",
+      "source": "https://doi.org/10.1016/j.eswa.2026.131994",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+      "reported_method": {
+        "known_class_model": "M3Net multi-task, multi-scale, multi-label",
+        "novel_class_detector": "Parallel SVM (PSVM)",
+        "observation_views": [
+          "Chip-Probe-CP-map",
+          "Delta-Fuse-Count-DFC-map"
+        ],
+        "claim_status": "paper-abstract-reported-industrial-dataset; detailed protocol and results not independently reproduced"
+      },
+      "acquisition": {
+        "raw_data_available_publicly": "not-verified",
+        "sample_lineage": "not-verified",
+        "dataset_license": "not-verified",
+        "redistribution": "not-authorized-until-verified",
+        "physical_test_campaign": "not-accessible-to-this-benchmark"
+      },
+      "tasks": [
+        "cp-only",
+        "dfc-only",
+        "late-fusion",
+        "cross-view-attention",
+        "missing-view-robustness",
+        "contradictory-view-detection",
+        "item-wise-open-set"
+      ],
+      "metrics": [
+        "per-view-macro-f1",
+        "fused-macro-f1",
+        "gain-over-best-single-view",
+        "missing-view-risk-coverage",
+        "cross-view-disagreement",
+        "novelty-fpr-tpr",
+        "per-item-transfer"
+      ],
+      "claim_ceiling": "no industrial-data or physical deployment claim until rights, sample lineage and exact test protocol are verified"
+    }
+  ],
+  "cross_cutting_protocol": {
+    "split_policy": "freeze-before-fitting; prefer-time-lot-wafer-design-grouped-evaluation; disclose-identity-gaps",
+    "negative_controls": [
+      "label-permutation",
+      "duplicate-and-group-leakage",
+      "timestamp-leakage",
+      "missingness-only-signal",
+      "corrupted-labels",
+      "stale-calibration",
+      "invalid-lineage",
+      "wrong-units",
+      "wrong-pdk-or-constraints",
+      "out-of-domain-inputs"
+    ],
+    "positive_control_required": true,
+    "result_packet": [
+      "benchmark-version",
+      "dataset-source-license-version-and-digest",
+      "frozen-split-manifest",
+      "code-commit-and-build-toolchain",
+      "model-config-and-weights-digest",
+      "tool-pdk-library-constraint-identities",
+      "hardware-runtime-memory",
+      "energy-only-when-instrumented",
+      "raw-and-derived-result-references",
+      "confidence-intervals",
+      "failed-controls",
+      "claim-ceiling"
+    ]
+  },
+  "research_targets_not_claims": {
+    "seeded_negative_control_rejection": "100%",
+    "primary_metric_relative_improvement_under_grouped_or_time_held_out_shift": ">=10% target versus strongest matched baseline, confidence interval supports gain",
+    "guardrails": [
+      "no-material-calibration-regression",
+      "no-rare-class-recall-regression",
+      "no-critical-tail-recall-regression",
+      "no-hard-constraint-violation"
+    ],
+    "physical_process_impact": "no-claim-until-preregistered-controlled-measurement-and-independent-outcome-verification"
+  },
+  "source_register": "docs/research/semi-bench-001/data-source-register-v0.1.json",
+  "latest_literature_references": {
+    "secom_park_baek_2026": {
+      "url": "https://www.mdpi.com/2075-1702/14/7/716",
+      "doi": "10.3390/machines14070716",
+      "publication_date": "2026-06-24",
+      "scope": "supplementary-SECOM-evaluation-in-a-Bosch-manufacturing-study",
+      "split": "stratified-60-20-20",
+      "best_reported_secom_pr_auc": 0.2207,
+      "note": "Only 21 defective observations in validation and test; validation precision>=0.90 yielded zero held-out test recall in this small experiment."
+    },
+    "wm811k_pss_hnet_2026": {
+      "url": "https://www.mdpi.com/2227-9717/14/7/1134",
+      "doi": "10.3390/pr14071134",
+      "publication_date": "2026-03-31",
+      "split": "stratified-80-20-sample-level",
+      "seeds": 3,
+      "macro_f1": {
+        "mean": 0.9098,
+        "std": 0.0008
+      },
+      "macro_recall": {
+        "mean": 0.8954,
+        "std": 0.0034
+      },
+      "parameters": 4381000,
+      "flops_giga": 0.754,
+      "latency_ms": 7.682,
+      "latency_hardware": "NVIDIA RTX 3060 Ti",
+      "training_hardware": "NVIDIA H100",
+      "note": "Single dataset; authors identify cross-dataset/process-condition generalization and batch latency as future validation."
+    }
+  },
+  "reference_evaluator": {
+    "classification_metric_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+    "tests": "benchmarks/semi-bench-001/reference/python/test_semi_binary_metrics_reference.py",
+    "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+    "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+    "mode": "test-only-independent-reference; production implementation remains Rust-first",
+    "local_tests": null,
+    "local_status": "not-run-as-a-full-suite",
+    "threshold_policy": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_threshold_policy_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_threshold_policy_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/validation-threshold-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/validation-threshold-known-answer-v1.expected.json",
+      "semantics": "maximize-validation-recall-subject-to-minimum-precision-floor; group-equal-scores; reject-validation-test-identity-overlap; explicit-fallback-if-infeasible",
+      "test_count": 3,
+      "empirical_dataset_result": false
+    },
+    "split_manifest_validator": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_split_manifest_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_split_manifest_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json",
+      "supported_schemes": [
+        "group_disjoint",
+        "forward_time",
+        "stratified_sample"
+      ],
+      "semantics": "unique-identity; all-splits-non-empty; group-disjoint-check; strict-forward-time-check; timezone-required; deterministic-assignment-digest; source-local-naive chronology permitted only with explicit clock_domain_id and no UTC/cross-domain claim",
+      "test_count": 11,
+      "empirical_dataset_result": false,
+      "supported_time_basis": [
+        "offset_aware",
+        "source_local_naive-with-explicit-clock_domain_id"
+      ],
+      "actual_source_manifest": {
+        "path": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+        "source_snapshot_id": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+        "manifest_blob_sha1": "7b38864a07347410c5c90c6d8e248c7ad8a5e81e",
+        "clock_domain_id": "uci-secom-mirror-single-source-clock",
+        "split_support": {
+          "train": {
+            "rows": 940,
+            "fail": 76,
+            "pass": 864
+          },
+          "validation": {
+            "rows": 313,
+            "fail": 11,
+            "pass": 302
+          },
+          "test": {
+            "rows": 314,
+            "fail": 17,
+            "pass": 297
+          }
+        },
+        "tested_by_ci": true,
+        "status": "frozen-row-level-split-manifest; model-not-yet-evaluated"
+      }
+    },
+    "hosted_ci": {
+      "workflow": "SEMI-BENCH-001 Reference Oracle",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
+      "run_id": 44917385489,
+      "tested_commit": "010faa4a517d4dc46a57a9b0f6b07015a188bf35",
+      "conclusion": "success",
+      "test_count": 46,
+      "passed_steps": [
+        "Run reference unit tests",
+        "Reproduce binary metric report byte-for-byte",
+        "Reproduce inspection decision report byte-for-byte",
+        "Reproduce contrastive-pair validation report byte-for-byte"
+      ],
+      "note": "Hosted GitHub Actions verified the complete 46-test suite and all three frozen CLI reports on the current clean-base v0.2 PR head."
+    },
+    "inspection_decision_policy": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_inspection_decision_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json",
+      "method": "exact-exhaustive-subset-optimization-for-at-most-18-candidates",
+      "constraints": [
+        "cash-budget",
+        "inspection-time-budget",
+        "per-group-capacity"
+      ],
+      "comparator": "matched-budget-risk-only-greedy",
+      "test_count": 10,
+      "claim_ceiling": "synthetic model-based expected value only; no physical savings or inspection authorization"
+    },
+    "total_test_count": 46,
+    "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler",
+    "contrastive_pair_manifest_validator": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_pair_manifest_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
+      "rules": [
+        "unique-sample-ids",
+        "unique-pair-ids",
+        "unique-unordered-pairs",
+        "no-self-pairs",
+        "endpoints-exist",
+        "pair-scope-matches-both-endpoint-splits",
+        "same-lot-pairs-require-matching-group-ids",
+        "time-near-pairs-require-clock-domain-and-within-embargo"
+      ],
+      "test_count": 11,
+      "claim_ceiling": "pair-manifest-integrity-only; no proof of pair-semantic correctness or model quality",
+      "local_verification": {
+        "tests_passed": 11,
+        "tests_total": 11,
+        "result": "PASS",
+        "cli_report_byte_for_byte": true
+      },
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489"
+    }
+  },
+  "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
+  "eda_end_to_end_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+  "industry_frontier_review": "docs/research/semi-bench-001/2026-industry-frontier.md",
+  "industry_architecture_references": {
+    "nist_tidal": "https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing",
+    "semi_semiconductor_digital_twin_activity": "https://downloads.semi.org/web/wstdsbal.nsf/0e0afa4c4969bea688256efd0062a27c/61c2bf6034c0eed988258dcd00669238%21OpenDocument",
+    "note": "TIDAL is a NIST programme architecture reference; SEMI document 7465 is a standards activity proposal, not a final published standard or conformance claim."
+  },
+  "inspection_metrology_packaging_review": "docs/research/semi-bench-001/2026-inspection-metrology-packaging-frontier.md",
+  "new_followups": {
+    "adaptive_inspection": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
+    "ai_sem_detection_limits": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
+    "chiplet_package_testability": "https://github.com/Luminous-Dynamics/symthaea/issues/13085",
+    "unseen_lot_time_generalization": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+    "industrial_cp_dfc_multiview": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+    "mixed_defect_compositional_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+    "open_world_wafer_defects": "https://github.com/Luminous-Dynamics/symthaea/issues/13121",
+    "secom_missingness_drift": "https://github.com/Luminous-Dynamics/symthaea/issues/13115",
+    "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114"
+  },
+  "new_research_updates": {
+    "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
+    "mixed_wbm_compositional_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+    "wafer_substrate_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+    "secom_external_baseline": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+    "wafer_lot_and_multiview_frontier": "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md",
+    "wafer_gnn_contrastive_paper": "https://doi.org/10.1007/s10845-026-02906-3",
+    "wafer_gnn_public_implementation": "https://github.com/irjawais/wafer-gnn-contrastive",
+    "wafer_gnn_lot_time_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+    "cp_dfc_open_world_paper": "https://doi.org/10.1016/j.eswa.2026.131994",
+    "cp_dfc_multiview_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+    "ppaplace_5000_dataset": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+    "ppaplace_dataset_license_note": "Hugging Face dataset card metadata is 'other'; verify exact use/redistribution terms; no raw archive checked in.",
+    "ppaplace_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13069"
+  },
+  "industry_frontier_reviews": [
+    "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
+    "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md"
+  ],
+  "source_integrity_audits": [
+    "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
+  ],
+  "secom_integrity_audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+  "missingness_drift_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13115"
+}

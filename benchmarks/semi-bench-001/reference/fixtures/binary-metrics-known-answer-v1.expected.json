@@ -1,0 +1,103 @@
+{
+  "case_id": "SEMI-BENCH-001-BINARY-KA-001",
+  "class_counts": {
+    "negative": 4,
+    "positive": 4
+  },
+  "probability_metrics": {
+    "brier_score": 0.21,
+    "calibration_bins": [
+      {
+        "bin": 0,
+        "count": 3,
+        "ece_contribution": 0.0625,
+        "lower_inclusive": 0.0,
+        "mean_score": 0.166666666667,
+        "observed_positive_rate": 0.333333333333,
+        "upper_exclusive": 0.25
+      },
+      {
+        "bin": 1,
+        "count": 2,
+        "ece_contribution": 0.0375,
+        "lower_inclusive": 0.25,
+        "mean_score": 0.35,
+        "observed_positive_rate": 0.5,
+        "upper_exclusive": 0.5
+      },
+      {
+        "bin": 2,
+        "count": 1,
+        "ece_contribution": 0.0875,
+        "lower_inclusive": 0.5,
+        "mean_score": 0.7,
+        "observed_positive_rate": 0.0,
+        "upper_exclusive": 0.75
+      },
+      {
+        "bin": 3,
+        "count": 2,
+        "ece_contribution": 0.0375,
+        "lower_inclusive": 0.75,
+        "mean_score": 0.85,
+        "observed_positive_rate": 1.0,
+        "upper_exclusive": null
+      }
+    ],
+    "expected_calibration_error": 0.225
+  },
+  "ranking_metrics": {
+    "auroc": 0.78125,
+    "average_precision": 0.830357142857,
+    "fpr_at_recall": {
+      "achieved_recall": 0.75,
+      "false_positive_rate": 0.25,
+      "target_recall": 0.75,
+      "threshold": 0.4
+    }
+  },
+  "risk_coverage": [
+    {
+      "accepted": 2,
+      "coverage": 0.25,
+      "errors": 0,
+      "minimum_confidence_inclusive": 0.9,
+      "risk": 0.0
+    },
+    {
+      "accepted": 5,
+      "coverage": 0.625,
+      "errors": 1,
+      "minimum_confidence_inclusive": 0.8,
+      "risk": 0.2
+    },
+    {
+      "accepted": 7,
+      "coverage": 0.875,
+      "errors": 2,
+      "minimum_confidence_inclusive": 0.7,
+      "risk": 0.285714285714
+    },
+    {
+      "accepted": 8,
+      "coverage": 1.0,
+      "errors": 3,
+      "minimum_confidence_inclusive": 0.6,
+      "risk": 0.375
+    }
+  ],
+  "sample_count": 8,
+  "schema": "luminous.semi-bench.binary-metrics.v1",
+  "threshold_metrics": {
+    "accuracy": 0.625,
+    "balanced_accuracy": 0.625,
+    "fn": 2,
+    "fp": 1,
+    "precision": 0.666666666667,
+    "sensitivity": 0.5,
+    "specificity": 0.75,
+    "threshold": 0.5,
+    "tn": 3,
+    "tp": 2
+  }
+}

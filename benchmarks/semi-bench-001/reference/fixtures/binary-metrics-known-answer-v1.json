@@ -1,0 +1,18 @@
+{
+  "schema": "luminous.semi-bench.binary-scores.v1",
+  "case_id": "SEMI-BENCH-001-BINARY-KA-001",
+  "decision_threshold": 0.5,
+  "calibration_bins": 4,
+  "recall_target": 0.75,
+  "positive_class_semantics": "process-failure-risk",
+  "samples": [
+    {"sample_id": "S01", "positive": true,  "score": 0.9},
+    {"sample_id": "S02", "positive": true,  "score": 0.8},
+    {"sample_id": "S03", "positive": false, "score": 0.7},
+    {"sample_id": "S04", "positive": true,  "score": 0.4},
+    {"sample_id": "S05", "positive": false, "score": 0.3},
+    {"sample_id": "S06", "positive": false, "score": 0.2},
+    {"sample_id": "S07", "positive": true,  "score": 0.2},
+    {"sample_id": "S08", "positive": false, "score": 0.1}
+  ]
+}
