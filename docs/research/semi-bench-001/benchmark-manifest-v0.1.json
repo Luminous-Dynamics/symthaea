@@ -309,5 +309,48 @@
       "no-hard-constraint-violation"
     ],
     "physical_process_impact": "no-claim-until-preregistered-controlled-measurement-and-independent-outcome-verification"
-  }
+  },
+  "source_register": "docs/research/semi-bench-001/data-source-register-v0.1.json",
+  "latest_literature_references": {
+    "secom_park_baek_2026": {
+      "url": "https://www.mdpi.com/2075-1702/14/7/716",
+      "doi": "10.3390/machines14070716",
+      "publication_date": "2026-06-24",
+      "scope": "supplementary-SECOM-evaluation-in-a-Bosch-manufacturing-study",
+      "split": "stratified-60-20-20",
+      "best_reported_secom_pr_auc": 0.2207,
+      "note": "Only 21 defective observations in validation and test; validation precision>=0.90 yielded zero held-out test recall in this small experiment."
+    },
+    "wm811k_pss_hnet_2026": {
+      "url": "https://www.mdpi.com/2227-9717/14/7/1134",
+      "doi": "10.3390/pr14071134",
+      "publication_date": "2026-03-31",
+      "split": "stratified-80-20-sample-level",
+      "seeds": 3,
+      "macro_f1": {
+        "mean": 0.9098,
+        "std": 0.0008
+      },
+      "macro_recall": {
+        "mean": 0.8954,
+        "std": 0.0034
+      },
+      "parameters": 4381000,
+      "flops_giga": 0.754,
+      "latency_ms": 7.682,
+      "latency_hardware": "NVIDIA RTX 3060 Ti",
+      "training_hardware": "NVIDIA H100",
+      "note": "Single dataset; authors identify cross-dataset/process-condition generalization and batch latency as future validation."
+    }
+  },
+  "reference_evaluator": {
+    "classification_metric_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+    "tests": "benchmarks/semi-bench-001/reference/python/test_semi_binary_metrics_reference.py",
+    "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+    "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+    "mode": "test-only-independent-reference; production implementation remains Rust-first",
+    "local_tests": 11,
+    "local_status": "pass"
+  },
+  "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067"
 }
