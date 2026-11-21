@@ -228,10 +228,9 @@ impl MetricObservation {
                     self.error_estimate,
                     self.lower_error_bound,
                     self.upper_error_bound,
-                ) {
-                    if estimate < lower || estimate > upper {
-                        return Err(LedgerError::EstimateOutsideErrorInterval);
-                    }
+                ) && (estimate < lower || estimate > upper)
+                {
+                    return Err(LedgerError::EstimateOutsideErrorInterval);
                 }
             }
         }
@@ -662,10 +661,8 @@ fn validate_time_interval(start: f64, end: f64) -> Result<(), LedgerError> {
 }
 
 fn validate_optional_finite(value: Option<f64>, nonnegative: bool) -> Result<(), LedgerError> {
-    if let Some(value) = value {
-        if !value.is_finite() || (nonnegative && value < 0.0) {
-            return Err(LedgerError::InvalidNumericValue);
-        }
+    if value.is_some_and(|value| !value.is_finite() || (nonnegative && value < 0.0)) {
+        return Err(LedgerError::InvalidNumericValue);
     }
     Ok(())
 }
