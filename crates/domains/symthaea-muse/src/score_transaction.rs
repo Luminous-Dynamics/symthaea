@@ -18,11 +18,21 @@ pub const SCORE_PATCH_SCHEMA_V1: &str = "mel-score-patch-receipt-v1";
 pub enum ScorePatchErrorV1 {
     SerializationFailed,
     EmptyTargetScope,
-    DuplicateTargetIndex { index: usize },
-    TargetIndexOutOfRange { index: usize, event_count: usize },
-    EventCountChanged { source_count: usize, result_count: usize },
+    DuplicateTargetIndex {
+        index: usize,
+    },
+    TargetIndexOutOfRange {
+        index: usize,
+        event_count: usize,
+    },
+    EventCountChanged {
+        source_count: usize,
+        result_count: usize,
+    },
     ScoreMetadataChanged,
-    ProtectedEventChanged { index: usize },
+    ProtectedEventChanged {
+        index: usize,
+    },
     ReceiptMismatch,
 }
 
@@ -232,8 +242,7 @@ pub fn verify_score_patch_receipt(
 mod tests {
     use super::*;
     use symthaea_music_theory::{
-        Duration, Emphasis, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole,
-        score::PartId,
+        Duration, Emphasis, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole, score::PartId,
     };
 
     fn fixture_score() -> Score {
