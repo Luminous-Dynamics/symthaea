@@ -830,11 +830,7 @@ pub fn compare_phase_space_measures_spectral_adaptive(
     let mut sum_squared_deviation = 0.0;
     let mut look_index = 1_usize;
     let mut checkpoints = Vec::new();
-    let mut decision = AdaptiveMmdDecision::UnresolvedBudgetExhausted;
-    let mut final_lower = 0.0;
-    let mut final_upper = 4.0;
-
-    loop {
+    let (decision, final_lower, final_upper) = loop {
         while feature_count < target_feature_count {
             let feature = sample_spectral_feature(kernel_config, &mut rng)?;
             let squared_difference = spectral_squared_signature_difference(
@@ -860,8 +856,8 @@ pub fn compare_phase_space_measures_spectral_adaptive(
         cumulative_alpha_spent += alpha_for_checkpoint;
         let interval_radius =
             4.0 * ((2.0 / alpha_for_checkpoint).ln() / (2.0 * feature_count as f64)).sqrt();
-        final_lower = (mean - interval_radius).max(0.0);
-        final_upper = (mean + interval_radius).min(4.0);
+        let final_lower = (mean - interval_radius).max(0.0);
+        let final_upper = (mean + interval_radius).min(4.0);
 
         if !mean.is_finite()
             || !sum_squared_deviation.is_finite()
@@ -884,23 +880,32 @@ pub fn compare_phase_space_measures_spectral_adaptive(
         });
 
         if final_upper <= adaptive_config.tolerance {
-            decision = AdaptiveMmdDecision::WithinTolerance;
-            break;
+            break (
+                AdaptiveMmdDecision::WithinTolerance,
+                final_lower,
+                final_upper,
+            );
         }
         if final_lower > adaptive_config.tolerance {
-            decision = AdaptiveMmdDecision::AboveTolerance;
-            break;
+            break (
+                AdaptiveMmdDecision::AboveTolerance,
+                final_lower,
+                final_upper,
+            );
         }
         if feature_count >= adaptive_config.max_feature_count {
-            decision = AdaptiveMmdDecision::UnresolvedBudgetExhausted;
-            break;
+            break (
+                AdaptiveMmdDecision::UnresolvedBudgetExhausted,
+                final_lower,
+                final_upper,
+            );
         }
 
         target_feature_count = target_feature_count
             .saturating_mul(2)
             .min(adaptive_config.max_feature_count);
         look_index = look_index.saturating_add(1);
-    }
+    };
 
     let feature_sample_variance = if feature_count > 1 {
         (sum_squared_deviation / (feature_count - 1) as f64).max(0.0)
