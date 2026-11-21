@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
-SOURCE_COMMIT="\${1:?usage: scripts/mel_rmi_track_a_qualification.sh <exact-clean-head-sha>}"
+SOURCE_COMMIT="${1:?usage: scripts/mel_rmi_track_a_qualification.sh <exact-clean-head-sha>}"
 if [[ ! "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
   echo "source commit must be a 40-character lowercase Git SHA" >&2
   exit 2
@@ -20,12 +20,12 @@ if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --
   exit 2
 fi
 
-BASE_TMP="\${RUNNER_TEMP:-\${TMPDIR:-/tmp}}"
+BASE_TMP="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 STAGE_ROOT="$BASE_TMP/mel-rmi-track-a-$SOURCE_COMMIT"
 STAGE_CRATE="$STAGE_ROOT/crates/domains/symthaea-muse"
 MANIFEST="$STAGE_CRATE/Cargo.toml"
-EVIDENCE_DIR="\${MEL_RMI_EVIDENCE_DIR:-$BASE_TMP/mel-rmi-track-a-evidence-$SOURCE_COMMIT}"
-SEED_COUNT="\${MEL_RMI_SEED_COUNT:-4}"
+EVIDENCE_DIR="${MEL_RMI_EVIDENCE_DIR:-$BASE_TMP/mel-rmi-track-a-evidence-$SOURCE_COMMIT}"
+SEED_COUNT="${MEL_RMI_SEED_COUNT:-4}"
 
 rm -rf "$STAGE_ROOT" "$EVIDENCE_DIR"
 mkdir -p "$STAGE_CRATE/src/bin" "$EVIDENCE_DIR"
