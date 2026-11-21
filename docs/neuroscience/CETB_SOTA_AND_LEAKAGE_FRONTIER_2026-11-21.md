@@ -125,3 +125,15 @@ The framework treats NSI as an imported fMRI measurement-sufficiency method, RCA
 A matched-input estimator × dose response surface is now implemented as a further extension of the first tournament. It compares absolute WJ, signed-shift WJ and normalized mean absolute edge error at each of five perturbation levels, keeping the random seed and input draws aligned across methods. This will help distinguish useful operating ranges rather than comparing three saturated strong-effect results.
 
 The output contains a full dose-response curve and Monte-Carlo confidence intervals for each metric. It deliberately does not rank or average metrics with different construct semantics.
+
+
+## 6. First executable RCAF estimator-by-dose results
+
+The matched-input three-estimator by five-dose surface passed exact-head focused validation on source commit `335d7430246ff01f013b96a934601de256f3ea23` (workflow `44899300679`). Each cell used 40 synthetic Monte-Carlo replicates; all estimators had null rejection 1/40 (2.5%, 95% Wilson interval 0.44%–12.88%).
+
+At module-loading increment 0.30, injection detection was:
+- absolute WJ: 45% (95% Wilson interval 30.7%–60.2%);
+- signed-shift WJ: 85% (70.9%–92.9%);
+- normalized mean absolute edge error: 92.5% (80.1%–97.4%).
+
+At 0.40, all reached 100% (40/40; Wilson lower bound about 91.2%). This supports a focused hypothesis that polarity-aware WJ and normalized edge error are more sensitive to moderate perturbations in this one factor model, but it is not a universal estimator ranking. Only 40 replicates per cell were used, and the different similarity definitions have different construct semantics. Final simulation calibration should use at least 1,000 replicates per cell and a broader nuisance grid.
