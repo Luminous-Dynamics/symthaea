@@ -44,7 +44,7 @@ No new HDC binding or bundling primitive is introduced. The static HDC bundle is
 | `hdc_ltc_zero_input` | Original bundle evolved under zero input | Passive state evolution without new sensory content |
 | `hdc_ltc_distractor` | Original bundle evolved under deterministic unrelated bipolar inputs | Retention under interference |
 
-For dynamic conditions, the same input-event count is run with regular and deterministic irregular positive time gaps summing approximately to the requested horizon. Each gap is supplied causally; no future input is visible. Static controls are emitted once per corpus, not copied into each temporal cohort.
+For dynamic conditions, the same input-event count is run with regular and deterministic irregular time gaps summing approximately to the requested horizon. Each gap is supplied causally; no future input is visible. The current neuron floors each integration interval at (10^{-9}) seconds, so the runner rejects smaller positive gaps to prevent the evolved state and reported logical time from diverging. Static controls are emitted once per corpus, not copied into each temporal cohort.
 
 The neuron is initialized with the exact same bundle via the existing public state setter and the same deterministic model seed across the two dynamic conditions. Its configuration, weights and state are therefore paired for each seed/dimension/load.
 
