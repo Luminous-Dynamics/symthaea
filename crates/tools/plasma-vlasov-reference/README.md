@@ -177,3 +177,17 @@ moments and overflow. The module is research infrastructure for
 [#13130 — adaptive Hermite coordinates and kinetic residual compression](https://github.com/Luminous-Dynamics/symthaea/issues/13130);
 it does not claim an adaptive Hermite implementation or invariant preservation
 for a discretized, remapped distribution.
+
+
+### Analytic affine-moment sensitivities
+
+`VelocityFrame::moment_jacobian` returns the exact first derivatives of
+((M_0,M_1,M_2)) with respect to the computational moments, frame shift
+(u), and positive frame scale (alpha). The shift and scale derivatives
+are checked against central finite differences on a manufactured moment
+state. Non-finite Jacobians are rejected rather than propagated.
+
+This is a narrowly scoped analytic sensitivity primitive. It does not
+differentiate a distribution remap, Hermite coefficient projection, kinetic
+time integrator, or adaptive representation-selection policy. Those paths
+need their own discrete derivative and conditioning qualification.
