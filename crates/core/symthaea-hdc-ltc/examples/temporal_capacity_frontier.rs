@@ -42,7 +42,7 @@ impl Default for Args {
         Self {
             input: String::new(),
             output: None,
-            min_seeds: 30,
+            min_seeds: 59,
         }
     }
 }
@@ -193,7 +193,7 @@ fn parse_args() -> Result<Args, Box<dyn Error>> {
             "--help" | "-h" => {
                 println!(
                     "temporal_capacity_frontier --input results.jsonl [--out frontier.jsonl] \
-                     [--min-seeds 30]"
+                     [--min-seeds 59]"
                 );
                 std::process::exit(0);
             }
