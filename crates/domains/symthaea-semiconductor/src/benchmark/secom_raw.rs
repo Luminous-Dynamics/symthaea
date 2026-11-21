@@ -291,8 +291,7 @@ pub fn audit_secom_raw_v1(
 
     let mut missing_sensor_cells = 0usize;
     let mut rows_with_any_missing = 0usize;
-    let mut missing_sensor_cells_by_feature =
-        vec![0usize; expectations.expected_features_per_row];
+    let mut missing_sensor_cells_by_feature = vec![0usize; expectations.expected_features_per_row];
     let total_sensor_cells = features.len() * expectations.expected_features_per_row;
     let mut pass = 0usize;
     let mut fail = 0usize;
@@ -314,7 +313,11 @@ pub fn audit_secom_raw_v1(
             }
             _ => unreachable!("label parser admits only -1 or +1"),
         };
-        let row_missing = feature_row.values.iter().filter(|value| value.is_none()).count();
+        let row_missing = feature_row
+            .values
+            .iter()
+            .filter(|value| value.is_none())
+            .count();
         missing_sensor_cells += row_missing;
         if row_missing > 0 {
             rows_with_any_missing += 1;
@@ -325,7 +328,9 @@ pub fn audit_secom_raw_v1(
             }
         }
 
-        let class_profile = missingness_by_class.entry(class_name.to_string()).or_default();
+        let class_profile = missingness_by_class
+            .entry(class_name.to_string())
+            .or_default();
         class_profile.rows += 1;
         class_profile.missing_cells += row_missing;
         class_profile.sensor_cells += expectations.expected_features_per_row;
