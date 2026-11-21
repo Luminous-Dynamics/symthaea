@@ -7,6 +7,9 @@ on:
       - "data/research/precursor_genome_graph_benchmark_v0_1.json"
       - "data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json"
       - "research/superconductivity/capability_experiment_planning/precursor_genome_graph/README.md"
+      - "data/schemas/precursor_genome_graph_score_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_*.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome_graph_score/**"
       - ".github/workflows/precursor-genome-audit.yml"
   push:
     branches: [main]
@@ -50,13 +53,26 @@ jobs:
           wc -c "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
 
       - name: Check auditor formatting
-        run: rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
+        run: |
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_score_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
 
       - name: Test graph invariants and endpoint semantics
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit
+
+      - name: Test graph cold-start scoring and leakage controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_score_audit
+
+      - name: Run synthetic graph cold-start score receipt
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_score_audit -- \
+            --schema data/schemas/precursor_genome_graph_score_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/precursor-genome/graph-score-smoke-receipt.json"
+          jq '{status, benchmark_id, graph, no_skill_baseline, models: [.models[] | {model_id, lopo, double_node_holdout}]}' "$RUNNER_TEMP/precursor-genome/graph-score-smoke-receipt.json"
 
       - name: Verify pinned source identity and reconcile the paper cohort
         run: |
@@ -70,6 +86,9 @@ jobs:
       - name: Clippy graph auditor
         run: cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit -- -D warnings
 
+      - name: Clippy graph cold-start score auditor
+        run: cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_score_audit -- -D warnings
+
       - name: Record exact input and environment identities
         if: always()
         run: |
@@ -81,6 +100,10 @@ jobs:
             sha256sum data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
+            sha256sum data/schemas/precursor_genome_graph_score_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_smoke_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_suite_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_score_audit.rs
             sha256sum "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
               sha256sum tools/superconductivity-discovery-harness/Cargo.lock
@@ -96,5 +119,6 @@ jobs:
           path: |
             ${{ runner.temp }}/precursor-genome/ledger_precursor_genome.json
             ${{ runner.temp }}/precursor-genome/graph-audit-receipt.json
+            ${{ runner.temp }}/precursor-genome/graph-score-smoke-receipt.json
             ${{ runner.temp }}/precursor-genome/identity.txt
             tools/superconductivity-discovery-harness/Cargo.lock
