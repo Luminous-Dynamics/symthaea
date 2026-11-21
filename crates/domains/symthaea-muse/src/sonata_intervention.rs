@@ -723,6 +723,33 @@ mod tests {
     use crate::score_transaction::verify_score_patch_receipt;
     use symthaea_music_theory::{MusicalIntent, Style, compose_sonata_with_plan};
 
+    fn candidate_gate_diagnostics(batch: &SonataInterventionBatch) -> String {
+        batch
+            .candidates
+            .iter()
+            .map(|candidate| {
+                let target_verified = candidate
+                    .verification
+                    .iter()
+                    .find(|item| Some(item.obligation_id) == batch.driving_obligation_id)
+                    .map(|item| item.verified);
+                let assessment = batch.selection.assessments.iter().find(|item| {
+                    item.alternative_id == candidate.alternative_id
+                });
+                format!(
+                    "{}:{:?}:theory={}:preserved={}:verified={:?}:assessment={:?}",
+                    candidate.alternative_id,
+                    candidate.strategy,
+                    candidate.theory_validation.valid,
+                    candidate.preserved_invariants,
+                    target_verified,
+                    assessment.map(|item| (item.eligible, item.target_obligation_verified))
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" | ")
+    }
+
     fn return_trace(realization: &SonataRealization) -> CognitiveDecisionTrace {
         let obligation = realization
             .plan
@@ -817,6 +844,7 @@ mod tests {
 
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
+        eprintln!("Sonata subintent gates: {}", candidate_gate_diagnostics(&batch));
         assert_eq!(batch.candidates.len(), 5);
         let source_digest = batch.candidates[0]
             .patch_receipt
@@ -895,11 +923,13 @@ mod tests {
         let mut repeat_trace = return_trace(&realization);
         repeat_trace.inference.source_action = MusicAction::RepeatMotif;
         let repeat_batch = generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
+        eprintln!("RepeatMotif gates: {}", candidate_gate_diagnostics(&repeat_batch));
 
         let mut maintain_trace = repeat_trace.clone();
         maintain_trace.inference.source_action = MusicAction::Maintain;
         let maintain_batch =
             generate_and_rank_sonata_return(&realization, &maintain_trace).unwrap();
+        eprintln!("Maintain gates: {}", candidate_gate_diagnostics(&maintain_batch));
 
         assert_eq!(
             repeat_batch.cognitive_subintent.disposition,
