@@ -6,7 +6,6 @@ on:
       - "benchmarks/semi-bench-001/**"
       - ".github/workflows/semi-bench-reference.yml"
   push:
-    branches: [main]
     paths:
       - "benchmarks/semi-bench-001/**"
       - ".github/workflows/semi-bench-reference.yml"
