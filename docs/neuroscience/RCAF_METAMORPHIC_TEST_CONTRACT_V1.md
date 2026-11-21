@@ -1,6 +1,6 @@
 # RCAF Metamorphic Test Contract V1
 
-**Status:** Implemented as focused unit tests on a stacked research branch; exact-head CI validation pending.
+**Status:** Implemented and focused-workflow validated on exact head `24c481252b64b8033b853408124b99a0321d6bd6`; broad repository CI and biological validation are not part of this result.
 **Date:** 2026-11-21
 **Scope:** Matrix comparison and edge-transition behavior only. No biological inference.
 
@@ -45,6 +45,14 @@ Swapping the before/after matrices should preserve total polarity-reversal count
 
 This ensures that symmetric counts remain symmetric without losing the direction of individual transitions.
 
+## Exact-head validation record
+
+RCAF focused workflow [44950930997](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44950930997) passed on source commit `24c481252b64b8033b853408124b99a0321d6bd6`: 36/36 Rust tests, rustfmt, Clippy, report/schema checks, EIG and multiverse checks, all five synthetic simulation/report stages, content-addressed receipt generation and artifact upload.
+
+Artifact SHA-256: `005a984e00220474e98414cdbb50d9a25a5492bc8901b47cd3e1828c9d61d0e4`.
+Receipt source-tree SHA-256: `0581db6a1f6e66501197ffc516492dd7c5c7ee5a1760a8fe620d87d4bb5d51f2`.
+
+This is a focused RCAF research-workflow pass only. Broad repository CI and PR Governance were skipped. The workflow runs the entire focused simulation stack as an integration check; the metamorphic contract itself is limited to the Rust function fixtures described above.
 ## Not assumed or currently tested
 
 - Global gain/offset invariance is endpoint-specific and is not asserted for correlation matrices in general.
