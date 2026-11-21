@@ -119,6 +119,7 @@ pub mod live_output;
 pub mod mel_extractor;
 pub mod mel_mlp;
 pub mod melody;
+pub mod perception_parity;
 #[cfg(feature = "theory")]
 pub mod methodology_plan;
 pub mod midi;
