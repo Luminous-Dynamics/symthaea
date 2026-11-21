@@ -733,9 +733,11 @@ mod tests {
                     .iter()
                     .find(|item| Some(item.obligation_id) == batch.driving_obligation_id)
                     .map(|item| item.verified);
-                let assessment = batch.selection.assessments.iter().find(|item| {
-                    item.alternative_id == candidate.alternative_id
-                });
+                let assessment = batch
+                    .selection
+                    .assessments
+                    .iter()
+                    .find(|item| item.alternative_id == candidate.alternative_id);
                 format!(
                     "{}:{:?}:theory={}:preserved={}:verified={:?}:assessment={:?}",
                     candidate.alternative_id,
@@ -844,7 +846,10 @@ mod tests {
 
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
-        eprintln!("Sonata subintent gates: {}", candidate_gate_diagnostics(&batch));
+        eprintln!(
+            "Sonata subintent gates: {}",
+            candidate_gate_diagnostics(&batch)
+        );
         assert_eq!(batch.candidates.len(), 5);
         let source_digest = batch.candidates[0]
             .patch_receipt
@@ -923,13 +928,19 @@ mod tests {
         let mut repeat_trace = return_trace(&realization);
         repeat_trace.inference.source_action = MusicAction::RepeatMotif;
         let repeat_batch = generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
-        eprintln!("RepeatMotif gates: {}", candidate_gate_diagnostics(&repeat_batch));
+        eprintln!(
+            "RepeatMotif gates: {}",
+            candidate_gate_diagnostics(&repeat_batch)
+        );
 
         let mut maintain_trace = repeat_trace.clone();
         maintain_trace.inference.source_action = MusicAction::Maintain;
         let maintain_batch =
             generate_and_rank_sonata_return(&realization, &maintain_trace).unwrap();
-        eprintln!("Maintain gates: {}", candidate_gate_diagnostics(&maintain_batch));
+        eprintln!(
+            "Maintain gates: {}",
+            candidate_gate_diagnostics(&maintain_batch)
+        );
 
         assert_eq!(
             repeat_batch.cognitive_subintent.disposition,
