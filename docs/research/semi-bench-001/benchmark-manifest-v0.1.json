@@ -737,9 +737,9 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962",
-      "run_id": 44917273962,
-      "tested_commit": "5f8ffa91bac2cb8cee923d0f1968d2f57fd01149",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
+      "run_id": 44917385489,
+      "tested_commit": "010faa4a517d4dc46a57a9b0f6b07015a188bf35",
       "conclusion": "success",
       "test_count": 46,
       "passed_steps": [
@@ -748,7 +748,7 @@
         "Reproduce inspection decision report byte-for-byte",
         "Reproduce contrastive-pair validation report byte-for-byte"
       ],
-      "note": "Hosted GitHub Actions verified 46/46 tests and all three frozen CLI reports on the clean-base v0.2 PR head."
+      "note": "Hosted GitHub Actions verified the complete 46-test suite and all three frozen CLI reports on the current clean-base v0.2 PR head."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -791,7 +791,7 @@
         "cli_report_byte_for_byte": true
       },
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962"
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489"
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
