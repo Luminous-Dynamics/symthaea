@@ -91,8 +91,17 @@ fn extract_python_method(source: &str, signature: &str) -> Option<String> {
 
     let mut result = String::new();
     for (index, line) in lines.iter().enumerate().skip(start) {
-        if index > start && !line.trim().is_empty() && leading_spaces(line) < method_indent {
-            break;
+        if index > start && !line.trim().is_empty() {
+            let indent = leading_spaces(line);
+            let trimmed = line.trim_start();
+            let sibling_definition = indent == method_indent
+                && (trimmed.starts_with("def ")
+                    || trimmed.starts_with("async def ")
+                    || trimmed.starts_with("class ")
+                    || trimmed.starts_with('@'));
+            if indent < method_indent || sibling_definition {
+                break;
+            }
         }
         result.push_str(line);
         result.push('\n');
@@ -327,6 +336,22 @@ mod tests {
 "#;
         let method = extract_python_method(source, FORWARD_SIGNATURE).unwrap();
         assert!(method.contains("timespans = torch.ones"));
+        assert!(!method.contains("def next_method"));
+    }
+
+    #[test]
+    fn method_extraction_keeps_nested_definitions_inside_the_method() {
+        let source = r#"class Model:
+    def forward(self, x, timespans=None, mask=None):
+        def helper(value):
+            return value
+        return helper(x)
+
+    def next_method(self):
+        return 1
+"#;
+        let method = extract_python_method(source, FORWARD_SIGNATURE).unwrap();
+        assert!(method.contains("def helper"));
         assert!(!method.contains("def next_method"));
     }
 
