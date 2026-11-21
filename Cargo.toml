@@ -25,12 +25,27 @@ exclude = [
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
+    # Stale path matched by crates/core/* but has no Cargo.toml. Keep it
+    # explicitly outside the workspace until it is restored as a real crate.
+    "crates/core/symthaea",
+    # A second stale core glob match with no Cargo.toml, found by exact-head
+    # workspace manifest qualification on 2026-11-21.
+    "crates/core/symthaea-iit",
+    # Stale observation-attestation directory with no Cargo manifest.
+    "crates/core/symthaea-observation-attestation",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
     # stack, but zero consumers — its only reference is foveation's non-default
     # `perception` feature nothing enables, and it duplicates src/perception/'s
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Stale/placeholder domain directories discovered by wildcard integrity scan;
+    # none currently contains a Cargo.toml, so none is a buildable workspace crate.
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-marine-geometry",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
