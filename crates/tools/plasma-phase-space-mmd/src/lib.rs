@@ -671,9 +671,21 @@ pub fn compare_phase_space_measures_spectral(
         mean += delta / count;
         let delta_after_update = squared_difference - mean;
         sum_squared_deviation += delta * delta_after_update;
+
+        let component_count = component_feature_counts[component_index] as f64;
+        let component_delta = squared_difference - component_means[component_index];
+        component_means[component_index] += component_delta / component_count;
+        let component_delta_after_update =
+            squared_difference - component_means[component_index];
+        component_sum_squared_deviations[component_index] +=
+            component_delta * component_delta_after_update;
     }
 
-    if !mean.is_finite() || !sum_squared_deviation.is_finite() {
+    if !mean.is_finite()
+        || !sum_squared_deviation.is_finite()
+        || component_means.iter().any(|value| !value.is_finite())
+        || component_sum_squared_deviations.iter().any(|value| !value.is_finite())
+    {
         return Err(MmdError::NonFiniteOutput);
     }
 
@@ -978,12 +990,35 @@ pub struct MmdMixtureConfig {
     pub components: Vec<MmdKernelComponent>,
 }
 
+/// Exact mixture reference with aggregate and per-component diagnostics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MmdMixtureResult {
+    pub aggregate: MmdResult,
+    /// Exact normalized MMD^2 for every configured kernel component, in the
+    /// same order as MmdMixtureConfig.components.
+    pub component_normalized_mmd_squared: Vec<f64>,
+}
+
+/// Per-component summary from a spectral mixture draw. These are descriptive
+/// conditional estimates; the mixture-wide Hoeffding bound does not apply to
+/// each component estimate independently.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpectralMmdMixtureComponentEstimate {
+    pub feature_count: usize,
+    pub normalized_mmd_squared_estimate: Option<f64>,
+    pub feature_sample_variance: Option<f64>,
+    pub feature_standard_error: Option<f64>,
+}
+
 /// Spectral mixture estimate together with component allocation provenance.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpectralMmdMixtureResult {
     pub estimate: SpectralMmdResult,
     /// Number of spectral features sampled from each configured component.
     pub component_feature_counts: Vec<usize>,
+    /// Conditional estimates for each component; None when the component
+    /// received no sampled features in this finite draw.
+    pub component_estimates: Vec<SpectralMmdMixtureComponentEstimate>,
 }
 
 fn validate_mixture_config(config: &MmdMixtureConfig) -> Result<f64, MmdError> {
@@ -1074,7 +1109,7 @@ pub fn compare_phase_space_measures_mmd_mixture(
     candidate: &[PhaseSpaceParticle1d],
     reference: &[PhaseSpaceParticle1d],
     config: &MmdMixtureConfig,
-) -> Result<MmdResult, MmdError> {
+) -> Result<MmdMixtureResult, MmdError> {
     let total_weight = validate_mixture_config(config)?;
     let (candidate_atoms, candidate_tv) =
         aggregate_measure(candidate, "candidate", config.domain_length)?;
@@ -1135,17 +1170,33 @@ pub fn compare_phase_space_measures_mmd_mixture(
         return Err(MmdError::NonFiniteOutput);
     }
 
-    Ok(MmdResult {
-        normalized_mmd_squared,
-        normalized_mmd,
-        total_variation_scale,
-        candidate_particle_count: candidate.len(),
-        reference_particle_count: reference.len(),
-        candidate_atom_count: candidate_atoms.len(),
-        reference_atom_count: reference_atoms.len(),
-        pair_evaluations,
-        roundoff_tolerance,
-        negative_roundoff_clamped,
+    let component_normalized_mmd_squared = config
+        .components
+        .iter()
+        .map(|component| {
+            compare_phase_space_measures_mmd(
+                candidate,
+                reference,
+                component_config(config.domain_length, *component),
+            )
+            .map(|result| result.normalized_mmd_squared)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(MmdMixtureResult {
+        aggregate: MmdResult {
+            normalized_mmd_squared,
+            normalized_mmd,
+            total_variation_scale,
+            candidate_particle_count: candidate.len(),
+            reference_particle_count: reference.len(),
+            candidate_atom_count: candidate_atoms.len(),
+            reference_atom_count: reference_atoms.len(),
+            pair_evaluations,
+            roundoff_tolerance,
+            negative_roundoff_clamped,
+        },
+        component_normalized_mmd_squared,
     })
 }
 
@@ -1198,6 +1249,8 @@ pub fn compare_phase_space_measures_spectral_mixture(
 
     let mut rng = SplitMix64::new(feature_config.seed);
     let mut component_feature_counts = vec![0_usize; mixture.components.len()];
+    let mut component_means = vec![0.0_f64; mixture.components.len()];
+    let mut component_sum_squared_deviations = vec![0.0_f64; mixture.components.len()];
     let mut mean = 0.0;
     let mut sum_squared_deviation = 0.0;
 
@@ -1253,6 +1306,33 @@ pub fn compare_phase_space_measures_spectral_mixture(
         return Err(MmdError::NonFiniteOutput);
     }
 
+    let component_estimates = component_feature_counts
+        .iter()
+        .enumerate()
+        .map(|(index, count)| {
+            if *count == 0 {
+                SpectralMmdMixtureComponentEstimate {
+                    feature_count: 0,
+                    normalized_mmd_squared_estimate: None,
+                    feature_sample_variance: None,
+                    feature_standard_error: None,
+                }
+            } else {
+                let variance = if *count > 1 {
+                    (component_sum_squared_deviations[index] / (*count - 1) as f64).max(0.0)
+                } else {
+                    0.0
+                };
+                SpectralMmdMixtureComponentEstimate {
+                    feature_count: *count,
+                    normalized_mmd_squared_estimate: Some(component_means[index]),
+                    feature_sample_variance: Some(variance),
+                    feature_standard_error: Some((variance / *count as f64).sqrt()),
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
     Ok(SpectralMmdMixtureResult {
         estimate: SpectralMmdResult {
             normalized_mmd_squared: mean,
@@ -1271,6 +1351,7 @@ pub fn compare_phase_space_measures_spectral_mixture(
             particle_feature_evaluations,
         },
         component_feature_counts,
+        component_estimates,
     })
 }
 
