@@ -73,3 +73,13 @@ The decision is made against a preregistered tolerance on normalized squared MMD
 The controller consumes one continuous seeded feature stream; it does not reseed between checkpoints. The same seed and final feature count reproduce the corresponding fixed-D prefix. The checkpoint transcript records feature counts, alpha allocations, cumulative alpha spending, estimate and interval.
 
 This is a simultaneous guarantee only over the declared checkpoint schedule, not every possible intermediate feature count. The bound assumes independent draws from the exact spectral measure; the deterministic SplitMix64 stream provides reproducibility but is not a cryptographic RNG or a formal proof of pseudorandom independence. The confidence statement concerns only random-feature integration error in normalized squared MMD—not physical solver, particle sampling or trajectory error.
+
+## Frozen multi-scale characteristic-kernel mixture
+
+The crate exposes exact and spectral mixture APIs using a finite positive combination of periodic von Mises × Gaussian velocity kernels. Each component has its own spatial concentration and velocity length scale; weights must be positive, sum to one within the declared tolerance, and duplicate scale pairs are rejected. Each component is characteristic and the positive mixture remains characteristic.
+
+- compare_phase_space_measures_mmd_mixture evaluates the exact small-N mixture quadratic form.
+- compare_phase_space_measures_spectral_mixture samples a component by its mixture probability, then samples that component's full Skellam × Gaussian spectrum.
+- The spectral result includes the per-component feature draw counts, seed and feature-sampling error report.
+
+The exact oracle must equal the positive weighted sum of the independent exact component MMD² values, within floating-point tolerance. The mixture is a new versioned diagnostic profile; it does not replace the baseline single-scale profile. Freeze scales and weights using training/calibration fixtures, never held-out trajectories. Report per-component MMD beside aggregate mixture MMD so the aggregate cannot hide a scale-specific failure.
