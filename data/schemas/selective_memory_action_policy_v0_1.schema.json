@@ -210,17 +210,13 @@
           "$ref": "#/$defs/sha256"
         },
         "declared_action": {
-          "type": "string",
-          "enum": [
-            "persist",
-            "session_only",
-            "discard_candidate",
-            "request_confirmation",
-            "use",
-            "verify",
-            "clarify",
-            "abstain",
-            "probe"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ingestion_action"
+            },
+            {
+              "$ref": "#/$defs/query_action"
+            }
           ]
         },
         "actual_tool_action": {
@@ -438,7 +434,8 @@
         "verification_receipt_valid",
         "tool_call_matches_action",
         "timely_abstention",
-        "evaluation_validity"
+        "evaluation_validity",
+        "persistence_receipt_valid"
       ],
       "properties": {
         "schema_version": {
@@ -460,17 +457,13 @@
           "$ref": "#/$defs/stage"
         },
         "expected_action": {
-          "type": "string",
-          "enum": [
-            "persist",
-            "session_only",
-            "discard_candidate",
-            "request_confirmation",
-            "use",
-            "verify",
-            "clarify",
-            "abstain",
-            "probe"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ingestion_action"
+            },
+            {
+              "$ref": "#/$defs/query_action"
+            }
           ]
         },
         "actual_action_match": {
@@ -555,8 +548,67 @@
         },
         "label_provenance_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "persistence_receipt_valid": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "expected_action": {
+                "const": "persist"
+              }
+            },
+            "required": [
+              "expected_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "persistence_receipt_valid"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "expected_action": {
+                "const": "verify"
+              }
+            },
+            "required": [
+              "expected_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "verification_receipt_valid"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "expected_action": {
+                "const": "clarify"
+              }
+            },
+            "required": [
+              "expected_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "clarification_resolved"
+            ]
+          }
+        }
+      ]
     },
     "metric": {
       "type": "object",
