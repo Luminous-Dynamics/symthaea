@@ -444,7 +444,13 @@
         "measured_negative_examples",
         "false_support_count",
         "false_support_rate_all_negatives",
-        "false_support_rate_measured_negatives"
+        "false_support_rate_measured_negatives",
+        "measured_negative_source_groups",
+        "false_support_source_groups",
+        "false_support_group_rate",
+        "false_support_group_upper_95_wilson",
+        "group_risk_status",
+        "group_risk_interval_method"
       ],
       "properties": {
         "negative_family": {
@@ -479,6 +485,44 @@
           ],
           "minimum": 0,
           "maximum": 1
+        },
+        "measured_negative_source_groups": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Distinct source groups containing at least one measured negative in this family."
+        },
+        "false_support_source_groups": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Distinct source groups with at least one falsely supported measured negative in this family."
+        },
+        "false_support_group_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "False-supporting source groups divided by measured-negative source groups."
+        },
+        "false_support_group_upper_95_wilson": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "One-sided nominal 95% Wilson score upper bound over independent source groups; not an exact interval or simultaneous family-wise bound."
+        },
+        "group_risk_status": {
+          "enum": [
+            "qualified_at_target",
+            "insufficient_evidence",
+            "observed_risk_exceeds_target"
+          ]
+        },
+        "group_risk_interval_method": {
+          "const": "wilson_score_one_sided_95"
         }
       }
     }
