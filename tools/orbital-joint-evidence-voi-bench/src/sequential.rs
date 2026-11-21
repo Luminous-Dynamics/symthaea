@@ -615,7 +615,6 @@ fn fixed_policy(scenario: &SequentialScenario) -> Result<FixedCampaignAudit, Str
         .map(|action| (action.action_id.as_str(), action))
         .collect();
     let mut resources = zero_resources();
-    let mut groups = BTreeMap::<Vec<String>, Vec<String>>::new();
     for action_id in &scenario.fixed_campaign_sequence {
         let action = actions_by_id
             .get(action_id.as_str())
@@ -701,6 +700,15 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     }
     let state_set: BTreeSet<&str> = scenario.states.iter().map(String::as_str).collect();
     let decision_set: BTreeSet<&str> = scenario.decisions.iter().map(String::as_str).collect();
+    if !["ACCEPT", "REJECT", "HOLD"]
+        .iter()
+        .all(|decision| decision_set.contains(decision))
+    {
+        return Err(format!(
+            "{} must declare ACCEPT, REJECT and HOLD dispositions",
+            scenario.scenario_id
+        ));
+    }
     if decision_set.len() != scenario.decisions.len() {
         return Err(format!(
             "{} has duplicate decision labels",
