@@ -12,7 +12,7 @@
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 use symthaea_canvas::{
-    EmbodimentSnapshot, MycelialTubeMesh, OrbitalCell, PresenceMode,
+    EmbodimentSnapshot, MycelialFilament, MycelialTubeMesh, OrbitalCell, PresenceMode,
     TubeTessellationConfig, build_mycelial_model, tessellate_mycelial_model,
 };
 use symthaea_mycelial_renderer::into_bevy_mesh;
@@ -115,6 +115,7 @@ fn setup_presence(
     )
     .expect("bounded canonical model must tessellate");
     spawn_filament_canopy(&mut commands, &mut meshes, &mut materials, cpu_mesh);
+    spawn_terminal_spores(&mut commands, &mut meshes, &mut materials, &model.filaments);
 
     spawn_core(&mut commands, &mut meshes, &mut materials, config.reduced_motion);
     spawn_orbital_cells(
@@ -134,8 +135,8 @@ fn spawn_filament_canopy(
 ) {
     let mesh = meshes.add(into_bevy_mesh(cpu_mesh));
     let material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.025, 0.58, 0.68),
-        emissive: LinearRgba::rgb(0.015, 0.24, 0.34),
+        base_color: Color::WHITE,
+        emissive: LinearRgba::rgb(0.012, 0.16, 0.21),
         metallic: 0.28,
         perceptual_roughness: 0.34,
         ..default()
@@ -145,6 +146,35 @@ fn spawn_filament_canopy(
         MeshMaterial3d(material),
         Transform::from_scale(Vec3::splat(0.035)),
     ));
+}
+
+fn spawn_terminal_spores(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    filaments: &[MycelialFilament],
+) {
+    let spore_mesh = meshes.add(Sphere::new(0.058).mesh().ico(2).expect("valid spore mesh"));
+    let spore_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.30, 0.86, 0.90),
+        emissive: LinearRgba::rgb(0.12, 0.70, 0.82),
+        metallic: 0.08,
+        perceptual_roughness: 0.22,
+        ..default()
+    });
+
+    for filament in filaments.iter().filter(|filament| filament.terminal) {
+        let position = filament.end;
+        commands.spawn((
+            Mesh3d(spore_mesh.clone()),
+            MeshMaterial3d(spore_material.clone()),
+            Transform::from_xyz(
+                position.x * 0.035,
+                position.z * 0.035,
+                position.y * 0.035,
+            ),
+        ));
+    }
 }
 
 fn spawn_core(
