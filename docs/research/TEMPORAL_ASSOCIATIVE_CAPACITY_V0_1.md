@@ -57,6 +57,7 @@ Each cohort also emits:
 - chance accuracy (1/K);
 - mean target/distractor similarity and retrieval margin;
 - a **finite-sample plug-in Fano diagnostic**;
+- initial/final state L2 norms, so the neuron's post-step global norm cap (5.0 in the current implementation) is visible rather than hidden in a cosine-only metric;
 - neuron API update count and neuron-reported logical time;
 - separate wall-time observations for model setup, input preparation, state evolution and query decoding.
 
@@ -69,7 +70,7 @@ max{0,log_2 K-h_2(e)-elog_2(K-1)}.
 
 The JSON field is named `plug_in_fano_information_lower_bound_bits`, but the value is calculated from the finite cohort's observed error rate. It is a descriptive plug-in diagnostic—not a confidence interval, a distribution-free finite-sample guarantee, or a substitute for estimating mutual information under a specified sampling distribution. The diagnostic is not the same as retrieval accuracy: a deterministic but wrong permutation can still preserve information about the label while failing the original semantic lookup. The per-query rows are retained so that uncertainty estimation and alternative estimators can be applied later.
 
-Wall-clock fields are observations from a single process run, not energy measurements. The model setup and input preparation costs are separated from the neuron-evolution loop; the latter includes the neuron method's own post-step statistics work. The API update counter counts public evolution calls, not floating-point operations or internal component operations.
+Wall-clock fields are observations from a single process run, not energy measurements. The model setup and input preparation costs are separated from the neuron-evolution loop; the latter includes the neuron method's own post-step statistics work. The API update counter counts public evolution calls, not floating-point operations or internal component operations. The initial and final state norms are diagnostics because the current HDC-LTC implementation rescales a state above its global norm limit after evolution; comparisons across dimension/fan-in must account for this nonlinear amplitude effect.
 
 ## Running
 
