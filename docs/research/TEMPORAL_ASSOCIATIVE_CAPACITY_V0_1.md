@@ -80,7 +80,8 @@ From the repository root:
 cargo run --release --manifest-path crates/core/symthaea-hdc-ltc/Cargo.toml \
   --example temporal_associative_capacity -- \
   --dims 1024,4096 --loads 4,8,16 --horizons 1,10 \
-  --events 1,8 --seeds 5 --out temporal-capacity.jsonl
+  --events 1,8 --seeds 5 --source-revision "$(git rev-parse HEAD)" \
+  --out temporal-capacity.jsonl
 ```
 
 Arguments:
@@ -89,9 +90,10 @@ Arguments:
 - `--horizons`: finite non-negative horizons in seconds; zero is reserved for identity/static controls;
 - `--events`: number of evolution calls for each dynamic cohort; the codebook and event-input arrays are capped at 8,388,608 dimension-elements per configured cohort to avoid unbounded allocations;
 - `--seeds`: number of deterministic corpus/model seeds;
+- `--source-revision`: optional 40- or 64-character hexadecimal Git SHA; use the current source commit for publishable measurements. The summary receipt stores null when omitted;
 - `--out`: JSONL destination; omit it or pass `-` for stdout.
 
-The JSONL stream contains one `query` record per item followed by one `summary` record for each cohort. A summary with (K) queries uses all (K) queries as its denominator; invalid and tied queries remain visible and cannot improve the correctness count.
+The JSONL stream contains one `query` record per item followed by one `summary` record for each cohort. Each summary carries the source revision used for the run (or null when the caller did not pin one). A summary with (K) queries uses all (K) queries as its denominator; invalid and tied queries remain visible and cannot improve the correctness count.
 
 ## Capacity targets for the next qualification phase
 
