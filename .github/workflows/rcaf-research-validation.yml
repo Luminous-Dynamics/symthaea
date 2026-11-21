@@ -124,6 +124,12 @@ jobs:
           jsonschema.validate(report, schema)
           assert report["null_false_positive_rate"]["estimate"] <= 0.15
           assert report["injection_detection_power"]["estimate"] >= 0.80
+          assert report["injection_directional_detection_power"]["estimate"] >= 0.80
+          assert (
+              report["injection_directional_detection_power"]["successes"]
+              + report["injection_wrong_direction_rejection_rate"]["successes"]
+              == report["injection_detection_power"]["successes"]
+          )
           assert report["median_injected_paired_gap"] > report["median_null_paired_gap"] + 0.035
           print("PASS: RCAF synthetic null calibration and injection recovery")
           PY
