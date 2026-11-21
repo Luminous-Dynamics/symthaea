@@ -291,6 +291,38 @@ fn allocate_output(elements: usize) -> Result<Vec<f64>, MixedReconstructionError
 mod tests {
     use super::*;
 
+    fn fields<'a>(
+        spatial_count: usize,
+        hermite_modes: usize,
+        hermite_coefficients: &'a [f64],
+        legendre_modes: usize,
+        legendre_coefficients: &'a [f64],
+    ) -> MixedCoefficientFields<'a> {
+        MixedCoefficientFields {
+            spatial_count,
+            hermite_modes,
+            hermite_coefficients,
+            legendre_modes,
+            legendre_coefficients,
+        }
+    }
+
+    fn grid<'a>(
+        velocities: &'a [f64],
+        shift: f64,
+        scale: f64,
+        velocity_min: f64,
+        velocity_max: f64,
+    ) -> MixedVelocityGrid<'a> {
+        MixedVelocityGrid {
+            velocities,
+            shift,
+            scale,
+            velocity_min,
+            velocity_max,
+        }
+    }
+
     fn close(actual: f64, expected: f64, tolerance: f64) {
         assert!(
             (actual - expected).abs() <= tolerance,
@@ -302,16 +334,8 @@ mod tests {
     fn reconstructs_hermite_bulk_and_legendre_residual_separately() {
         let velocities = [-2.0, 0.0, 1.0, 2.0];
         let distribution = reconstruct_mixed_distribution(
-            2,
-            &velocities,
-            1,
-            &[2.0, 3.0],
-            1,
-            &[0.5, -0.25],
-            0.0,
-            1.0,
-            -1.0,
-            1.0,
+            fields(2, 1, &[2.0, 3.0], 1, &[0.5, -0.25]),
+            grid(&velocities, 0.0, 1.0, -1.0, 1.0),
         )
         .unwrap();
 
@@ -352,9 +376,11 @@ mod tests {
     #[test]
     fn pure_hermite_reconstruction_allows_zero_legendre_modes() {
         let velocities = [0.0, 0.5];
-        let distribution =
-            reconstruct_mixed_distribution(1, &velocities, 1, &[2.0], 0, &[], 0.0, 1.0, -1.0, 1.0)
-                .unwrap();
+        let distribution = reconstruct_mixed_distribution(
+            fields(1, 1, &[2.0], 0, &[]),
+            grid(&velocities, 0.0, 1.0, -1.0, 1.0),
+        )
+        .unwrap();
 
         assert_eq!(distribution.legendre_residual(), &[0.0, 0.0]);
         assert_eq!(distribution.total(), distribution.hermite_bulk());
@@ -364,16 +390,8 @@ mod tests {
     fn pure_legendre_reconstruction_allows_zero_hermite_modes() {
         let velocities = [-2.0, 0.0, 2.0];
         let distribution = reconstruct_mixed_distribution(
-            1,
-            &velocities,
-            0,
-            &[],
-            1,
-            &[0.75],
-            f64::NAN,
-            0.0,
-            -1.0,
-            1.0,
+            fields(1, 0, &[], 1, &[0.75]),
+            grid(&velocities, f64::NAN, 0.0, -1.0, 1.0),
         )
         .unwrap();
 
@@ -384,9 +402,11 @@ mod tests {
 
     #[test]
     fn signed_legendre_residual_is_preserved_without_clipping() {
-        let distribution =
-            reconstruct_mixed_distribution(1, &[0.0], 1, &[0.0], 1, &[-2.5], 0.0, 1.0, -1.0, 1.0)
-                .unwrap();
+        let distribution = reconstruct_mixed_distribution(
+            fields(1, 1, &[0.0], 1, &[-2.5]),
+            grid(&[0.0], 0.0, 1.0, -1.0, 1.0),
+        )
+        .unwrap();
 
         assert_eq!(distribution.legendre_at(0, 0), Some(-2.5));
         assert_eq!(distribution.total_at(0, 0), Some(-2.5));
@@ -395,16 +415,8 @@ mod tests {
     #[test]
     fn reconstruction_requires_exact_coefficient_shapes() {
         let error = reconstruct_mixed_distribution(
-            2,
-            &[0.0],
-            1,
-            &[1.0],
-            1,
-            &[0.5, 0.5],
-            0.0,
-            1.0,
-            -1.0,
-            1.0,
+            fields(2, 1, &[1.0], 1, &[0.5, 0.5]),
+            grid(&[0.0], 0.0, 1.0, -1.0, 1.0),
         );
         assert_eq!(
             error,
@@ -418,8 +430,10 @@ mod tests {
 
     #[test]
     fn reconstruction_rejects_non_finite_coefficients() {
-        let hermite_error =
-            reconstruct_mixed_distribution(1, &[0.0], 1, &[f64::NAN], 0, &[], 0.0, 1.0, -1.0, 1.0);
+        let hermite_error = reconstruct_mixed_distribution(
+            fields(1, 1, &[f64::NAN], 0, &[]),
+            grid(&[0.0], 0.0, 1.0, -1.0, 1.0),
+        );
         assert_eq!(
             hermite_error,
             Err(MixedReconstructionError::NonFiniteCoefficient {
@@ -429,16 +443,8 @@ mod tests {
         );
 
         let legendre_error = reconstruct_mixed_distribution(
-            1,
-            &[0.0],
-            0,
-            &[],
-            1,
-            &[f64::INFINITY],
-            f64::NAN,
-            0.0,
-            -1.0,
-            1.0,
+            fields(1, 0, &[], 1, &[f64::INFINITY]),
+            grid(&[0.0], f64::NAN, 0.0, -1.0, 1.0),
         );
         assert_eq!(
             legendre_error,
@@ -452,16 +458,8 @@ mod tests {
     #[test]
     fn reconstruction_detects_non_finite_output() {
         let distribution = reconstruct_mixed_distribution(
-            1,
-            &[1.0],
-            2,
-            &[1.7e308, 1.7e308],
-            1,
-            &[1.7e308],
-            0.0,
-            1.0,
-            -2.0,
-            2.0,
+            fields(1, 2, &[1.7e308, 1.7e308], 1, &[1.7e308]),
+            grid(&[1.0], 0.0, 1.0, -2.0, 2.0),
         );
         assert!(matches!(
             distribution,
@@ -475,15 +473,24 @@ mod tests {
     #[test]
     fn reconstruction_rejects_empty_grids_and_no_basis() {
         assert_eq!(
-            reconstruct_mixed_distribution(0, &[0.0], 1, &[1.0], 0, &[], 0.0, 1.0, -1.0, 1.0),
+            reconstruct_mixed_distribution(
+                fields(0, 1, &[1.0], 0, &[]),
+                grid(&[0.0], 0.0, 1.0, -1.0, 1.0),
+            ),
             Err(MixedReconstructionError::EmptySpatialGrid)
         );
         assert_eq!(
-            reconstruct_mixed_distribution(1, &[], 1, &[1.0], 0, &[], 0.0, 1.0, -1.0, 1.0),
+            reconstruct_mixed_distribution(
+                fields(1, 1, &[1.0], 0, &[]),
+                grid(&[], 0.0, 1.0, -1.0, 1.0),
+            ),
             Err(MixedReconstructionError::EmptyVelocityGrid)
         );
         assert_eq!(
-            reconstruct_mixed_distribution(1, &[0.0], 0, &[], 0, &[], 0.0, 1.0, -1.0, 1.0),
+            reconstruct_mixed_distribution(
+                fields(1, 0, &[], 0, &[]),
+                grid(&[0.0], 0.0, 1.0, -1.0, 1.0),
+            ),
             Err(MixedReconstructionError::NoRepresentedModes)
         );
     }
@@ -491,7 +498,10 @@ mod tests {
     #[test]
     fn reconstruction_rejects_shape_overflow_before_allocating() {
         assert_eq!(
-            reconstruct_mixed_distribution(usize::MAX, &[0.0], 2, &[], 0, &[], 0.0, 1.0, -1.0, 1.0),
+            reconstruct_mixed_distribution(
+                fields(usize::MAX, 2, &[], 0, &[]),
+                grid(&[0.0], 0.0, 1.0, -1.0, 1.0),
+            ),
             Err(MixedReconstructionError::ShapeOverflow)
         );
     }
@@ -499,16 +509,8 @@ mod tests {
     #[test]
     fn reconstruction_checks_all_output_shapes_and_accessors() {
         let distribution = reconstruct_mixed_distribution(
-            2,
-            &[0.0, 1.0, 2.0],
-            1,
-            &[1.0, 2.0],
-            0,
-            &[],
-            0.0,
-            1.0,
-            -1.0,
-            1.0,
+            fields(2, 1, &[1.0, 2.0], 0, &[]),
+            grid(&[0.0, 1.0, 2.0], 0.0, 1.0, -1.0, 1.0),
         )
         .unwrap();
 
