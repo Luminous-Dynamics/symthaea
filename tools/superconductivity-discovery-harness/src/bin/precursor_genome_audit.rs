@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
@@ -31,17 +31,26 @@ fn git_blob_sha1(bytes: &[u8]) -> String {
 }
 
 fn nonempty_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value.get(key).and_then(Value::as_str).filter(|value| !value.trim().is_empty())
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| format!("missing or empty string field {key}"))
 }
 
 fn count_field(value: &Value, key: &str) -> Result<usize, String> {
-    value.get(key).and_then(Value::as_u64).and_then(|number| usize::try_from(number).ok())
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .and_then(|number| usize::try_from(number).ok())
         .ok_or_else(|| format!("missing or invalid non-negative integer field {key}"))
 }
 
 fn optional_index(value: &Value, key: &str) -> Option<usize> {
-    value.get(key).and_then(Value::as_u64).and_then(|number| usize::try_from(number).ok())
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .and_then(|number| usize::try_from(number).ok())
 }
 
 fn number_is_finite(value: Option<&Value>) -> bool {
@@ -49,12 +58,18 @@ fn number_is_finite(value: Option<&Value>) -> bool {
 }
 
 fn json_count_map(value: &Value, key: &str) -> Result<BTreeMap<String, usize>, String> {
-    let object = value.get(key).and_then(Value::as_object)
+    let object = value
+        .get(key)
+        .and_then(Value::as_object)
         .ok_or_else(|| format!("manifest expected_profile.{key} must be an object"))?;
     let mut counts = BTreeMap::new();
     for (name, count) in object {
-        let number = count.as_u64().and_then(|number| usize::try_from(number).ok())
-            .ok_or_else(|| format!("manifest expected_profile.{key}.{name} must be a non-negative integer"))?;
+        let number = count
+            .as_u64()
+            .and_then(|number| usize::try_from(number).ok())
+            .ok_or_else(|| {
+                format!("manifest expected_profile.{key}.{name} must be a non-negative integer")
+            })?;
         counts.insert(name.clone(), number);
     }
     Ok(counts)
@@ -70,11 +85,7 @@ fn check_count(profile: &Value, key: &str, observed: usize) -> Result<(), String
     Ok(())
 }
 
-fn check_map(
-    profile: &Value,
-    key: &str,
-    observed: &BTreeMap<String, usize>,
-) -> Result<(), String> {
+fn check_map(profile: &Value, key: &str, observed: &BTreeMap<String, usize>) -> Result<(), String> {
     let expected = json_count_map(profile, key)?;
     if &expected != observed {
         return Err(format!(
@@ -105,9 +116,13 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("source manifest schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema).map_err(|error| format!("manifest schema compilation failed: {error}"))?;
+    let validator = validator_for(&schema)
+        .map_err(|error| format!("manifest schema compilation failed: {error}"))?;
     if let Some(error) = validator.iter_errors(&manifest).next() {
-        return Err(format!("source manifest schema validation failed: {error} at {}", error.instance_path()));
+        return Err(format!(
+            "source manifest schema validation failed: {error} at {}",
+            error.instance_path()
+        ));
     }
     if nonempty_string(&manifest, "contract")? != CONTRACT {
         return Err("unsupported Precursor Genome source-manifest contract".to_owned());
@@ -116,7 +131,10 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         return Err("source manifest has an unsupported claim ceiling".to_owned());
     }
     if nonempty_string(&ledger, "repository_name")? != "Precursor_Genome_Alpha" {
-        return Err("source ledger repository_name does not match the pinned Precursor Genome release".to_owned());
+        return Err(
+            "source ledger repository_name does not match the pinned Precursor Genome release"
+                .to_owned(),
+        );
     }
 
     let actual_blob_sha1 = git_blob_sha1(ledger_bytes);
@@ -127,9 +145,12 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         ));
     }
 
-    let samples = ledger.get("samples").and_then(Value::as_array)
+    let samples = ledger
+        .get("samples")
+        .and_then(Value::as_array)
         .ok_or("source ledger.samples must be an array")?;
-    let profile = manifest.get("expected_profile")
+    let profile = manifest
+        .get("expected_profile")
         .ok_or("source manifest expected_profile is missing")?;
 
     let mut sample_ids = HashSet::new();
@@ -167,10 +188,14 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         }
         all_sample_ids.push(sample_id.clone());
 
-        let precursors = sample.get("precursors").and_then(Value::as_array)
+        let precursors = sample
+            .get("precursors")
+            .and_then(Value::as_array)
             .ok_or_else(|| format!("sample {sample_id} is missing its precursor array"))?;
         if precursors.len() != 2 {
-            return Err(format!("sample {sample_id} must have exactly two precursor entries"));
+            return Err(format!(
+                "sample {sample_id} must have exactly two precursor entries"
+            ));
         }
         let mut formulas = Vec::with_capacity(2);
         for precursor in precursors {
@@ -181,24 +206,33 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         formulas.sort();
         let pair_key = format!("{} + {}", formulas[0], formulas[1]);
         if !precursor_pairs.insert(pair_key.clone()) {
-            return Err(format!("duplicate precursor pair {pair_key} at sample {sample_id}"));
+            return Err(format!(
+                "duplicate precursor pair {pair_key} at sample {sample_id}"
+            ));
         }
 
-        let category = sample.pointer("/outcome/reaction_category")
+        let category = sample
+            .pointer("/outcome/reaction_category")
             .and_then(Value::as_str)
             .filter(|category| !category.trim().is_empty())
             .unwrap_or("unclassified")
             .to_owned();
         if category != "unclassified" && !CATEGORIES.contains(&category.as_str()) {
-            return Err(format!("sample {sample_id} has unsupported reaction category {category}"));
+            return Err(format!(
+                "sample {sample_id} has unsupported reaction category {category}"
+            ));
         }
         *category_counts.entry(category.clone()).or_default() += 1;
-        category_ids.entry(category.clone()).or_default().push(sample_id.clone());
+        category_ids
+            .entry(category.clone())
+            .or_default()
+            .push(sample_id.clone());
         if category == "unclassified" {
             unclassified_ids.push(sample_id.clone());
         }
 
-        let physical_failure = sample.get("physical_failure")
+        let physical_failure = sample
+            .get("physical_failure")
             .is_some_and(|value| !value.is_null());
         if physical_failure {
             physical_failures += 1;
@@ -227,13 +261,17 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
             classified_temperature_no_failure.push(sample_id.clone());
         }
 
-        let scans = sample.pointer("/characterization/xrd/scans")
+        let scans = sample
+            .pointer("/characterization/xrd/scans")
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
         scan_count += scans.len();
         for scan in &scans {
-            let status = scan.get("status").and_then(Value::as_str).unwrap_or("missing");
+            let status = scan
+                .get("status")
+                .and_then(Value::as_str)
+                .unwrap_or("missing");
             *scan_status_counts.entry(status.to_owned()).or_default() += 1;
             if let Some(cases) = scan.get("refinement_cases").and_then(Value::as_array) {
                 refinement_case_count += cases.len();
@@ -242,17 +280,23 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
 
         if let Some(refinement) = active_refinement(sample) {
             samples_with_active_refinement += 1;
-            let quality = refinement.pointer("/verification/human_quality_score")
+            let quality = refinement
+                .pointer("/verification/human_quality_score")
                 .and_then(Value::as_u64)
                 .map(|score| score.to_string())
                 .unwrap_or_else(|| "missing".to_owned());
-            let acceptance = match refinement.pointer("/verification/is_accepted").and_then(Value::as_bool) {
+            let acceptance = match refinement
+                .pointer("/verification/is_accepted")
+                .and_then(Value::as_bool)
+            {
                 Some(true) => "accepted",
                 Some(false) => "rejected",
                 None => "missing",
             };
             *active_quality_counts.entry(quality.clone()).or_default() += 1;
-            *active_acceptance_counts.entry(acceptance.to_owned()).or_default() += 1;
+            *active_acceptance_counts
+                .entry(acceptance.to_owned())
+                .or_default() += 1;
 
             if acceptance == "rejected" {
                 rejected_active_refinement_ids.push(sample_id.clone());
@@ -267,12 +311,15 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
                 accepted_quality_1_or_2_cohort.push(sample_id.clone());
             }
         } else {
-            *active_quality_counts.entry("no_active_refinement".to_owned()).or_default() += 1;
+            *active_quality_counts
+                .entry("no_active_refinement".to_owned())
+                .or_default() += 1;
             no_active_refinement_ids.push(sample_id.clone());
         }
     }
 
-    let mut expected_categories = CATEGORIES.iter()
+    let mut expected_categories = CATEGORIES
+        .iter()
         .map(|category| ((*category).to_owned(), 0usize))
         .collect::<BTreeMap<_, _>>();
     expected_categories.insert("unclassified".to_owned(), 0);
@@ -295,23 +342,42 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
     }
     let mut expected_acceptance = BTreeMap::new();
     for key in ["accepted", "rejected", "missing"] {
-        expected_acceptance.insert(key.to_owned(), *active_acceptance_counts.get(key).unwrap_or(&0));
+        expected_acceptance.insert(
+            key.to_owned(),
+            *active_acceptance_counts.get(key).unwrap_or(&0),
+        );
     }
 
     check_count(profile, "samples", samples.len())?;
     check_count(profile, "unique_sample_ids", sample_ids.len())?;
-    check_count(profile, "unique_precursor_formulas", precursor_formulas.len())?;
+    check_count(
+        profile,
+        "unique_precursor_formulas",
+        precursor_formulas.len(),
+    )?;
     check_count(profile, "unique_precursor_pairs", precursor_pairs.len())?;
     check_count(profile, "synthesis_objects", synthesis_objects)?;
     check_count(profile, "physical_failures", physical_failures)?;
-    check_count(profile, "samples_with_recorded_heating_temperature", samples_with_heating_temperature)?;
+    check_count(
+        profile,
+        "samples_with_recorded_heating_temperature",
+        samples_with_heating_temperature,
+    )?;
     check_map(profile, "category_counts", &expected_categories)?;
     check_count(profile, "scans", scan_count)?;
     check_map(profile, "scans_by_status", &scan_status_counts)?;
     check_count(profile, "refinement_cases", refinement_case_count)?;
-    check_count(profile, "samples_with_active_refinement", samples_with_active_refinement)?;
+    check_count(
+        profile,
+        "samples_with_active_refinement",
+        samples_with_active_refinement,
+    )?;
     check_map(profile, "active_refinement_quality", &expected_quality)?;
-    check_map(profile, "active_refinement_acceptance", &expected_acceptance)?;
+    check_map(
+        profile,
+        "active_refinement_acceptance",
+        &expected_acceptance,
+    )?;
     check_count(
         profile,
         "classified_with_temperature_and_no_physical_failure",
@@ -323,16 +389,22 @@ fn audit(ledger_bytes: &[u8], schema_bytes: &[u8], manifest_bytes: &[u8]) -> Res
         accepted_quality_1_or_2_cohort.len(),
     )?;
 
-    let paper_counts = manifest.pointer("/publication_comparison/paper_category_counts")
+    let paper_counts = manifest
+        .pointer("/publication_comparison/paper_category_counts")
         .ok_or("manifest publication_comparison.paper_category_counts is missing")?;
     let mut paper_delta = BTreeMap::new();
     for category in CATEGORIES {
         let paper_count = count_field(paper_counts, category)?;
         let ledger_count = *expected_categories.get(category).unwrap_or(&0);
-        paper_delta.insert(category.to_owned(), json!(ledger_count as i64 - paper_count as i64));
+        paper_delta.insert(
+            category.to_owned(),
+            json!(ledger_count as i64 - paper_count as i64),
+        );
     }
     let paper_total = count_field(
-        manifest.get("publication_comparison").expect("schema validated publication_comparison"),
+        manifest
+            .get("publication_comparison")
+            .expect("schema validated publication_comparison"),
         "paper_analyzable_outcomes",
     )?;
     let ledger_classified = samples.len() - *expected_categories.get("unclassified").unwrap_or(&0);
@@ -456,7 +528,8 @@ fn main() {
         eprintln!("SC-PRECURSOR-GENOME-FAIL: {error}");
         process::exit(1);
     });
-    let rendered = serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
+    let rendered =
+        serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
 
     if let Some(path) = output_path {
         if let Err(error) = fs::write(&path, format!("{rendered}\n")) {
@@ -474,7 +547,8 @@ mod tests {
 
     fn schema_bytes() -> Vec<u8> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        fs::read(root.join("data/schemas/precursor_genome_source_manifest_v0_1.schema.json")).unwrap()
+        fs::read(root.join("data/schemas/precursor_genome_source_manifest_v0_1.schema.json"))
+            .unwrap()
     }
 
     fn synthetic_inputs() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -570,12 +644,19 @@ mod tests {
             },
             "claim_ceiling": CLAIM_CEILING
         });
-        (ledger_bytes, schema_bytes(), serde_json::to_vec(&manifest).unwrap())
+        (
+            ledger_bytes,
+            schema_bytes(),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
     }
 
     #[test]
     fn git_blob_sha1_matches_the_empty_git_object() {
-        assert_eq!(git_blob_sha1(&[]), "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
+        assert_eq!(
+            git_blob_sha1(&[]),
+            "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+        );
     }
 
     #[test]
@@ -588,7 +669,12 @@ mod tests {
         let changed_ledger = serde_json::to_vec(&data).unwrap();
         let mut manifest_data: Value = serde_json::from_slice(&manifest).unwrap();
         manifest_data["ledger_git_blob_sha1"] = json!(git_blob_sha1(&changed_ledger));
-        let error = audit(&changed_ledger, &schema, &serde_json::to_vec(&manifest_data).unwrap()).unwrap_err();
+        let error = audit(
+            &changed_ledger,
+            &schema,
+            &serde_json::to_vec(&manifest_data).unwrap(),
+        )
+        .unwrap_err();
         assert!(error.contains("duplicate precursor pair"));
     }
 
@@ -598,8 +684,14 @@ mod tests {
         let receipt = audit(&ledger, &schema, &manifest).unwrap();
         assert_eq!(receipt["status"], "precursor_genome_source_audit_pass");
         assert_eq!(receipt["counts"]["category_counts"]["transformed"], 1);
-        assert_eq!(receipt["cohorts"]["classified_temperature_no_physical_failure"][0], "SYN-001");
-        assert_eq!(receipt["cohorts"]["temperature_and_accepted_quality_1_or_2"][0], "SYN-001");
+        assert_eq!(
+            receipt["cohorts"]["classified_temperature_no_physical_failure"][0],
+            "SYN-001"
+        );
+        assert_eq!(
+            receipt["cohorts"]["temperature_and_accepted_quality_1_or_2"][0],
+            "SYN-001"
+        );
     }
 
     #[test]
@@ -619,7 +711,12 @@ mod tests {
         let changed_ledger = serde_json::to_vec(&data).unwrap();
         let mut manifest_data: Value = serde_json::from_slice(&manifest).unwrap();
         manifest_data["ledger_git_blob_sha1"] = json!(git_blob_sha1(&changed_ledger));
-        let error = audit(&changed_ledger, &schema, &serde_json::to_vec(&manifest_data).unwrap()).unwrap_err();
+        let error = audit(
+            &changed_ledger,
+            &schema,
+            &serde_json::to_vec(&manifest_data).unwrap(),
+        )
+        .unwrap_err();
         assert!(error.contains("duplicate sample_id"));
     }
 
@@ -635,13 +732,26 @@ mod tests {
         manifest_data["expected_profile"]["physical_failures"] = json!(1);
         manifest_data["expected_profile"]["category_counts"]["transformed"] = json!(0);
         manifest_data["expected_profile"]["category_counts"]["unclassified"] = json!(1);
-        manifest_data["expected_profile"]["classified_with_temperature_and_no_physical_failure"] = json!(0);
-        manifest_data["expected_profile"]["cohort_temperature_and_accepted_quality_1_or_2"] = json!(0);
+        manifest_data["expected_profile"]["classified_with_temperature_and_no_physical_failure"] =
+            json!(0);
+        manifest_data["expected_profile"]["cohort_temperature_and_accepted_quality_1_or_2"] =
+            json!(0);
         manifest_data["publication_comparison"]["paper_category_counts"]["transformed"] = json!(0);
-        let receipt = audit(&changed_ledger, &schema, &serde_json::to_vec(&manifest_data).unwrap()).unwrap();
+        let receipt = audit(
+            &changed_ledger,
+            &schema,
+            &serde_json::to_vec(&manifest_data).unwrap(),
+        )
+        .unwrap();
         assert_eq!(receipt["counts"]["category_counts"]["unclassified"], 1);
         assert_eq!(receipt["exclusions"]["physical_failure_ids"][0], "SYN-001");
         assert_eq!(receipt["exclusions"]["unclassified_ids"][0], "SYN-001");
-        assert_eq!(receipt["cohorts"]["classified_temperature_no_physical_failure"].as_array().unwrap().len(), 0);
+        assert_eq!(
+            receipt["cohorts"]["classified_temperature_no_physical_failure"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
     }
 }
