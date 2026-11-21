@@ -134,7 +134,7 @@ No schedule should be called "energy-efficient" based on fewer samples alone. Me
 ## 10. Validation status
 
 - `research/temporal-sensing/Cargo.toml` and `src/lib.rs` authored.
-- Eighteen Rust test functions authored for fixed interval, event trigger, multi-rate, min/max gap, VOI, budget exhaustion, novelty, residual and invalid-input controls.
+- Nineteen Rust test functions authored for fixed interval, event trigger, multi-rate, min/max gap, VOI, budget exhaustion, novelty, residual and invalid-input controls.
 - No Cargo build, rustfmt, Clippy or tests have run; the authoring environment lacks cargo/rustc/rustfmt.
 - No candidate model, real sensor, baseline or hardware/energy campaign has run.
 - No production model or default changed.
@@ -163,7 +163,7 @@ adjusted_benefit_us   = predicted_ted_reduction_us
 score_us_per_nJ_ppm  = adjusted_benefit_us × 1,000,000 / observation_energy_nJ
 \`\`\`
 
-All coefficients are candidate policy parameters, and all belief-state statistics/confidence values are candidate estimates. Hidden evaluator trajectories, labels and oracle losses remain unavailable. The policy uses checked integer arithmetic and PPM bounds. Its ignorance term is an explicit independent heuristic; it is **not** the paper's exact value-function replication.
+All coefficients are candidate policy parameters, and all belief-state statistics/confidence values are candidate estimates. Hidden evaluator trajectories, labels and oracle losses remain unavailable. The policy uses checked integer arithmetic and PPM bounds. The public `risk_adjusted_voi_diagnostics` helper returns every intermediate component (expected TED reduction, risk premium, ignorance exposure, ignorance penalty, adjusted benefit, sensor-energy estimate and adjusted value per nJ), and the scheduler calls this same helper so logged diagnostics cannot diverge from the trigger calculation. Its ignorance term is an explicit independent heuristic; it is **not** the paper's exact value-function replication.
 
 Compare four separate arms:
 1. expected VOI per nJ;
@@ -178,3 +178,5 @@ Reference:
 - https://www.repository.cam.ac.uk/items/886c107c-7c63-4a48-b307-f22abb1fa3bd
 
 The v0.2 implementation adds four candidate-side tests (18 total); none has been executed. No paper reproduction, candidate comparison, SOTA or energy result is claimed.
+
+The 19 authored tests include exact component-value checks for the exported diagnostics helper. The candidate can persist those values into a per-opportunity run receipt for paired policy analysis; no receipt adapter or real run has yet been executed.
