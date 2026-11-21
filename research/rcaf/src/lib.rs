@@ -972,6 +972,35 @@ mod tests {
             assert!((baseline - swapped).abs() < 1e-12, "{mode:?}");
             assert!((identity - 1.0).abs() < 1e-12, "{mode:?}");
         }
+
+        let baseline_transitions =
+            summarize_edge_sign_transitions_labeled(&labels, &a, &labels, &b, 0.05).unwrap();
+        let permuted_transitions = summarize_edge_sign_transitions_labeled(
+            &permuted_labels,
+            &permuted_a,
+            &permuted_labels,
+            &permuted_b,
+            0.05,
+        )
+        .unwrap();
+        assert_eq!(baseline_transitions, permuted_transitions);
+
+        let mismatched_labels = vec![
+            "ROI-D".to_string(),
+            "ROI-B".to_string(),
+            "ROI-C".to_string(),
+            "ROI-A".to_string(),
+        ];
+        assert_eq!(
+            summarize_edge_sign_transitions_labeled(
+                &labels,
+                &a,
+                &mismatched_labels,
+                &b,
+                0.05,
+            ),
+            Err(MetricError::RoiOrderMismatch)
+        );
     }
 
     #[test]
@@ -1065,6 +1094,24 @@ mod tests {
             summarize_rcaf_by_participant(&empty, 100, 0.05, 7),
             Err(MetricError::EmptyParticipantId { index: 0 })
         );
+    }
+
+    #[test]
+    fn weighted_jaccard_is_invariant_to_common_positive_scaling_and_joint_edge_permutation() {
+        let left = [0.2, 0.5, 0.1, 0.7];
+        let right = [0.1, 0.4, 0.3, 0.6];
+        let baseline = weighted_jaccard(&left, &right).unwrap();
+
+        for scale in [1e-6, 0.25, 3.0, 1e6] {
+            let scaled_left: Vec<f64> = left.iter().map(|value| value * scale).collect();
+            let scaled_right: Vec<f64> = right.iter().map(|value| value * scale).collect();
+            assert!((weighted_jaccard(&scaled_left, &scaled_right).unwrap() - baseline).abs() < 1e-12);
+        }
+
+        let permutation = [2, 0, 3, 1];
+        let permuted_left: Vec<f64> = permutation.iter().map(|&index| left[index]).collect();
+        let permuted_right: Vec<f64> = permutation.iter().map(|&index| right[index]).collect();
+        assert!((weighted_jaccard(&permuted_left, &permuted_right).unwrap() - baseline).abs() < 1e-12);
     }
 
     #[test]
