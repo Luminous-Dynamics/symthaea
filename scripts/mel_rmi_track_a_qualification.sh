@@ -25,14 +25,17 @@ STAGE_ROOT="$BASE_TMP/mel-rmi-track-a-$SOURCE_COMMIT"
 STAGE_CRATE="$STAGE_ROOT/crates/domains/symthaea-muse"
 MANIFEST="$STAGE_CRATE/Cargo.toml"
 EVIDENCE_DIR="${MEL_RMI_EVIDENCE_DIR:-$BASE_TMP/mel-rmi-track-a-evidence-$SOURCE_COMMIT}"
-SEED_COUNT="${MEL_RMI_SEED_COUNT:-4}"
+TRIALS_PER_TARGET="${MEL_RMI_TRIALS_PER_TARGET:-8}"
+SEED_ROOT="${MEL_RMI_SEED_ROOT:-42}"
 
 rm -rf "$STAGE_ROOT" "$EVIDENCE_DIR"
-mkdir -p "$STAGE_CRATE/src/bin" "$EVIDENCE_DIR"
+mkdir -p "$STAGE_CRATE/src/bin" "$STAGE_CRATE/tests" "$EVIDENCE_DIR"
 
 cp crates/domains/symthaea-muse/src/rmi_benchmark.rs "$STAGE_CRATE/src/rmi_benchmark.rs"
-cp crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs "$STAGE_CRATE/src/bin/rmi_bench_track_a.rs"
-printf 'pub mod rmi_benchmark;\n' > "$STAGE_CRATE/src/lib.rs"
+cp crates/domains/symthaea-muse/src/rmi_track_a_runner.rs "$STAGE_CRATE/src/rmi_track_a_runner.rs"
+cp crates/domains/symthaea-muse/src/bin/rmi_track_a.rs "$STAGE_CRATE/src/bin/rmi_track_a.rs"
+cp crates/domains/symthaea-muse/tests/rmi_track_a_replay.rs "$STAGE_CRATE/tests/rmi_track_a_replay.rs"
+printf 'pub mod rmi_benchmark;\npub mod rmi_track_a_runner;\n' > "$STAGE_CRATE/src/lib.rs"
 
 cat > "$MANIFEST" <<'CARGO_TOML'
 [package]
@@ -47,8 +50,8 @@ description = "Isolated qualification harness for the Muse RMI Track A evaluator
 path = "src/lib.rs"
 
 [[bin]]
-name = "rmi_bench_track_a"
-path = "src/bin/rmi_bench_track_a.rs"
+name = "rmi_track_a"
+path = "src/bin/rmi_track_a.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -61,30 +64,40 @@ echo "exact_source_head=$SOURCE_COMMIT"
 
 cargo fmt --manifest-path "$MANIFEST" --check
 cargo generate-lockfile --manifest-path "$MANIFEST"
+
+LOCK_SHA256="$(sha256sum "$STAGE_CRATE/Cargo.lock" | awk '{print $1}')"
+export SYMTHAEA_MUSE_GIT_REV="$SOURCE_COMMIT"
+export RUSTC_VERSION="$(rustc --version)"
+export MUSE_RMI_CARGO_LOCK_SHA256="$LOCK_SHA256"
+
 cargo test --locked --manifest-path "$MANIFEST" --lib rmi_benchmark::tests
-cargo test --locked --manifest-path "$MANIFEST" --bin rmi_bench_track_a
+cargo test --locked --manifest-path "$MANIFEST" --lib rmi_track_a_runner::tests
+cargo test --locked --manifest-path "$MANIFEST" --bin rmi_track_a
+cargo test --locked --manifest-path "$MANIFEST" --test rmi_track_a_replay
 cargo clippy --locked --manifest-path "$MANIFEST" --all-targets -- -D warnings
 
 REPORT="$EVIDENCE_DIR/melothaea-rmi-track-a.json"
-cargo run --locked --manifest-path "$MANIFEST" --bin rmi_bench_track_a -- \
-  --source-commit "$SOURCE_COMMIT" \
-  --seed-count "$SEED_COUNT" \
-  --output "$REPORT" \
-  --self-check
+cargo run --locked --manifest-path "$MANIFEST" --bin rmi_track_a -- "$TRIALS_PER_TARGET" "$SEED_ROOT" "$REPORT"
 
 cp "$MANIFEST" "$EVIDENCE_DIR/Cargo.toml"
 cp "$STAGE_CRATE/Cargo.lock" "$EVIDENCE_DIR/Cargo.lock"
 cp "$STAGE_CRATE/src/lib.rs" "$EVIDENCE_DIR/lib.rs"
 cp "$STAGE_CRATE/src/rmi_benchmark.rs" "$EVIDENCE_DIR/rmi_benchmark.rs"
-cp "$STAGE_CRATE/src/bin/rmi_bench_track_a.rs" "$EVIDENCE_DIR/rmi_bench_track_a.rs"
+cp "$STAGE_CRATE/src/rmi_track_a_runner.rs" "$EVIDENCE_DIR/rmi_track_a_runner.rs"
+cp "$STAGE_CRATE/src/bin/rmi_track_a.rs" "$EVIDENCE_DIR/rmi_track_a.rs"
+cp "$STAGE_CRATE/tests/rmi_track_a_replay.rs" "$EVIDENCE_DIR/rmi_track_a_replay.rs"
 sha256sum \
   "$EVIDENCE_DIR/Cargo.toml" \
   "$EVIDENCE_DIR/Cargo.lock" \
   "$EVIDENCE_DIR/lib.rs" \
   "$EVIDENCE_DIR/rmi_benchmark.rs" \
-  "$EVIDENCE_DIR/rmi_bench_track_a.rs" \
+  "$EVIDENCE_DIR/rmi_track_a_runner.rs" \
+  "$EVIDENCE_DIR/rmi_track_a.rs" \
+  "$EVIDENCE_DIR/rmi_track_a_replay.rs" \
   "$REPORT" > "$EVIDENCE_DIR/SHA256SUMS"
-printf 'exact_head=%s\nseed_count=%s\n' "$SOURCE_COMMIT" "$SEED_COUNT" > "$EVIDENCE_DIR/source-identities.txt"
+printf 'exact_head=%s\ntrials_per_target=%s\nseed_root=%s\nrustc=%s\ncargo_lock_sha256=%s\n' \
+  "$SOURCE_COMMIT" "$TRIALS_PER_TARGET" "$SEED_ROOT" "$RUSTC_VERSION" "$LOCK_SHA256" \
+  > "$EVIDENCE_DIR/source-identities.txt"
 
 echo "RMI Track A qualification completed."
 echo "report=$REPORT"
