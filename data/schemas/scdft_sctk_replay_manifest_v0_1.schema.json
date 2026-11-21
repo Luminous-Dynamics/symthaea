@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/scdft_sctk_replay_manifest_v0_1.schema.json",
+  "title": "SCTK Pb SCDFT Upstream Replay Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "manifest_id",
+    "upstream",
+    "example_scope",
+    "physics_scope",
+    "cases",
+    "files",
+    "replay_state",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SCDFT-SCTK-REPLAY-0.1"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_url",
+        "commit_sha",
+        "ref_name",
+        "commit_date",
+        "commit_message",
+        "inspected_at"
+      ],
+      "properties": {
+        "repository_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "ref_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "commit_message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inspected_at": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "example_scope": {
+      "enum": [
+        "contributed_legacy_pb_example"
+      ]
+    },
+    "physics_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material",
+        "structure",
+        "pressure_gpa",
+        "spin_orbit_included",
+        "finite_q_method",
+        "literature_basis",
+        "not_equivalent_to_2026_prl_fixture"
+      ],
+      "properties": {
+        "material": {
+          "const": "Pb"
+        },
+        "structure": {
+          "const": "fcc"
+        },
+        "pressure_gpa": {
+          "const": 0
+        },
+        "spin_orbit_included": {
+          "const": false
+        },
+        "finite_q_method": {
+          "const": false
+        },
+        "literature_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "not_equivalent_to_2026_prl_fixture": {
+          "const": true
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "spin_fluctuations",
+          "expected_tc_k",
+          "reference_tc_k",
+          "converged_iterations",
+          "reference_run_date",
+          "tc_output_path",
+          "tc_output_blob_sha",
+          "reference_output_complete",
+          "README_expectation_k"
+        ],
+        "properties": {
+          "case_id": {
+            "enum": [
+              "without_spin_fluctuations",
+              "with_spin_fluctuations"
+            ]
+          },
+          "spin_fluctuations": {
+            "type": "boolean"
+          },
+          "expected_tc_k": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reference_tc_k": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "converged_iterations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reference_run_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "tc_output_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tc_output_blob_sha": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "reference_output_complete": {
+            "const": true
+          },
+          "README_expectation_k": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "git_blob_sha1",
+          "role",
+          "case_scope",
+          "required_for_replay"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "git_blob_sha1": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "role": {
+            "enum": [
+              "readme",
+              "pseudopotential",
+              "qe_input",
+              "sctk_input",
+              "reference_output"
+            ]
+          },
+          "case_scope": {
+            "enum": [
+              "shared",
+              "with_spin_fluctuations",
+              "without_spin_fluctuations"
+            ]
+          },
+          "required_for_replay": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "replay_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_status",
+        "reference_output_integrity_status",
+        "local_replay_receipt",
+        "qe_version",
+        "sctk_version",
+        "input_digest",
+        "output_digest",
+        "notes"
+      ],
+      "properties": {
+        "execution_status": {
+          "const": "not_executed"
+        },
+        "reference_output_integrity_status": {
+          "const": "upstream_blob_ids_pinned_local_bytes_not_yet_verified"
+        },
+        "local_replay_receipt": {
+          "type": "null"
+        },
+        "qe_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sctk_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "input_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "output_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Pinned upstream Pb SCDFT reference example only. No local calculation is executed or independently reproduced by this manifest."
+    }
+  }
+}

@@ -1,0 +1,95 @@
+name: SCTK Pb Legacy Replay Manifest Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/scdft-sctk-replay-auditor/**"
+      - "data/schemas/scdft_sctk_replay_manifest_v0_1.schema.json"
+      - "data/research/scdft_sctk_pb_legacy_replay_manifest_v0_1.json"
+      - "research/superconductivity/sctk_replay/**"
+      - ".github/workflows/scdft-sctk-replay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scdft-sctk-replay-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  replay-manifest:
+    name: Pinned upstream Git blob manifest and physics guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Apply pinned Rust formatting
+        run: cargo fmt --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml --all
+
+      - name: Verify canonical Rust formatting
+        run: cargo fmt --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml --all -- --check
+
+      - name: Capture rustfmt-only patch
+        if: always()
+        run: |
+          git diff --binary -- tools/scdft-sctk-replay-auditor > "$RUNNER_TEMP/sc-rustfmt.patch"
+          git diff --stat -- tools/scdft-sctk-replay-auditor
+          sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml
+
+      - name: Run manifest, Git blob algorithm and negative controls
+        run: cargo test --locked --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml --bin scdft_sctk_replay_audit
+
+      - name: Audit pinned upstream replay manifest (no calculation is run)
+        run: |
+          cargo run --locked --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml --bin scdft_sctk_replay_audit -- \
+            --schema data/schemas/scdft_sctk_replay_manifest_v0_1.schema.json \
+            --manifest data/research/scdft_sctk_pb_legacy_replay_manifest_v0_1.json \
+            --out "$RUNNER_TEMP/scdft-sctk-replay-manifest-receipt.json"
+          cat "$RUNNER_TEMP/scdft-sctk-replay-manifest-receipt.json"
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/scdft-sctk-replay-auditor/Cargo.toml --bin scdft_sctk_replay_audit -- -D warnings
+
+      - name: Record exact-run identity
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "worktree_status=$(git status --short)"
+            if [ -f "$RUNNER_TEMP/sc-rustfmt.patch" ]; then sha256sum "$RUNNER_TEMP/sc-rustfmt.patch"; fi
+            sha256sum data/schemas/scdft_sctk_replay_manifest_v0_1.schema.json
+            sha256sum data/research/scdft_sctk_pb_legacy_replay_manifest_v0_1.json
+            sha256sum tools/scdft-sctk-replay-auditor/Cargo.toml
+            sha256sum tools/scdft-sctk-replay-auditor/src/main.rs
+            if [ -f tools/scdft-sctk-replay-auditor/Cargo.lock ]; then
+              sha256sum tools/scdft-sctk-replay-auditor/Cargo.lock
+            else
+              echo "cargo_lock=not-generated"
+            fi
+          } > "$RUNNER_TEMP/scdft-sctk-replay-environment.txt"
+
+      - name: Upload exact-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scdft-sctk-replay-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/scdft-sctk-replay-auditor/Cargo.lock
+            ${{ runner.temp }}/scdft-sctk-replay-environment.txt
+            ${{ runner.temp }}/scdft-sctk-replay-manifest-receipt.json
+            ${{ runner.temp }}/sc-rustfmt.patch
