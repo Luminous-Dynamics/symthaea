@@ -320,3 +320,50 @@ Include task types where stable positions help and tasks where new relationships
 - Stable visualization of connected components in dynamic graphs: https://doi.org/10.1177/1473871620972339
 - Runions et al., Modeling Trees with a Space Colonization Algorithm (2007): https://doi.org/10.2312/NPH/NPH07/063-070
 - Physarum-inspired decentralized mesh networks for multi-robot systems (2026): https://www.nature.com/articles/s41598-025-33456-y
+
+
+## 2.5 Bevy 0.20 direct browser-engine comparison (11 October 2026)
+
+A particularly relevant independent comparison now exists: **"Six 3D engines measured in the browser"** compares pinned Bevy 0.20.0, Three.js r186, Babylon.js 9.30.0, PlayCanvas 2.23.2, Godot 4.7.2 and DriftEngine 4.13.0. The DriftEngine vendor authored the comparison, so treat it as a useful disclosed benchmark, not a neutral certification. The page publishes the methodology, scene captures, engine versions and where the author’s engine loses.
+
+Reference: https://driftengine.dev/blog/webgpu-engines-measured (11 October 2026).
+
+### Desktop workload results relevant to Mycelial Presence
+
+Desktop test host: AMD Radeon RX 9070 XT, Chrome/Vulkan, 1280×720, pixel ratio 1, vsync/frame cap off; 120 warmup frames then up to 600 timed frames, medians and P95 values.
+
+| Workload | Bevy 0.20.0 WebGPU | Bevy 0.20.0 WebGL2 | Interpretation |
+|---|---:|---:|---|
+| 1,000 separate objects median / P95 | 3.12 / 4.02 ms | 2.41 / 3.29 ms | Automatic batching makes entity count different from draw-call count |
+| 10,000 separate objects median / P95 | 10.58 / 11.75 ms | 10.77 / 12.04 ms | Bevy performed strongly on this particular scene |
+| One mesh repeated as instances, 100,000 median / P95 | 24.12 / 25.65 ms | 94.71 / 97.27 ms | The instancing API/path was substantially different from separate-object batching |
+| One mesh repeated as instances, 1,000,000 median / P95 | 211.10 / 218.15 ms | 895.04 / 908.40 ms | Neither path reaches 60 FPS at this scale |
+| Sponza scene frame time | 4.17 ms | 9.45 ms | Different, richer scene; not directly comparable to our canopy |
+
+The test’s explanation matters: Bevy automatically batches separate objects, but the one-object-many-instances case includes entity processing and Bevy’s automatic instancing; render and ECS costs were not separately isolated. The benchmark therefore supports two separate hypotheses, not one blanket conclusion:
+1. Standard Bevy ECS entities can batch effectively when they share the right assets/material path.
+2. Bevy’s explicit instancing/instance-processing path may be a distinct bottleneck and must be measured separately.
+
+### Phone workload results relevant to the mobile renderer
+
+Phone host: Samsung Galaxy S23 Ultra, Adreno 740, Chrome Android, USB-tethered, 1280×720, pixel ratio 1, vsync on.
+
+| Workload | Bevy WebGPU | Bevy WebGL2 |
+|---|---:|---:|
+| Separate objects held at 60 FPS | 12,288 | 12,288 |
+| One mesh repeated as instances held at 60 FPS | 53,248 | 13,824 |
+| 256-light workload held at 60 FPS (reported limit) | 624 | 4,096+ |
+| Sponza frame time | 25.0 ms | 20.8 ms |
+| Sponza first frame | 6,850 ms | 7,659 ms |
+
+The phone result is an especially important warning: Bevy’s best desktop/backend ordering does not transfer directly to a mobile GPU. The report also says phone temperature can move the ceilings. Its Galaxy S23 Ultra is not our Pixel 8 Pro, and its desktop RX 9070 XT is not our RTX 2070 laptop; the figures must remain device-specific external reference points.
+
+### Benchmark consequence
+
+Add two distinct primitive workloads to MPRB:
+- **Many ECS primitives with shared mesh/material:** measures Bevy's standard batching path for terminal spores, junction bulbs and orbital cells.
+- **One mesh, many explicit instances:** measures instance submission/processing separately from ECS entity count.
+
+Also report time-to-first-visible-frame and browser payload size for any future Bevy WebAssembly delivery. The external benchmark measures several seconds to first Sponza frame for Bevy web builds; native desktop startup is a different path and must not be conflated with browser cold start.
+
+Do not conclude that Bevy is universally faster/slower from these rows. Use this source to make the Mycelial workload design more representative and to insist on separate CPU/ECS, draw-submission, GPU, startup and mobile thermal measurements.
