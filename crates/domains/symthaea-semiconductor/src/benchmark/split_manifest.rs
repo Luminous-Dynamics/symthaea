@@ -97,7 +97,9 @@ impl ParsedTime {
         match basis {
             "offset_aware" => {
                 let parsed = DateTime::parse_from_rfc3339(raw).map_err(|_| {
-                    SplitManifestError(format!("{field}: timezone offset is required for offset_aware"))
+                    SplitManifestError(format!(
+                        "{field}: timezone offset is required for offset_aware"
+                    ))
                 })?;
                 Ok(Self::Offset(parsed))
             }
@@ -246,7 +248,9 @@ pub fn validate_split_manifest_v1(
 
     let time_basis = if manifest.split_scheme == "forward_time" {
         let basis = manifest.time_basis.as_deref().ok_or_else(|| {
-            SplitManifestError("time_basis: expected offset_aware or source_local_naive".to_string())
+            SplitManifestError(
+                "time_basis: expected offset_aware or source_local_naive".to_string(),
+            )
         })?;
         if !["offset_aware", "source_local_naive"].contains(&basis) {
             return Err(SplitManifestError(
@@ -265,10 +269,7 @@ pub fn validate_split_manifest_v1(
     };
 
     for (index, row) in manifest.assignments.iter().enumerate() {
-        require_text(
-            &row.sample_id,
-            &format!("assignments[{index}].sample_id"),
-        )?;
+        require_text(&row.sample_id, &format!("assignments[{index}].sample_id"))?;
         if !seen_ids.insert(row.sample_id.clone()) {
             return Err(SplitManifestError(format!(
                 "assignments[{index}].sample_id: duplicate {:?}",
@@ -314,7 +315,8 @@ pub fn validate_split_manifest_v1(
                 ))
             })?;
             require_text(raw, &format!("assignments[{index}].observed_at"))?;
-            let parsed = ParsedTime::parse(raw, basis, &format!("assignments[{index}].observed_at"))?;
+            let parsed =
+                ParsedTime::parse(raw, basis, &format!("assignments[{index}].observed_at"))?;
             canonical.insert("observed_at".into(), json!(parsed.canonical()));
             split_times
                 .entry(row.split.clone())
@@ -402,19 +404,17 @@ pub fn validate_split_manifest_v1(
         temporal_bounds = Some(bounds);
     }
 
-    canonical_rows.sort_by(|left, right| {
-        left["sample_id"]
-            .as_str()
-            .cmp(&right["sample_id"].as_str())
-    });
+    canonical_rows
+        .sort_by(|left, right| left["sample_id"].as_str().cmp(&right["sample_id"].as_str()));
     let payload = canonical_manifest_payload(
         manifest,
         &canonical_rows,
         time_basis,
         manifest.clock_domain_id.as_deref(),
     );
-    let serialized = serde_json::to_vec(&payload)
-        .map_err(|error| SplitManifestError(format!("canonical manifest serialization failed: {error}")))?;
+    let serialized = serde_json::to_vec(&payload).map_err(|error| {
+        SplitManifestError(format!("canonical manifest serialization failed: {error}"))
+    })?;
     let split_digest = format!("{:x}", Sha256::digest(serialized));
 
     let report = SplitValidationReportV1 {
@@ -473,8 +473,12 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    const INPUT: &str = include_str!("../../../../../benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json");
-    const EXPECTED: &str = include_str!("../../../../../benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json");
+    const INPUT: &str = include_str!(
+        "../../../../../benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json"
+    );
+    const EXPECTED: &str = include_str!(
+        "../../../../../benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json"
+    );
 
     fn known_answer() -> SplitManifestV1 {
         serde_json::from_str(INPUT).expect("split fixture must parse")
