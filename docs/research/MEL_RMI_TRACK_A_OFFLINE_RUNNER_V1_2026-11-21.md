@@ -57,6 +57,7 @@ From the repository root, after a Rust toolchain is installed:
 
 \`\`\`bash
 rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs
+cargo test -p symthaea-muse --lib rmi_benchmark::tests
 cargo test -p symthaea-muse --bin rmi_bench_track_a
 cargo run -p symthaea-muse --bin rmi_bench_track_a -- \\
   --source-commit "$(git rev-parse HEAD)" \\
