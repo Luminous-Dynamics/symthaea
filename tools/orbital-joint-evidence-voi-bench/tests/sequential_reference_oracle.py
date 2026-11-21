@@ -293,7 +293,10 @@ def audit_scenario(scenario):
             or abs(sum(weights["state_weights"].values()) - 1.0) > TOL):
         raise ValueError("resource-frequency model is invalid or used outside cost accounting")
 
-    baseline, _ = terminal_regret(scenario, states, set())
+    baseline, baseline_node = terminal_regret(scenario, states, set())
+    baseline_disposition = baseline_node["decision"]
+    if baseline_disposition != "HOLD":
+        raise ValueError("no-evidence baseline must remain HOLD")
     myopic_id, myopic_risk, myopic_stops = evaluate_myopic(scenario, baseline)
     fixed_risk, fixed_resources = evaluate_fixed(scenario)
     adaptive = solve(
@@ -330,6 +333,7 @@ def audit_scenario(scenario):
         raise ValueError("adaptive worst path exceeds budget")
     return {
         "scenario_id": scenario["scenario_id"],
+        "baseline_terminal_disposition": baseline_disposition,
         "baseline_worst_case_regret": baseline,
         "myopic_action_id": myopic_id,
         "myopic_worst_case_regret": myopic_risk,
