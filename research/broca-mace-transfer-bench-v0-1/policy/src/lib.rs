@@ -121,8 +121,116 @@ impl EvidenceDigest256 {
         Self(bytes)
     }
 
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
     pub const fn is_known(self) -> bool {
         self.0 != [0; 32]
+    }
+
+    pub fn to_hex(self) -> String {
+        self.0.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+}
+
+/// Versioned semantic identity of a causal estimand. Each field digest is
+/// produced from a canonical typed subdocument by the trusted verifier.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SemanticEstimandV1 {
+    pub schema_version: u16,
+    pub population_spec_digest: EvidenceDigest256,
+    pub treatment_version_digest: EvidenceDigest256,
+    pub comparator_version_digest: EvidenceDigest256,
+    pub outcome_definition_digest: EvidenceDigest256,
+    pub outcome_unit_digest: EvidenceDigest256,
+    pub follow_up_horizon_ms: u64,
+    pub censoring_strategy_digest: EvidenceDigest256,
+    pub intercurrent_event_strategy_digest: EvidenceDigest256,
+    pub target_weighting_digest: EvidenceDigest256,
+}
+
+impl SemanticEstimandV1 {
+    pub const UNKNOWN: Self = Self {
+        schema_version: 0,
+        population_spec_digest: EvidenceDigest256::UNKNOWN,
+        treatment_version_digest: EvidenceDigest256::UNKNOWN,
+        comparator_version_digest: EvidenceDigest256::UNKNOWN,
+        outcome_definition_digest: EvidenceDigest256::UNKNOWN,
+        outcome_unit_digest: EvidenceDigest256::UNKNOWN,
+        follow_up_horizon_ms: 0,
+        censoring_strategy_digest: EvidenceDigest256::UNKNOWN,
+        intercurrent_event_strategy_digest: EvidenceDigest256::UNKNOWN,
+        target_weighting_digest: EvidenceDigest256::UNKNOWN,
+    };
+
+    pub const fn new(
+        schema_version: u16,
+        population_spec_digest: EvidenceDigest256,
+        treatment_version_digest: EvidenceDigest256,
+        comparator_version_digest: EvidenceDigest256,
+        outcome_definition_digest: EvidenceDigest256,
+        outcome_unit_digest: EvidenceDigest256,
+        follow_up_horizon_ms: u64,
+        censoring_strategy_digest: EvidenceDigest256,
+        intercurrent_event_strategy_digest: EvidenceDigest256,
+        target_weighting_digest: EvidenceDigest256,
+    ) -> Self {
+        Self {
+            schema_version,
+            population_spec_digest,
+            treatment_version_digest,
+            comparator_version_digest,
+            outcome_definition_digest,
+            outcome_unit_digest,
+            follow_up_horizon_ms,
+            censoring_strategy_digest,
+            intercurrent_event_strategy_digest,
+            target_weighting_digest,
+        }
+    }
+
+    pub fn is_complete(self) -> bool {
+        self.schema_version == 1
+            && self.population_spec_digest.is_known()
+            && self.treatment_version_digest.is_known()
+            && self.comparator_version_digest.is_known()
+            && self.outcome_definition_digest.is_known()
+            && self.outcome_unit_digest.is_known()
+            && self.follow_up_horizon_ms > 0
+            && self.censoring_strategy_digest.is_known()
+            && self.intercurrent_event_strategy_digest.is_known()
+            && self.target_weighting_digest.is_known()
+    }
+
+    pub fn canonical_fields(self) -> Vec<String> {
+        vec![
+            self.schema_version.to_string(),
+            self.population_spec_digest.to_hex(),
+            self.treatment_version_digest.to_hex(),
+            self.comparator_version_digest.to_hex(),
+            self.outcome_definition_digest.to_hex(),
+            self.outcome_unit_digest.to_hex(),
+            self.follow_up_horizon_ms.to_string(),
+            self.censoring_strategy_digest.to_hex(),
+            self.intercurrent_event_strategy_digest.to_hex(),
+            self.target_weighting_digest.to_hex(),
+        ]
+    }
+
+    pub fn canonical_digest(self) -> EvidenceDigest256 {
+        use sha2::{Digest, Sha256};
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"mycelix:mace:semantic-estimand:v1\\0");
+        for field in self.canonical_fields() {
+            hasher.update((field.len() as u64).to_be_bytes());
+            hasher.update(field.as_bytes());
+        }
+        let digest = hasher.finalize();
+        let mut bytes = [0_u8; 32];
+        bytes.copy_from_slice(&digest);
+        EvidenceDigest256::from_bytes(bytes)
     }
 }
 
@@ -139,6 +247,7 @@ pub struct CausalIdentificationV1 {
     pub method: IdentificationMethodV1,
     pub design_digest: EvidenceDigest256,
     pub estimand_digest: EvidenceDigest256,
+    pub semantic_estimand: SemanticEstimandV1,
     pub propensity_min_bps: u16,
     pub propensity_max_bps: u16,
     pub max_standardized_mean_difference_micros: u32,
@@ -150,6 +259,7 @@ impl CausalIdentificationV1 {
         method: IdentificationMethodV1::Unknown,
         design_digest: EvidenceDigest256::UNKNOWN,
         estimand_digest: EvidenceDigest256::UNKNOWN,
+        semantic_estimand: SemanticEstimandV1::UNKNOWN,
         propensity_min_bps: 0,
         propensity_max_bps: 10_000,
         max_standardized_mean_difference_micros: u32::MAX,
@@ -169,6 +279,7 @@ impl CausalIdentificationV1 {
             method,
             design_digest,
             estimand_digest,
+            semantic_estimand: SemanticEstimandV1::UNKNOWN,
             propensity_min_bps,
             propensity_max_bps,
             max_standardized_mean_difference_micros,
@@ -176,12 +287,22 @@ impl CausalIdentificationV1 {
         }
     }
 
-    /// Only independently verified randomized designs qualify in this tranche.
-    /// Quasi-experimental strategies need method-specific assumptions first.
+    pub const fn with_semantic_estimand(
+        mut self,
+        semantic_estimand: SemanticEstimandV1,
+    ) -> Self {
+        self.semantic_estimand = semantic_estimand;
+        self
+    }
+
+    /// Only randomized designs with a complete, digest-matched semantic
+    /// estimand qualify in this tranche.
     pub fn qualifies_for_transfer(self) -> bool {
         self.method == IdentificationMethodV1::RandomizedControlledTrial
             && self.design_digest.is_known()
             && self.estimand_digest.is_known()
+            && self.semantic_estimand.is_complete()
+            && self.semantic_estimand.canonical_digest() == self.estimand_digest
             && self.propensity_min_bps >= 500
             && self.propensity_min_bps <= self.propensity_max_bps
             && self.propensity_max_bps <= 9_500
@@ -376,6 +497,7 @@ struct QualifiedGroup {
     source_root_digests: BTreeSet<SourceRootDigest>,
     source_events: BTreeSet<u32>,
     estimand_digest: Option<EvidenceDigest256>,
+    semantic_estimand: Option<SemanticEstimandV1>,
     mixed_estimands: bool,
     sum: f64,
     error_bound_sum: f64,
@@ -390,14 +512,18 @@ impl QualifiedGroup {
         }
         self.source_families.insert(item.source_family);
         self.source_root_digests.insert(item.source_root_digest);
-        match self.estimand_digest {
-            None => {
+        match (self.estimand_digest, self.semantic_estimand) {
+            (None, None) => {
                 self.estimand_digest = Some(item.causal_identification.estimand_digest);
+                self.semantic_estimand = Some(item.causal_identification.semantic_estimand);
             }
-            Some(existing) if existing != item.causal_identification.estimand_digest => {
+            (Some(existing_digest), Some(existing_semantic))
+                if existing_digest != item.causal_identification.estimand_digest
+                    || existing_semantic != item.causal_identification.semantic_estimand =>
+            {
                 self.mixed_estimands = true;
             }
-            Some(_) => {}
+            _ => self.mixed_estimands = true,
         }
         self.sum += item.observed_utility;
         self.error_bound_sum += item.measurement_error_bound;
@@ -455,7 +581,11 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
-    if a_ok && b_ok && a.estimand_digest != b.estimand_digest {
+    if a_ok
+        && b_ok
+        && (a.estimand_digest != b.estimand_digest
+            || a.semantic_estimand != b.semantic_estimand)
+    {
         return Decision::abstain();
     }
 
@@ -537,6 +667,7 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
         return Decision::abstain();
     };
     if target_b.estimand_digest != Some(target_estimand)
+        || target_b.semantic_estimand != target_a.semantic_estimand
         || target_b.mixed_estimands
     {
         return Decision::abstain();
@@ -588,6 +719,8 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
         };
         if source_a.mixed_estimands
             || source_b.estimand_digest != Some(source_estimand)
+            || source_b.semantic_estimand != source_a.semantic_estimand
+            || source_a.semantic_estimand != target_a.semantic_estimand
             || source_b.mixed_estimands
             || source_estimand != target_estimand
         {
@@ -691,6 +824,21 @@ mod tests {
         SourceRootDigest::from_bytes(bytes)
     }
 
+    fn fixture_semantic_estimand() -> SemanticEstimandV1 {
+        SemanticEstimandV1::new(
+            1,
+            EvidenceDigest256::from_bytes([1; 32]),
+            EvidenceDigest256::from_bytes([2; 32]),
+            EvidenceDigest256::from_bytes([3; 32]),
+            EvidenceDigest256::from_bytes([4; 32]),
+            EvidenceDigest256::from_bytes([5; 32]),
+            30_000,
+            EvidenceDigest256::from_bytes([6; 32]),
+            EvidenceDigest256::from_bytes([7; 32]),
+            EvidenceDigest256::from_bytes([8; 32]),
+        )
+    }
+
     fn fixture_causal_identification(seed: u32) -> CausalIdentificationV1 {
         let mut design = [0_u8; 32];
         let estimand = [0xA5_u8; 32];
@@ -698,12 +846,13 @@ mod tests {
         CausalIdentificationV1::new(
             IdentificationMethodV1::RandomizedControlledTrial,
             EvidenceDigest256::from_bytes(design),
-            EvidenceDigest256::from_bytes(estimand),
+            fixture_semantic_estimand().canonical_digest(),
             5_000,
             5_000,
             50_000,
             true,
         )
+        .with_semantic_estimand(fixture_semantic_estimand())
     }
 
     fn sample(
