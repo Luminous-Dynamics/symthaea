@@ -349,8 +349,17 @@
     "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
     "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
     "mode": "test-only-independent-reference; production implementation remains Rust-first",
-    "local_tests": 11,
-    "local_status": "pass"
+    "local_tests": 14,
+    "local_status": "PASS",
+    "threshold_policy": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_threshold_policy_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_threshold_policy_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/validation-threshold-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/validation-threshold-known-answer-v1.expected.json",
+      "semantics": "maximize-validation-recall-subject-to-minimum-precision-floor; group-equal-scores; reject-validation-test-identity-overlap; explicit-fallback-if-infeasible",
+      "test_count": 3,
+      "empirical_dataset_result": false
+    }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067"
 }
