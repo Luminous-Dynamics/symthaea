@@ -539,7 +539,7 @@ mod tests {
         assert_eq!(summary.pending_unserved, 0);
         assert_eq!(summary.deadline_misses, 2);
         assert_eq!(summary.max_consecutive_deadline_misses, 1);
-        assert_eq!(summary.miss_to_miss_transition_rate, None);
+        assert_eq!(summary.miss_to_miss_transition_rate, Some(0.0));
         assert_eq!(summary.fresh_correct_on_time, 1);
         assert_eq!(summary.fresh_correct_on_time_coverage, Some(0.25));
         assert_eq!(summary.on_time_decision_coverage, Some(0.25));
