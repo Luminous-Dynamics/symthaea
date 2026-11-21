@@ -285,9 +285,12 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "at least 20 Monte-Carlo replicates are required",
         });
     }
-    if config.module_size < 2
-        || config.module_start + config.module_size > config.regions
-    {
+    let Some(module_end) = config.module_start.checked_add(config.module_size) else {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "injected module bounds overflow",
+        });
+    };
+    if config.module_size < 2 || module_end > config.regions {
         return Err(MetricError::InvalidSimulationConfig {
             reason: "injected module must contain at least two in-range regions",
         });
