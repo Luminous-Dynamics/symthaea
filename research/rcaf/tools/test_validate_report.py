@@ -138,6 +138,40 @@ class RcafValidatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ReportValidationError, "SHA-256"):
             validate_semantics(report)
 
+    def test_signal_analysis_requires_verified_download(self):
+        report = fixture()
+        report["evidence_status"] = "signal_analysis"
+        report["dataset"]["access_state"] = "metadata_only"
+        with self.assertRaisesRegex(ReportValidationError, "downloaded_verified"):
+            validate_semantics(report)
+
+    def test_excluded_count_must_match_total_attrition(self):
+        report = fixture()
+        report["dataset"]["participant_flow"]["excluded"] = 1
+        with self.assertRaisesRegex(ReportValidationError, "unique total attrition"):
+            validate_semantics(report)
+
+    def test_independent_replay_requires_complete_receipts(self):
+        report = fixture()
+        report["evidence_status"] = "independent_replay"
+        report["dataset"]["access_state"] = "downloaded_verified"
+        report["dataset"]["doi"] = "10.1234/example"
+        report["dataset"]["file_manifest_sha256"] = "b" * 64
+        with self.assertRaisesRegex(ReportValidationError, "code_revision"):
+            validate_semantics(report)
+
+        report["analysis"]["code_revision"] = "abc123"
+        report["analysis"]["configuration_sha256"] = "c" * 64
+        report["analysis"]["environment_sha256"] = "d" * 64
+        report["result_sha256"] = "e" * 64
+        validate_semantics(report)
+
+    def test_edge_sign_threshold_must_match_analysis(self):
+        report = fixture()
+        report["summary"]["edge_sign_transitions"]["neutral_threshold"] = 0.1
+        with self.assertRaisesRegex(ReportValidationError, "must match analysis"):
+            validate_semantics(report)
+
     def test_ci_order_is_enforced(self):
         report = fixture()
         report["summary"]["participant_bootstrap_ci"]["lower"] = 0.2
