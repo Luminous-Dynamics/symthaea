@@ -25,7 +25,7 @@ The 2026 result is accelerator-driven D–D fusion in metallic foils/hydrides. T
 | H4 | Electronic-structure differences control a substantial component | At matched D occupancy, defects and geometry, material-to-material changes correlate with independently calculated/measured electronic structure and screening response | DFT/electronic-structure calculations, conductivity/DOS measurements, controlled composition/phase series | Effect follows D density/defects alone and does not transfer with electronic-structure predictors on held-out materials |
 | H5 | A distinct low-energy nuclear mechanism (e.g. resonance) contributes | Energy-localized structure, branching/particle spectra, angular distributions or other nuclear signatures not explained by smooth screening/transport models | Fine energy scans with calibrated spread; independent particle spectroscopy; channel ratios in actual overlap regions; predicted product searches | Predicted resonance features/products are absent at preregistered sensitivity across the relevant energy range |
 | H6 | Instrument, calibration, analysis, or environmental artifacts explain some/all of the apparent effect | Apparent signal follows detector state, beam composition/current, energy calibration, background, dead time, threshold or sample-order effects rather than material state | Independent detectors; blinded calibration/injection; randomized condition order; beam-only/no-beam and H2O/D2O controls; clock and DAQ audit | Same effect survives blinded controls, independent instrumentation, calibration changes and independent-lab replication |
-| H7 | A claimed heat anomaly is chemical, electrical, thermal or accounting-related rather than nuclear | Heat follows reaction chemistry, recombination, thermal lag, input accounting or apparatus state without quantitatively matching nuclear products | Traceable calorimetry plus full energy balance, blank/reference-heater runs, gas/liquid accounting, independent nuclear-product diagnostics and isotope assays | Heat is time-correlated and quantitatively reconciled with independently measured nuclear products and the reaction energy balance across replication |
+| H7 | A claimed heat anomaly is chemical, electrical, thermal or accounting-related rather than nuclear | Heat follows reaction chemistry, recombination, thermal lag, input accounting or apparatus state without quantitatively matching nuclear products | Traceable calorimetry plus full energy balance, blank/reference-heater runs, gas/liquid accounting, independent nuclear-product diagnostics and isotope assays | Heat is time-correlated and quantitatively reconciled with independently measured nuclear products and the reaction energy balance across replication |\n| H8 | A non-negligible D₂⁺ molecular-ion component creates a second per-deuteron energy population after dissociation | Under prompt symmetric dissociation, D fragments from singly charged D₂⁺ carry about half the molecular kinetic energy; at the same acceleration potential their D–D center-of-mass energy is about half that of D⁺. Yield predictions therefore depend on mass-resolved species fractions and dissociation depth, not just nominal voltage and a single energy-spread scalar | Mass-resolved beam-species fractions vs operating point; energy distribution per species; dissociation/fragmentation evidence; independent beam current and charge calibration; time-resolved or energy-resolved product data | A sufficiently low D₂⁺ fraction or negligible/late dissociation makes its forward-modelled contribution too small to change held-out yields within uncertainty, or mass-resolved diagnostics show no distinct lower-energy component |
 
 ## Causal structure
 
@@ -86,3 +86,19 @@ The analysis must report null outcomes and upper bounds with sensitivity. A non-
 - Karahadian et al. (2026), https://doi.org/10.1038/s41467-026-74421-1
 - Chen et al. (2025), https://doi.org/10.1038/s41586-025-09042-7
 - ARPA-E LENR Exploratory Topic criteria, https://arpa-e-foa.energy.gov/FileContent.aspx?FileID=68c066ad-2aa8-4bbe-bfbf-fcb73762fdda
+
+
+## H8 follow-up: beam-species mixture is a required nuisance model
+
+The 2026 Methods report a typical ion source composition of approximately 85% D⁺ and 15% D₂⁺ and calculate deuteron flux by weighting each D₂⁺ ion as two deuterons. Under the explicit prompt-dissociation limiting assumption, 15% D₂⁺ ion-current fraction corresponds to:
+
+[
+f_{D	ext{ from }D^+}=rac{0.85}{0.85+2(0.15)}approx0.7391,qquad
+f_{D	ext{ from }D_2^+}=rac{2(0.15)}{0.85+2(0.15)}approx0.2609.
+]
+
+For a singly charged ion accelerated through (V) kV, D⁺ has (E_{cm}approx V/2) keV for D on stationary D. If D₂⁺ dissociates while approximately retaining the molecular velocity, each D fragment has (E_{cm}approx V/4) keV. This is a conditional forward-model scenario; the actual dissociation probability and depth are not established by the published scalar beam-energy spread.
+
+This becomes an explicit competing explanation/nuisance model. The model must be compared at matched total deuteron flux and cannot be described as explaining the low-energy plateau without mass-resolved beam diagnostics and prospective predictions.
+
+Source: Karahadian et al. (2026), Methods, https://doi.org/10.1038/s41467-026-74421-1
