@@ -147,3 +147,22 @@ Every result must be split- and protocol-specific. A higher random-split accurac
 - A class-heldout WM-811K task is an open-set proxy, not proof of discovering a new physical defect mechanism.
 - A surrogate EDA score is not final detailed-route or fabricated-silicon performance.
 - None of these public benchmark results establishes yield improvement, fab process qualification or physical equipment capability.
+
+
+## 3A. Corrected 2026 MixedWM38 comparison: closed-set transfer is not compositional SOTA
+
+The full Awais et al. article adds a critical result not visible in the abstract. On its held-out MixedWM38 test set (7,603 wafers), the WM-811K-pretrained graph-contrastive pipeline reports 90.86% bit-wise accuracy and bit-wise macro-F1 0.815. The authors state that 36x36 downsampling loses spatial detail, the GIN was not tuned specifically for MixedWM38, and the supervised schedule was shorter than those in stronger benchmark methods. The paper cites WSCN at 98.20% and PIENet at 98.90% on its comparison context. These values use paper-specific protocols and must not be directly ranked until the label encoding, split and exact metric match.
+
+This changes the next target: keep both per-defect 8-bit prediction and whole-composition recognition. Required outputs:
+- bit-wise macro-F1 and per-defect recall;
+- exact-set match / 38-way category accuracy;
+- harmonic mean of seen- and unseen-combination accuracy;
+- leave-combination-out and leave-component-out tasks;
+- real-only, synthetic-only and source-mixed evaluations only when source identity is actually known;
+- native resolution versus 36x36 and other downsampling ablations.
+
+A separate July 5, 2026 FAD-Net paper reports 95.35–98.63% accuracy, F1 0.9255–0.9858 and AUC 0.9971–0.9997 across WM-811K and MixedWM38. Its public abstract does not expose the exact per-dataset split and source-identity protocol, and its data availability statement directs readers to the manuscript/author for further details. Treat it as an important reproduction lead, not an apples-to-apples leaderboard entry.
+
+Sources:
+- https://link.springer.com/article/10.1007/s10845-026-02906-3
+- https://doi.org/10.1002/qre.70321
