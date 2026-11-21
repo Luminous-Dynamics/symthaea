@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/workspace-stale-member-exclusion-20261121
+      - research/mel-audio-perception-parity-20261121
     paths:
       - "crates/domains/symthaea-muse/src/perception_parity.rs"
       - "crates/domains/symthaea-muse/src/audio_frontend_evidence.rs"
