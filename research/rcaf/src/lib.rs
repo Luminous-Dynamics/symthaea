@@ -114,7 +114,7 @@ fn validate_correlation_matrix(matrix: &[Vec<f64>]) -> Result<usize, MetricError
         return Err(MetricError::NonSquareMatrix);
     }
     for (i, row) in matrix.iter().enumerate() {
-        for (j, (a, row_j)) in row
+        for ((j, a), row_j) in row
             .iter()
             .enumerate()
             .skip(i + 1)
