@@ -45,10 +45,13 @@ def resource_dominates(left, right):
     )
 
 
-def terminal_regret(scenario, belief):
+def terminal_regret(scenario, belief, covered_obligations):
     decisions = scenario["decisions"]
     best = None
     for decision in decisions:
+        required = set(scenario["decision_obligations"][decision])
+        if not required.issubset(set(covered_obligations)):
+            continue
         worst = max(
             scenario["loss_matrix"][decision][state]
             - min(scenario["loss_matrix"][candidate][state] for candidate in decisions)
@@ -57,11 +60,14 @@ def terminal_regret(scenario, belief):
         candidate = (worst, decision)
         if best is None or candidate < best:
             best = candidate
+    if best is None:
+        raise ValueError("no terminal disposition supported by path-complete evidence")
     return best[0], {
         "node_kind": "Terminal",
         "belief_states": list(belief),
         "decision": best[1],
         "worst_case_regret": best[0],
+        "covered_obligations": sorted(set(covered_obligations)),
     }
 
 
@@ -117,8 +123,8 @@ def choose_plan(candidates):
     }
 
 
-def solve(scenario, belief, remaining_budget, depth, used):
-    stop_risk, stop_node = terminal_regret(scenario, belief)
+def solve(scenario, belief, remaining_budget, depth, used, covered_obligations):
+    stop_risk, stop_node = terminal_regret(scenario, belief, covered_obligations)
     candidates = [{
         "risk": stop_risk,
         "expected": zero_resources(),
@@ -153,7 +159,8 @@ def solve(scenario, belief, remaining_budget, depth, used):
                 key: remaining_budget[key] - action["resource_plan"][key]
                 for key in RESOURCE_KEYS
             }
-            child = solve(scenario, child_belief, child_budget, depth - 1, next_used)
+            next_covered = set(covered_obligations) | set(action["obligations_covered"])
+            child = solve(scenario, child_belief, child_budget, depth - 1, next_used, next_covered)
             worst_risk = max(worst_risk, child["risk"])
             probability = branch_probability(scenario, belief, child_belief)
             if child["expected"] is None:
@@ -204,7 +211,8 @@ def evaluate_fixed(scenario):
             for action_id in scenario["fixed_campaign_sequence"]
         )
         groups.setdefault(signature, []).append(state)
-    risk = max(terminal_regret(scenario, belief)[0] for belief in groups.values())
+    covered = set().union(*(set(by_id[action_id]["obligations_covered"]) for action_id in scenario["fixed_campaign_sequence"]))
+    risk = max(terminal_regret(scenario, belief, covered)[0] for belief in groups.values())
     return risk, total
 
 
@@ -246,11 +254,11 @@ def audit_scenario(scenario):
             or abs(sum(weights["state_weights"].values()) - 1.0) > TOL):
         raise ValueError("resource-frequency model is invalid or used outside cost accounting")
 
-    baseline, _ = terminal_regret(scenario, states)
+    baseline, _ = terminal_regret(scenario, states, set())
     myopic_id, myopic_risk, myopic_stops = evaluate_myopic(scenario, baseline)
     fixed_risk, fixed_resources = evaluate_fixed(scenario)
     adaptive = solve(
-        scenario, states, scenario["budget"], scenario["max_actions"], set()
+        scenario, states, scenario["budget"], scenario["max_actions"], set(), set()
     )
     first_action = (
         adaptive["node"]["action_id"]
