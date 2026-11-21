@@ -136,3 +136,15 @@ This benchmark proves only that a particular software implementation behaves in 
 ## 10. Temporal-dependence stress check
 
 The Rust test suite now runs an additional exchangeable-null calibration with AR(1) coefficient `rho=0.65`. It requires the Monte-Carlo null rejection estimate to remain no greater than 0.15 and the absolute median paired null gap to remain below 0.04. This is a second synthetic operating point, not proof of general null calibration. A full autocorrelation grid with Monte-Carlo intervals remains a required benchmark before applying this metric to real time series.
+
+
+## 11. Estimator semantics and matched-input comparison
+
+The simulation harness exposes a matched-input estimator tournament:
+1. **Absolute Weighted Jaccard:** compares absolute edge magnitudes, deliberately discarding sign.
+2. **Signed-shift Weighted Jaccard:** shifts every correlation from [-1,1] into [0,2]; sign disagreement lowers similarity.
+3. **Normalized mean absolute edge error:** (1-\operatorname{mean}(|r_i-s_i|)/2) over the upper triangle.
+
+All three consume the same simulated matrices using the same random seed. A known sign-flip fixture returns absolute WJ=1, signed-shift WJ=1/3, and normalized mean-absolute similarity=0.5. This demonstrates that the estimators are not interchangeable; any "winner" must first be tied to a declared construct and then evaluated for null calibration and injection sensitivity.
+
+Run `cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament`. The output schema is `research/rcaf/estimator-tournament.schema.json`.
