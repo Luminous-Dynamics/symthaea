@@ -108,5 +108,6 @@
   "authority_granted": false,
   "requalification_claims_covered": [
     "STRUCTURAL-INTERFACE-CAPABILITY-001"
-  ]
+  ],
+  "record_revision": "v1"
 }
