@@ -747,7 +747,9 @@
         "Reproduce binary metric report byte-for-byte",
         "Reproduce inspection decision report byte-for-byte"
       ],
-      "details": "Includes test_frozen_secom_source_clock_manifest_has_expected_support"
+      "details": "Includes test_frozen_secom_source_clock_manifest_has_expected_support",
+      "latest_verified_test_count": 35,
+      "note": "The latest verified hosted run predates the contrastive-pair validator. The new validator was run locally (11/11 tests plus byte-for-byte CLI report reproduction); the combined 46-test suite has not yet received a verified hosted run."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -782,7 +784,14 @@
         "time-near-pairs-require-clock-domain-and-within-embargo"
       ],
       "test_count": 11,
-      "claim_ceiling": "pair-manifest-integrity-only; no proof of pair-semantic correctness or model quality"
+      "claim_ceiling": "pair-manifest-integrity-only; no proof of pair-semantic correctness or model quality",
+      "local_verification": {
+        "tests_passed": 11,
+        "tests_total": 11,
+        "result": "PASS",
+        "cli_report_byte_for_byte": true
+      },
+      "hosted_ci_status": "not-yet-verified"
     },
     "test_count_pending_hosted_ci": 46,
     "pair_validator_hosted_ci_status": "pending"
