@@ -1,0 +1,50 @@
+{
+  "schema": "EvidenceActionProposalOutcomeV1",
+  "record_kind": "OUTCOME",
+  "outcome_id": "JEV-OUTCOME-ABORTED-SYNTHETIC-001",
+  "proposal_ref": {
+    "id": "JEV-017-A-TARGETED-STRUCTURAL-REQUALIFICATION",
+    "kind": "evidence_action_proposal",
+    "revision": "v1"
+  },
+  "decision_context": {
+    "profile_ref": "provider-client-profile://P2-C2@cfg-r8",
+    "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0002",
+    "configuration_id": "CFG-R8",
+    "icd_revision": "R4"
+  },
+  "execution_state": "ABORTED",
+  "execution_attempted": true,
+  "actual_resources": {
+    "engineering_hours": 1.2,
+    "compute_core_hours": 0,
+    "facility_hours": 1.5,
+    "specimen_count": 1,
+    "review_hours": 0.4,
+    "external_cost_units": 0.5
+  },
+  "executing_owner": {
+    "id": "test-owner:human-authorized-operator",
+    "kind": "external_execution_owner"
+  },
+  "execution_authority_ref": {
+    "id": "test-authorization:human-signed-001",
+    "kind": "external_execution_authorization"
+  },
+  "result_evidence_refs": [
+    {
+      "id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "aborted_run_log"
+    }
+  ],
+  "verification": {
+    "state": "INDETERMINATE",
+    "verifier_ref": null,
+    "reason_codes": [
+      "TEST_ABORTED_NO_ACCEPTANCE_RESULT"
+    ]
+  },
+  "discrepancy_ref": null,
+  "claim_ceiling": "execution_record_only_no_qualification_promotion",
+  "authority_granted": false
+}
