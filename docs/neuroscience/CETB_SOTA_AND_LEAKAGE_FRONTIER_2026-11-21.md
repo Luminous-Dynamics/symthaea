@@ -111,3 +111,10 @@ It is still not a realistic BOLD/EEG/MEG pipeline simulator: no hemodynamic resp
 RCAF now compares three estimator semantics on identical simulated matrices: absolute Weighted Jaccard, signed-shift Weighted Jaccard and normalized mean absolute edge error. The polarity-flip known-answer fixture demonstrates why their outputs are not directly interchangeable (1.0, 1/3 and 0.5 respectively for a single +0.5→−0.5 edge).
 
 The matched-input tournament runs null false-positive and injected-change sensitivity for each estimator, preserving a common seed. CETB should extend this tournament to Pearson, Spearman, shrinkage covariance/precision and modality-appropriate pyspi estimators once the data representation and estimand are matched. Do not select a universal winner from synthetic performance alone.
+
+
+## 5. Separate measurement qualification axes
+
+CETB now has a claim-scoped receipt schema at `research/cetb/measurement_qualification/measurement-qualification.schema.json`. It requires separate records for measurement sufficiency, participant-level repeatability, construct validity and three transportability lanes (participant holdout, site holdout, independent cohort). It explicitly forbids a composite score.
+
+The framework treats NSI as an imported fMRI measurement-sufficiency method, RCAF as a participant-paired repeatability method, and external validation as a separate transportability test. None substitutes for the others. The protocol is `CETB_MEASUREMENT_QUALIFICATION_STACK_V0.md`.
