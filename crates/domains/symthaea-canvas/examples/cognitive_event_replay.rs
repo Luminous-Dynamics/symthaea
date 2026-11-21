@@ -104,13 +104,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         fs::write(path, svg)?;
     }
 
-    let synthetic = snapshot
-        .nodes
-        .iter()
-        .all(|node| matches!(
-            node.evidence.provenance,
+    let synthetic = events.iter().all(|event| {
+        matches!(
+            event.evidence.provenance,
             symthaea_canvas::CognitiveProvenance::SyntheticFixture
-        ));
+        )
+    });
     println!("event_fixture: {event_path}");
     println!("session_id: {session_id}");
     println!("event_schema_version: {}", events[0].schema_version);
