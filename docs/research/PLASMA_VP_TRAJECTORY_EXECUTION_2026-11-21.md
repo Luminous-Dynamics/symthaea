@@ -143,6 +143,16 @@ WarpX/Smilei results are admissible only when their pinned configuration actuall
 
 Every timing must include applicable setup/preprocessing, training amortisation, inference, field solve, deposition/gather, particle push, communication, synchronization, diagnostics, corrections, fallbacks, output and I/O. Report both physics-matched fixed-error comparisons and best-achievable Pareto frontiers under the same physical acceptance envelope.
 
+### Additional 1D1V representation comparator: tensor-train / MPS
+
+The February 2026 paper *Tensor Network Compression for Fully Spectral Vlasov–Poisson Simulation* (arXiv:2602.13092) and its open [VlasovTT.jl implementation](https://github.com/erikasgrim/VlasovTT.jl) are direct comparators for this cohort. The inspected repository head is `99aa077b6f5e4ae4dfc8330590e502267caf298b`; the repository declares an MIT licence and contains both compressed TT/MPS and dense-reference solver paths.
+
+The paper reports a quantics 1024-by-1024 phase-space grid (10 bits per dimension), \(\Delta t=0.1\), TCI tolerance \(10^{-8}\), field maximum bond dimension 32, and a Landau case with \(A=0.01\), \(v_{th}=1\), \(v\in[-6,6]\). It reports a linear Landau field-amplitude damping rate near -0.151, TT bond ranks around 15–45 for Landau and 120–150 for two-stream in the studied runs, and approximately \(10^{-3}\) relative total-energy deviation for Landau. These are paper-reported outcomes, not an independent Symthaea reproduction.
+
+The paper also identifies important failure surfaces: looser rank truncation reduces the Landau damping rate and creates larger negative artifacts in \(f\); the electric-acceleration TCI fit consumes approximately an order of magnitude more time than the combined TT–MPO contractions in the reported runtime decomposition. Therefore report rank history, truncation residual, field damping/growth, negative distribution mass, TCI reconstruction cost and full per-step runtime together.
+
+Tracking: [#13104 — adaptive phase-space representation tournament](https://github.com/Luminous-Dynamics/symthaea/issues/13104). A representation transition (dense↔TT↔particle↔Hermite) is itself a numerical operation and requires its own discrepancy, invariant, positivity and cost receipt. No universal representation winner is assumed.
+
 ## 8. Prospective targets and statistics
 
 These are targets, not measurements:
