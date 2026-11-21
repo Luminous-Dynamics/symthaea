@@ -6,8 +6,10 @@
 
 ## Files
 
-- `scenarios.json`: 13 synthetic scenarios, explicit state/loss contexts, action proposals, resource vectors and expected qualitative/known-answer checks.
-- `scenarios.schema.json`: JSON Schema Draft 2020-12 for the v0.1 corpus.\n- [Executable dry-run preflight](https://github.com/Luminous-Dynamics/symthaea/tree/research/orbital-joint-evidence-voi-v0-1/tools/orbital-joint-evidence-voi-bench): resource/admissibility/claim checks, finite-state minimax regret and one explicit calibrated EVSI case.\n- A separately implemented standard-library Python oracle under the same tool directory.
+- `scenarios.json`: 14 synthetic scenarios, explicit state/loss contexts, action proposals, resource vectors and expected qualitative/known-answer checks.
+- `scenarios.schema.json`: JSON Schema Draft 2020-12 for the v0.1 corpus.
+- [Executable dry-run preflight](https://github.com/Luminous-Dynamics/symthaea/tree/research/orbital-joint-evidence-voi-v0-1/tools/orbital-joint-evidence-voi-bench): resource/admissibility/claim checks, finite-state minimax regret and one explicit calibrated EVSI case.
+- A separately implemented standard-library Python oracle under the same tool directory.
 
 ## Scenario coverage
 
@@ -23,7 +25,9 @@
 | JEV-008 | Can coupon evidence be promoted to a production-joint claim without a transfer bridge? It must not. |
 | JEV-009 | Can an information-rich action replace a pre-registered critical campaign interaction? It must not. |
 | JEV-010 | Can a first-mating test resolve wear/lifecycle claims? It must not. |
-| JEV-011 | Does an aborted test retain its cost and evidence gap rather than becoming a pass? |\n| JEV-012 | Are actual resources preserved when an aborted test exceeds its estimate but stays within the scenario budget? |\n| JEV-013 | Are actual resources retained and reported when an aborted test exceeds both estimate and total budget? |
+| JEV-011 | Does an aborted test retain its cost and evidence gap rather than becoming a pass? |
+| JEV-012 | Are actual resources preserved when an aborted test exceeds its estimate but stays within the scenario budget? |
+| JEV-013 | Are actual resources retained and reported when an aborted test exceeds both estimate and total budget? |
 | JEV-014 | Do equal-value actions with incomparable resource plans trigger human review rather than a fabricated cost scalar? |
 
 ## Important interpretation
