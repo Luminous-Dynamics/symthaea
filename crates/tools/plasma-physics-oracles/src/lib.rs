@@ -126,11 +126,7 @@ impl GaussLawReport {
     /// Apply separately declared residual and periodic-neutrality tolerances.
     ///
     /// Invalid (negative or non-finite) tolerances fail closed.
-    pub fn satisfies_tolerances(
-        &self,
-        residual_tolerance: f64,
-        neutrality_tolerance: f64,
-    ) -> bool {
+    pub fn satisfies_tolerances(&self, residual_tolerance: f64, neutrality_tolerance: f64) -> bool {
         residual_tolerance.is_finite()
             && residual_tolerance >= 0.0
             && neutrality_tolerance.is_finite()
@@ -146,9 +142,15 @@ pub enum OracleError {
     InvalidDomainLength,
     InvalidPermittivity,
     ZeroFourierModes,
-    NonFinitePosition { particle: usize },
-    NonFiniteProbePosition { probe: usize },
-    NonFiniteParticleCharge { particle: usize },
+    NonFinitePosition {
+        particle: usize,
+    },
+    NonFiniteProbePosition {
+        probe: usize,
+    },
+    NonFiniteParticleCharge {
+        particle: usize,
+    },
     NonFiniteOracleOutput,
     TooFewCells,
     FieldChargeLengthMismatch {
@@ -156,8 +158,12 @@ pub enum OracleError {
         charge_cells: usize,
     },
     InvalidCellWidth,
-    NonFiniteFieldValue { cell: usize },
-    NonFiniteChargeDensity { cell: usize },
+    NonFiniteFieldValue {
+        cell: usize,
+    },
+    NonFiniteChargeDensity {
+        cell: usize,
+    },
 }
 
 impl fmt::Display for OracleError {
@@ -176,7 +182,9 @@ impl fmt::Display for OracleError {
                 write!(f, "particle {particle} has a non-finite charge")
             }
             Self::NonFiniteOracleOutput => write!(f, "oracle output is non-finite"),
-            Self::TooFewCells => write!(f, "periodic Gauss verification requires at least two cells"),
+            Self::TooFewCells => {
+                write!(f, "periodic Gauss verification requires at least two cells")
+            }
             Self::FieldChargeLengthMismatch {
                 field_cells,
                 charge_cells,
@@ -250,10 +258,7 @@ pub fn periodic_fourier_energy_and_forces(
         let energy_scale = 2.0 / (length * epsilon * wave_number * wave_number);
         let force_scale = 2.0 / (length * epsilon * wave_number);
 
-        if !wave_number.is_finite()
-            || !energy_scale.is_finite()
-            || !force_scale.is_finite()
-        {
+        if !wave_number.is_finite() || !energy_scale.is_finite() || !force_scale.is_finite() {
             return Err(OracleError::NonFiniteOracleOutput);
         }
 
@@ -398,15 +403,36 @@ mod tests {
     #[test]
     fn probe_field_is_invariant_under_co_located_weight_split() {
         let original = [
-            Particle1d { position: 0.3, charge: 1.2 },
-            Particle1d { position: 2.1, charge: -0.5 },
-            Particle1d { position: 5.4, charge: 0.25 },
+            Particle1d {
+                position: 0.3,
+                charge: 1.2,
+            },
+            Particle1d {
+                position: 2.1,
+                charge: -0.5,
+            },
+            Particle1d {
+                position: 5.4,
+                charge: 0.25,
+            },
         ];
         let split = [
-            Particle1d { position: 0.3, charge: 0.4 },
-            Particle1d { position: 0.3, charge: 0.8 },
-            Particle1d { position: 2.1, charge: -0.5 },
-            Particle1d { position: 5.4, charge: 0.25 },
+            Particle1d {
+                position: 0.3,
+                charge: 0.4,
+            },
+            Particle1d {
+                position: 0.3,
+                charge: 0.8,
+            },
+            Particle1d {
+                position: 2.1,
+                charge: -0.5,
+            },
+            Particle1d {
+                position: 5.4,
+                charge: 0.25,
+            },
         ];
         let probes = [0.1, 1.7, 3.3, 6.2];
         let first = periodic_fourier_field_at_probes(&original, &probes, config(7)).unwrap();
@@ -420,9 +446,18 @@ mod tests {
     #[test]
     fn probe_field_is_permutation_invariant() {
         let particles = [
-            Particle1d { position: 0.4, charge: 1.0 },
-            Particle1d { position: 2.7, charge: -0.7 },
-            Particle1d { position: 4.9, charge: 0.2 },
+            Particle1d {
+                position: 0.4,
+                charge: 1.0,
+            },
+            Particle1d {
+                position: 2.7,
+                charge: -0.7,
+            },
+            Particle1d {
+                position: 4.9,
+                charge: 0.2,
+            },
         ];
         let permuted = [particles[2], particles[0], particles[1]];
         let probes = [0.2, 1.8, 3.5, 5.9];
@@ -437,16 +472,27 @@ mod tests {
     #[test]
     fn probe_field_times_probe_charge_matches_variational_force() {
         let particles = [
-            Particle1d { position: 0.6, charge: 1.0 },
-            Particle1d { position: 2.2, charge: -0.4 },
-            Particle1d { position: 5.1, charge: 0.8 },
+            Particle1d {
+                position: 0.6,
+                charge: 1.0,
+            },
+            Particle1d {
+                position: 2.2,
+                charge: -0.4,
+            },
+            Particle1d {
+                position: 5.1,
+                charge: 0.8,
+            },
         ];
         let probes: Vec<f64> = particles.iter().map(|particle| particle.position).collect();
         let field = periodic_fourier_field_at_probes(&particles, &probes, config(4)).unwrap();
         let variational = periodic_fourier_energy_and_forces(&particles, config(4)).unwrap();
 
-        for ((particle, electric_field), force) in
-            particles.iter().zip(field.iter()).zip(variational.forces.iter())
+        for ((particle, electric_field), force) in particles
+            .iter()
+            .zip(field.iter())
+            .zip(variational.forces.iter())
         {
             close(particle.charge * electric_field, *force, 1.0e-12);
         }
@@ -455,26 +501,43 @@ mod tests {
     #[test]
     fn changing_total_weight_changes_the_probe_field() {
         let baseline = [
-            Particle1d { position: 0.3, charge: 1.0 },
-            Particle1d { position: 2.0, charge: -0.5 },
+            Particle1d {
+                position: 0.3,
+                charge: 1.0,
+            },
+            Particle1d {
+                position: 2.0,
+                charge: -0.5,
+            },
         ];
         let changed = [
-            Particle1d { position: 0.3, charge: 1.5 },
-            Particle1d { position: 2.0, charge: -0.5 },
+            Particle1d {
+                position: 0.3,
+                charge: 1.5,
+            },
+            Particle1d {
+                position: 2.0,
+                charge: -0.5,
+            },
         ];
         let probes = [0.7, 1.4, 2.8, 4.1];
         let first = periodic_fourier_field_at_probes(&baseline, &probes, config(4)).unwrap();
         let second = periodic_fourier_field_at_probes(&changed, &probes, config(4)).unwrap();
 
-        assert!(first
-            .iter()
-            .zip(second.iter())
-            .any(|(left, right)| (left - right).abs() > 1.0e-6));
+        assert!(
+            first
+                .iter()
+                .zip(second.iter())
+                .any(|(left, right)| (left - right).abs() > 1.0e-6)
+        );
     }
 
     #[test]
     fn probe_field_rejects_non_finite_probe_positions() {
-        let particles = [Particle1d { position: 0.2, charge: 1.0 }];
+        let particles = [Particle1d {
+            position: 0.2,
+            charge: 1.0,
+        }];
         assert_eq!(
             periodic_fourier_field_at_probes(&particles, &[f64::NAN], config(1)).unwrap_err(),
             OracleError::NonFiniteProbePosition { probe: 0 }
@@ -605,10 +668,12 @@ mod tests {
             let mut minus = particles;
             plus[index].position += step;
             minus[index].position -= step;
-            let energy_plus =
-                periodic_fourier_energy_and_forces(&plus, config(4)).unwrap().potential_energy;
-            let energy_minus =
-                periodic_fourier_energy_and_forces(&minus, config(4)).unwrap().potential_energy;
+            let energy_plus = periodic_fourier_energy_and_forces(&plus, config(4))
+                .unwrap()
+                .potential_energy;
+            let energy_minus = periodic_fourier_energy_and_forces(&minus, config(4))
+                .unwrap()
+                .potential_energy;
             let derivative = (energy_plus - energy_minus) / (2.0 * step);
             close(*expected_force, -derivative, 2.0e-8);
         }
@@ -690,8 +755,7 @@ mod tests {
             OracleError::TooFewCells
         );
         assert_eq!(
-            verify_periodic_1d_gauss_law(&[f64::NAN, 0.0], &[0.0, 0.0], 1.0, 1.0)
-                .unwrap_err(),
+            verify_periodic_1d_gauss_law(&[f64::NAN, 0.0], &[0.0, 0.0], 1.0, 1.0).unwrap_err(),
             OracleError::NonFiniteFieldValue { cell: 0 }
         );
     }
