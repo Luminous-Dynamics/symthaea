@@ -501,8 +501,7 @@ pub fn run_common_mode_nuisance_sweep(
                 == baseline.injection_wrong_direction_rejection_rate,
             report.median_null_paired_gap == baseline.median_null_paired_gap,
             report.median_injected_paired_gap == baseline.median_injected_paired_gap,
-            report.median_null_positive_gap_fraction
-                == baseline.median_null_positive_gap_fraction,
+            report.median_null_positive_gap_fraction == baseline.median_null_positive_gap_fraction,
             report.median_injected_positive_gap_fraction
                 == baseline.median_injected_positive_gap_fraction,
         ]
@@ -1226,7 +1225,10 @@ mod tests {
         let strengths = [0.0, 0.10, 0.20, 0.30];
         let sweep = run_common_mode_nuisance_sweep(&config, &strengths).unwrap();
         assert_eq!(sweep.nuisance_strengths.as_slice(), &strengths[..]);
-        assert_eq!(sweep.schema_version, "rcaf.common-mode-nuisance-sweep/0.1.0");
+        assert_eq!(
+            sweep.schema_version,
+            "rcaf.common-mode-nuisance-sweep/0.1.0"
+        );
         assert_eq!(
             sweep.reports[0].nuisance_only_rejection_rate,
             sweep.reports[0].null_false_positive_rate
