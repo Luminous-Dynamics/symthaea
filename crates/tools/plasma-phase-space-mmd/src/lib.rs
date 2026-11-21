@@ -1015,4 +1015,200 @@ mod tests {
             })
         ));
     }
+
+    #[test]
+    fn spectral_estimator_is_reproducible_for_frozen_seed() {
+        let candidate = [particle(0.5, -0.25, 0.4), particle(5.0, 1.5, 0.6)];
+        let reference = [particle(0.75, -0.1, 0.4), particle(4.5, 1.25, 0.6)];
+        let features = SpectralMmdConfig {
+            feature_count: 512,
+            seed: 0x5eed_cafe,
+        };
+        let first =
+            compare_phase_space_measures_spectral(&candidate, &reference, config(), features)
+                .unwrap();
+        let second =
+            compare_phase_space_measures_spectral(&candidate, &reference, config(), features)
+                .unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.feature_count, 512);
+        assert_eq!(first.seed, 0x5eed_cafe);
+    }
+
+    #[test]
+    fn spectral_estimator_uses_linear_particle_feature_work() {
+        let candidate = [particle(0.5, 0.0, 0.5), particle(1.5, 1.0, 0.5)];
+        let reference = [particle(0.75, 0.0, 0.5), particle(2.5, 1.0, 0.5)];
+        let result = compare_phase_space_measures_spectral(
+            &candidate,
+            &reference,
+            config(),
+            SpectralMmdConfig {
+                feature_count: 100,
+                seed: 17,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.particle_feature_evaluations, 400);
+        assert_eq!(result.candidate_atom_count, 2);
+        assert_eq!(result.reference_atom_count, 2);
+        assert!(result.feature_standard_error.is_finite());
+        assert!(result.hoeffding_95_half_width > 0.0);
+        assert!(result.feature_bound_lower <= result.normalized_mmd_squared);
+        assert!(result.feature_bound_upper >= result.normalized_mmd_squared);
+    }
+
+    #[test]
+    fn spectral_estimator_preserves_permutation_and_signed_split_invariance() {
+        let candidate = [
+            particle(1.0, 0.25, 0.5),
+            particle(6.0, -0.5, 0.5),
+        ];
+        let permutation = [
+            particle(6.0, -0.5, 0.5),
+            particle(1.0, 0.25, 0.5),
+        ];
+        let signed_split = [
+            particle(1.0, 0.25, 0.75),
+            particle(1.0, 0.25, -0.25),
+            particle(6.0, -0.5, 0.2),
+            particle(6.0, -0.5, 0.3),
+        ];
+        let features = SpectralMmdConfig {
+            feature_count: 1024,
+            seed: 12345,
+        };
+        let permuted = compare_phase_space_measures_spectral(
+            &candidate,
+            &permutation,
+            config(),
+            features,
+        )
+        .unwrap();
+        let split = compare_phase_space_measures_spectral(
+            &candidate,
+            &signed_split,
+            config(),
+            features,
+        )
+        .unwrap();
+        assert!(permuted.normalized_mmd <= 1.0e-12);
+        assert!(split.normalized_mmd <= 1.0e-12);
+        assert_eq!(split.reference_atom_count, 2);
+    }
+
+    #[test]
+    fn spectral_estimator_tracks_exact_oracle_with_reported_bound() {
+        let candidate = [
+            particle(0.0, -0.5, 0.2),
+            particle(1.5, 0.25, 0.3),
+            particle(5.0, 1.25, 0.5),
+        ];
+        let reference = [
+            particle(0.25, -0.4, 0.2),
+            particle(2.0, 0.5, 0.3),
+            particle(5.5, 1.0, 0.5),
+        ];
+        let exact = compare_phase_space_measures_mmd(&candidate, &reference, config()).unwrap();
+        let approximate = compare_phase_space_measures_spectral(
+            &candidate,
+            &reference,
+            config(),
+            SpectralMmdConfig {
+                feature_count: 8192,
+                seed: 0x2026_1121,
+            },
+        )
+        .unwrap();
+        let absolute_error =
+            (approximate.normalized_mmd_squared - exact.normalized_mmd_squared).abs();
+        assert!(
+            absolute_error <= approximate.hoeffding_95_half_width,
+            "squared-MMD error {absolute_error:e} exceeded feature-sampling bound {:e}",
+            approximate.hoeffding_95_half_width
+        );
+    }
+
+    #[test]
+    fn spectral_estimator_resolves_the_finite_fourier_alias_control() {
+        let length = config().domain_length;
+        let candidate = (0..4)
+            .map(|index| particle(f64::from(index) * length / 4.0, 0.0, 0.25))
+            .collect::<Vec<_>>();
+        let reference = (0..4)
+            .map(|index| particle(length / 8.0 + f64::from(index) * length / 4.0, 0.0, 0.25))
+            .collect::<Vec<_>>();
+        let result = compare_phase_space_measures_spectral(
+            &candidate,
+            &reference,
+            config(),
+            SpectralMmdConfig {
+                feature_count: 4096,
+                seed: 99,
+            },
+        )
+        .unwrap();
+        assert!(
+            result.normalized_mmd_squared > 0.02,
+            "spectral approximation failed the alias negative control: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn spectral_estimator_rejects_zero_feature_count() {
+        assert_eq!(
+            compare_phase_space_measures_spectral(
+                &[],
+                &[],
+                config(),
+                SpectralMmdConfig {
+                    feature_count: 0,
+                    seed: 1,
+                },
+            ),
+            Err(MmdError::InvalidFeatureCount)
+        );
+    }
+
+    #[test]
+    fn spectral_skellam_sampler_has_expected_moments() {
+        let concentration = 30.0;
+        let mut rng = SplitMix64::new(0x5eed);
+        let samples = 50_000_u64;
+        let mut sum = 0.0;
+        let mut sum_squared = 0.0;
+        for _ in 0..samples {
+            let harmonic =
+                sample_spatial_harmonic(concentration, &mut rng).unwrap() as f64;
+            sum += harmonic;
+            sum_squared += harmonic * harmonic;
+        }
+        let mean = sum / samples as f64;
+        let variance = sum_squared / samples as f64 - mean * mean;
+        assert!(mean.abs() < 0.12, "Skellam mean was {mean}");
+        assert!(
+            (variance - concentration).abs() < 0.8,
+            "Skellam variance was {variance}, expected {concentration}"
+        );
+    }
+
+    #[test]
+    fn spectral_equal_empty_measures_have_zero_estimate() {
+        let result = compare_phase_space_measures_spectral(
+            &[],
+            &[],
+            config(),
+            SpectralMmdConfig {
+                feature_count: 256,
+                seed: 4,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.normalized_mmd_squared, 0.0);
+        assert_eq!(result.normalized_mmd, 0.0);
+        assert_eq!(result.particle_feature_evaluations, 0);
+    }
+
+
 }
