@@ -817,7 +817,10 @@ mod tests {
         let mut config = test_config(side, side);
         config.nx = side;
         config.nv = side;
-        assert!(matches!(config.validate(), Err(SolverError::GridSizeOverflow)));
+        assert!(matches!(
+            config.validate(),
+            Err(SolverError::GridSizeOverflow)
+        ));
     }
 
     #[test]
