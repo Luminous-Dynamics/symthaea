@@ -1,0 +1,100 @@
+name: MEL Matched Comparison Contract
+
+on:
+  push:
+    branches:
+      - research/mel-matched-comparison-contract-20261121
+    paths:
+      - "benchmarks/mel/schemas/matched-comparison-run-v1.schema.json"
+      - "benchmarks/mel/matched-comparison-run-v1.example.json"
+      - "tools/mel-matched-comparison-validator/**"
+      - "docs/research/MEL_BENCH_002_MATCHED_COMPARISON_CONTRACT_V1_2026-11-21.md"
+      - ".github/workflows/mel-matched-comparison-contract.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "benchmarks/mel/schemas/matched-comparison-run-v1.schema.json"
+      - "benchmarks/mel/matched-comparison-run-v1.example.json"
+      - "tools/mel-matched-comparison-validator/**"
+      - "docs/research/MEL_BENCH_002_MATCHED_COMPARISON_CONTRACT_V1_2026-11-21.md"
+      - ".github/workflows/mel-matched-comparison-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-matched-comparison-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Exact-head matched-comparison contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact tested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "exact source head: $actual"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Resolve standalone validator lockfile
+        run: cargo generate-lockfile --manifest-path tools/mel-matched-comparison-validator/Cargo.toml
+
+      - name: Preserve original validator source
+        run: cp tools/mel-matched-comparison-validator/src/main.rs "$RUNNER_TEMP/matched-validator-main.source.rs"
+
+      - name: Normalize temporary checkout formatting and check
+        run: |
+          cargo fmt --manifest-path tools/mel-matched-comparison-validator/Cargo.toml
+          cargo fmt --manifest-path tools/mel-matched-comparison-validator/Cargo.toml --check
+
+      - name: Run strict semantic validator tests
+        run: cargo test --locked --manifest-path tools/mel-matched-comparison-validator/Cargo.toml
+
+      - name: Validate frozen matched-comparison example
+        run: cargo run --locked --manifest-path tools/mel-matched-comparison-validator/Cargo.toml
+
+      - name: Run warnings-denied Clippy
+        run: cargo clippy --locked --manifest-path tools/mel-matched-comparison-validator/Cargo.toml --all-targets -- -D warnings
+
+      - name: Record exact-head contract evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-matched-comparison-evidence"
+          mkdir -p "$evidence"
+          cp tools/mel-matched-comparison-validator/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-matched-comparison-validator/Cargo.lock "$evidence/Cargo.lock"
+          cp "$RUNNER_TEMP/matched-validator-main.source.rs" "$evidence/validator-main.source.rs"
+          cp tools/mel-matched-comparison-validator/src/main.rs "$evidence/validator-main.formatted.rs"
+          cp benchmarks/mel/schemas/matched-comparison-run-v1.schema.json "$evidence/schema.json"
+          cp benchmarks/mel/matched-comparison-run-v1.example.json "$evidence/example.json"
+          (
+            cd "$evidence"
+            sha256sum Cargo.toml Cargo.lock validator-main.source.rs validator-main.formatted.rs schema.json example.json > SHA256SUMS
+          )
+          printf 'exact_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identities.txt"
+
+      - name: Upload exact-head matched-comparison evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-matched-comparison-contract-${{ github.sha }}
+          path: ${{ runner.temp }}/mel-matched-comparison-evidence/
+          if-no-files-found: error
+          retention-days: 90
