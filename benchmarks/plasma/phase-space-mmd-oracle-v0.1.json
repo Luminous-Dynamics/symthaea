@@ -83,7 +83,19 @@
       "claim_limit": "bounds random spectral-feature error in normalized squared MMD only; not particle-sampling or physical solver error"
     },
     "complexity": "O(N log N + M log M + D*(U+V)) time and O(N+M) temporary memory; U,V are unique nonzero support atoms",
-    "escalation_policy": "If feature uncertainty overlaps a predeclared physical acceptance boundary, escalate to exact small-N oracle where feasible or trusted solver; never accept from approximation alone."
+    "escalation_policy": "If feature uncertainty overlaps a predeclared physical acceptance boundary, escalate to exact small-N oracle where feasible or trusted solver; never accept from approximation alone.",
+    "preregistered_seed_values": [
+      7,
+      17,
+      29,
+      43,
+      59,
+      71,
+      89,
+      101,
+      2026,
+      20261121
+    ]
   },
   "adaptive_decision": {
     "algorithm": "checkpointed_alpha_spending_hoeffding",
@@ -104,5 +116,53 @@
     "optional_stopping": "only preregistered checkpoint looks are covered simultaneously; do not inspect mid-batch intervals",
     "random_stream": "one deterministic SplitMix64 feature stream; no reseeding between checkpoints",
     "claim_limit": "simultaneous bound for ideal independent spectral feature draws and random-feature integration error only; not physical solver or particle-sampling error"
+  },
+  "metric_sweep_runner": {
+    "example": "crates/tools/plasma-phase-space-mmd/examples/spectral_mmd_sweep.rs",
+    "command": "cargo run --release --locked --manifest-path crates/tools/plasma-phase-space-mmd/Cargo.toml --example spectral_mmd_sweep",
+    "fixtures": [
+      "finite_fourier_alias",
+      "joint_position_velocity_correlation",
+      "signed_colocated_cancellation",
+      "high_spatial_concentration"
+    ],
+    "feature_counts": [
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "seed_values": [
+      7,
+      17,
+      29,
+      43,
+      59,
+      71,
+      89,
+      101,
+      2026,
+      20261121
+    ],
+    "expected_csv_rows": 360,
+    "outputs": [
+      "exact_mmd_squared",
+      "approx_mmd_squared",
+      "absolute_error",
+      "relative_error",
+      "feature_standard_error",
+      "hoeffding_95_half_width",
+      "particle_feature_evaluations",
+      "runtime_us",
+      "target_arch",
+      "target_os"
+    ],
+    "artifact_name": "plasma-phase-space-mmd-sweep",
+    "interpretation": "diagnostic-kernel microbenchmark only; not full kinetic solver time-to-solution or SOTA speedup"
   }
 }

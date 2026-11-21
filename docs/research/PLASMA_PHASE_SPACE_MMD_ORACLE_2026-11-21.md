@@ -1,7 +1,7 @@
 # Characteristic-kernel MMD oracle for phase-space measures
 
 **Date:** 2026-11-21  
-**Status:** standalone reference implementation authored; Rust compile/test/format/Clippy evidence pending  
+**Status:** exact small-N oracle, full-spectrum approximation and adaptive controller implemented; focused Rust 1.96 validation passed on their respective exact PR heads; metric sweep runner added and awaiting its own workflow evidence  
 **Tracking:** [Issue #13022](https://github.com/Luminous-Dynamics/symthaea/issues/13022)  
 **Separate implementation:** [PR #13021](https://github.com/Luminous-Dynamics/symthaea/pull/13021) adds the fast finite-feature diagnostic; this work does not modify that PR.
 
@@ -195,12 +195,13 @@ A speed claim is admissible only when particle update, field solve, deposition/g
 
 ## 10. Execution state
 
-- New standalone Rust crate and 17 authored unit tests: source created.
-- Frozen JSON kernel/profile contract: source created.
-- Focused exact-revision Rust 1.96 workflow: source created.
-- Python formula checks for the two negative controls: completed.
-- Local rustc/cargo unavailable in the authoring runtime; Rust format, compilation, tests and Clippy have not been executed locally.
-- The focused workflow must be observed on the exact PR head. Queued, skipped or absent jobs are not passes.
+The implementation is now split into three independently reviewable, exact-head-validated increments:
+
+- [PR #13033](https://github.com/Luminous-Dynamics/symthaea/pull/13033): exact characteristic-kernel MMD oracle; Rust 1.96 fmt, 17 tests and strict Clippy passed on head `32fe3591617be44d2d2a8c216e707b0dce65f56a`, focused workflow run #15.
+- [PR #13045](https://github.com/Luminous-Dynamics/symthaea/pull/13045): full-spectrum O(D(U+V)) approximation; Rust 1.96 fmt, 25 tests and strict Clippy passed on head `24970dcb5b8223f219f0f44db6e3d8bef6e6b9d7`, focused workflow run #36.
+- [PR #13048](https://github.com/Luminous-Dynamics/symthaea/pull/13048): anytime-valid adaptive feature budget; Rust 1.96 fmt, 30 tests and strict Clippy passed on head `dbe07a5cb1dc00f6b9224cee3fd436309b49bb21`, focused workflow run #49.
+
+Broad CI and PR Governance were skipped on these runs and are not claimed as passed. The new reproducible metric sweep is tracked separately in [PR #13049](https://github.com/Luminous-Dynamics/symthaea/pull/13049); its generated CSV artifact remains pending until its own exact-head workflow executes successfully.
 
 
 ## 11. Scalable spectral approximation: exact spectrum, randomized evaluation
@@ -375,3 +376,43 @@ Relevant baselines:
 The next comparison matrix should include: fixed-D standard RFF; RFF with the Yao-style bootstrap error estimator adapted and validated for this functional; current alpha-spending geometric checkpoint controller; and a proven empirical-Bernstein / mixture confidence sequence. Hold physics cases, kernel scales, seeds, error target and hardware constant. Report achieved coverage across all looks, false-safe rate, mean and p95 feature count, absolute and relative MMD² error versus exact oracle, wall time and memory.
 
 Our credible claim ceiling is narrower and stronger: the implementation provides a measure-aware, full-spectrum sampler for this specific periodic × Gaussian kernel, an exact small-N reference, and a checkpointed optional-stopping-safe budget controller. Competitive superiority remains an empirical question.
+
+
+## 14. Reproducible metric-level scaling experiment
+
+The new spectral_mmd_sweep Rust example compares the O(D(U+V)) spectral estimator against the exact small-N oracle on four fixed negative/positive controls:
+- finite Fourier aliasing;
+- changed joint position/velocity correlation;
+- co-located signed cancellation;
+- high spatial concentration.
+
+It runs 9 feature counts (64 through 16,384) and 10 preregistered seeds, yielding 360 CSV rows. Every row records exact/approximate normalized MMD², absolute and relative error, empirical feature standard error, fixed-D Hoeffding radius, particle-feature evaluation count, runtime in microseconds, architecture and OS.
+
+The focused workflow runs this example after format, tests and strict Clippy and uploads the CSV as the plasma-phase-space-mmd-sweep artifact. Exact-head run #81 (ID 44870965231) passed Rust 1.96 formatting, all 30 tests, strict Clippy, sweep execution and artifact upload on head 77618c17a26a8d1355b6bca6f6c3eb04cb1c8c20. Broad CI, PR Governance and Workflow Syntax checks were skipped, not passed.
+
+This remains a metric-level microbenchmark on one GitHub-hosted x86_64 Linux runner. The CPU model was not captured. It is not an end-to-end PIC solver benchmark, not evidence of physical speedup, and not an industry SOTA comparison. A later matched-budget tournament must measure the complete kinetic pipeline on named hardware and include field solve, particle push, communication, corrections, diagnostics and fallback.
+
+
+
+## 16. Observed spectral MMD feature-sweep results
+
+The exact-head run generated the full 360-row CSV artifact. The archived artifact is plasma-phase-space-mmd-sweep, artifact ID 14694220651, ZIP SHA-256 07b1cb4aca200b3bdaf2a172f71678e8af445e2d5a348cc4750523be47f2381a. The extracted CSV SHA-256 is 73a0152e912e13c25e28329476e7451c8862b0668d17cadfd578e40e32b95134. The row-level data is retained as a workflow artifact; aggregated results are committed in benchmarks/plasma/phase-space-mmd-sweep-results-v0.1.json.
+
+| Features D | Mean absolute error | P95 absolute error | Maximum absolute error | Median runtime |
+|---:|---:|---:|---:|---:|
+| 64 | 0.035298 | 0.121500 | 0.217773 | 9 µs |
+| 128 | 0.023836 | 0.069038 | 0.195854 | 17 µs |
+| 256 | 0.018426 | 0.065608 | 0.146155 | 33.5 µs |
+| 512 | 0.014006 | 0.040100 | 0.058929 | 69 µs |
+| 1,024 | 0.008688 | 0.026871 | 0.028865 | 136.5 µs |
+| 2,048 | 0.007416 | 0.025738 | 0.031371 | 272.5 µs |
+| 4,096 | 0.004819 | 0.014137 | 0.027271 | 544.5 µs |
+| 8,192 | 0.002841 | 0.008614 | 0.011905 | 1,090.5 µs |
+| 16,384 | 0.002192 | 0.006926 | 0.014442 | 2,321 µs |
+
+All 360 observed rows were within their own row-specific fixed-D Hoeffding half-width. This is an empirical observation on the frozen four-fixture / ten-seed sweep, not a new coverage proof. The intervals are conservative and their formal interpretation still depends on the declared independent spectral-draw assumption.
+
+At D=16,384, the largest fixture-level error was 0.014442 on the joint position-velocity correlation case; the mean absolute error there was 0.003728. The high-spatial-concentration fixture's mean absolute error was 0.002553; the finite-Fourier alias mean absolute error was 0.002488. The signed co-located-cancellation control returned zero error for all 90 rows, as expected for identical represented measures.
+
+Runtime scales approximately with D on this small fixed set of supports, but the measurements are diagnostic microseconds on a hosted runner and vary with fixture particle count and runner execution. They must not be extrapolated to million-particle workloads or interpreted as PIC time-to-solution. The benchmark's primary result is the measured approximation-error curve against the exact small-N oracle, not a speedup claim.
+

@@ -29,7 +29,9 @@ For \(\mu=\sum_i a_i\delta_{z_i}\) and \(\nu=\sum_j b_j\delta_{z_j}\), the oracl
 
 Before computing MMD, co-located periodic phase-space coordinates are canonicalized and their signed coefficients are aggregated. Total variation is the sum of absolute aggregated atom coefficients, not the sum of absolute raw particle weights. This preserves normalization under signed split/merge representations, including cancellation of opposite signs at the same support point. Weights are divided by the larger total variation of the two represented measures before pair accumulation. The zero-measure convention uses scale one.
 
-The unnormalized MMD is the RKHS metric for this characteristic kernel. The reported ratio is a pair-normalized discrepancy; because its denominator depends on both inputs, we do not claim that the normalized ratio itself satisfies the triangle inequality.\n\nThe implementation uses compensated summation and checks that the squared discrepancy is nonnegative within a conservative roundoff tolerance. Materially negative values fail closed. It reports kernel pair-evaluation count, unique support atom count and raw particle counts as metadata.
+The unnormalized MMD is the RKHS metric for this characteristic kernel. The reported ratio is a pair-normalized discrepancy; because its denominator depends on both inputs, we do not claim that the normalized ratio itself satisfies the triangle inequality.
+
+The implementation uses compensated summation and checks that the squared discrepancy is nonnegative within a conservative roundoff tolerance. Materially negative values fail closed. It reports kernel pair-evaluation count, unique support atom count and raw particle counts as metadata.
 
 ## Scope and limits
 
@@ -73,3 +75,15 @@ The decision is made against a preregistered tolerance on normalized squared MMD
 The controller consumes one continuous seeded feature stream; it does not reseed between checkpoints. The same seed and final feature count reproduce the corresponding fixed-D prefix. The checkpoint transcript records feature counts, alpha allocations, cumulative alpha spending, estimate and interval.
 
 This is a simultaneous guarantee only over the declared checkpoint schedule, not every possible intermediate feature count. The bound assumes independent draws from the exact spectral measure; the deterministic SplitMix64 stream provides reproducibility but is not a cryptographic RNG or a formal proof of pseudorandom independence. The confidence statement concerns only random-feature integration error in normalized squared MMD—not physical solver, particle sampling or trajectory error.
+
+## Reproducible exact-oracle comparison sweep
+
+The spectral_mmd_sweep example compares the scalable estimator with the exact small-N oracle over four frozen controls: finite-Fourier aliasing, changed position/velocity correlation, co-located signed cancellation, and a high-spatial-concentration case. It uses the preregistered feature-count sweep and ten frozen seeds and emits a CSV with exact and approximate normalized MMD squared, absolute/relative errors, feature standard error, Hoeffding radius, work count, runtime, architecture and operating system.
+
+Run locally:
+
+\`\`\`sh
+cargo run --release --locked --manifest-path crates/tools/plasma-phase-space-mmd/Cargo.toml --example spectral_mmd_sweep > spectral-mmd-sweep.csv
+\`\`\`
+
+The focused GitHub Actions workflow runs the example after format, tests and strict Clippy, then uploads the plasma-phase-space-mmd-sweep artifact. This measures the metric implementation on the workflow runner. It does not measure a full PIC solver, physical time-to-solution, multi-GPU scaling or superiority over NEOPIC, Smilei or WarpX.
