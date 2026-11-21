@@ -84,5 +84,25 @@
     },
     "complexity": "O(N log N + M log M + D*(U+V)) time and O(N+M) temporary memory; U,V are unique nonzero support atoms",
     "escalation_policy": "If feature uncertainty overlaps a predeclared physical acceptance boundary, escalate to exact small-N oracle where feasible or trusted solver; never accept from approximation alone."
+  },
+  "adaptive_decision": {
+    "algorithm": "checkpointed_alpha_spending_hoeffding",
+    "initial_feature_count": 64,
+    "maximum_feature_count": 16384,
+    "checkpoint_schedule": "D_t = min(2^(t-1)*initial_feature_count, maximum_feature_count)",
+    "confidence_level": 0.95,
+    "alpha_spending": "alpha_t = (1-confidence_level)/(t*(t+1))",
+    "bound": "r_t = 4*sqrt(ln(2/alpha_t)/(2*D_t))",
+    "decision_metric": "normalized_squared_mmd",
+    "tolerance": "preregistered per physics cohort",
+    "decisions": [
+      "within_tolerance",
+      "above_tolerance",
+      "unresolved_budget_exhausted"
+    ],
+    "unresolved_policy": "abstain; escalate to exact small-N oracle where feasible or trusted solver; never accept unresolved",
+    "optional_stopping": "only preregistered checkpoint looks are covered simultaneously; do not inspect mid-batch intervals",
+    "random_stream": "one deterministic SplitMix64 feature stream; no reseeding between checkpoints",
+    "claim_limit": "simultaneous bound for ideal independent spectral feature draws and random-feature integration error only; not physical solver or particle-sampling error"
   }
 }
