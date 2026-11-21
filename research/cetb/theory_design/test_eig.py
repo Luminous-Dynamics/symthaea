@@ -103,6 +103,21 @@ class ExpectedInformationGainTests(unittest.TestCase):
         with self.assertRaises(DesignValidationError):
             evaluate_design_scenarios({"A": 1.0}, [(1.0, {"A": {"x": 1.0}})], cost=0.0)
 
+    def test_scenarios_must_preserve_outcome_space_and_normalized_weights(self):
+        prior = {"A": 0.5, "B": 0.5}
+        scenario_a = {"A": {"yes": 0.8, "no": 0.2}, "B": {"yes": 0.2, "no": 0.8}}
+        scenario_b = {"A": {"yes": 1.0}, "B": {"yes": 1.0}}
+        with self.assertRaisesRegex(DesignValidationError, "same explicit outcome"):
+            evaluate_design_scenarios(prior, [(0.5, scenario_a), (0.5, scenario_b)], cost=1.0)
+        with self.assertRaisesRegex(DesignValidationError, "weights must sum to 1"):
+            evaluate_design_scenarios(prior, [(0.4, scenario_a)], cost=1.0)
+
+    def test_boolean_cost_and_invalid_tolerance_are_rejected(self):
+        with self.assertRaises(DesignValidationError):
+            evaluate_design_scenarios({"A": 1.0}, [(1.0, {"A": {"yes": 1.0}})], cost=True)
+        with self.assertRaises(DesignValidationError):
+            expected_information_gain_bits({"A": 1.0}, {"A": {"yes": 1.0}}, tolerance=-1.0)
+
 
 if __name__ == "__main__":
     unittest.main()
