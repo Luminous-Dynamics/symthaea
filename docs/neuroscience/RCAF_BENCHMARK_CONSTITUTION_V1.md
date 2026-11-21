@@ -197,3 +197,39 @@ RCAF cannot by itself establish:
 | Published WJ results reproduced | Not run |
 | Guard-gap and repeatability-surface extensions | Not run |
 | Independent dataset validation | Not run |
+
+
+## 11. RCAF v1.1: participant sign test and polarity transitions
+
+The standalone kernel now includes two complementary diagnostics.
+
+### Exact participant-level sign test
+
+For participant-paired gaps g_i = S_within,i - S_between,i, count positive, negative and exactly zero gaps. Exclude exact-zero ties from the binomial denominator and compute the two-sided exact sign-test probability under equal positive/negative sign probability.
+
+This is a distribution-free test of a zero median under independent participant pairs. It is not a randomized treatment-assignment test, does not establish causality and does not replace the effect distribution or confidence interval. Report positive, negative, tie and non-tied counts with the p-value. Near-zero differences are not silently treated as ties; any equivalence margin must be separately prespecified.
+
+The exact sign test complements the participant bootstrap. At small N, its p-value has coarse resolution; for N=23 all 23 non-tied gaps in one direction yield 2/2^23, and no stronger exact two-sided sign-test result is possible for that N.
+
+### Direct edge-sign transitions
+
+Pair-aware positive-only and negative-only WJ deliberately compare only edges having the same requested sign in both matrices. This avoids treating a polarity-reversed edge as a zero-weight member of the selected-sign denominator, but means the WJ subset does not itself quantify reversals.
+
+Therefore each matrix comparison must also report:
+- positive-to-negative and negative-to-positive reversals;
+- positive/negative-to-neutral and neutral-to-positive/negative transitions;
+- stable positive, negative and neutral edge counts;
+- polarity-reversal and total sign-state-change fractions;
+- the predeclared neutral-band threshold and a sensitivity grid.
+
+A matrix's dimension does not prove its ROI ordering. Bind each matrix to a canonical ROI label/order digest and reject comparisons if the labels or order differ. Report selected-edge counts for every WJ mode.
+
+### Machine-readable report
+
+research/rcaf/rcaf-report.schema.json defines the participant-level output contract, including source/access state, acquisition/release/QC/analysis denominator flow, frozen estimator/preprocessing, ROI-order digest, participant-level summaries, sign-test results, bootstrap interval and explicit claim limits. The fixture at research/rcaf/fixtures/synthetic-rcaf-report.json is synthetic only.
+
+## 12. Quality-aware measurement extensions
+
+The 2026 Network Similarity Index (NSI) offers an external quality-assessment comparator for precision functional mapping. CETB should evaluate it where individual functional-connectivity mapping assumptions fit, and should treat it as an optional quality covariate—not a universal gate across task-fMRI, anesthesia, EEG or iEEG.
+
+The 2025 239-statistic functional-connectivity benchmark shows that estimator choice changes network properties, identifiability and prediction. RCAF must therefore keep WJ as one estimator within an objective-matched estimator tournament. Compare Pearson/Spearman, covariance/precision and graph/network measures under frozen analysis variants; do not use the best-performing estimator selected on the final test cohort.
