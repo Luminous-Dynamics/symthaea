@@ -63,7 +63,7 @@ jobs:
           jq -e '
             .schema == "luminous.orbital-joint-evidence-voi.sequential.v0.1" and
             .benchmark_id == "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001" and
-            (.scenarios | length == 1) and
+            (.scenarios | length == 2) and
             .scenarios[0].resource_frequency_model.used_for == "EXPECTED_RESOURCE_USE_ONLY" and
             (.scenarios | all(.decision_obligations.ACCEPT == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"])) and
             (.scenarios | all([.actions[].obligations_covered[]] | all(. == "COMBINED-LOAD-CAPABILITY-001" or . == "THERMAL-WEAR-INSPECTABILITY-001"))) and
