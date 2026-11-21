@@ -213,9 +213,34 @@ The nuisance-only and signal-plus-nuisance cells use the same deterministic rand
 
 New outputs report two-sided detection, expected-direction recovery, wrong-direction significant rejection and median paired gap for the combined cell. This creates a direct test of whether an artifact masks a genuine effect, changes its magnitude or produces a significant result in the wrong direction. The existing nuisance-only false-alarm output remains separate; it must not be collapsed into classical Type-I error.
 
-**Implementation status at this document revision:** code, schemas, adversarial plan validator, tests, README and focused workflow assertions have been added on PR #13139. On exact head `470cf519cd76ab60aebb31bf3e96fb0607f9e24e`, all report-contract checks, 32 Rust tests, formatting, Clippy and the default injection report have passed. The injection dose sweep is currently running; the common-mode/joint sweep, estimator runs and content-addressed receipt/archive are still pending. No numerical result for the combined cell is claimed until its report is archived.
+**Implementation and execution status:** the focused RCAF workflow [44950237593](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44950237593) passed on exact source commit `470cf519cd76ab60aebb31bf3e96fb0607f9e24e`: all report-contract checks, 32 Rust tests, rustfmt, Clippy, five simulation/report stages, content-addressed receipt generation and artifact archive. The archive digest is SHA-256 `5a0d661f4016fa680eae511ee9227d9c9d52f05c9abca5b714352ab6ee781e31`; the receipt source-tree digest is `e7653f633d4b613bee7959c0cd569a14545da96655ac47e6c8fdc8dd00e3ec51`. This is a focused research-workflow pass only: broad repository CI, PR governance and workflow syntax were skipped.
 
-Next qualification steps are to run the crossed dose grid with at least 1,000 replicates for screening and at least 10,000 for confirmatory primary null families, then add distinct nuisance families (site/scanner drift, regional low-rank artifact, motion-like bursts, censoring and physiological waveforms). The current shared common-mode Gaussian factor is an intentionally narrow first challenge, not a realistic scanner-artifact model.
+### Crossed experiment results
+
+The archived crossed signal × nuisance sweep used 40 Monte-Carlo replicates at each common-mode dose, with clean signal-only and null metrics matched across doses:
+
+| Common-mode dose | Nuisance-only operational false alarm | Signal+ nuisance directional recovery at Δ=0.40 | Median clean-signal gap | Median combined gap |
+|---:|---:|---:|---:|---:|
+| 0.00 | 1/40 = 2.5% [0.4–12.9%] | 40/40 = 100% [91.2–100%] | 0.06509 | 0.06509 |
+| 0.10 | 0/40 = 0% [0–8.8%] | 40/40 = 100% [91.2–100%] | 0.06509 | 0.06975 |
+| 0.20 | 1/40 = 2.5% [0.4–12.9%] | 40/40 = 100% [91.2–100%] | 0.06509 | 0.07285 |
+| 0.30 | 5/40 = 12.5% [5.5–26.1%] | 40/40 = 100% [91.2–100%] | 0.06509 | 0.08903 |
+
+Intervals are 95% Wilson intervals. The nuisance-only rate is an **artifact-only operational false-alarm rate**, not classical Type-I error: the artifact changes the observed-data distribution while the latent target remains fixed. The response is non-monotonic at the lower doses, and the 40-replicate estimates are imprecise.
+
+The key finding is not that the method becomes more robust. In this synthetic generator, common-mode nuisance **inflates** the apparent signal contrast. At dose 0.30 the combined median paired gap is about 36.8% larger than the clean signal-only gap, while the nuisance-only false-alarm estimate rises to 12.5%.
+
+A second view comes from the 40-replicate effect sweep at common-mode dose 0.20. For absolute WJ at a moderate planted effect Δ=0.30, directional recovery was 18/40 = 45.0% without nuisance (95% Wilson 30.7–60.2%) and 34/40 = 85.0% with nuisance (70.9–92.9%). Treat this as artifact-induced amplification, not valid power improvement: the nuisance itself can create an apparent network contrast, and the combined cell inherits that confounding. At Δ=0.40 the recovery rates hit the 100% ceiling, which is not discriminating.
+
+At common-mode loading 0.20, the three-comparator tournament (40 replicates each) produced nuisance-only rejection estimates of 1/40 = 2.5% for absolute WJ (95% Wilson 0.4–12.9%), 4/40 = 10.0% for signed-shift WJ (4.0–23.1%) and 8/40 = 20.0% for normalized mean absolute edge error (10.5–34.8%). The same-distribution null estimate was 1/40 for each. These pilots show that nuisance sensitivity depends on the comparison statistic under this generator; they do not establish a universal best estimator.
+
+### What the result changes
+
+1. A signal-only pass and nuisance-only pass are not enough: the crossed interaction is required.
+2. “Higher power” must be judged alongside nuisance-only false alarms and effect inflation; otherwise a confounded metric can look better.
+3. The current common-mode factor is one narrow synthetic artifact family, not a realistic scanner, motion or physiological model.
+4. The small pilot grid is for debugging and counterexample discovery only. Increase primary null families to at least 10,000 replicates, use independent confirmation seeds, and report intervals in every stratum.
+5. Next nuisance families should include site/scanner gain and offset, spatially structured low-rank artifacts, motion-like bursts, censoring, physiological waveforms, missingness, nonstationarity and positive/negative leakage controls.
 ## 11. Scope and safety of claims
 
 - A passed synthetic challenge qualifies only the tested generator, intervention and analysis implementation.
