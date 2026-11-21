@@ -362,7 +362,7 @@
         },
         "source_independence": {
           "enum": [
-            "same_participants_new_split",
+            "same_release_heldout_participants",
             "same_release_heldout_site",
             "independent_acquisition_same_cohort",
             "independent_cohort",
