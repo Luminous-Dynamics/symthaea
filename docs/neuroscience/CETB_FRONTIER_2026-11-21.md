@@ -213,3 +213,10 @@ A new standalone Rust research module, `research/rcaf/src/simulation.rs`, genera
 The runnable example is `research/rcaf/examples/rcaf_injection_recovery.rs`; its output contract is `research/rcaf/injection-recovery.schema.json`. The fixed smoke fixture uses 24 participants, 12 regions, 160 time points per segment, module-loading increment 0.40 and 100 replicates by default. These are synthetic software checks only. It does not model all neuroimaging artifacts or biological state transitions.
 
 The protocol, assumptions, smoke-test thresholds and next simulation dimensions are specified in `RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
+
+
+## 12. Defensible multiverse analysis contract
+
+The new `CETB_DEFENSIBLE_MULTIVERSE_PROTOCOL_V0.md` turns analytic flexibility into a versioned evidence contract. The machine-readable schema and validator require each option to have an independent rationale, every compatibility rule to refer to known option IDs, equivalence assessments to be explicit, and confirmatory manifests to be frozen before outcome access. The synthetic fixture has seven tests.
+
+This is deliberately not yet a full pipeline executor. It locks and audits the decision space before data analysis. The 2026 multiverse guidance recommends assessing defensibility first and equivalence separately; CETB now represents that distinction in its protocol and schema.
