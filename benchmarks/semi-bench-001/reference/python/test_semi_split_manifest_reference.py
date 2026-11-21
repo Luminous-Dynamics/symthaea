@@ -52,6 +52,7 @@ class SplitManifestReferenceTests(unittest.TestCase):
     def test_forward_time_requires_strict_chronology(self) -> None:
         manifest = copy.deepcopy(self.manifest)
         manifest["split_scheme"] = "forward_time"
+        manifest["time_basis"] = "offset_aware"
         for index, row in enumerate(manifest["assignments"]):
             split_date = {"train": "2026-01-01", "validation": "2026-01-03", "test": "2026-01-05"}[row["split"]]
             row.pop("group_id")
@@ -63,6 +64,7 @@ class SplitManifestReferenceTests(unittest.TestCase):
     def test_rejects_overlapping_forward_time_windows(self) -> None:
         manifest = copy.deepcopy(self.manifest)
         manifest["split_scheme"] = "forward_time"
+        manifest["time_basis"] = "offset_aware"
         for row in manifest["assignments"]:
             row.pop("group_id")
             row["observed_at"] = {
@@ -77,10 +79,58 @@ class SplitManifestReferenceTests(unittest.TestCase):
     def test_rejects_timezone_free_timestamps(self) -> None:
         manifest = copy.deepcopy(self.manifest)
         manifest["split_scheme"] = "forward_time"
+        manifest["time_basis"] = "offset_aware"
         for row in manifest["assignments"]:
             row.pop("group_id")
             row["observed_at"] = "2026-01-01T12:00:00"
         with self.assertRaisesRegex(SplitContractError, "timezone offset"):
+            split_validator.validate_split_manifest(manifest)
+
+
+    def test_accepts_explicit_source_local_naive_clock_domain(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["split_scheme"] = "forward_time"
+        manifest["time_basis"] = "source_local_naive"
+        manifest["clock_domain_id"] = "single-secom-source-clock"
+        for row in manifest["assignments"]:
+            row.pop("group_id")
+            row["observed_at"] = {
+                "train": "2008-07-19T11:55:00",
+                "validation": "2008-09-20T06:08:00",
+                "test": "2008-10-02T20:54:00",
+            }[row["split"]]
+        result = split_validator.validate_split_manifest(manifest)
+        self.assertTrue(result["guarantees"]["strict_forward_time"])
+        self.assertEqual(result["time_basis"], "source_local_naive")
+        self.assertEqual(result["clock_domain_id"], "single-secom-source-clock")
+        self.assertEqual(
+            result["claim_limits"]["temporal_independence"],
+            "established-within-declared-source-clock-domain-only",
+        )
+
+    def test_rejects_naive_clock_without_declared_clock_domain(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["split_scheme"] = "forward_time"
+        manifest["time_basis"] = "source_local_naive"
+        for row in manifest["assignments"]:
+            row.pop("group_id")
+            row["observed_at"] = {
+                "train": "2008-07-19T11:55:00",
+                "validation": "2008-09-20T06:08:00",
+                "test": "2008-10-02T20:54:00",
+            }[row["split"]]
+        with self.assertRaisesRegex(SplitContractError, "clock_domain_id"):
+            split_validator.validate_split_manifest(manifest)
+
+    def test_rejects_offset_aware_values_in_naive_clock_domain(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["split_scheme"] = "forward_time"
+        manifest["time_basis"] = "source_local_naive"
+        manifest["clock_domain_id"] = "single-secom-source-clock"
+        for row in manifest["assignments"]:
+            row.pop("group_id")
+            row["observed_at"] = "2008-07-19T11:55:00+02:00"
+        with self.assertRaisesRegex(SplitContractError, "must be timezone-free"):
             split_validator.validate_split_manifest(manifest)
 
 
