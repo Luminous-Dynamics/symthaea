@@ -28,12 +28,17 @@ impl fmt::Display for CoordinateAuditError {
             Self::NonFiniteCoordinate { index } => write!(f, "coordinate {index} is non-finite"),
             Self::InvalidDomainLength => write!(f, "domain length must be finite and positive"),
             Self::NonFiniteOrigin => write!(f, "domain origin must be finite"),
-            Self::ZeroSampleSpan => write!(f, "sample min-max normalization requires non-zero span"),
+            Self::ZeroSampleSpan => {
+                write!(f, "sample min-max normalization requires non-zero span")
+            }
             Self::LengthMismatch { before, after } => {
                 write!(f, "coordinate lengths differ: {before} vs {after}")
             }
             Self::ChangedIndexOutOfRange { index, length } => {
-                write!(f, "changed index {index} is outside coordinate length {length}")
+                write!(
+                    f,
+                    "changed index {index} is outside coordinate length {length}"
+                )
             }
         }
     }
@@ -57,12 +62,13 @@ fn validate_coordinates(coordinates: &[f64]) -> Result<(), CoordinateAuditError>
 ///
 /// Changing one extremal coordinate can therefore change every other
 /// normalized coordinate.
-pub fn sample_minmax_normalize(
-    coordinates: &[f64],
-) -> Result<Vec<f64>, CoordinateAuditError> {
+pub fn sample_minmax_normalize(coordinates: &[f64]) -> Result<Vec<f64>, CoordinateAuditError> {
     validate_coordinates(coordinates)?;
     let minimum = coordinates.iter().copied().fold(f64::INFINITY, f64::min);
-    let maximum = coordinates.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let maximum = coordinates
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
     let span = maximum - minimum;
     if !span.is_finite() || span <= 0.0 {
         return Err(CoordinateAuditError::ZeroSampleSpan);
@@ -202,8 +208,7 @@ mod tests {
                 particle_count - 1,
             )
             .unwrap();
-            let expected_shift =
-                (particle_count - 2) as f64 / (2.0 * (particle_count - 1) as f64);
+            let expected_shift = (particle_count - 2) as f64 / (2.0 * (particle_count - 1) as f64);
             close(shift, expected_shift, 1.0e-14);
         }
     }
@@ -212,10 +217,8 @@ mod tests {
     fn fixed_periodic_domain_map_does_not_couple_other_particles() {
         let before = [0.0, 0.25, 0.5, 0.75, 1.0];
         let after = [0.0, 0.25, 0.5, 0.75, 2.0];
-        let normalized_before =
-            fixed_periodic_domain_normalize(&before, 0.0, 2.0).unwrap();
-        let normalized_after =
-            fixed_periodic_domain_normalize(&after, 0.0, 2.0).unwrap();
+        let normalized_before = fixed_periodic_domain_normalize(&before, 0.0, 2.0).unwrap();
+        let normalized_after = fixed_periodic_domain_normalize(&after, 0.0, 2.0).unwrap();
         let shift =
             max_unaffected_coordinate_shift(&normalized_before, &normalized_after, 4).unwrap();
         close(shift, 0.0, 0.0);
@@ -234,8 +237,7 @@ mod tests {
         let length = 5.5;
         let base = periodic_coordinate_embedding(1.25, length).unwrap();
         for turns in [-3.0, -1.0, 1.0, 4.0] {
-            let translated =
-                periodic_coordinate_embedding(1.25 + turns * length, length).unwrap();
+            let translated = periodic_coordinate_embedding(1.25 + turns * length, length).unwrap();
             close(base[0], translated[0], 1.0e-14);
             close(base[1], translated[1], 1.0e-14);
         }
