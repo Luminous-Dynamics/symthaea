@@ -192,9 +192,7 @@ mod tests {
 
         let physical = source.frame_to_physical(source_moments).unwrap();
         let destination_moments = destination.physical_to_frame(physical).unwrap();
-        let reconstructed = destination
-            .frame_to_physical(destination_moments)
-            .unwrap();
+        let reconstructed = destination.frame_to_physical(destination_moments).unwrap();
 
         close(reconstructed.zeroth, physical.zeroth, 1.0e-14);
         close(reconstructed.first, physical.first, 1.0e-14);
