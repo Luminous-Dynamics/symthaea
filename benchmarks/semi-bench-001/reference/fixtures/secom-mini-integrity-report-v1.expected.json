@@ -21,7 +21,7 @@
       "rows": 1,
       "missing_cells": 0,
       "sensor_cells": 3,
-      "missing_fraction": 0
+      "missing_fraction": 0.0
     },
     "pass": {
       "rows": 1,
