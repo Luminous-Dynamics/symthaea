@@ -24,8 +24,7 @@ use crate::mycelial_model::{
     MYCELIAL_MODEL_VERSION, MycelialFilament, MycelialModel, SpatialPoint3,
 };
 use crate::mycelial_network::{
-    AnastomosisKind, MycelialAnastomosis, MycelialNetworkConfig,
-    build_mycelial_network_graph,
+    AnastomosisKind, MycelialAnastomosis, MycelialNetworkConfig, build_mycelial_network_graph,
 };
 
 pub const MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION: u16 = 1;
@@ -138,14 +137,28 @@ pub enum MycelialJunctionGraphError {
     FilamentLimitExceeded(usize),
     InvalidFilamentGeometry(u32),
     DuplicateFilamentId(u32),
-    MissingParent { filament_id: u32, parent_id: u32 },
+    MissingParent {
+        filament_id: u32,
+        parent_id: u32,
+    },
     ParentCycle(u32),
-    ParentJunctionGap { filament_id: u32, gap: f32, limit: f32 },
+    ParentJunctionGap {
+        filament_id: u32,
+        gap: f32,
+        limit: f32,
+    },
     TerminalFlagMismatch(u32),
     NetworkValidation(String),
     InvalidFusionParameter(u32),
-    JunctionGapExceeded { fusion_id: u32, gap: f32, limit: f32 },
-    SharedFusionContact { filament_id: u32, parameter_micros: u32 },
+    JunctionGapExceeded {
+        fusion_id: u32,
+        gap: f32,
+        limit: f32,
+    },
+    SharedFusionContact {
+        filament_id: u32,
+        parameter_micros: u32,
+    },
     JunctionLimitExceeded(usize),
     SegmentLimitExceeded(usize),
     DegenerateHyphaSegment(u32),
@@ -171,7 +184,10 @@ impl fmt::Display for MycelialJunctionGraphError {
             Self::MissingParent {
                 filament_id,
                 parent_id,
-            } => write!(f, "filament {filament_id} references missing parent {parent_id}"),
+            } => write!(
+                f,
+                "filament {filament_id} references missing parent {parent_id}"
+            ),
             Self::ParentCycle(id) => write!(f, "parent cycle includes filament {id}"),
             Self::ParentJunctionGap {
                 filament_id,
@@ -182,7 +198,10 @@ impl fmt::Display for MycelialJunctionGraphError {
                 "filament {filament_id} child start gap {gap:.6} exceeds junction tolerance {limit:.6}"
             ),
             Self::TerminalFlagMismatch(id) => {
-                write!(f, "filament {id} terminal flag disagrees with its child set")
+                write!(
+                    f,
+                    "filament {id} terminal flag disagrees with its child set"
+                )
             }
             Self::NetworkValidation(message) => {
                 write!(f, "accepted anastomosis validation failed: {message}")
@@ -217,7 +236,10 @@ impl fmt::Display for MycelialJunctionGraphError {
             Self::InvalidGraph(reason) => write!(f, "invalid junction–hypha graph: {reason}"),
             Self::UnknownRootJunction(id) => write!(f, "unknown declared root junction {id}"),
             Self::EfficiencyGraphTooLarge(count) => {
-                write!(f, "efficiency calculation is bounded to 2,048 junctions, got {count}")
+                write!(
+                    f,
+                    "efficiency calculation is bounded to 2,048 junctions, got {count}"
+                )
             }
         }
     }
@@ -269,20 +291,14 @@ pub fn build_mycelial_junction_hypha_graph(
 
     // Reuse the existing accepted-fusion contract. Candidate detection alone
     // never reaches this builder: callers must pass approved fusion records.
-    build_mycelial_network_graph(
-        model,
-        anastomoses,
-        MycelialNetworkConfig::default(),
-    )
-    .map_err(|error| MycelialJunctionGraphError::NetworkValidation(error.to_string()))?;
+    build_mycelial_network_graph(model, anastomoses, MycelialNetworkConfig::default())
+        .map_err(|error| MycelialJunctionGraphError::NetworkValidation(error.to_string()))?;
 
     let mut filaments = BTreeMap::<u32, &MycelialFilament>::new();
     let mut children = BTreeMap::<u32, Vec<u32>>::new();
     for filament in &model.filaments {
         if filaments.insert(filament.id, filament).is_some() {
-            return Err(MycelialJunctionGraphError::DuplicateFilamentId(
-                filament.id,
-            ));
+            return Err(MycelialJunctionGraphError::DuplicateFilamentId(filament.id));
         }
         if !valid_filament_geometry(filament) {
             return Err(MycelialJunctionGraphError::InvalidFilamentGeometry(
@@ -313,12 +329,13 @@ pub fn build_mycelial_junction_hypha_graph(
             cursor = filaments.get(&id).and_then(|value| value.parent_id);
         }
         if let Some(parent_id) = filament.parent_id {
-            let parent = filaments.get(&parent_id).ok_or(
-                MycelialJunctionGraphError::MissingParent {
-                    filament_id: filament.id,
-                    parent_id,
-                },
-            )?;
+            let parent =
+                filaments
+                    .get(&parent_id)
+                    .ok_or(MycelialJunctionGraphError::MissingParent {
+                        filament_id: filament.id,
+                        parent_id,
+                    })?;
             let gap = point_distance(parent.end, filament.start);
             maximum_gap = maximum_gap.max(gap);
             if gap > config.maximum_junction_gap_model_units {
@@ -336,16 +353,12 @@ pub fn build_mycelial_junction_hypha_graph(
     let mut contact_to_node = BTreeMap::<(u32, u32), String>::new();
 
     for fusion in anastomoses {
-        let source = filaments
-            .get(&fusion.source_filament_id)
-            .ok_or(MycelialJunctionGraphError::InvalidFusionParameter(
-                fusion.id,
-            ))?;
-        let target = filaments
-            .get(&fusion.target_filament_id)
-            .ok_or(MycelialJunctionGraphError::InvalidFusionParameter(
-                fusion.id,
-            ))?;
+        let source = filaments.get(&fusion.source_filament_id).ok_or(
+            MycelialJunctionGraphError::InvalidFusionParameter(fusion.id),
+        )?;
+        let target = filaments.get(&fusion.target_filament_id).ok_or(
+            MycelialJunctionGraphError::InvalidFusionParameter(fusion.id),
+        )?;
         let source_t = parameter_micros(fusion.source_t);
         let target_t = parameter_micros(fusion.target_t);
         if source_t != PARAMETER_SCALE
@@ -395,10 +408,7 @@ pub fn build_mycelial_junction_hypha_graph(
                 id: node_id,
                 kind: JunctionKind::Anastomosis,
                 position: fusion.junction_position,
-                incident_filament_ids: vec![
-                    fusion.source_filament_id,
-                    fusion.target_filament_id,
-                ],
+                incident_filament_ids: vec![fusion.source_filament_id, fusion.target_filament_id],
                 terminal_filament_ids,
                 anastomosis_ids: vec![fusion.id],
             },
@@ -484,16 +494,18 @@ pub fn build_mycelial_junction_hypha_graph(
                     filament_id,
                 ));
             }
-            let start_node = nodes
-                .get(start_junction_id)
-                .ok_or(MycelialJunctionGraphError::InvalidGraph(
-                    "segment start junction is missing",
-                ))?;
-            let end_node = nodes
-                .get(end_junction_id)
-                .ok_or(MycelialJunctionGraphError::InvalidGraph(
-                    "segment end junction is missing",
-                ))?;
+            let start_node =
+                nodes
+                    .get(start_junction_id)
+                    .ok_or(MycelialJunctionGraphError::InvalidGraph(
+                        "segment start junction is missing",
+                    ))?;
+            let end_node =
+                nodes
+                    .get(end_junction_id)
+                    .ok_or(MycelialJunctionGraphError::InvalidGraph(
+                        "segment end junction is missing",
+                    ))?;
             let end_is_anastomosis = end_node.kind == JunctionKind::Anastomosis;
             let start_offset = f64::from(point_distance(start_point, start_node.position));
             let end_offset = f64::from(point_distance(end_point, end_node.position));
@@ -613,16 +625,18 @@ fn parameter_micros(parameter: f32) -> u32 {
 fn bezier_point(filament: &MycelialFilament, parameter_micros: u32) -> SpatialPoint3 {
     let t = f64::from(parameter_micros) / f64::from(PARAMETER_SCALE);
     let u = 1.0 - t;
-    let points = [filament.start, filament.control_a, filament.control_b, filament.end];
+    let points = [
+        filament.start,
+        filament.control_a,
+        filament.control_b,
+        filament.end,
+    ];
     let coordinate = |axis: fn(SpatialPoint3) -> f32| {
         let p0 = f64::from(axis(points[0]));
         let p1 = f64::from(axis(points[1]));
         let p2 = f64::from(axis(points[2]));
         let p3 = f64::from(axis(points[3]));
-        (u * u * u * p0
-            + 3.0 * u * u * t * p1
-            + 3.0 * u * t * t * p2
-            + t * t * t * p3) as f32
+        (u * u * u * p0 + 3.0 * u * u * t * p1 + 3.0 * u * t * t * p2 + t * t * t * p3) as f32
     };
     SpatialPoint3 {
         x: coordinate(|point| point.x),
@@ -770,8 +784,7 @@ impl MycelialJunctionHyphaGraph {
             .segments
             .iter()
             .map(|segment| {
-                segment.start_junction_offset_model_units
-                    + segment.end_junction_offset_model_units
+                segment.start_junction_offset_model_units + segment.end_junction_offset_model_units
             })
             .sum::<f64>();
         Ok(MycelialJunctionGraphMetrics {
@@ -781,9 +794,9 @@ impl MycelialJunctionHyphaGraph {
             cycle_rank,
             total_hypha_length_model_units_microunits: quantize_nonnegative(total_length),
             total_junction_offset_model_units_microunits: quantize_nonnegative(total_offsets),
-            maximum_junction_gap_microunits: quantize_nonnegative(
-                f64::from(self.maximum_junction_gap_model_units),
-            )
+            maximum_junction_gap_microunits: quantize_nonnegative(f64::from(
+                self.maximum_junction_gap_model_units,
+            ))
             .min(u64::from(u32::MAX)) as u32,
         })
     }
@@ -804,9 +817,11 @@ impl MycelialJunctionHyphaGraph {
         let mut sum_directness = 0.0;
         let mut sum_path_length = 0.0;
         let mut reachable_pairs = 0usize;
-        let eligible_pairs = self.junctions.len().saturating_mul(
-            self.junctions.len().saturating_sub(1),
-        ) / 2;
+        let eligible_pairs = self
+            .junctions
+            .len()
+            .saturating_mul(self.junctions.len().saturating_sub(1))
+            / 2;
         for source in 0..self.junctions.len() {
             let distances = shortest_path_distances(&adjacency, source);
             for target in (source + 1)..self.junctions.len() {
@@ -864,9 +879,7 @@ impl MycelialJunctionHyphaGraph {
             let index = index_by_id
                 .get(root_id.as_str())
                 .copied()
-                .ok_or_else(|| MycelialJunctionGraphError::UnknownRootJunction(
-                    root_id.clone(),
-                ))?;
+                .ok_or_else(|| MycelialJunctionGraphError::UnknownRootJunction(root_id.clone()))?;
             roots.insert(index);
         }
         let adjacency = self.adjacency()?;
@@ -889,7 +902,9 @@ impl MycelialJunctionHyphaGraph {
                     distance.is_finite().then_some((*root, distance))
                 })
                 .min_by(|left, right| {
-                    left.1.total_cmp(&right.1).then_with(|| left.0.cmp(&right.0))
+                    left.1
+                        .total_cmp(&right.1)
+                        .then_with(|| left.0.cmp(&right.0))
                 });
             if let Some((root, path_length)) = nearest {
                 let direct = f64::from(point_distance(
@@ -927,7 +942,12 @@ impl MycelialJunctionHyphaGraph {
         hasher.update(&self.source_model_version.to_le_bytes());
         hasher.update(&[0]); // organism_local_model_unit
         hasher.update(self.source_model_digest.as_bytes());
-        hasher.update(&self.maximum_junction_gap_model_units.to_bits().to_le_bytes());
+        hasher.update(
+            &self
+                .maximum_junction_gap_model_units
+                .to_bits()
+                .to_le_bytes(),
+        );
         let mut junctions: Vec<_> = self.junctions.iter().collect();
         junctions.sort_by(|left, right| left.id.cmp(&right.id));
         hasher.update(&(junctions.len() as u64).to_le_bytes());
@@ -955,8 +975,18 @@ impl MycelialJunctionHyphaGraph {
             hash_string(&mut hasher, &segment.start_junction_id);
             hash_string(&mut hasher, &segment.end_junction_id);
             hasher.update(&segment.arc_length_model_units.to_bits().to_le_bytes());
-            hasher.update(&segment.start_junction_offset_model_units.to_bits().to_le_bytes());
-            hasher.update(&segment.end_junction_offset_model_units.to_bits().to_le_bytes());
+            hasher.update(
+                &segment
+                    .start_junction_offset_model_units
+                    .to_bits()
+                    .to_le_bytes(),
+            );
+            hasher.update(
+                &segment
+                    .end_junction_offset_model_units
+                    .to_bits()
+                    .to_le_bytes(),
+            );
             hasher.update(&segment.radius_start_model_units.to_bits().to_le_bytes());
             hasher.update(&segment.radius_end_model_units.to_bits().to_le_bytes());
         }
@@ -990,7 +1020,9 @@ impl MycelialJunctionHyphaGraph {
         }
         for neighbours in &mut adjacency {
             neighbours.sort_by(|left, right| {
-                left.0.cmp(&right.0).then_with(|| left.1.total_cmp(&right.1))
+                left.0
+                    .cmp(&right.0)
+                    .then_with(|| left.1.total_cmp(&right.1))
             });
         }
         Ok(adjacency)
@@ -1171,7 +1203,11 @@ mod tests {
     }
 
     fn fixture_model() -> MycelialModel {
-        let branch = SpatialPoint3 { x: 0.0, y: 10.0, z: 0.0 };
+        let branch = SpatialPoint3 {
+            x: 0.0,
+            y: 10.0,
+            z: 0.0,
+        };
         MycelialModel {
             schema_version: MYCELIAL_MODEL_VERSION,
             mode: PresenceMode::Ambient,
@@ -1186,8 +1222,16 @@ mod tests {
                     None,
                     false,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 7.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 7.0,
+                        z: 0.0,
+                    },
                     branch,
                 ),
                 filament(
@@ -1195,18 +1239,42 @@ mod tests {
                     Some(1),
                     true,
                     branch,
-                    SpatialPoint3 { x: 0.0, y: 11.5, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 13.5, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 15.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 11.5,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 13.5,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 15.0,
+                        z: 0.0,
+                    },
                 ),
                 filament(
                     3,
                     Some(1),
                     true,
                     branch,
-                    SpatialPoint3 { x: 0.0, y: 12.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 18.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 20.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 12.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 18.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 20.0,
+                        z: 0.0,
+                    },
                 ),
             ],
             orbital_cells: Vec::<OrbitalCell>::new(),
@@ -1221,7 +1289,11 @@ mod tests {
             target_filament_id: 3,
             target_t: 0.5,
             kind: AnastomosisKind::TipToSide,
-            junction_position: SpatialPoint3 { x: 0.0, y: 15.0, z: 0.0 },
+            junction_position: SpatialPoint3 {
+                x: 0.0,
+                y: 15.0,
+                z: 0.0,
+            },
         }
     }
 
@@ -1239,7 +1311,10 @@ mod tests {
         assert_eq!(metrics.hypha_segment_count, 3);
         assert_eq!(metrics.connected_components, 1);
         assert_eq!(metrics.cycle_rank, 0);
-        assert_eq!(metrics.total_hypha_length_model_units_microunits, 25_000_000);
+        assert_eq!(
+            metrics.total_hypha_length_model_units_microunits,
+            25_000_000
+        );
         graph.validate().unwrap();
     }
 
@@ -1287,18 +1362,42 @@ mod tests {
                     None,
                     true,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
                 filament(
                     5,
                     None,
                     true,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 1.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 1.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 1.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
             ],
             orbital_cells: Vec::new(),
@@ -1383,10 +1482,7 @@ mod tests {
             MycelialJunctionGraphConfig::default(),
         )
         .unwrap();
-        assert_ne!(
-            first.source_model_digest,
-            third.source_model_digest
-        );
+        assert_ne!(first.source_model_digest, third.source_model_digest);
     }
 
     #[test]
