@@ -1,6 +1,6 @@
 # MUSE observer calibration v1 — false-support and selective-risk evaluation
 
-**Status:** standalone Rust implementation, schemas and synthetic fixture are authored on branch `research/muse-observer-calibration-v1-20261120`. The exact-head Rust workflow has not yet qualified this source. No acoustic calibration or benchmark win is claimed.
+**Status:** calibration v1 passed exact-head formatting, 17 tests, Clippy, CLI and schema validation at commit `321fcf4726087c735a169d377f31eff736daff3c`. The source-group family-risk extension described below is now authored on branch `research/muse-observer-calibration-v1-mainline-20261121` and awaits its own exact-head run. No real-audio calibration or benchmark win is claimed.
 
 **Tracking:** [#12998 — Calibrate acoustic pitch evidence and benchmark false support](https://github.com/Luminous-Dynamics/symthaea/issues/12998).
 
@@ -43,8 +43,9 @@ Rows whose observer measurement is `no_measurable_spectral_energy`, `insufficien
 
 - Isotonic regression provides a monotone mapping. It is not a multi-feature classifier and does not solve harmonic attribution.
 - The model hash binds only the fit split, observer/version, feature and protocol/rights receipts. The threshold-selection split and held-out split have separate hashes in the output.
-- The output reports Brier score, fixed-bin ECE, ROC-AUC, average precision, support precision, event recall, false-support rates over all and measured negatives, measurement coverage, support coverage and abstention rate. It also reports held-out false-support counts/rates separately for each negative family, so octave collision, missing fundamental and cross-part contamination cannot hide inside an aggregate.
+- The output reports Brier score, fixed-bin ECE, ROC-AUC, average precision, support precision, event recall, false-support rates over all and measured negatives, measurement coverage, support coverage and abstention rate. It reports held-out false-support counts/rates separately for each negative family, so octave collision, missing fundamental and cross-part contamination cannot hide inside an aggregate. The family report also counts distinct measured-negative source groups and distinct groups with at least one false support; note rows from one work do not inflate the independent denominator.
 - A deterministic, seeded cluster bootstrap resamples whole source groups—not individual note rows—and reports percentile 95% intervals for support precision, both false-support rates (all negatives and measured negatives), event recall, support coverage and Brier score. The contract freezes the seed, replicate count and minimum held-out group count; a work cap bounds the resampling computation.
+- Each negative family reports a one-sided nominal 95% Wilson score upper bound over independent source groups, plus `qualified_at_target`, `insufficient_evidence` or `observed_risk_exceeds_target`. This is a Wilson score bound, not an exact Clopper-Pearson interval. Bounds are marginal per family, not simultaneous family-wise coverage. Underpowered families must remain `insufficient_evidence`; zero note-level false supports do not prove a low group-level risk.
 - `verify_calibration_bundle_v1` deterministically re-runs fitting, threshold selection and held-out scoring from the exact sealed dataset and contract; it rejects a modified model, threshold or metric report.
 - If no threshold satisfies the false-support ceiling, the result emits no support threshold and all cases abstain. It never relaxes the ceiling to obtain a positive coverage number.
 
@@ -65,7 +66,7 @@ On a held-out, rights-cleared, work/performer/patch-disjoint measured cohort:
 - zero false supports on deterministic octave-collision, missing-fundamental, wrong-part and cross-part contamination negatives;
 - report every observer measurement state, including abstentions, and stratify by instrument, patch, register, dynamics, SNR and overlap.
 
-These targets require enough independent source groups for reliable clustered intervals; the 39-row synthetic fixture is only a unit test and must not be used to claim them.
+These targets require enough independent source groups for reliable clustered intervals; the 39-row synthetic fixture is only a unit test and must not be used to claim them. As a conservative planning heuristic for a 1% family risk ceiling, roughly 299 independent negative source groups with zero failing groups are needed for a one-sided 95% exact-binomial upper bound below 1%; the v1 Wilson score field is explicitly labelled as an approximate score bound, and each family must be sized and reported independently.
 
 ## Competitive and benchmark context (20 November 2026)
 
@@ -86,7 +87,7 @@ SMEBench's human validation is an additional warning against equating automatic 
 - Schemas: `docs/research/schemas/muse-observer-calibration-*.schema.json`
 - Exact-head workflow: `.github/workflows/muse-observer-calibration.yml`
 
-Seventeen unit tests are authored for monotonic isotonic fitting, threshold selection, unmeasured abstention, group leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, bundle tampering, and checked-in fixture replay. They have **not** been compiled or executed. The local environment has no Cargo, rustc or rustfmt. No exact-head Rust formatting, compilation, test or Clippy pass is claimed.
+Eighteen unit tests are authored, covering monotonic isotonic fitting, threshold selection, unmeasured abstention, group/artifact leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, negative-family attribution, source-group risk bounds, bundle tampering and checked-in fixture replay. The previous v1 source revision passed its exact-head focused workflow. The new source-group family-risk extension remains unqualified until its own exact-head workflow completes; no real-audio calibration result is claimed.
 
 ## Next
 
@@ -95,4 +96,4 @@ Seventeen unit tests are authored for monotonic isotonic fitting, threshold sele
 3. Add real measured renderer/performer cohorts and blind adjudication; keep synthetic, renderer and real-instrument strata separate.
 4. Extend the synthetic/renderer/real cohort and run leave-one-patch-out evaluation; cluster-bootstrap intervals are implemented, but the synthetic fixture is not large enough to support a research claim.
 5. Compare the calibrated observer against pinned YIN/pYIN and permitted learned F0/transcription baselines on identical stems and labels.
-6. Register the calibration receipt as an independent component in #12985. A calibration receipt may support an acoustic claim; it cannot replace symbolic correctness, render execution integrity, score-to-audio conformance or human acceptance.
+6. Register the calibration receipt as an independent component in #12985 only after the source-group risk extension qualifies. A calibration receipt may support an acoustic claim; it cannot replace symbolic correctness, render execution integrity, score-to-audio conformance or human acceptance.
