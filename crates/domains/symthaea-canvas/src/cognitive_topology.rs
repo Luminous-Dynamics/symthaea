@@ -795,7 +795,21 @@ mod tests {
     #[test]
     fn non_monotonic_event_time_is_rejected() {
         let mut topology = fixture();
-        topology.nodes[0].evidence.monotonic_ns = 4_000;
+        for node in &mut topology.nodes {
+            if node.evidence.event_id == "event:retrieval" {
+                node.evidence.monotonic_ns = 4_000;
+            }
+        }
+        for edge in &mut topology.edges {
+            if edge.evidence.event_id == "event:retrieval" {
+                edge.evidence.monotonic_ns = 4_000;
+            }
+        }
+        for episode in &mut topology.episodes {
+            if episode.evidence.event_id == "event:retrieval" {
+                episode.evidence.monotonic_ns = 4_000;
+            }
+        }
         assert_eq!(topology.validate(), Err(CognitiveTopologyError::InvalidSequence));
     }
 
