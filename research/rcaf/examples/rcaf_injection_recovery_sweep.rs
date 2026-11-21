@@ -4,8 +4,10 @@ use std::fs;
 use std::io::{self, Write};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut config = InjectionRecoveryConfig::default();
-    config.monte_carlo_replicates = 40;
+    let config = InjectionRecoveryConfig {
+        monte_carlo_replicates: 40,
+        ..InjectionRecoveryConfig::default()
+    };
     let sweep = run_injection_recovery_sweep(&config, &[0.0, 0.10, 0.20, 0.30, 0.40])?;
     let rendered = sweep.to_json_pretty();
 
