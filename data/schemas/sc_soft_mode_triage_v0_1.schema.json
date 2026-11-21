@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-soft-mode-recall-v0.1/data/schemas/sc_soft_mode_triage_v0_1.schema.json",
+  "title": "Superconductivity soft-mode triage v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "claim_ceiling",
+    "thresholds",
+    "source_reference_cases",
+    "synthetic_candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sc-soft-mode-triage.v0.1"
+    },
+    "evidence_class": {
+      "const": "synthetic"
+    },
+    "claim_ceiling": {
+      "const": "synthetic-soft-mode-disposition-and-recall-semantics-only"
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "imaginary_tolerance_cm1",
+        "minimum_converged_runs",
+        "maximum_force_residual_mev_per_angstrom"
+      ],
+      "properties": {
+        "imaginary_tolerance_cm1": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_converged_runs": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "maximum_force_residual_mev_per_angstrom": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "source_reference_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference_case_id",
+          "material_formula",
+          "source_doi",
+          "source_url",
+          "evidence_class",
+          "reported_soft_mode_status",
+          "reported_experimental_tc_k",
+          "reported_experimental_evidence",
+          "raw_phonon_artifact_status",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "reference_case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_formula": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_doi": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "evidence_class": {
+            "const": "source_reported_literature"
+          },
+          "reported_soft_mode_status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reported_experimental_tc_k": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reported_experimental_evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "raw_phonon_artifact_status": {
+            "const": "not_admitted_no_numeric_frequency_values"
+          },
+          "claim_ceiling": {
+            "const": "source-reported-positive-control-only"
+          }
+        }
+      }
+    },
+    "synthetic_candidates": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "material_family_id",
+          "condition_profile_id",
+          "structure_sha256",
+          "reference_case_id",
+          "phonon_runs",
+          "evaluation_truth"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "condition_profile_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "structure_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "reference_case_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evaluation_truth": {
+            "enum": [
+              "synthetic_known_positive",
+              "synthetic_known_negative",
+              "synthetic_unknown"
+            ]
+          },
+          "phonon_runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "run_id",
+                "method_scope",
+                "converged",
+                "minimum_frequency_cm1",
+                "frequency_uncertainty_cm1",
+                "max_force_residual_mev_per_angstrom"
+              ],
+              "properties": {
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "method_scope": {
+                  "const": "harmonic_0k_same_structure"
+                },
+                "converged": {
+                  "type": "boolean"
+                },
+                "minimum_frequency_cm1": {
+                  "type": "number"
+                },
+                "frequency_uncertainty_cm1": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max_force_residual_mev_per_angstrom": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
