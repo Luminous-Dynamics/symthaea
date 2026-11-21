@@ -303,19 +303,11 @@ pub fn qualify_transition(
                 }
                 Some(_) => {}
             }
-            check_bounded_metric(
+            check_fraction_metric(
                 &mut reasons,
-                TransitionMetric::DestinationNegativeMassFraction,
                 evidence.destination_negative_mass_fraction,
                 budget.max_destination_negative_mass_fraction,
             );
-            if let Some(Some(value)) = evidence.destination_negative_mass_fraction.map(Some) {
-                if value > 1.0 {
-                    reasons.push(TransitionReason::InvalidMetric {
-                        metric: TransitionMetric::DestinationNegativeMassFraction,
-                    });
-                }
-            }
         }
 
         match evidence.peak_memory_bytes {
@@ -392,6 +384,31 @@ fn check_bounded_metric(
         Some(value) if value > limit => {
             reasons.push(TransitionReason::LimitExceeded {
                 metric,
+                observed: value,
+                limit,
+            });
+        }
+        Some(_) => {}
+    }
+}
+
+fn check_fraction_metric(
+    reasons: &mut Vec<TransitionReason>,
+    observed: Option<f64>,
+    limit: f64,
+) {
+    match observed {
+        None => reasons.push(TransitionReason::MissingMetric {
+            metric: TransitionMetric::DestinationNegativeMassFraction,
+        }),
+        Some(value) if !value.is_finite() || !(0.0..=1.0).contains(&value) => {
+            reasons.push(TransitionReason::InvalidMetric {
+                metric: TransitionMetric::DestinationNegativeMassFraction,
+            });
+        }
+        Some(value) if value > limit => {
+            reasons.push(TransitionReason::LimitExceeded {
+                metric: TransitionMetric::DestinationNegativeMassFraction,
                 observed: value,
                 limit,
             });
