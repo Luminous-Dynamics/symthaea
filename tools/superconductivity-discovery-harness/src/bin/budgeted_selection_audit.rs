@@ -20,6 +20,7 @@ struct Identity {
     reduced_formula: String,
     family_id: String,
     prototype_id: String,
+    source_id: String,
     mechanism_track: String,
     target_semantics: String,
 }
@@ -109,6 +110,7 @@ fn identity(value: &Value, path: &str) -> Result<Identity, String> {
         reduced_formula: text_field(value, "reduced_formula", path)?.to_owned(),
         family_id: text_field(value, "family_id", path)?.to_owned(),
         prototype_id: text_field(value, "prototype_id", path)?.to_owned(),
+        source_id: text_field(value, "source_id", path)?.to_owned(),
         mechanism_track: text_field(value, "mechanism_track", path)?.to_owned(),
         target_semantics: text_field(value, "target_semantics", path)?.to_owned(),
     })
@@ -168,6 +170,7 @@ where
             "family_id" => identity.family_id.clone(),
             "prototype_id" => identity.prototype_id.clone(),
             "reduced_formula" => identity.reduced_formula.clone(),
+            "source_id" => identity.source_id.clone(),
             _ => unreachable!("validated group field"),
         })
         .collect()
@@ -233,7 +236,7 @@ fn validate_family_holdouts(
     training: &[Identity],
     evaluation: &[EvaluationCandidate],
 ) -> Result<(), String> {
-    for field in ["family_id", "prototype_id", "reduced_formula"] {
+    for field in ["family_id", "prototype_id", "reduced_formula", "source_id"] {
         let training_values = collect_group(training.iter(), field);
         let evaluation_values =
             collect_group(evaluation.iter().map(|candidate| &candidate.identity), field);
@@ -408,7 +411,7 @@ fn calibration_metrics(candidates: &[EvaluationCandidate]) -> Result<Value, Stri
         let probability = candidate
             .predicted_probability
             .expect("scored candidate has probability");
-        let outcome = f64::from(candidate.truth_positive);
+        let outcome = if candidate.truth_positive { 1.0 } else { 0.0 };
         let error = probability - outcome;
         brier_sum += error * error;
         if (probability >= 0.5) != candidate.truth_positive {
@@ -555,9 +558,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         },
         "training_candidate_count": training.len(),
         "evaluation_candidate_count": evaluation.len(),
-        "held_out_family_count": collect_group(training.iter(), "family_id").len().min(
-            collect_group(evaluation.iter().map(|candidate| &candidate.identity), "family_id").len()
-        ),
+        "training_family_count": collect_group(training.iter(), "family_id").len(),
+        "held_out_family_count": collect_group(evaluation.iter().map(|candidate| &candidate.identity), "family_id").len(),
         "evaluation_family_count": collect_group(evaluation.iter().map(|candidate| &candidate.identity), "family_id").len(),
         "evaluation_positive_count": total_positives,
         "budgeted_selection": {
@@ -718,6 +720,13 @@ mod tests {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][0]["prototype_id"] = json!("PROTO-A");
         assert!(audit_fixture(&fixture).unwrap_err().contains("prototype_id leakage"));
+    }
+
+    #[test]
+    fn rejects_source_paper_overlap() {
+        let mut fixture = fixture_value();
+        fixture["evaluation_candidates"][0]["source_id"] = json!("SRC-TR-A");
+        assert!(audit_fixture(&fixture).unwrap_err().contains("source_id leakage"));
     }
 
     #[test]
