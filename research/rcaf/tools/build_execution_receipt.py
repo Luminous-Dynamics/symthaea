@@ -90,17 +90,20 @@ def build_receipt(root: Path, reports: list[Path]) -> dict[str, Any]:
             "estimator_ids": sorted(estimator_ids),
         })
 
-    revision = os.environ.get("GITHUB_SHA", "")
-    if revision and (len(revision) != 40 or any(char not in "0123456789abcdef" for char in revision.lower())):
-        raise ValueError("GITHUB_SHA is not a 40-character Git commit SHA")
+    checkout_revision = command_version(["git", "rev-parse", "HEAD"])
+    event_revision = os.environ.get("GITHUB_SHA", "")
+    for label, revision in (("checkout", checkout_revision), ("event", event_revision)):
+        if revision and (len(revision) != 40 or any(char not in "0123456789abcdef" for char in revision.lower())):
+            raise ValueError(f"{label} revision is not a 40-character Git commit SHA")
 
     return {
         "schema_version": "rcaf.execution-receipt/0.1.0",
-        "source_commit": revision or None,
+        "source_commit": checkout_revision or None,
         "workflow": {
             "name": os.environ.get("GITHUB_WORKFLOW"),
             "run_id": os.environ.get("GITHUB_RUN_ID"),
             "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "event_sha": event_revision or None,
         },
         "environment": {
             "os": platform.platform(),
