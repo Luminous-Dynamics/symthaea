@@ -85,7 +85,7 @@ No inferential confidence intervals are attached to these small deterministic sy
 
 The root workspace currently contains a wildcard member glob that also matches a retired \`crates/core/symthaea\` path with no \`Cargo.toml\`. Cargo loads the workspace before honoring \`-p symthaea-muse\`, so a normal package-scoped command cannot currently start. Do not add a fake member or weaken the repository-wide workspace rule to work around this.
 
-The focused qualification script stages the exact production RMI module, runner, CLI and replay test into a temporary isolated Rust 2024 package with only \`serde\`, \`serde_json\` and \`sha2\`. It generates a lockfile, hashes it, embeds the exact source revision/compiler/lock identity into the runner manifest, then runs formatting, evaluator tests, runner tests, CLI tests, fresh-process replay, warnings-denied Clippy and the fixture suite.
+The focused qualification script stages the exact production RMI module, runner, CLI and replay test into a temporary isolated Rust 2024 package with only \`serde\`, \`serde_json\` and \`sha2\`. It first preserves the original source bytes and hashes, runs Rustfmt normalization only on the temporary staging copy, checks the normalized copy, and records both original and formatted source digests. It then generates and hashes the isolated lockfile, embeds the exact repository source revision/compiler/lock identity into the runner manifest, and runs evaluator tests, runner tests, CLI tests, fresh-process replay, warnings-denied Clippy and the fixture suite.
 
 From a clean checkout on the pinned Rust 1.96.0 toolchain:
 
@@ -102,7 +102,7 @@ MEL_RMI_EVIDENCE_DIR=/tmp/mel-rmi-track-a-evidence \\
 bash scripts/mel_rmi_track_a_qualification.sh "$(git rev-parse HEAD)"
 \`\`\`
 
-The script rejects a dirty checkout or any source SHA that does not equal the exact checked-out \`HEAD\`. It preserves the isolated manifest, generated lockfile, exact copied source files, JSON report, and SHA-256 evidence list.
+The script rejects a dirty checkout or any source SHA that does not equal the exact checked-out \`HEAD\`. It preserves the isolated manifest, generated lockfile, original source copies, rustfmt-normalized test copies, JSON report, and SHA-256 evidence list. Formatting is normalized only in the temporary staging directory; the repository sources are not silently rewritten by qualification.
 
 **Qualification boundary:** this validates the exact RMI sources and runner in an isolated crate. It does not compile all of \`symthaea-muse\` or the full monorepo workspace, because the unrelated missing workspace member currently prevents Cargo from loading the main package. The actual package module/bin registration remains an integration seam until that workspace issue is repaired and full-package compilation succeeds.
 
