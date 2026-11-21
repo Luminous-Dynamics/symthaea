@@ -8,8 +8,8 @@
   },
   "kernel": {
     "family": "von_mises_periodic_position_times_gaussian_velocity",
-    "spatial_concentration_kappa": 2.0,
-    "velocity_length_scale": 1.0,
+    "spatial_concentration_kappa": 2,
+    "velocity_length_scale": 1,
     "spatial_length_scale_mapping": "ell_x = L / (2*pi*sqrt(kappa))",
     "normalization": "k_x(x,x)=1 and k_v(v,v)=1"
   },
@@ -33,7 +33,8 @@
     "A finite empirical MMD computation is an exact-kernel finite-sample reference up to floating-point arithmetic, not an exact-arithmetic proof.",
     "Characteristicness does not guarantee useful finite-precision sensitivity for every bandwidth or finite sample.",
     "This is not Wasserstein distance, total-variation distance, a field-error metric, a statistical p-value, a plasma solver, or a physics certificate.",
-    "This profile applies only to the declared 1D1V periodic-position and unbounded-velocity cohort."
+    "This profile applies only to the declared 1D1V periodic-position and unbounded-velocity cohort.",
+    "The unnormalized MMD is the RKHS metric; the reported pair-normalized ratio is a scale-normalized discrepancy and is not claimed to satisfy the triangle inequality."
   ],
   "provenance": {
     "implementation": "standalone dependency-free Rust crate",
