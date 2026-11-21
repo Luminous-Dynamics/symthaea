@@ -400,6 +400,82 @@
         "repair-and-containment"
       ],
       "claim_ceiling": "synthetic fault coverage only until qualified package test vehicles and independent reliability evidence exist"
+    },
+    {
+      "id": "mixedwm38-compositional-zero-shot-and-synthetic-to-real",
+      "source": "https://github.com/Junliangwangdhu/WaferMap",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+      "reference_paper": {
+        "title": "Classifying mixed-defect from single-defect training in imbalanced wafer maps via diffusion and attention",
+        "doi": "10.1016/j.eswa.2025.130127",
+        "publication_date": "2026-03-01",
+        "method": [
+          "class-mixing-diffusion-model",
+          "prompt-wise-attention-score-similarity"
+        ],
+        "reported_harmonic_mean_accuracy_most_imbalanced": 0.743,
+        "reported_gain_vs_compared_diffusion_classifier_percentage_points": 3.92,
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "dataset_caveats": [
+        "upstream states GAN-generated maps were added to balance mixed combinations",
+        "original source has no clear per-sample synthetic-vs-real provenance in the published interface",
+        "third-party data audit reports undocumented pixel value 3 and visual mapping required for label column order",
+        "Near-full (149) and Random (866) are sparse single classes and absent from mixtures according to one independent data audit",
+        "source data license must be verified independently; downstream code repository MIT license does not establish raw dataset rights"
+      ],
+      "tasks": [
+        "standard-multilabel-interpolation",
+        "leave-combination-out-zero-shot",
+        "leave-component-out-open-set",
+        "cross-dataset-partial-label-transfer",
+        "synthetic-to-real-only-if-provenance-supports"
+      ],
+      "metrics": [
+        "per-component-macro-f1",
+        "exact-set-match",
+        "harmonic-mean-seen-unseen",
+        "open-set-false-acceptance",
+        "risk-coverage",
+        "per-cardinality-performance"
+      ],
+      "claim_ceiling": "synthetic/unknown-origin benchmark results are not real-fab generalization or process-root-cause proof"
+    },
+    {
+      "id": "upstream-silicon-substrate-material-to-wafer",
+      "source": "https://doi.org/10.1016/j.ijmachtools.2025.104345",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+      "reference_publication_date": "2026-01",
+      "scope": [
+        "crystal-growth",
+        "ingot-shaping-and-slicing",
+        "grinding-lapping-polishing",
+        "surface-quality",
+        "tool-wear"
+      ],
+      "tasks": [
+        "material-lot-provenance",
+        "crystal-growth-modelling",
+        "kerf-and-slicing-quality",
+        "wafer-geometry",
+        "surface-and-subsurface-quality",
+        "metrology-uncertainty",
+        "downstream-compatibility"
+      ],
+      "metrics": [
+        "accepted-wafer-yield",
+        "TTV",
+        "bow-warp",
+        "flatness",
+        "roughness",
+        "defect-density",
+        "material-utilization",
+        "kerf-loss",
+        "cycle-time",
+        "tool-wear",
+        "water-energy-chemical-intensity-per-accepted-wafer"
+      ],
+      "claim_ceiling": "literature/simulation or exact measured substrate test only; no electronic-grade purification or qualified substrate production claim"
     }
   ],
   "cross_cutting_protocol": {
@@ -551,5 +627,14 @@
     "adaptive_inspection": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
     "ai_sem_detection_limits": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
     "chiplet_package_testability": "https://github.com/Luminous-Dynamics/symthaea/issues/13085"
-  }
+  },
+  "new_research_updates": {
+    "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
+    "mixed_wbm_compositional_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+    "wafer_substrate_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+    "secom_external_baseline": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python"
+  },
+  "industry_frontier_reviews": [
+    "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md"
+  ]
 }
