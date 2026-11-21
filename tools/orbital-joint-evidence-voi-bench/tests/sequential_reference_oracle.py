@@ -79,6 +79,11 @@ def partitions(belief, action):
 
 
 def branch_probability(scenario, belief, branch):
+    for action in scenario["actions"]:
+        covered = action.get("obligations_covered")
+        if (not isinstance(covered, list) or len(covered) != len(set(covered))
+                or not set(covered).issubset(declared_obligations)):
+            raise ValueError("action contains unknown or duplicate evidence obligations")
     weights = scenario["resource_frequency_model"]["state_weights"]
     total = sum(weights[state] for state in belief)
     part = sum(weights[state] for state in branch)
@@ -226,7 +231,8 @@ def evaluate_myopic(scenario, baseline):
         groups = partitions(scenario["states"], action)
         if len(groups) < 2:
             continue
-        risk = max(terminal_regret(scenario, belief)[0] for belief in groups.values())
+        coverage = set(action["obligations_covered"])
+        risk = max(terminal_regret(scenario, belief, coverage)[0] for belief in groups.values())
         scored.append((risk, action["action_id"]))
     scored.sort()
     if scored and scored[0][0] + TOL < baseline:
@@ -239,6 +245,14 @@ def audit_scenario(scenario):
             or scenario["claim_ceiling"] != CLAIM):
         raise ValueError("unsupported evidence or claim ceiling")
     states = scenario["states"]
+    decisions = scenario["decisions"]
+    if (set(scenario["decision_obligations"]) != set(decisions)
+            or any(not isinstance(items, list) or len(items) != len(set(items))
+                   or any(not isinstance(item, str) or not item.strip() for item in items)
+                   for items in scenario["decision_obligations"].values())
+            or not scenario["decision_obligations"]["ACCEPT"]):
+        raise ValueError("decision acceptance obligations are incomplete or duplicated")
+    declared_obligations = set().union(*(set(items) for items in scenario["decision_obligations"].values()))
     if len(states) < 2 or len(set(states)) != len(states):
         raise ValueError("invalid hidden-state set")
     context = scenario["decision_context"]
