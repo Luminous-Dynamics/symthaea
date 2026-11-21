@@ -743,7 +743,7 @@ mod tests {
         let electric = solve_periodic_poisson_spectral(&rho, config).unwrap();
         let mut maximum_error: f64 = 0.0;
         for ix in 0..config.nx {
-            let expected = -amplitude / k * (k * config.x(ix)).sin();
+            let expected = amplitude / k * (k * config.x(ix)).sin();
             maximum_error = maximum_error.max((electric[ix] - expected).abs());
         }
         assert!(maximum_error < 2.0e-12);
