@@ -45,6 +45,7 @@ pub struct ThresholdMetrics {
     pub tp: usize,
     pub fp: usize,
     pub tn: usize,
+    #[serde(rename = "fn")]
     pub fn_: usize,
     pub sensitivity: f64,
     pub specificity: f64,
