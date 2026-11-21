@@ -638,9 +638,6 @@ impl Complex {
     fn scale(self, scalar: f64) -> Self {
         Self::new(self.re * scalar, self.im * scalar)
     }
-    fn norm(self) -> f64 {
-        self.re.hypot(self.im)
-    }
 }
 
 /// In-place radix-2 Cooley-Tukey FFT. Forward is unnormalised; inverse divides by N.
