@@ -130,6 +130,7 @@ pub struct OwnerApproval {
 pub struct EvidenceActionProposalV1 {
     pub schema: String,
     pub record_kind: String,
+    pub record_revision: String,
     pub action_id: String,
     pub policy_id: String,
     pub policy_version: String,
@@ -498,6 +499,7 @@ fn validate_change_impact_receipt(impact: &ChangeImpact) -> Result<(), String> {
 pub fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), String> {
     if proposal.schema != "EvidenceActionProposalOutcomeV1"
         || proposal.record_kind != "PROPOSAL"
+        || proposal.record_revision != "v1"
         || proposal.claim_ceiling != "proposal_only_no_qualification_authority"
         || !proposal.no_actuation
         || proposal.authority_granted
@@ -651,6 +653,26 @@ pub fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(
     Ok(())
 }
 
+pub fn validate_action_pair(proposal_bytes: &[u8], outcome_bytes: &[u8]) -> Result<(), String> {
+    let proposal: EvidenceActionProposalV1 = serde_json::from_slice(proposal_bytes)
+        .map_err(|error| format!("invalid proposal record: {error}"))?;
+    let outcome: EvidenceActionOutcomeV1 = serde_json::from_slice(outcome_bytes)
+        .map_err(|error| format!("invalid outcome record: {error}"))?;
+    validate_action_proposal(&proposal)?;
+    validate_action_outcome(&outcome)?;
+    let expected_digest = format!("{:x}", Sha256::digest(proposal_bytes));
+    if outcome.proposal_ref.id != proposal.action_id
+        || outcome.proposal_ref.revision.as_deref() != Some(proposal.record_revision.as_str())
+        || outcome.proposal_ref.sha256.as_deref() != Some(expected_digest.as_str())
+    {
+        return Err("outcome does not reference the exact proposal identity, revision and bytes".to_owned());
+    }
+    if outcome.decision_context != proposal.decision_context {
+        return Err("outcome decision context differs from the exact proposal".to_owned());
+    }
+    Ok(())
+}
+
 pub fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), String> {
     if outcome.schema != "EvidenceActionProposalOutcomeV1"
         || outcome.record_kind != "OUTCOME"
@@ -658,6 +680,9 @@ pub fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), 
         || outcome.claim_ceiling != "execution_record_only_no_qualification_promotion"
         || outcome.authority_granted
         || !valid_contract_reference(&outcome.proposal_ref)
+        || outcome.proposal_ref.kind != "evidence_action_proposal"
+        || outcome.proposal_ref.revision.as_deref() != Some("v1")
+        || outcome.proposal_ref.sha256.as_deref().is_none_or(|digest| !valid_sha256(digest))
     {
         return Err(
             "outcome schema, identity, claim ceiling or authority boundary is invalid".to_owned(),
@@ -734,6 +759,13 @@ pub fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), 
         && outcome.verification.verifier_ref.is_none()
     {
         return Err("verified outcome has no verifier reference".to_owned());
+    }
+    if matches!(
+        outcome.execution_state.as_str(),
+        "FAILED" | "ABORTED" | "INVALID" | "CENSORED" | "OUT_OF_DOMAIN" | "DISPUTED"
+    ) && outcome.verification.state == "VERIFIED_WITHIN_SCOPE"
+    {
+        return Err("non-success execution outcome cannot be verified within scope".to_owned());
     }
     if outcome.verification.state != "VERIFIED_WITHIN_SCOPE"
         && outcome.verification.reason_codes.is_empty()
@@ -1926,6 +1958,45 @@ mod tests {
             "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE"
         );
         assert!(!first.selection_matches_oracle);
+    }
+
+    #[test]
+    fn exact_proposal_outcome_pair_is_digest_and_context_bound() {
+        validate_action_pair(PROPOSAL_FIXTURE, OUTCOME_FIXTURE)
+            .expect("synthetic outcome must bind to exact proposal bytes");
+    }
+
+    #[test]
+    fn outcome_cannot_be_replayed_against_a_different_serial() {
+        let mut outcome: Value = serde_json::from_slice(OUTCOME_FIXTURE).unwrap();
+        outcome["decision_context"]["article_subject_ref"] =
+            Value::String("physical-unit://JOINT-SPECIMEN-0003".to_owned());
+        let bytes = serde_json::to_vec(&outcome).unwrap();
+        assert!(validate_action_pair(PROPOSAL_FIXTURE, &bytes).is_err());
+    }
+
+    #[test]
+    fn outcome_cannot_reference_a_different_proposal_digest() {
+        let mut outcome: Value = serde_json::from_slice(OUTCOME_FIXTURE).unwrap();
+        outcome["proposal_ref"]["sha256"] =
+            Value::String("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned());
+        let bytes = serde_json::to_vec(&outcome).unwrap();
+        assert!(validate_action_pair(PROPOSAL_FIXTURE, &bytes).is_err());
+    }
+
+    #[test]
+    fn aborted_execution_cannot_be_promoted_to_verified_within_scope() {
+        let mut outcome: Value = serde_json::from_slice(OUTCOME_FIXTURE).unwrap();
+        outcome["verification"]["state"] = Value::String("VERIFIED_WITHIN_SCOPE".to_owned());
+        outcome["verification"]["verifier_ref"] = serde_json::json!({
+            "id":"verifier:independent-structural-review",
+            "kind":"verification_authority",
+            "revision":"v1"
+        });
+        outcome["verification"]["reason_codes"] = Value::Array(vec![]);
+        let bytes = serde_json::to_vec(&outcome).unwrap();
+        let parsed: EvidenceActionOutcomeV1 = serde_json::from_slice(&bytes).unwrap();
+        assert!(validate_action_outcome(&parsed).is_err());
     }
 
     #[test]
