@@ -1,3 +1,4 @@
+pub mod sequential;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
