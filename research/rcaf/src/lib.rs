@@ -25,6 +25,12 @@ pub enum MetricError {
     InvalidBootstrapDraws { draws: usize },
     InvalidAlpha,
     InvalidSignThreshold,
+    RoiLabelCountMismatch { labels: usize, regions: usize },
+    RoiOrderMismatch,
+    EmptyRoiLabel { index: usize },
+    DuplicateRoiLabel { index: usize },
+    EmptyParticipantId { index: usize },
+    DuplicateParticipantId { index: usize },
 }
 
 impl fmt::Display for MetricError {
@@ -55,7 +61,13 @@ impl fmt::Display for MetricError {
             Self::InvalidBootstrapDraws { draws } =>
                 write!(f, "at least 100 bootstrap draws are required, got {draws}"),
             Self::InvalidAlpha => write!(f, "alpha must be finite and in (0, 0.5)"),
-            Self::InvalidSignThreshold => write!(f, "sign threshold must be finite and non-negative"),
+            Self::InvalidSignThreshold => write!(f, "sign threshold must be finite and in [0, 1]"),
+            Self::RoiLabelCountMismatch { labels, regions } => write!(f, "ROI label count {labels} does not match matrix dimension {regions}"),
+            Self::RoiOrderMismatch => write!(f, "ROI label order differs between compared matrices"),
+            Self::EmptyRoiLabel { index } => write!(f, "ROI label at index {index} is empty"),
+            Self::DuplicateRoiLabel { index } => write!(f, "duplicate ROI label at index {index}"),
+            Self::EmptyParticipantId { index } => write!(f, "participant ID at index {index} is empty"),
+            Self::DuplicateParticipantId { index } => write!(f, "duplicate participant ID at index {index}"),
         }
     }
 }
@@ -100,6 +112,45 @@ fn validate_correlation_matrix(matrix: &[Vec<f64>]) -> Result<usize, MetricError
         }
     }
     Ok(n)
+}
+
+
+fn validate_roi_labels(labels: &[String], regions: usize) -> Result<(), MetricError> {
+    if labels.len() != regions {
+        return Err(MetricError::RoiLabelCountMismatch { labels: labels.len(), regions });
+    }
+    let mut seen = std::collections::HashSet::with_capacity(labels.len());
+    for (index, label) in labels.iter().enumerate() {
+        if label.trim().is_empty() {
+            return Err(MetricError::EmptyRoiLabel { index });
+        }
+        if !seen.insert(label) {
+            return Err(MetricError::DuplicateRoiLabel { index });
+        }
+    }
+    Ok(())
+}
+
+/// WJ comparison that verifies exact ROI labels and order before comparing matrices.
+///
+/// This is the preferred entry point for empirical data. The unlabeled matrix function is
+/// retained for fixtures and callers that already enforce alignment externally.
+pub fn weighted_jaccard_labeled_correlation_matrices(
+    a_roi_labels: &[String],
+    a: &[Vec<f64>],
+    b_roi_labels: &[String],
+    b: &[Vec<f64>],
+    mode: CorrelationWjMode,
+    minimum_selected_edges: usize,
+) -> Result<f64, MetricError> {
+    let n_a = validate_correlation_matrix(a)?;
+    let n_b = validate_correlation_matrix(b)?;
+    validate_roi_labels(a_roi_labels, n_a)?;
+    validate_roi_labels(b_roi_labels, n_b)?;
+    if a_roi_labels != b_roi_labels {
+        return Err(MetricError::RoiOrderMismatch);
+    }
+    weighted_jaccard_correlation_matrices(a, b, mode, minimum_selected_edges)
 }
 
 /// WJ similarity between two aligned correlation matrices.
@@ -202,6 +253,39 @@ pub struct RcafSummary {
     pub bootstrap_draws: usize,
     /// Exact two-sided participant-level sign test on paired gaps; ties are excluded.
     pub sign_test: SignTestSummary,
+}
+
+
+/// A within/between pair attached to one pseudonymous participant key.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParticipantSimilarity {
+    pub participant_id: String,
+    pub within_similarity: f64,
+    pub between_similarity: f64,
+}
+
+/// Safely summarize paired participant records after validating unique participant identity.
+///
+/// This is the preferred participant-level API. It prevents accidental pairing by row order
+/// across separately assembled within and between vectors.
+pub fn summarize_rcaf_by_participant(
+    observations: &[ParticipantSimilarity],
+    bootstrap_draws: usize,
+    alpha: f64,
+    seed: u64,
+) -> Result<RcafSummary, MetricError> {
+    let mut seen = std::collections::HashSet::with_capacity(observations.len());
+    for (index, observation) in observations.iter().enumerate() {
+        if observation.participant_id.trim().is_empty() {
+            return Err(MetricError::EmptyParticipantId { index });
+        }
+        if !seen.insert(&observation.participant_id) {
+            return Err(MetricError::DuplicateParticipantId { index });
+        }
+    }
+    let within: Vec<f64> = observations.iter().map(|item| item.within_similarity).collect();
+    let between: Vec<f64> = observations.iter().map(|item| item.between_similarity).collect();
+    summarize_rcaf(&within, &between, bootstrap_draws, alpha, seed)
 }
 
 /// Summarize participant-paired within-state and between-state similarities.
@@ -440,6 +524,25 @@ fn classify_sign(value: f64, neutral_threshold: f64) -> SignState {
     }
 }
 
+
+/// Sign-transition analysis that verifies exact ROI labels and order before comparison.
+pub fn summarize_edge_sign_transitions_labeled(
+    a_roi_labels: &[String],
+    a: &[Vec<f64>],
+    b_roi_labels: &[String],
+    b: &[Vec<f64>],
+    neutral_threshold: f64,
+) -> Result<EdgeSignTransitionSummary, MetricError> {
+    let n_a = validate_correlation_matrix(a)?;
+    let n_b = validate_correlation_matrix(b)?;
+    validate_roi_labels(a_roi_labels, n_a)?;
+    validate_roi_labels(b_roi_labels, n_b)?;
+    if a_roi_labels != b_roi_labels {
+        return Err(MetricError::RoiOrderMismatch);
+    }
+    summarize_edge_sign_transitions(a, b, neutral_threshold)
+}
+
 /// Summarize sign transitions over aligned upper-triangle edges.
 ///
 /// A non-zero neutral_threshold treats correlations in [-threshold, +threshold] as neutral.
@@ -450,7 +553,7 @@ pub fn summarize_edge_sign_transitions(
     b: &[Vec<f64>],
     neutral_threshold: f64,
 ) -> Result<EdgeSignTransitionSummary, MetricError> {
-    if !neutral_threshold.is_finite() || neutral_threshold < 0.0 {
+    if !neutral_threshold.is_finite() || !(0.0..=1.0).contains(&neutral_threshold) {
         return Err(MetricError::InvalidSignThreshold);
     }
     let n_a = validate_correlation_matrix(a)?;
@@ -620,6 +723,59 @@ mod tests {
             summarize_edge_sign_transitions(&a, &b, f64::NAN),
             Err(MetricError::InvalidSignThreshold)
         );
+    }
+
+
+    #[test]
+    fn labeled_matrix_comparison_rejects_roi_order_mismatch() {
+        let a = vec![vec![1.0, 0.2], vec![0.2, 1.0]];
+        let b = a.clone();
+        let labels_a = vec!["ROI-1".to_string(), "ROI-2".to_string()];
+        let labels_b = vec!["ROI-2".to_string(), "ROI-1".to_string()];
+        assert_eq!(
+            weighted_jaccard_labeled_correlation_matrices(
+                &labels_a, &a, &labels_b, &b, CorrelationWjMode::Absolute, 1
+            ),
+            Err(MetricError::RoiOrderMismatch)
+        );
+        assert_eq!(
+            weighted_jaccard_labeled_correlation_matrices(
+                &["ROI-1".to_string()], &a, &labels_a, &b, CorrelationWjMode::Absolute, 1
+            ),
+            Err(MetricError::RoiLabelCountMismatch { labels: 1, regions: 2 })
+        );
+    }
+
+    #[test]
+    fn participant_keyed_summary_rejects_duplicate_or_empty_ids() {
+        let valid = vec![
+            ParticipantSimilarity { participant_id: "p1".into(), within_similarity: 0.6, between_similarity: 0.5 },
+            ParticipantSimilarity { participant_id: "p2".into(), within_similarity: 0.7, between_similarity: 0.6 },
+        ];
+        let summary = summarize_rcaf_by_participant(&valid, 100, 0.05, 7).unwrap();
+        assert_eq!(summary.participant_count, 2);
+        assert!((summary.median_paired_gap - 0.1).abs() < 1e-12);
+
+        let duplicate = vec![valid[0].clone(), valid[0].clone()];
+        assert_eq!(
+            summarize_rcaf_by_participant(&duplicate, 100, 0.05, 7),
+            Err(MetricError::DuplicateParticipantId { index: 1 })
+        );
+        let empty = vec![
+            ParticipantSimilarity { participant_id: " ".into(), within_similarity: 0.6, between_similarity: 0.5 },
+            valid[1].clone(),
+        ];
+        assert_eq!(
+            summarize_rcaf_by_participant(&empty, 100, 0.05, 7),
+            Err(MetricError::EmptyParticipantId { index: 0 })
+        );
+    }
+
+    #[test]
+    fn exact_sign_test_has_expected_resolution_at_n23() {
+        let gaps = vec![0.1; 23];
+        let result = exact_sign_test(&gaps).unwrap();
+        assert!((result.p_two_sided_exact - 2.0 / 8_388_608.0).abs() < 1e-18);
     }
 
     #[test]
