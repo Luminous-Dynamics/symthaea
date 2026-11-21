@@ -433,3 +433,8 @@ These extend the programme from classifying inspected examples to optimizing ins
 A fourth test-only reference primitive is now included: a budgeted inspection-allocation oracle. It combines modeled defect risk with test sensitivity/specificity, actionability, exposed population, avoidable loss, false-hold cost, direct inspection cost and delay penalty. It computes the exact optimal subset for small finite candidate sets and compares it with a matched-budget risk-only greedy policy. Its synthetic known-answer is part of the SEMI-BENCH-001 workflow; it does not establish physical inspection savings.
 
 See [SEMI-INSPECT-001 #13083](https://github.com/Luminous-Dynamics/symthaea/issues/13083).
+
+
+### Current executable verification
+
+The updated 31-test reference suite, including the budget-aware inspection-selection oracle, passed in hosted GitHub Actions run [#44890353550](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550). The job also reproduced both the binary-metrics and inspection-decision expected reports byte-for-byte. This is a hosted CI result, not a local test claim.
