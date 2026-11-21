@@ -3,14 +3,14 @@ name: MUSE Sonata Cognitive Subintent
 on:
   pull_request:
     branches:
-      - main
       - fix/workspace-stale-member-exclusion-20261121
+      - research/mel-sonata-cognitive-subintent-20261121
     paths:
       - "crates/domains/symthaea-muse/src/sonata_intervention.rs"
+      - "crates/domains/symthaea-muse/src/musical_policy.rs"
       - "Cargo.lock"
       - "Cargo.toml"
       - "docs/research/MEL_SONATA_COGNITIVE_SUBINTENT_V1_2026-11-21.md"
-      - ".github/workflows/muse-sonata-cognitive-subintent.yml"
   workflow_dispatch:
 
 permissions:
