@@ -371,8 +371,8 @@ mod tests {
     fn checked_in_ledger_has_valid_references_and_comparison_groups() {
         let ledger = current_ledger();
         validate_ledger(&ledger).expect("ledger must satisfy semantic validator");
-        assert_eq!(ledger.sources.len(), 11);
-        assert_eq!(ledger.observations.len(), 21);
+        assert_eq!(ledger.sources.len(), 13);
+        assert_eq!(ledger.observations.len(), 37);
     }
 
     #[test]
@@ -438,6 +438,35 @@ mod tests {
             metric.confidence_level = Some(1.0);
         }
         assert!(validate_ledger(&ledger).is_err());
+    }
+
+    #[test]
+    fn mirex_reward_accuracy_remains_distinct_from_audio_elo() {
+        let ledger = current_ledger();
+        let observation = ledger
+            .observations
+            .iter()
+            .find(|item| item.observation_id == "mirex-2026-cmi-pref-cloudear-overall")
+            .unwrap();
+        assert!(!observation.directly_comparable_to_audio_elo);
+        assert_eq!(observation.metrics[0].sample_size, Some(249));
+        assert_eq!(observation.metrics[0].unit, "percent");
+    }
+
+    #[test]
+    fn approximate_muse_perception_results_are_labelled_as_approximate() {
+        let ledger = current_ledger();
+        let observation = ledger
+            .observations
+            .iter()
+            .find(|item| {
+                item.observation_id == "muse-perception-audio-midi-gemini-2-5-pro-2026"
+            })
+            .unwrap();
+        assert!(!observation.directly_comparable_to_audio_elo);
+        assert!(observation.metrics.iter().all(|metric| {
+            metric.unit == "percent_approx" && metric.sample_size.is_none()
+        }));
     }
 
     #[test]
