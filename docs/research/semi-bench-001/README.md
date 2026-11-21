@@ -499,3 +499,10 @@ The PPAPlace-5000 data release provides 5,000 complete placements with post-GRT 
 The fourth-class? reference layer has been extended with a split-local contrastive-pair validator at `benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py`. It prevents positive/negative pairs from crossing train/validation/test boundaries, prohibits pair identity duplication and requires evidence for same-lot or near-time production-proximity pair labels. This is important for reproducing the 2026 wafer-map GNN that uses lot/time context in contrastive pair construction.
 
 See [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122).
+
+
+## Contrastive-pair integrity reference
+
+The branch now includes [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122) and a test-only contrastive-pair manifest validator. The validator rejects cross-split pairs, scope mismatches, duplicate pair/edge identities, self-pairs, orphan sample references and unsupported same-lot/time-near production-proximity claims. It binds time-near pairs to a declared clock domain and embargo.
+
+The new validator's 11 tests passed locally, and its CLI reproduced the frozen JSON report byte-for-byte. The complete reference suite now contains 46 tests; the latest hosted GitHub Actions pass still covers the preceding 35-test version. No hosted pass is claimed yet for the new pair validator.
