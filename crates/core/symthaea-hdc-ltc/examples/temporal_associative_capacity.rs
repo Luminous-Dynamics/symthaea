@@ -790,7 +790,12 @@ mod tests {
                 assert!((0.0..=maximum).contains(&bound));
             }
             assert_eq!(plug_in_fano_lower_bound_bits(0.0, classes), maximum);
-            assert_eq!(plug_in_fano_lower_bound_bits(1.0, classes), 0.0);
+            let always_wrong_bound =
+                (maximum - ((classes - 1) as f64).log2()).max(0.0);
+            assert!(
+                (plug_in_fano_lower_bound_bits(1.0, classes) - always_wrong_bound).abs()
+                    < 1.0e-12
+            );
         }
     }
 }
