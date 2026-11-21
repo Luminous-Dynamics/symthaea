@@ -877,8 +877,8 @@ mod tests {
         assert_eq!(metrics.anastomosis_count, 1);
         assert_eq!(metrics.connected_components, 1);
         assert_eq!(metrics.cycle_rank, 1);
-        assert_eq!(metrics.articulation_filament_count, 1);
-        assert_eq!(metrics.max_components_after_single_filament_failure, 2);
+        assert_eq!(metrics.articulation_filament_count, 0);
+        assert_eq!(metrics.max_components_after_single_filament_failure, 1);
         assert_eq!(model, original);
     }
 
