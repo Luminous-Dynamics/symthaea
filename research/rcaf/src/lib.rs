@@ -1,3 +1,5 @@
+pub mod simulation;
+
 //! Repeatability-calibrated similarity metrics for CETB research.
 //!
 //! This crate deliberately contains no data loader, correlation estimator or clinical
