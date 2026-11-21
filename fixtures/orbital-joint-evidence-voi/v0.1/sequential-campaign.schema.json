@@ -250,7 +250,7 @@
         "admissibility",
         "resource_plan",
         "observation_by_state",
-        "obligations_covered"
+        "obligations_by_observation"
       ],
       "properties": {
         "action_id": {
