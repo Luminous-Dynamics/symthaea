@@ -282,6 +282,10 @@
         },
         "candidate_reported_deadline_slack_at_use_ns": {
           "type": "integer"
+        },
+        "candidate_reported_evidence_age_at_retrieval_ns": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "allOf": [
@@ -610,6 +614,13 @@
         },
         "abstention_exposure_micros": {
           "type": "integer",
+          "minimum": 0
+        },
+        "actual_evidence_age_at_retrieval_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         }
       },
