@@ -112,43 +112,73 @@
       ],
       "properties": {
         "weighted_l1_relative_error": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "weighted_l2_relative_error": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "mass_relative_error": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "momentum_absolute_error": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "total_energy_relative_error": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "destination_field_residual": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "destination_minimum_distribution": {
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "destination_negative_mass_fraction": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
         "peak_memory_bytes": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 1
         },
         "wall_time_nanoseconds": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 1
         }
       }
@@ -219,9 +249,23 @@
         },
         "state_sha256": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "minLength": 1
         }
       }
+    },
+    "acceptedRepresentation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/representation"
+        },
+        {
+          "properties": {
+            "state_sha256": {
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      ]
     }
   },
   "allOf": [
@@ -240,6 +284,65 @@
               "destination_minimum_distribution",
               "destination_negative_mass_fraction"
             ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification": {
+            "properties": {
+              "decision": {
+                "const": "accepted"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_representation": {
+            "$ref": "#/$defs/acceptedRepresentation"
+          },
+          "destination_representation": {
+            "$ref": "#/$defs/acceptedRepresentation"
+          },
+          "measurements": {
+            "properties": {
+              "weighted_l1_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "weighted_l2_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "mass_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "momentum_absolute_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "total_energy_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "destination_field_residual": {
+                "type": "number",
+                "minimum": 0
+              },
+              "peak_memory_bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "wall_time_nanoseconds": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
           }
         }
       }
