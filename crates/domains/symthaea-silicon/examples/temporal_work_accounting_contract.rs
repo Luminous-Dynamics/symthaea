@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 
 const SCHEMA: &str = "symthaea.temporal-work-ledger";
-const SCHEMA_VERSION: &str = "0.1";
+const SCHEMA_VERSION: &str = "0.2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -63,8 +63,16 @@ struct TemporalWork {
     solver_substeps: u64,
     gate_evaluations: u64,
     leak_updates: u64,
+    /// Evaluator-defined opportunities, frozen independently of the candidate.
+    decision_opportunities: u64,
+    /// Final outputs; includes late outputs that missed their deadline.
     output_decisions: u64,
+    late_decisions: u64,
+    abstained_decisions: u64,
+    unserved_decisions: u64,
+    /// Correct/incorrect counts apply only to timely outputs; the remainder is unverified.
     independently_verified_correct_decisions: u64,
+    independently_verified_incorrect_decisions: u64,
     state_bytes_read: u64,
     state_bytes_written: u64,
     parameter_bytes_read: u64,
@@ -96,6 +104,10 @@ impl TemporalWork {
 
     fn primitive_scalar_operations(&self) -> Option<u64> {
         self.operations.primitive_scalar_total()
+    }
+
+    fn timely_output_decisions(&self) -> Option<u64> {
+        self.output_decisions.checked_sub(self.late_decisions)
     }
 }
 
@@ -136,6 +148,10 @@ struct QualityObservation {
     task_metric_name: Option<String>,
     task_metric_value: Option<f64>,
     trajectory_max_abs_error: Option<f64>,
+    /// Frozen task contract defining one decision opportunity and its deadline.
+    decision_contract_id: Option<String>,
+    /// Independent evaluator/verifier identity for correctness labels.
+    independent_verifier_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -189,8 +205,44 @@ impl TemporalWorkReceipt {
         if self.work.accepted_observations > self.work.input_events {
             return Err("accepted observations cannot exceed supplied input events");
         }
-        if self.work.independently_verified_correct_decisions > self.work.output_decisions {
-            return Err("verified correct decisions cannot exceed output decisions");
+        let classified_opportunities = self
+            .work
+            .output_decisions
+            .checked_add(self.work.abstained_decisions)
+            .and_then(|count| count.checked_add(self.work.unserved_decisions))
+            .ok_or("decision disposition counter overflow")?;
+        if classified_opportunities != self.work.decision_opportunities {
+            return Err("decision dispositions must equal declared opportunities");
+        }
+        if self.work.late_decisions > self.work.output_decisions {
+            return Err("late decisions cannot exceed output decisions");
+        }
+        let timely_outputs = self
+            .work
+            .timely_output_decisions()
+            .ok_or("late decision counter exceeds output count")?;
+        let verified_outputs = self
+            .work
+            .independently_verified_correct_decisions
+            .checked_add(self.work.independently_verified_incorrect_decisions)
+            .ok_or("verified decision counter overflow")?;
+        if verified_outputs > timely_outputs {
+            return Err("verified decisions cannot exceed on-time output decisions");
+        }
+        if verified_outputs > 0 {
+            if self
+                .quality
+                .decision_contract_id
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+                || self
+                    .quality
+                    .independent_verifier_id
+                    .as_deref()
+                    .is_none_or(|value| value.trim().is_empty())
+            {
+                return Err("verified decisions require decision contract and independent verifier identities");
+            }
         }
         if self.system.deadline_misses > self.system.deadline_count {
             return Err("deadline misses cannot exceed declared deadlines");
@@ -278,7 +330,53 @@ impl TemporalWorkReceipt {
         Some(bytes as f64 / self.logical_seconds()?)
     }
 
-    /// Primitive scalar operation count per independently verified correct decision.
+    /// Timely output coverage over evaluator-defined decision opportunities.
+    /// Abstentions, unserved opportunities and late outputs do not count as coverage.
+    fn on_time_decision_coverage(&self) -> Option<f64> {
+        let opportunities = self.work.decision_opportunities;
+        if opportunities == 0 {
+            return None;
+        }
+        let timely = self.work.timely_output_decisions()?;
+        Some(timely as f64 / opportunities as f64)
+    }
+
+    /// Fraction of timely outputs whose correctness was independently checked.
+    fn verification_coverage_on_time(&self) -> Option<f64> {
+        let timely = self.work.timely_output_decisions()?;
+        if timely == 0 {
+            return None;
+        }
+        let verified = self
+            .work
+            .independently_verified_correct_decisions
+            .checked_add(self.work.independently_verified_incorrect_decisions)?;
+        Some(verified as f64 / timely as f64)
+    }
+
+    /// Accuracy among independently verified timely decisions.
+    fn verified_accuracy_on_time(&self) -> Option<f64> {
+        let correct = self.work.independently_verified_correct_decisions;
+        let incorrect = self.work.independently_verified_incorrect_decisions;
+        let verified = correct.checked_add(incorrect)?;
+        if verified == 0 {
+            return None;
+        }
+        Some(correct as f64 / verified as f64)
+    }
+
+    /// Primitive scalar operations per evaluator-defined opportunity.
+    /// This includes the cost of abstentions and unserved opportunities.
+    fn scalar_operations_per_decision_opportunity(&self) -> Option<f64> {
+        let opportunities = self.work.decision_opportunities;
+        if opportunities == 0 {
+            return None;
+        }
+        let operations = self.work.primitive_scalar_operations()?;
+        Some(operations as f64 / opportunities as f64)
+    }
+
+    /// Diagnostic ratio only: compare it only at a declared coverage and quality floor.
     /// Undefined denominators remain None; they are never reported as zero.
     fn scalar_operations_per_correct_decision(&self) -> Option<f64> {
         let operations = self.work.primitive_scalar_operations()?;
@@ -316,6 +414,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", serde_json::to_string_pretty(&receipt)?);
     println!("derived real_time_factor: {:?}", receipt.real_time_factor());
     println!(
+        "derived on_time_decision_coverage: {:?}",
+        receipt.on_time_decision_coverage()
+    );
+    println!(
         "derived scalar_ops_per_correct_decision: {:?}",
         receipt.scalar_operations_per_correct_decision()
     );
@@ -334,8 +436,14 @@ mod tests {
         receipt.work.accepted_observations = 96;
         receipt.work.fast_state_updates = 200;
         receipt.work.slow_context_refreshes = 20;
+        receipt.work.decision_opportunities = 12;
         receipt.work.output_decisions = 10;
+        receipt.work.late_decisions = 1;
+        receipt.work.abstained_decisions = 1;
         receipt.work.independently_verified_correct_decisions = 8;
+        receipt.work.independently_verified_incorrect_decisions = 1;
+        receipt.quality.decision_contract_id = Some("decision-contract-v1".to_owned());
+        receipt.quality.independent_verifier_id = Some("independent-oracle-v1".to_owned());
         receipt.work.operations = OperationCounts {
             scalar_add_sub: 100,
             scalar_multiply: 50,
@@ -401,6 +509,47 @@ mod tests {
     }
 
     #[test]
+    fn decision_cost_is_paired_with_coverage_and_verified_accuracy() {
+        let receipt = observation();
+        receipt.validate().unwrap();
+        assert_eq!(receipt.on_time_decision_coverage(), Some(0.75));
+        assert_eq!(receipt.verification_coverage_on_time(), Some(1.0));
+        assert_eq!(receipt.verified_accuracy_on_time(), Some(8.0 / 9.0));
+        assert_eq!(
+            receipt.scalar_operations_per_decision_opportunity(),
+            Some(200.0 / 12.0)
+        );
+        assert_eq!(receipt.scalar_operations_per_correct_decision(), Some(25.0));
+    }
+
+    #[test]
+    fn abstentions_and_unserved_opportunities_cannot_disappear_from_the_denominator() {
+        let mut receipt = observation();
+        receipt.work.unserved_decisions = 1;
+        assert_eq!(
+            receipt.validate(),
+            Err("decision dispositions must equal declared opportunities")
+        );
+
+        let mut receipt = observation();
+        receipt.work.late_decisions = 11;
+        assert_eq!(
+            receipt.validate(),
+            Err("late decisions cannot exceed output decisions")
+        );
+    }
+
+    #[test]
+    fn verified_decisions_require_an_independent_verifier_identity() {
+        let mut receipt = observation();
+        receipt.quality.independent_verifier_id = None;
+        assert_eq!(
+            receipt.validate(),
+            Err("verified decisions require decision contract and independent verifier identities")
+        );
+    }
+
+    #[test]
     fn primitive_operations_remain_separate_from_vector_lanes() {
         let receipt = observation();
         assert_eq!(receipt.work.primitive_scalar_operations(), Some(200));
@@ -421,10 +570,11 @@ mod tests {
         );
 
         let mut receipt = observation();
-        receipt.work.independently_verified_correct_decisions = 11;
+        receipt.work.independently_verified_correct_decisions = 9;
+        receipt.work.independently_verified_incorrect_decisions = 1;
         assert_eq!(
             receipt.validate(),
-            Err("verified correct decisions cannot exceed output decisions")
+            Err("verified decisions cannot exceed on-time output decisions")
         );
     }
 
