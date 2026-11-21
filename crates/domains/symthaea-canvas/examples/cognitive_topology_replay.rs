@@ -4,7 +4,8 @@
 //! Validate and fingerprint a Mycelial cognitive-topology fixture.
 //!
 //! Run from the repository root:
-//! cargo run -p symthaea-canvas --example cognitive_topology_replay -- //!   crates/domains/symthaea-canvas/tests/fixtures/cognitive_topology_v1.json
+//! cargo run -p symthaea-canvas --example cognitive_topology_replay --
+//!   crates/domains/symthaea-canvas/tests/fixtures/cognitive_topology_v1.json
 
 use std::error::Error;
 use std::fs;
