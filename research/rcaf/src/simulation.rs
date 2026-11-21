@@ -147,12 +147,12 @@ impl EstimatorDoseResponseTournamentReport {
                     .lines()
                     .map(|line| format!("      {line}"))
                     .collect::<Vec<_>>()
-                    .join("\\n");
+                    .join("\n");
                 format!(
                     concat!(
-                        "    {{\\n",
-                        "      \\"estimator\\": \\"{}\\",\\n",
-                        "      \\"sweep\\": {}\\n",
+                        "    {{\n",
+                        "      \"estimator\": \"{}\",\n",
+                        "      \"sweep\": {}\n",
                         "    }}"
                     ),
                     curve.estimator,
@@ -160,7 +160,7 @@ impl EstimatorDoseResponseTournamentReport {
                 )
             })
             .collect::<Vec<_>>()
-            .join(",\\n");
+            .join(",\n");
         let rendered_effects = self
             .effect_sizes
             .iter()
@@ -169,17 +169,17 @@ impl EstimatorDoseResponseTournamentReport {
             .join(", ");
         format!(
             concat!(
-                "{{\\n",
-                "  \\"schema_version\\": \\"{}\\",\\n",
-                "  \\"estimators_compared\\": {},\\n",
-                "  \\"effect_sizes\\": [{}],\\n",
-                "  \\"curves\\": [\\n{}\\n  ],\\n",
-                "  \\"claim_limits\\": [\\n",
-                "    \\"matched_synthetic_inputs_only\\",\\n",
-                "    \\"not_a_biological_estimator_ranking\\",\\n",
-                "    \\"no_universal_metric_winner_is_implied\\"\\n",
-                "  ]\\n",
-                "}}\\n"
+                "{{\n",
+                "  \"schema_version\": \"{}\",\n",
+                "  \"estimators_compared\": {},\n",
+                "  \"effect_sizes\": [{}],\n",
+                "  \"curves\": [\n{} \n  ],\n",
+                "  \"claim_limits\": [\n",
+                "    \"matched_synthetic_inputs_only\",\n",
+                "    \"not_a_biological_estimator_ranking\",\n",
+                "    \"no_universal_metric_winner_is_implied\"\n",
+                "  ]\n",
+                "}}\n"
             ),
             self.schema_version,
             self.estimators_compared,
