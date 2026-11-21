@@ -145,6 +145,9 @@
         "gap_profile",
         "horizon_seconds",
         "event_count",
+        "input_seeds",
+        "gap_coefficient_of_variation",
+        "gap_schedule_seconds",
         "query_count",
         "valid_query_count",
         "correct_count",
@@ -308,6 +311,29 @@
         },
         "interpretation": {
           "const": "finite-sample plug-in Fano diagnostic; not a confidence-certified information bound"
+        },
+        "gap_schedule_seconds": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "gap_coefficient_of_variation": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_seeds": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     }
