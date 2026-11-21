@@ -7,10 +7,136 @@ use super::{
     exact_sign_test, weighted_jaccard_correlation_matrices, CorrelationWjMode, MetricError,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimilarityEstimator {
+    AbsoluteWeightedJaccard,
+    SignedShiftWeightedJaccard,
+    NormalizedMeanAbsoluteEdgeError,
+}
+
+impl SimilarityEstimator {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AbsoluteWeightedJaccard => "absolute_weighted_jaccard",
+            Self::SignedShiftWeightedJaccard => "signed_shift_weighted_jaccard",
+            Self::NormalizedMeanAbsoluteEdgeError => "normalized_mean_absolute_edge_error",
+        }
+    }
+}
+
+pub fn correlation_similarity(
+    left: &[Vec<f64>],
+    right: &[Vec<f64>],
+    estimator: SimilarityEstimator,
+) -> Result<f64, MetricError> {
+    match estimator {
+        SimilarityEstimator::AbsoluteWeightedJaccard => weighted_jaccard_correlation_matrices(
+            left,
+            right,
+            CorrelationWjMode::Absolute,
+            1,
+        ),
+        SimilarityEstimator::SignedShiftWeightedJaccard => weighted_jaccard_correlation_matrices(
+            left,
+            right,
+            CorrelationWjMode::SignedShift,
+            1,
+        ),
+        SimilarityEstimator::NormalizedMeanAbsoluteEdgeError => {
+            let left_size = super::validate_correlation_matrix(left)?;
+            let right_size = super::validate_correlation_matrix(right)?;
+            if left_size != right_size {
+                return Err(MetricError::MatrixSizeMismatch {
+                    left: left_size,
+                    right: right_size,
+                });
+            }
+            let mut absolute_error = 0.0;
+            let mut edge_count = 0usize;
+            for (row_index, row) in left.iter().enumerate() {
+                for (col_index, (&left_value, &right_value)) in row
+                    .iter()
+                    .zip(right[row_index].iter())
+                    .enumerate()
+                    .skip(row_index + 1)
+                {
+                    let _ = col_index;
+                    absolute_error += (left_value - right_value).abs();
+                    edge_count += 1;
+                }
+            }
+            if edge_count == 0 {
+                return Err(MetricError::TooFewRegions);
+            }
+            Ok((1.0 - absolute_error / edge_count as f64 / 2.0).clamp(0.0, 1.0))
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EstimatorTournamentReport {
+    pub schema_version: &'static str,
+    pub estimators_compared: usize,
+    pub results: Vec<InjectionRecoveryReport>,
+}
+
+impl EstimatorTournamentReport {
+    pub fn to_json_pretty(&self) -> String {
+        let rendered_reports = self
+            .results
+            .iter()
+            .map(|report| {
+                report
+                    .to_json_pretty()
+                    .lines()
+                    .map(|line| format!("  {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .collect::<Vec<_>>()
+            .join(",\n");
+        format!(
+            concat!(
+                "{{\n",
+                "  \"schema_version\": \"{}\",\n",
+                "  \"estimators_compared\": {},\n",
+                "  \"results\": [\n{}\n  ],\n",
+                "  \"claim_limits\": [\"synthetic_matched_inputs_only\", \"not_a_biological_estimator_ranking\", \"not_clinically_validated\"]\n",
+                "}}\n"
+            ),
+            self.schema_version,
+            self.estimators_compared,
+            rendered_reports
+        )
+    }
+}
+
+pub fn run_estimator_tournament(
+    config: &InjectionRecoveryConfig,
+) -> Result<EstimatorTournamentReport, MetricError> {
+    let estimators = [
+        SimilarityEstimator::AbsoluteWeightedJaccard,
+        SimilarityEstimator::SignedShiftWeightedJaccard,
+        SimilarityEstimator::NormalizedMeanAbsoluteEdgeError,
+    ];
+    let mut results = Vec::with_capacity(estimators.len());
+    for estimator in estimators {
+        let mut estimator_config = config.clone();
+        estimator_config.estimator = estimator;
+        results.push(run_injection_recovery(&estimator_config)?);
+    }
+    Ok(EstimatorTournamentReport {
+        schema_version: "rcaf.estimator-tournament/0.1.0",
+        estimators_compared: results.len(),
+        results,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct InjectionRecoveryConfig {
     pub participants: usize,
     pub regions: usize,
+    pub estimator: SimilarityEstimator,
     pub samples_per_segment: usize,
     pub monte_carlo_replicates: usize,
     pub module_start: usize,
@@ -31,6 +157,7 @@ impl Default for InjectionRecoveryConfig {
         Self {
             participants: 24,
             regions: 12,
+            estimator: SimilarityEstimator::AbsoluteWeightedJaccard,
             samples_per_segment: 160,
             monte_carlo_replicates: 100,
             module_start: 4,
@@ -63,6 +190,7 @@ pub struct InjectionRecoveryReport {
     pub regions: usize,
     pub samples_per_segment: usize,
     pub monte_carlo_replicates: usize,
+    pub estimator: &'static str,
     pub injection_loading_delta: f64,
     pub temporal_autocorrelation: f64,
     pub alpha: f64,
@@ -188,6 +316,7 @@ impl InjectionRecoveryReport {
                 "  \"regions\": {},\n",
                 "  \"samples_per_segment\": {},\n",
                 "  \"monte_carlo_replicates\": {},\n",
+                "  \"estimator\": \"{}\",\n",
                 "  \"injection_loading_delta\": {:.12},\n",
                 "  \"temporal_autocorrelation\": {:.12},\n",
                 "  \"alpha\": {:.12},\n",
@@ -211,6 +340,7 @@ impl InjectionRecoveryReport {
             self.regions,
             self.samples_per_segment,
             self.monte_carlo_replicates,
+            self.estimator,
             self.injection_loading_delta,
             self.temporal_autocorrelation,
             self.alpha,
@@ -310,24 +440,12 @@ pub fn run_injection_recovery(
                 config.temporal_autocorrelation,
             );
 
-            let within_similarity = weighted_jaccard_correlation_matrices(
-                &repeat_a,
-                &repeat_b,
-                CorrelationWjMode::Absolute,
-                1,
-            )?;
-            let null_between_similarity = weighted_jaccard_correlation_matrices(
-                &repeat_a,
-                &null_c,
-                CorrelationWjMode::Absolute,
-                1,
-            )?;
-            let injected_between_similarity = weighted_jaccard_correlation_matrices(
-                &repeat_a,
-                &injected_c,
-                CorrelationWjMode::Absolute,
-                1,
-            )?;
+            let within_similarity =
+                correlation_similarity(&repeat_a, &repeat_b, config.estimator)?;
+            let null_between_similarity =
+                correlation_similarity(&repeat_a, &null_c, config.estimator)?;
+            let injected_between_similarity =
+                correlation_similarity(&repeat_a, &injected_c, config.estimator)?;
 
             null_gaps.push(within_similarity - null_between_similarity);
             injected_gaps.push(within_similarity - injected_between_similarity);
@@ -355,6 +473,7 @@ pub fn run_injection_recovery(
         regions: config.regions,
         samples_per_segment: config.samples_per_segment,
         monte_carlo_replicates: config.monte_carlo_replicates,
+        estimator: config.estimator.as_str(),
         injection_loading_delta: config.injection_loading_delta,
         temporal_autocorrelation: config.temporal_autocorrelation,
         alpha: config.alpha,
@@ -712,5 +831,23 @@ mod tests {
             run_injection_recovery_sweep(&config, &[0.1, 0.1]),
             Err(MetricError::InvalidSimulationConfig { .. })
         ));
+    }
+
+    #[test]
+    fn estimator_tournament_uses_same_synthetic_seed_and_reports_three_metrics() {
+        let mut config = test_config();
+        config.monte_carlo_replicates = 25;
+        let tournament = run_estimator_tournament(&config).unwrap();
+        assert_eq!(tournament.estimators_compared, 3);
+        assert_eq!(tournament.results[0].seed, tournament.results[1].seed);
+        assert_eq!(tournament.results[1].seed, tournament.results[2].seed);
+        assert_eq!(
+            tournament.results.iter().map(|r| r.estimator).collect::<Vec<_>>(),
+            vec![
+                "absolute_weighted_jaccard",
+                "signed_shift_weighted_jaccard",
+                "normalized_mean_absolute_edge_error",
+            ]
+        );
     }
 }
