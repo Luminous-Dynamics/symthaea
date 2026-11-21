@@ -18,6 +18,7 @@ use crate::cognitive_bridge::{
     CognitiveDecisionTrace, CognitiveSection, SymbolicAction, SymbolicMeasurementEvidence,
 };
 use crate::intervention::{InterventionDescriptor, InterventionStrategy, ObligationClass};
+use crate::musical_inference::MusicAction;
 use crate::musical_policy::{
     MusicalPolicyPreference, MusicalPolicySelection, PolicyCandidateEvidence,
     select_by_musical_policy,
@@ -39,6 +40,62 @@ pub enum SonataReturnStrategy {
     OctaveBelow,
     ContourFromCurrentRegister,
 }
+
+/// Versioned cognitive preference over *how* to realize a formal Sonata return.
+///
+/// These are subordinate subintents: they may choose only among candidates
+/// that already satisfy the source-bound Sonata obligation, canonical theory
+/// validation, and the protected-score complement. They never replace the
+/// formal `ReturnOpeningMaterial` action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SonataReturnSubintentRequestV1 {
+    PreserveCurrentReturn,
+    RestoreOpeningMotifLiterally,
+}
+
+/// Result of applying a cognitive subintent to a formally valid candidate set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SonataReturnSubintentDispositionV1 {
+    Applied {
+        selected_alternative_id: String,
+        selected_strategy: SonataReturnStrategy,
+    },
+    UnsupportedShadowOnly,
+    RejectedByFormalGates,
+}
+
+/// Evidence showing whether the FEP source action had a supported,
+/// subordinate effect on the selected Sonata return candidate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SonataReturnSubintentEvidenceV1 {
+    pub schema: String,
+    pub formal_action: SymbolicAction,
+    pub source_action: MusicAction,
+    pub driving_obligation_id: Option<u64>,
+    pub request: Option<SonataReturnSubintentRequestV1>,
+    pub disposition: SonataReturnSubintentDispositionV1,
+    pub rationale: String,
+}
+
+impl SonataReturnSubintentEvidenceV1 {
+    fn unsupported(trace: &CognitiveDecisionTrace) -> Self {
+        Self {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: trace.proposal.driving_obligation_id,
+            request: None,
+            disposition: SonataReturnSubintentDispositionV1::UnsupportedShadowOnly,
+            rationale: format!(
+                "FEP source action {:?} has no qualified Sonata-return subintent mapping;                  it remains shadow-only and cannot alter candidate selection",
+                trace.inference.source_action
+            ),
+        }
+    }
+}
+
+/// Schema identifier for subordinate Sonata return preferences.
+pub const SONATA_RETURN_SUBINTENT_SCHEMA_V1: &str = "sonata-return-subintent-v1";
 
 /// One generated score and all evidence used to assess it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -68,6 +125,7 @@ pub struct SonataInterventionBatch {
     pub target_section: SonataSectionKind,
     pub expected_transformation: ReturnTransformation,
     pub driving_obligation_id: Option<u64>,
+    pub cognitive_subintent: SonataReturnSubintentEvidenceV1,
     pub candidates: Vec<SonataInterventionCandidate>,
     pub selection: MusicalPolicySelection,
 }
@@ -248,19 +306,120 @@ pub fn generate_and_rank_sonata_return_with_model(
         });
     }
 
-    let selection = select_by_musical_policy(
+    let mut selection = select_by_musical_policy(
         MusicalPolicyPreference::for_action(trace.proposal.action),
         &policy_evidence,
     );
+    let cognitive_subintent =
+        apply_return_subintent_v1(trace, &candidates, &mut selection);
 
     Ok(SonataInterventionBatch {
         source_section: source_kind,
         target_section: target_kind,
         expected_transformation: expected,
         driving_obligation_id: trace.proposal.driving_obligation_id,
+        cognitive_subintent,
         candidates,
         selection,
     })
+}
+
+/// Map only source actions whose meaning is represented by an existing
+/// Sonata return strategy. Do not guess a register or motif operation for
+/// unrelated FEP actions such as modulation, chromatic exploration or adding
+/// a counterline.
+fn qualified_return_subintent(
+    source_action: MusicAction,
+) -> Option<(SonataReturnSubintentRequestV1, SonataReturnStrategy)> {
+    match source_action {
+        MusicAction::RepeatMotif => Some((
+            SonataReturnSubintentRequestV1::RestoreOpeningMotifLiterally,
+            SonataReturnStrategy::LiteralRegister,
+        )),
+        MusicAction::Maintain => Some((
+            SonataReturnSubintentRequestV1::PreserveCurrentReturn,
+            SonataReturnStrategy::KeepCurrent,
+        )),
+        MusicAction::FollowHarmony
+        | MusicAction::ChromaticExplore
+        | MusicAction::ModulateKey
+        | MusicAction::IncreaseComplexity
+        | MusicAction::ResolveTension
+        | MusicAction::AddCountermelody => None,
+    }
+}
+
+/// Apply a supported cognitive subintent only after formal candidate evidence
+/// exists. The candidate score itself is never rewritten by this function.
+fn apply_return_subintent_v1(
+    trace: &CognitiveDecisionTrace,
+    candidates: &[SonataInterventionCandidate],
+    selection: &mut MusicalPolicySelection,
+) -> SonataReturnSubintentEvidenceV1 {
+    let Some((request, requested_strategy)) =
+        qualified_return_subintent(trace.inference.source_action)
+    else {
+        return SonataReturnSubintentEvidenceV1::unsupported(trace);
+    };
+
+    let Some(obligation_id) = trace.proposal.driving_obligation_id else {
+        return SonataReturnSubintentEvidenceV1 {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: None,
+            request: Some(request),
+            disposition: SonataReturnSubintentDispositionV1::RejectedByFormalGates,
+            rationale: "the cognitive subintent is recognized, but no driving formal obligation is bound; the existing musical-policy selection is retained".into(),
+        };
+    };
+
+    let selected = candidates.iter().find(|candidate| {
+        candidate.strategy == requested_strategy
+            && candidate.theory_validation.valid
+            && candidate.preserved_invariants
+            && candidate.verification.iter().any(|evidence| {
+                evidence.obligation_id == obligation_id && evidence.verified
+            })
+            && selection.assessments.iter().any(|assessment| {
+                assessment.alternative_id == candidate.alternative_id
+                    && assessment.eligible
+                    && assessment.target_obligation_verified == Some(true)
+            })
+    });
+
+    if let Some(candidate) = selected {
+        selection.recommended_id = Some(candidate.alternative_id.clone());
+        selection.rationale.push(format!(
+            "subordinate cognitive subintent {:?} selected {} only after the driving obligation, theory validation, and protected-score checks passed",
+            request, candidate.alternative_id
+        ));
+        SonataReturnSubintentEvidenceV1 {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: Some(obligation_id),
+            request: Some(request),
+            disposition: SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: candidate.alternative_id.clone(),
+                selected_strategy: requested_strategy,
+            },
+            rationale: "the cognitive source action selected a qualified realization strategy without changing the formal Sonata objective or candidate scores".into(),
+        }
+    } else {
+        SonataReturnSubintentEvidenceV1 {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: Some(obligation_id),
+            request: Some(request),
+            disposition: SonataReturnSubintentDispositionV1::RejectedByFormalGates,
+            rationale: format!(
+                "requested strategy {:?} did not produce a candidate that passed the driving obligation, theory, and protected-score gates; the existing musical-policy selection is retained",
+                requested_strategy
+            ),
+        }
+    }
 }
 
 /// Learn symbolic outcomes from every theory-valid generated alternative.
