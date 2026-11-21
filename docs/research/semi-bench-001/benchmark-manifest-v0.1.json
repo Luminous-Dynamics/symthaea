@@ -806,6 +806,102 @@
         "synthetic-real-provenance-not-inferred"
       ],
       "claim_ceiling": "cluster separability is not pseudo-label accuracy; no causal, yield or cross-fab claim"
+    },
+    {
+      "id": "deployable-wafer-map-model-pareto",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149",
+      "sources": [
+        "https://doi.org/10.1038/s41598-026-63752-0",
+        "https://doi.org/10.1038/s41598-026-68884-x",
+        "https://doi.org/10.1007/s10845-026-02906-3",
+        "https://doi.org/10.1002/qre.70321",
+        "https://arxiv.org/abs/2610.35080"
+      ],
+      "paper_reported_reference_points": {
+        "vit_tiny": {
+          "dataset": "WM-38K",
+          "accuracy": 0.984,
+          "parameters": 5700000,
+          "inference_speedup": 1.77,
+          "memory_reduction_factor": 4.47
+        },
+        "hybrid_deep_handcrafted": {
+          "dataset": "WM-811K",
+          "accuracy": 0.9889,
+          "macro_f1": 0.9441,
+          "trainable_parameters": 64967,
+          "offline_generator_excluded_from_inference_count": true
+        },
+        "graph_contrastive_gin": {
+          "dataset": "WM-811K-sampled",
+          "accuracy": 0.986,
+          "macro_f1": 0.975,
+          "split": "sample-level-stratified-60-20-20"
+        },
+        "fad_net": {
+          "datasets": [
+            "WM-811K",
+            "MixedWM38"
+          ],
+          "accuracy_range": [
+            0.9535,
+            0.9863
+          ],
+          "f1_range": [
+            0.9255,
+            0.9858
+          ],
+          "auc_range": [
+            0.9971,
+            0.9997
+          ]
+        },
+        "frozen_lmm": {
+          "MixedWM38_six_class_macro_accuracy": 0.929,
+          "WM811K_six_class_macro_accuracy": 0.791,
+          "latency_seconds_per_image": [
+            0.5,
+            1
+          ]
+        }
+      },
+      "tasks": [
+        "matched-single-pattern",
+        "full-mixed-composition",
+        "open-set-abstention",
+        "lot-disjoint",
+        "time-forward",
+        "source-transfer",
+        "resolution-ablation",
+        "edge-runtime"
+      ],
+      "metrics": [
+        "macro-f1",
+        "worst-class-recall",
+        "exact-composition-match",
+        "unknown-fpr-at-known-retention",
+        "calibration",
+        "p50-p95-p99-latency",
+        "peak-ram",
+        "peak-accelerator-memory",
+        "artifact-bytes",
+        "measured-energy-per-inference",
+        "training-and-update-lifecycle-cost"
+      ],
+      "hardware_profiles": [
+        "cpu-only",
+        "edge-accelerator",
+        "workstation-gpu"
+      ],
+      "integrity_gates": [
+        "matched-splits-and-label-mapping",
+        "same-input-resolution-or-declared-ablation",
+        "include-all-deployed-components",
+        "report-offline-generator-training-cost-separately",
+        "hardware-and-runtime-pinned",
+        "no-test-set-threshold-or-quantization-selection"
+      ],
+      "claim_ceiling": "paper results are not directly rankable until task, split, source identity, hardware and metric are matched; no fab yield/process qualification claim"
     }
   ],
   "cross_cutting_protocol": {
@@ -940,6 +1036,41 @@
       },
       "method": "integrates labeled WM-811K and unlabeled Mixed38 using pseudo-labels informed by cluster distributions and inter-label boundaries",
       "caveat": "The abstract's cluster-separation metrics do not establish pseudo-label correctness or production transfer; full split and source identity protocol require reproduction."
+    },
+    "vit_tiny_mixed_defect_2026": {
+      "title": "Scalable and lightweight vision transformers for mixed-defect classification in semiconductor wafer maps",
+      "url": "https://doi.org/10.1038/s41598-026-63752-0",
+      "publication_date": "2026-08-25",
+      "reported_results": {
+        "dataset": "WM-38K",
+        "accuracy": 0.984,
+        "parameters": 5700000,
+        "inference_speedup_vs_comparable_transformers": 1.77,
+        "memory_reduction_factor": 4.47
+      },
+      "caveat": "reported as paper result; exact source identity, split protocol and hardware/runtime need matched reproduction before direct leaderboard comparison"
+    },
+    "hybrid_deep_handcrafted_2026": {
+      "title": "A hybrid deep and handcrafted feature learning approach for imbalanced wafer map defect classification",
+      "url": "https://doi.org/10.1038/s41598-026-68884-x",
+      "publication_date": "2026-09-10",
+      "reported_results": {
+        "dataset": "WM-811K",
+        "accuracy": 0.9889,
+        "macro_f1": 0.9441,
+        "trainable_parameters": 64967
+      },
+      "method": [
+        "class-mask-conditioned-StyleGAN2-ADA-offline-augmentation",
+        "global-local-MobileNetV2-derived-branches",
+        "cross-attention",
+        "radial-angular-profile",
+        "connected-component-count",
+        "eccentricity",
+        "edge-concentration",
+        "class-balanced-focal-loss"
+      ],
+      "caveat": "64,967 trainable parameters exclude offline generator and deterministic handcrafted features; exact split and full lifecycle resource costs need reproduction"
     }
   },
   "reference_evaluator": {
@@ -1217,7 +1348,8 @@
     "rust_semiconductor_metrics": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
     "frozen_lmm_rule_ordered_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
     "fab_closed_loop_decision_support": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
-    "cross_dataset_wafer_pseudolabel_alignment": "https://github.com/Luminous-Dynamics/symthaea/issues/13148"
+    "cross_dataset_wafer_pseudolabel_alignment": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
+    "deployable_model_pareto": "https://github.com/Luminous-Dynamics/symthaea/issues/13149"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
@@ -1242,7 +1374,10 @@
     "fab_closed_loop_decision_review": "https://doi.org/10.1007/s43684-026-00146-z",
     "fab_closed_loop_decision_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
     "cross_dataset_wafer_pseudolabel_paper": "https://doi.org/10.1109/ACCESS.2026.3744016",
-    "cross_dataset_wafer_pseudolabel_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13148"
+    "cross_dataset_wafer_pseudolabel_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
+    "vit_tiny_mixed_defect_2026": "https://doi.org/10.1038/s41598-026-63752-0",
+    "hybrid_deep_handcrafted_2026": "https://doi.org/10.1038/s41598-026-68884-x",
+    "deployable_model_pareto_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
