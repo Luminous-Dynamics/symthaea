@@ -85,7 +85,7 @@
       },
       "derived_ratio_from_rounded_rates_pct": 15.6457564576,
       "difference_vs_reported_percentage_points": 0.5457564576,
-      "reconciliation_status": "open; do not replace reported percentage with ratio derived from rounded rates"
+      "reconciliation_status": "open; printed phase-I/phase-II saturation rates are 135.5(5) and 156.7(4) n/s, while the article separately reports a 15.1(1)% campaign increase; preserve both and resolve the estimator using source time series/analysis code"
     },
     {
       "campaign": 2,
@@ -112,14 +112,14 @@
       },
       "derived_ratio_from_rounded_rates_pct": 11.4065780266,
       "difference_vs_reported_percentage_points": 0.1065780266,
-      "reconciliation_status": "open; do not replace reported percentage with ratio derived from rounded rates"
+      "reconciliation_status": "open; printed phase-I/phase-II saturation rates are 142.9(5) and 159.2(5) n/s, while the article separately reports an 11.3(1)% campaign increase; preserve both and resolve the estimator using source time series/analysis code"
     },
     {
       "campaign": 3,
       "phase_i_rate": {
         "value": 138.6,
-        "reported_uncertainty": 0.3,
-        "notation": "138.6(3)",
+        "reported_uncertainty": 1.3,
+        "notation": "138.6(13)",
         "unit": "neutrons_per_second",
         "provenance_kind": "published_summary"
       },
@@ -139,7 +139,7 @@
       },
       "derived_ratio_from_rounded_rates_pct": 18.5425685426,
       "difference_vs_reported_percentage_points": 0.0425685426,
-      "reconciliation_status": "close at displayed precision; retain both source values separately"
+      "reconciliation_status": "reported percentage and printed rounded saturation rates are close but not interchangeable; preserve source claims separately"
     }
   ],
   "aggregate": {
@@ -159,5 +159,8 @@
     "Rounded rate pairs and source-reported percent changes are kept as separate claims because direct division does not reproduce every printed campaign percentage.",
     "The D/Pd ratio during fusion was not directly measured in each fusion run; the paper relates it to separate in-situ XRD characterization.",
     "This result is accelerator-driven D-D fusion and does not demonstrate cold fusion, excess-energy generation, or net energy."
+  ],
+  "limitation": [
+    "The printed campaign saturation-rate uncertainties are 0.5, 0.5, and 1.3 n/s for Phase I, and 0.4, 0.5, and 1.3 n/s for Phase II. The earlier fixture transcription of the third Phase I uncertainty as 0.3 was corrected to 1.3 after checking the article PDF."
   ]
 }
