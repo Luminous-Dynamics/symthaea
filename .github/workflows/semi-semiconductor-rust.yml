@@ -1,0 +1,41 @@
+name: Semiconductor Rust Contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-semiconductor/**"
+      - "Cargo.lock"
+      - "docs/research/semi-bench-001/splits/**"
+      - "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1*.json"
+      - ".github/workflows/semi-semiconductor-rust.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-semiconductor/**"
+      - "Cargo.lock"
+      - "docs/research/semi-bench-001/splits/**"
+      - "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1*.json"
+      - ".github/workflows/semi-semiconductor-rust.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  split-manifest-contract:
+    name: Rust split-manifest parity and SECOM source manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-semiconductor/Cargo.toml -- --check
+
+      - name: Test Rust benchmark contracts
+        run: cargo test --manifest-path crates/domains/symthaea-semiconductor/Cargo.toml --locked
