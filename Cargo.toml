@@ -20,6 +20,10 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # This directory only contains a retired empty examples/ placeholder; the
+    # actual symthaea package is the repository root package above. Exclude it
+    # so the crates/core/* glob cannot treat a non-crate directory as a member.
+    "crates/core/symthaea",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
