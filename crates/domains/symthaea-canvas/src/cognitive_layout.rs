@@ -61,8 +61,7 @@ impl CognitiveSpatialProjection {
     /// Digest quantized coordinates and link endpoints, at 0.001 world-unit
     /// resolution. Semantic evidence is bound separately by topology_digest.
     pub fn geometry_digest_hex(&self) -> Result<String, CognitiveLayoutError> {
-        if self.schema_version != COGNITIVE_PROJECTION_SCHEMA_VERSION
-            || self.session_id.is_empty()
+        if self.schema_version != COGNITIVE_PROJECTION_SCHEMA_VERSION || self.session_id.is_empty()
         {
             return Err(CognitiveLayoutError::InvalidProjection);
         }
@@ -100,11 +99,7 @@ impl CognitiveSpatialProjection {
         hasher.update(&(anchors.len() as u64).to_le_bytes());
         for anchor in anchors {
             hash_layout_string(&mut hasher, &anchor.node_id);
-            for coordinate in [
-                anchor.position.x,
-                anchor.position.y,
-                anchor.position.z,
-            ] {
+            for coordinate in [anchor.position.x, anchor.position.y, anchor.position.z] {
                 let quantized = (f64::from(coordinate) * 1_000.0).round() as i64;
                 hasher.update(&quantized.to_le_bytes());
             }
@@ -218,10 +213,16 @@ impl fmt::Display for CognitiveLayoutError {
         match self {
             Self::InvalidConfig => write!(f, "invalid or unbounded cognitive layout configuration"),
             Self::InvalidPreviousProjection => {
-                write!(f, "previous projection has an incompatible session, schema, or anchor set")
+                write!(
+                    f,
+                    "previous projection has an incompatible session, schema, or anchor set"
+                )
             }
             Self::InvalidProjection => {
-                write!(f, "spatial projection contains invalid or unbounded geometry")
+                write!(
+                    f,
+                    "spatial projection contains invalid or unbounded geometry"
+                )
             }
             Self::Topology(error) => write!(f, "cognitive topology validation failed: {error}"),
         }
@@ -316,8 +317,7 @@ pub fn layout_cognitive_topology(
                         &projection.anchors[right].node_id,
                     )
                 };
-                let magnitude = (config.repulsion_strength / distance.max(0.5).powi(2))
-                    .min(2.0);
+                let magnitude = (config.repulsion_strength / distance.max(0.5).powi(2)).min(2.0);
                 let force = direction.scale(magnitude);
                 forces[left] = forces[left].add(force);
                 forces[right] = forces[right].sub(force);
@@ -340,8 +340,7 @@ pub fn layout_cognitive_topology(
             } else {
                 pair_direction(&edge.source, &edge.target)
             };
-            let magnitude = ((distance - config.ideal_edge_length)
-                * config.attraction_strength)
+            let magnitude = ((distance - config.ideal_edge_length) * config.attraction_strength)
                 .clamp(-2.0, 2.0);
             let force = direction.scale(magnitude);
             forces[source] = forces[source].add(force);
@@ -361,9 +360,15 @@ pub fn layout_cognitive_topology(
             }
             let next = positions[index].add(step);
             positions[index] = SpatialPoint3 {
-                x: next.x.clamp(-config.coordinate_limit, config.coordinate_limit),
-                y: next.y.clamp(-config.coordinate_limit, config.coordinate_limit),
-                z: next.z.clamp(-config.coordinate_limit, config.coordinate_limit),
+                x: next
+                    .x
+                    .clamp(-config.coordinate_limit, config.coordinate_limit),
+                y: next
+                    .y
+                    .clamp(-config.coordinate_limit, config.coordinate_limit),
+                z: next
+                    .z
+                    .clamp(-config.coordinate_limit, config.coordinate_limit),
             };
         }
     }
@@ -507,22 +512,14 @@ mod tests {
     #[test]
     fn force_layout_is_deterministic_and_independent_of_input_order() {
         let topology = fixture();
-        let first = layout_cognitive_topology(
-            &topology,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("valid layout");
+        let first = layout_cognitive_topology(&topology, None, CognitiveLayoutConfig::default())
+            .expect("valid layout");
         let mut reordered = topology;
         reordered.nodes.reverse();
         reordered.edges.reverse();
         reordered.episodes.reverse();
-        let second = layout_cognitive_topology(
-            &reordered,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("valid reordered layout");
+        let second = layout_cognitive_topology(&reordered, None, CognitiveLayoutConfig::default())
+            .expect("valid reordered layout");
         assert_eq!(first, second);
         assert_eq!(first.topology_digest, second.topology_digest);
     }
@@ -530,32 +527,30 @@ mod tests {
     #[test]
     fn incremental_layout_uses_previous_positions_and_keeps_semantics_separate() {
         let topology = fixture();
-        let previous = layout_cognitive_topology(
-            &topology,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("initial layout");
+        let previous = layout_cognitive_topology(&topology, None, CognitiveLayoutConfig::default())
+            .expect("initial layout");
         let semantic_digest = topology.canonical_digest_hex().expect("valid topology");
 
         let mut extended = topology.clone();
         extended.revision += 1;
         extended.last_sequence += 1;
-        extended.nodes.push(crate::cognitive_topology::CognitiveNode {
-            id: "concept:additional".to_string(),
-            kind: crate::cognitive_topology::CognitiveNodeKind::Concept,
-            label: "Additional concept".to_string(),
-            status: EpistemicStatus::Observed,
-            evidence: crate::cognitive_topology::CognitiveEvidence {
-                event_id: "event:additional".to_string(),
-                producer: "synthetic-fixture".to_string(),
-                sequence: 4,
-                monotonic_ns: 4_000,
-                provenance: CognitiveProvenance::SyntheticFixture,
-                trace_digest: None,
-            },
-            activation: None,
-        });
+        extended
+            .nodes
+            .push(crate::cognitive_topology::CognitiveNode {
+                id: "concept:additional".to_string(),
+                kind: crate::cognitive_topology::CognitiveNodeKind::Concept,
+                label: "Additional concept".to_string(),
+                status: EpistemicStatus::Observed,
+                evidence: crate::cognitive_topology::CognitiveEvidence {
+                    event_id: "event:additional".to_string(),
+                    producer: "synthetic-fixture".to_string(),
+                    sequence: 4,
+                    monotonic_ns: 4_000,
+                    provenance: CognitiveProvenance::SyntheticFixture,
+                    trace_digest: None,
+                },
+                activation: None,
+            });
         let next = layout_cognitive_topology(
             &extended,
             Some(&previous),
@@ -598,11 +593,7 @@ mod tests {
         let mut previous = project_cognitive_topology(&topology).expect("valid projection");
         previous.session_id = "another-session".to_string();
         assert_eq!(
-            layout_cognitive_topology(
-                &topology,
-                Some(&previous),
-                CognitiveLayoutConfig::default()
-            ),
+            layout_cognitive_topology(&topology, Some(&previous), CognitiveLayoutConfig::default()),
             Err(CognitiveLayoutError::InvalidPreviousProjection)
         );
     }
@@ -610,18 +601,10 @@ mod tests {
     #[test]
     fn geometry_digest_is_deterministic_and_binds_layout_not_semantics() {
         let topology = fixture();
-        let first = layout_cognitive_topology(
-            &topology,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("valid layout");
-        let second = layout_cognitive_topology(
-            &topology,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("valid repeated layout");
+        let first = layout_cognitive_topology(&topology, None, CognitiveLayoutConfig::default())
+            .expect("valid layout");
+        let second = layout_cognitive_topology(&topology, None, CognitiveLayoutConfig::default())
+            .expect("valid repeated layout");
         assert_eq!(
             first.geometry_digest_hex().expect("valid geometry"),
             second.geometry_digest_hex().expect("valid geometry")
