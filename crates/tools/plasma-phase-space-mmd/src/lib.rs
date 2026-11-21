@@ -488,7 +488,7 @@ fn log_factorial(k: u64) -> f64 {
 /// lambda. The spatial von Mises spectrum is sampled as a Skellam difference
 /// of two independent Poisson(kappa/2) variates.
 fn sample_poisson(lambda: f64, rng: &mut SplitMix64) -> Result<u64, MmdError> {
-    if !lambda.is_finite() || lambda < 0.0 || lambda > 1.0e12 {
+    if !lambda.is_finite() || !(0.0..=1.0e12).contains(&lambda) {
         return Err(MmdError::UnsupportedSpatialConcentrationForSampling);
     }
     if lambda == 0.0 {
