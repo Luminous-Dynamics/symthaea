@@ -245,13 +245,12 @@ fn append_filament(
     } else {
         direction
     };
-    let control_a = start
-        .add(start_tangent.scale(length * 0.28))
-        .add(lateral.scale(0.16));
+    let control_a = start.add(start_tangent.scale(length * 0.28));
     let control_b = start
         .add(direction.scale(length * 0.76))
         .add(lateral.scale(0.88));
 
+    let end_tangent = end.sub(control_b).normalized();
     let id = *next_id;
     *next_id = (*next_id).wrapping_add(1);
     let radius_start = 2.8 * 0.66f32.powi(generation as i32);
@@ -286,7 +285,7 @@ fn append_filament(
             Some(id),
             end,
             child_direction,
-            direction,
+            end_tangent,
             child_length,
             remaining_depth - 1,
             generation + 1,
@@ -402,4 +401,28 @@ mod tests {
                 .is_some()
         );
     }
+    #[test]
+    fn child_filaments_begin_at_parent_endpoint_with_matching_tangent() {
+        let model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        for child in model.filaments.iter().filter(|filament| filament.parent_id.is_some()) {
+            let parent_id = child.parent_id.expect("filtered child");
+            let parent = model
+                .filaments
+                .iter()
+                .find(|filament| filament.id == parent_id)
+                .expect("parent exists");
+            let gap = child.start.sub(parent.end).length();
+            assert!(gap < 1.0e-5, "child root must equal parent endpoint");
+            let parent_tangent = parent.end.sub(parent.control_b).normalized();
+            let child_tangent = child.control_a.sub(child.start).normalized();
+            assert!(
+                parent_tangent.dot(child_tangent) > 0.9999,
+                "parent and child tangents should be continuous at fork"
+            );
+        }
+    }
+
 }
