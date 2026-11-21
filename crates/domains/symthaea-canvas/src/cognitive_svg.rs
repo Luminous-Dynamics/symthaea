@@ -157,7 +157,7 @@ pub fn render_cognitive_projection_svg(
     .expect("writing to String cannot fail");
     writeln!(
         &mut output,
-        r#"<rect x="0" y="0" width="100%" height="100%" fill="#071321"/>"#
+        r##"<rect x="0" y="0" width="100%" height="100%" fill="#071321"/>"##
     )
     .expect("writing to String cannot fail");
 
