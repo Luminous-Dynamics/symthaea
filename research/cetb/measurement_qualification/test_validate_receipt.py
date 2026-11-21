@@ -54,7 +54,7 @@ class MeasurementQualificationTests(unittest.TestCase):
         receipt["transportability"]["site_holdout"] = {
             "status": "adequate",
             "sample_size": 40,
-            "source_independence": "same_participants_new_split",
+            "source_independence": "same_release_heldout_participants",
             "details": "Deliberately invalid claim."
         }
         with self.assertRaisesRegex(QualificationError, "random participant split"):
