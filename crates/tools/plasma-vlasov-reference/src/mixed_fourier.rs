@@ -327,8 +327,7 @@ mod tests {
         let spatial_count = 16;
         let phase = 0.37;
         let amplitude = 1.25;
-        let mut coefficients =
-            vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
         add_real_cosine(&mut coefficients, 0, spatial_count, 2, amplitude, phase);
 
         let real = adept_shifted_fourier_to_real_space(
@@ -356,8 +355,7 @@ mod tests {
         let spatial_count = 16;
         let phase = -0.29;
         let amplitude = 0.8;
-        let mut coefficients =
-            vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
         add_real_cosine(&mut coefficients, 0, spatial_count, -3, amplitude, phase);
 
         let real = adept_shifted_fourier_to_real_space(
@@ -412,10 +410,7 @@ mod tests {
     #[test]
     fn inverse_fftshift_is_applied_only_on_the_spatial_axis() {
         let spatial_count = 8;
-        let mut coefficients = vec![
-            ComplexFourierCoefficient::new(0.0, 0.0);
-            2 * spatial_count
-        ];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); 2 * spatial_count];
         set_shifted_mode(
             &mut coefficients,
             0,
@@ -450,8 +445,7 @@ mod tests {
     #[test]
     fn imaginary_residual_is_reported_and_rejected_without_silent_clipping() {
         let spatial_count = 8;
-        let mut coefficients =
-            vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
         set_shifted_mode(
             &mut coefficients,
             0,
@@ -577,8 +571,7 @@ mod tests {
     fn multiplication_by_spatial_count_is_required_for_adept_inverse_convention() {
         let spatial_count = 32;
         let physical_constant = -0.625;
-        let mut coefficients =
-            vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
+        let mut coefficients = vec![ComplexFourierCoefficient::new(0.0, 0.0); spatial_count];
         set_shifted_mode(
             &mut coefficients,
             0,
