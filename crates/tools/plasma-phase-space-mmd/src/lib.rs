@@ -2035,21 +2035,20 @@ mod tests {
         let mixture = mixture_config();
         let mixed =
             compare_phase_space_measures_mmd_mixture(&candidate, &reference, &mixture).unwrap();
-        let total_weight = mixture.components.iter().map(|item| item.weight).sum::<f64>();
-        let mut weighted_sum = 0.0;
-        for component in &mixture.components {
-            let exact = compare_phase_space_measures_mmd(
-                &candidate,
-                &reference,
-                component_config(mixture.domain_length, *component),
-            )
-            .unwrap();
-            weighted_sum += component.weight / total_weight * exact.normalized_mmd_squared;
-        }
+        let weighted_sum = mixture
+            .components
+            .iter()
+            .zip(&mixed.component_normalized_mmd_squared)
+            .map(|(component, component_mmd_squared)| component.weight * component_mmd_squared)
+            .sum::<f64>();
+        assert_eq!(
+            mixed.component_normalized_mmd_squared.len(),
+            mixture.components.len()
+        );
         assert!(
-            (mixed.normalized_mmd_squared - weighted_sum).abs() <= 1.0e-12,
+            (mixed.aggregate.normalized_mmd_squared - weighted_sum).abs() <= 1.0e-12,
             "mixture MMD^2 {} differed from weighted component sum {weighted_sum}",
-            mixed.normalized_mmd_squared
+            mixed.aggregate.normalized_mmd_squared
         );
     }
 
@@ -2075,9 +2074,9 @@ mod tests {
         let split =
             compare_phase_space_measures_mmd_mixture(&candidate, &signed_split, &mixture_config())
                 .unwrap();
-        assert_mmd_zero(permuted);
-        assert_mmd_zero(split);
-        assert_eq!(split.reference_atom_count, 2);
+        assert_mmd_zero(permuted.aggregate);
+        assert_mmd_zero(split.aggregate);
+        assert_eq!(split.aggregate.reference_atom_count, 2);
     }
 
     #[test]
@@ -2092,7 +2091,7 @@ mod tests {
         let right =
             compare_phase_space_measures_mmd_mixture(&candidate, &reference, &reversed).unwrap();
         assert!(
-            (left.normalized_mmd_squared - right.normalized_mmd_squared).abs() <= 1.0e-12
+            (left.aggregate.normalized_mmd_squared - right.aggregate.normalized_mmd_squared).abs() <= 1.0e-12
         );
     }
 
@@ -2152,7 +2151,7 @@ mod tests {
         )
         .unwrap();
         let error =
-            (approximate.estimate.normalized_mmd_squared - exact.normalized_mmd_squared).abs();
+            (approximate.estimate.normalized_mmd_squared - exact.aggregate.normalized_mmd_squared).abs();
         assert!(
             error <= approximate.estimate.hoeffding_95_half_width,
             "mixture spectral error {error:e} exceeds feature bound {:e}",
@@ -2267,9 +2266,9 @@ mod tests {
         .unwrap();
 
         assert!(narrow.normalized_mmd_squared > broad.normalized_mmd_squared);
-        assert!(mixture.normalized_mmd_squared > broad.normalized_mmd_squared);
+        assert!(mixture.aggregate.normalized_mmd_squared > broad.normalized_mmd_squared);
         assert!(
-            (mixture.normalized_mmd_squared
+            (mixture.aggregate.normalized_mmd_squared
                 - (0.2 * broad.normalized_mmd_squared + 0.8 * narrow.normalized_mmd_squared))
                 .abs()
                 <= 1.0e-12
