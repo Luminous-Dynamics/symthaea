@@ -396,7 +396,7 @@
     "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
     "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
     "mode": "test-only-independent-reference; production implementation remains Rust-first",
-    "local_tests": 14,
+    "local_tests": 21,
     "local_status": "PASS",
     "threshold_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_threshold_policy_reference.py",
@@ -405,6 +405,20 @@
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/validation-threshold-known-answer-v1.expected.json",
       "semantics": "maximize-validation-recall-subject-to-minimum-precision-floor; group-equal-scores; reject-validation-test-identity-overlap; explicit-fallback-if-infeasible",
       "test_count": 3,
+      "empirical_dataset_result": false
+    },
+    "split_manifest_validator": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_split_manifest_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_split_manifest_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json",
+      "supported_schemes": [
+        "group_disjoint",
+        "forward_time",
+        "stratified_sample"
+      ],
+      "semantics": "unique-identity; all-splits-non-empty; group-disjoint-check; strict-forward-time-check; timezone-required; deterministic-assignment-digest",
+      "test_count": 7,
       "empirical_dataset_result": false
     }
   },
