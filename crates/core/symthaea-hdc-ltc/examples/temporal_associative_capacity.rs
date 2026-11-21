@@ -114,6 +114,7 @@ struct SummaryRecord {
     final_state_norm: f64,
     api_update_count: u64,
     reported_logical_seconds: f64,
+    memory_preparation_wall_ns: u128,
     model_setup_wall_ns: u128,
     input_preparation_wall_ns: u128,
     evolution_wall_ns: u128,
@@ -556,6 +557,7 @@ fn cohort_id(
 fn run_cohort(
     writer: &mut impl Write,
     memory: &PreparedMemory,
+    memory_preparation_wall_ns: u128,
     seed: u64,
     dim: usize,
     fan_in: usize,
@@ -698,6 +700,7 @@ fn run_cohort(
             final_state_norm: state.norm() as f64,
             api_update_count: evolution.api_update_count,
             reported_logical_seconds: evolution.reported_logical_seconds,
+            memory_preparation_wall_ns,
             model_setup_wall_ns: evolution.model_setup_wall_ns,
             input_preparation_wall_ns: evolution.input_preparation_wall_ns,
             evolution_wall_ns: evolution.evolution_wall_ns,
@@ -726,7 +729,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         for &fan_in in &args.loads {
             for seed_index in 0..args.seed_count {
                 let seed = seed_index as u64;
+                let memory_prep_start = Instant::now();
                 let memory = prepare_memory(dim, fan_in, seed);
+                let memory_preparation_wall_ns = memory_prep_start.elapsed().as_nanos();
 
                 // Static controls are emitted once per corpus, not duplicated
                 // for each horizon or event schedule.
@@ -738,6 +743,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     run_cohort(
                         &mut writer,
                         &memory,
+                        memory_preparation_wall_ns,
                         seed,
                         dim,
                         fan_in,
@@ -753,6 +759,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 run_cohort(
                     &mut writer,
                     &memory,
+                    memory_preparation_wall_ns,
                     seed,
                     dim,
                     fan_in,
