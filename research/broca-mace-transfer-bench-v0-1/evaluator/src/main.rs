@@ -215,6 +215,10 @@ fn cases() -> Vec<Scenario> {
         experience(120, 1, baseline_quality, Action::A, 0.80),
         experience(121, 2, baseline_quality, Action::B, 0.70),
     ];
+    let one_sided = vec![
+        experience(126, 30, baseline_quality, Action::B, 0.40),
+        experience(127, 31, baseline_quality, Action::B, 0.42),
+    ];
     let shifted_identified = valid_pair(shifted_quality, 130, 0.89, 0.30);
 
     let mut common_cause = valid_pair(baseline_quality, 160, 0.96, 0.65);
@@ -364,6 +368,15 @@ fn cases() -> Vec<Scenario> {
             0.0,
             1.0,
             None,
+            false,
+        ),
+        scenario(
+            "one_sided_qualified_evidence",
+            one_sided,
+            Query { scope: baseline_quality },
+            0.90,
+            0.40,
+            Some(Action::A),
             false,
         ),
         scenario(
@@ -828,6 +841,26 @@ mod tests {
 
         assert!(!simulate(Policy::ActiveProbe, exact).3);
         assert!(!simulate(Policy::ActiveProbe, invariant).3);
+    }
+
+    #[test]
+    fn one_sided_evidence_abstains_then_active_probe_learns_the_better_action() {
+        let case = cases()
+            .into_iter()
+            .find(|item| item.name == "one_sided_qualified_evidence")
+            .expect("one-sided fixture exists");
+        let query = case.session_b;
+        let exact = decide(Policy::CausalQualified, &case.session_a, query);
+        assert_eq!(exact.action, None);
+        assert!(exact.evidence_ids.is_empty());
+
+        let (decision, memory, cost, requested, resolved) =
+            simulate(Policy::ActiveProbe, &case);
+        assert!(requested);
+        assert!(resolved);
+        assert_eq!(decision.action, Some(Action::A));
+        assert_eq!(memory.len(), case.session_a.len() + 4);
+        assert!((cost - PROBE_COST).abs() < f64::EPSILON);
     }
 
     #[test]

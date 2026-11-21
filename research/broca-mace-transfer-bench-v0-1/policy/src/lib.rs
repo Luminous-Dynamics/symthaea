@@ -750,8 +750,8 @@ mod tests {
         let qualified = decide(Policy::CausalQualified, &memory, Query { scope });
 
         assert_eq!(frequency.action, Some(Action::A));
-        assert_eq!(qualified.action, Some(Action::B));
-        assert_eq!(qualified.evidence_ids, vec![8, 9]);
+        assert_eq!(qualified.action, None);
+        assert!(qualified.evidence_ids.is_empty());
     }
 
     fn transport_case(

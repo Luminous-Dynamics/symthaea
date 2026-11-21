@@ -162,7 +162,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 19);
+    let mut cases = Vec::with_capacity(clusters as usize * 20);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -545,6 +545,21 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             Some(Action::B),
             false,
         ));
+
+        let one_sided = vec![
+            exp(id + 250, family + 30, baseline, Action::B, 0.40),
+            exp(id + 251, family + 31, baseline, Action::B, 0.42),
+        ];
+        cases.push(case(
+            cluster,
+            "one_sided_qualified_evidence",
+            one_sided,
+            baseline,
+            0.90,
+            0.40,
+            Some(Action::A),
+            false,
+        ));
     }
     cases
 }
@@ -772,7 +787,7 @@ fn session_c_control() -> Vec<(Policy, Option<Action>, Option<Action>, bool)> {
 fn report(cases: &[Case]) {
     let clusters = cluster_means(Policy::NoMemory, cases).len();
     let families: BTreeSet<&str> = cases.iter().map(|item| item.family).collect();
-    println!("MACE generated-world stress benchmark v0.12");
+    println!("MACE generated-world stress benchmark v0.13");
     println!(
         "clusters={}, scenarios={}, families={}",
         clusters,
@@ -964,6 +979,26 @@ mod tests {
     }
 
     #[test]
+    fn one_sided_qualified_memory_requires_probe_before_comparison() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "one_sided_qualified_evidence")
+            .expect("one-sided fixture exists");
+        let exact = decide(Policy::CausalQualified, &item.memory, item.query);
+        assert_eq!(exact.action, None);
+        assert!(exact.evidence_ids.is_empty());
+
+        let (decision, memory, cost, requested, resolved) =
+            simulate(Policy::ActiveProbe, item);
+        assert!(requested);
+        assert!(resolved);
+        assert_eq!(decision.action, Some(Action::A));
+        assert_eq!(memory.len(), item.memory.len() + 4);
+        assert!((cost - PROBE_COST).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn high_reward_observational_and_quasi_experimental_claims_do_not_transfer() {
         let cases = generated_worlds(1);
         for family_name in [
@@ -1018,12 +1053,12 @@ mod tests {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 152);
+        assert_eq!(first.len(), 160);
         assert_eq!(first[0].cluster, 1);
-        assert_eq!(first[19].cluster, 2);
+        assert_eq!(first[20].cluster, 2);
         assert_ne!(
             first[0].memory[0].source_family,
-            first[19].memory[0].source_family
+            first[20].memory[0].source_family
         );
     }
 
@@ -1037,15 +1072,15 @@ mod tests {
         let frequency = decide(Policy::FrequencyOnly, &item.memory, item.query);
         let qualified = decide(Policy::CausalQualified, &item.memory, item.query);
         assert_eq!(frequency.action, Some(Action::A));
-        assert_eq!(qualified.action, Some(Action::B));
-        assert_eq!(qualified.evidence_ids.len(), 2);
+        assert_eq!(qualified.action, None);
+        assert!(qualified.evidence_ids.is_empty());
     }
 
     #[test]
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 304);
+        assert_eq!(score.count, 320);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);
