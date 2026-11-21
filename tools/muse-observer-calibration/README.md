@@ -30,7 +30,7 @@ cargo run --manifest-path tools/muse-observer-calibration/Cargo.toml -- verify D
 - Fit, threshold-selection and held-out splits must be source-group disjoint. Exact WAV/MIDI digests cannot be re-used across source groups.
 - Confidence intervals resample complete source groups, never individual notes.
 - No-safe-threshold means no support decision is emitted; all cases abstain.
-- Held-out results report false support by negative family (e.g. octave collision vs cross-part contamination), not only an aggregate rate.
+- Held-out results report false support by negative family (e.g. octave collision vs cross-part contamination), including independent source-group counts, failing-group counts and a one-sided nominal 95% Wilson score upper bound. This is marginal per family, not a simultaneous family-wise bound. Underpowered families report insufficient evidence.
 - The calibration bundle can support an acoustic claim; it cannot replace symbolic correctness, renderer execution assurance, score-to-audio conformance or human acceptance.
 
 See `docs/research/MUSE_OBSERVER_CALIBRATION_V1.md` and issue #12998 for the full protocol and claim limits.
