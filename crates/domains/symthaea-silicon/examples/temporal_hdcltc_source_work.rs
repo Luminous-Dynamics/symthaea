@@ -98,7 +98,8 @@ struct SourceDerivedWork {
     equilibrium_recomputations: u64,
     tau_recomputations: u64,
     gating_evaluations: u64,
-    exponential_evaluations: u64,
+    /// Direct calls to f32::exp in the pinned source; excludes tanh/libm internals.
+    explicit_exp_calls: u64,
     state_norm_scans: u64,
     iterative_substeps: u64,
     fused_equilibrium_passes: u64,
@@ -124,7 +125,7 @@ impl SourceDerivedWork {
             equilibrium_recomputations: 0,
             tau_recomputations: 0,
             gating_evaluations: 0,
-            exponential_evaluations: 0,
+            explicit_exp_calls: 0,
             state_norm_scans: 0,
             iterative_substeps: 0,
             fused_equilibrium_passes: 0,
@@ -152,20 +153,20 @@ impl SourceDerivedWork {
                 // compute_tau + apply_state_bounds + update_stats.
                 work.state_norm_scans = 3;
                 // One sigmoid exponential and one time-decay exponential.
-                work.exponential_evaluations = 2;
+                work.explicit_exp_calls = 2;
             }
             EvolutionMethod::FusedClosedForm => {
                 work.tau_recomputations = 1;
                 work.gating_evaluations = 1;
                 work.fused_equilibrium_passes = 1;
                 work.state_norm_scans = 3;
-                work.exponential_evaluations = 2;
+                work.explicit_exp_calls = 2;
             }
             EvolutionMethod::AnalyticalClosedForm => {
                 work.equilibrium_recomputations = 1;
                 work.tau_recomputations = 1;
                 work.state_norm_scans = 3;
-                work.exponential_evaluations = 1;
+                work.explicit_exp_calls = 1;
             }
             EvolutionMethod::IterativeClosedForm => {
                 let max_substep = tau_base / 10.0;
@@ -180,7 +181,7 @@ impl SourceDerivedWork {
                 work.iterative_substeps = steps;
                 work.equilibrium_recomputations = steps;
                 work.tau_recomputations = steps;
-                work.exponential_evaluations = steps;
+                work.explicit_exp_calls = steps;
                 // One state norm per compute_tau substep, then bounds + stats.
                 work.state_norm_scans = steps
                     .checked_add(2)
@@ -449,7 +450,7 @@ mod tests {
         assert_eq!(work.iterative_substeps, 50);
         assert_eq!(work.equilibrium_recomputations, 50);
         assert_eq!(work.tau_recomputations, 50);
-        assert_eq!(work.exponential_evaluations, 50);
+        assert_eq!(work.explicit_exp_calls, 50);
         assert_eq!(work.state_norm_scans, 52);
     }
 
@@ -465,12 +466,12 @@ mod tests {
 
         assert_eq!(ordinary.equilibrium_recomputations, 1);
         assert_eq!(ordinary.gating_evaluations, 1);
-        assert_eq!(ordinary.exponential_evaluations, 2);
+        assert_eq!(ordinary.explicit_exp_calls, 2);
         assert_eq!(fused.equilibrium_recomputations, 0);
         assert_eq!(fused.fused_equilibrium_passes, 1);
         assert_eq!(fused.gating_evaluations, 1);
         assert_eq!(analytical.gating_evaluations, 0);
-        assert_eq!(analytical.exponential_evaluations, 1);
+        assert_eq!(analytical.explicit_exp_calls, 1);
     }
 
     #[test]
