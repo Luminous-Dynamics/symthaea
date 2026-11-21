@@ -58,7 +58,10 @@ pub use cognitive_morphology::{
     CognitiveMorphologyError, CognitiveMorphologyNode, CognitiveMorphologyProjection,
     build_cognitive_morphology,
 };
-pub use cognitive_svg::{CognitiveSvgError, CognitiveSvgOptions, render_cognitive_projection_svg};
+pub use cognitive_svg::{
+    CognitiveSvgError, CognitiveSvgOptions, render_cognitive_morphology_svg,
+    render_cognitive_projection_svg,
+};
 pub use cognitive_topology::{
     COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveEdge, CognitiveEpisode, CognitiveEpisodeKind,
     CognitiveEpisodeState, CognitiveEvidence, CognitiveNode, CognitiveNodeKind,
