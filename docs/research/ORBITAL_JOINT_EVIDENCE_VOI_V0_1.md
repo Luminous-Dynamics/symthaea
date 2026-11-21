@@ -238,8 +238,8 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 ## 11. Deliverables
 
 P0: this contract and owner map.  
-P1: machine-readable action and outcome schema plus 11 frozen synthetic scenarios.  
-P2: executable dry-run preflight that audits admissibility, resource budgets, claim identity, common-cause labels, mandatory obligations, minimax regret and the one explicit calibrated-EVSI case; a separately implemented standard-library Python oracle independently checks the known answers. No solver or physical execution is invoked.  
+P1: machine-readable action and outcome schema plus 13 frozen synthetic scenarios.  
+P2: executable dry-run preflight that audits admissibility, resource budgets, claim identity, common-cause labels, mandatory obligations, minimax regret, the one explicit calibrated-EVSI case, and actual resource consumption including aborted-test overruns; a separately implemented standard-library Python oracle independently checks the known answers. No solver or physical execution is invoked.  
 P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
 P5: only after review, authorized human-supervised physical evidence handoff.
