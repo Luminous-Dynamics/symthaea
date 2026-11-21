@@ -44,7 +44,7 @@ A binary Brier convention must be declared. The standard single-probability bina
 
 ### Lane A — Adversarial theory prediction
 
-Use the COGITATE IIT–GNWT collaboration as the reference case for preregistered theory disagreement. The Nature paper reports 256 participants across fMRI, MEG and intracranial EEG, with modality-specific analysis cohorts of 120, 102 and 34 respectively. It found results that aligned with some commitments and challenged important predictions from both theories. It is a published benchmark and replication target, not a blind holdout.
+The COGITATE IIT–GNWT collaboration is the reference case for preregistered theory disagreement. The Nature paper describes acquisition/cohort counts of 256 overall (fMRI 120, MEG 102, iEEG 34), but its quality-controlled main-study samples differ: fMRI 108 (35 optimization, 73 replication), MEG 97 (32 optimization, 65 replication), and iEEG 34 recruited with two excluded for incomplete data. Some iEEG endpoints have further exclusions; a specific identity-RDM analysis reports 29 participants. The current public data catalogue separately lists 118 fMRI, 100 MEG/EEG and 38 iEEG records. These are distinct denominators, not interchangeable sample sizes. Freeze endpoint-level inclusion, QC and optimization/replication membership from participant metadata and the exact supplement before reproducing any result. The study aligned with some commitments and challenged important predictions from both theories. It is a published benchmark and reproduction target, not a blind holdout.
 
 CETB extension: serialize prediction cards, analysis windows, expected distributions, primary outcomes, failure conditions and provenance; compare theory predictions only on outcomes the theories actually committed to before analysis. Reconcile the participant-level dataset-release and paper-analysis denominators before reproducing modality counts.
 
@@ -184,3 +184,10 @@ These are proposed gates, not achieved results:
 - Bajwa et al. (2026), on005620 repeated-awakening EEG dataset, NEMAR DOI: 10.82901/nemar.on005620.
 - Ziemann et al. (2026), clinical utility and translation of TMS–EEG, Clinical Neurophysiology, DOI: 10.1016/j.clinph.2025.2111487.
 - Casali et al. (2013), PCI, Science Translational Medicine, DOI: 10.1126/scitranslmed.3006294.
+
+
+## 12. COGITATE denominator and release correction (2026-11-21)
+
+The machine-readable registry now distinguishes (a) acquisition/cohort counts in the Nature paper, (b) quality-controlled primary-analysis counts, (c) optimization versus replication phase counts, and (d) current public-release counts. Never quote one of these as another. For endpoint-specific iEEG analyses, retain the actual participant flow rather than reusing a modality-wide N.
+
+The current COGITATE release documentation states CC BY 4.0 and provides raw/BIDS bundles, but account registration and agreement to the data terms are required to retrieve them. Freeze the exact bundle DOI/version and terms at intake. A metadata page or public DOI does not prove that the files have been downloaded, checksummed or analyzed.
