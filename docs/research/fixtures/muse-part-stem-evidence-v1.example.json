@@ -1,0 +1,47 @@
+{
+  "schema": "muse-part-stem-evidence-v1",
+  "score_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "midi_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "midi_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "audio_clock": {
+    "origin": "score_zero",
+    "sample_rate_hz": 48000,
+    "channels": 2,
+    "sample_format": "pcm-float32",
+    "bits_per_sample": 32,
+    "frame_count": 576000
+  },
+  "stems": [
+    {
+      "part_id": 0,
+      "segment_id": "part-0-seg-0",
+      "instrument_id": "instrument-0",
+      "midi_track_index": 1,
+      "render_method": "single_track_input",
+      "renderer_id": "fixture-fluid-synth",
+      "renderer_binary_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "patch_id": "fixture-patch-0",
+      "patch_asset_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "render_config_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "track_event_set_sha256": "cc6f1483ec4265053fda03c643a58ba370fa7c128d53338f50a0b4be79b96452",
+      "source_note_ordinals": [0, 1],
+      "wav_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    {
+      "part_id": 1,
+      "segment_id": "part-1-seg-0",
+      "instrument_id": "instrument-1",
+      "midi_track_index": 2,
+      "render_method": "single_track_input",
+      "renderer_id": "fixture-fluid-synth",
+      "renderer_binary_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "patch_id": "fixture-patch-1",
+      "patch_asset_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "render_config_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "track_event_set_sha256": "6b7ffc45604b8e057e2e8c37133d6d42eb8bfc4faafba20fe1da844b06ba8cf1",
+      "source_note_ordinals": [2, 3],
+      "wav_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ],
+  "bundle_sha256": "cf46ca59163af7500b87043c138f655d1ed6f2408a43bde9799ede8155cffa7d"
+}
