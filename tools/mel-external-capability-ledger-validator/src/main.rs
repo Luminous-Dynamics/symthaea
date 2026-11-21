@@ -82,6 +82,7 @@ enum EvidenceKindV1 {
     DocumentedProductCapability,
     DocumentedApiCapability,
     ResearchPrototype,
+    TemporalControlBenchmark,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,6 +93,9 @@ struct MetricV1 {
     unit: String,
     plus_minus: Option<f64>,
     sample_size: Option<u64>,
+    lower_bound: Option<f64>,
+    upper_bound: Option<f64>,
+    confidence_level: Option<f64>,
     scope: String,
 }
 
@@ -259,6 +263,28 @@ fn validate_ledger(ledger: &LedgerV1) -> Result<(), Vec<String>> {
                     observation.observation_id
                 ));
             }
+            if metric.lower_bound.is_some() != metric.upper_bound.is_some() {
+                errors.push(format!(
+                    "observation {} has an incomplete confidence interval",
+                    observation.observation_id
+                ));
+            }
+            if let (Some(lower), Some(upper)) = (metric.lower_bound, metric.upper_bound) {
+                if !lower.is_finite() || !upper.is_finite() || lower > upper {
+                    errors.push(format!(
+                        "observation {} has an invalid confidence interval",
+                        observation.observation_id
+                    ));
+                }
+            }
+            if metric.confidence_level.is_some_and(|level| {
+                !level.is_finite() || !(0.0..1.0).contains(&level)
+            }) {
+                errors.push(format!(
+                    "observation {} has an invalid confidence level",
+                    observation.observation_id
+                ));
+            }
             if metric.unit == "Elo" && !observation.directly_comparable_to_audio_elo {
                 errors.push(format!(
                     "observation {} uses Elo without declaring the native audio-Elo comparison group",
@@ -345,8 +371,8 @@ mod tests {
     fn checked_in_ledger_has_valid_references_and_comparison_groups() {
         let ledger = current_ledger();
         validate_ledger(&ledger).expect("ledger must satisfy semantic validator");
-        assert_eq!(ledger.sources.len(), 9);
-        assert_eq!(ledger.observations.len(), 11);
+        assert_eq!(ledger.sources.len(), 10);
+        assert_eq!(ledger.observations.len(), 16);
     }
 
     #[test]
