@@ -48,6 +48,18 @@ pub struct MomentReport {
     pub normalized_first_velocity_moment: f64,
     /// The same half second moment normalized by velocity_scale^2.
     pub normalized_half_second_velocity_moment: f64,
+    /// Mean velocity for nonnegative measures with positive total mass.
+    ///
+    /// Undefined for signed measures and zero-mass measures.
+    pub mean_velocity: Option<f64>,
+    /// Half second central velocity moment, evaluated directly about mean_velocity.
+    ///
+    /// Defined only for nonnegative measures with positive total mass. It is
+    /// a physical thermal-energy moment only with the appropriate mass/weight
+    /// normalization.
+    pub half_second_central_velocity_moment: Option<f64>,
+    /// The central moment normalized by velocity_scale^2.
+    pub normalized_half_second_central_velocity_moment: Option<f64>,
     /// True total variation after co-located signed coefficients are summed.
     pub total_variation: f64,
     /// Whether every nonzero aggregated atom has a nonnegative coefficient.
@@ -257,12 +269,51 @@ pub fn evaluate_phase_space_moments(
         normalized_second.add(terms[4]);
     }
 
+    let zeroth_moment = zeroth.total();
+    let first_velocity_moment = first.total();
+    let mean_velocity = if is_nonnegative_measure && zeroth_moment > 0.0 {
+        let mean = first_velocity_moment / zeroth_moment;
+        if !mean.is_finite() {
+            return Err(MomentError::MomentOverflow);
+        }
+        Some(mean)
+    } else {
+        None
+    };
+
+    let (half_second_central_velocity_moment, normalized_half_second_central_velocity_moment) =
+        if let Some(mean) = mean_velocity {
+            let mut central = CompensatedSum::default();
+            let mut normalized_central = CompensatedSum::default();
+            for atom in &atoms {
+                let centered_velocity = atom.velocity - mean;
+                let normalized_centered_velocity = centered_velocity / config.velocity_scale;
+                let central_term =
+                    0.5 * atom.weight * centered_velocity * centered_velocity;
+                let normalized_term = 0.5
+                    * atom.weight
+                    * normalized_centered_velocity
+                    * normalized_centered_velocity;
+                if !central_term.is_finite() || !normalized_term.is_finite() {
+                    return Err(MomentError::MomentOverflow);
+                }
+                central.add(central_term);
+                normalized_central.add(normalized_term);
+            }
+            (Some(central.total()), Some(normalized_central.total()))
+        } else {
+            (None, None)
+        };
+
     let report = MomentReport {
-        zeroth_moment: zeroth.total(),
-        first_velocity_moment: first.total(),
+        zeroth_moment,
+        first_velocity_moment,
         half_second_velocity_moment: second.total(),
         normalized_first_velocity_moment: normalized_first.total(),
         normalized_half_second_velocity_moment: normalized_second.total(),
+        mean_velocity,
+        half_second_central_velocity_moment,
+        normalized_half_second_central_velocity_moment,
         total_variation,
         is_nonnegative_measure,
         input_particle_count: particles.len(),
@@ -278,6 +329,13 @@ pub fn evaluate_phase_space_moments(
     ]
     .iter()
     .any(|value| !value.is_finite())
+        || report.mean_velocity.is_some_and(|value| !value.is_finite())
+        || report
+            .half_second_central_velocity_moment
+            .is_some_and(|value| !value.is_finite())
+        || report
+            .normalized_half_second_central_velocity_moment
+            .is_some_and(|value| !value.is_finite())
     {
         return Err(MomentError::MomentOverflow);
     }
@@ -320,6 +378,19 @@ mod tests {
         assert_near(report.half_second_velocity_moment, 2.0, 1.0e-14);
         assert_near(report.normalized_first_velocity_moment, 0.5, 1.0e-14);
         assert_near(report.normalized_half_second_velocity_moment, 0.5, 1.0e-14);
+        assert_near(report.mean_velocity.unwrap(), 1.0, 1.0e-14);
+        assert_near(
+            report.half_second_central_velocity_moment.unwrap(),
+            1.5,
+            1.0e-14,
+        );
+        assert_near(
+            report
+                .normalized_half_second_central_velocity_moment
+                .unwrap(),
+            0.375,
+            1.0e-14,
+        );
         assert!(report.is_nonnegative_measure);
         assert_near(report.total_variation, 1.0, 1.0e-14);
     }
@@ -369,6 +440,12 @@ mod tests {
         assert_near(report.first_velocity_moment, -0.125, 1.0e-14);
         assert_near(report.half_second_velocity_moment, 0.03125, 1.0e-14);
         assert_near(report.total_variation, 0.25, 1.0e-14);
+        assert_near(report.mean_velocity.unwrap(), -0.5, 1.0e-14);
+        assert_near(
+            report.half_second_central_velocity_moment.unwrap(),
+            0.0,
+            1.0e-14,
+        );
         assert!(report.is_nonnegative_measure);
         assert_eq!(report.unique_atom_count, 1);
     }
@@ -380,6 +457,11 @@ mod tests {
         assert_near(report.zeroth_moment, 0.5, 1.0e-14);
         assert_near(report.first_velocity_moment, -2.0, 1.0e-14);
         assert_near(report.half_second_velocity_moment, -0.5, 1.0e-14);
+        assert!(report.mean_velocity.is_none());
+        assert!(report.half_second_central_velocity_moment.is_none());
+        assert!(report
+            .normalized_half_second_central_velocity_moment
+            .is_none());
         assert!(!report.is_nonnegative_measure);
         assert_near(report.total_variation, 1.5, 1.0e-14);
     }
@@ -436,6 +518,8 @@ mod tests {
         let empty = evaluate_phase_space_moments(&[], config()).unwrap();
         assert_eq!(empty.zeroth_moment, 0.0);
         assert_eq!(empty.total_variation, 0.0);
+        assert!(empty.mean_velocity.is_none());
+        assert!(empty.half_second_central_velocity_moment.is_none());
         assert!(empty.is_nonnegative_measure);
         assert_eq!(empty.unique_atom_count, 0);
 
