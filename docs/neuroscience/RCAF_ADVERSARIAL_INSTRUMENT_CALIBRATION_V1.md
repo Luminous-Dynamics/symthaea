@@ -114,6 +114,23 @@ Report each dimension independently. Do not collapse them into a single quality,
 
 For a nominal 5% test, a proposed engineering target is an empirical Type-I rate within 0.01 of nominal across the predeclared primary null cells, with Monte-Carlo uncertainty reported. This is a calibration target, not a universal scientific standard. Power should be assessed at a prospectively defined minimally meaningful effect; 80% or 90% may be adopted as a design target only when justified by the intended inference and error costs. A high-power cell cannot compensate for a failed nuisance-only null.
 
+### Qualification envelope, not a universal score
+
+The final product should be a **claim-scoped qualification envelope** over the conditions in which a measurement method has actually been tested. For each constructor/comparator pair and declared construct, record:
+
+- modality, acquisition and preprocessing versions;
+- participant count, usable duration, segment length and temporal dependence;
+- SNR, missingness mechanism/rate, nuisance family and site/device;
+- responder fraction, direction and smallest meaningful effect;
+- Type-I calibration, directional power, uncertainty coverage and bias;
+- transportability tier and evidence receipt.
+
+Each envelope cell is marked `qualified`, `failed`, `not tested` or `out of domain`. Do not promote a neighbouring untested cell by visual interpolation. A method-selection policy may choose among estimators only inside the qualified region; outside it, CETB should abstain and explain why. Benchmark both unsafe acceptance of unqualified conditions and false abstention on qualified conditions.
+
+This creates an instrument passport rather than a leaderboard score: researchers can see exactly what a method is trusted to measure, at what resolution and under which acquisition conditions.
+
+For prospective design, expected information gain should also be stress-tested against plausible nuisance priors and acquisition constraints. Freeze predictive distributions before data collection, score them on untouched outcomes with proper predictive scores (for example, log score or Brier score where applicable), and report sensitivity to the prior over nuisance conditions. A high nominal EIG is not valuable if it disappears under modest, defensible nuisance assumptions.
+
 **Direction-of-effect audit:** the current `research/rcaf/src/simulation.rs::run_injection_recovery` increments `injection_detection_power` whenever the *two-sided* exact sign-test p-value is below alpha; it does not require the expected positive paired gap for the declared positive module-loading injection. A significant negative gap could therefore be counted as a successful detection. Until the kernel records expected-direction power and wrong-direction rejection separately, interpret the current field as two-sided difference-detection, not directional recovery. The adversarial plan requires both new outputs.
 
 ## 6. Statistical safeguards
