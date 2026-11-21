@@ -560,6 +560,44 @@
         {
           "if": {
             "properties": {
+              "stage": {
+                "const": "ingestion"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expected_action": {
+                "$ref": "#/$defs/ingestion_action"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "query"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expected_action": {
+                "$ref": "#/$defs/query_action"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
               "expected_action": {
                 "const": "persist"
               }
