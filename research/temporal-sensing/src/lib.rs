@@ -746,6 +746,30 @@ mod tests {
     }
 
     #[test]
+    fn risk_adjusted_voi_diagnostics_expose_each_fixed_point_component() {
+        let mut current = features();
+        current.predicted_ted_reduction_us = 100;
+        current.opportunity_loss_stddev_us = 2_000;
+        current.model_confidence_ppm = 500_000;
+        current.prediction_horizon_us = 10_000;
+
+        let diagnostics =
+            risk_adjusted_voi_diagnostics(current, 50, 250_000, 200_000).unwrap();
+        assert_eq!(diagnostics.expected_ted_reduction_us, 100);
+        assert_eq!(diagnostics.risk_premium_us, 500);
+        assert_eq!(diagnostics.ignorance_exposure_us, 5_000);
+        assert_eq!(diagnostics.ignorance_penalty_us, 1_000);
+        assert_eq!(diagnostics.adjusted_benefit_us, 1_600);
+        assert_eq!(diagnostics.estimated_observation_energy_nj, 50);
+        assert_eq!(diagnostics.adjusted_value_per_nj_ppm, 32_000_000);
+
+        assert_eq!(
+            risk_adjusted_voi_diagnostics(current, 0, 0, 0),
+            Err(SensingError::ZeroObservationEnergy)
+        );
+    }
+
+    #[test]
     fn fully_confident_model_has_no_ignorance_surcharge() {
         let mut current = features();
         current.predicted_ted_reduction_us = 100;
