@@ -716,6 +716,7 @@ impl MycelialJunctionHyphaGraph {
                 && junction.position.y.abs() <= MAX_GRAPH_COORDINATE
                 && junction.position.z.abs() <= MAX_GRAPH_COORDINATE;
             if junction.id.is_empty()
+                || junction.incident_filament_ids.is_empty()
                 || junction.id.len() > MAX_GRAPH_ID_BYTES
                 || junction.id.chars().any(char::is_control)
                 || !bounded_position
@@ -1606,6 +1607,68 @@ mod tests {
         )
         .unwrap();
         assert_ne!(first.source_model_digest, third.source_model_digest);
+    }
+
+    #[test]
+    fn bezier_arc_length_matches_an_independent_high_resolution_chord_oracle() {
+        let curve = filament(
+            99,
+            None,
+            true,
+            SpatialPoint3 { x: -1.0, y: 0.0, z: 0.0 },
+            SpatialPoint3 { x: 2.0, y: 7.0, z: 1.0 },
+            SpatialPoint3 { x: -3.0, y: -4.0, z: 2.0 },
+            SpatialPoint3 { x: 4.0, y: 2.0, z: -1.0 },
+        );
+        let estimated = bezier_arc_length(&curve, 0.0, 1.0);
+        let point_at = |t: f64| {
+            let u = 1.0 - t;
+            let coordinates = [
+                (curve.start.x, curve.control_a.x, curve.control_b.x, curve.end.x),
+                (curve.start.y, curve.control_a.y, curve.control_b.y, curve.end.y),
+                (curve.start.z, curve.control_a.z, curve.control_b.z, curve.end.z),
+            ];
+            let mut point = [0.0f64; 3];
+            for (index, (p0, p1, p2, p3)) in coordinates.into_iter().enumerate() {
+                point[index] = u.powi(3) * f64::from(p0)
+                    + 3.0 * u.powi(2) * t * f64::from(p1)
+                    + 3.0 * u * t.powi(2) * f64::from(p2)
+                    + t.powi(3) * f64::from(p3);
+            }
+            point
+        };
+        let subdivisions = 100_000usize;
+        let mut previous = point_at(0.0);
+        let mut reference = 0.0f64;
+        for index in 1..=subdivisions {
+            let current = point_at(index as f64 / subdivisions as f64);
+            let squared_distance = (0..3)
+                .map(|axis| (current[axis] - previous[axis]).powi(2))
+                .sum::<f64>();
+            reference += squared_distance.sqrt();
+            previous = current;
+        }
+        let relative_error = (estimated - reference).abs() / reference;
+        assert!(
+            relative_error <= 2.0e-6,
+            "composite Simpson arc-length error {relative_error:e}; estimated={estimated}, reference={reference}"
+        );
+    }
+
+    #[test]
+    fn serialized_graph_roundtrip_preserves_digest_and_validity() {
+        let model = fixture_model();
+        let graph = build_mycelial_junction_hypha_graph(
+            &model,
+            &[accepted_tip_to_side()],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        let digest = graph.canonical_digest_hex().unwrap();
+        let bytes = serde_json::to_vec(&graph).unwrap();
+        let restored: MycelialJunctionHyphaGraph = serde_json::from_slice(&bytes).unwrap();
+        restored.validate().unwrap();
+        assert_eq!(restored.canonical_digest_hex().unwrap(), digest);
     }
 
     #[test]
