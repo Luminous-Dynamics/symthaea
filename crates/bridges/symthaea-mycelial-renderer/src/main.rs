@@ -94,7 +94,7 @@ fn setup_presence(
         Camera3d::default(),
         Tonemapping::TonyMcMapface,
         Bloom::NATURAL,
-        Transform::from_xyz(6.4, 4.4, 8.6).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(13.0, 9.0, 19.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
     commands.spawn((
         DirectionalLight {
