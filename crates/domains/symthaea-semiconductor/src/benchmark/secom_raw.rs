@@ -404,8 +404,7 @@ mod tests {
     fn rejects_unknown_target_label() {
         let labels = b"0 \"19/07/2008 11:55:00\"\n1 \"19/07/2008 12:00:00\"\n";
         let mut expected = expectations();
-        expected.expected_label_sha256 =
-            format!("{:x}", Sha256::digest(labels));
+        expected.expected_label_sha256 = format!("{:x}", Sha256::digest(labels));
         assert!(
             audit_secom_raw_v1(FEATURES, labels, &expected)
                 .unwrap_err()
