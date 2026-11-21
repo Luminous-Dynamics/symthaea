@@ -231,3 +231,24 @@ Do not claim a higher gamma-rejection figure based on a simulated gate. Instead,
 
 The source archive is a 14.7 GB file whose internal manifest remains uninspected, and the article's DOI citation differs from the title-matched visible Zenodo v2 record. No raw-waveform reproduction or exact detector-chain replay should be claimed until that discrepancy is resolved and source artifacts are ingested.
 
+
+
+## 9. New statistical and spatiotemporal SOTA benchmarks
+
+Add two benchmark families before claiming a new model is better than the published homogeneous/phenomenological fits.
+
+### Shared-reference and correlated uncertainty benchmark
+- Generate counts with one shared 6.5-keV reference denominator and correlated beam-charge/loading/systematic perturbations.
+- Compare diagonal weighted log-space fitting against generalized least squares with the full covariance.
+- Measure parameter bias, confidence-interval coverage, false model preference and residual calibration.
+- The diagonal implementation must be retained as a source-faithful baseline; covariance-aware inference is an additional benchmark until the original analysis treatment is inspected.
+- Target: nominal 90% and 95% intervals should achieve their nominal coverage within Monte Carlo uncertainty on blinded synthetic data.
+
+### Spatial-beam/material-state benchmark
+- Generate counterfactual cases with identical integrated charge but different 2-D spot profiles, same beam spot but different depth profiles, and different D+/D2+ spectra.
+- Compare bulk-average, 1-D depth-only and space-time target-state models at equal input information/compute budget.
+- Hold out complete spot profiles, irradiation campaigns and material states.
+- Metrics: held-out log predictive score, calibration, yield residual structure, mass-balance residual, spatial profile reconstruction, and runtime.
+- Target: the richer model earns credit only when its additional measured state variables improve held-out prediction; complexity alone is not a win.
+
+These benchmarks are proposed research targets, not demonstrated SOTA advantages.
