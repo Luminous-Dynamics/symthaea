@@ -25,7 +25,8 @@ x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 getrandom = "0.2"
 hex = { version = "0.4", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
-# positioning = { path = "../../../../mycelix-workspace/mycelix-position/lib/positioning", optional = true }
+# Pin the standalone facade that compiles Mycelix's canonical Position source tree.
+positioning = { package = "mycelix-positioning-v2", git = "https://github.com/Luminous-Dynamics/mycelix", rev = "9bd90984e57cee2a6c239f3809d68024db648928", optional = true }
 # mycelix-prism-common = { path = "../../../../mycelix-workspace/mycelix-prism/prism-common", optional = true }
 # prism-search = { path = "../../../../mycelix-workspace/mycelix-prism/prism-search", optional = true }
 tracing = { workspace = true }
@@ -51,7 +52,7 @@ litert = []
 # Broca + LiteRT fusion engine (consciousness skeleton + factual expansion).
 fusion = ["litert", "broca-full"]
 # Decentralized cooperative positioning (GPS-independent).
-positioning = []
+positioning = ["dep:positioning"]
 # Property/invariant tests that target unstable or evolving APIs.
 prop-tests = []
 
