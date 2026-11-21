@@ -59,3 +59,17 @@ For each joint frequency, both measures are evaluated with the same feature draw
 The Hoeffding interval applies only to random spectral-feature approximation error in normalized squared MMD. It is not a confidence interval for the physical solver, finite-particle Monte Carlo error, or a statistical two-sample test. The seed and feature count must be frozen and recorded in the benchmark identity. Compare feature-count sweeps and multiple independent seeds against the exact small-N oracle; do not select the seed or feature count after observing held-out physics results.
 
 This path uses O(N log N + M log M) canonicalization and O(D(U+V)) feature evaluation. It is designed for monitoring and large-particle approximation, while the direct quadratic oracle remains the small-N reference.
+
+
+## Anytime-valid adaptive feature budget
+
+The crate exposes compare_phase_space_measures_spectral_adaptive for checkpointed adaptive feature acquisition. It inspects only a preregistered geometric schedule (initial D, 2D, 4D, ...), spending alpha_t = alpha/(t(t+1)) at checkpoint t. Since the spending series sums to alpha, the union bound gives simultaneous coverage across all inspected looks. Each checkpoint uses the bounded [0,4] squared-feature sample and a look-specific Hoeffding radius.
+
+The decision is made against a preregistered tolerance on normalized squared MMD:
+- WithinTolerance: the complete interval lies at or below tolerance.
+- AboveTolerance: the complete interval lies above tolerance.
+- UnresolvedBudgetExhausted: the interval still overlaps at the maximum feature budget. This is an abstention/escalation result, never an acceptance.
+
+The controller consumes one continuous seeded feature stream; it does not reseed between checkpoints. The same seed and final feature count reproduce the corresponding fixed-D prefix. The checkpoint transcript records feature counts, alpha allocations, cumulative alpha spending, estimate and interval.
+
+This is a simultaneous guarantee only over the declared checkpoint schedule, not every possible intermediate feature count. The bound assumes independent draws from the exact spectral measure; the deterministic SplitMix64 stream provides reproducibility but is not a cryptographic RNG or a formal proof of pseudorandom independence. The confidence statement concerns only random-feature integration error in normalized squared MMD—not physical solver, particle sampling or trajectory error.
