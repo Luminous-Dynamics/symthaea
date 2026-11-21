@@ -364,6 +364,13 @@ pub(super) fn derive_as_known(
     verified_sources: &VerifiedSourceRegistry,
     verified_consolidations: &VerifiedConsolidationRegistry,
 ) -> Result<IngestReport, String> {
+    // Canonical ingress and receipt APIs use signed millisecond timestamps.
+    // Reject values outside that domain before any cast or receipt comparison.
+    let valid_at_i64 = i64::try_from(valid_at_ms)
+        .map_err(|_| "valid_at_ms exceeds the supported signed range".to_owned())?;
+    let known_at_i64 = i64::try_from(known_at_ms)
+        .map_err(|_| "known_at_ms exceeds the supported signed range".to_owned())?;
+
     let events = parse_jsonl(input)?;
     let retracted_ids = apply_corrections(&events, valid_at_ms, known_at_ms)?;
     let visible: Vec<&RawEvent> = events
@@ -1079,6 +1086,63 @@ mod tests {
             &source_registry(),
             consolidations,
         )
+    }
+
+    #[test]
+    fn query_timestamps_above_i64_max_fail_closed_without_wrapping() {
+        let raw = jsonl(observation_events());
+        let overflow = u64::try_from(i64::MAX).expect("i64::MAX is nonnegative") + 1;
+        let actions = VerifiedActionRegistry::new();
+        let outcomes = VerifiedOutcomeRegistry::new();
+        let sources = VerifiedSourceRegistry::new();
+        let consolidations = VerifiedConsolidationRegistry::new();
+
+        let valid_time_error = derive_as_known(
+            &raw,
+            overflow,
+            100,
+            &actions,
+            &outcomes,
+            &sources,
+            &consolidations,
+        )
+        .expect_err("out-of-range valid time must be rejected");
+        assert!(valid_time_error.contains("valid_at_ms"));
+
+        let knowledge_time_error = derive_as_known(
+            &raw,
+            100,
+            overflow,
+            &actions,
+            &outcomes,
+            &sources,
+            &consolidations,
+        )
+        .expect_err("out-of-range knowledge time must be rejected");
+        assert!(knowledge_time_error.contains("known_at_ms"));
+    }
+
+    #[test]
+    fn maximum_supported_signed_query_timestamps_remain_valid() {
+        let raw = jsonl(observation_events());
+        let maximum = u64::try_from(i64::MAX).expect("i64::MAX is nonnegative");
+        let actions = VerifiedActionRegistry::new();
+        let outcomes = VerifiedOutcomeRegistry::new();
+        let sources = VerifiedSourceRegistry::new();
+        let consolidations = VerifiedConsolidationRegistry::new();
+
+        let report = derive_as_known(
+            &raw,
+            maximum,
+            maximum,
+            &actions,
+            &outcomes,
+            &sources,
+            &consolidations,
+        )
+        .expect("the maximum supported signed millisecond timestamp is valid");
+        assert_eq!(report.raw_event_count, 12);
+        assert!(report.experiences.is_empty());
     }
 
     #[test]
