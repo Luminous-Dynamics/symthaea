@@ -147,7 +147,11 @@
         "event_count",
         "target_per_seed_accuracy",
         "target_seed_reliability",
-        "confidence_level",
+        "familywise_confidence_level",
+        "per_level_alpha",
+        "tested_level_count",
+        "multiplicity_correction",
+        "minimum_seeds_if_all_pass",
         "tested_fan_in_levels",
         "common_seed_count",
         "paired_seed_sets",
@@ -201,9 +205,6 @@
         "target_seed_reliability": {
           "const": 0.95
         },
-        "confidence_level": {
-          "const": 0.95
-        },
         "tested_fan_in_levels": {
           "type": "array",
           "minItems": 1,
@@ -232,6 +233,27 @@
         "interpretation": {
           "type": "string",
           "minLength": 1
+        },
+        "familywise_confidence_level": {
+          "type": "number",
+          "const": 0.95
+        },
+        "per_level_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.05
+        },
+        "tested_level_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "multiplicity_correction": {
+          "type": "string",
+          "const": "Bonferroni within fixed family"
+        },
+        "minimum_seeds_if_all_pass": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -250,7 +272,11 @@
         "event_count",
         "target_per_seed_accuracy",
         "target_seed_reliability",
-        "confidence_level",
+        "familywise_confidence_level",
+        "per_level_alpha",
+        "tested_level_count",
+        "multiplicity_correction",
+        "minimum_seeds_if_all_pass",
         "tested_horizon_seconds",
         "common_seed_count",
         "paired_seed_sets",
@@ -300,9 +326,6 @@
         "target_seed_reliability": {
           "const": 0.95
         },
-        "confidence_level": {
-          "const": 0.95
-        },
         "tested_horizon_seconds": {
           "type": "array",
           "minItems": 1,
@@ -331,6 +354,27 @@
         "interpretation": {
           "type": "string",
           "minLength": 1
+        },
+        "familywise_confidence_level": {
+          "type": "number",
+          "const": 0.95
+        },
+        "per_level_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.05
+        },
+        "tested_level_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "multiplicity_correction": {
+          "type": "string",
+          "const": "Bonferroni within fixed family"
+        },
+        "minimum_seeds_if_all_pass": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }
