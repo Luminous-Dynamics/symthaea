@@ -390,7 +390,6 @@ pub fn compare_phase_space_measures_mmd(
     })
 }
 
-
 /// Configuration for the linear-cost spectral MMD approximation.
 ///
 /// The seed and feature count are part of the benchmark identity. A run with
@@ -476,9 +475,7 @@ fn log_factorial(k: u64) -> f64 {
     let x = k as f64;
     let inverse = 1.0 / x;
     let inverse_squared = inverse * inverse;
-    (x + 0.5) * x.ln() - x
-        + 0.918_938_533_204_672_7
-        + inverse / 12.0
+    (x + 0.5) * x.ln() - x + 0.918_938_533_204_672_7 + inverse / 12.0
         - inverse * inverse_squared / 360.0
         + inverse * inverse_squared * inverse_squared / 1260.0
         - inverse * inverse_squared * inverse_squared * inverse_squared / 1680.0
@@ -544,16 +541,12 @@ fn sample_poisson(lambda: f64, rng: &mut SplitMix64) -> Result<u64, MmdError> {
 /// Draw from the normalized Fourier spectrum of the periodic von Mises
 /// factor. Its coefficient at integer n is exp(-kappa) I_|n|(kappa), exactly
 /// the Skellam(lambda=kappa/2, lambda=kappa/2) probability mass.
-fn sample_spatial_harmonic(
-    concentration: f64,
-    rng: &mut SplitMix64,
-) -> Result<i64, MmdError> {
+fn sample_spatial_harmonic(concentration: f64, rng: &mut SplitMix64) -> Result<i64, MmdError> {
     let lambda = concentration * 0.5;
     let left = sample_poisson(lambda, rng)?;
     let right = sample_poisson(lambda, rng)?;
     let difference = i128::from(left) - i128::from(right);
-    i64::try_from(difference)
-        .map_err(|_| MmdError::UnsupportedSpatialConcentrationForSampling)
+    i64::try_from(difference).map_err(|_| MmdError::UnsupportedSpatialConcentrationForSampling)
 }
 
 fn sample_spectral_feature(
@@ -572,11 +565,7 @@ fn sample_spectral_feature(
 }
 
 /// Evaluate one complex Fourier feature for a canonical weighted atom.
-fn feature_value(
-    atom: WeightedAtom,
-    feature: SpectralFeature,
-    config: MmdConfig,
-) -> (f64, f64) {
+fn feature_value(atom: WeightedAtom, feature: SpectralFeature, config: MmdConfig) -> (f64, f64) {
     let spatial_phase = std::f64::consts::TAU
         * feature.spatial_harmonic as f64
         * (atom.position / config.domain_length);
@@ -644,13 +633,10 @@ pub fn compare_phase_space_measures_spectral(
         }
 
         let real_difference = candidate_real.total() - reference_real.total();
-        let imaginary_difference =
-            candidate_imaginary.total() - reference_imaginary.total();
+        let imaginary_difference = candidate_imaginary.total() - reference_imaginary.total();
         let squared_difference =
             real_difference * real_difference + imaginary_difference * imaginary_difference;
-        if !squared_difference.is_finite()
-            || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference)
-        {
+        if !squared_difference.is_finite() || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference) {
             return Err(MmdError::NonFiniteOutput);
         }
 
@@ -1060,14 +1046,8 @@ mod tests {
 
     #[test]
     fn spectral_estimator_preserves_permutation_and_signed_split_invariance() {
-        let candidate = [
-            particle(1.0, 0.25, 0.5),
-            particle(6.0, -0.5, 0.5),
-        ];
-        let permutation = [
-            particle(6.0, -0.5, 0.5),
-            particle(1.0, 0.25, 0.5),
-        ];
+        let candidate = [particle(1.0, 0.25, 0.5), particle(6.0, -0.5, 0.5)];
+        let permutation = [particle(6.0, -0.5, 0.5), particle(1.0, 0.25, 0.5)];
         let signed_split = [
             particle(1.0, 0.25, 0.75),
             particle(1.0, 0.25, -0.25),
@@ -1078,20 +1058,12 @@ mod tests {
             feature_count: 1024,
             seed: 12345,
         };
-        let permuted = compare_phase_space_measures_spectral(
-            &candidate,
-            &permutation,
-            config(),
-            features,
-        )
-        .unwrap();
-        let split = compare_phase_space_measures_spectral(
-            &candidate,
-            &signed_split,
-            config(),
-            features,
-        )
-        .unwrap();
+        let permuted =
+            compare_phase_space_measures_spectral(&candidate, &permutation, config(), features)
+                .unwrap();
+        let split =
+            compare_phase_space_measures_spectral(&candidate, &signed_split, config(), features)
+                .unwrap();
         assert!(permuted.normalized_mmd <= 1.0e-12);
         assert!(split.normalized_mmd <= 1.0e-12);
         assert_eq!(split.reference_atom_count, 2);
@@ -1179,8 +1151,7 @@ mod tests {
         let mut sum = 0.0;
         let mut sum_squared = 0.0;
         for _ in 0..samples {
-            let harmonic =
-                sample_spatial_harmonic(concentration, &mut rng).unwrap() as f64;
+            let harmonic = sample_spatial_harmonic(concentration, &mut rng).unwrap() as f64;
             sum += harmonic;
             sum_squared += harmonic * harmonic;
         }
@@ -1209,6 +1180,5 @@ mod tests {
         assert_eq!(result.normalized_mmd, 0.0);
         assert_eq!(result.particle_feature_evaluations, 0);
     }
-
 
 }
