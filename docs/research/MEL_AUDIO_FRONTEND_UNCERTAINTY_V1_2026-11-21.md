@@ -56,3 +56,6 @@ This is an evidence-contract layer. It does not itself run pitch tracking, onset
 ## Qualification boundary
 
 A passing test suite establishes the evidence type and validator behavior on deterministic fixtures only. It does not establish pitch/onset/chroma/beat estimation accuracy, human musicality, or improved MUSE benchmark scores.
+
+
+**Integration note:** the validator is designed to attach to the paired perception case by exact `audio_input_sha256`; this preserves a single content-addressed source between front-end extraction evidence and the modality-comparison report.
