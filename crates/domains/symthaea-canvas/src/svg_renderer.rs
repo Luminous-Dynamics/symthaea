@@ -515,6 +515,43 @@ mod tests {
         assert!(svg.contains("prefers-reduced-motion"));
     }
 
+
+    #[test]
+    fn hyphae_and_staggered_spores_animate_but_respect_reduced_motion() {
+        let hyphae = SceneNode::group(Some("hyphae"));
+        let spore = SceneNode::circle(12.0, 14.0, 2.0).with_style(Style {
+            css_class: Some("spore-phase-2".to_string()),
+            ..Style::default()
+        });
+        let starfield = SceneNode::group(Some("starfield")).with_child(spore);
+        let root = SceneNode::group(None)
+            .with_child(hyphae)
+            .with_child(starfield);
+
+        let full = render_svg_with_options(
+            &root,
+            0.5,
+            SvgRenderOptions::default(),
+        );
+        assert!(full.contains("@keyframes hyphae-pulse"));
+        assert!(full.contains("@keyframes star-twinkle"));
+        assert!(full.contains(".spore-phase-2"));
+        assert!(full.contains("#hyphae"));
+
+        let reduced = render_svg_with_options(
+            &root,
+            0.5,
+            SvgRenderOptions {
+                motion: MotionPreference::Reduced,
+                ..SvgRenderOptions::default()
+            },
+        );
+        assert!(!reduced.contains("@keyframes"));
+        assert!(reduced.contains("#hyphae"));
+        assert!(reduced.contains("#starfield > circle"));
+        assert!(reduced.contains("animation: none"));
+    }
+
     #[test]
     fn reduced_motion_disables_animation() {
         let root = SceneNode::group(Some("root"));
