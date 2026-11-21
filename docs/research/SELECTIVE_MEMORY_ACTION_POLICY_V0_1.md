@@ -69,6 +69,10 @@ subject to hard constraints that remove unauthorized or inadmissible actions bef
 
 The implementation must record the cost-model version and probability/calibration profile used for the choice. Cost weights must be frozen before the held-out run and accompanied by sensitivity analysis. A low average cost cannot compensate for a hard privacy, authority or invalid-evidence violation.
 
+Compose with [#9561 — counterfactual calibration of temporal memory value](https://github.com/Luminous-Dynamics/symthaea/issues/9561) and [#9666 — joint allocation of sensing, memory, compute and verification](https://github.com/Luminous-Dynamics/symthaea/issues/9666). The value estimator owns prediction of future decision benefit; the joint allocator owns component-wise hard resource feasibility. This selector consumes their outputs; it must not train a second memory-value model or replace the allocator.
+
+Hard, non-fungible resource limits (bytes, CPU/GPU time, tool calls, sensor budget, deadlines and verification work) must be checked component by component before expected-loss ranking. They must never be collapsed into a single scalar cost and then traded against a safety or feasibility failure. The Rust reference therefore requires a separate `resource_feasible` result for each action option, in addition to its scalar priced operational/delay costs. That feasibility result must be backed by a versioned resource-budget profile and source-bound receipt; model confidence or self-report is not sufficient.
+
 ### Why the two clocks matter
 
 The policy must track both:
