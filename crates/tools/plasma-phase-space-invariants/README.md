@@ -23,6 +23,8 @@ trajectory-acceptance certificate. It does not compute field energy, Gauss-law
 or charge-continuity residuals, entropy, Casimirs, or time-integration error.
 Those must be added in equation- and discretization-specific layers.
 
+The frozen definitions and known-answer/metamorphic fixtures are recorded in `benchmarks/plasma/phase-space-invariants-v0.1.json`. Its status is explicitly reference-only and it does not assign solver-acceptance tolerances.
+
 ## Validation
 
 Run with Rust 1.96:
