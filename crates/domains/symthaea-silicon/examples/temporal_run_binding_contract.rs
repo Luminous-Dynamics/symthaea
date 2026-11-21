@@ -356,7 +356,7 @@ fn join_receipts(
     let elapsed_horizon_ns = logical_horizon_end_ns
         .checked_sub(identity.logical_time_origin_ns)
         .ok_or(BindingError::LogicalHorizonOutOfRange)?;
-    if logical_duration_ns == 0 || elapsed_horizon_ns > logical_duration_ns {
+    if logical_duration_ns == 0 || elapsed_horizon_ns == 0 || elapsed_horizon_ns > logical_duration_ns {
         return Err(BindingError::LogicalHorizonOutOfRange);
     }
 
@@ -700,6 +700,17 @@ mod tests {
         let joined = join_receipts("run-origin-valid", &id, &work, &freshness, None).unwrap();
         assert_eq!(joined.logical_time_origin_ns, 500);
         assert_eq!(joined.logical_horizon_end_ns - joined.logical_time_origin_ns, 1_000);
+    }
+
+    #[test]
+    fn rejects_empty_elapsed_evaluation_horizon() {
+        let id = identity();
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let mut value: Value = serde_json::from_slice(&freshness).unwrap();
+        value["logical_horizon_end_ns"] = Value::from(id.logical_time_origin_ns);
+        let modified = serde_json::to_vec(&value).unwrap();
+        let error = join_receipts("run-empty-horizon", &id, &work, &modified, None).unwrap_err();
+        assert_eq!(error, BindingError::LogicalHorizonOutOfRange);
     }
 
     #[test]
