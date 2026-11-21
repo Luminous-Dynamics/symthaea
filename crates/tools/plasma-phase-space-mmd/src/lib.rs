@@ -70,13 +70,27 @@ pub enum MmdError {
     InvalidDomainLength,
     InvalidSpatialConcentration,
     InvalidVelocityLengthScale,
-    NonFinitePosition { measure: &'static str, particle: usize },
-    NonFiniteVelocity { measure: &'static str, particle: usize },
-    NonFiniteWeight { measure: &'static str, particle: usize },
-    TotalVariationOverflow { measure: &'static str },
+    NonFinitePosition {
+        measure: &'static str,
+        particle: usize,
+    },
+    NonFiniteVelocity {
+        measure: &'static str,
+        particle: usize,
+    },
+    NonFiniteWeight {
+        measure: &'static str,
+        particle: usize,
+    },
+    TotalVariationOverflow {
+        measure: &'static str,
+    },
     PairCountOverflow,
     NonFiniteOutput,
-    MateriallyNegativeMmdSquared { value: f64, tolerance: f64 },
+    MateriallyNegativeMmdSquared {
+        value: f64,
+        tolerance: f64,
+    },
 }
 
 impl fmt::Display for MmdError {
@@ -408,10 +422,8 @@ mod tests {
                 let mut real = CompensatedSum::default();
                 let mut imaginary = CompensatedSum::default();
                 for item in particles {
-                    let phase = std::f64::consts::TAU
-                        * f64::from(*mode)
-                        * item.position
-                        / domain_length;
+                    let phase =
+                        std::f64::consts::TAU * f64::from(*mode) * item.position / domain_length;
                     real.add(item.weight * phase.cos());
                     imaginary.add(item.weight * phase.sin());
                 }
@@ -461,10 +473,7 @@ mod tests {
     #[test]
     fn signed_co_located_cancellation_uses_measure_total_variation() {
         let candidate = [particle(1.0, 0.0, 0.25)];
-        let reference = [
-            particle(1.0, 0.0, 0.50),
-            particle(1.0, 0.0, -0.25),
-        ];
+        let reference = [particle(1.0, 0.0, 0.50), particle(1.0, 0.0, -0.25)];
         let result = compare_phase_space_measures_mmd(&candidate, &reference, config()).unwrap();
         assert_mmd_zero(result);
         assert_eq!(result.total_variation_scale, 0.25);
@@ -541,8 +550,7 @@ mod tests {
         let scaled_candidate = [particle(1.0, 0.0, 50.0), particle(5.0, 1.0, 50.0)];
         let scaled_reference = [particle(1.0, 0.0, 40.0), particle(5.0, 1.0, 60.0)];
 
-        let original =
-            compare_phase_space_measures_mmd(&candidate, &reference, config()).unwrap();
+        let original = compare_phase_space_measures_mmd(&candidate, &reference, config()).unwrap();
         let scaled =
             compare_phase_space_measures_mmd(&scaled_candidate, &scaled_reference, config())
                 .unwrap();
@@ -584,13 +592,22 @@ mod tests {
     fn kernel_is_symmetric_and_periodic_on_known_points() {
         let left = particle(0.75, -0.2, 1.0);
         let right = particle(3.25, 1.7, 1.0);
-        let left_atom = WeightedAtom { position: left.position, velocity: left.velocity, weight: 1.0 };
-        let right_atom = WeightedAtom { position: right.position, velocity: right.velocity, weight: 1.0 };
+        let left_atom = WeightedAtom {
+            position: left.position,
+            velocity: left.velocity,
+            weight: 1.0,
+        };
+        let right_atom = WeightedAtom {
+            position: right.position,
+            velocity: right.velocity,
+            weight: 1.0,
+        };
         let forward = kernel(left_atom, right_atom, config());
         let reverse = kernel(right_atom, left_atom, config());
         let shifted = kernel(
             WeightedAtom {
-                position: (left.position + 2.0 * config().domain_length).rem_euclid(config().domain_length),
+                position: (left.position + 2.0 * config().domain_length)
+                    .rem_euclid(config().domain_length),
                 velocity: left.velocity,
                 weight: 1.0,
             },
@@ -631,31 +648,39 @@ mod tests {
         let invalid = [particle(f64::NAN, 0.0, 1.0)];
         assert!(matches!(
             compare_phase_space_measures_mmd(&invalid, &[], config()),
-            Err(MmdError::NonFinitePosition { measure: "candidate", particle: 0 })
+            Err(MmdError::NonFinitePosition {
+                measure: "candidate",
+                particle: 0
+            })
         ));
 
         let invalid = [particle(0.0, f64::INFINITY, 1.0)];
         assert!(matches!(
             compare_phase_space_measures_mmd(&[], &invalid, config()),
-            Err(MmdError::NonFiniteVelocity { measure: "reference", particle: 0 })
+            Err(MmdError::NonFiniteVelocity {
+                measure: "reference",
+                particle: 0
+            })
         ));
 
         let invalid = [particle(0.0, 0.0, f64::NAN)];
         assert!(matches!(
             compare_phase_space_measures_mmd(&invalid, &[], config()),
-            Err(MmdError::NonFiniteWeight { measure: "candidate", particle: 0 })
+            Err(MmdError::NonFiniteWeight {
+                measure: "candidate",
+                particle: 0
+            })
         ));
     }
 
     #[test]
     fn overflowing_total_variation_fails_closed() {
-        let invalid = [
-            particle(0.0, 0.0, f64::MAX),
-            particle(1.0, 0.0, f64::MAX),
-        ];
+        let invalid = [particle(0.0, 0.0, f64::MAX), particle(1.0, 0.0, f64::MAX)];
         assert!(matches!(
             compare_phase_space_measures_mmd(&invalid, &[], config()),
-            Err(MmdError::TotalVariationOverflow { measure: "candidate" })
+            Err(MmdError::TotalVariationOverflow {
+                measure: "candidate"
+            })
         ));
     }
 }
