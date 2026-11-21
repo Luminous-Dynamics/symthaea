@@ -9,7 +9,7 @@ on:
       - "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1*.json"
       - ".github/workflows/semi-semiconductor-rust.yml"
   push:
-    branches: [main]
+    branches: [main, research/eng-semi-rust-contracts-v0.1]
     paths:
       - "crates/domains/symthaea-semiconductor/**"
       - "Cargo.lock"
