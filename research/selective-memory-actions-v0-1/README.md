@@ -16,6 +16,7 @@ cargo fmt --manifest-path research/selective-memory-actions-v0-1/Cargo.toml -- -
 - Applies hard admission gates before cost ranking.
 - Enforces an upstream-derived evidence freshness assessment at actual use time (age budget plus signed deadline slack); unknown or late use is blocked. Retrieval age is recorded separately for diagnostics.
 - Uses deterministic tie-breaking from a frozen policy rank.
+- Binds every run to canonical time semantics, freshness metric definitions and task-specific age/deadline budgets via manifest digests.
 - Rejects mixed-stage options, duplicate actions, invalid probability mass and arithmetic overflow.
 
 ## Tests and current validation
