@@ -250,10 +250,7 @@ fn expected_from_resources(resources: &Resources) -> ExpectedResourceUse {
     }
 }
 
-fn expected_add(
-    left: &ExpectedResourceUse,
-    right: &ExpectedResourceUse,
-) -> ExpectedResourceUse {
+fn expected_add(left: &ExpectedResourceUse, right: &ExpectedResourceUse) -> ExpectedResourceUse {
     ExpectedResourceUse {
         engineering_hours: left.engineering_hours + right.engineering_hours,
         compute_core_hours: left.compute_core_hours + right.compute_core_hours,
@@ -304,11 +301,7 @@ fn expected_close(left: &ExpectedResourceUse, right: &ExpectedResourceUse) -> bo
     .all(|(a, b)| (a - b).abs() <= 1.0e-9)
 }
 
-fn regret(
-    scenario: &SequentialScenario,
-    decision: &str,
-    state: &str,
-) -> Result<f64, String> {
+fn regret(scenario: &SequentialScenario, decision: &str, state: &str) -> Result<f64, String> {
     let actual = *scenario
         .loss_matrix
         .get(decision)
@@ -323,12 +316,7 @@ fn regret(
                 .get(candidate)
                 .and_then(|row| row.get(state))
                 .copied()
-                .ok_or_else(|| {
-                    format!(
-                        "{} missing loss {candidate}/{state}",
-                        scenario.scenario_id
-                    )
-                })
+                .ok_or_else(|| format!("{} missing loss {candidate}/{state}", scenario.scenario_id))
         })
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
@@ -520,8 +508,7 @@ fn solve(
             )?;
             worst_case_regret = worst_case_regret.max(child.worst_case_regret);
             if let Some(child_expected) = &child.expected_resources {
-                let probability =
-                    conditional_branch_probability(scenario, belief, branch_belief)?;
+                let probability = conditional_branch_probability(scenario, belief, branch_belief)?;
                 expected_future = expected_add(
                     &expected_future,
                     &expected_scale(child_expected, probability),
@@ -534,10 +521,9 @@ fn solve(
             branch_nodes.insert(observation.clone(), child.node);
         }
         let current_expected = expected_from_resources(&action.resource_plan);
-        let expected_resources = has_future_expected_cost
-            .then(|| expected_add(&current_expected, &expected_future));
-        let worst_path_resources =
-            add_resources(&action.resource_plan, &worst_future_resources)?;
+        let expected_resources =
+            has_future_expected_cost.then(|| expected_add(&current_expected, &expected_future));
+        let worst_path_resources = add_resources(&action.resource_plan, &worst_future_resources)?;
         if !fits_budget(&worst_path_resources, &scenario.budget) {
             continue;
         }
@@ -554,10 +540,7 @@ fn solve(
     select_plan(candidates)
 }
 
-fn myopic_policy(
-    scenario: &SequentialScenario,
-    baseline: f64,
-) -> Result<MyopicAudit, String> {
+fn myopic_policy(scenario: &SequentialScenario, baseline: f64) -> Result<MyopicAudit, String> {
     let mut scored = Vec::new();
     for action in &scenario.actions {
         if !eligible_action(scenario, action, &scenario.budget, &BTreeSet::new()) {
@@ -594,9 +577,7 @@ fn myopic_policy(
     })
 }
 
-fn fixed_policy(
-    scenario: &SequentialScenario,
-) -> Result<FixedCampaignAudit, String> {
+fn fixed_policy(scenario: &SequentialScenario) -> Result<FixedCampaignAudit, String> {
     let actions_by_id: BTreeMap<&str, &SequentialAction> = scenario
         .actions
         .iter()
@@ -620,11 +601,7 @@ fn fixed_policy(
         let signature: Vec<String> = scenario
             .fixed_campaign_sequence
             .iter()
-            .map(|action_id| {
-                actions_by_id[action_id.as_str()]
-                    .observation_by_state[state]
-                    .clone()
-            })
+            .map(|action_id| actions_by_id[action_id.as_str()].observation_by_state[state].clone())
             .collect();
         groups.entry(signature).or_default().push(state.clone());
     }
@@ -643,7 +620,10 @@ fn fixed_policy(
 
 fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenarioAudit, String> {
     if scenario.evidence_class != "synthetic" || scenario.claim_ceiling != CLAIM_CEILING {
-        return Err(format!("{} has unsupported evidence or claim ceiling", scenario.scenario_id));
+        return Err(format!(
+            "{} has unsupported evidence or claim ceiling",
+            scenario.scenario_id
+        ));
     }
     let context = &scenario.decision_context;
     if [
@@ -655,7 +635,10 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     .iter()
     .any(|value| value.trim().is_empty())
     {
-        return Err(format!("{} has incomplete decision context", scenario.scenario_id));
+        return Err(format!(
+            "{} has incomplete decision context",
+            scenario.scenario_id
+        ));
     }
     if scenario.states.len() < 2
         || scenario.states.iter().collect::<BTreeSet<_>>().len() != scenario.states.len()
@@ -664,15 +647,24 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         || scenario.actions.is_empty()
         || !valid_resources(&scenario.budget)
     {
-        return Err(format!("{} has invalid basic scenario shape", scenario.scenario_id));
+        return Err(format!(
+            "{} has invalid basic scenario shape",
+            scenario.scenario_id
+        ));
     }
     let state_set: BTreeSet<&str> = scenario.states.iter().map(String::as_str).collect();
     let decision_set: BTreeSet<&str> = scenario.decisions.iter().map(String::as_str).collect();
     if decision_set.len() != scenario.decisions.len() {
-        return Err(format!("{} has duplicate decision labels", scenario.scenario_id));
+        return Err(format!(
+            "{} has duplicate decision labels",
+            scenario.scenario_id
+        ));
     }
     if scenario.loss_matrix.len() != decision_set.len() {
-        return Err(format!("{} loss matrix has wrong decision count", scenario.scenario_id));
+        return Err(format!(
+            "{} loss matrix has wrong decision count",
+            scenario.scenario_id
+        ));
     }
     for (decision, row) in &scenario.loss_matrix {
         if !decision_set.contains(decision.as_str())
@@ -680,7 +672,10 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
             || row.keys().any(|state| !state_set.contains(state.as_str()))
             || row.values().any(|loss| !loss.is_finite() || *loss < 0.0)
         {
-            return Err(format!("{} loss row {decision} is incomplete or invalid", scenario.scenario_id));
+            return Err(format!(
+                "{} loss row {decision} is incomplete or invalid",
+                scenario.scenario_id
+            ));
         }
     }
     let frequency = &scenario.resource_frequency_model;
@@ -698,7 +693,10 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
             .any(|weight| !weight.is_finite() || *weight <= 0.0)
         || (frequency.state_weights.values().sum::<f64>() - 1.0).abs() > 1.0e-9
     {
-        return Err(format!("{} has invalid resource-frequency model", scenario.scenario_id));
+        return Err(format!(
+            "{} has invalid resource-frequency model",
+            scenario.scenario_id
+        ));
     }
     let mut action_ids = BTreeSet::new();
     for action in &scenario.actions {
@@ -709,21 +707,34 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
             || action.admissibility != "ADMISSIBLE" && action.admissibility != "INADMISSIBLE"
             || !valid_resources(&action.resource_plan)
             || action.observation_by_state.len() != state_set.len()
-            || action.observation_by_state.keys().any(|state| !state_set.contains(state.as_str()))
-            || scenario.states.iter().any(|state| !action.observation_by_state.contains_key(state))
+            || action
+                .observation_by_state
+                .keys()
+                .any(|state| !state_set.contains(state.as_str()))
+            || scenario
+                .states
+                .iter()
+                .any(|state| !action.observation_by_state.contains_key(state))
         {
             return Err(format!("{} has malformed action", scenario.scenario_id));
         }
     }
     if scenario.fixed_campaign_sequence.is_empty()
-        || scenario.fixed_campaign_sequence.iter().collect::<BTreeSet<_>>().len()
+        || scenario
+            .fixed_campaign_sequence
+            .iter()
+            .collect::<BTreeSet<_>>()
+            .len()
             != scenario.fixed_campaign_sequence.len()
         || scenario
             .fixed_campaign_sequence
             .iter()
             .any(|action_id| !action_ids.contains(action_id.as_str()))
     {
-        return Err(format!("{} has invalid fixed campaign sequence", scenario.scenario_id));
+        return Err(format!(
+            "{} has invalid fixed campaign sequence",
+            scenario.scenario_id
+        ));
     }
 
     let baseline = terminal_plan(scenario, &scenario.states)?.worst_case_regret;
@@ -766,11 +777,17 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     } else {
         oracle_matched = false;
     }
-    oracle_matched &= expected_close(&fixed.expected_resources, &expected.fixed_expected_resources);
+    oracle_matched &= expected_close(
+        &fixed.expected_resources,
+        &expected.fixed_expected_resources,
+    );
     if expected.require_adaptive_resource_pareto_dominates_fixed {
-        oracle_matched &= adaptive.expected_resources.as_ref().is_some_and(|adaptive_use| {
-            expected_dominates(adaptive_use, &fixed.expected_resources)
-        });
+        oracle_matched &= adaptive
+            .expected_resources
+            .as_ref()
+            .is_some_and(|adaptive_use| {
+                expected_dominates(adaptive_use, &fixed.expected_resources)
+            });
     }
 
     if !oracle_matched {
@@ -780,7 +797,10 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         ));
     }
     if !fits_budget(&adaptive.worst_path_resources, &scenario.budget) {
-        return Err(format!("{} adaptive worst path exceeds budget", scenario.scenario_id));
+        return Err(format!(
+            "{} adaptive worst path exceeds budget",
+            scenario.scenario_id
+        ));
     }
     Ok(SequentialScenarioAudit {
         scenario_id: scenario.scenario_id.clone(),
@@ -800,7 +820,10 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     })
 }
 
-pub fn run_sequential_audit(input: &[u8], source_commit: &str) -> Result<SequentialReceipt, String> {
+pub fn run_sequential_audit(
+    input: &[u8],
+    source_commit: &str,
+) -> Result<SequentialReceipt, String> {
     if !valid_commit(source_commit) {
         return Err("source commit must be exactly 40 lowercase hexadecimal characters".to_owned());
     }
@@ -820,12 +843,18 @@ pub fn run_sequential_audit(input: &[u8], source_commit: &str) -> Result<Sequent
     let mut scenarios = Vec::new();
     for scenario in &corpus.scenarios {
         if !ids.insert(scenario.scenario_id.as_str()) {
-            return Err(format!("duplicate sequential scenario {}", scenario.scenario_id));
+            return Err(format!(
+                "duplicate sequential scenario {}",
+                scenario.scenario_id
+            ));
         }
         scenarios.push(validate_scenario(scenario)?);
     }
     scenarios.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
-    let oracle_matches = scenarios.iter().filter(|scenario| scenario.oracle_matched).count();
+    let oracle_matches = scenarios
+        .iter()
+        .filter(|scenario| scenario.oracle_matched)
+        .count();
     let oracle_mismatches = scenarios.len() - oracle_matches;
     Ok(SequentialReceipt {
         schema: "luminous.orbital-joint-evidence-voi.sequential-receipt.v0.1".to_owned(),
@@ -847,8 +876,9 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    const FIXTURE: &[u8] =
-        include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json");
+    const FIXTURE: &[u8] = include_bytes!(
+        "../../../fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json"
+    );
     const SOURCE: &str = "0123456789abcdef0123456789abcdef01234567";
 
     fn receipt() -> SequentialReceipt {
@@ -869,7 +899,11 @@ mod tests {
     fn adaptive_policy_uses_observation_contingent_stopping() {
         let result = receipt();
         let scenario = &result.scenarios[0];
-        let PolicyNode::Test { action_id, branches } = &scenario.adaptive_campaign.policy else {
+        let PolicyNode::Test {
+            action_id,
+            branches,
+        } = &scenario.adaptive_campaign.policy
+        else {
             panic!("adaptive policy must start with a test");
         };
         assert_eq!(action_id, "A-COMBINED-LOAD-SCREEN");
@@ -877,7 +911,11 @@ mod tests {
             branches.get("FAIL"),
             Some(PolicyNode::Terminal { decision, .. }) if decision == "REJECT"
         ));
-        let Some(PolicyNode::Test { action_id, branches }) = branches.get("PASS") else {
+        let Some(PolicyNode::Test {
+            action_id,
+            branches,
+        }) = branches.get("PASS")
+        else {
             panic!("PASS branch must run the targeted thermal inspection");
         };
         assert_eq!(action_id, "B-THERMAL-INSPECTION");
@@ -903,7 +941,11 @@ mod tests {
     fn contingent_campaign_reduces_every_expected_resource_dimension() {
         let result = receipt();
         let scenario = &result.scenarios[0];
-        let adaptive = scenario.adaptive_campaign.expected_resources.as_ref().unwrap();
+        let adaptive = scenario
+            .adaptive_campaign
+            .expected_resources
+            .as_ref()
+            .unwrap();
         let fixed = &scenario.fixed_campaign.expected_resources;
         assert!(expected_dominates(adaptive, fixed));
         assert!((adaptive.engineering_hours - 1.2).abs() < 1.0e-9);
@@ -947,8 +989,28 @@ mod tests {
         let second_scenario = &second.scenarios[0];
         assert_eq!(original_scenario.adaptive_campaign.worst_case_regret, 0.0);
         assert_eq!(second_scenario.adaptive_campaign.worst_case_regret, 0.0);
-        assert!((second_scenario.adaptive_campaign.expected_resources.as_ref().unwrap().engineering_hours - 1.1).abs() < 1.0e-9);
-        assert!((original_scenario.adaptive_campaign.expected_resources.as_ref().unwrap().engineering_hours - 1.2).abs() < 1.0e-9);
+        assert!(
+            (second_scenario
+                .adaptive_campaign
+                .expected_resources
+                .as_ref()
+                .unwrap()
+                .engineering_hours
+                - 1.1)
+                .abs()
+                < 1.0e-9
+        );
+        assert!(
+            (original_scenario
+                .adaptive_campaign
+                .expected_resources
+                .as_ref()
+                .unwrap()
+                .engineering_hours
+                - 1.2)
+                .abs()
+                < 1.0e-9
+        );
     }
 
     #[test]
@@ -973,7 +1035,10 @@ mod tests {
     fn action_order_does_not_change_contingent_policy() {
         let original = receipt();
         let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
-        value["scenarios"][0]["actions"].as_array_mut().unwrap().reverse();
+        value["scenarios"][0]["actions"]
+            .as_array_mut()
+            .unwrap()
+            .reverse();
         let changed = serde_json::to_vec(&value).unwrap();
         let second = run_sequential_audit(&changed, SOURCE).unwrap();
         assert_eq!(
