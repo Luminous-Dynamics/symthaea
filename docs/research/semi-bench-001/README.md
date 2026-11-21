@@ -438,3 +438,14 @@ See [SEMI-INSPECT-001 #13083](https://github.com/Luminous-Dynamics/symthaea/issu
 ### Current executable verification
 
 The updated 31-test reference suite, including the budget-aware inspection-selection oracle, passed in hosted GitHub Actions run [#44890353550](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550). The job also reproduced both the binary-metrics and inspection-decision expected reports byte-for-byte. This is a hosted CI result, not a local test claim.
+
+
+## Real-data and upstream substrate manufacturing update
+
+The review [2026-real-data-and-upstream-frontier.md](2026-real-data-and-upstream-frontier.md) records an external SECOM benchmark audit, MixedWM38 synthetic-data caveats, 2026 compositional zero-shot literature, and the upstream silicon substrate manufacturing frontier.
+
+New workstreams:
+- [SEMI-WBM-COMP-001 #13113](https://github.com/Luminous-Dynamics/symthaea/issues/13113): leave-combination-out mixed-defect recognition, open-set rejection and synthetic-to-real separation.
+- [SEMI-SUBSTRATE-001 #13114](https://github.com/Luminous-Dynamics/symthaea/issues/13114): crystal growth, ingot slicing, wafer machining, material utilization and substrate metrology.
+
+The key change is to treat random-split performance on GAN-augmented MixedWM38 as a data/pipeline check, not a claim of factory generalization. For SECOM, the public external baseline uses a stratified random split and must remain separate from a forward-time evaluation.
