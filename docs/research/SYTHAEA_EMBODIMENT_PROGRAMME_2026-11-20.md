@@ -207,7 +207,11 @@ Added to symthaea-canvas:
 - visemes accepted only while a RuntimeEvent confirms SpeechOutputState::Playing;
 - stale visemes cleared when playback stops; reset clears transient state and speech lifecycle;
 - negative controls for invalid provenance, invalid lifecycle transitions, stale events, and visemes outside confirmed playback;
-- mycelial_presence.rs: deterministic non-humanoid branch geometry, activity-dependent palette, explicit uncertainty halo, speech-weight core modulation, and SVG rendering through the existing renderer;
+- mycelial_presence.rs: deterministic non-humanoid presentation, activity glyphs, explicit uncertainty halo, gaze/playback overlays, and a 2.5D SVG projection;
+- mycelial_model.rs: versioned renderer-neutral 3D cubic-Bézier filaments, parent topology, tapered radii, orbital cells, and provenance-bearing observed signals;
+- mycelial_mesh.rs: bounded CPU tessellation into indexed tube geometry using parallel-transport frames, with per-filament mesh ranges and invalid/oversized-model rejection;
+- three user-selected presentation modes (Ambient, Cognitive, Conversational) that alter visual complexity without changing runtime signal semantics;
+- examples/mycelial_spatial_mesh.rs: inspect filament counts and generated mesh vertices/triangles for each mode;
 - embodiment_trace.rs: bounded, versioned event corpus, deterministic replay, activity/playback interval summaries and exact event-index failure reporting;
 - tests/fixtures/embodiment_trace_v1.json: a reference trace that covers listening, synthesis, ready, queueing, playback, visemes, completion, uncertainty and reset;
 - examples/embodiment_trace_replay.rs: a standalone CLI that validates a trace, performs warmup and repeated replay, reports P50/P95 reducer latency, and emits a BLAKE3 digest plus platform metadata;
@@ -226,7 +230,16 @@ Export the rendered presence from the same trace:
 
 Repository source inspection found that `src/cognitive_loop/voice_channel.rs` returns synthesized PCM in `VoiceResponse`, while `src/voice/repl_voice.rs` contains separate playback paths (Rodio queueing and an optional live-voice backend). A returned PCM buffer or a successful queue append is not proof that audio is actually playing. This branch therefore defines the lifecycle contract but does not yet falsely wire synthesis completion to `Playing`.
 
-**Not implemented yet:** live runtime producers, actual playback-start callbacks, audio-aligned viseme inference, a running frontend/session integration, VRM loading, live gaze tracking, platform packaging, and measured benchmark results. The SVG adapter is a first renderable presence, not a completed conversational puppet.
+**Not implemented yet:** live runtime producers, actual playback-start callbacks, audio-aligned viseme inference, a running frontend/session integration, VRM loading, live gaze tracking, platform packaging, and measured benchmark results. The SVG adapter now projects the canonical 3D model and remains the portable/debug renderer, not a completed conversational puppet. A native Bevy/WGPU scene, GPU material/shader, and browser WebGPU/WebGL adapter are still not implemented.
+
+## Renderer evolution — 2026-11-21
+
+The Mycelial Presence no longer treats SVG as its source of truth. A deterministic renderer-neutral spatial model and bounded CPU tube-mesh tessellator are now in the branch. SVG is retained as the inspectable, portable 2D projection and fallback; future Bevy/WGPU or browser GPU adapters will consume the same model/mesh.
+
+This avoids a renderer-specific rewrite and keeps cognitive event semantics independent from geometry, materials, and camera motion. The native GPU renderer is a separate next adapter, not a completed result.
+
+Detailed decision, browser/native compatibility considerations, resource limits, visual direction, and matched benchmark targets:
+[MYCELIAL_RENDERER_EVOLUTION_2026-11-21.md](MYCELIAL_RENDERER_EVOLUTION_2026-11-21.md)
 
 ## Benchmark programme: Symthaea Embodiment Fidelity Benchmark (SEFB)
 
