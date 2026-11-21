@@ -1,0 +1,125 @@
+{
+  "schema_version": "rcaf.sign-test-power/0.1.0",
+  "status": "analytical_design_calculation_not_empirical_result",
+  "date": "2026-11-21",
+  "test": {
+    "name": "two_sided_exact_sign_test",
+    "alpha": 0.05,
+    "unit": "independent_non_tied_participant",
+    "null_positive_gap_probability": 0.5,
+    "alternative_positive_gap_probabilities": [
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8
+    ]
+  },
+  "power_grid": [
+    {
+      "n_eff": 23,
+      "power": [
+        0.125,
+        0.254,
+        0.44,
+        0.654,
+        0.84
+      ]
+    },
+    {
+      "n_eff": 30,
+      "power": [
+        0.177,
+        0.358,
+        0.589,
+        0.803,
+        0.939
+      ]
+    },
+    {
+      "n_eff": 50,
+      "power": [
+        0.237,
+        0.506,
+        0.782,
+        0.945,
+        0.994
+      ]
+    },
+    {
+      "n_eff": 80,
+      "power": [
+        0.369,
+        0.724,
+        0.941,
+        0.995,
+        1
+      ]
+    },
+    {
+      "n_eff": 100,
+      "power": [
+        0.462,
+        0.828,
+        0.979,
+        0.999,
+        1
+      ]
+    },
+    {
+      "n_eff": 150,
+      "power": [
+        0.663,
+        0.955,
+        0.999,
+        1,
+        1
+      ]
+    },
+    {
+      "n_eff": 200,
+      "power": [
+        0.788,
+        0.988,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "approximate_minimum_n_for_power_0_8": [
+    {
+      "q": 0.6,
+      "n_eff": 199
+    },
+    {
+      "q": 0.65,
+      "n_eff": 90
+    },
+    {
+      "q": 0.7,
+      "n_eff": 49
+    },
+    {
+      "q": 0.75,
+      "n_eff": 30
+    },
+    {
+      "q": 0.8,
+      "n_eff": 20
+    }
+  ],
+  "assumptions": [
+    "independent participant-level pairs",
+    "no ties among n_eff",
+    "fixed q under alternative",
+    "two-sided exact binomial p value",
+    "no effect-size or hierarchical variance modeling"
+  ],
+  "interpretation_limits": [
+    "does not power median-gap CI",
+    "does not account for missingness unless modeled",
+    "not a clinical or causal inference",
+    "not an empirical result"
+  ]
+}
