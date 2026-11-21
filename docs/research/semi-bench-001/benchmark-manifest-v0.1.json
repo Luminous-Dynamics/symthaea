@@ -1081,10 +1081,10 @@
       "hosted_ci_status": "success",
       "claim_ceiling": "known-answer metric semantic agreement only; not a model-quality or physical manufacturing result",
       "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
-      "test_count": 18,
-      "test_result": "18/18 Rust tests passed across binary metrics, split-manifest integrity and contrastive-pair integrity; fmt, clippy and binary CLI report parity passed",
-      "tested_commit": "4a7f7029fa8694914f0c85650053d879e399b402",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "test_count": 6,
+      "test_result": "6 binary-metric Rust unit tests passed; fmt and clippy passed in combined Rust hosted run",
+      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9",
       "verification_steps": [
         "cargo fmt --check",
         "cargo clippy --all-targets -- -D warnings",
@@ -1112,8 +1112,9 @@
       ],
       "test_count": 6,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
-      "claim_ceiling": "split-manifest identity and leakage integrity only; not model generalization"
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "claim_ceiling": "split-manifest identity and leakage integrity only; not model generalization",
+      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9"
     },
     "rust_contrastive_pair_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/pair_manifest.rs",
@@ -1131,20 +1132,26 @@
       ],
       "test_count": 6,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
-      "claim_ceiling": "pair-manifest integrity only; does not prove pair semantic correctness or model quality"
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "claim_ceiling": "pair-manifest integrity only; does not prove pair semantic correctness or model quality",
+      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9"
     },
-    "total_rust_test_count": 18,
+    "total_rust_test_count": 23,
     "latest_rust_hosted_ci": {
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
-      "commit": "4a7f7029fa8694914f0c85650053d879e399b402",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9",
       "conclusion": "success",
-      "tests": 18,
+      "tests": 23,
       "passed_steps": [
         "cargo fmt --check",
         "cargo clippy --all-targets -- -D warnings",
-        "cargo test: 18 passed",
-        "binary metrics CLI byte-for-byte parity"
+        "cargo test: 23 passed",
+        "Rust binary-metrics CLI report byte-for-byte",
+        "Rust SECOM raw-audit CLI report byte-for-byte"
+      ],
+      "limitations": [
+        "raw audit CLI verified with synthetic 2-row fixture only",
+        "full 1567x590 raw sensor feature file not retrieved in this runtime"
       ]
     },
     "secom_raw_integrity_audit": {
@@ -1169,6 +1176,23 @@
       ],
       "hosted_ci_status": "pending",
       "claim_ceiling": "raw-source integrity only; no predictive model or physical process claim"
+    },
+    "rust_secom_raw_integrity_audit": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-secom-audit.rs",
+      "expectations": "docs/research/semi-bench-001/secom-raw-expectations-v1.json",
+      "tests": 5,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9",
+      "verification_steps": [
+        "rustfmt",
+        "clippy-with-warnings-denied",
+        "5 raw-parser tests",
+        "synthetic raw-audit CLI byte-for-byte report parity"
+      ],
+      "real_sensor_matrix_ingested": false,
+      "claim_ceiling": "synthetic parser contract and raw-source digest/shape validation code; no full-matrix model result"
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
