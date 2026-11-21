@@ -215,3 +215,20 @@ CETB uses a proposed internal Q0–Q5 evidence ladder. It qualifies each empiric
 - Q5: clinical utility and intended-use qualification, including applicable ethics and regulatory requirements.
 
 A second publication on the same participants, a different derivative of the same raw data, or a new split of the same participants cannot satisfy Q3. A protocol does not earn the tier of the future experiment it describes. See `CETB_CLAIM_QUALIFICATION_LADDER_V0.md` and its machine-readable JSON companion.
+
+
+## 15. Prospective theory-discriminating experiment design
+
+CETB adds a design stage before empirical evaluation: use independently authored, preregistered predictive distributions to estimate which feasible experiment is expected to distinguish competing theories most effectively.
+
+For candidate design d, the primary criterion is mutual information between theory identity T and the predeclared observable outcome Y:
+
+[
+\operatorname{EIG}(d)=I(T;Y\mid d)=
+\sum_t\pi_t\sum_y P(y\mid t,d)
+\log_2\frac{P(y\mid t,d)}{P(y\mid d)}.
+]
+
+The utility must include missing, ambiguous and failed measurement outcomes; it must report prior and nuisance sensitivity and acquisition cost separately. A conservative lower quantile over predeclared nuisance scenarios can be reported alongside expected EIG, but it is not a worst-case guarantee.
+
+A pure-standard-library reference calculator and synthetic tests are in `research/cetb/theory_design/`. It does not author theory predictions, select priors or establish theory truth. Prediction cards must be frozen by independent theory owners/evaluators before design selection. See `CETB_THEORY_DISCRIMINATION_DESIGN_V0.md`.
