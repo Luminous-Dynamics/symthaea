@@ -1,0 +1,75 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "pic-neural-initial-guess-residual-correction-v0.1",
+  "created_at": "2026-11-20",
+  "status": "source_review_specification_only",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12939",
+  "source": {
+    "arxiv": "2606.17733",
+    "title": "Latent Residual-Closure Fourier Neural Operator for Robust Multi-Field Solving in Particle-in-Cell Simulations",
+    "submitted": "2026-06-16",
+    "authors": ["Jianhua Lyu", "Linlin Zhong"],
+    "code_artifact": "not_admitted",
+    "data_artifact": "not_admitted",
+    "license": "unknown_pending_source_review"
+  },
+  "task_lanes": [
+    "one_dimensional_linear_landau_damping",
+    "two_dimensional_two_stream_instability",
+    "two_dimensional_scrape_off_layer"
+  ],
+  "architecture_hypothesis": {
+    "mode": "neural_initial_guess_plus_exact_classical_residual_correction",
+    "source_reported_fixed_corrections": 20,
+    "acceptance_authority": "pinned_classical_solver_residual_and_invariants",
+    "fallback": "unchanged_classical_solver",
+    "neural_one_shot_output_authoritative": false
+  },
+  "candidate_methods": [
+    "classical_solver_canonical_initialisation",
+    "classical_multigrid_fft_or_krylov_baseline",
+    "source_LRC_FNO_one_shot",
+    "source_LRC_FNO_plus_20_corrections",
+    "LRC_FNO_plus_adaptive_residual_stop",
+    "coarse_FNO_without_latent_residual",
+    "source_compression_without_refiner",
+    "latent_residual_refiner_ablation",
+    "low_rank_or_ROM_warm_start"
+  ],
+  "required_gates": [
+    "exact_discrete_residual_at_every_correction",
+    "same_classical_stopping_tolerance",
+    "fallback_on_neural_or_correction_failure",
+    "gauss_law_if_applicable",
+    "magnetic_divergence_if_applicable",
+    "charge_current_continuity",
+    "particle_field_energy_balance",
+    "momentum_conservation_if_applicable",
+    "closed_loop_long_horizon_stability"
+  ],
+  "metrics": [
+    "initial_and_final_exact_solver_residual",
+    "residual_contraction_history",
+    "iterations_to_convergence",
+    "convergence_failure_and_stagnation_rate",
+    "fallback_rate_and_full_fallback_cost",
+    "particle_field_energy_residual",
+    "charge_and_current_continuity_residual",
+    "closed_loop_trajectory_error",
+    "end_to_end_wall_time",
+    "memory_and_device_transfer",
+    "training_cost_amortization"
+  ],
+  "prospective_targets": {
+    "same_exact_solver_tolerance": true,
+    "zero_false_convergence_on_frozen_negative_controls": true,
+    "end_to_end_speedup_target": 2.0,
+    "speedup_target_status": "prospective_not_achieved"
+  },
+  "execution": {
+    "source_reproduction": "not_performed",
+    "solver_integration": "not_performed",
+    "closed_loop_pic_run": "not_performed",
+    "physical_validation": "not_performed"
+  }
+}
