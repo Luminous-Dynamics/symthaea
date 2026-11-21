@@ -676,8 +676,7 @@ mod tests {
             .predictions
             .iter_mut()
             .find(|prediction| {
-                prediction.case_id == "sync-3"
-                    && prediction.modality == PerceptionModalityV1::Audio
+                prediction.case_id == "sync-3" && prediction.modality == PerceptionModalityV1::Audio
             })
             .unwrap();
         prediction.answer = Some(PerceptionAnswerV1::SyncopationLevel { level: 2 });
