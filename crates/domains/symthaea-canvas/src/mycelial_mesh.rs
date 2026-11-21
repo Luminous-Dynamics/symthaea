@@ -9,7 +9,12 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::mycelial_model::{MycelialFilament, MycelialModel, SpatialPoint3};
+use crate::mycelial_model::{
+    MycelialFilament, MycelialModel, SpatialPoint3, MYCELIAL_MODEL_VERSION,
+};
+
+pub const MAX_MYCELIAL_FILAMENTS: usize = 512;
+pub const MAX_TUBE_MESH_VERTICES: usize = 1_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TubeTessellationConfig {
@@ -32,6 +37,11 @@ impl Default for TubeTessellationConfig {
 pub enum TubeTessellationError {
     AxialResolutionOutOfRange(u8),
     RadialResolutionOutOfRange(u8),
+    UnsupportedModelVersion(u16),
+    FilamentCountExceeded(usize),
+    MeshVertexLimitExceeded(usize),
+    InvalidFilamentGeometry(u32),
+    InvalidFilamentTopology,
     VertexCountOverflow,
 }
 
@@ -43,6 +53,21 @@ impl fmt::Display for TubeTessellationError {
             }
             Self::RadialResolutionOutOfRange(value) => {
                 write!(f, "radial segments must be in 3..=32, got {value}")
+            }
+            Self::UnsupportedModelVersion(version) => {
+                write!(f, "unsupported MycelialModel version {version}")
+            }
+            Self::FilamentCountExceeded(count) => {
+                write!(f, "model has {count} filaments; limit is {MAX_MYCELIAL_FILAMENTS}")
+            }
+            Self::MeshVertexLimitExceeded(count) => {
+                write!(f, "mesh requires {count} vertices; limit is {MAX_TUBE_MESH_VERTICES}")
+            }
+            Self::InvalidFilamentGeometry(id) => {
+                write!(f, "filament {id} has non-finite points or invalid radii")
+            }
+            Self::InvalidFilamentTopology => {
+                write!(f, "filament IDs must be unique and parent references must exist")
             }
             Self::VertexCountOverflow => write!(f, "tube mesh exceeds u32 vertex indexing"),
         }
@@ -94,8 +119,12 @@ impl MycelialTubeMesh {
             && self.normals.iter().all(|normal| normal.iter().all(|v| v.is_finite()))
             && self.indices.iter().all(|index| (*index as usize) < self.positions.len())
             && self.filaments.iter().all(|range| {
-                (range.first_vertex as usize + range.vertex_count as usize) <= self.positions.len()
-                    && (range.first_index as usize + range.index_count as usize) <= self.indices.len()
+                (range.first_vertex as usize)
+                    .checked_add(range.vertex_count as usize)
+                    .is_some_and(|end| end <= self.positions.len())
+                    && (range.first_index as usize)
+                        .checked_add(range.index_count as usize)
+                        .is_some_and(|end| end <= self.indices.len())
             })
     }
 }
@@ -108,10 +137,42 @@ pub fn tessellate_mycelial_model(
     config: TubeTessellationConfig,
 ) -> Result<MycelialTubeMesh, TubeTessellationError> {
     validate_config(config)?;
+    if model.schema_version != MYCELIAL_MODEL_VERSION {
+        return Err(TubeTessellationError::UnsupportedModelVersion(model.schema_version));
+    }
+    if model.filaments.len() > MAX_MYCELIAL_FILAMENTS {
+        return Err(TubeTessellationError::FilamentCountExceeded(model.filaments.len()));
+    }
+
+    let mut ids = std::collections::HashSet::with_capacity(model.filaments.len());
+    for filament in &model.filaments {
+        if !ids.insert(filament.id) {
+            return Err(TubeTessellationError::InvalidFilamentTopology);
+        }
+        if !valid_filament_geometry(filament) {
+            return Err(TubeTessellationError::InvalidFilamentGeometry(filament.id));
+        }
+    }
+    if model.filaments.iter().any(|filament| {
+        filament.parent_id.is_some_and(|parent_id| !ids.contains(&parent_id))
+    }) {
+        return Err(TubeTessellationError::InvalidFilamentTopology);
+    }
+
+    let vertices_per_filament =
+        (config.axial_segments as usize + 1) * config.radial_segments as usize;
+    let estimated_vertices = model
+        .filaments
+        .len()
+        .checked_mul(vertices_per_filament)
+        .ok_or(TubeTessellationError::VertexCountOverflow)?;
+    if estimated_vertices > MAX_TUBE_MESH_VERTICES {
+        return Err(TubeTessellationError::MeshVertexLimitExceeded(estimated_vertices));
+    }
 
     let mut mesh = MycelialTubeMesh {
-        positions: Vec::new(),
-        normals: Vec::new(),
+        positions: Vec::with_capacity(estimated_vertices),
+        normals: Vec::with_capacity(estimated_vertices),
         indices: Vec::new(),
         filaments: Vec::with_capacity(model.filaments.len()),
     };
@@ -122,6 +183,17 @@ pub fn tessellate_mycelial_model(
 
     debug_assert!(mesh.validate());
     Ok(mesh)
+}
+
+fn valid_filament_geometry(filament: &MycelialFilament) -> bool {
+    filament.start.is_finite()
+        && filament.control_a.is_finite()
+        && filament.control_b.is_finite()
+        && filament.end.is_finite()
+        && filament.radius_start.is_finite()
+        && filament.radius_end.is_finite()
+        && filament.radius_start > 0.0
+        && filament.radius_end > 0.0
 }
 
 fn validate_config(config: TubeTessellationConfig) -> Result<(), TubeTessellationError> {
