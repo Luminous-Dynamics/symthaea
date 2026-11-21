@@ -184,12 +184,12 @@ fn audit_registry(schema_bytes: &[u8], registry_bytes: &[u8]) -> Result<Value, S
                     ));
                 }
             }
+            "experimental_report" if observations.is_empty() => {
+                return Err(format!(
+                    "{candidate_id}: experimental report requires at least one observed transition"
+                ));
+            }
             "experimental_report" => {
-                if observations.is_empty() {
-                    return Err(format!(
-                        "{candidate_id}: experimental report requires at least one observed transition"
-                    ));
-                }
                 // Experimental materials may also have separate, explicitly
                 // calculated or predicted Tc estimates; these stay in their
                 // own fields and never overwrite measured observations.
@@ -339,9 +339,9 @@ mod tests {
         let (schema, registry) = committed_inputs();
         let receipt = audit_registry(&schema, &registry).expect("registry must pass");
         assert_eq!(receipt["status"], "pass");
-        assert_eq!(receipt["source_count"], 23);
-        assert_eq!(receipt["candidate_count"], 13);
-        assert_eq!(receipt["benchmark_catalog_count"], 18);
+        assert_eq!(receipt["source_count"], 25);
+        assert_eq!(receipt["candidate_count"], 15);
+        assert_eq!(receipt["benchmark_catalog_count"], 19);
     }
 
     #[test]

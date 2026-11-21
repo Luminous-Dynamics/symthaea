@@ -171,3 +171,27 @@ Measurement scope is now required on every observation assertion. An observed Tc
 Observation events may carry a source.external_catalog object when extraction_method is database_import. It preserves library_id, external_record_id, API version, dataset version, snapshot ID, retrieval time, ETag, X-Data-Version and parent paper/material/sample/state/result IDs.
 
 The Rust observation auditor now requires those fields on database imports, checks X-Data-Version against the declared dataset version, and verifies imported parent material/sample/state/result IDs against the event. A synthetic SCLib-shaped example and negative controls are included. No real external dataset has been downloaded or mirrored.
+
+
+## Specimen / batch / campaign / laboratory reproducibility design
+
+Schema: `data/schemas/sc_reproducibility_design_v0_1.schema.json`.
+
+Synthetic hierarchy fixture: `tools/superconductivity-discovery-harness/fixtures/reproducibility_hierarchy_smoke_v0_1.json`.
+
+Run:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reproducibility_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_reproducibility_audit -- \
+  --schema data/schemas/sc_reproducibility_design_v0_1.schema.json \
+  --fixture tools/superconductivity-discovery-harness/fixtures/reproducibility_hierarchy_smoke_v0_1.json \
+  --out /tmp/sc-reproducibility-smoke.json
+```
+
+The auditor checks split design and group leakage for same-specimen repeatability, paired instrument transfer, within-batch specimen holdout, between-batch, between-campaign, inter-laboratory, protocol-transfer and time-forward tasks. It keeps the nominal material family / property profile distinct from each observation's realized `material_state_id`: independent batches and protocols may legitimately realize different states of the same target material, while same-specimen repeatability and paired instrument / inter-lab transfer require the state to match. It requires a paired-same-specimen declaration for instrument transfer and matched-sample inter-lab transfer, and requires group separation for generalization holdouts. UTC timestamps are checked in canonical, ordered form.
+
+This is a **group-split and design-semantics auditor**, not a variance-component estimator. It does not calculate repeatability/reproducibility standard deviations, intraclass correlations, causal effects, uncertainty calibration or material performance. The fixture is synthetic and proves only that these declared split rules are checked. Real variance decomposition requires independent, adequately replicated specimens / batches / campaigns / labs, matched measurement conditions and a rights-cleared source cohort. A random row-level split is not a valid substitute.
+
+
+Reproducibility fixture semantic note: non-Tc observations (including local pairing energy and superfluid stiffness) use `tc_criterion: not_applicable`; `null` is not used to represent this state. The synthetic predicted-Tc fixture is human-curated and is therefore not labelled as an external database import.

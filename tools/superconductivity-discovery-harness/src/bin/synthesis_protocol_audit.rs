@@ -20,21 +20,6 @@ fn has_actual_value(value: &Value) -> bool {
         .is_some_and(|object| object.values().any(|item| !item.is_null()))
 }
 
-fn has_locator(value: &Value) -> bool {
-    let Some(locator) = value.as_object() else {
-        return false;
-    };
-    ["page", "section", "table", "figure", "row_or_record_id"]
-        .iter()
-        .any(|field| {
-            locator.get(*field).is_some_and(|item| match item {
-                Value::String(text) => !text.trim().is_empty(),
-                Value::Number(number) => number.as_u64().is_some_and(|n| n > 0),
-                _ => false,
-            })
-        })
-}
-
 fn load_observation_events(
     observation_schema_bytes: &[u8],
     observation_fixture_bytes: &[u8],
@@ -81,7 +66,7 @@ fn load_observation_events(
         .ok_or_else(|| "observation fixture requires observations array".to_owned())?;
     let mut event_map = HashMap::with_capacity(events.len());
     for (index, event) in events.iter().enumerate() {
-        for error in validator.iter_errors(event) {
+        if let Some(error) = validator.iter_errors(event).next() {
             return Err(format!(
                 "observation fixture event[{index}] schema validation failed: {} at {}",
                 error,
@@ -141,7 +126,7 @@ fn validate_protocol(
 
     let validator =
         validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
-    for error in validator.iter_errors(&protocol) {
+    if let Some(error) = validator.iter_errors(&protocol).next() {
         return Err(format!(
             "protocol schema validation failed: {} at {}",
             error,
@@ -732,14 +717,17 @@ mod tests {
     #[test]
     fn phase_fractions_cannot_exceed_one_hundred_percent() {
         let (_, mut fixture, _, observations) = committed_inputs();
-        fixture["outcome_records"][0]["realized_phases"].push(json!({
-            "phase_id": "second-phase",
-            "identity_status": "identified",
-            "formula": "synthetic second phase",
-            "structure": null,
-            "phase_fraction_percent": 40.0,
-            "microstructure_notes": null
-        }));
+        fixture["outcome_records"][0]["realized_phases"]
+            .as_array_mut()
+            .expect("realized_phases must be an array")
+            .push(json!({
+                "phase_id": "second-phase",
+                "identity_status": "identified",
+                "formula": "synthetic second phase",
+                "structure": null,
+                "phase_fraction_percent": 40.0,
+                "microstructure_notes": null
+            }));
         fixture["outcome_records"][0]["realized_phases"][0]["phase_fraction_percent"] = json!(70.0);
         assert!(audit_mutated(fixture, observations).is_err());
     }

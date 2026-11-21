@@ -1,0 +1,265 @@
+{
+  "schema_version": "sc-reproducibility-design.v0.1",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "group-split-and-reproducibility-design-semantics-only",
+  "observations": [
+    {
+      "observation_id": "OBS-001",
+      "specimen_id": "SPEC-001",
+      "batch_id": "BATCH-001",
+      "campaign_id": "CAMP-001",
+      "lab_id": "LAB-001",
+      "instrument_id": "INST-001",
+      "protocol_id": "PROTO-TRANSPORT-A",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 300,
+      "timestamp_utc": "2026-11-20T09:00:00Z",
+      "replicate_index": 1,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-001",
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
+    },
+    {
+      "observation_id": "OBS-002",
+      "specimen_id": "SPEC-001",
+      "batch_id": "BATCH-001",
+      "campaign_id": "CAMP-001",
+      "lab_id": "LAB-001",
+      "instrument_id": "INST-001",
+      "protocol_id": "PROTO-TRANSPORT-A",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 298,
+      "timestamp_utc": "2026-11-20T09:10:00Z",
+      "replicate_index": 2,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-001",
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
+    },
+    {
+      "observation_id": "OBS-003",
+      "specimen_id": "SPEC-001",
+      "batch_id": "BATCH-001",
+      "campaign_id": "CAMP-001",
+      "lab_id": "LAB-001",
+      "instrument_id": "INST-002",
+      "protocol_id": "PROTO-TRANSPORT-A",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 301,
+      "timestamp_utc": "2026-11-20T09:20:00Z",
+      "replicate_index": 1,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-002",
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
+    },
+    {
+      "observation_id": "OBS-004",
+      "specimen_id": "SPEC-002",
+      "batch_id": "BATCH-001",
+      "campaign_id": "CAMP-001",
+      "lab_id": "LAB-001",
+      "instrument_id": "INST-001",
+      "protocol_id": "PROTO-TRANSPORT-A",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 296,
+      "timestamp_utc": "2026-11-20T09:30:00Z",
+      "replicate_index": 1,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-003",
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
+    },
+    {
+      "observation_id": "OBS-005",
+      "specimen_id": "SPEC-003",
+      "batch_id": "BATCH-002",
+      "campaign_id": "CAMP-001",
+      "lab_id": "LAB-001",
+      "instrument_id": "INST-001",
+      "protocol_id": "PROTO-TRANSPORT-A",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 292,
+      "timestamp_utc": "2026-11-20T10:00:00Z",
+      "replicate_index": 1,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-004",
+      "material_state_id": "SYNTH-STATE-B",
+      "material_id": "SYNTH-REBCO-4MM"
+    },
+    {
+      "observation_id": "OBS-006",
+      "specimen_id": "SPEC-004",
+      "batch_id": "BATCH-003",
+      "campaign_id": "CAMP-002",
+      "lab_id": "LAB-001",
+      "instrument_id": "INST-001",
+      "protocol_id": "PROTO-TRANSPORT-A",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 288,
+      "timestamp_utc": "2026-11-20T10:30:00Z",
+      "replicate_index": 1,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-005",
+      "material_state_id": "SYNTH-STATE-C",
+      "material_id": "SYNTH-REBCO-4MM"
+    },
+    {
+      "observation_id": "OBS-007",
+      "specimen_id": "SPEC-001",
+      "batch_id": "BATCH-001",
+      "campaign_id": "CAMP-001",
+      "lab_id": "LAB-002",
+      "instrument_id": "INST-003",
+      "protocol_id": "PROTO-TRANSPORT-A",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 299,
+      "timestamp_utc": "2026-11-20T11:00:00Z",
+      "replicate_index": 1,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-006",
+      "material_state_id": "SYNTH-STATE-A",
+      "material_id": "SYNTH-REBCO-4MM"
+    },
+    {
+      "observation_id": "OBS-008",
+      "specimen_id": "SPEC-005",
+      "batch_id": "BATCH-004",
+      "campaign_id": "CAMP-003",
+      "lab_id": "LAB-003",
+      "instrument_id": "INST-004",
+      "protocol_id": "PROTO-TRANSPORT-B",
+      "condition_id": "COND-77K-SF",
+      "property_id": "Ic_77K_self_field",
+      "property_unit": "A",
+      "value": 285,
+      "timestamp_utc": "2026-11-20T12:00:00Z",
+      "replicate_index": 1,
+      "evidence_class": "synthetic",
+      "evidence_authority": "synthetic_measurement",
+      "source_id": "SYNTH-SOURCE-007",
+      "material_state_id": "SYNTH-STATE-D",
+      "material_id": "SYNTH-REBCO-4MM"
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "TASK-REPEAT",
+      "task_type": "same_specimen_repeatability",
+      "train_observation_ids": [
+        "OBS-001"
+      ],
+      "test_observation_ids": [
+        "OBS-002"
+      ],
+      "paired_specimen_transfer": false
+    },
+    {
+      "task_id": "TASK-INSTRUMENT",
+      "task_type": "instrument_transfer",
+      "train_observation_ids": [
+        "OBS-001"
+      ],
+      "test_observation_ids": [
+        "OBS-003"
+      ],
+      "paired_specimen_transfer": true
+    },
+    {
+      "task_id": "TASK-WITHIN-BATCH",
+      "task_type": "within_batch_specimen_holdout",
+      "train_observation_ids": [
+        "OBS-001"
+      ],
+      "test_observation_ids": [
+        "OBS-004"
+      ],
+      "paired_specimen_transfer": false
+    },
+    {
+      "task_id": "TASK-BETWEEN-BATCH",
+      "task_type": "between_batch_holdout",
+      "train_observation_ids": [
+        "OBS-001"
+      ],
+      "test_observation_ids": [
+        "OBS-005"
+      ],
+      "paired_specimen_transfer": false
+    },
+    {
+      "task_id": "TASK-BETWEEN-CAMPAIGN",
+      "task_type": "between_campaign_holdout",
+      "train_observation_ids": [
+        "OBS-001"
+      ],
+      "test_observation_ids": [
+        "OBS-006"
+      ],
+      "paired_specimen_transfer": false
+    },
+    {
+      "task_id": "TASK-INTER-LAB",
+      "task_type": "inter_lab_transfer",
+      "train_observation_ids": [
+        "OBS-001"
+      ],
+      "test_observation_ids": [
+        "OBS-007"
+      ],
+      "paired_specimen_transfer": true
+    },
+    {
+      "task_id": "TASK-PROTOCOL",
+      "task_type": "protocol_transfer",
+      "train_observation_ids": [
+        "OBS-001"
+      ],
+      "test_observation_ids": [
+        "OBS-008"
+      ],
+      "paired_specimen_transfer": false
+    },
+    {
+      "task_id": "TASK-TIME",
+      "task_type": "time_forward",
+      "train_observation_ids": [
+        "OBS-001",
+        "OBS-002"
+      ],
+      "test_observation_ids": [
+        "OBS-005",
+        "OBS-006",
+        "OBS-008"
+      ],
+      "paired_specimen_transfer": false
+    }
+  ],
+  "material_profile": {
+    "material_id": "SYNTH-REBCO-4MM",
+    "property_id": "Ic_77K_self_field",
+    "property_unit": "A"
+  }
+}

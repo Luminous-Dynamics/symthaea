@@ -360,7 +360,7 @@
         "strain_state": null
       },
       "provenance": {
-        "extraction_method": "database_import",
+        "extraction_method": "manual_curated",
         "extraction_model": null,
         "extraction_revision": "fixture-v0",
         "extraction_confidence": 1,
@@ -619,7 +619,7 @@
         "detection_status": "detected",
         "measurement_scope": "local_probe",
         "measurement_scope_description": "synthetic local shot-noise spectroscopy example",
-        "tc_criterion": null,
+        "tc_criterion": "not_applicable",
         "measurement_method": "synthetic local shot-noise spectroscopy",
         "model_id": null,
         "model_revision": null,
@@ -708,7 +708,7 @@
         "detection_status": "detected",
         "measurement_scope": "bulk",
         "measurement_scope_description": "synthetic bulk stiffness measurement example",
-        "tc_criterion": null,
+        "tc_criterion": "not_applicable",
         "measurement_method": "synthetic bulk superfluid stiffness probe",
         "model_id": null,
         "model_revision": null,
@@ -772,9 +772,9 @@
           "x_data_version": "v2026.09.03",
           "external_parent_ids": {
             "paper_id": "fixture-paper-005",
-            "material_id": "fixture-material-001",
-            "sample_id": "fixture-sample-002",
-            "state_id": "fixture-state-004",
+            "material_id": "fixture-sclib-material-001",
+            "sample_id": "fixture-sclib-sample-002",
+            "state_id": "fixture-sclib-state-004",
             "result_id": "fixture-parent-result-019",
             "event_id": "fixture-event-018"
           },
