@@ -224,6 +224,8 @@ fn validate_task(
     let test_conditions = get_group(&test, "condition_id")?;
     let train_properties = get_group(&train, "property_id")?;
     let test_properties = get_group(&test, "property_id")?;
+    let train_states = get_group(&train, "material_state_id")?;
+    let test_states = get_group(&test, "material_state_id")?;
 
     if train_properties != test_properties || train_properties.len() != 1 {
         return Err(format!(
@@ -244,6 +246,7 @@ fn validate_task(
                 ));
             }
             require_same_single(&train_specimens, &test_specimens, "specimen")?;
+            require_same_single(&train_states, &test_states, "material state")?;
             require_same_single(&train_batches, &test_batches, "batch")?;
             require_same_single(&train_campaigns, &test_campaigns, "campaign")?;
             require_same_single(&train_labs, &test_labs, "laboratory")?;
@@ -272,6 +275,7 @@ fn validate_task(
                 ));
             }
             require_same_single(&train_specimens, &test_specimens, "paired specimen")?;
+            require_same_single(&train_states, &test_states, "paired material state")?;
             require_same_single(&train_batches, &test_batches, "batch")?;
             require_same_single(&train_campaigns, &test_campaigns, "campaign")?;
             require_same_single(&train_labs, &test_labs, "laboratory")?;
@@ -312,6 +316,7 @@ fn validate_task(
             require_disjoint(&train_labs, &test_labs, "laboratory")?;
             if paired {
                 require_same_single(&train_specimens, &test_specimens, "paired specimen")?;
+                require_same_single(&train_states, &test_states, "paired material state")?;
                 require_same_single(&train_batches, &test_batches, "batch")?;
                 require_same_single(&train_campaigns, &test_campaigns, "campaign")?;
                 require_same_single(&train_conditions, &test_conditions, "condition")?;
@@ -348,6 +353,8 @@ fn validate_task(
         "test_observation_count": test.len(),
         "train_specimen_count": train_specimens.len(),
         "test_specimen_count": test_specimens.len(),
+        "train_material_state_count": train_states.len(),
+        "test_material_state_count": test_states.len(),
         "train_batch_count": train_batches.len(),
         "test_batch_count": test_batches.len(),
         "train_campaign_count": train_campaigns.len(),
@@ -382,12 +389,12 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         return Err("fixture claim ceiling does not match the reproducibility audit".to_owned());
     }
 
-    let state = fixture
-        .get("material_state")
-        .ok_or_else(|| "material_state is required".to_owned())?;
-    let state_id = nonempty_text(state, "state_id", "material_state")?;
-    let property = nonempty_text(state, "property_id", "material_state")?;
-    let unit = nonempty_text(state, "property_unit", "material_state")?;
+    let profile = fixture
+        .get("material_profile")
+        .ok_or_else(|| "material_profile is required".to_owned())?;
+    let material_id = nonempty_text(profile, "material_id", "material_profile")?;
+    let property = nonempty_text(profile, "property_id", "material_profile")?;
+    let unit = nonempty_text(profile, "property_unit", "material_profile")?;
     let observations = array(
         fixture
             .get("observations")
@@ -396,6 +403,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     )?;
     let mut observations_by_id = HashMap::with_capacity(observations.len());
     let mut specimens = BTreeSet::new();
+    let mut material_states = BTreeSet::new();
     let mut batches = BTreeSet::new();
     let mut campaigns = BTreeSet::new();
     let mut labs = BTreeSet::new();
@@ -404,12 +412,13 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
 
     for (index, observation) in observations.iter().enumerate() {
         let path = format!("observations[{index}]");
-        if nonempty_text(observation, "material_state_id", &path)? != state_id
+        nonempty_text(observation, "material_state_id", &path)?;
+        if nonempty_text(observation, "material_id", &path)? != material_id
             || nonempty_text(observation, "property_id", &path)? != property
             || nonempty_text(observation, "property_unit", &path)? != unit
         {
             return Err(format!(
-                "{path}: material_state_id/property_id/property_unit does not match material_state"
+                "{path}: material_id/property_id/property_unit does not match material_profile"
             ));
         }
         if nonempty_text(observation, "evidence_class", &path)? != "synthetic"
@@ -433,6 +442,9 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             return Err(format!("duplicate observation_id {observation_id}"));
         }
         specimens.insert(nonempty_text(observation, "specimen_id", &path)?.to_owned());
+        material_states.insert(
+            nonempty_text(observation, "material_state_id", &path)?.to_owned(),
+        );
         batches.insert(nonempty_text(observation, "batch_id", &path)?.to_owned());
         campaigns.insert(nonempty_text(observation, "campaign_id", &path)?.to_owned());
         labs.insert(nonempty_text(observation, "lab_id", &path)?.to_owned());
@@ -462,6 +474,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         "fixture_sha256": sha256_hex(fixture_bytes),
         "observation_count": observations.len(),
         "unique_specimen_count": specimens.len(),
+        "unique_material_state_count": material_states.len(),
         "unique_batch_count": batches.len(),
         "unique_campaign_count": campaigns.len(),
         "unique_laboratory_count": labs.len(),
