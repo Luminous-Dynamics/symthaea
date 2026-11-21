@@ -210,7 +210,7 @@
         },
         "tested_fan_in_levels": {
           "type": "array",
-          "minItems": 2,
+          "minItems": 1,
           "items": {
             "type": "integer",
             "minimum": 2
@@ -311,7 +311,7 @@
         },
         "tested_horizon_seconds": {
           "type": "array",
-          "minItems": 2,
+          "minItems": 1,
           "items": {
             "type": "number",
             "exclusiveMinimum": 0
