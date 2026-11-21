@@ -375,7 +375,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     }
     let validator =
         validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
-    for error in validator.iter_errors(&fixture) {
+    if let Some(error) = validator.iter_errors(&fixture).next() {
         return Err(format!(
             "fixture schema validation failed: {} at {}",
             error,
