@@ -3,11 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-canvas
 //!
-//! Living topology UI: real-time SVG projection of Symthaea's cognitive geometry.
+//! Renderer-neutral living topology model with deterministic SVG and 3D mesh adapters.
 //!
 //! Converts cognitive telemetry (consciousness level, neuromodulators, Betti numbers,
 //! Cantor depth, harmony activations) into a declarative scene graph, then renders
-//! self-contained animated SVG.
+//! self-contained animated SVG or portable indexed 3D tube geometry.
 //!
 //! Pipeline: `CognitiveSnapshot → AestheticEngine → AestheticState → build_scene() → render_svg()`
 //!
@@ -60,7 +60,8 @@ pub use mycelial_model::{
 };
 pub use mycelial_mesh::{
     tessellate_mycelial_model, FilamentMeshRange, MycelialTubeMesh,
-    TubeTessellationConfig, TubeTessellationError,
+    TubeTessellationConfig, TubeTessellationError, MAX_MYCELIAL_FILAMENTS,
+    MAX_TUBE_MESH_VERTICES,
 };
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
