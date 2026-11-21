@@ -132,8 +132,9 @@ fn validate(subject: &BinaryScoreSubjectV1) -> Result<(usize, usize), BinaryMetr
             "calibration_bins: expected integer in [2, 100]".into(),
         ));
     }
-    if !subject.recall_target.is_finite()
-        || !(0.0 < subject.recall_target && subject.recall_target <= 1.0)
+    if !(subject.recall_target.is_finite()
+        && 0.0 < subject.recall_target
+        && subject.recall_target <= 1.0)
     {
         return Err(BinaryMetricsError(
             "recall_target: must be finite and in (0, 1]".into(),
