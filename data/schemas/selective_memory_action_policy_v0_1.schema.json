@@ -86,7 +86,10 @@
         "track",
         "independent_cluster_count",
         "case_count",
-        "randomization"
+        "randomization",
+        "time_semantics_profile_sha256",
+        "freshness_metric_profile_sha256",
+        "freshness_budget_profile_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -157,6 +160,15 @@
           ]
         },
         "hardware_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "time_semantics_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "freshness_metric_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "freshness_budget_profile_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
@@ -286,6 +298,9 @@
         "candidate_reported_evidence_age_at_retrieval_ns": {
           "type": "integer",
           "minimum": 0
+        },
+        "freshness_assessment_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
