@@ -156,3 +156,31 @@ def validate_pair_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
             "does_not_establish_causal_production_relationship": True,
         },
     }
+
+
+def main() -> int:
+    import argparse
+    import json
+    import sys
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input", type=Path, help="contrastive-pair manifest JSON")
+    parser.add_argument("--output", type=Path, help="write validation report JSON")
+    args = parser.parse_args()
+    try:
+        subject = json.loads(args.input.read_text(encoding="utf-8"))
+        result = validate_pair_manifest(subject)
+    except (OSError, json.JSONDecodeError, PairManifestError) as exc:
+        print(f"SEMI-BENCH contrastive-pair validator REJECT: {exc}", file=sys.stderr)
+        return 2
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if args.output:
+        args.output.write_text(rendered, encoding="utf-8")
+    else:
+        sys.stdout.write(rendered)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
