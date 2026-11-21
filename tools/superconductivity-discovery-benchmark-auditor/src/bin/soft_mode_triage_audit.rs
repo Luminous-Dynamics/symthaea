@@ -15,6 +15,13 @@ const FIXTURE_PATH: &str = "data/research/sc_soft_mode_triage_fixture_v0_1.json"
 #[derive(Debug, Clone)]
 struct PhononRun {
     run_id: String,
+    convergence_profile_id: String,
+    functional_id: String,
+    pseudopotential_set_id: String,
+    q_mesh: [u32; 3],
+    supercell: [u32; 3],
+    electronic_cutoff_ev: f64,
+    displacement_amplitude_angstrom: f64,
     converged: bool,
     minimum_frequency_cm1: f64,
     frequency_uncertainty_cm1: f64,
@@ -150,6 +157,27 @@ fn bool_field(value: &Value, key: &str, path: &str) -> Result<bool, String> {
         .ok_or_else(|| fail(path, format!("{key} must be boolean")))
 }
 
+fn positive_integer_triplet(value: &Value, key: &str, path: &str) -> Result<[u32; 3], String> {
+    let values = array(
+        value.get(key).ok_or_else(|| fail(path, format!("missing property {key}")))?,
+        &format!("{path}.{key}"),
+    )?;
+    if values.len() != 3 {
+        return Err(fail(path, format!("{key} must contain exactly three positive integers")));
+    }
+    let mut result = [0_u32; 3];
+    for (index, item) in values.iter().enumerate() {
+        let raw = item
+            .as_u64()
+            .ok_or_else(|| fail(path, format!("{key}[{index}] must be a positive integer")))?;
+        result[index] = u32::try_from(raw)
+            .ok()
+            .filter(|number| *number > 0)
+            .ok_or_else(|| fail(path, format!("{key}[{index}] is outside the valid range")))?;
+    }
+    Ok(result)
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -194,7 +222,14 @@ fn parse_thresholds(value: &Value) -> Result<Thresholds, String> {
 fn parse_run(value: &Value, path: &str) -> Result<PhononRun, String> {
     const KEYS: &[&str] = &[
         "run_id",
+        "convergence_profile_id",
         "method_scope",
+        "functional_id",
+        "pseudopotential_set_id",
+        "q_mesh",
+        "supercell",
+        "electronic_cutoff_ev",
+        "displacement_amplitude_angstrom",
         "converged",
         "minimum_frequency_cm1",
         "frequency_uncertainty_cm1",
@@ -210,6 +245,17 @@ fn parse_run(value: &Value, path: &str) -> Result<PhononRun, String> {
     }
     Ok(PhononRun {
         run_id: text_field(value, "run_id", path)?.to_owned(),
+        convergence_profile_id: text_field(value, "convergence_profile_id", path)?.to_owned(),
+        functional_id: text_field(value, "functional_id", path)?.to_owned(),
+        pseudopotential_set_id: text_field(value, "pseudopotential_set_id", path)?.to_owned(),
+        q_mesh: positive_integer_triplet(value, "q_mesh", path)?,
+        supercell: positive_integer_triplet(value, "supercell", path)?,
+        electronic_cutoff_ev: positive_number(value, "electronic_cutoff_ev", path)?,
+        displacement_amplitude_angstrom: positive_number(
+            value,
+            "displacement_amplitude_angstrom",
+            path,
+        )?,
         converged: bool_field(value, "converged", path)?,
         minimum_frequency_cm1: number_field(value, "minimum_frequency_cm1", path)?,
         frequency_uncertainty_cm1: nonnegative_number(
@@ -249,11 +295,30 @@ fn parse_candidate(value: &Value, path: &str) -> Result<Candidate, String> {
         &format!("{path}.phonon_runs"),
     )?;
     let mut run_ids = BTreeSet::new();
+    let mut convergence_profile_ids = BTreeSet::new();
     let mut runs = Vec::with_capacity(run_values.len());
+    let mut reference_method: Option<(String, String)> = None;
     for (index, run) in run_values.iter().enumerate() {
         let parsed = parse_run(run, &format!("{path}.phonon_runs[{index}]"))?;
         if !run_ids.insert(parsed.run_id.clone()) {
             return Err(fail(path, "duplicate phonon run_id"));
+        }
+        if !convergence_profile_ids.insert(parsed.convergence_profile_id.clone()) {
+            return Err(fail(path, "duplicate convergence_profile_id"));
+        }
+        let method = (
+            parsed.functional_id.clone(),
+            parsed.pseudopotential_set_id.clone(),
+        );
+        if let Some(expected) = &reference_method {
+            if expected != &method {
+                return Err(fail(
+                    path,
+                    "convergence runs must use the same functional and pseudopotential set",
+                ));
+            }
+        } else {
+            reference_method = Some(method);
         }
         runs.push(parsed);
     }
@@ -286,6 +351,21 @@ fn disposition(candidate: &Candidate, thresholds: &Thresholds) -> Disposition {
             || run.max_force_residual_mev_per_angstrom
                 > thresholds.maximum_force_residual_mev_per_angstrom
     }) {
+        return Disposition::UnderconvergedUnknown;
+    }
+    let distinct_convergence_profiles = candidate
+        .runs
+        .iter()
+        .map(|run| run.convergence_profile_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let distinct_mesh_supercell_settings = candidate
+        .runs
+        .iter()
+        .map(|run| (run.q_mesh, run.supercell))
+        .collect::<BTreeSet<_>>();
+    if distinct_convergence_profiles.len() < thresholds.minimum_converged_runs
+        || distinct_mesh_supercell_settings.len() < thresholds.minimum_converged_runs
+    {
         return Disposition::UnderconvergedUnknown;
     }
 
