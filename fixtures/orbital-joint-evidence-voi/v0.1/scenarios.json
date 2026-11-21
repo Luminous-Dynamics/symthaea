@@ -151,7 +151,10 @@
         ],
         "notes": "The mass-only action produces the same observation in both states. The coupon interaction test separates the two states; the full truss test exceeds the facility budget."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-002",
@@ -271,7 +274,10 @@
         ],
         "notes": "Prior probabilities are explicit synthetic fixture inputs, not derived from interval endpoints. The test is perfect for this two-state synthetic oracle."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-003",
@@ -344,7 +350,10 @@
         ],
         "notes": "All admissible options produce identical observations in both possible states. No action changes the supported decision."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-004",
@@ -417,7 +426,10 @@
         ],
         "notes": "A theoretically perfect test exceeds the specimen and facility budgets. Decision value does not override hard resource constraints."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-005",
@@ -492,7 +504,10 @@
         ],
         "notes": "The only informative action targets a superseded geometry/configuration and therefore cannot resolve the current profile."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-006",
@@ -579,7 +594,8 @@
         "requirement-profile://C1": []
       },
       "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
-      "requires_independent_evidence": true
+      "requires_independent_evidence": true,
+      "required_obligations": []
     },
     {
       "scenario_id": "JEV-007",
@@ -654,7 +670,10 @@
         ],
         "notes": "Axial-only measurement cannot resolve a coupled axial/shear/bending/torsion interaction. No admitted interaction profile exists, so the proposed test cannot support the target claim."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-008",
@@ -731,7 +750,10 @@
         ],
         "notes": "Coupon action may support a source-scale material property but does not resolve the production-joint target claim without an admitted scale-transfer bridge."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-009",
@@ -842,7 +864,9 @@
       "required_obligations": [
         "LOAD-X-TEMP-X-EOL-001"
       ],
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-010",
@@ -964,7 +988,9 @@
       "required_obligations": [
         "WEAR-LIFECYCLE-001"
       ],
-      "target_claim_id": "WEAR-LIFECYCLE-001"
+      "target_claim_id": "WEAR-LIFECYCLE-001",
+      "requires_independent_evidence": false,
+      "current_evidence_dependency_groups": {}
     },
     {
       "scenario_id": "JEV-011",
@@ -1047,7 +1073,10 @@
         ],
         "notes": "The only attempted test aborted after incurring resources and produced no admissible outcome. Preserve consumed cost and missing evidence; do not infer success."
       },
-      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     }
   ]
 }
