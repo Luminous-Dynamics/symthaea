@@ -25,7 +25,8 @@
       "replicate_index": 1,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-001"
+      "source_id": "SYNTH-SOURCE-001",
+      "material_state_id": "SYNTH-STATE-001"
     },
     {
       "observation_id": "OBS-002",
@@ -43,7 +44,8 @@
       "replicate_index": 2,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-001"
+      "source_id": "SYNTH-SOURCE-001",
+      "material_state_id": "SYNTH-STATE-001"
     },
     {
       "observation_id": "OBS-003",
@@ -61,7 +63,8 @@
       "replicate_index": 1,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-002"
+      "source_id": "SYNTH-SOURCE-002",
+      "material_state_id": "SYNTH-STATE-001"
     },
     {
       "observation_id": "OBS-004",
@@ -79,7 +82,8 @@
       "replicate_index": 1,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-003"
+      "source_id": "SYNTH-SOURCE-003",
+      "material_state_id": "SYNTH-STATE-001"
     },
     {
       "observation_id": "OBS-005",
@@ -97,7 +101,8 @@
       "replicate_index": 1,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-004"
+      "source_id": "SYNTH-SOURCE-004",
+      "material_state_id": "SYNTH-STATE-001"
     },
     {
       "observation_id": "OBS-006",
@@ -115,7 +120,8 @@
       "replicate_index": 1,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-005"
+      "source_id": "SYNTH-SOURCE-005",
+      "material_state_id": "SYNTH-STATE-001"
     },
     {
       "observation_id": "OBS-007",
@@ -133,7 +139,8 @@
       "replicate_index": 1,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-006"
+      "source_id": "SYNTH-SOURCE-006",
+      "material_state_id": "SYNTH-STATE-001"
     },
     {
       "observation_id": "OBS-008",
@@ -151,7 +158,8 @@
       "replicate_index": 1,
       "evidence_class": "synthetic",
       "evidence_authority": "synthetic_measurement",
-      "source_id": "SYNTH-SOURCE-007"
+      "source_id": "SYNTH-SOURCE-007",
+      "material_state_id": "SYNTH-STATE-001"
     }
   ],
   "tasks": [
