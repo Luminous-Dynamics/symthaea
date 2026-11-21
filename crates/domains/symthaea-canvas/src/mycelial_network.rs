@@ -14,9 +14,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::mycelial_model::{
-    MYCELIAL_MODEL_VERSION, MycelialModel, SpatialPoint3,
-};
+use crate::mycelial_model::{MYCELIAL_MODEL_VERSION, MycelialModel, SpatialPoint3};
 
 pub const MYCELIAL_NETWORK_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MYCELIAL_ANASTOMOSES: usize = 512;
@@ -112,7 +110,10 @@ pub enum MycelialNetworkError {
     FilamentCountExceeded(usize),
     AnastomosisCountExceeded(usize),
     DuplicateFilamentId(u32),
-    MissingParent { filament_id: u32, parent_id: u32 },
+    MissingParent {
+        filament_id: u32,
+        parent_id: u32,
+    },
     DuplicateAnastomosisId(u32),
     MissingSourceFilament(u32),
     MissingTargetFilament(u32),
@@ -134,16 +135,27 @@ impl fmt::Display for MycelialNetworkError {
             Self::UnsupportedModelVersion(version) => {
                 write!(f, "unsupported source MycelialModel version {version}")
             }
-            Self::InvalidConfig => write!(f, "maximum fusion distance must be finite and in (0, 100]"),
+            Self::InvalidConfig => {
+                write!(f, "maximum fusion distance must be finite and in (0, 100]")
+            }
             Self::FilamentCountExceeded(count) => {
                 write!(f, "filament count {count} exceeds network limit")
             }
             Self::AnastomosisCountExceeded(count) => {
-                write!(f, "anastomosis count {count} exceeds limit {MAX_MYCELIAL_ANASTOMOSES}")
+                write!(
+                    f,
+                    "anastomosis count {count} exceeds limit {MAX_MYCELIAL_ANASTOMOSES}"
+                )
             }
             Self::DuplicateFilamentId(id) => write!(f, "duplicate filament ID {id}"),
-            Self::MissingParent { filament_id, parent_id } => {
-                write!(f, "filament {filament_id} references missing parent {parent_id}")
+            Self::MissingParent {
+                filament_id,
+                parent_id,
+            } => {
+                write!(
+                    f,
+                    "filament {filament_id} references missing parent {parent_id}"
+                )
             }
             Self::DuplicateAnastomosisId(id) => {
                 write!(f, "duplicate anastomosis ID {id}")
@@ -162,13 +174,23 @@ impl fmt::Display for MycelialNetworkError {
                 write!(f, "anastomosis {id} target is not a terminal hyphal tip")
             }
             Self::InvalidFusionParameter(id) => {
-                write!(f, "anastomosis {id} has invalid parameter values for its fusion kind")
+                write!(
+                    f,
+                    "anastomosis {id} has invalid parameter values for its fusion kind"
+                )
             }
             Self::InvalidJunctionPosition(id) => {
                 write!(f, "anastomosis {id} has a non-finite junction position")
             }
-            Self::FusionTooFar { anastomosis_id, distance, limit } => {
-                write!(f, "anastomosis {anastomosis_id} contact distance {distance:.3} exceeds limit {limit:.3}")
+            Self::FusionTooFar {
+                anastomosis_id,
+                distance,
+                limit,
+            } => {
+                write!(
+                    f,
+                    "anastomosis {anastomosis_id} contact distance {distance:.3} exceeds limit {limit:.3}"
+                )
             }
         }
     }
@@ -226,13 +248,11 @@ pub fn detect_anastomosis_candidates(
             if !bounds_may_contact(source_tip, target, config.max_fusion_distance) {
                 continue;
             }
-            let (target_t, target_point, distance) =
-                nearest_bezier_parameter(target, source_tip);
+            let (target_t, target_point, distance) = nearest_bezier_parameter(target, source_tip);
             if !distance.is_finite() || distance > config.max_fusion_distance {
                 continue;
             }
-            if !(INTERIOR_PARAMETER_MARGIN..=(1.0 - INTERIOR_PARAMETER_MARGIN))
-                .contains(&target_t)
+            if !(INTERIOR_PARAMETER_MARGIN..=(1.0 - INTERIOR_PARAMETER_MARGIN)).contains(&target_t)
             {
                 continue;
             }
@@ -315,12 +335,21 @@ fn bounds_may_contact(
             0.0
         }
     };
-    let dx = distance_to_interval(point.x, xs.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
-        xs.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance);
-    let dy = distance_to_interval(point.y, ys.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
-        ys.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance);
-    let dz = distance_to_interval(point.z, zs.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
-        zs.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance);
+    let dx = distance_to_interval(
+        point.x,
+        xs.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
+        xs.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance,
+    );
+    let dy = distance_to_interval(
+        point.y,
+        ys.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
+        ys.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance,
+    );
+    let dz = distance_to_interval(
+        point.z,
+        zs.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
+        zs.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance,
+    );
     dx * dx + dy * dy + dz * dz <= maximum_distance * maximum_distance
 }
 
@@ -401,9 +430,8 @@ pub fn build_mycelial_network_graph(
         }
     }
 
-    let mut connections = Vec::with_capacity(
-        model.filaments.len().saturating_sub(1) + anastomoses.len(),
-    );
+    let mut connections =
+        Vec::with_capacity(model.filaments.len().saturating_sub(1) + anastomoses.len());
     for filament in &model.filaments {
         if let Some(parent_id) = filament.parent_id {
             if !filaments.contains_key(&parent_id) {
@@ -430,16 +458,12 @@ pub fn build_mycelial_network_graph(
         if fusion.source_filament_id == fusion.target_filament_id {
             return Err(MycelialNetworkError::SelfFusion(fusion.id));
         }
-        let source = filaments
-            .get(&fusion.source_filament_id)
-            .ok_or(MycelialNetworkError::MissingSourceFilament(
-                fusion.source_filament_id,
-            ))?;
-        let target = filaments
-            .get(&fusion.target_filament_id)
-            .ok_or(MycelialNetworkError::MissingTargetFilament(
-                fusion.target_filament_id,
-            ))?;
+        let source = filaments.get(&fusion.source_filament_id).ok_or(
+            MycelialNetworkError::MissingSourceFilament(fusion.source_filament_id),
+        )?;
+        let target = filaments.get(&fusion.target_filament_id).ok_or(
+            MycelialNetworkError::MissingTargetFilament(fusion.target_filament_id),
+        )?;
         if !source.terminal {
             return Err(MycelialNetworkError::SourceIsNotTerminalTip(fusion.id));
         }
@@ -656,10 +680,7 @@ fn single_filament_failure_metrics(
     (articulation_count, worst_components)
 }
 
-fn count_components_without(
-    adjacency: &HashMap<u32, Vec<u32>>,
-    excluded: Option<u32>,
-) -> usize {
+fn count_components_without(adjacency: &HashMap<u32, Vec<u32>>, excluded: Option<u32>) -> usize {
     let mut visited = BTreeSet::new();
     let mut components = 0;
     for start in adjacency.keys().copied() {
@@ -712,7 +733,7 @@ mod tests {
     use crate::mycelial_model::{
         MycelialFilament, OrbitalCell, PresenceMode, build_mycelial_model,
     };
-    use crate::{CognitiveTopology, COGNITIVE_TOPOLOGY_SCHEMA_VERSION};
+    use crate::{COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveTopology};
 
     fn filament(
         id: u32,
@@ -737,7 +758,11 @@ mod tests {
     }
 
     fn fork_model() -> MycelialModel {
-        let root_end = SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 };
+        let root_end = SpatialPoint3 {
+            x: 0.0,
+            y: 3.0,
+            z: 0.0,
+        };
         MycelialModel {
             schema_version: MYCELIAL_MODEL_VERSION,
             mode: PresenceMode::Ambient,
@@ -751,25 +776,57 @@ mod tests {
                     1,
                     None,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
                     root_end,
                 ),
                 filament(
                     2,
                     Some(1),
                     root_end,
-                    SpatialPoint3 { x: 1.0, y: 4.0, z: 0.0 },
-                    SpatialPoint3 { x: 2.0, y: 5.0, z: 0.0 },
-                    SpatialPoint3 { x: 3.0, y: 6.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 4.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 2.0,
+                        y: 5.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 3.0,
+                        y: 6.0,
+                        z: 0.0,
+                    },
                 ),
                 filament(
                     3,
                     Some(1),
                     root_end,
-                    SpatialPoint3 { x: 2.0, y: 5.0, z: 0.0 },
-                    SpatialPoint3 { x: 4.0, y: 7.0, z: 0.0 },
-                    SpatialPoint3 { x: 6.0, y: 9.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 2.0,
+                        y: 5.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 4.0,
+                        y: 7.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 6.0,
+                        y: 9.0,
+                        z: 0.0,
+                    },
                 ),
             ],
             orbital_cells: Vec::<OrbitalCell>::new(),
@@ -782,12 +839,8 @@ mod tests {
             &crate::embodiment::EmbodimentSnapshot::default(),
             PresenceMode::Ambient,
         );
-        let graph = build_mycelial_network_graph(
-            &model,
-            &[],
-            MycelialNetworkConfig::default(),
-        )
-        .unwrap();
+        let graph =
+            build_mycelial_network_graph(&model, &[], MycelialNetworkConfig::default()).unwrap();
         let metrics = graph.metrics();
         assert_eq!(metrics.filament_count, 120);
         assert_eq!(metrics.parent_branch_count, 112);
@@ -809,14 +862,15 @@ mod tests {
             target_filament_id: 3,
             target_t: 0.5,
             kind: AnastomosisKind::TipToSide,
-            junction_position: SpatialPoint3 { x: 3.0, y: 6.0, z: 0.0 },
+            junction_position: SpatialPoint3 {
+                x: 3.0,
+                y: 6.0,
+                z: 0.0,
+            },
         };
-        let graph = build_mycelial_network_graph(
-            &model,
-            &[fusion],
-            MycelialNetworkConfig::default(),
-        )
-        .unwrap();
+        let graph =
+            build_mycelial_network_graph(&model, &[fusion], MycelialNetworkConfig::default())
+                .unwrap();
         let metrics = graph.metrics();
         assert_eq!(metrics.filament_count, 3);
         assert_eq!(metrics.parent_branch_count, 2);
@@ -832,16 +886,10 @@ mod tests {
     fn anastomosis_detection_is_deterministic_and_only_proposes_contacts() {
         let model = fork_model();
         let original = model.clone();
-        let first = detect_anastomosis_candidates(
-            &model,
-            MycelialNetworkConfig::default(),
-        )
-        .unwrap();
-        let second = detect_anastomosis_candidates(
-            &model,
-            MycelialNetworkConfig::default(),
-        )
-        .unwrap();
+        let first =
+            detect_anastomosis_candidates(&model, MycelialNetworkConfig::default()).unwrap();
+        let second =
+            detect_anastomosis_candidates(&model, MycelialNetworkConfig::default()).unwrap();
         assert_eq!(first, second);
         assert!(first.iter().any(|candidate| {
             candidate.fusion.source_filament_id == 2
@@ -853,30 +901,23 @@ mod tests {
         assert_eq!(model, original);
 
         // Detection itself is proposal-only: the tree still has no cycles.
-        let tree = build_mycelial_network_graph(
-            &model,
-            &[],
-            MycelialNetworkConfig::default(),
-        )
-        .unwrap();
+        let tree =
+            build_mycelial_network_graph(&model, &[], MycelialNetworkConfig::default()).unwrap();
         assert_eq!(tree.metrics().cycle_rank, 0);
     }
 
     #[test]
     fn accepted_candidate_is_the_only_operation_that_adds_network_connectivity() {
         let model = fork_model();
-        let candidate = detect_anastomosis_candidates(
-            &model,
-            MycelialNetworkConfig::default(),
-        )
-        .unwrap()
-        .into_iter()
-        .find(|candidate| {
-            candidate.fusion.source_filament_id == 2
-                && candidate.fusion.target_filament_id == 3
-                && candidate.fusion.kind == AnastomosisKind::TipToSide
-        })
-        .expect("known geometric contact");
+        let candidate = detect_anastomosis_candidates(&model, MycelialNetworkConfig::default())
+            .unwrap()
+            .into_iter()
+            .find(|candidate| {
+                candidate.fusion.source_filament_id == 2
+                    && candidate.fusion.target_filament_id == 3
+                    && candidate.fusion.kind == AnastomosisKind::TipToSide
+            })
+            .expect("known geometric contact");
         let graph = build_mycelial_network_graph(
             &model,
             &[candidate.fusion],
@@ -896,14 +937,14 @@ mod tests {
             target_filament_id: 3,
             target_t: 0.5,
             kind: AnastomosisKind::TipToSide,
-            junction_position: SpatialPoint3 { x: 50.0, y: 50.0, z: 0.0 },
+            junction_position: SpatialPoint3 {
+                x: 50.0,
+                y: 50.0,
+                z: 0.0,
+            },
         };
         assert!(matches!(
-            build_mycelial_network_graph(
-                &model,
-                &[fusion],
-                MycelialNetworkConfig::default(),
-            ),
+            build_mycelial_network_graph(&model, &[fusion], MycelialNetworkConfig::default(),),
             Err(MycelialNetworkError::FusionTooFar { .. })
         ));
     }
@@ -918,10 +959,18 @@ mod tests {
             target_filament_id: 3,
             target_t: 0.5,
             kind: AnastomosisKind::TipToTip,
-            junction_position: SpatialPoint3 { x: 3.0, y: 6.0, z: 0.0 },
+            junction_position: SpatialPoint3 {
+                x: 3.0,
+                y: 6.0,
+                z: 0.0,
+            },
         };
         assert!(matches!(
-            build_mycelial_network_graph(&model, &[bad_parameter], MycelialNetworkConfig::default()),
+            build_mycelial_network_graph(
+                &model,
+                &[bad_parameter],
+                MycelialNetworkConfig::default()
+            ),
             Err(MycelialNetworkError::InvalidFusionParameter(9))
         ));
 
@@ -932,7 +981,11 @@ mod tests {
             target_filament_id: 2,
             target_t: 0.5,
             kind: AnastomosisKind::TipToSide,
-            junction_position: SpatialPoint3 { x: 3.0, y: 6.0, z: 0.0 },
+            junction_position: SpatialPoint3 {
+                x: 3.0,
+                y: 6.0,
+                z: 0.0,
+            },
         };
         assert!(matches!(
             build_mycelial_network_graph(&model, &[self_contact], MycelialNetworkConfig::default()),
@@ -942,10 +995,9 @@ mod tests {
 
     #[test]
     fn morphology_fusion_does_not_mutate_cognitive_topology_digest() {
-        let topology: CognitiveTopology = serde_json::from_str(include_str!(
-            "../tests/fixtures/cognitive_topology_v1.json"
-        ))
-        .unwrap();
+        let topology: CognitiveTopology =
+            serde_json::from_str(include_str!("../tests/fixtures/cognitive_topology_v1.json"))
+                .unwrap();
         let before = topology.canonical_digest_hex().unwrap();
         let model = fork_model();
         let fusion = MycelialAnastomosis {
@@ -955,14 +1007,15 @@ mod tests {
             target_filament_id: 3,
             target_t: 0.5,
             kind: AnastomosisKind::TipToSide,
-            junction_position: SpatialPoint3 { x: 3.0, y: 6.0, z: 0.0 },
+            junction_position: SpatialPoint3 {
+                x: 3.0,
+                y: 6.0,
+                z: 0.0,
+            },
         };
-        let _graph = build_mycelial_network_graph(
-            &model,
-            &[fusion],
-            MycelialNetworkConfig::default(),
-        )
-        .unwrap();
+        let _graph =
+            build_mycelial_network_graph(&model, &[fusion], MycelialNetworkConfig::default())
+                .unwrap();
         assert_eq!(topology.canonical_digest_hex().unwrap(), before);
     }
 }
