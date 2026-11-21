@@ -341,7 +341,7 @@ mod tests {
         assert_eq!(receipt["status"], "pass");
         assert_eq!(receipt["source_count"], 25);
         assert_eq!(receipt["candidate_count"], 15);
-        assert_eq!(receipt["benchmark_catalog_count"], 18);
+        assert_eq!(receipt["benchmark_catalog_count"], 19);
     }
 
     #[test]
