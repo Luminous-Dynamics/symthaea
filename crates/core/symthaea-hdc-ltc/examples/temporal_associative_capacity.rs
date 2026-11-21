@@ -812,6 +812,27 @@ mod tests {
     }
 
     #[test]
+    fn hdc_ltc_post_step_norm_cap_is_reportable() {
+        let memory = prepare_memory(256, 4, 23);
+        assert!(memory.bundle.norm() > 5.0);
+
+        let outcome = evolve_state(
+            256,
+            &memory.bundle,
+            23,
+            0.1,
+            1,
+            "regular",
+            "hdc_ltc_zero_input",
+        )
+        .expect("one valid positive interval should evolve");
+
+        assert_eq!(outcome.api_update_count, 1);
+        assert!((outcome.reported_logical_seconds - 0.1).abs() < 1.0e-6);
+        assert!(outcome.state.norm() <= 5.0 + 1.0e-5);
+    }
+
+    #[test]
     fn evolution_rejects_intervals_below_the_neuron_time_floor() {
         let memory = prepare_memory(256, 4, 19);
         let result = evolve_state(
