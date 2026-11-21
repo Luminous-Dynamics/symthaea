@@ -673,6 +673,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                     )?;
                 }
 
+                // The zero-horizon HDC-LTC path must be an exact identity
+                // shortcut: same state, zero updates and same decode as static.
+                run_cohort(
+                    &mut writer,
+                    &memory,
+                    seed,
+                    dim,
+                    fan_in,
+                    0.0,
+                    0,
+                    "not_applicable",
+                    "hdc_ltc_zero_input",
+                )?;
+
                 for &horizon_seconds in args.horizons.iter().filter(|&&h| h > 0.0) {
                     for &events in &args.events {
                         for gap_profile in ["regular", "irregular"] {
