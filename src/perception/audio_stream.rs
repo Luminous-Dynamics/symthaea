@@ -285,6 +285,13 @@ pub(super) fn run_worker(
         if n > 0 {
             processor.push_audio(&scratch[..n]);
             for frame in processor.process() {
+                // Do not bundle acoustic snapshots across a source-audio gap.
+                // StreamProcessor marks the first frame after an overrun and
+                // has already reset its temporal state for that new segment.
+                if frame.discontinuity_before {
+                    pending.clear();
+                }
+
                 if let Some(ref ph) = frame.phoneme {
                     phonemes_decoded += 1;
                     if phonemes_decoded.is_multiple_of(100) {
