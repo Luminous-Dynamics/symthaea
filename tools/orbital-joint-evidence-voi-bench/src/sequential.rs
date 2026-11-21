@@ -1147,6 +1147,19 @@ mod tests {
     }
 
     #[test]
+    fn baseline_without_evidence_is_hold_not_reject_or_accept() {
+        let corpus: SequentialCorpus = serde_json::from_slice(FIXTURE).unwrap();
+        let scenario = &corpus.scenarios[0];
+        let baseline =
+            terminal_plan(scenario, &scenario.states, &BTreeSet::new()).unwrap();
+        assert_eq!(baseline.worst_case_regret, 2.0);
+        assert!(matches!(
+            baseline.node,
+            PolicyNode::Terminal { decision, .. } if decision == "HOLD"
+        ));
+    }
+
+    #[test]
     fn accept_leaf_carries_every_required_path_obligation() {
         let result = receipt();
         let scenario = &result.scenarios[0];
