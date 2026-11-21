@@ -47,7 +47,7 @@ These are raw observations. In particular:
 
 ## Verification tests
 
-The unit suite contains:
+The unit suite contains 11 tests:
 - radix-2 FFT forward/inverse round-trip;
 - homogeneous Maxwellian equilibrium;
 - manufactured free-streaming characteristic solution;
