@@ -50,7 +50,7 @@ const MEASURED_SAMPLES: usize = 32;
 fn simd_runtime_path() -> &'static str {
     #[cfg(all(target_arch = "x86_64", feature = "simd"))]
     {
-        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+        if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
             return "x86_64_avx2_fma";
         }
         return "x86_64_scalar_fallback";
