@@ -185,11 +185,7 @@ impl Accumulator {
     }
 
     fn add_element(&mut self, kind_bin: usize, center: (f32, f32), size: f32) {
-        if !center.0.is_finite()
-            || !center.1.is_finite()
-            || !size.is_finite()
-            || size <= 0.0
-        {
+        if !center.0.is_finite() || !center.1.is_finite() || !size.is_finite() || size <= 0.0 {
             return;
         }
         self.kind_histogram[kind_bin] += 1.0;
