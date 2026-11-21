@@ -28,7 +28,7 @@ use std::error::Error;
 
 const ORACLE_RK4_STEPS_PER_KNOT: usize = 4_096;
 const FRESHNESS_BUDGET_TICKS: u64 = 6;
-const DECISION_DEADLINE_BUDGET_TICKS: u64 = 12;
+const DECISION_DEADLINE_BUDGET_TICKS: u64 = 8;
 const INITIAL_STATE: f64 = -0.25;
 const TAU: f64 = 140.0;
 
@@ -757,6 +757,7 @@ mod tests {
         let jittered = run_profile(SamplingProfile::Jittered).unwrap();
         let regular = run_profile(SamplingProfile::Regular).unwrap();
         assert!(jittered.stale_outputs > 0);
+        assert!(jittered.late_outputs > 0);
         assert_eq!(regular.stale_outputs, 0);
         assert_eq!(regular.late_outputs, 0);
         assert!(jittered.stale_outputs <= jittered.delivered_events);
