@@ -1,6 +1,15 @@
 name: MEL Score Transaction Receipts
 
 on:
+  push:
+    branches:
+      - research/mel-score-transaction-receipts-v2-20261121
+    paths:
+      - "crates/domains/symthaea-muse/src/score_transaction.rs"
+      - "crates/domains/symthaea-muse/src/sonata_intervention.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
   pull_request:
     branches:
       - main
@@ -24,24 +33,25 @@ concurrency:
 
 jobs:
   qualify:
-    name: Exact merge-head score transaction qualification
+    name: Exact-head score transaction qualification
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Checkout exact PR merge head
+      - name: Checkout exact workflow source revision
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Verify exact merge and source revisions
+      - name: Verify exact source revision
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
           test "$actual" = "${{ github.sha }}"
-          printf 'merge_head=%s\n' "$actual" > "$RUNNER_TEMP/source-identities.txt"
-          printf 'pr_head=%s\n' "${{ github.event.pull_request.head.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
-          printf 'base_head=%s\n' "${{ github.event.pull_request.base.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'source_head=%s\n' "$actual" > "$RUNNER_TEMP/source-identities.txt"
+          printf 'event_name=%s\n' "${{ github.event_name }}" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'pr_head=%s\n' "${{ github.event.pull_request.head.sha || '' }}" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'base_head=%s\n' "${{ github.event.pull_request.base.sha || '' }}" >> "$RUNNER_TEMP/source-identities.txt"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
