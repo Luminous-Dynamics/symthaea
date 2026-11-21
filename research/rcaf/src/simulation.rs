@@ -123,6 +123,105 @@ pub fn run_estimator_tournament(
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct EstimatorDoseResponseCurve {
+    pub estimator: &'static str,
+    pub sweep: InjectionRecoverySweepReport,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EstimatorDoseResponseTournamentReport {
+    pub schema_version: &'static str,
+    pub estimators_compared: usize,
+    pub effect_sizes: Vec<f64>,
+    pub curves: Vec<EstimatorDoseResponseCurve>,
+}
+
+impl EstimatorDoseResponseTournamentReport {
+    pub fn to_json_pretty(&self) -> String {
+        let rendered_curves = self
+            .curves
+            .iter()
+            .map(|curve| {
+                let sweep_json = curve.sweep.to_json_pretty();
+                let indented_sweep = sweep_json
+                    .lines()
+                    .map(|line| format!("      {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\\n");
+                format!(
+                    concat!(
+                        "    {{\\n",
+                        "      \\"estimator\\": \\"{}\\",\\n",
+                        "      \\"sweep\\": {}\\n",
+                        "    }}"
+                    ),
+                    curve.estimator,
+                    indented_sweep
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",\\n");
+        let rendered_effects = self
+            .effect_sizes
+            .iter()
+            .map(|value| format!("{value:.12}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            concat!(
+                "{{\\n",
+                "  \\"schema_version\\": \\"{}\\",\\n",
+                "  \\"estimators_compared\\": {},\\n",
+                "  \\"effect_sizes\\": [{}],\\n",
+                "  \\"curves\\": [\\n{}\\n  ],\\n",
+                "  \\"claim_limits\\": [\\n",
+                "    \\"matched_synthetic_inputs_only\\",\\n",
+                "    \\"not_a_biological_estimator_ranking\\",\\n",
+                "    \\"no_universal_metric_winner_is_implied\\"\\n",
+                "  ]\\n",
+                "}}\\n"
+            ),
+            self.schema_version,
+            self.estimators_compared,
+            rendered_effects,
+            rendered_curves
+        )
+    }
+}
+
+/// Compare each estimator across the same predeclared injection strengths.
+///
+/// Each estimator receives the same seed, participant loading draws, temporal innovations,
+/// repeat segments and injection grid. This produces an estimator-by-dose surface rather than
+/// a single strong-effect comparison that may saturate all methods.
+pub fn run_estimator_dose_response_tournament(
+    config: &InjectionRecoveryConfig,
+    effect_sizes: &[f64],
+) -> Result<EstimatorDoseResponseTournamentReport, MetricError> {
+    let estimators = [
+        SimilarityEstimator::AbsoluteWeightedJaccard,
+        SimilarityEstimator::SignedShiftWeightedJaccard,
+        SimilarityEstimator::NormalizedMeanAbsoluteEdgeError,
+    ];
+    let mut curves = Vec::with_capacity(estimators.len());
+    for estimator in estimators {
+        let mut estimator_config = config.clone();
+        estimator_config.estimator = estimator;
+        let sweep = run_injection_recovery_sweep(&estimator_config, effect_sizes)?;
+        curves.push(EstimatorDoseResponseCurve {
+            estimator: estimator.as_str(),
+            sweep,
+        });
+    }
+    Ok(EstimatorDoseResponseTournamentReport {
+        schema_version: "rcaf.estimator-dose-response-tournament/0.1.0",
+        estimators_compared: curves.len(),
+        effect_sizes: effect_sizes.to_vec(),
+        curves,
+    })
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct InjectionRecoveryConfig {
     pub participants: usize,
     pub regions: usize,
@@ -860,6 +959,53 @@ mod tests {
                 "normalized_mean_absolute_edge_error",
             ]
         );
+    }
+
+    #[test]
+    fn estimator_dose_response_tournament_uses_common_seed_and_grid() {
+        let config = InjectionRecoveryConfig {
+            monte_carlo_replicates: 20,
+            ..test_config()
+        };
+        let effects = [0.0, 0.1, 0.2, 0.3];
+        let tournament =
+            run_estimator_dose_response_tournament(&config, &effects).unwrap();
+        assert_eq!(tournament.estimators_compared, 3);
+        assert_eq!(tournament.effect_sizes, effects);
+        assert_eq!(
+            tournament
+                .curves
+                .iter()
+                .map(|curve| curve.estimator)
+                .collect::<Vec<_>>(),
+            vec![
+                "absolute_weighted_jaccard",
+                "signed_shift_weighted_jaccard",
+                "normalized_mean_absolute_edge_error",
+            ]
+        );
+        for curve in &tournament.curves {
+            assert_eq!(
+                curve.sweep.reports.iter().map(|row| row.seed).collect::<Vec<_>>(),
+                vec![config.seed; effects.len()]
+            );
+            assert_eq!(
+                curve.sweep.reports
+                    .iter()
+                    .map(|row| row.injection_loading_delta)
+                    .collect::<Vec<_>>(),
+                effects
+            );
+        }
+    }
+
+    #[test]
+    fn estimator_dose_response_tournament_rejects_bad_effect_grid() {
+        let config = test_config();
+        assert!(matches!(
+            run_estimator_dose_response_tournament(&config, &[0.2, 0.1]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
     }
 
     #[test]
