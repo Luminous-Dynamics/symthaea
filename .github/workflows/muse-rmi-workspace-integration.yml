@@ -1,0 +1,96 @@
+name: MUSE RMI Real Workspace Integration
+
+on:
+  pull_request:
+    branches:
+      - main
+      - fix/workspace-stale-member-exclusion-20261121
+    paths:
+      - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/rmi_track_a_runner.rs"
+      - "crates/domains/symthaea-muse/src/bin/rmi_track_a.rs"
+      - "crates/domains/symthaea-muse/tests/rmi_track_a_replay.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-rmi-workspace-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-rmi-workspace-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrate:
+    name: Exact merge-head Muse RMI integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact pull request merge head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify merge and source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.sha }}"
+          test "$actual" = "$expected"
+          printf 'merge_head=%s\n' "$actual" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'pr_head=%s\n' "${{ github.event.pull_request.head.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'base_head=%s\n' "${{ github.event.pull_request.base.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+          git log -1 --format='%H %P %s'
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Resolve real workspace manifests under the committed lockfile
+        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
+
+      - name: Compile the real Muse library
+        run: cargo check --locked -p symthaea-muse --lib
+
+      - name: Run RMI evaluator tests in the real Muse package
+        run: cargo test --locked -p symthaea-muse --lib rmi_benchmark::tests
+
+      - name: Run RMI runner tests in the real Muse package
+        run: cargo test --locked -p symthaea-muse --lib rmi_track_a_runner::tests
+
+      - name: Run RMI CLI and fresh-process replay integration tests
+        run: cargo test --locked -p symthaea-muse --test rmi_track_a_replay
+
+      - name: Execute RMI fixture suite through the real Cargo package
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/melothaea-rmi-track-a-real-workspace.json"
+          cargo run --locked -p symthaea-muse --bin rmi_track_a -- 8 42 "$report"
+          test -s "$report"
+          cp "$report" "$RUNNER_TEMP/melothaea-rmi-track-a-real-workspace.json"
+
+      - name: Record exact merge-head integration evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/muse-rmi-real-workspace-evidence"
+          mkdir -p "$evidence"
+          cp "$RUNNER_TEMP/workspace-metadata.json" "$evidence/workspace-metadata.json"
+          cp "$RUNNER_TEMP/source-identities.txt" "$evidence/source-identities.txt"
+          cp Cargo.lock "$evidence/Cargo.lock"
+          cp "$RUNNER_TEMP/melothaea-rmi-track-a-real-workspace.json" "$evidence/rmi-report.json"
+          sha256sum             "$evidence/workspace-metadata.json"             "$evidence/source-identities.txt"             "$evidence/Cargo.lock"             "$evidence/rmi-report.json" > "$evidence/SHA256SUMS"
+
+      - name: Upload exact merge-head integration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-rmi-real-workspace-${{ github.sha }}
+          path: ${{ runner.temp }}/muse-rmi-real-workspace-evidence/
+          if-no-files-found: error
+          retention-days: 90
