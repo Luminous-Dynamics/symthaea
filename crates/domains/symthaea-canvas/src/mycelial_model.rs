@@ -194,10 +194,17 @@ pub fn build_mycelial_model(
         activity: snapshot.activity.clone(),
         speech_output: snapshot.speech_output.clone(),
         // Viseme animation is valid only while a runtime event confirms playback.
-        viseme: snapshot
-            .viseme
-            .clone()
-            .filter(|_| snapshot.current_speech_output() == Some(SpeechOutputState::Playing)),
+        viseme: if snapshot.current_speech_output() == Some(SpeechOutputState::Playing) {
+            snapshot.viseme.clone().and_then(|mut observed| {
+                if !observed.value.weight.is_finite() {
+                    return None;
+                }
+                observed.value.weight = finite_unit(observed.value.weight);
+                Some(observed)
+            })
+        } else {
+            None
+        },
         gaze: snapshot.gaze.clone(),
         uncertainty: snapshot.uncertainty.clone().map(|mut observed| {
             observed.value = finite_unit(observed.value);
@@ -423,6 +430,25 @@ mod tests {
                 "parent and child tangents should be continuous at fork"
             );
         }
+    }
+
+    #[test]
+    fn playing_viseme_weight_is_bounded_and_nonfinite_weights_are_dropped() {
+        use crate::embodiment::{Viseme, VisemeSignal};
+        let mut snapshot = EmbodimentSnapshot::default();
+        snapshot.speech_output = Some(observed(SpeechOutputState::Playing, 1));
+        snapshot.viseme = Some(observed(
+            VisemeSignal { viseme: Viseme::Ee, weight: 1.7 },
+            2,
+        ));
+        let model = build_mycelial_model(&snapshot, PresenceMode::Ambient);
+        assert_eq!(model.viseme.as_ref().map(|value| value.value.weight), Some(1.0));
+
+        snapshot.viseme = Some(observed(
+            VisemeSignal { viseme: Viseme::Ee, weight: f32::NAN },
+            3,
+        ));
+        assert!(build_mycelial_model(&snapshot, PresenceMode::Ambient).viseme.is_none());
     }
 
 }
