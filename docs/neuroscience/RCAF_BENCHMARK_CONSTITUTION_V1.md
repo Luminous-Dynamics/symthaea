@@ -260,3 +260,18 @@ These calculations:
 - do not imply that a small study is useless or that a non-significant result shows no state effect.
 
 Future data collection must predeclare an effect/consistency target and simulate the full participant/session/run/segment and QC design. Never increase sample size by counting repeated windows as new participants.
+
+
+## 15. Synthetic null calibration and injection recovery
+
+RCAF now includes a Gaussian-factor synthetic generator for known same-state null comparisons and known module-loading perturbations. This supplements the deterministic hand fixtures with finite-sample matrix estimation and participant-level Monte-Carlo calibration.
+
+The protocol is `RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`. It specifies:
+- null false-positive frequency under exchangeable same-state segments;
+- detection power for a known network perturbation;
+- Wilson Monte-Carlo intervals;
+- participant-level pairing and exact sign testing;
+- the limitations of the synthetic Gaussian factor model;
+- future effect-size, duration, sample-size, missing-edge, nuisance and estimator sweeps.
+
+The current fixed test is a narrow engineering smoke gate, not a biological performance target. It must be expanded across nuisance scenarios before any empirical claim depends on it.
