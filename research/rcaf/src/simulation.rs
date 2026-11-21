@@ -654,6 +654,21 @@ mod tests {
     }
 
     #[test]
+    fn invalid_temporal_autocorrelation_fails_closed() {
+        let mut config = test_config();
+        config.temporal_autocorrelation = 1.0;
+        assert!(matches!(
+            run_injection_recovery(&config),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        config.temporal_autocorrelation = f64::NAN;
+        assert!(matches!(
+            run_injection_recovery(&config),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+    }
+
+    #[test]
     fn dose_response_sweep_uses_sorted_effect_sizes_and_increases_at_strong_endpoint() {
         let mut config = test_config();
         config.monte_carlo_replicates = 30;
