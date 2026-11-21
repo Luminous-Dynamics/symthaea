@@ -59,14 +59,14 @@ Passing these tests establishes only that this reference implementation reproduc
 
 The separate helper `python/semi_threshold_policy_reference.py` selects the highest validation recall subject to a declared precision floor, with equal-score thresholds grouped. It then applies the chosen threshold once to a disjoint test subject. Validation/test identity overlap is rejected. If no threshold satisfies the floor, the specified fallback is reported rather than silently choosing one.
 
-The synthetic 10-validation / 10-test known-answer case is frozen in `fixtures/validation-threshold-known-answer-v1.json` and `fixtures/validation-threshold-known-answer-v1.expected.json`. Its 3 tests bring this reference suite to 14 tests in total. The tiny fixture demonstrates semantics only; it says nothing about real threshold reliability on rare-failure datasets.
+The synthetic 10-validation / 10-test known-answer case is frozen in `fixtures/validation-threshold-known-answer-v1.json` and `fixtures/validation-threshold-known-answer-v1.expected.json`. Its 3 tests bring the suite to 14 tests at that stage. The tiny fixture demonstrates semantics only; it says nothing about real threshold reliability on rare-failure datasets.
 
 
 ## Leakage-resistant split-manifest validator
 
 The independent helper `python/semi_split_manifest_reference.py` validates a frozen split assignment without reading or distributing raw dataset rows. It supports three explicitly distinct policies: `group_disjoint`, `forward_time`, and `stratified_sample`. It rejects duplicate sample identities, empty splits, cross-split group reuse, non-chronological/overlapping time windows, timezone-free timestamps and malformed dataset digests. It emits a deterministic SHA-256 identity for the sorted assignment set and states which independence claims are—and are not—established.
 
-The synthetic group-disjoint known-answer input/output are `fixtures/split-manifest-known-answer-v1.json` and `fixtures/split-manifest-known-answer-v1.expected.json`. Seven tests cover known-answer stability and adversarial leakage controls. Combined with the binary-metrics and threshold-policy suites, the full reference suite contains 21 tests. Hosted GitHub Actions run [#44881540564](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44881540564) completed successfully, including the unit-test and byte-for-byte report steps. This is a hosted CI result; no local test execution is claimed.
+The synthetic group-disjoint known-answer input/output are `fixtures/split-manifest-known-answer-v1.json` and `fixtures/split-manifest-known-answer-v1.expected.json`. Seven tests cover known-answer stability and adversarial leakage controls. Together with binary metrics, threshold policy, and inspection-decision policy, the current suite contains 31 tests. Hosted GitHub Actions run [#44890353550](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550) completed successfully, including unit tests and byte-for-byte reproduction of the binary-metrics and inspection-decision reports. This is a hosted CI result; no local test execution is claimed.
 
 
 ## Budget-aware inspection decision reference
@@ -76,3 +76,10 @@ The independent helper `python/semi_inspection_decision_reference.py` scores a f
 A matched-budget risk-only greedy policy is emitted as a comparator. The synthetic fixture is in `fixtures/inspection-decision-known-answer-v1.json` with frozen output in `fixtures/inspection-decision-known-answer-v1.expected.json`. Ten tests cover known answers, budget/group constraints, input-order invariance, invalid probabilities/costs, duplicate identities, excessive candidate count and empty-positive-value behavior.
 
 This is an exact finite-set reference oracle, not a production scheduling algorithm. All expected values are model-based; uninspected wafers remain unknown, and the fixture is not evidence of physical savings or fab yield.
+
+
+## Adaptive inspection decision oracle
+
+The independent helper `python/semi_inspection_decision_reference.py` evaluates a finite candidate set using an explicit expected-net-value formula. It includes risk probability, test sensitivity/specificity, actionability, exposed volume, avoidable loss, false-hold cost, inspection cost and delay penalty. It selects the exact best subset subject to cash, time and per-group capacity limits, using exhaustive enumeration capped at 18 candidates. The matched-budget risk-only comparator is emitted separately.
+
+The synthetic fixture selects A/C/F under the 45-minute / 20-cost-unit budget for modeled net value 1,286.16. The risk-only greedy comparator selects A/B/D/F with modeled net value 607.05. These are fixture outputs, not observed factory savings. Ten tests cover known answers, budget/group constraints, deterministic ordering and malformed/empty cases.
