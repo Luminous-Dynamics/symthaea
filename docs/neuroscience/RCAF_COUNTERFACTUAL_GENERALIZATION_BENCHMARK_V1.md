@@ -149,6 +149,42 @@ The proposed differentiator is a *claim-conditional evidence frontier*: for each
 7. Reproduce the frozen ds006623 source analysis before using ds003171 as an independent transport cohort. Freeze preprocessing, labels, quality exclusions and estimator selection before opening external outcomes.
 8. Publish raw per-cell outputs, confidence intervals, resource costs, source/configuration/environment digests and all failed cells.
 
+## 9. Pilot execution evidence from the separate RCAF implementation branch
+
+A first exact-head smoke run is now available from the implementation branch PR #13139. It used commit [`42582270476f110576f754de60c6a779d2fc7d6c`](https://github.com/Luminous-Dynamics/symthaea/commit/42582270476f110576f754de60c6a779d2fc7d6c), workflow run [`44949124581`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44949124581), and archived artifact `rcaf-simulation-evidence-c1a71fbc7f40cf88011ab5626891f0e85a8468bc` (artifact SHA-256 `72579b8937dc652afa160745b5581fa125a6d5b6ce9a815a39e6db4ff1998023`). The content-addressed receipt records source-tree SHA-256 `fbf4a71ff73bb49d88e7bd43863ce5e24b5981fce95af5224744d72520cd9589`.
+
+The focused validation run passed all 32 Rust tests, formatting, Clippy, Python report-validator tests, EIG checks, multiverse and measurement-qualification checks, schema/semantic validation, all five simulation/report stages, receipt generation and artifact upload. The workflow's broad CI, governance and syntax workflows were skipped; this is not a whole-repository pass.
+
+### Default synthetic injection smoke case
+
+Configuration: 24 participants, 12 regions, 160 samples per segment, 100 Monte-Carlo replicates, module size 5, global loading 0.20, module loading 0.18, loading jitter 0.06, AR(1) coefficient 0.30, expected loading increment 0.40, common-mode nuisance loading 0.20, and alpha 0.05.
+
+| Output | Observed | 95% Wilson interval |
+|---|---:|---:|
+| Same-distribution null rejection | 1/100 = 0.010 | 0.0018–0.0545 |
+| Nuisance-only rejection | 1/100 = 0.010 | 0.0018–0.0545 |
+| Two-sided injection detection | 100/100 = 1.000 | 0.9630–1.0000 |
+| Expected-direction recovery | 100/100 = 1.000 | 0.9630–1.0000 |
+| Wrong-direction significant rejection | 0/100 = 0.000 | 0.0000–0.0370 |
+
+Median participant-paired gap was -0.00269 under the same-state null, -0.00180 for the nuisance-only observation and +0.06838 under the intended injection. These results show that this strong planted signal is easy to recover in this one Gaussian-factor setting; they do not demonstrate power at a minimally meaningful effect or empirical validity.
+
+### Matched nuisance and estimator pilot
+
+At the common-mode nuisance dose grid `[0.00, 0.10, 0.20, 0.30]`, the absolute-weighted-Jaccard nuisance-only rejection estimates were 0.025, 0.000, 0.025 and 0.125 respectively (100 replicates per point). At dose 0.30 the Wilson interval was 0.0546–0.2611. This is a detectable concern at the high tested dose, with substantial Monte-Carlo uncertainty; the observed curve is not monotonic at every intermediate point.
+
+In the matched-input estimator tournament at common-mode loading 0.20, the observed same-distribution null rejection was 0.025 for all three matrix comparators and expected-direction recovery was 1.000 for all three. Their nuisance-only rejection estimates differed: absolute weighted Jaccard 0.025, signed-shift weighted Jaccard 0.100, and normalized mean absolute edge error 0.200. This is an initial indication that nuisance sensitivity is estimator-dependent under the declared synthetic factor model—not a universal ranking. The intervals are broad at 100 replicates and confirmatory runs are still required.
+
+The five-point effect sweep `[0.00, 0.10, 0.20, 0.30, 0.40]` produced directional recovery estimates of `[0.025, 0.000, 0.050, 0.450, 1.000]` for absolute weighted Jaccard. The matched estimator-by-dose curves differed at intermediate doses while reaching 1.000 at the strongest dose. These are descriptive finite-Monte-Carlo pilot curves; their small non-monotonicities at weak doses must not be interpreted as a biological dose-response law.
+
+### Interpretation
+
+1. The strong positive injection is recovered in this synthetic world, and opposite-direction rejection is counted separately.
+2. Nuisance sensitivity is not zero by construction: the high common-mode dose and comparator spread expose a real challenge that needs to be qualified.
+3. The 100-replicate intervals are too wide to certify a nominal 5% tail. Increase primary confirmatory null families to at least 10,000 replicates, and report Wilson intervals for every critical cell.
+4. The execution receipt demonstrates a content-addressed record of this run; it does not prove independent replay.
+5. No biological data were downloaded or processed, and these results do not establish SOTA superiority, consciousness detection, causal inference or clinical readiness.
+
 ## 9. Scope and safety of claims
 
 - A passed synthetic challenge qualifies only the tested generator, intervention and analysis implementation.
