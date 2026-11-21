@@ -101,16 +101,41 @@ def validate_semantics(report: dict[str, Any], tolerance: float = 1e-9) -> None:
     )
     _need(counts["analysis_included"] == len(participants),
           "participant_flow.analysis_included must equal participant row count")
+    _need(counts["excluded"] == counts["acquired_or_recruited"] - counts["analysis_included"],
+          "participant_flow.excluded must equal the unique total attrition count")
 
-    if dataset.get("access_state") == "downloaded_verified":
+    access_state = dataset.get("access_state")
+    evidence_status = report["evidence_status"]
+    if access_state == "downloaded_verified":
         digest = dataset.get("file_manifest_sha256")
         _need(isinstance(digest, str) and re.fullmatch(r"[a-f0-9]{64}", digest) is not None,
               "downloaded_verified requires a lowercase SHA-256 file manifest digest")
-    if report["evidence_status"] == "synthetic_fixture":
+    if evidence_status in {"signal_analysis", "independent_replay"}:
+        _need(access_state == "downloaded_verified",
+              f"{evidence_status} requires access_state=downloaded_verified")
+    if evidence_status == "metadata_only":
+        _need(access_state in {"not_downloaded", "metadata_only"},
+              "metadata_only evidence cannot claim verified signal-data download")
+    if evidence_status == "synthetic_fixture":
         _need(dataset.get("access_state") == "not_downloaded",
               "synthetic_fixture must not claim downloaded data")
         _need(dataset.get("doi") in (None, ""),
               "synthetic_fixture must not assert a real dataset DOI")
+
+    # Confirmatory replay requires content-addressed inputs, configuration, environment and output.
+    result_digest = report.get("result_sha256")
+    if evidence_status == "independent_replay":
+        _need(isinstance(analysis.get("code_revision"), str) and analysis["code_revision"].strip() != "",
+              "independent_replay requires analysis.code_revision")
+        for field in ("configuration_sha256", "environment_sha256"):
+            digest = analysis.get(field)
+            _need(isinstance(digest, str) and re.fullmatch(r"[a-f0-9]{64}", digest) is not None,
+                  f"independent_replay requires a valid analysis.{field}")
+        _need(isinstance(result_digest, str) and re.fullmatch(r"[a-f0-9]{64}", result_digest) is not None,
+              "independent_replay requires a lowercase SHA-256 result_sha256")
+    elif result_digest is not None:
+        _need(isinstance(result_digest, str) and re.fullmatch(r"[a-f0-9]{64}", result_digest) is not None,
+              "result_sha256 must be a lowercase SHA-256 digest")
 
     # Frozen configuration and ROI alignment identity.
     roi_digest = analysis.get("roi_order_sha256")
@@ -213,6 +238,8 @@ def validate_semantics(report: dict[str, Any], tolerance: float = 1e-9) -> None:
               "edge_sign_transitions.sign_state_change_count is invalid")
         edge_threshold = _finite_number(edge.get("neutral_threshold"), "edge_sign_transitions.neutral_threshold")
         _need(0.0 <= edge_threshold <= 1.0, "edge_sign_transitions.neutral_threshold must be in [0, 1]")
+        _need(abs(edge_threshold - neutral) <= tolerance,
+              "edge_sign_transitions.neutral_threshold must match analysis.neutral_sign_threshold")
 
     _need(claim_limits.get("phenomenal_experience_inference") == "not_established_by_rcaf",
           "RCAF claim ceiling for phenomenal experience is missing or altered")
