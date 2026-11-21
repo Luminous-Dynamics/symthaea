@@ -549,7 +549,7 @@ fn graph_from_audit_receipt(receipt: &Value) -> Result<Graph, String> {
             other => return Err(format!("source sample {sample_id} has unsupported cohort status {other}")),
         };
         let mut item = json!({
-            "record_id": sample_id,
+            "record_id": sample_id.clone(),
             "sample_id": sample_id,
             "precursor_a": precursor_a,
             "precursor_b": precursor_b,
