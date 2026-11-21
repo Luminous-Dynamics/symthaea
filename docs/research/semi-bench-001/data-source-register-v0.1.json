@@ -411,9 +411,9 @@
       "local_test_count": 11,
       "local_test_result": "PASS",
       "physical_or_dataset_claim": false,
-      "test_count": 35,
+      "test_count": 46,
       "test_result": "PASS-in-hosted-GitHub-Actions",
-      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316"
+      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962"
     },
     "independent_inspection_decision_oracle": {
       "input_schema": "luminous.semi-bench.inspection-decision.v1",
@@ -434,14 +434,16 @@
       "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
       "test_count": 11,
-      "hosted_ci_status": "not-yet-verified",
+      "hosted_ci_status": "success",
       "claim_ceiling": "pair-manifest-integrity-only",
       "local_verification": {
         "tests_passed": 11,
         "tests_total": 11,
         "result": "PASS",
         "cli_report_byte_for_byte": true
-      }
+      },
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962",
+      "hosted_ci_test_count": 46
     }
   },
   "reproducibility_artifacts": [
