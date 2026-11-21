@@ -802,6 +802,22 @@ mod tests {
     }
 
     #[test]
+    fn fixed_one_way_and_yoked_agents_do_not_influence_responsive_partner() {
+        let result = report(3);
+        for agent in ["fixed-response", "one-way-prompt", "yoked-replay"] {
+            for target in targets() {
+                let key = format!(
+                    "target={}|agent={agent}|partner=synthetic-responsive-partner",
+                    target_name(target)
+                );
+                let counts = &result.payload.agent_to_partner_sensitivity[&key];
+                assert_eq!(counts.targeted_sensitivity_count, 0);
+                assert_eq!(counts.collateral_changed_feature_total, 0);
+            }
+        }
+    }
+
+    #[test]
     fn responsive_partner_positive_control_tracks_contingent_agent() {
         let result = report(4);
         for target in targets() {
