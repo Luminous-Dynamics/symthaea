@@ -56,6 +56,8 @@ jobs:
           jq -e '
             .title == "OrbitalJointSequentialPlanningCorpusV0_1" and
             ."$defs".scenario.properties.max_actions.maximum == 8 and
+            (. "$defs".scenario.required | index("decision_obligations") != null) and
+            (. "$defs".action.required | index("obligations_covered") != null) and
             ."$defs".action.properties.admissibility.enum == ["ADMISSIBLE","INADMISSIBLE"]
           ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.schema.json
           jq -e '
@@ -63,6 +65,8 @@ jobs:
             .benchmark_id == "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001" and
             (.scenarios | length == 1) and
             .scenarios[0].resource_frequency_model.used_for == "EXPECTED_RESOURCE_USE_ONLY" and
+            (.scenarios | all(.decision_obligations.ACCEPT == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"])) and
+            (.scenarios | all([.actions[].obligations_covered[]] | all(. == "COMBINED-LOAD-CAPABILITY-001" or . == "THERMAL-WEAR-INSPECTABILITY-001"))) and
             (.scenarios[0].actions | map(.decision_context) | unique | length == 1)
           ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json
       - name: Format
