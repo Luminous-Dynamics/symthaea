@@ -519,6 +519,7 @@ pub fn build_raw_prediction(
 
     Ok(FutureUsePredictionV1::new(
         input.event_id,
+        input.target_model_sha256,
         input.target_scope,
         input.predicted_at_ms,
         input.horizon_end_ms,

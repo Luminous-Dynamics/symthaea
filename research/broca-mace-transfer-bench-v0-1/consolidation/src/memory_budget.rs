@@ -245,6 +245,7 @@ impl QualifiedModelMemoryBudgetV1 {
 pub enum ModelBudgetSurfacingReject {
     TargetModelMismatch,
     InvalidTargetModelDigest,
+    SalienceTargetModelMismatch,
     Selection(SalienceReject),
 }
 
@@ -791,6 +792,15 @@ pub fn select_for_qualified_model_budget(
     }
     if runtime_target_model_sha256 != budget.target_model_sha256 {
         return Err(ModelBudgetSurfacingReject::TargetModelMismatch);
+    }
+    if budget.selected_context_budget_tokens > 0
+        && candidates.iter().any(|candidate| {
+            candidate
+                .target_model_sha256()
+                .is_some_and(|model| model != runtime_target_model_sha256)
+        })
+    {
+        return Err(ModelBudgetSurfacingReject::SalienceTargetModelMismatch);
     }
     let plan = if budget.selected_context_budget_tokens == 0 {
         let mut empty_plan = MemorySurfacingPlanV1 {

@@ -39,6 +39,8 @@ impl MemorySurfacingModeV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FutureUsePredictionV1 {
     pub event_id: u32,
+    /// Identity of the agent model whose future memory utility is predicted.
+    pub target_model_sha256: String,
     pub target_scope: Scope,
     pub predicted_at_ms: i64,
     pub horizon_end_ms: i64,
@@ -66,6 +68,7 @@ pub const MAX_SALIENCE_GROUP_ECE_MICROS: u32 = 100_000;
 pub struct SalienceCalibrationReceiptV1 {
     pub prediction_sha256: String,
     pub evidence_sha256: String,
+    pub target_model_sha256: String,
     pub target_scope: Scope,
     pub as_known: AsKnownQuery,
     pub model_id: String,
@@ -96,6 +99,7 @@ impl SalienceCalibrationReceiptV1 {
         let fields = [
             self.prediction_sha256.clone(),
             self.evidence_sha256.clone(),
+            self.target_model_sha256.clone(),
             scope_code(self.target_scope).to_owned(),
             self.as_known.valid_at_ms.to_string(),
             self.as_known.known_at_ms.to_string(),
@@ -151,6 +155,10 @@ impl VerifiedFutureUsePredictionV1 {
     pub fn calibration_receipt(&self) -> &SalienceCalibrationReceiptV1 {
         &self.calibration
     }
+
+    pub fn target_model_sha256(&self) -> &str {
+        &self.prediction.target_model_sha256
+    }
 }
 
 fn validate_calibration_receipt(
@@ -159,6 +167,9 @@ fn validate_calibration_receipt(
     target_scope: Scope,
     as_known: AsKnownQuery,
 ) -> Result<(), SalienceReject> {
+    if receipt.target_model_sha256 != prediction.target_model_sha256 {
+        return Err(SalienceReject::PredictionTargetModelMismatch);
+    }
     if receipt.prediction_sha256 != prediction.prediction_sha256
         || receipt.evidence_sha256 != prediction.evidence_sha256
         || receipt.model_id != prediction.model_id
@@ -259,6 +270,7 @@ pub fn verify_future_use_prediction(
         return Err(SalienceReject::MissingModelIdentity);
     }
     if !is_lower_sha256(&prediction.evidence_sha256)
+        || !is_lower_sha256(&prediction.target_model_sha256)
         || !is_lower_sha256(&prediction.model_config_sha256)
         || !is_lower_sha256(&prediction.rationale_sha256)
         || !is_lower_sha256(&prediction.prediction_sha256)
@@ -279,6 +291,7 @@ pub fn verify_future_use_prediction(
 impl FutureUsePredictionV1 {
     pub fn new(
         event_id: u32,
+        target_model_sha256: impl Into<String>,
         target_scope: Scope,
         predicted_at_ms: i64,
         horizon_end_ms: i64,
@@ -293,6 +306,7 @@ impl FutureUsePredictionV1 {
     ) -> Self {
         let mut prediction = Self {
             event_id,
+            target_model_sha256: target_model_sha256.into(),
             target_scope,
             predicted_at_ms,
             horizon_end_ms,
@@ -313,6 +327,7 @@ impl FutureUsePredictionV1 {
     pub fn canonical_digest(&self) -> String {
         let fields = [
             self.event_id.to_string(),
+            self.target_model_sha256.clone(),
             scope_code(self.target_scope).to_owned(),
             self.predicted_at_ms.to_string(),
             self.horizon_end_ms.to_string(),
@@ -432,6 +447,12 @@ impl MemorySurfacingCandidateV1 {
         self.event_id
     }
 
+    pub fn target_model_sha256(&self) -> Option<&str> {
+        self.prediction
+            .as_ref()
+            .map(VerifiedFutureUsePredictionV1::target_model_sha256)
+    }
+
     pub fn evidence_sha256(&self) -> &str {
         &self.evidence_sha256
     }
@@ -501,6 +522,7 @@ pub enum SalienceReject {
     InvalidPredictionDigest,
     PredictionCalibrationMissing,
     PredictionCalibrationMismatch,
+    PredictionTargetModelMismatch,
     PredictionCalibrationSnapshotMismatch,
     InvalidCalibrationDigest,
     CalibrationDatasetsOverlap,
@@ -903,6 +925,7 @@ mod tests {
     ) -> FutureUsePredictionV1 {
         FutureUsePredictionV1::new(
             event_id,
+            digest("target-agent-model"),
             scope(),
             90,
             1_000,
@@ -924,6 +947,7 @@ mod tests {
         let mut receipt = SalienceCalibrationReceiptV1 {
             prediction_sha256: prediction.prediction_sha256.clone(),
             evidence_sha256: prediction.evidence_sha256.clone(),
+            target_model_sha256: prediction.target_model_sha256.clone(),
             target_scope: prediction.target_scope,
             as_known,
             model_id: prediction.model_id.clone(),
@@ -1086,6 +1110,40 @@ mod tests {
             })
             .unwrap_or_default()
             .selected_indices
+    }
+
+    #[test]
+    fn calibration_receipt_cannot_cross_target_agent_models() {
+        let raw = raw_prediction(
+            77,
+            9_500,
+            1_000,
+            0,
+            digest("evidence-77"),
+        );
+        let mut receipt = calibration_receipt(
+            &raw,
+            AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
+        );
+        receipt.target_model_sha256 = digest("different-target-model");
+        receipt.receipt_sha256 = receipt.canonical_digest();
+        assert_eq!(
+            verify_future_use_prediction(
+                raw,
+                scope(),
+                AsKnownQuery {
+                    valid_at_ms: 100,
+                    known_at_ms: 100,
+                },
+                &FixtureSaliencePredictionVerifier {
+                    receipt: Some(receipt),
+                },
+            ),
+            Err(SalienceReject::PredictionTargetModelMismatch)
+        );
     }
 
     #[test]
