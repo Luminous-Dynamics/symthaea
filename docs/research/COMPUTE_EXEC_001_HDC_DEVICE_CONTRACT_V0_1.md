@@ -1,0 +1,275 @@
+# COMPUTE-EXEC-001 — HDC host/device execution contract v0.1
+
+**Status:** proposed protocol and machine-readable schema; not an implemented driver or hardware qualification.  
+**Owner:** Symthaea silicon integration.  
+**Issue:** [#12953](https://github.com/Luminous-Dynamics/symthaea/issues/12953).
+
+## 1. Executive decision
+
+Make the accelerator boundary a versioned, capability-bound command protocol. The host submits *semantic work*, not raw register pokes or arbitrary pointers. The device receives only registered buffer handles and bounded byte ranges. Completion is accepted only for the exact command, device epoch and buffer generation that were submitted.
+
+The first protocol profile admits three exact operations:
+
+1. **HDC_BIND_XOR_EXACT** — XOR two canonical 16,384-bit BinaryHV vectors.
+2. **HDC_HAMMING_EXACT** — return an exact integer Hamming distance in the inclusive range 0..16,384.
+3. **HDC_TOP1_EXACT** — scan a declared candidate set and return the minimum Hamming distance, breaking ties by the lowest stable item ID.
+
+No CfC, floating-point, approximate, analog, photonic, arbitrary-kernel or general DMA command is admitted in v0.1. Those require separate semantics and qualification.
+
+### Why this is the next paradigm shift
+
+Traditional accelerator interfaces expose a device-specific command queue and leave correctness, placement, memory lifetime, reset and fallback behavior scattered across drivers and applications. This contract makes those concerns explicit:
+
+- **Semantic portability:** the same operation identity can be implemented by CPU, SIMD, Vulkan/WebGPU or FPGA without changing its mathematical meaning.
+- **Data locality as part of the command:** the command names resident buffers and permitted ranges, not just an arithmetic kernel.
+- **Failure is a first-class outcome:** reset, timeout and uncertain completion do not masquerade as successful work.
+- **Qualification follows the artifact:** the operation, implementation, device profile, fixture and result remain linked.
+- **Safe fallback:** exact CPU fallback is a declared execution path, not a silent algorithm substitution.
+
+This is an integration contract for existing owners, not a new scheduler, GPU framework or evidence ontology.
+
+## 2. Ownership and composition
+
+| Concern | Canonical owner | This contract's relationship |
+|---|---|---|
+| BinaryHV algebra and oracle | #5808 / #5813 | Consumes exact semantics; does not redefine them |
+| Conventional workload baselines | #5805 | Uses its frozen workload identities and boundaries |
+| HDL simulation/formal/synthesis | #5818 | Supplies qualified implementation artifacts |
+| FPGA-to-MPW evidence ladder | #5800 | Supplies stage/evidence distinctions |
+| Semantic GPU execution | #6968 | Reuses operation identity and receipt concepts |
+| Hamming/top-1 reducer RTL | #7908 / #7909 | Defines device-side result semantics |
+| End-to-end retrieval/locality | #7864 / #7866 | Supplies benchmark boundary and promotion targets |
+| Physical FPGA qualification | #10901 | Supplies exact board/SOM and board observation |
+| RAM/persistence/recovery | #7919 | Owns durable storage and memory-tier policy |
+| Cross-paradigm comparison | #9236 | Owns architecture portfolio and routing-regret comparisons |
+| Carrier and module | #10886 / #10888 | Supplies board/module physical interface constraints |
+
+No new HDC algebra, GPU Fabric, evidence ontology, persistence layer, DMA framework or board authority is introduced.
+
+## 3. Canonical representation
+
+The only representation admitted in v0.1 is:
+
+| Property | Required value |
+|---|---|
+| Representation ID | luminous.binaryhv.bipolar.16384.v1 |
+| Logical dimension | 16,384 bits |
+| Payload length | 2,048 bytes |
+| Packing | bit 0 is the least-significant bit of byte 0; byte sequence is canonical |
+| Bind | bitwise XOR |
+| Distance | popcount(A XOR B), integer 0..16,384 |
+| Top-1 tie break | lowest stable item ID, independent of input ordering |
+
+The canonical Rust BinaryHV implementation remains authoritative. The hardware mapping must not reinterpret bit polarity, byte order, padding, or tie semantics.
+
+An even-N bundle or a continuous-f32 HDC-LTC profile is intentionally excluded until its canonical tie/numeric and trajectory semantics have been frozen for hardware use.
+
+## 4. Protocol objects
+
+Three independent machine-readable schemas accompany this document:
+
+- device capability manifest;
+- host command descriptor;
+- device completion record.
+
+They describe protocol shape and basic field constraints. They do not replace semantic validation, IOMMU setup, cryptographic attestation, HDL proof or hardware testing.
+
+### 4.1 Device capability manifest
+
+The host must obtain a capability manifest before dispatch. It binds:
+
+- stable device identity and a per-initialization device epoch;
+- backend and execution class (software reference, simulator, synthesis estimate, FPGA hardware, ASIC hardware);
+- implementation artifact identity and hardware profile digest where available;
+- admitted operation IDs and representation IDs;
+- maximum transfer size, required alignment and in-flight command bound;
+- DMA isolation profile;
+- cache-coherency behavior;
+- the evidence stage and provenance references supporting those declarations.
+
+A manifest is a claim by the backend until independently verified. It is not a hardware attestation merely because it contains hashes. A physical device with no qualified DMA isolation must not be admitted for host-memory DMA.
+
+### 4.2 Command descriptor
+
+A command binds:
+
+- protocol schema/version;
+- command ID, device ID, device epoch and monotonic sequence within that epoch;
+- canonical operation ID and semantic contract identity;
+- exact representation identity and dimensions;
+- workload/input manifest digest;
+- implementation/kernel artifact digest when known;
+- timeout budget;
+- operation parameters;
+- a list of opaque buffer handles, generations, offsets, lengths and access rights.
+
+**Raw host pointers, process virtual addresses and unconstrained physical addresses are forbidden.** The host driver resolves opaque handles inside a registered DMA domain. Offset and length arithmetic must use checked operations before any mapping or device submission.
+
+The schema defines buffer descriptors generically. The host semantic validator must enforce operation-specific role/length rules:
+
+| Operation | Required buffers | Required size rules |
+|---|---|---|
+| XOR exact | input_a, input_b, output | each exactly 2,048 bytes |
+| Hamming exact | input_a, input_b, result | inputs exactly 2,048 bytes; result holds one unsigned 16-bit distance |
+| Top-1 exact | query, candidate_vectors, candidate_ids, result | query 2,048 bytes; candidate payload = candidate_count × 2,048; ID payload = candidate_count × 8; result at least 16 bytes |
+
+Top-1's 16-byte result record is little-endian: winner stable ID (u64), Hamming distance (u16), then six reserved zero bytes. The host rejects non-zero reserved bytes. Candidate IDs are stable application IDs, not array positions.
+
+### 4.3 Completion record
+
+The device completion binds the command ID, device ID, epoch and sequence. A successful completion includes a bounded result object and output digest where the transport supports it. The host must verify that the completion refers to the current registered output generation and expected output range.
+
+A completion digest is an integrity aid, not a digital signature or proof of correct computation. Qualification runs compare the device output to an independently generated software oracle. Physical authenticity requires a separately qualified trust chain.
+
+## 5. DMA, memory ownership and isolation
+
+### 5.1 Buffer lifecycle
+
+A buffer transitions through these host-owned states:
+
+1. **Unregistered** — no device access is possible.
+2. **Registered** — handle and generation are assigned; access rights and permitted range are fixed.
+3. **Host-owned** — host may write/read according to the registered rights.
+4. **Device-owned** — host does not mutate or recycle the submitted range; required cache clean/invalidate and memory barriers have been performed.
+5. **Completed** — matching completion observed; ownership returns to host after the required invalidation/barrier.
+6. **Quarantined** — device loss, reset or ambiguous completion means the range cannot be reused until the driver proves the old DMA context is quiescent.
+
+No buffer may be freed, remapped or reused while a device could still write it.
+
+### 5.2 Isolation profiles
+
+- **IOMMU domain:** preferred; device DMA is restricted to the command's registered mappings.
+- **Dedicated bounded DMA pool:** weaker fallback for boards without an available IOMMU. All device-visible memory is isolated in a dedicated pool, with bounds and ownership checked by the driver. This profile must be disclosed and tested.
+- **None / unknown:** physical DMA execution is not admitted.
+
+Do not assume the selected K26/KV260, ECP5 board, SoM, firmware or carrier exposes an IOMMU or coherent DMA. Verify the exact platform documentation and then test the actual board.
+
+### 5.3 Cache and ordering
+
+Cache behavior must be explicit per hardware profile: coherent, explicit flush/invalidate, or unknown. Unknown is not treated as coherent. Every transfer must have explicit ownership and ordering barriers. The protocol does not infer coherence from the CPU architecture name.
+
+## 6. Device epochs, command sequencing and ambiguous outcomes
+
+A new device initialization/reset creates a new 128-bit device epoch. Commands carry that epoch and a strictly increasing sequence number. Completions from an earlier epoch are rejected even if their command ID matches.
+
+The host-side execution state is:
+
+**Prepared → Registered → Submitted → Accepted → Completed**
+
+Failure paths are distinct:
+
+- Rejected before acceptance: no device execution is admitted.
+- Device failure with confirmed quiescence: command failed; buffers may be reclaimed after driver confirmation.
+- Host timeout/device disappearance without confirmed cancellation: **OUTCOME_UNKNOWN**.
+- Reset: invalidate all prior-epoch commands, quarantine outstanding buffers, reinitialize the device and reconcile before reuse.
+
+A timeout is not proof that a command did not execute. Do not blindly resubmit a command into the same output range. Exact HDC operations are mathematically pure, but concurrent DMA writes, buffer reuse and command duplication can still corrupt memory. A replay is permitted only after the previous DMA context is quiescent and the input/output generations are reconciled.
+
+## 7. Exact fallback and backend eligibility
+
+The command names a semantic operation, not a preferred chip. A backend is eligible only when its capability manifest admits the exact operation, representation, dimensions, limits and evidence stage required by the caller.
+
+The initial backend comparison uses:
+
+- canonical Rust scalar reference;
+- optimized CPU/SIMD;
+- GPU Fabric backend only when actual execution is observed;
+- RTL simulation (correctness evidence only);
+- synthesis estimate (resource evidence only);
+- identified FPGA hardware (physical execution only).
+
+If an FPGA is unavailable, over capacity, reset, stale, unsupported or unqualified, the host may execute the **same exact semantic operation** on the canonical CPU/SIMD path. The result records the actual backend. It must never report an FPGA execution when a CPU fallback ran.
+
+An approximate, analogue or reduced-dimensional result is a different representation/operation profile. It cannot satisfy an exact request or inherit an exact qualification.
+
+## 8. Mycelix, Symtropy and Sol-Atlas boundaries
+
+- **Mycelix** may record device, firmware, board, lot, repair and operation provenance. A provenance record is not proof that a measurement is true, and a device is not authorized to mutate a journal/payment/actuator merely because it returned a result.
+- **Symtropy** may model thermal, power, reliability and physical resource behavior. Modelled values remain distinct from board measurements.
+- **Sol-Atlas** may track mineral, component, manufacturing, repair and lifecycle provenance. Carrier assembly with imported FPGA/SoC remains imported-silicon dependent.
+- **Symthaea** owns semantic work requests and canonical software references. It does not self-certify hardware correctness.
+
+## 9. Qualification matrix
+
+### Descriptor and host validation
+
+Positive fixtures:
+- valid XOR, Hamming and Top-1 command shapes;
+- one candidate;
+- stable ID ties with candidate order shuffled;
+- distinct sequence numbers within one epoch;
+- exact capability match.
+
+Negative controls:
+- unknown operation/version;
+- wrong representation/dimension/byte length;
+- arithmetic overflow in candidate_count × vector_bytes;
+- offset/length outside registered buffer;
+- zero length, misalignment, stale buffer generation;
+- read/write permission mismatch;
+- duplicate sequence or command ID;
+- wrong device epoch;
+- unsupported IOMMU/coherency profile;
+- unknown capability or artifact mismatch.
+
+### Runtime and memory safety
+
+- device completion after timeout;
+- duplicate, late or cross-epoch completion;
+- device reset during in-flight DMA;
+- queue full / backpressure;
+- cancellation race;
+- input/output aliasing;
+- non-coherent cache stale data;
+- partial output and malformed reserved bytes;
+- device loss with uncertain DMA quiescence.
+
+Acceptance requires invalid descriptors to be rejected before DMA, no stale completion accepted, no mutation outside registered output ranges, and no buffer reuse before quiescence.
+
+### Functional parity
+
+For every admitted command, compare output byte-for-byte (or exact integer distance) against the canonical Rust oracle. Include all-zero/all-one, alternating, one-hot, boundary-bit, fixed-seed random and adversarial fixtures. Top-1 ties must use lowest stable ID, not lowest input slot.
+
+## 10. Benchmark and competitive targets
+
+Reuse #7864 and #10901. Do not create a second benchmark runner.
+
+Run the same frozen vectors, query IDs, candidate order, task contract and measurement boundary across the canonical scalar CPU, optimized CPU/SIMD, any real GPU backend and FPGA candidate. Report separately:
+
+- exact result parity and task success;
+- end-to-end p50/p95/p99, throughput and cold-start/setup;
+- host/device bytes, registration, copying, queueing, synchronization and result transfer;
+- resident memory, capacity, bank utilization and bytes per accepted query;
+- energy/query only with a calibrated meter and declared full-system boundary;
+- device utilization, stalls, reset/recovery and thermal behavior;
+- FPGA LUT/FF/BRAM/URAM/DSP and timing only from a named synthesis/implementation target.
+
+Keep kernel-only numbers diagnostic; the product decision is made on end-to-end successful work.
+
+The existing project candidate gate remains: equal exact outputs and task quality, with either ≥1.5× end-to-end throughput or ≥30% lower measured joules/query, while p95 latency is no more than 10% worse in the declared serving profile. These are proposed gates, not measured results or universal industry standards.
+
+Include negative controls where CPU/SIMD wins: small batches, warm cache, transfer-bound requests, tiny codebooks and unsupported device profiles.
+
+## 11. Evidence and claim ceiling
+
+| Evidence available | Allowed claim | Not established |
+|---|---|---|
+| Schema/fixture | Protocol shape is specified | Driver, DMA or device behavior |
+| Host validator tests | Descriptor logic behaves as tested | RTL correctness or IOMMU isolation |
+| RTL simulation | Simulated design matches tested oracle fixtures | Synthesis, FPGA, power or speed |
+| Formal properties | Named properties hold under the proof model | Whole-system correctness |
+| Synthesis | Resource/netlist report for exact flow | Routed timing or board behavior |
+| FPGA implementation | Bitstream/implementation for exact board target | Observed board operation |
+| FPGA board run | Physical function under captured conditions | ASIC behavior or commercial reliability |
+| Calibrated end-to-end board benchmark | Measured workload result within stated boundary | General superiority outside that profile |
+
+The first PR implements only the machine-readable contract and fixtures. No driver, RTL integration, simulator result, formal proof, synthesis result, FPGA measurement or performance superiority is claimed.
+
+## 12. Proposed PR sequence
+
+A. Protocol schemas, capability manifest, examples and negative-case catalogue.  
+B. Pure host-side validator and deterministic state-machine tests; no MMIO/DMA.  
+C. Simulator adapter and command/completion differential tests.  
+D. Exact FPGA adapter on the #10901 board profile with declared isolation/coherency.  
+E. End-to-end benchmark and receipt integration with #6968/#7864.
+

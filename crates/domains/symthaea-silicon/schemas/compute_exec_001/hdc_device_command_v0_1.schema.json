@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-silicon/schemas/compute_exec_001/hdc_device_command_v0_1.schema.json",
+  "title": "Luminous HDC device command v0.1",
+  "description": "Shape contract only. A host semantic validator must enforce operation-specific buffer roles, registered ranges, capability matching, epoch/sequence freshness and DMA safety before submission. JSON encodes u64-valued fields as decimal strings so values above 2^53 are not rounded by common JavaScript parsers; the host validator must range-check against u64::MAX.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "command_id",
+    "device_id",
+    "device_epoch",
+    "sequence",
+    "operation_id",
+    "semantic_contract",
+    "representation",
+    "workload_manifest_sha256",
+    "implementation_sha256",
+    "timeout_ms",
+    "parameters",
+    "buffers"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.hdc-device-command"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "command_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "device_epoch": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "sequence": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "operation_id": {
+      "enum": [
+        "hdc.bind_xor.exact.v1",
+        "hdc.hamming.exact.v1",
+        "hdc.top1.exact.v1"
+      ]
+    },
+    "semantic_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "contract_version",
+        "contract_sha256"
+      ],
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contract_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation_id",
+        "dimension_bits",
+        "payload_bytes",
+        "bit_order",
+        "byte_order"
+      ],
+      "properties": {
+        "representation_id": {
+          "const": "luminous.binaryhv.bipolar.16384.v1"
+        },
+        "dimension_bits": {
+          "const": 16384
+        },
+        "payload_bytes": {
+          "const": 2048
+        },
+        "bit_order": {
+          "const": "lsb0"
+        },
+        "byte_order": {
+          "const": "little"
+        }
+      }
+    },
+    "workload_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "implementation_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 60000
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "tie_break_policy": {
+          "const": "lowest_stable_id"
+        },
+        "result_record_bytes": {
+          "const": 16
+        }
+      }
+    },
+    "buffers": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "handle_id",
+          "generation",
+          "offset_bytes",
+          "length_bytes",
+          "access"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "input_a",
+              "input_b",
+              "query",
+              "candidate_vectors",
+              "candidate_ids",
+              "output",
+              "result"
+            ]
+          },
+          "handle_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "generation": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$"
+          },
+          "offset_bytes": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "length_bytes": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$"
+          },
+          "access": {
+            "enum": [
+              "read",
+              "write"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation_id": {
+            "const": "hdc.top1.exact.v1"
+          }
+        },
+        "required": [
+          "operation_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "parameters": {
+            "required": [
+              "candidate_count",
+              "tie_break_policy",
+              "result_record_bytes"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation_id": {
+            "enum": [
+              "hdc.bind_xor.exact.v1",
+              "hdc.hamming.exact.v1"
+            ]
+          }
+        },
+        "required": [
+          "operation_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "parameters": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "candidate_count"
+                  ]
+                },
+                {
+                  "required": [
+                    "tie_break_policy"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

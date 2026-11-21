@@ -1,0 +1,57 @@
+{
+  "schema": "luminous.hdc-device-negative-cases",
+  "schema_version": "0.1.0",
+  "claim_ceiling": "Test plan only; no runtime validator or DMA hardware has been executed by these fixtures.",
+  "cases": [
+    {
+      "id": "overflow-candidate-payload",
+      "mutation": "candidate_count=4294967295 while candidate_vectors.length_bytes remains 4096",
+      "expected": "reject before DMA using checked multiplication"
+    },
+    {
+      "id": "stale-buffer-generation",
+      "mutation": "increment one submitted buffer generation after registration",
+      "expected": "reject stale handle before DMA"
+    },
+    {
+      "id": "stale-device-epoch",
+      "mutation": "completion.device_epoch differs from submitted command epoch",
+      "expected": "reject completion and quarantine buffers"
+    },
+    {
+      "id": "duplicate-sequence",
+      "mutation": "submit the same device_epoch + sequence twice",
+      "expected": "reject duplicate command before queue acceptance"
+    },
+    {
+      "id": "out-of-range-buffer",
+      "mutation": "offset_bytes + length_bytes exceeds registered handle extent",
+      "expected": "reject using checked addition before DMA"
+    },
+    {
+      "id": "write-to-readonly",
+      "mutation": "mark output buffer access as read",
+      "expected": "reject operation-specific access mismatch"
+    },
+    {
+      "id": "exact-to-approx-fallback",
+      "mutation": "device unavailable; candidate proposes reduced-dimension approximate implementation",
+      "expected": "reject as exact fallback; use canonical CPU/SIMD or report unavailable"
+    },
+    {
+      "id": "late-completion-after-reset",
+      "mutation": "deliver completion from old device epoch after reset",
+      "expected": "reject stale completion and retain quarantine until quiescent"
+    },
+    {
+      "id": "unisolated-physical-dma",
+      "mutation": "physical execution class advertises dma_isolation=none",
+      "expected": "capability manifest schema/validator must reject physical execution admission"
+    },
+    {
+      "id": "unknown-coherency",
+      "mutation": "physical backend declares cache_coherency=unknown",
+      "expected": "reject physical DMA admission"
+    }
+  ]
+}

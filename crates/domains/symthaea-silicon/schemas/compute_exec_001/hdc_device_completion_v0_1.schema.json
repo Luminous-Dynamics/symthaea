@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-silicon/schemas/compute_exec_001/hdc_device_completion_v0_1.schema.json",
+  "title": "Luminous HDC device completion v0.1",
+  "description": "Device-reported completion shape. The host must match command ID, device epoch, sequence, buffer generation and expected output range. A digest is not a signature or correctness proof. Sequence and stable item IDs are decimal strings in JSON to preserve exact u64 values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "command_id",
+    "device_id",
+    "device_epoch",
+    "sequence",
+    "status"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.hdc-device-completion"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "command_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "device_epoch": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "sequence": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "rejected",
+        "failed",
+        "cancelled",
+        "outcome_unknown"
+      ]
+    },
+    "error_code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "error_detail": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "output_sha256"
+      ],
+      "properties": {
+        "output_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "winner_stable_id": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "hamming_distance_bits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16384
+        },
+        "result_record_bytes": {
+          "const": 16
+        }
+      }
+    },
+    "device_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "result"
+        ],
+        "not": {
+          "required": [
+            "error_code"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "rejected",
+              "failed",
+              "cancelled",
+              "outcome_unknown"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "error_code"
+        ],
+        "not": {
+          "required": [
+            "result"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "outcome_unknown"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_code": {
+            "const": "OUTCOME_UNKNOWN"
+          }
+        }
+      }
+    }
+  ]
+}
