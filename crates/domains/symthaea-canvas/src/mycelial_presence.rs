@@ -399,14 +399,7 @@ pub fn build_mycelial_presence_with_mode(
         let (end_x, end_y) = project_spatial(filament.end);
         let path = format!(
             "M {:.2} {:.2} C {:.2} {:.2}, {:.2} {:.2}, {:.2} {:.2}",
-            start_x,
-            start_y,
-            control_a_x,
-            control_a_y,
-            control_b_x,
-            control_b_y,
-            end_x,
-            end_y,
+            start_x, start_y, control_a_x, control_a_y, control_b_x, control_b_y, end_x, end_y,
         );
         let generation_factor = (filament.generation as f32 / 4.0).clamp(0.0, 1.0);
         let branch_color = base_color.lerp(
