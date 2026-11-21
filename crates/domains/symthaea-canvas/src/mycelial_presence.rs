@@ -11,7 +11,7 @@ use std::f32::consts::TAU;
 use crate::color::Color;
 use crate::embodiment::{EmbodimentActivity, EmbodimentSnapshot, SpeechOutputState};
 use crate::mycelial_model::{PresenceMode, SpatialPoint3, build_mycelial_model};
-use crate::scene_graph::{FilterType, GradientStop, NodeKind, SceneNode, Style};
+use crate::scene_graph::{FilterType, GradientStop, NodeKind, SceneNode, Style, Transform};
 use crate::svg_renderer::{SvgRenderOptions, VIEWPORT_H, VIEWPORT_W, render_svg_with_options};
 
 const CENTER_X: f32 = VIEWPORT_W / 2.0;
@@ -397,10 +397,10 @@ pub fn build_mycelial_presence_with_mode(
         let (control_a_x, control_a_y) = project_spatial(filament.control_a);
         let (control_b_x, control_b_y) = project_spatial(filament.control_b);
         let (end_x, end_y) = project_spatial(filament.end);
-        let path = format!(concat!(
-            "M {start_x:.2} {start_y:.2} C {control_a_x:.2} {control_a_y:.2}, ",
-            "{control_b_x:.2} {control_b_y:.2}, {end_x:.2} {end_y:.2}"
-        ));
+        let path = format!(
+            "M {:.2} {:.2} C {:.2} {:.2}, {:.2} {:.2}, {:.2} {:.2}",
+            start_x, start_y, control_a_x, control_a_y, control_b_x, control_b_y, end_x, end_y
+        );
         let generation_factor = (filament.generation as f32 / 4.0).clamp(0.0, 1.0);
         let branch_color = base_color.lerp(
             &Color::from_hsl(274.0, 0.58, 0.70),
@@ -849,14 +849,14 @@ mod tests {
             motif_id(&predicting_scene).as_deref(),
             Some("motif-predicting")
         );
-        let motif_node = |scene: &SceneNode| {
+        fn motif_node(scene: &SceneNode) -> Option<&SceneNode> {
             scene.children.iter().find(|child| match &child.kind {
                 NodeKind::Group { id } => id
                     .as_deref()
                     .is_some_and(|value| value.starts_with("motif-")),
                 _ => false,
             })
-        };
+        }
         assert_ne!(
             motif_node(&associating_scene).unwrap().node_count(),
             motif_node(&predicting_scene).unwrap().node_count()
