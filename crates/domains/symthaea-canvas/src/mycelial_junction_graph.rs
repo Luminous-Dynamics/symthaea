@@ -294,6 +294,7 @@ pub fn build_mycelial_junction_hypha_graph(
         }
     }
 
+    let mut maximum_gap = 0.0f32;
     for filament in &model.filaments {
         let has_children = children
             .get(&filament.id)
@@ -319,6 +320,7 @@ pub fn build_mycelial_junction_hypha_graph(
                 },
             )?;
             let gap = point_distance(parent.end, filament.start);
+            maximum_gap = maximum_gap.max(gap);
             if gap > config.maximum_junction_gap_model_units {
                 return Err(MycelialJunctionGraphError::ParentJunctionGap {
                     filament_id: filament.id,
@@ -332,7 +334,6 @@ pub fn build_mycelial_junction_hypha_graph(
     let source_model_digest = source_model_digest(model);
     let mut nodes = BTreeMap::<String, MycelialJunction>::new();
     let mut contact_to_node = BTreeMap::<(u32, u32), String>::new();
-    let mut maximum_gap = 0.0f32;
 
     for fusion in anastomoses {
         let source = filaments
@@ -493,6 +494,7 @@ pub fn build_mycelial_junction_hypha_graph(
                 .ok_or(MycelialJunctionGraphError::InvalidGraph(
                     "segment end junction is missing",
                 ))?;
+            let end_is_anastomosis = end_node.kind == JunctionKind::Anastomosis;
             let start_offset = f64::from(point_distance(start_point, start_node.position));
             let end_offset = f64::from(point_distance(end_point, end_node.position));
             let id = format!("hypha:{filament_id}:{}-{}", t_start, t_end);
@@ -514,7 +516,7 @@ pub fn build_mycelial_junction_hypha_graph(
             }
             if let Some(node) = nodes.get_mut(end_junction_id) {
                 node.incident_filament_ids.push(filament_id);
-                if end_node.kind == JunctionKind::Anastomosis {
+                if end_is_anastomosis {
                     node.terminal_filament_ids.push(filament_id);
                 }
             }
@@ -867,6 +869,7 @@ impl MycelialJunctionHyphaGraph {
                 ))?;
             roots.insert(index);
         }
+        let adjacency = self.adjacency()?;
         let terminals: Vec<_> = self
             .junctions
             .iter()
@@ -878,10 +881,7 @@ impl MycelialJunctionHyphaGraph {
         let mut sum_path_length = 0.0;
         let mut reachable_pairs = 0usize;
         for terminal in &terminals {
-            let distances = shortest_path_distances(
-                &self.adjacency()?,
-                *terminal,
-            );
+            let distances = shortest_path_distances(&adjacency, *terminal);
             let nearest = roots
                 .iter()
                 .filter_map(|root| {
