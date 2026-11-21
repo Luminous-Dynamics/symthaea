@@ -59,14 +59,12 @@ impl VelocityFrame {
             with_respect_to_shift: [
                 0.0,
                 moments.zeroth,
-                2.0 * self.shift * moments.zeroth
-                    + 2.0 * self.scale * moments.first,
+                2.0 * self.shift * moments.zeroth + 2.0 * self.scale * moments.first,
             ],
             with_respect_to_scale: [
                 0.0,
                 moments.first,
-                2.0 * self.shift * moments.first
-                    + 2.0 * self.scale * moments.second,
+                2.0 * self.shift * moments.first + 2.0 * self.scale * moments.second,
             ],
         };
         jacobian.validate()?;
@@ -224,11 +222,7 @@ mod tests {
 
         assert_eq!(
             jacobian.with_respect_to_frame_moments,
-            [
-                [1.0, 0.0, 0.0],
-                [2.0, 0.5, 0.0],
-                [4.0, 2.0, 0.25],
-            ]
+            [[1.0, 0.0, 0.0], [2.0, 0.5, 0.0], [4.0, 2.0, 0.25],]
         );
         assert_eq!(jacobian.with_respect_to_shift, [0.0, 3.0, 14.0]);
         assert_eq!(jacobian.with_respect_to_scale, [0.0, 4.0, 13.0]);
