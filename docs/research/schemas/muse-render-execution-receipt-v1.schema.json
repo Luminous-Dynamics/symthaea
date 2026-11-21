@@ -1,0 +1,739 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MUSE Render Execution Receipt v1",
+  "description": "Attempt-level binding across source/candidate Score, edit verification, exact MIDI bytes, renderer invocation, exact WAV bytes, and independent evidence. Shape validation is not semantic digest verification or execution attestation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "attempt_id",
+    "attempt_state",
+    "source",
+    "edit",
+    "midi",
+    "renderer",
+    "execution",
+    "audio",
+    "verification",
+    "attestation",
+    "digest_recipe",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-render-execution-receipt-v1"
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "attempt_state": {
+      "enum": [
+        "not_submitted",
+        "submitted",
+        "completed",
+        "failed",
+        "outcome_unknown"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_score_sha256",
+        "candidate_score_sha256",
+        "score_digest_schema"
+      ],
+      "properties": {
+        "source_score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "score_digest_schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_sha256",
+        "edit_receipt_sha256",
+        "verifier_id",
+        "verifier_version",
+        "verification_receipt_sha256",
+        "verdict",
+        "authorized_operation_ids"
+      ],
+      "properties": {
+        "plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "edit_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "verifier_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "verification_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verdict": {
+          "$ref": "#/$defs/verdict"
+        },
+        "authorized_operation_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "midi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_schema",
+        "manifest_digest_schema",
+        "manifest_sha256",
+        "score_digest_schema",
+        "score_sha256",
+        "timeline_digest_schema",
+        "timeline_sha256",
+        "binding_digest_schema",
+        "binding_sha256",
+        "capability_digest_schema",
+        "capability_sha256",
+        "midi_sha256",
+        "byte_length",
+        "ticks_per_quarter",
+        "tempo_microseconds_per_quarter",
+        "meter_numerator",
+        "meter_denominator",
+        "note_count"
+      ],
+      "properties": {
+        "manifest_schema": {
+          "const": "muse-midi-performance-v1"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "midi_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "timeline_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "capability_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ticks_per_quarter": {
+          "const": 960
+        },
+        "note_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "manifest_digest_schema": {
+          "const": "muse-midi-performance-manifest-serde-json-sha256-v1"
+        },
+        "score_digest_schema": {
+          "const": "muse-score-serde-json-sha256-v1"
+        },
+        "timeline_digest_schema": {
+          "const": "muse-orchestration-timeline-serde-json-sha256-v1"
+        },
+        "binding_digest_schema": {
+          "const": "muse-midi-instrument-bindings-serde-json-sha256-v1"
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "capability_digest_schema": {
+          "const": "muse-midi-instrument-capabilities-serde-json-sha256-v1"
+        },
+        "tempo_microseconds_per_quarter": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "meter_numerator": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        },
+        "meter_denominator": {
+          "const": 4
+        }
+      }
+    },
+    "renderer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "renderer_id",
+        "renderer_version",
+        "binary_sha256",
+        "environment_sha256",
+        "configuration_sha256",
+        "asset_sha256",
+        "fallback_used",
+        "fallback_reason"
+      ],
+      "properties": {
+        "renderer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "renderer_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "asset_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fallback_used": {
+          "type": "boolean"
+        },
+        "fallback_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "executor_id",
+        "input_midi_sha256",
+        "output_audio_sha256",
+        "exit_code",
+        "started_at",
+        "finished_at",
+        "stdout_sha256",
+        "stderr_sha256",
+        "invocation_sha256"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not_started",
+            "submitted",
+            "running",
+            "completed",
+            "failed",
+            "unknown"
+          ]
+        },
+        "executor_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "input_midi_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output_audio_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "stdout_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stderr_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "invocation_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "container",
+        "audio_sha256",
+        "byte_length",
+        "sample_rate_hz",
+        "channels",
+        "frames"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "not_produced",
+            "produced",
+            "partial",
+            "unknown"
+          ]
+        },
+        "container": {
+          "enum": [
+            "wav",
+            "unknown"
+          ]
+        },
+        "audio_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "byte_length": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "sample_rate_hz": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "channels": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "frames": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "midi_score_conformance",
+        "rendered_score_conformance",
+        "protected_audio_preservation",
+        "human_evaluation"
+      ],
+      "properties": {
+        "midi_score_conformance": {
+          "$ref": "#/$defs/evidence_result"
+        },
+        "rendered_score_conformance": {
+          "$ref": "#/$defs/evidence_result"
+        },
+        "protected_audio_preservation": {
+          "$ref": "#/$defs/evidence_result"
+        },
+        "human_evaluation": {
+          "$ref": "#/$defs/evidence_result"
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identity",
+        "key_id",
+        "signature"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "unsigned_local",
+            "workflow_observed",
+            "signed"
+          ]
+        },
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "signature": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        }
+      }
+    },
+    "digest_recipe": {
+      "const": "muse-render-execution-receipt-sorted-json-sha256-v1"
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "abstain",
+        "not_run"
+      ]
+    },
+    "evidence_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "verifier_id",
+        "verifier_version",
+        "receipt_sha256",
+        "reason"
+      ],
+      "properties": {
+        "verdict": {
+          "$ref": "#/$defs/verdict"
+        },
+        "verifier_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "verifier_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "receipt_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "attempt_state": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "attempt_state"
+        ],
+        "additionalProperties": false
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "state": {
+                "const": "completed"
+              },
+              "input_midi_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "output_audio_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "exit_code": {
+                "const": 0
+              },
+              "finished_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          },
+          "audio": {
+            "properties": {
+              "disposition": {
+                "const": "produced"
+              },
+              "audio_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "byte_length": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sample_rate_hz": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "channels": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "frames": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attempt_state": {
+            "const": "not_submitted"
+          }
+        },
+        "required": [
+          "attempt_state"
+        ],
+        "additionalProperties": false
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "state": {
+                "const": "not_started"
+              },
+              "input_midi_sha256": {
+                "type": "null"
+              },
+              "output_audio_sha256": {
+                "type": "null"
+              },
+              "exit_code": {
+                "type": "null"
+              }
+            },
+            "additionalProperties": false
+          },
+          "audio": {
+            "properties": {
+              "disposition": {
+                "const": "not_produced"
+              },
+              "audio_sha256": {
+                "type": "null"
+              },
+              "byte_length": {
+                "type": "null"
+              },
+              "sample_rate_hz": {
+                "type": "null"
+              },
+              "channels": {
+                "type": "null"
+              },
+              "frames": {
+                "type": "null"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attempt_state": {
+            "const": "outcome_unknown"
+          }
+        },
+        "required": [
+          "attempt_state"
+        ],
+        "additionalProperties": false
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            },
+            "additionalProperties": false
+          },
+          "verification": {
+            "properties": {
+              "midi_score_conformance": {
+                "properties": {
+                  "verdict": {
+                    "enum": [
+                      "abstain",
+                      "not_run"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "rendered_score_conformance": {
+                "properties": {
+                  "verdict": {
+                    "enum": [
+                      "abstain",
+                      "not_run"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "protected_audio_preservation": {
+                "properties": {
+                  "verdict": {
+                    "enum": [
+                      "abstain",
+                      "not_run"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ]
+}

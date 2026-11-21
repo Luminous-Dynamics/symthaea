@@ -1,0 +1,110 @@
+{
+  "schema": "muse-render-execution-receipt-v1",
+  "attempt_id": "fixture.completed.0001",
+  "attempt_state": "completed",
+  "source": {
+    "source_score_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidate_score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "score_digest_schema": "muse-score-serde-json-sha256-v1"
+  },
+  "edit": {
+    "plan_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "edit_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "verifier_id": "fixture-only-score-edit-verifier",
+    "verifier_version": "0.0.0-fixture",
+    "verification_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "verdict": "pass",
+    "authorized_operation_ids": [
+      "fixture-velocity-change"
+    ]
+  },
+  "midi": {
+    "manifest_schema": "muse-midi-performance-v1",
+    "manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "midi_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "timeline_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "capability_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "byte_length": 4096,
+    "ticks_per_quarter": 960,
+    "note_count": 128,
+    "manifest_digest_schema": "muse-midi-performance-manifest-serde-json-sha256-v1",
+    "score_digest_schema": "muse-score-serde-json-sha256-v1",
+    "timeline_digest_schema": "muse-orchestration-timeline-serde-json-sha256-v1",
+    "binding_digest_schema": "muse-midi-instrument-bindings-serde-json-sha256-v1",
+    "binding_sha256": "abababababababababababababababababababababababababababababababab",
+    "capability_digest_schema": "muse-midi-instrument-capabilities-serde-json-sha256-v1",
+    "tempo_microseconds_per_quarter": 500000,
+    "meter_numerator": 4,
+    "meter_denominator": 4
+  },
+  "renderer": {
+    "renderer_id": "fixture-only-fluidsynth",
+    "renderer_version": "0.0.0-fixture",
+    "binary_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "environment_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "configuration_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "asset_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "fallback_used": false,
+    "fallback_reason": null
+  },
+  "execution": {
+    "state": "completed",
+    "executor_id": "fixture-only-executor",
+    "input_midi_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "output_audio_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "exit_code": 0,
+    "started_at": "2026-11-19T10:00:00Z",
+    "finished_at": "2026-11-19T10:00:02Z",
+    "stdout_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "stderr_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "invocation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "audio": {
+    "disposition": "produced",
+    "container": "wav",
+    "audio_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "byte_length": 352844,
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "frames": 88200
+  },
+  "verification": {
+    "midi_score_conformance": {
+      "verdict": "not_run",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "synthetic fixture; no MIDI was produced"
+    },
+    "rendered_score_conformance": {
+      "verdict": "not_run",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "synthetic fixture; no audio conformance run"
+    },
+    "protected_audio_preservation": {
+      "verdict": "not_run",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "synthetic fixture; no audio preservation run"
+    },
+    "human_evaluation": {
+      "verdict": "not_run",
+      "verifier_id": null,
+      "verifier_version": null,
+      "receipt_sha256": null,
+      "reason": "synthetic fixture; no listening study"
+    }
+  },
+  "attestation": {
+    "kind": "unsigned_local",
+    "identity": "synthetic-fixture",
+    "key_id": null,
+    "signature": null
+  },
+  "digest_recipe": "muse-render-execution-receipt-sorted-json-sha256-v1",
+  "receipt_sha256": "4980fe0cf03c82712f1dfe7ca5dd5fc780f7c038d5bdf5e557d3d7659b6c9b38"
+}
