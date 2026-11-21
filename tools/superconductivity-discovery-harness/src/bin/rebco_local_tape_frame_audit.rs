@@ -411,6 +411,18 @@ mod tests {
         audit(schema_bytes(), &fixture)
     }
 
+    fn assert_schema_rejects(value: &Value, expected_path: &str) {
+        let error = audit_fixture(value).expect_err("invalid fixture must be rejected");
+        assert!(
+            error.contains("fixture schema validation failed"),
+            "expected schema rejection, received: {error}"
+        );
+        assert!(
+            error.contains(expected_path),
+            "expected rejection at {expected_path}, received: {error}"
+        );
+    }
+
     #[test]
     fn identity_frame_maps_global_axes_to_same_local_axes() {
         let receipt = audit(schema_bytes(), fixture_bytes()).expect("fixture audits");
@@ -516,10 +528,9 @@ mod tests {
     fn rejects_wrong_matrix_shape() {
         let mut value = fixture();
         value["stations"][0]["local_to_global_rotation_matrix"] = json!([[1, 0], [0, 1]]);
-        assert!(
-            audit_fixture(&value)
-                .unwrap_err()
-                .contains("exactly three rows")
+        assert_schema_rejects(
+            &value,
+            "/stations/0/local_to_global_rotation_matrix",
         );
     }
 
@@ -539,10 +550,9 @@ mod tests {
     fn rejects_negative_frame_uncertainty() {
         let mut value = fixture();
         value["stations"][0]["transform_uncertainty_rad"] = json!(-0.1);
-        assert!(
-            audit_fixture(&value)
-                .unwrap_err()
-                .contains("must be non-negative")
+        assert_schema_rejects(
+            &value,
+            "/stations/0/transform_uncertainty_rad",
         );
     }
 
@@ -550,10 +560,9 @@ mod tests {
     fn rejects_malformed_source_digest() {
         let mut value = fixture();
         value["stations"][0]["source_artifact_sha256"] = json!("ABC");
-        assert!(
-            audit_fixture(&value)
-                .unwrap_err()
-                .contains("lowercase 64-character SHA-256")
+        assert_schema_rejects(
+            &value,
+            "/stations/0/source_artifact_sha256",
         );
     }
 
