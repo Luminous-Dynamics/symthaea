@@ -43,5 +43,46 @@
       "https://jmlr.org/papers/v11/sriperumbudur10a.html",
       "https://www.jmlr.org/papers/v13/gretton12a.html"
     ]
+  },
+  "spectral_approximation": {
+    "algorithm": "common_random_spectral_features",
+    "spatial_frequency_distribution": {
+      "name": "Skellam",
+      "definition": "P1-P2 where P1,P2 are independent Poisson(kappa/2)",
+      "pmf": "exp(-kappa)*I_abs(n)(kappa)",
+      "rationale": "exact normalized Fourier spectrum of the periodic von Mises kernel"
+    },
+    "velocity_frequency_distribution": {
+      "name": "Gaussian",
+      "mean": 0,
+      "standard_deviation": "1/velocity_length_scale",
+      "rationale": "exact Fourier spectrum of the Gaussian velocity kernel"
+    },
+    "estimator": "mean_d(|normalized_complex_signature_difference_d|^2)",
+    "common_random_numbers": true,
+    "deterministic_prng": "SplitMix64",
+    "feature_count_sweep": [
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "preregistered_independent_seeds": 10,
+    "feature_sampling_error": {
+      "per_feature_sample_range": [
+        0,
+        4
+      ],
+      "reported": "empirical_variance_standard_error_and_95_percent_hoeffding_half_width",
+      "hoeffding_half_width": "4*sqrt(ln(2/0.05)/(2*D))",
+      "claim_limit": "bounds random spectral-feature error in normalized squared MMD only; not particle-sampling or physical solver error"
+    },
+    "complexity": "O(N log N + M log M + D*(U+V)) time and O(N+M) temporary memory; U,V are unique nonzero support atoms",
+    "escalation_policy": "If feature uncertainty overlaps a predeclared physical acceptance boundary, escalate to exact small-N oracle where feasible or trusted solver; never accept from approximation alone."
   }
 }

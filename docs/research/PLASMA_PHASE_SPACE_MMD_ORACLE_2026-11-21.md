@@ -201,3 +201,131 @@ A speed claim is admissible only when particle update, field solve, deposition/g
 - Python formula checks for the two negative controls: completed.
 - Local rustc/cargo unavailable in the authoring runtime; Rust format, compilation, tests and Clippy have not been executed locally.
 - The focused workflow must be observed on the exact PR head. Queued, skipped or absent jobs are not passes.
+
+
+## 11. Scalable spectral approximation: exact spectrum, randomized evaluation
+
+The first scalable increment is implemented in the same standalone crate as the exact oracle. It does not replace the kernel with a truncated Fourier series. Instead, it samples the full spectral probability measure of the frozen kernel and estimates the spectral MMD integral with common random features.
+
+For the periodic von Mises factor,
+
+\[
+k_x(\Delta x)=e^{-\kappa}\exp\!\left(\kappa\cos\frac{2\pi\Delta x}{L}\right)
+=\sum_{n\in\mathbb Z} e^{-\kappa}I_{|n|}(\kappa)
+e^{i2\pi n\Delta x/L}.
+\]
+
+The normalized coefficient distribution is exactly Skellam:
+
+\[
+p(n)=e^{-\kappa}I_{|n|}(\kappa)
+=\Pr(P_1-P_2=n),\qquad
+P_1,P_2\stackrel{\mathrm{iid}}{\sim}\mathrm{Poisson}(\kappa/2).
+\]
+
+For the Gaussian velocity factor,
+
+\[
+\exp\!\left(-\frac{\Delta v^2}{2\ell_v^2}\right)
+=\mathbb E_{\omega\sim\mathcal N(0,\ell_v^{-2})}
+e^{i\omega\Delta v}.
+\]
+
+Therefore, independent draws \(n\sim p(n)\) and \(\omega\sim\mathcal N(0,\ell_v^{-2})\) give an exact spectral sampling scheme for the product kernel. The periodic geometry is retained without a Euclidean wrap approximation, and no finite spatial-mode truncation is introduced.
+
+For each feature \(d\), evaluate the same complex feature on both measures:
+
+\[
+\Delta_d=
+\frac{1}{s}\left[
+\sum_i a_i e^{i(2\pi n_d x_i/L+\omega_d v_i)}
+-
+\sum_j b_j e^{i(2\pi n_d x'_j/L+\omega_d v'_j)}
+\right],
+\quad
+s=\max(\mathrm{TV}(\mu),\mathrm{TV}(\nu)).
+\]
+
+Then
+
+\[
+\widehat{\operatorname{MMD}^2}_{D}
+=\frac1D\sum_{d=1}^{D}|\Delta_d|^2
+\]
+
+is an unbiased, nonnegative estimate of normalized squared MMD. The same random frequencies are used for candidate and reference (common random numbers), avoiding unnecessary independent approximation noise in the difference.
+
+### Runtime and uncertainty contract
+
+- Canonicalize periodic coordinates and aggregate co-located signed support weights before normalizing total variation.
+- Draw Skellam spatial harmonics from a difference of two Poisson variates. Small rates use inversion; larger rates use PTRS transformed rejection.
+- Draw velocity frequencies with Box–Muller from the exact Gaussian spectral law.
+- Use a frozen SplitMix64 seed and feature count as part of benchmark identity. This generator is deterministic, not cryptographic.
+- Evaluate features in a streaming pass, with no \(D\times N\) matrix allocation.
+- Report empirical feature variance, standard error, Hoeffding 95% half-width, feature-bound interval, unique atom counts and \(D(U+V)\) particle-feature evaluations.
+
+After canonicalization, feature evaluation is \(O(D(U+V))\), where \(U,V\) are unique nonzero atoms. Canonicalization costs \(O(N\log N+M\log M)\). The direct MMD oracle remains quadratic in \(U,V\) and is the trusted small-N reference.
+
+Each normalized squared feature sample lies in [0,4], because each normalized signed measure has total variation at most one and the difference between two characteristic coefficients has magnitude at most two. The implementation reports a conservative two-sided Hoeffding radius at alpha=0.05:
+
+\[
+r_D=4\sqrt{\frac{\log(2/0.05)}{2D}}.
+\]
+
+This interval only bounds random spectral-feature error in normalized squared MMD across independent feature draws. It is not a bound on particle sampling error, physical solver error, rollout error or statistical two-sample testing. The empirical standard error is reported separately; it must not be substituted for the bounded guarantee.
+
+### Falsification suite
+
+Eight new tests exercise:
+1. Frozen-seed deterministic replay.
+2. Linear particle-feature operation accounting.
+3. Particle permutation and signed co-located split/cancellation invariance.
+4. Agreement with the exact oracle inside the declared feature-sampling bound on a frozen fixture.
+5. Resolution of the earlier finite-Fourier alias control.
+6. Rejection of a zero feature count.
+7. Skellam sampler mean and variance against the known zero mean and kappa variance, including the large-rate PTRS path.
+8. Equal empty measures producing zero estimate.
+
+This implementation makes a concrete distinction between an exact spectral law and a randomized finite approximation. The estimator uses the whole kernel spectrum, but a finite draw still has random approximation error. A future deterministic or quasi-Monte Carlo integration may reduce variance, but must be compared against this common-random-number RFF baseline and the exact small-N oracle.
+
+### Benchmark protocol for feature-count scaling
+
+Freeze the feature-count sweep before evaluating held-out solver trajectories. Recommended initial sweep:
+
+| Feature count D | Required output |
+|---:|---|
+| 64 | Exact-oracle absolute/relative error, runtime, memory |
+| 128 | Same |
+| 256 | Same |
+| 512 | Same |
+| 1,024 | Same |
+| 2,048 | Same |
+| 4,096 | Same |
+| 8,192 | Same |
+| 16,384 | Same |
+
+Use at least ten preregistered independent seeds for benchmark characterization, with paired feature draws used within each candidate/reference comparison. Report mean, median, p95 and worst absolute error, relative error where the exact value is nonzero, empirical feature standard error, conservative Hoeffding radius, wall time, peak memory and throughput. Keep the exact oracle only at small N; do not claim O(ND) deployment performance by timing the quadratic reference path.
+
+Challenge the approximation with:
+- finite-feature alias supports;
+- thin beams and narrow velocity structures;
+- multimodal and anisotropic distributions;
+- high spatial concentration / high harmonic content;
+- signed delta-f measures with co-located cancellation;
+- particle-count transfer and representation split/merge;
+- position-velocity dependence changes invisible to the separate marginals;
+- weak discrepancies near numerical precision.
+
+A feature budget is not "safe" because its mean error is small. For the tournament, freeze a maximum approximation error in each physics lane, measure false-safe rate and require exact-oracle escalation or classical fallback when the approximation interval overlaps the acceptance boundary.
+
+### Beyond standard random features
+
+The immediate RFF implementation is a baseline, not the endpoint. The next research options are:
+1. Stratified / randomized quasi-Monte Carlo in Gaussian velocity spectral quantiles and the discrete Skellam CDF, with exact-oracle comparisons.
+2. Common randomized low-discrepancy feature banks shared across candidate/reference and time snapshots.
+3. Error-adaptive feature allocation from a predeclared confidence budget, with the final feature map still pinned by receipt.
+4. Multi-scale positive kernel mixtures with bandwidths frozen before evaluation.
+5. Physics-informed importance sampling only if an explicit likelihood-ratio correction keeps the estimator unbiased; otherwise it is a different diagnostic and must be named as such.
+
+Do not reuse the same seed after tuning on held-out trajectories and call the result independent evaluation. Treat feature count, seed, kernel scales and numerical precision as benchmark inputs.
+
