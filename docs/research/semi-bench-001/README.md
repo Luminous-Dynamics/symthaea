@@ -403,3 +403,10 @@ The Python code is an independent test/reference oracle only. The production imp
 ## Validation-selected operating-point policy
 
 The reference evaluator now includes a separate validation-only selector that maximizes recall subject to a declared minimum precision, groups equal-score ties, rejects validation/test identity overlap and records an explicit fallback when no observed threshold is feasible. A frozen 10-validation / 10-test known-answer fixture covers this policy. It directly addresses the 2026 SECOM supplementary finding where a high-precision validation operating point produced zero test recall with only 21 positive test observations. The selector does not make a scarce validation sample statistically reliable; confidence intervals and operating-point stability remain required.
+
+
+## End-to-end EDA benchmark follow-up
+
+The 2026 frontier review is documented in [2026-industry-frontier.md](2026-industry-frontier.md). The new [SEMI-EDA-001 #13069](https://github.com/Luminous-Dynamics/symthaea/issues/13069) workstream adds ChiPBench and PPAPlace as end-to-end placement references. It makes final routed WNS/TNS/PPA the adjudicator and treats HPWL/pre-route predictions as intermediate surrogates that must pass a held-out fidelity gate.
+
+The benchmark scope also maps to NIST's TIDAL manufacturing-intelligence programme and the SEMI proposal for a digital-twin specification in semiconductor manufacturing. These are external architecture/standards references, not Luminous conformance claims.
