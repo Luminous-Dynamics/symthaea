@@ -184,7 +184,7 @@ JSON Schema validates structure; it does not prove these cross-record and derive
 
 The preferred empirical kernel entry points implement participant-key and ROI-order checks before comparison. The report validator remains responsible for cross-row arithmetic and source-to-output provenance.
 
-The committed `research/rcaf/tools/validate_report.py` checks the Draft 2020-12 report schema when supplied and recomputes semantic invariants (participant count, paired-gap arithmetic, medians, positive-gap fraction, exact sign-test counts/p-value, dataset flow and claim ceilings). It is an isolated research helper, not a production dependency. Nine Python unit tests were run locally and passed; this is separate from the Rust kernel tests, which remain uncompiled here.
+The committed `research/rcaf/tools/validate_report.py` checks the Draft 2020-12 report schema when supplied and recomputes semantic invariants (participant count, paired-gap arithmetic, medians, positive-gap fraction, exact sign-test counts/p-value, dataset flow, verified-source state, attrition, replay digests and claim ceilings). It is an isolated research helper, not a production dependency. The latest focused workflow runs the expanded report-validator, power-calculator and theory-design tests, schema validation, Rust formatting, Rust tests and strict Clippy; exact-head results are recorded in the PR and README.
 
 
 ## 8. Power and cohort design
@@ -197,3 +197,10 @@ These are exact-binomial planning calculations for a sign test only. They do not
 ## 9. Intake source lock updates
 
 The MEG tournament JSON and dataset registry now record the author repository commit/blob IDs, the two pyspi versions, the two distinct Zenodo data archives, the grouped 10-fold seed, model/scaler settings, and the pre-fold mean-imputation finding. These are intake audits only. No preprocessed data file, BIDS bundle or raw MEG file has been downloaded or analysed by this branch.
+
+
+## 10. Theory-discriminating design calculator
+
+The new `research/cetb/theory_design/eig.py` utility implements categorical expected information gain in bits, including explicit missing/ambiguous/failure outcome categories and nuisance-scenario aggregation. It reports expected EIG, a predeclared lower-quantile robustness summary and acquisition cost separately. Eight synthetic unit tests cover identical and opposing theory predictions, partial discrimination, explicit missingness, nuisance sensitivity, cost, ordering invariance and invalid probability mass.
+
+The tool is a reference calculator only. It does not provide or calibrate theory predictions, choose priors, validate the measurement model or identify which theory is true. It is wired into the focused research validation workflow.
