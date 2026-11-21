@@ -40,7 +40,7 @@ jobs:
       - name: Prepare isolated crate and golden fixtures
         run: |
           set -euo pipefail
-          export CHECK_ROOT="\${RUNNER_TEMP}/semi-contract-check"
+          export CHECK_ROOT="${RUNNER_TEMP}/semi-contract-check"
           mkdir -p "\${CHECK_ROOT}/crates/domains" \
                    "\${CHECK_ROOT}/benchmarks/semi-bench-001/reference" \
                    "\${CHECK_ROOT}/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a"
@@ -71,7 +71,7 @@ jobs:
       - name: Format isolated crate
         run: |
           set -euo pipefail
-          ROOT="\${RUNNER_TEMP}/semi-contract-check"
+          ROOT="${RUNNER_TEMP}/semi-contract-check"
           rustfmt --edition 2024 "\${ROOT}/crates/domains/symthaea-semiconductor/src/lib.rs"
           rustfmt --edition 2024 "\${ROOT}/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
           rustfmt --edition 2024 "\${ROOT}/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
@@ -80,4 +80,4 @@ jobs:
           rustfmt --edition 2024 --check "\${ROOT}/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
 
       - name: Test Rust benchmark contracts
-        run: cargo test --manifest-path "\${RUNNER_TEMP}/semi-contract-check/crates/domains/symthaea-semiconductor/Cargo.toml"
+        run: cargo test --manifest-path "${RUNNER_TEMP}/semi-contract-check/crates/domains/symthaea-semiconductor/Cargo.toml"
