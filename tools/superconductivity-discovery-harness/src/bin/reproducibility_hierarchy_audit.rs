@@ -1,7 +1,7 @@
 use jsonschema::validator_for;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -36,15 +36,41 @@ fn canonical_utc(value: &str) -> bool {
         || bytes[13] != b':'
         || bytes[16] != b':'
         || bytes[19] != b'Z'
+        || !bytes
+            .iter()
+            .enumerate()
+            .all(|(index, byte)| {
+                matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
+            })
     {
         return false;
     }
-    bytes
-        .iter()
-        .enumerate()
-        .all(|(index, byte)| {
-            matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
-        })
+    let number = |start: usize, end: usize| {
+        std::str::from_utf8(&bytes[start..end])
+            .ok()
+            .and_then(|text| text.parse::<u32>().ok())
+    };
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
+        number(0, 4),
+        number(5, 7),
+        number(8, 10),
+        number(11, 13),
+        number(14, 16),
+        number(17, 19),
+    ) else {
+        return false;
+    };
+    if !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 || day == 0 {
+        return false;
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    day <= days_in_month
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -62,10 +88,6 @@ fn get_group<'a>(
             nonempty_text(observation, field, &format!("observations[{index}]"))
         })
         .collect()
-}
-
-fn intersection_size<T: Ord + Clone>(left: &BTreeSet<T>, right: &BTreeSet<T>) -> usize {
-    left.intersection(right).count()
 }
 
 fn require_disjoint<T: Ord + Clone>(
@@ -328,6 +350,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let state = fixture
         .get("material_state")
         .ok_or_else(|| "material_state is required".to_owned())?;
+    let state_id = nonempty_text(state, "state_id", "material_state")?;
     let property = nonempty_text(state, "property_id", "material_state")?;
     let unit = nonempty_text(state, "property_unit", "material_state")?;
     let observations = array(
@@ -346,10 +369,13 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
 
     for (index, observation) in observations.iter().enumerate() {
         let path = format!("observations[{index}]");
-        if nonempty_text(observation, "property_id", &path)? != property
+        if nonempty_text(observation, "material_state_id", &path)? != state_id
+            || nonempty_text(observation, "property_id", &path)? != property
             || nonempty_text(observation, "property_unit", &path)? != unit
         {
-            return Err(format!("{path}: property_id/property_unit does not match material_state"));
+            return Err(format!(
+                "{path}: material_state_id/property_id/property_unit does not match material_state"
+            ));
         }
         if nonempty_text(observation, "evidence_class", &path)? != "synthetic"
             || nonempty_text(observation, "evidence_authority", &path)? != "synthetic_measurement"
