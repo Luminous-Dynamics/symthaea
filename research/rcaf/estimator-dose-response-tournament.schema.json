@@ -135,7 +135,7 @@
                     },
                     "injection_loading_delta": {
                       "type": "number",
-                      "exclusiveMinimum": 0
+                      "minimum": 0
                     },
                     "alpha": {
                       "type": "number",
