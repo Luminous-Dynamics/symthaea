@@ -1021,6 +1021,7 @@ pub mod aesthetic_listener;
 pub mod ambient_drone;
 pub mod arc;
 pub mod audio_feedback;
+pub mod audio_frontend_evidence;
 pub mod auto_master;
 pub mod binaural;
 pub mod collaborative;
