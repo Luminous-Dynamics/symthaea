@@ -9,6 +9,8 @@ ds006623 provides 26 healthy volunteers studied during graded propofol sedation,
 
 The 2026 dataset descriptor reports a decrease in integration–segregation difference (ISD) during loss of responsiveness. It also publishes the processing configuration and points to the analysis code and Zenodo archive. This gives us a reproducible, bounded first target and a direct way to audit how much of a reported effect depends on the original preprocessing choices.
 
+The 2026 dataset descriptor reports no task-evoked mental-imagery responses in this 26-person release cohort. This must not be conflated with the separate 2018 Scientific Reports study (n=5), which reported time-locked imagery in one participant during LOR.
+
 It does not provide a direct, continuous ground-truth label for phenomenal experience. The primary result is about a neural network measure across behavioural/pharmacological states.
 
 ## 2. Frozen source inputs

@@ -52,7 +52,7 @@ CETB extension: serialize prediction cards, analysis windows, expected distribut
 
 Use OpenNeuro ds006623 v1.0.0 as the first bounded reproducibility target. It contains MRI/fMRI and behavioural data from 26 healthy volunteers under graded propofol sedation, including task/rest runs, hand-squeeze traces and infusion information.
 
-The dataset descriptor reports a decrease in integration–segregation difference (ISD) during loss of responsiveness. The descriptor provides the published processing details and points to the authors' analysis code and Zenodo archive. This target is a reproduction of published work, not a novel discovery or a direct readout of phenomenal experience.
+The dataset descriptor reports a decrease in integration–segregation difference (ISD) during loss of responsiveness and no task-evoked mental-imagery responses in this 26-person release cohort. Do not conflate this cohort with the separate 2018 Scientific Reports study (n=5), which reported time-locked imagery in one participant during LOR. The descriptor provides the published processing details and points to the authors' analysis code and Zenodo archive. This target is a reproduction of published work, not a novel discovery or a direct readout of phenomenal experience.
 
 ### Lane C — Repeated-awakening EEG and experience reports
 

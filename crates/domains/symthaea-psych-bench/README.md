@@ -31,14 +31,15 @@ cargo test -p symthaea-psych-bench
 
 ## Qualia Confidence Matrix
 
-7 benchmarks testing necessary conditions for consciousness, derived from
-GWT, IIT, HOT, and FEP:
+7 mostly synthetic architecture diagnostics motivated by GWT, IIT, HOT and
+FEP. They test named model behaviours, not necessary or sufficient conditions
+for consciousness:
 
 | Benchmark | Theory | What it tests | Key metric |
 |-----------|--------|---------------|------------|
 | GWT Asphyxiation | GWT | Domain collapse order under workspace restriction | Spearman rho |
 | Phase Transition | IIT | Sigmoidal vs. linear fidelity collapse | Sigmoid advantage |
-| Perturbational Complexity | IIT/Clinical | Complex vs. simple response to perturbation (digital PCI) | PCI ratio |
+| Perturbational Complexity | IIT-motivated synthetic diagnostic | Broadcast-on vs. broadcast-off response complexity in a toy network | Synthetic LZ ratio |
 | Somatic Interference | Damasio | Emergent cascade degradation under neuromod distress | Cascade ratio |
 | Bistable Perception | Psychophysics | Heavy-tailed switching in ambiguous perception | CV of switch interval |
 | Unconscious Priming | GWT | Sub/supra-threshold processing dissociation | Priming dissociation |
