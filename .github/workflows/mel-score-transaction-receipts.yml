@@ -11,9 +11,6 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
   pull_request:
-    branches:
-      - main
-      - research/mel-sonata-cognitive-subintent-20261121
     paths:
       - "crates/domains/symthaea-muse/src/score_transaction.rs"
       - "crates/domains/symthaea-muse/src/sonata_intervention.rs"
