@@ -1241,8 +1241,8 @@ mod tests {
     #[test]
     fn all_frozen_scenarios_pass_the_independent_semantic_contract() {
         let receipt = run_audit(FIXTURE, SOURCE).expect("scenario catalogue must audit");
-        assert_eq!(receipt.scenario_count, 15);
-        assert_eq!(receipt.oracle_matches, 15);
+        assert_eq!(receipt.scenario_count, 17);
+        assert_eq!(receipt.oracle_matches, 17);
         assert_eq!(receipt.oracle_mismatches, 0);
         assert!(!receipt.authority_granted);
     }
@@ -1603,6 +1603,57 @@ mod tests {
         );
         assert!(case.selection_matches_oracle);
         assert!(case.abstention_correct);
+    }
+
+    #[test]
+    fn incomplete_change_frontier_blocks_even_informative_requalification_actions() {
+        let receipt = run_audit(FIXTURE, SOURCE).unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "JEV-016")
+            .unwrap();
+        assert_eq!(case.eligible_action_count, 0);
+        assert_eq!(case.selected_action_id, None);
+        assert_eq!(case.selection_disposition, "ABSTAIN_NO_DECISION_VALUE");
+        assert!(case.selection_matches_oracle);
+        let action = &case.actions[0];
+        assert!(!action.change_frontier_complete);
+        assert!(!action.requalification_claims_covered);
+        assert!(!action.policy_eligible);
+        assert!(action.reasons.iter().any(|reason| reason == "CHANGE_FRONTIER_INCOMPLETE"));
+    }
+
+    #[test]
+    fn complete_change_frontier_requires_and_selects_targeted_requalification() {
+        let receipt = run_audit(FIXTURE, SOURCE).unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "JEV-017")
+            .unwrap();
+        assert_eq!(
+            case.selected_action_id.as_deref(),
+            Some("A-TARGETED-STRUCTURAL-REQUALIFICATION")
+        );
+        assert!(case.selection_matches_oracle);
+        let unrelated = case
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-UNRELATED-DESIGN-RECHECK")
+            .unwrap();
+        let targeted = case
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-TARGETED-STRUCTURAL-REQUALIFICATION")
+            .unwrap();
+        assert!(unrelated.change_frontier_complete);
+        assert!(!unrelated.requalification_claims_covered);
+        assert!(!unrelated.policy_eligible);
+        assert!(unrelated.reasons.iter().any(|reason| reason == "REQUALIFICATION_CLAIM_NOT_COVERED"));
+        assert!(targeted.change_frontier_complete);
+        assert!(targeted.requalification_claims_covered);
+        assert!(targeted.policy_eligible);
     }
 
     #[test]
