@@ -781,7 +781,19 @@ mod tests {
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
         assert_eq!(batch.candidates.len(), 5);
+        assert_eq!(
+            batch.cognitive_subintent.schema,
+            SONATA_RETURN_SUBINTENT_SCHEMA_V1
+        );
+        assert_eq!(
+            batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "literal-register".into(),
+                selected_strategy: SonataReturnStrategy::LiteralRegister,
+            }
+        );
         let selected = batch.selection.recommended_id.as_deref().unwrap();
+        assert_eq!(selected, "literal-register");
         let selected = batch
             .candidates
             .iter()
@@ -794,6 +806,81 @@ mod tests {
             evidence.obligation_id == trace.proposal.driving_obligation_id.unwrap()
                 && evidence.verified
         }));
+    }
+
+    #[test]
+    fn unsupported_fep_actions_remain_shadow_only_and_do_not_change_selection() {
+        let intent = MusicalIntent {
+            seed: 47,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let realization =
+            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let mut first_trace = return_trace(&realization);
+        first_trace.inference.source_action = MusicAction::AddCountermelody;
+        let first = generate_and_rank_sonata_return(&realization, &first_trace).unwrap();
+
+        let mut second_trace = first_trace.clone();
+        second_trace.inference.source_action = MusicAction::ModulateKey;
+        let second = generate_and_rank_sonata_return(&realization, &second_trace).unwrap();
+
+        assert_eq!(
+            first.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::UnsupportedShadowOnly
+        );
+        assert_eq!(
+            second.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::UnsupportedShadowOnly
+        );
+        assert_eq!(first.cognitive_subintent.request, None);
+        assert_eq!(second.cognitive_subintent.request, None);
+        assert_eq!(first.selection.recommended_id, second.selection.recommended_id);
+        assert_eq!(
+            first
+                .candidates
+                .iter()
+                .map(|candidate| candidate.score.clone())
+                .collect::<Vec<_>>(),
+            second
+                .candidates
+                .iter()
+                .map(|candidate| candidate.score.clone())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn cognitive_subintent_cannot_override_selection_without_driving_obligation() {
+        let intent = MusicalIntent {
+            seed: 53,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let realization =
+            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+
+        let mut supported_trace = return_trace(&realization);
+        supported_trace.proposal.driving_obligation_id = None;
+        let supported = generate_and_rank_sonata_return(&realization, &supported_trace).unwrap();
+
+        let mut unsupported_trace = supported_trace.clone();
+        unsupported_trace.inference.source_action = MusicAction::AddCountermelody;
+        let unsupported =
+            generate_and_rank_sonata_return(&realization, &unsupported_trace).unwrap();
+
+        assert_eq!(
+            supported.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::RejectedByFormalGates
+        );
+        assert_eq!(
+            supported.cognitive_subintent.request,
+            Some(SonataReturnSubintentRequestV1::RestoreOpeningMotifLiterally)
+        );
+        assert_eq!(
+            supported.selection.recommended_id,
+            unsupported.selection.recommended_id
+        );
     }
 
     #[test]
