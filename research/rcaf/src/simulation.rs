@@ -116,7 +116,7 @@ pub fn run_estimator_tournament(
         results.push(run_injection_recovery(&estimator_config)?);
     }
     Ok(EstimatorTournamentReport {
-        schema_version: "rcaf.estimator-tournament/0.1.0",
+        schema_version: "rcaf.estimator-tournament/0.2.0",
         estimators_compared: results.len(),
         results,
     })
@@ -210,7 +210,7 @@ pub fn run_estimator_dose_response_tournament(
         });
     }
     Ok(EstimatorDoseResponseTournamentReport {
-        schema_version: "rcaf.estimator-dose-response-tournament/0.1.0",
+        schema_version: "rcaf.estimator-dose-response-tournament/0.2.0",
         estimators_compared: curves.len(),
         effect_sizes: effect_sizes.to_vec(),
         curves,
@@ -389,7 +389,7 @@ pub fn run_injection_recovery_sweep(
         .count();
 
     Ok(InjectionRecoverySweepReport {
-        schema_version: "rcaf.injection-recovery-sweep/0.1.0",
+        schema_version: "rcaf.injection-recovery-sweep/0.2.0",
         effect_size_points: reports.len(),
         endpoint_median_gap_difference: last_gap - first_gap,
         monotonic_adjacent_pair_fraction: adjacent_increases as f64 / (reports.len() - 1) as f64,
@@ -1086,7 +1086,7 @@ mod tests {
             );
         }
         let output = tournament.to_json_pretty();
-        assert!(output.contains("rcaf.estimator-dose-response-tournament/0.1.0"));
+        assert!(output.contains("rcaf.estimator-dose-response-tournament/0.2.0"));
         assert!(output.contains("signed_shift_weighted_jaccard"));
     }
 
