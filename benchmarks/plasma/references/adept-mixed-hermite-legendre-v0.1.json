@@ -1,0 +1,271 @@
+{
+  "schema": "luminous.plasma.external-solver-admission",
+  "schema_version": "0.1.0",
+  "admission_id": "ADEPT-HERMITE-LEGENDRE-1D1V-2026-11-21",
+  "status": "source-pinned-upstream-tests-passed-independent-reproduction-pending",
+  "upstream": {
+    "repository": "ergodicio/adept",
+    "repository_url": "https://github.com/ergodicio/adept",
+    "visibility": "public",
+    "default_branch": "main",
+    "source_commit": "0c85ce0d3d66abab51212191c2644f58a31a49cd",
+    "source_commit_date": "2026-11-02T18:01:03Z",
+    "source_commit_signature_verified_by_github": true,
+    "license": "MIT",
+    "license_blob_sha": "8fe2307e6cda98e0dc31c18582f9e453b6c51ff3",
+    "runtime": {
+      "language": "Python",
+      "requires_python": ">=3.11",
+      "numerical_stack": [
+        "JAX",
+        "Diffrax",
+        "NumPy",
+        "SciPy"
+      ],
+      "package_manager": "uv",
+      "lockfile": "uv.lock",
+      "lockfile_blob_sha": "9c21b90a12084a5fd5a8c88a65931f02a7d04582",
+      "project_manifest_blob_sha": "763657bf39ed3da6542a4a0576b58063c25d5d03",
+      "hardware_paths": [
+        "CPU",
+        "NVIDIA GPU (JAX CUDA 12 extra)"
+      ]
+    },
+    "source_files": [
+      {
+        "path": "adept/_hermite_legendre_1d/modules.py",
+        "blob_sha": "426336cda2b4afc7d616464c72e91be5b37ccfd5"
+      },
+      {
+        "path": "adept/_hermite_legendre_1d/storage.py",
+        "blob_sha": "fbd440966a620f244bc879be6a04c13adc221068"
+      },
+      {
+        "path": "adept/_hermite_legendre_1d/vector_field.py",
+        "blob_sha": "f65b1700f2c98ed942c0d8ed9baefca1b30bb822"
+      },
+      {
+        "path": "adept/hermite_legendre_1d.py",
+        "blob_sha": "967ba447525e74fb577c0d37c53be5fe80bd47b5"
+      },
+      {
+        "path": "README.md",
+        "blob_sha": "0b2602b6a587b156c79211231a239283b21e91dd"
+      },
+      {
+        "path": "pyproject.toml",
+        "blob_sha": "763657bf39ed3da6542a4a0576b58063c25d5d03"
+      },
+      {
+        "path": "uv.lock",
+        "blob_sha": "9c21b90a12084a5fd5a8c88a65931f02a7d04582"
+      },
+      {
+        "path": "LICENSE",
+        "blob_sha": "8fe2307e6cda98e0dc31c18582f9e453b6c51ff3"
+      }
+    ]
+  },
+  "method": {
+    "label": "mixed asymmetric-weighted Hermite bulk plus bounded Legendre residual",
+    "reference_paper": {
+      "title": "Mixed Hermite-Legendre spectral method for kinetic plasma simulations",
+      "authors": [
+        "Issan",
+        "Delzanno",
+        "Roytershteyn"
+      ],
+      "arxiv": "2606.12322",
+      "submitted": "2026-06-10",
+      "publication_status": "arXiv preprint; journal publication not asserted"
+    },
+    "distribution_decomposition": "f(x,v,t) = f0(x,v,t) + delta_f(x,v,t)",
+    "bulk_representation": "asymmetrically weighted Hermite basis on unbounded velocity coordinate",
+    "residual_representation": "Legendre basis on finite velocity window [v_a, v_b]",
+    "coupling": "highest Hermite coefficient feeds Legendre correction; both bases contribute to the self-consistent Poisson field",
+    "spatial_representation": "Fourier spectral on periodic x",
+    "integrators": [
+      "structured split with exact streaming and local Cayley force updates",
+      "Lawson-RK4",
+      "IMEX with frozen-field backward-Euler Lorentz substep"
+    ],
+    "structural_controls": [
+      "optional low-mode moment correction for mass, momentum and energy",
+      "Legendre velocity-window penalty and boundary diagnostics",
+      "separate Hermite and Legendre artificial high-mode damping",
+      "optional BGK and Dougherty collision models"
+    ],
+    "important_semantics": [
+      "Hermite shift u and scale alpha are configuration parameters in the pinned implementation; no automatic time-varying frame update is claimed.",
+      "Legendre correction has finite velocity support and requires boundary adequacy checks.",
+      "The mixed basis is distinct from a single adaptive-Hermite basis and from the invariant-backbone plus compressed-residual hypothesis.",
+      "Backward-Euler IMEX stability must be evaluated alongside its numerical dissipation."
+    ]
+  },
+  "upstream_validation": {
+    "workflow_name": "cpu-tests",
+    "workflow_run_id": 41496559182,
+    "workflow_url": "https://github.com/ergodicio/adept/actions/runs/41496559182",
+    "event": "push",
+    "source_commit": "0c85ce0d3d66abab51212191c2644f58a31a49cd",
+    "workflow_conclusion": "success",
+    "dedicated_job": {
+      "name": "test-hermite-legendre-1d",
+      "job_id": 125452928400,
+      "conclusion": "success",
+      "command": "uv run --locked pytest tests/test_hermite_legendre_1d",
+      "collected": 31,
+      "passed": 31,
+      "failed": 0,
+      "duration_seconds": 205.57
+    },
+    "interpretation": "Upstream source's own mixed Hermite-Legendre test suite passed at this exact pinned commit. This is external baseline admission evidence, not an independent Symthaea reproduction."
+  },
+  "source_profiles": {
+    "landau_driven_resonance": {
+      "config_source": "tests/test_hermite_legendre_1d/test_landau_damping.py",
+      "blob_sha": "f00780b65f542e7c5b3695dea7a478f9c56822a2",
+      "characteristics": {
+        "experiment_type": "externally driven Maxwellian resonance followed by free ring-down",
+        "klambda_D": [
+          0.3,
+          0.35
+        ],
+        "nx": 64,
+        "hermite_modes": 256,
+        "legendre_modes": 16,
+        "legendre_window": [
+          -6,
+          6
+        ],
+        "dt": 0.05,
+        "final_time": 80,
+        "fit_window": [
+          45,
+          70
+        ],
+        "field_frequency_relative_tolerance": 0.02,
+        "field_damping_relative_tolerance": 0.15
+      },
+      "comparison_caveat": "Not the same initial-value density-perturbed Landau case as Symthaea alpha=0.001/0.01; must remain a separate profile."
+    },
+    "two_stream_split": {
+      "config_source": "configs/hermite-legendre-1d/two-stream.yaml",
+      "blob_sha": "5577b80b873ad7595471a5ddb481a7c822728f12",
+      "parameters": {
+        "spatial_period": "4*pi",
+        "nx": 64,
+        "hermite_modes": 85,
+        "legendre_modes": 171,
+        "velocity_window": [
+          -2.5,
+          2.5
+        ],
+        "dt": 0.002,
+        "final_time": 35,
+        "initial_amplitude": 0.01,
+        "integrator": "lawson"
+      }
+    },
+    "two_stream_imex": {
+      "config_source": "configs/hermite-legendre-1d/two-stream-imex.yaml",
+      "blob_sha": "9ad59a0c87480911c3e9d057a57070b83c94232f",
+      "parameters": {
+        "spatial_period": "4*pi",
+        "nx": 64,
+        "hermite_modes": 85,
+        "legendre_modes": 171,
+        "velocity_window": [
+          -2.5,
+          2.5
+        ],
+        "dt": 0.02,
+        "final_time": 35,
+        "initial_amplitude": 0.01,
+        "integrator": "imex"
+      },
+      "caveat": "Upstream test documents Lawson non-finiteness at dt=0.01 and IMEX stability at dt=0.01; larger-step IMEX must be evaluated for dissipation and matched fidelity."
+    },
+    "bump_on_tail": {
+      "config_source": "configs/hermite-legendre-1d/bump-on-tail.yaml",
+      "blob_sha": "755d0947bf4d9722cca55edaf79710f646d014c1",
+      "parameters": {
+        "spatial_period": "20*pi",
+        "nx": 128,
+        "hermite_modes": 32,
+        "legendre_modes": 128,
+        "velocity_window": [
+          2,
+          18
+        ],
+        "dt": 0.1,
+        "configured_final_time": 120,
+        "initial_perturbation": 0.0001,
+        "beam_density": 0.01,
+        "beam_drift": 10,
+        "beam_thermal_speed": 1,
+        "integrator": "split"
+      },
+      "caveat": "YAML comments additionally report a t=700 run and Nh/window behavior. Those are source comments, not the configured t=120 profile and not yet independently reproduced by Symthaea."
+    },
+    "linear_advection": {
+      "config_source": "configs/hermite-legendre-1d/linear-advection.yaml",
+      "blob_sha": "933cd89b8696c38372da9bd78932e467095de39f",
+      "characteristics": {
+        "exact_solution": "f(x,v,t)=f(x-v*t,v,0)",
+        "nx": 64,
+        "hermite_modes": 100,
+        "legendre_modes": 100,
+        "velocity_window": [
+          -5,
+          5
+        ],
+        "dt": 0.01,
+        "final_time": 20,
+        "field_enabled": false
+      }
+    }
+  },
+  "test_sources": [
+    {
+      "path": "tests/test_hermite_legendre_1d/test_landau_damping.py",
+      "blob_sha": "f00780b65f542e7c5b3695dea7a478f9c56822a2"
+    },
+    {
+      "path": "tests/test_hermite_legendre_1d/test_conservation.py",
+      "blob_sha": "62f06bc4c932233a649caa91230742b25596be55"
+    },
+    {
+      "path": "tests/test_hermite_legendre_1d/test_split.py",
+      "blob_sha": "ee7f0ec355fa66195af121ad938f6dea63177cab"
+    },
+    {
+      "path": "tests/test_hermite_legendre_1d/test_imex.py",
+      "blob_sha": "cd5807fcd578b150683533eac998a28bb09650cc"
+    },
+    {
+      "path": "tests/test_hermite_legendre_1d/test_streaming.py",
+      "blob_sha": "667991c4691d64b2c29a0b360932699fa4c1377b"
+    },
+    {
+      "path": "tests/test_hermite_legendre_1d/test_linear_advection.py",
+      "blob_sha": "90dcb800003d417c354c7c9386538f3c998a5a4b"
+    },
+    {
+      "path": "tests/test_hermite_legendre_1d/test_collisions.py",
+      "blob_sha": "95fa6382372d49884dbc713d34518f94592dde0a"
+    }
+  ],
+  "reproduction_requirements": [
+    "Reproduce exact upstream test/configuration lanes before modifying the algorithm.",
+    "Keep driven Landau resonance separate from the initial-value Landau density perturbation experiment.",
+    "Run paired CPU comparisons first at identical precision and normalized physical initial conditions.",
+    "Separately report best documented CPU/GPU pathways; never conflate hardware advantage with algorithmic advantage.",
+    "Use a common diagnostic grid/quadrature and report both coefficients and reconstructed total distribution.",
+    "Count all basis transforms, closure coupling, Legendre projection, collision operators, moment correction, Poisson solve and I/O.",
+    "Measure Legendre boundary occupancy, Hermite and Legendre spectral tails, total f positivity/negative mass and all invariant drifts.",
+    "For IMEX, report phase error, damping/growth rate and energy dissipation beside stability and wall time.",
+    "Retain all failed, unqualified and resource-limited runs."
+  ],
+  "claim_ceiling": "The pinned ADEPT implementation and its 31-test upstream CI result are admitted as an external comparator. No Symthaea reproduction, head-to-head result, speedup, stronger conservation, positivity guarantee, or production superiority is claimed."
+}
