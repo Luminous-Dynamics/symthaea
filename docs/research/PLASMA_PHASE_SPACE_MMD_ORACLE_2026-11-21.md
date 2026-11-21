@@ -195,7 +195,7 @@ A speed claim is admissible only when particle update, field solve, deposition/g
 
 ## 10. Execution state
 
-- New standalone Rust crate and 18 authored unit tests: source created.
+- New standalone Rust crate and 17 authored unit tests: source created.
 - Frozen JSON kernel/profile contract: source created.
 - Focused exact-revision Rust 1.96 workflow: source created.
 - Python formula checks for the two negative controls: completed.
