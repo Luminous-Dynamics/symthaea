@@ -739,10 +739,16 @@ mod tests {
                     .iter()
                     .find(|item| item.alternative_id == candidate.alternative_id);
                 format!(
-                    "{}:{:?}:theory={}:preserved={}:verified={:?}:assessment={:?}",
+                    "{}:{:?}:theory={}:issues={:?}:preserved={}:verified={:?}:assessment={:?}",
                     candidate.alternative_id,
                     candidate.strategy,
                     candidate.theory_validation.valid,
+                    candidate
+                        .theory_validation
+                        .issues
+                        .iter()
+                        .map(|issue| format!("{:?}:{}", issue.rule, issue.message))
+                        .collect::<Vec<_>>(),
                     candidate.preserved_invariants,
                     target_verified,
                     assessment.map(|item| (item.eligible, item.target_obligation_verified))
