@@ -836,6 +836,81 @@ mod tests {
     }
 
     #[test]
+    fn same_source_score_counterfactual_changes_only_qualified_subintent_selection() {
+        let intent = MusicalIntent {
+            seed: 61,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let mut realization =
+            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let target = section(
+            &realization.plan,
+            SonataSectionKind::RecapitulationPrimary,
+        )
+        .unwrap();
+        let target_indices =
+            melody_indices(&realization.score, target.start.beats(), target.end.beats());
+        for index in &target_indices {
+            realization.score.notes[*index].pitch =
+                realization.score.notes[*index].pitch.transpose(1);
+        }
+        let (resolution, verification) =
+            verify_sonata_obligations(&realization.score, &realization.plan);
+        realization.resolution = resolution;
+        realization.verification = verification;
+
+        let mut repeat_trace = return_trace(&realization);
+        repeat_trace.inference.source_action = MusicAction::RepeatMotif;
+        let repeat_batch =
+            generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
+
+        let mut maintain_trace = repeat_trace.clone();
+        maintain_trace.inference.source_action = MusicAction::Maintain;
+        let maintain_batch =
+            generate_and_rank_sonata_return(&realization, &maintain_trace).unwrap();
+
+        assert_eq!(
+            repeat_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "literal-register".into(),
+                selected_strategy: SonataReturnStrategy::LiteralRegister,
+            }
+        );
+        assert_eq!(
+            maintain_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "current-score".into(),
+                selected_strategy: SonataReturnStrategy::KeepCurrent,
+            }
+        );
+        let selected_score = |batch: &SonataInterventionBatch| {
+            let selected_id = batch.selection.recommended_id.as_deref().unwrap();
+            &batch
+                .candidates
+                .iter()
+                .find(|candidate| candidate.alternative_id == selected_id)
+                .unwrap()
+                .score
+        };
+        assert_ne!(selected_score(&repeat_batch), selected_score(&maintain_batch));
+        for batch in [&repeat_batch, &maintain_batch] {
+            let selected_id = batch.selection.recommended_id.as_deref().unwrap();
+            let selected = batch
+                .candidates
+                .iter()
+                .find(|candidate| candidate.alternative_id == selected_id)
+                .unwrap();
+            assert!(selected.theory_validation.valid);
+            assert!(selected.preserved_invariants);
+            assert!(selected.verification.iter().any(|evidence| {
+                evidence.obligation_id == batch.driving_obligation_id.unwrap()
+                    && evidence.verified
+            }));
+        }
+    }
+
+    #[test]
     fn unsupported_fep_actions_remain_shadow_only_and_do_not_change_selection() {
         let intent = MusicalIntent {
             seed: 47,
