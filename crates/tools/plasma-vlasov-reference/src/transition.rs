@@ -91,13 +91,31 @@ impl TransitionBudget {
     /// Check that all configured limits are finite and physically meaningful.
     pub fn validate(self) -> Result<(), InvalidTransitionBudget> {
         let nonnegative_finite = [
-            ("max_weighted_l1_relative_error", self.max_weighted_l1_relative_error),
-            ("max_weighted_l2_relative_error", self.max_weighted_l2_relative_error),
+            (
+                "max_weighted_l1_relative_error",
+                self.max_weighted_l1_relative_error,
+            ),
+            (
+                "max_weighted_l2_relative_error",
+                self.max_weighted_l2_relative_error,
+            ),
             ("max_mass_relative_error", self.max_mass_relative_error),
-            ("max_momentum_absolute_error", self.max_momentum_absolute_error),
-            ("max_total_energy_relative_error", self.max_total_energy_relative_error),
-            ("max_destination_field_residual", self.max_destination_field_residual),
-            ("max_destination_negative_mass_fraction", self.max_destination_negative_mass_fraction),
+            (
+                "max_momentum_absolute_error",
+                self.max_momentum_absolute_error,
+            ),
+            (
+                "max_total_energy_relative_error",
+                self.max_total_energy_relative_error,
+            ),
+            (
+                "max_destination_field_residual",
+                self.max_destination_field_residual,
+            ),
+            (
+                "max_destination_negative_mass_fraction",
+                self.max_destination_negative_mass_fraction,
+            ),
         ];
         for (field, value) in nonnegative_finite {
             if !value.is_finite() || value < 0.0 {
@@ -243,9 +261,7 @@ pub fn qualify_transition(
     }
 
     if let Err(error) = budget.validate() {
-        reasons.push(TransitionReason::InvalidBudget {
-            field: error.field,
-        });
+        reasons.push(TransitionReason::InvalidBudget { field: error.field });
     } else {
         check_bounded_metric(
             &mut reasons,
@@ -392,11 +408,7 @@ fn check_bounded_metric(
     }
 }
 
-fn check_fraction_metric(
-    reasons: &mut Vec<TransitionReason>,
-    observed: Option<f64>,
-    limit: f64,
-) {
+fn check_fraction_metric(reasons: &mut Vec<TransitionReason>, observed: Option<f64>, limit: f64) {
     match observed {
         None => reasons.push(TransitionReason::MissingMetric {
             metric: TransitionMetric::DestinationNegativeMassFraction,
@@ -553,14 +565,18 @@ mod tests {
         let receipt = qualify_transition(&observed, budget());
 
         assert_eq!(receipt.decision, TransitionDecision::Rejected);
-        assert!(receipt.reasons.iter().any(|reason| matches!(
-            reason,
-            TransitionReason::MemoryBudgetExceeded { .. }
-        )));
-        assert!(receipt.reasons.iter().any(|reason| matches!(
-            reason,
-            TransitionReason::WallTimeBudgetExceeded { .. }
-        )));
+        assert!(
+            receipt
+                .reasons
+                .iter()
+                .any(|reason| matches!(reason, TransitionReason::MemoryBudgetExceeded { .. }))
+        );
+        assert!(
+            receipt
+                .reasons
+                .iter()
+                .any(|reason| matches!(reason, TransitionReason::WallTimeBudgetExceeded { .. }))
+        );
     }
 
     #[test]
