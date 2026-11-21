@@ -1,142 +1,79 @@
-# Project Hypnos: Clinical Validation Results
+# Project Hypnos: Sleep-Stage Classification Pilot — Evidence Status
 
-**Date**: January 17, 2026
-**Status**: ✅ First Light Achieved
-**Subjects Tested**: SC4001, SC4002 (Sleep-EDF Database, PhysioNet)
+**Historical experiment date:** January 17, 2026  
+**Current interpretation:** exploratory sleep-stage classification prototype  
+**Subjects reported:** SC4001 and SC4002 (Sleep-EDF / PhysioNet)  
+**Clinical validation:** not performed  
+**Consciousness detection:** not established
 
-## Executive Summary
+## Executive summary
 
-Project Hypnos validates that **LTC (Liquid Time-Constant) dynamics can detect consciousness states from real clinical EEG**. Using a simple dual-channel synchrony measure as a proxy for integrated information (Φ), we achieve:
+The historical Hypnos note reports a small EEG feature/classification experiment using two Sleep-EDF participants and two EEG derivations (Fpz-Cz and Pz-Oz). It uses synchrony, permutation entropy and hand-tuned thresholds to classify sleep stages.
 
-- **N3 (Deep Sleep) Detection**: 73-79% accuracy across subjects
-- **Binary (Wake vs Sleep)**: 60-68% accuracy
-- **Cross-Subject Generalization**: Feature patterns consistent across individuals
+The reported numbers are retained below as historical, repository-reported results. They have not been independently rerun in the current review. The experiment is evidence that a simple feature pipeline was explored on real EEG files; it is not evidence that Symthaea detects phenomenal consciousness or is ready for clinical monitoring.
 
-## The Core Thesis
+Sleep-stage annotation is not a direct ground-truth label for subjective experience. Wake, N1, N2, N3 and REM are physiological/behavioural sleep-stage categories. They must not be collapsed into conscious/unconscious labels without an independently justified outcome measure.
 
-**Hypothesis**: LTC dynamics naturally resonate with biological consciousness states because both operate on similar timescales of neural integration.
+## Historical results reported by the original note
 
-**Validation**: The synchrony between frontal (Fpz-Cz) and occipital (Pz-Oz) EEG channels correlates inversely with consciousness level:
+### SC4001
 
-| State | Synchrony | Consciousness | Interpretation |
-|-------|-----------|---------------|----------------|
-| N3 (Deep Sleep) | 0.45-0.48 | LOWEST | High neural synchrony = global delta waves |
-| N2 (Light Sleep) | 0.39-0.42 | Low | Transitional |
-| N1 (Drowsy) | 0.32-0.37 | Medium-Low | Transitional |
-| REM (Dreaming) | 0.27-0.29 | Paradoxical | Wake-like but disconnected |
-| Wake | 0.19-0.20 | HIGHEST | Desynchronized = differentiated activity |
+- Overall accuracy: 56.8%
+- Binary wake-versus-sleep accuracy: 67.7%
+- Wake: 59.1%
+- N3: 72.7%
+- REM: 49.6%
+- N2: 34.0%
 
-## Clinical Results
+### SC4002 (described as zero-shot in the original note)
 
-### SC4001 (Subject 1)
-```
-Overall Accuracy: 56.8%
-Binary (Wake vs Sleep): 67.7%
+- Overall accuracy: 43.7%
+- Binary wake-versus-sleep accuracy: 59.5%
+- Wake: 40.6%
+- N3: 79.1%
+- REM: 45.6%
+- N2: 31.1%
 
-Per-Class:
-  Wake: 59.1%
-  N3:   72.7% ✅
-  REM:  49.6%
-  N2:   34.0%
-```
+The original note also reports no N1 detection due to limited examples. It does not provide participant-clustered confidence intervals, calibration results, a full confusion matrix, a locked pre-analysis protocol, or an adequately powered multi-subject evaluation. Thresholds were empirically tuned, so the reported values should not be treated as an unbiased estimate of generalization without recovering the exact train/test and tuning procedure.
 
-### SC4002 (Subject 2, Zero-Shot Generalization)
-```
-Overall Accuracy: 43.7%
-Binary (Wake vs Sleep): 59.5%
+## What this experiment can support
 
-Per-Class:
-  Wake: 40.6%
-  N3:   79.1% ✅  (IMPROVED on unseen data!)
-  REM:  45.6%
-  N2:   31.1%
-```
+- A reproducibility task for the historical two-subject feature pipeline.
+- A preliminary sleep-stage classification baseline.
+- An engineering comparison of synchrony, permutation entropy and LTC-derived features.
+- A reason to evaluate subject-level generalization on the full pinned Sleep-EDF release.
 
-## Key Scientific Findings
+## What it cannot support
 
-### 1. Synchrony Inversely Correlates with Consciousness
-The IIT-predicted relationship holds: maximum integration (synchrony) during minimum consciousness (N3), minimum integration during maximum consciousness (Wake).
+- A claim that LTC dynamics detect consciousness.
+- A claim that N3 means no subjective experience or that REM is an unconscious state.
+- A claim that the synchrony ordering is a universal biomarker.
+- A claim of anesthesia, coma, disorders-of-consciousness, meditation or sleep-disorder diagnostic utility.
+- A clinical performance claim from two participants.
 
-### 2. The REM Paradox
-REM sleep shows wake-like low synchrony (0.27-0.29) despite being an unconscious state. This matches neuroscience: REM has desynchronized EEG (like wake) but lacks conscious awareness.
+## Technical description
 
-### 3. Cross-Subject Robustness
-The synchrony ordering **N3 > N2 > N1 > REM > Wake** is identical across both subjects, suggesting a universal biomarker.
+The historical implementation uses frontal Fpz-Cz and occipital Pz-Oz EEG derivations. The note describes correlation/synchrony, zero-crossing or dominant-frequency features, permutation entropy and dual-timescale LTC features. It reports empirically selected thresholds rather than a prospective locked classifier.
 
-## Technical Implementation
+The term “Φ-proxy” is not a validated measurement of integrated information. It is an internal feature label. It must not be reported as a measured biological Φ value.
 
-### Architecture
-```
-Frontal EEG (Fpz-Cz) ─┬─→ Correlation ─→ Synchrony ─┐
-                      │                              ├─→ Classify ─→ Consciousness State
-Occipital EEG (Pz-Oz) ┴─→ Zero-Cross ─→ Dom Freq ──┘
-```
+## Required next experiment
 
-### Thresholds (Empirically Tuned)
-```rust
-sync_threshold: 0.40     // N3 if sync > 0.40
-complexity_threshold: 0.30
-wake_sync: < 0.25        // Wake if sync < 0.25 && freq < 13Hz
-rem_sync: < 0.30         // REM if sync < 0.30 && freq > 13Hz
-// Default: Light Sleep (N1/N2)
-```
+1. Pin the exact Sleep-EDF release, participant list, EDF/annotation hashes and channel derivations.
+2. Reconstruct the historical SC4001 → SC4002 procedure exactly, including filtering, epoching, feature extraction, threshold fitting and annotation alignment.
+3. Add persistence / majority, spectral-power, entropy, linear and regularized baselines.
+4. Use nested leave-one-subject-out validation; all epochs from one subject remain in one fold.
+5. Report per-subject confusion matrices, macro-F1, balanced accuracy, sensitivity/specificity, MCC, Brier/log score, calibration curves and participant-clustered confidence intervals.
+6. Preserve unknown and ambiguous epochs rather than forcing a stage label.
+7. Keep sleep-stage prediction separate from experience-report prediction. A consciousness-related extension needs awakening reports or another explicit experience-sensitive outcome and a preregistered design.
+8. Seek external review before describing this as a biomarker or clinical system.
 
-### Files
-- `examples/clinical_validation.rs` - Self-contained validation harness
-- `scripts/download_sleep_edf.sh` - Data download script
-- `datasets/sleep-edf/sleep-cassette/` - PhysioNet data
+## Reproducibility command
 
-## Running the Validation
+The historical note documented:
 
-```bash
-# Download data
-./scripts/download_sleep_edf.sh
+    ./scripts/download_sleep_edf.sh
+    cargo run --example clinical_validation --release
+    SUBJECT=SC4002 cargo run --example clinical_validation --release
 
-# Run on SC4001
-cargo run --example clinical_validation --release
-
-# Run on SC4002 (cross-validation)
-SUBJECT=SC4002 cargo run --example clinical_validation --release
-```
-
-## Implications
-
-### For Symthaea
-The LTC-based architecture can serve as a **computational biomarker for consciousness** in:
-- Anesthesia depth monitoring
-- Coma/vegetative state assessment
-- Sleep disorder diagnosis
-- Meditation state detection
-
-### For Consciousness Science
-This provides empirical evidence that:
-1. Integration (Φ-proxy) correlates with consciousness states
-2. Simple, interpretable metrics can capture complex neural phenomena
-3. The approach generalizes across individuals without retraining
-
-## Limitations
-
-1. **Wake Detection**: 40-59% accuracy suggests threshold overlap with light sleep
-2. **N1 Detection**: 0% - too few epochs and transitional nature
-3. **No Machine Learning**: Simple thresholds; ML could improve significantly
-4. **Two Subjects**: More cross-validation needed
-
-## Next Steps
-
-1. **Multi-Subject Validation**: Test on 10+ subjects from Sleep-EDF
-2. **Machine Learning**: Train proper classifier on features
-3. **Real-Time Implementation**: Integrate with Symthaea streaming
-4. **Anesthesia Data**: Validate on propofol/sevoflurane recordings
-5. **Publication**: Write up findings for scientific review
-
-## Conclusion
-
-Project Hypnos demonstrates **first light** for LTC-based consciousness detection on real clinical EEG. The core thesis is validated:
-
-> **LTC dynamics naturally resonate with biological consciousness states.**
-
-The synchrony-based Φ-proxy successfully discriminates N3 (deep sleep) with 73-79% accuracy across subjects, providing a foundation for real-world consciousness monitoring applications.
-
----
-
-*"We have built a window into consciousness - not perfect, but real."*
+These commands are retained as historical instructions. Their current accuracy, input hashes, toolchain and output have not been verified in this audit.

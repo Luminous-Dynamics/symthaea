@@ -1,17 +1,15 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Clinical Validation - Project Hypnos
+//! Project Hypnos: exploratory sleep-stage classification prototype.
 //!
-//! Validates Symthaea's consciousness detection on REAL clinical EEG data
-//! from the Sleep-EDF database (PhysioNet).
+//! This example classifies Sleep-EDF sleep-stage annotations from EEG. Sleep
+//! stages are not ground truth for phenomenal consciousness, and this example
+//! does not validate a consciousness detector or clinical biomarker.
 //!
-//! ## The Thesis
-//!
-//! If the LTC-based sentinel can accurately classify sleep stages from
-//! real human EEG recordings, it validates:
-//!
-//! **LTC dynamics naturally resonate with biological consciousness states.**
+//! Report outputs as sleep-stage classification only. Any relationship to
+//! consciousness theory remains an exploratory hypothesis requiring independent
+//! experience-sensitive outcomes and participant-held-out validation.
 //!
 //! ## Running
 //!
@@ -29,7 +27,7 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PERMUTATION ENTROPY - The DIFFERENTIATION component of Φ
+// PERMUTATION ENTROPY - time-series feature (not a measured biological Φ)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Calculates Permutation Entropy (Order 3) - Time-domain complexity measure

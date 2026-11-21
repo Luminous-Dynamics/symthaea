@@ -1,32 +1,25 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # PCI (Perturbational Complexity Index) Validation
+//! # Synthetic HDC Perturbation / Similarity-Entropy Demonstration
 //!
-//! Validates Symthaea's Φ computation as a proxy for PCI, the gold-standard
-//! clinical measure of consciousness level.
+//! IMPORTANT: this example is not a clinical PCI implementation or validation.
+//! It creates hand-parameterized synthetic HDC networks, applies a simulated
+//! perturbation and computes entropy over pairwise vector similarities. It does
+//! not use TMS, EEG, human recordings or the clinical PCI algorithm.
 //!
-//! ## Background
-//! PCI (Casali et al. 2013) measures the "algorithmic complexity of the brain's
-//! deterministic response to a perturbation" (TMS-EEG). It reliably distinguishes:
-//! - Wakefulness: PCI > 0.31
-//! - REM sleep: PCI ~ 0.30-0.40
-//! - NREM sleep: PCI < 0.31
-//! - Anesthesia: PCI < 0.31
-//! - Vegetative state: PCI < 0.31
-//! - Minimally conscious: PCI > 0.31
+//! The fixture's named regimes and illustrative PCI ranges are manually assigned
+//! model settings, not observed clinical labels. The reported similarity entropy
+//! is not numerically comparable to a clinical PCI value or universal cutoff.
 //!
 //! ## Method
-//! Since we can't do TMS-EEG in software, we simulate the PCI paradigm:
-//! 1. Create networks representing different consciousness states
-//! 2. Apply perturbation (inject signal into one node)
-//! 3. Measure spread complexity (Lempel-Ziv complexity of response pattern)
-//! 4. Verify that Φ correlates with simulated PCI
+//! 1. Create synthetic HDC networks with assigned coupling, recurrence and noise.
+//! 2. Perturb a vector in the network.
+//! 3. Measure entropy of the pairwise similarity distribution.
+//! 4. Compare the synthetic metric with the synthetic network settings.
 //!
-//! ## Validation Criteria
-//! - Φ should be higher for "awake" networks than "anesthetized" networks
-//! - Φ should correlate with perturbation spread complexity
-//! - Networks with more recurrent connections should show higher Φ
+//! This is an internal architecture demonstration only. It cannot validate
+//! consciousness detection, IIT, GNWT, or clinical PCI.
 //!
 //! ## Run
 //! ```bash
@@ -244,7 +237,7 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!(
         "  {:25} │ {:>10} │ {:>10} │ {:>12}",
-        "State", "Φ (mean)", "PCI (sim)", "Expected PCI"
+        "Synthetic regime", "Φ (mean)", "Similarity entropy", "Illustrative range (not comparable)"
     );
     println!("  ─────────────────────────┼────────────┼────────────┼──────────────");
 

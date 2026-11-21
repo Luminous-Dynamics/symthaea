@@ -1,0 +1,140 @@
+{
+  "schema_version": "1.0.0",
+  "status": "research_intake_registry",
+  "as_of": "2026-11-21",
+  "policy": {
+    "no_universal_consciousness_label": true,
+    "no_data_redistribution_without_exact_version_terms": true,
+    "raw_data_not_stored_in_repository": true,
+    "participant_is_primary_independent_unit_unless_modelled_otherwise": true
+  },
+  "datasets": [
+    {
+      "id": "openneuro-ds006623",
+      "name": "An open fMRI resource for studying human brain function and covert consciousness under anesthesia",
+      "provider": "OpenNeuro",
+      "version": "1.0.0",
+      "doi": "10.18112/openneuro.ds006623.v1.0.0",
+      "data_url": "https://openneuro.org/datasets/ds006623",
+      "repository_url": "https://github.com/OpenNeuroDatasets/ds006623",
+      "paper_doi": "10.1038/s41597-025-06442-2",
+      "license": "CC0",
+      "license_status": "reported_in_dataset_description_and_paper",
+      "participants": 26,
+      "population": "healthy volunteers, ages 19-34",
+      "modalities": ["MRI", "fMRI", "behavioural"],
+      "tasks": ["tennis imagery", "spatial navigation imagery", "hand-squeeze imagery", "actual hand squeeze", "rest"],
+      "context": "graded propofol sedation with responsive and loss-of-responsiveness periods",
+      "available_metadata": ["hand-squeeze force traces", "propofol infusion profiles", "effect-site concentrations", "task events", "motion/QC", "fMRIPrep derivatives", "XCP-D derivatives", "MRIQC derivatives"],
+      "published_preprocessing": {
+        "fmriprep": "23.2.1",
+        "xcp_d": "0.10.6",
+        "bids": "1.8.0"
+      },
+      "published_isd_method": {
+        "source_pipeline": "xcp_d_without_GSR_bandpass_output",
+        "roi_count": 456,
+        "roi_description": "400 Schaefer cortical parcels plus 56 Tian subcortical parcels",
+        "integration": "multi-level global efficiency",
+        "segregation": "multi-level clustering coefficient",
+        "segregation_adjustment": "subtract first mode after matrix eigendecomposition",
+        "thresholds": 50,
+        "threshold_range": [0.001, 1.0],
+        "threshold_spacing": "logarithmic",
+        "lor_edge_exclusion_minutes": 5
+      },
+      "best_use": "first reproducibility target for the published propofol fMRI ISD analysis, followed by exploratory subject-grouped predictions of behavioural responsiveness",
+      "limitations": [
+        "26 participants is a small cohort for flexible machine learning",
+        "behavioural unresponsiveness is not equivalent to absence of phenomenal experience",
+        "task-related neural processing is not a direct subjective report",
+        "the dataset and published ISD analyses have already been described publicly; evaluation is reproduction/secondary analysis, not a blind replication"
+      ],
+      "acquisition_status": "metadata_audited; data_files_not_downloaded",
+      "file_manifest_status": "pending_frozen_manifest_and_checksums"
+    },
+    {
+      "id": "nemar-on005620",
+      "name": "A repeated awakening study exploring the capacity of complexity measures to capture dreaming during propofol sedation",
+      "provider": "NEMAR",
+      "version": "1.0.0",
+      "doi": "10.82901/nemar.on005620",
+      "source_openneuro_doi": "10.18112/openneuro.ds005620.v1.0.0",
+      "data_url": "https://nemar.org/dataset/on005620",
+      "version_url": "https://data.nemar.org/on005620/v1.0.0/",
+      "repository_url": "https://github.com/nemarDatasets/on005620",
+      "license_catalogue": "CC0",
+      "license_readme": "CC-BY-4.0",
+      "license_status": "CONFLICT_REQUIRES_RECONCILIATION",
+      "participants": 21,
+      "recordings": 202,
+      "channels": "65-channel 10-10 layout as listed by the NEMAR catalogue",
+      "sampling_rate_hz": 5000,
+      "size_gb": 77.3,
+      "tasks": ["awake", "sed", "sed2"],
+      "modalities": ["EEG", "some sessions with TMS"],
+      "best_use": "secondary repeated-awakening study with report-aligned EEG complexity and perturbation analyses",
+      "acquisition_strategy": "prefer NEMAR Zarr remote slice access or the smallest subject/session/task subset; do not fetch the 77.3 GB archive by default",
+      "preconditions": [
+        "inspect exact v1.0.0 dataset_description.json",
+        "inspect the v1.0.0 Zarr root attributes for licence, citation and source commit",
+        "preserve attribution conservatively while licence statements disagree",
+        "verify event/report timing and which recordings include TMS"
+      ],
+      "limitations": [
+        "21 participants; recordings and windows are not independent participants",
+        "dream report, recall and absence of recall are distinct outcomes",
+        "TMS-present and TMS-absent recordings must not be pooled without an explicit design",
+        "do not redistribute raw data or derived participant-level data until terms are reconciled"
+      ],
+      "acquisition_status": "metadata_audited; no_signal_download"
+    },
+    {
+      "id": "cogitate-iit-gnwt",
+      "name": "Adversarial testing of global neuronal workspace and integrated information theories of consciousness",
+      "provider": "COGITATE consortium",
+      "version": "published_release; exact portal snapshot to be frozen at intake",
+      "paper_doi": "10.1038/s41586-025-08888-1",
+      "data_url": "https://cogitate-consortium.github.io/cogitate-data/03_cogdataset/",
+      "participants_total": 256,
+      "paper_analysis_counts": {
+        "fmri": 120,
+        "meg": 102,
+        "ieeg": 34
+      },
+      "release_documentation_counts": {
+        "fmri": 118,
+        "meg": 100,
+        "ieeg": 38
+      },
+      "denominator_status": "RECONCILE_PARTICIPANT_LEVEL_QC_AND_RELEASE_PHASE_FLAGS",
+      "modalities": ["fMRI", "MEG", "iEEG/ECoG"],
+      "theories_compared": ["Integrated Information Theory", "Global Neuronal Workspace Theory"],
+      "best_use": "reproduce the preregistered theory-discrimination analysis and test prediction-card/receipt infrastructure",
+      "holdout_status": "published_results_are_public; not a new blind holdout",
+      "limitations": [
+        "the release cohort counts and paper analysis denominators differ by modality",
+        "optimization and final-test phase proportions must be read from participant-level flags and supplements, not inferred from summary prose",
+        "published outcomes have been inspected; subsequent analysis is a reproduction or secondary analysis"
+      ],
+      "acquisition_status": "public_release_documentation_reviewed; data_access_terms_to_be_checked"
+    },
+    {
+      "id": "sleep-edf-hypnos",
+      "name": "Sleep-EDF used by Project Hypnos",
+      "provider": "PhysioNet",
+      "version": "NOT_YET_PINNED",
+      "data_url": "https://physionet.org/content/sleep-edfx/",
+      "license_status": "verify_exact_release_terms_before_reuse",
+      "participants_used_in_historical_hypnos_note": 2,
+      "modalities": ["EEG", "sleep-stage annotations"],
+      "best_use": "sleep-stage classification and reproducibility of the two-subject pilot",
+      "limitations": [
+        "sleep-stage labels are not ground truth for phenomenal consciousness",
+        "the historical pilot reports two subjects only and must not be described as clinical validation",
+        "dataset release, EDF files, annotation version and file checksums must be pinned before a new analysis"
+      ],
+      "acquisition_status": "historical_local_use_reported; new_version_not_pinned"
+    }
+  ]
+}
