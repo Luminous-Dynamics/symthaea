@@ -7,9 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use symthaea_semiconductor::benchmark::{
-    SecomRawExpectationsV1, audit_secom_raw_v1,
-};
+use symthaea_semiconductor::benchmark::{SecomRawExpectationsV1, audit_secom_raw_v1};
 
 fn run() -> Result<(), String> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
