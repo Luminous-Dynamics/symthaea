@@ -2,7 +2,7 @@
 
 **Tracker:** [#13111](https://github.com/Luminous-Dynamics/symthaea/issues/13111)  
 **Specification:** [ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md](../../../docs/research/ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md)  
-**Status:** 13 hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit and deterministic one-step action selector; no multi-step adaptive policy tournament yet.
+**Status:** 14 hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit and deterministic one-step action selector; no multi-step adaptive policy tournament yet.
 
 ## Files
 
@@ -24,6 +24,7 @@
 | JEV-009 | Can an information-rich action replace a pre-registered critical campaign interaction? It must not. |
 | JEV-010 | Can a first-mating test resolve wear/lifecycle claims? It must not. |
 | JEV-011 | Does an aborted test retain its cost and evidence gap rather than becoming a pass? |\n| JEV-012 | Are actual resources preserved when an aborted test exceeds its estimate but stays within the scenario budget? |\n| JEV-013 | Are actual resources retained and reported when an aborted test exceeds both estimate and total budget? |
+| JEV-014 | Do equal-value actions with incomparable resource plans trigger human review rather than a fabricated cost scalar? |
 
 ## Important interpretation
 
