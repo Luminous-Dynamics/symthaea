@@ -7,3 +7,5 @@ description = "Dependency-free repeatability-calibrated similarity metrics for C
 
 [lib]
 path = "src/lib.rs"
+
+[workspace]
