@@ -47,6 +47,36 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Detect stale wildcard member directories before Cargo resolution
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import glob
+          import pathlib
+          import tomllib
+
+          with open("Cargo.toml", "rb") as source:
+              workspace = tomllib.load(source)["workspace"]
+
+          excluded = set(workspace.get("exclude", []))
+          unresolved = []
+          for pattern in workspace.get("members", []):
+              if not any(token in pattern for token in "*?["):
+                  continue
+              for match in glob.glob(pattern):
+                  path = pathlib.Path(match)
+                  if path.is_dir() and not (path / "Cargo.toml").is_file():
+                      if path.as_posix() not in excluded:
+                          unresolved.append(path.as_posix())
+
+          if unresolved:
+              raise SystemExit(
+                  "Wildcard member directories without Cargo.toml must be explicitly excluded:\n"
+                  + "\n".join(sorted(unresolved))
+              )
+          print("all wildcard-matched directories without Cargo.toml are explicitly excluded")
+          PY
+
       - name: Resolve every workspace manifest
         run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
 
