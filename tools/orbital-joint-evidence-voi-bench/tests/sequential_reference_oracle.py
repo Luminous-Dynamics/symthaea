@@ -79,15 +79,6 @@ def partitions(belief, action):
 
 
 def branch_probability(scenario, belief, branch):
-    for action in scenario["actions"]:
-        possible_outcomes = set(action["observation_by_state"].values())
-        mapping = action.get("obligations_by_observation")
-        if not isinstance(mapping, dict) or set(mapping) != possible_outcomes:
-            raise ValueError("action outcome-to-obligation map is incomplete")
-        for covered in mapping.values():
-            if (not isinstance(covered, list) or len(covered) != len(set(covered))
-                    or not set(covered).issubset(declared_obligations)):
-                raise ValueError("action contains unknown or duplicate evidence obligations")
     weights = scenario["resource_frequency_model"]["state_weights"]
     total = sum(weights[state] for state in belief)
     part = sum(weights[state] for state in branch)
@@ -278,6 +269,15 @@ def audit_scenario(scenario):
             or not scenario["decision_obligations"]["REJECT"]):
         raise ValueError("decision acceptance obligations are incomplete or duplicated")
     declared_obligations = set().union(*(set(items) for items in scenario["decision_obligations"].values()))
+    for action in scenario["actions"]:
+        possible_outcomes = set(action["observation_by_state"].values())
+        mapping = action.get("obligations_by_observation")
+        if not isinstance(mapping, dict) or set(mapping) != possible_outcomes:
+            raise ValueError("action outcome-to-obligation map is incomplete")
+        for covered in mapping.values():
+            if (not isinstance(covered, list) or len(covered) != len(set(covered))
+                    or not set(covered).issubset(declared_obligations)):
+                raise ValueError("action contains unknown or duplicate evidence obligations")
     if len(states) < 2 or len(set(states)) != len(states):
         raise ValueError("invalid hidden-state set")
     context = scenario["decision_context"]
