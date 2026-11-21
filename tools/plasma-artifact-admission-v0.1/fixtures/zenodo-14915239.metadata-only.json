@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.1.0",
+  "doi": "10.5281/zenodo.14915239",
+  "record_version": "1",
+  "metadata_uri": "https://zenodo.org/records/14915239",
+  "retrieved_on": "2026-11-19",
+  "rights": {
+    "status": "unverified",
+    "license_identifier": null,
+    "evidence_uri": "https://zenodo.org/records/14915239",
+    "local_inspection": "unknown",
+    "execute_research": "unknown",
+    "create_derivative": "unknown",
+    "redistribute": "unknown",
+    "commercial_use": "unknown"
+  },
+  "files": [
+    {
+      "name": "Linear_Landau_Damping_training_data.mat",
+      "size_bytes": null,
+      "checksums": [
+        { "algorithm": "md5", "value": "6370e709ce0a825148917fabc8638a2a", "origin": "repository_metadata" }
+      ],
+      "acquisition": "metadata_only"
+    },
+    {
+      "name": "Noninear_Landau_Damping_training_data.mat",
+      "size_bytes": null,
+      "checksums": [
+        { "algorithm": "md5", "value": "6370e709ce0a825148917fabc8638a2a", "origin": "repository_metadata" }
+      ],
+      "acquisition": "metadata_only"
+    }
+  ]
+}

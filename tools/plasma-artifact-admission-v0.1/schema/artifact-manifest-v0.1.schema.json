@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/plasma-artifact-manifest-v0.1.schema.json",
+  "title": "Plasma Research Artifact Admission Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "doi", "record_version", "metadata_uri", "retrieved_on", "rights", "files"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "doi": { "type": "string", "pattern": "^10\\.5281/zenodo\\.[0-9]+$" },
+    "record_version": { "type": "string", "minLength": 1 },
+    "metadata_uri": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "retrieved_on": { "type": "string", "format": "date" },
+    "rights": { "$ref": "#/$defs/rights" },
+    "files": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/file" } }
+  },
+  "$defs": {
+    "permission": { "enum": ["granted", "denied", "unknown"] },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "license_identifier", "evidence_uri", "local_inspection", "execute_research", "create_derivative", "redistribute", "commercial_use"],
+      "properties": {
+        "status": { "enum": ["verified", "unverified", "missing"] },
+        "license_identifier": { "type": ["string", "null"] },
+        "evidence_uri": { "type": ["string", "null"] },
+        "local_inspection": { "$ref": "#/$defs/permission" },
+        "execute_research": { "$ref": "#/$defs/permission" },
+        "create_derivative": { "$ref": "#/$defs/permission" },
+        "redistribute": { "$ref": "#/$defs/permission" },
+        "commercial_use": { "$ref": "#/$defs/permission" }
+      }
+    },
+    "checksum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "value", "origin"],
+      "properties": {
+        "algorithm": { "enum": ["md5", "sha256"] },
+        "value": { "type": "string", "pattern": "^[A-Fa-f0-9]+$" },
+        "origin": { "enum": ["repository_metadata", "local_computation"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "algorithm": { "const": "md5" } } },
+          "then": { "properties": { "value": { "pattern": "^[A-Fa-f0-9]{32}$" } } }
+        },
+        {
+          "if": { "properties": { "algorithm": { "const": "sha256" } } },
+          "then": { "properties": { "value": { "pattern": "^[A-Fa-f0-9]{64}$" } } }
+        }
+      ]
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "size_bytes", "checksums", "acquisition"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "size_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "checksums": { "type": "array", "items": { "$ref": "#/$defs/checksum" } },
+        "acquisition": { "enum": ["metadata_only", "acquired", "quarantined"] }
+      }
+    }
+  }
+}
