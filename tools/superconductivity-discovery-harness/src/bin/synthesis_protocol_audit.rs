@@ -81,7 +81,7 @@ fn load_observation_events(
         .ok_or_else(|| "observation fixture requires observations array".to_owned())?;
     let mut event_map = HashMap::with_capacity(events.len());
     for (index, event) in events.iter().enumerate() {
-        for error in validator.iter_errors(event) {
+        if let Some(error) = validator.iter_errors(event).next() {
             return Err(format!(
                 "observation fixture event[{index}] schema validation failed: {} at {}",
                 error,
@@ -141,7 +141,7 @@ fn validate_protocol(
 
     let validator =
         validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
-    for error in validator.iter_errors(&protocol) {
+    if let Some(error) = validator.iter_errors(&protocol).next() {
         return Err(format!(
             "protocol schema validation failed: {} at {}",
             error,
