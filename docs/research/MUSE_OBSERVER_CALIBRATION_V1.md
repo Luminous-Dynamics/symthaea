@@ -86,7 +86,7 @@ SMEBench's human validation is an additional warning against equating automatic 
 - Schemas: `docs/research/schemas/muse-observer-calibration-*.schema.json`
 - Exact-head workflow: `.github/workflows/muse-observer-calibration.yml`
 
-Fifteen unit tests are authored for monotonic isotonic fitting, threshold selection, unmeasured abstention, group leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, bundle tampering, and checked-in fixture replay. They have **not** been compiled or executed. The local environment has no Cargo, rustc or rustfmt. No exact-head Rust formatting, compilation, test or Clippy pass is claimed.
+Seventeen unit tests are authored for monotonic isotonic fitting, threshold selection, unmeasured abstention, group leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, bundle tampering, and checked-in fixture replay. They have **not** been compiled or executed. The local environment has no Cargo, rustc or rustfmt. No exact-head Rust formatting, compilation, test or Clippy pass is claimed.
 
 ## Next
 
