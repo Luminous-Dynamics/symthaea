@@ -33,7 +33,7 @@ Signed measures remain on the characteristic-MMD lane. This crate does not reint
 
 ## Algorithm
 
-The exact finite transportation LP is evaluated by a successive-shortest-augmenting-path min-cost-flow method. Bellman-Ford is used on the residual network because reverse arcs have negative costs. The solver reports augmenting-path count, shortest-path relaxation count, and N-by-M ground-cost evaluations.
+The exact finite transportation LP is evaluated by a successive-shortest-augmenting-path min-cost-flow method. Bellman-Ford is used on the residual network because reverse arcs have negative costs. The solver reports augmenting-path count, shortest-path relaxation count, and N-by-M ground-cost evaluations. Probability weights are normalized with compensated summation, and the solver drains every representable source residual rather than stopping at a fixed total-flow epsilon. If any destination residual remains, it returns an unresolved-mass error instead of reporting a partial W1 value.
 
 This is a reference implementation for small supports. Its dense bipartite graph and repeated Bellman-Ford searches are not a production-scale Sinkhorn or NUFFT-accelerated method. The result is the W1 cost between probability-normalized measures under the declared ground metric.
 
@@ -49,7 +49,8 @@ The tests cover:
 - signed-weight rejection;
 - empty measures;
 - invalid scales and non-finite data;
-- residual-graph rerouting behavior.
+- residual-graph rerouting behavior;
+- a sub-1e-12 normalized mass atom whose large velocity separation contributes order-one W1.
 
 ## Run
 
