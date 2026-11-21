@@ -303,13 +303,27 @@ fn subset_is_better(
     best_minutes: f64,
     best_ids: &[String],
 ) -> bool {
-    value > best_value + 1.0e-12
-        || ((value - best_value).abs() <= 1.0e-12
-            && (cost < best_cost - 1.0e-12
-                || ((cost - best_cost).abs() <= 1.0e-12
-                    && (minutes < best_minutes - 1.0e-12
-                        || ((minutes - best_minutes).abs() <= 1.0e-12
-                            && (best_ids.is_empty() || ids < best_ids)))))
+    const EPSILON: f64 = 1.0e-12;
+
+    if value > best_value + EPSILON {
+        return true;
+    }
+    if (value - best_value).abs() > EPSILON {
+        return false;
+    }
+    if cost < best_cost - EPSILON {
+        return true;
+    }
+    if (cost - best_cost).abs() > EPSILON {
+        return false;
+    }
+    if minutes < best_minutes - EPSILON {
+        return true;
+    }
+    if (minutes - best_minutes).abs() > EPSILON {
+        return false;
+    }
+    best_ids.is_empty() || ids < best_ids
 }
 
 pub fn evaluate_inspection_decision(
