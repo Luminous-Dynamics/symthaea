@@ -7,6 +7,9 @@
 //! satisfy before their estimates are passed to a symbolic solver. The purpose
 //! is to keep "the waveform was misheard" distinguishable from "the notes were
 //! reasoned about incorrectly".
+//!
+//! Stage-level statuses are exhaustive: omission cannot mean success,
+//! confidence, or a silent fallback.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
