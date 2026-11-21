@@ -841,8 +841,7 @@ mod tests {
 
     fn fixture_causal_identification(seed: u32) -> CausalIdentificationV1 {
         let mut design = [0_u8; 32];
-        let estimand = [0xA5_u8; 32];
-        design[..4].copy_from_slice(&seed.to_be_bytes());
+            design[..4].copy_from_slice(&seed.to_be_bytes());
         CausalIdentificationV1::new(
             IdentificationMethodV1::RandomizedControlledTrial,
             EvidenceDigest256::from_bytes(design),

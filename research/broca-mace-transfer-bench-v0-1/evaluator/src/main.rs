@@ -74,7 +74,6 @@ fn fixture_causal_identification(
     seed: u32,
 ) -> broca_mace_policy::CausalIdentificationV1 {
     let mut design = [0_u8; 32];
-    let estimand = [0_u8; 32];
     design[..4].copy_from_slice(&seed.to_be_bytes());
     broca_mace_policy::CausalIdentificationV1::new(
         broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,

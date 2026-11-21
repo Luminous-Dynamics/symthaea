@@ -25,22 +25,36 @@ use broca_mace_policy::{
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+fn fixture_semantic_estimand() -> broca_mace_policy::SemanticEstimandV1 {
+    broca_mace_policy::SemanticEstimandV1::new(
+        1,
+        broca_mace_policy::EvidenceDigest256::from_bytes([1; 32]),
+        broca_mace_policy::EvidenceDigest256::from_bytes([2; 32]),
+        broca_mace_policy::EvidenceDigest256::from_bytes([3; 32]),
+        broca_mace_policy::EvidenceDigest256::from_bytes([4; 32]),
+        broca_mace_policy::EvidenceDigest256::from_bytes([5; 32]),
+        30_000,
+        broca_mace_policy::EvidenceDigest256::from_bytes([6; 32]),
+        broca_mace_policy::EvidenceDigest256::from_bytes([7; 32]),
+        broca_mace_policy::EvidenceDigest256::from_bytes([8; 32]),
+    )
+}
+
 fn fixture_causal_identification(
     seed: u32,
 ) -> broca_mace_policy::CausalIdentificationV1 {
     let mut design = [0_u8; 32];
-    let mut estimand = [0_u8; 32];
     design[..4].copy_from_slice(&seed.to_be_bytes());
-    estimand[..4].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
     broca_mace_policy::CausalIdentificationV1::new(
         broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,
         broca_mace_policy::EvidenceDigest256::from_bytes(design),
-        broca_mace_policy::EvidenceDigest256::from_bytes(estimand),
+        fixture_semantic_estimand().canonical_digest(),
         5_000,
         5_000,
         50_000,
         true,
     )
+    .with_semantic_estimand(fixture_semantic_estimand())
 }
 
 #[derive(Clone, Debug)]
