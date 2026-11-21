@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod pair_manifest;
 pub mod split_manifest;
+pub mod secom_raw;
 
 pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
@@ -13,4 +14,8 @@ pub use pair_manifest::{
 };
 pub use split_manifest::{
     SplitManifestError, SplitManifestV1, SplitValidationReportV1, validate_split_manifest_v1,
+};
+
+pub use secom_raw::{
+    SecomRawDataError, SecomRawExpectationsV1, SecomRawIntegrityReportV1, audit_secom_raw_v1,
 };
