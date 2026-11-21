@@ -1014,17 +1014,71 @@
       "hosted_ci_status": "success",
       "claim_ceiling": "known-answer metric semantic agreement only; not a model-quality or physical manufacturing result",
       "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44933592943",
-      "test_count": 6,
-      "test_result": "6/6 Rust tests passed; fmt, clippy and CLI report parity passed",
-      "tested_commit": "b0d17926ccedd5bd283556aec275302ea294a199",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
+      "test_count": 18,
+      "test_result": "18/18 Rust tests passed across binary metrics, split-manifest integrity and contrastive-pair integrity; fmt, clippy and binary CLI report parity passed",
+      "tested_commit": "4a7f7029fa8694914f0c85650053d879e399b402",
       "verification_steps": [
         "cargo fmt --check",
         "cargo clippy --all-targets -- -D warnings",
-        "cargo test: 6 passed, 0 failed",
-        "Rust CLI report matched frozen Python JSON byte-for-byte"
+        "cargo test: 18 passed, 0 failed",
+        "Rust binary metric CLI matched frozen Python JSON byte-for-byte",
+        "Rust split-manifest known-answer and actual SECOM chronology tests passed",
+        "Rust contrastive-pair known-answer and adversarial tests passed"
       ],
       "workspace_note": "Checks were run in a temporary minimal workspace because the repository root workspace currently references missing crates/core/symthaea/Cargo.toml; this avoids modifying unrelated root workspace state."
+    },
+    "rust_split_manifest_validator": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs",
+      "tests": "inline-unit-tests",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json",
+      "real_source_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+      "semantics": [
+        "unique-sample-ids",
+        "nonempty-train-validation-test",
+        "group-disjointness",
+        "strict-forward-time-order",
+        "offset-aware-or-declared-source-local-clock",
+        "canonical-split-digest",
+        "actual-SECOM-count-support"
+      ],
+      "test_count": 6,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
+      "claim_ceiling": "split-manifest identity and leakage integrity only; not model generalization"
+    },
+    "rust_contrastive_pair_validator": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/pair_manifest.rs",
+      "tests": "inline-unit-tests",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
+      "semantics": [
+        "unique-sample-and-pair-ids",
+        "unique-unordered-edges",
+        "no-self-pairs",
+        "no-orphan-endpoints",
+        "same-split-endpoints-and-pair-scope",
+        "same-lot-evidence",
+        "time-near-within-clock-domain-and-embargo"
+      ],
+      "test_count": 6,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
+      "claim_ceiling": "pair-manifest integrity only; does not prove pair semantic correctness or model quality"
+    },
+    "total_rust_test_count": 18,
+    "latest_rust_hosted_ci": {
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
+      "commit": "4a7f7029fa8694914f0c85650053d879e399b402",
+      "conclusion": "success",
+      "tests": 18,
+      "passed_steps": [
+        "cargo fmt --check",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo test: 18 passed",
+        "binary metrics CLI byte-for-byte parity"
+      ]
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
