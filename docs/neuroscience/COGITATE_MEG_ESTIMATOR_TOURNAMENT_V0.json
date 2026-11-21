@@ -49,9 +49,26 @@
   },
   "reproduction_lanes": [
     {
-      "id": "reference-replay",
+      "id": "reference-replay-pyspi-1.1.0",
       "kind": "historical-reproduction",
-      "requires_exact_paper_pipeline": true
+      "requires_exact_paper_pipeline": true,
+      "pyspi_version": "1.1.0",
+      "folds": "StratifiedGroupKFold-10",
+      "seed": 127
+    },
+    {
+      "id": "repository-replay-pyspi-1.1.1",
+      "kind": "repository-pinned-reproduction",
+      "requires_exact_author_requirements": true,
+      "pyspi_version": "1.1.1",
+      "folds": "StratifiedGroupKFold-10",
+      "seed": 127
+    },
+    {
+      "id": "fold-local-imputation",
+      "kind": "preprocessing-sensitivity",
+      "imputer_fit_scope": "training-fold-only",
+      "not_exact_historical_reproduction": true
     },
     {
       "id": "nested-selection",
@@ -110,5 +127,98 @@
     "cross_task_within_participant_transfer_not_unseen_participant_generalization",
     "published_top_candidate_is_hypothesis_generating_until_nested_selection_and_independent_confirmation",
     "no_superiority_claim_without_matched_protocol"
-  ]
+  ],
+  "author_code_audit": {
+    "source_repository": "https://github.com/anniegbryant/MEG_functional_connectivity",
+    "source_commit": "cab648bbe2eab7093f9ab7b9a5fcddabf28e60a0",
+    "source_commit_date": "2026-01-27",
+    "source_files": {
+      "readme": {
+        "path": "README.md",
+        "blob_sha": "3639b61917dda7e903dc26f845478001e64c2a39"
+      },
+      "requirements": {
+        "path": "requirements.txt",
+        "blob_sha": "5406f118265796a1a91a48f11dce2ffd81930837"
+      },
+      "classifier": {
+        "path": "classification/fit_pyspi_classifiers.py",
+        "blob_sha": "bff12517d61fbab8b77272222074a2cb67736816"
+      },
+      "feature_extraction": {
+        "path": "functional_connectivity_analysis/run_pyspi_for_subject_averaged_epochs.py",
+        "blob_sha": "ef8d2b2c6d8037e39a9fd655a576933b41bf6c07"
+      }
+    },
+    "code_archive_doi": "10.5281/zenodo.15122629",
+    "data_archives": [
+      {
+        "doi": "10.5281/zenodo.18294156",
+        "role": "final-paper-preprocessed-empirical-and-model-archive",
+        "files": [
+          "empirical.zip",
+          "model.zip"
+        ],
+        "created": "2026-01-21"
+      },
+      {
+        "doi": "10.5281/zenodo.15315238",
+        "role": "older-preprint-supporting-data-archive",
+        "files": [
+          "data.zip"
+        ],
+        "created": "2025-05-01"
+      }
+    ],
+    "version_discrepancy": {
+      "paper_methods_pyspi": "1.1.0",
+      "author_requirements_pyspi": "1.1.1",
+      "resolution": "unresolved_reproduce_both_and_compare_to_archived_empirical_CSVs",
+      "impact": "pyspi 1.1.1 fixes directionality of time-lagged mutual-information statistics; affected measures include tlmi_gaussian, tlmi_kraskov_NN-4, tlmi_kraskov_NN-4_DCE and tlmi_kernel_W-0.25"
+    },
+    "author_classifier": {
+      "fold_type": "StratifiedGroupKFold",
+      "folds": 10,
+      "shuffle": true,
+      "random_state": 127,
+      "group_key": "subject_ID",
+      "classifier": "LogisticRegression",
+      "logistic_regression": {
+        "penalty": "l1",
+        "C": 1,
+        "solver": "liblinear",
+        "class_weight": "balanced",
+        "random_state": 127
+      },
+      "scaler": "MixedSigmoidScaler(unit_variance=true)",
+      "metrics": [
+        "accuracy",
+        "balanced_accuracy",
+        "AUC"
+      ],
+      "svm_sensitivity": [
+        "Linear_SVM_C1",
+        "RBF_SVM_C1"
+      ],
+      "cross_task": "train on one relevance context and test on the other using all same 94 participants; this is not unseen-participant validation"
+    },
+    "preprocessing_audit": {
+      "finding": "mean imputation for statistics with 0-10% missingness occurs on the full selected participant table before grouped CV in current author script",
+      "status": "potential_unsupervised_transductive_leakage_not_quantified",
+      "not_label_leakage": true,
+      "sensitivity": "retain historical code for reproduction; add fold-local training-only imputation in a separately labeled sensitivity analysis",
+      "no_claim_that_published_result_is_invalid": true
+    },
+    "repo_requirements_versions": {
+      "python_readme": "3.9.17",
+      "python_conda_command": "3.9.21",
+      "mne": "0.23.0",
+      "mne_connectivity": "0.7.0",
+      "scikit_learn": "1.6.1",
+      "numpy": "2.2.4",
+      "scipy": "1.15.2",
+      "pandas": "2.2.3"
+    },
+    "status": "public_readme_requirements_and_classifier_sources_inspected; no empirical data downloaded or analyzed"
+  }
 }
