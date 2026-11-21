@@ -10,7 +10,9 @@
 //!   dv/dt = (q/m) E
 //! The common electron convention uses q/m = -1 and n_background = 1.
 
-#![forbid(unsafe_code)]\n\npub mod transition;
+#![forbid(unsafe_code)]
+
+pub mod transition;
 
 use std::error::Error;
 use std::f64::consts::TAU;
