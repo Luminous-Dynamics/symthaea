@@ -150,7 +150,26 @@ The v0.1 runner is a synthetic *associative recall* probe. It must not be presen
 | Continuous-time state modelling | Original CfC variants (including CfC-mmRNN), HDC-LTC, NIALIM/DFA-CfN/PRDFA-CfN, Neural CDE / ODE-RNN, and strong GRU-D / GRU / LSTM controls | Use the same continuous-time task, timestamps, interpolation policy, initial conditions, training data and tuning budget. A passive-retention test is not a substitute for a forecasting or sequence-learning test. |
 | Irregular-time forecasting | BITS and TIME-compatible data/tasks, plus strong task-appropriate time-series models | Use their split/no-leakage protocols and report results by missingness, sampling irregularity and pattern, not only a single average. Do not relabel synthetic v0.1 results as BITS or TIME results. |
 | Continual learning / neuromorphic relevance | NeuroBench algorithm tasks where applicable; deployed system track only after a real target implementation exists | Algorithm quality/complexity is separate from end-to-end deployed timing and efficiency. |
+| Agent memory / experience transfer | MemoryArena, AMA-Bench and same-backbone memory systems; connect to Symthaea #9516 MACE and #9677 replay/stability–plasticity | Evaluate downstream dependent-task decisions, not recall alone. Keep HDC primitive performance separate from full agent-stack performance. |
 | Retrieval at scale | Exact scan first; then conventional vector index / ANN and cache baselines where corpus size justifies them | Candidate-generation recall and final exact reranking are separate. Match hardware, concurrency, filters, data residency, cold-start and update/rebuild costs. |
+
+### Agent-memory and industry-system comparison
+
+A mechanism-level HDC associative-recall result is not an agent-memory result. The downstream qualification must preserve a distinct agent/system track:
+
+- **MemoryArena (ICML 2026):** multi-session Memory–Agent–Environment tasks with dependent subtasks, where experience learned in earlier interactions must improve later actions. The authors report that near-saturated performance on long-context recall benchmarks can still fail to transfer to this setting. Its public task families include web navigation, preference-constrained planning, progressive information search and sequential formal reasoning.
+- **AMA-Bench (ICML 2026):** long-horizon agent trajectories containing states, actions, observations and tool outputs. Its paper reports that similarity-heavy memory can lose causal and objective information; AMA-Agent combines causality graphs and tool-augmented retrieval and reports 57.22% accuracy, 11.16 percentage points above its strongest baseline on that benchmark. This is a paper-reported result, not a Symthaea comparison.
+- **Commercial/open memory implementations:** Mem0, Letta/MemGPT, LangMem and Zep/Graphiti are reasonable systems to include in a same-backbone comparison. They must use the identical agent backbone, tool permissions, task set, turn budget, token budget, storage limits and outcome evaluator. A third-party benchmark's single-run recall or vendor-reported LongMemEval/LoCoMo number is context, not an apples-to-apples SOTA ranking.
+
+This downstream work is already owned by [Symthaea #9516 — causal experience transfer across interdependent agent sessions](https://github.com/Luminous-Dynamics/symthaea/issues/9516), which defines MACE and explicitly plans to reuse MemoryArena and AMA-Bench where licensing permits. The mechanism-level bridge is:
+
+- #13099: passive HDC-LTC associative retention and capacity as a low-level representation/control arm;
+- #9677: online learning, replay, stability–plasticity, forgetting and retention byte-time;
+- #13019: when to refresh slow context;
+- #9666: joint sensing, memory, compute and verification under temporal error debt;
+- #9516: whether qualified experience is transferred into later dependent agent decisions.
+
+Do not duplicate these owners or collapse their metrics. A future MACE adapter should carry a frozen HDC memory configuration as one candidate arm, preserve the common agent/action authority, and report final task completion, regret, false causal claims, stale-policy reuse, memory bytes and end-to-end cost.
 
 ### Current state-of-the-art context
 
