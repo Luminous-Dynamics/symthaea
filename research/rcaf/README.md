@@ -57,3 +57,13 @@ python3 -m unittest discover -s research/rcaf/tools -p 'test_*.py'
 ```
 
 The validator never promotes a synthetic fixture to biological evidence. It also does not prove source-data truth, correct preprocessing, absence of hidden confounds, or clinical validity; these require separate evidence gates.
+
+
+## Focused validation workflow
+
+`.github/workflows/rcaf-research-validation.yml` runs only for changes to the standalone RCAF research package. It checks:
+- the Python report-validator unit tests;
+- the synthetic report against the committed Draft 2020-12 schema and semantic validator;
+- Rust 1.96 formatting, all kernel tests and strict Clippy.
+
+This workflow does not add the standalone crate to the root Cargo workspace or alter production CI. A workflow run is evidence only for the exact commit it checks; skipped, queued or absent runs are not passes.
