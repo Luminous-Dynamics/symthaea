@@ -165,7 +165,6 @@ fn mean_and_sample_std(values: &[f64]) -> (f64, f64) {
     (mean, variance.sqrt())
 }
 
-#[derive(serde::Serialize)]
 struct RegimeResult {
     profile: &'static str,
     phi_engine_output_mean: f64,
@@ -249,7 +248,13 @@ fn main() {
         "node_count": NODE_COUNT,
         "trial_count_per_profile": TRIAL_COUNT,
         "hypervector_dimension": DIM,
-        "profiles": results,
+        "profiles": results.iter().map(|result| serde_json::json!({
+            "profile": result.profile,
+            "phi_engine_output_mean": result.phi_engine_output_mean,
+            "phi_engine_output_sample_std": result.phi_engine_output_sample_std,
+            "reference_node_similarity_entropy_mean": result.reference_node_similarity_entropy_mean,
+            "reference_node_similarity_entropy_sample_std": result.reference_node_similarity_entropy_sample_std
+        })).collect::<Vec<_>>(),
         "fixture_checks": {
             "all_values_finite": all_finite,
             "similarity_entropy_in_unit_interval": entropy_in_range
