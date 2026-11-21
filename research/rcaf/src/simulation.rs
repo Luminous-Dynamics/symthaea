@@ -986,17 +986,27 @@ mod tests {
         );
         for curve in &tournament.curves {
             assert_eq!(
-                curve.sweep.reports.iter().map(|row| row.seed).collect::<Vec<_>>(),
+                curve
+                    .sweep
+                    .reports
+                    .iter()
+                    .map(|row| row.seed)
+                    .collect::<Vec<_>>(),
                 vec![config.seed; effects.len()]
             );
             assert_eq!(
-                curve.sweep.reports
+                curve
+                    .sweep
+                    .reports
                     .iter()
                     .map(|row| row.injection_loading_delta)
                     .collect::<Vec<_>>(),
                 effects
             );
         }
+        let output = tournament.to_json_pretty();
+        assert!(output.contains("rcaf.estimator-dose-response-tournament/0.1.0"));
+        assert!(output.contains("signed_shift_weighted_jaccard"));
     }
 
     #[test]
