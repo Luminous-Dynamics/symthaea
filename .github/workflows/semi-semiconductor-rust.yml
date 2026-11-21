@@ -41,13 +41,13 @@ jobs:
         run: |
           set -euo pipefail
           export CHECK_ROOT="${RUNNER_TEMP}/semi-contract-check"
-          mkdir -p "\${CHECK_ROOT}/crates/domains" \
-                   "\${CHECK_ROOT}/benchmarks/semi-bench-001/reference" \
-                   "\${CHECK_ROOT}/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a"
-          cp -a crates/domains/symthaea-semiconductor "\${CHECK_ROOT}/crates/domains/"
-          cp -a benchmarks/semi-bench-001/reference/fixtures "\${CHECK_ROOT}/benchmarks/semi-bench-001/reference/"
+          mkdir -p "${CHECK_ROOT}/crates/domains" \
+                   "${CHECK_ROOT}/benchmarks/semi-bench-001/reference" \
+                   "${CHECK_ROOT}/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a"
+          cp -a crates/domains/symthaea-semiconductor "${CHECK_ROOT}/crates/domains/"
+          cp -a benchmarks/semi-bench-001/reference/fixtures "${CHECK_ROOT}/benchmarks/semi-bench-001/reference/"
           cp -a docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json \
-            "\${CHECK_ROOT}/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/"
+            "${CHECK_ROOT}/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/"
           python3 - <<'PY'
           import os
           from pathlib import Path
