@@ -16,11 +16,11 @@ The 2025 Nature adversarial study preregistered competing IIT/GNWT predictions a
 - MEG: 97, split into 32 optimization and 65 replication participants.
 - iEEG: 34 recruited; two participants were excluded for incomplete data. Specific endpoints can have further denominators (for example, one identity-RDM analysis reports 29 after excluding incomplete experiments).
 
-The current public COGITATE data catalogue lists 118 fMRI, 100 MEG/EEG and 38 iEEG records. These are release counts, not the same thing as the paper's quality-controlled analysis samples. All three denominators must be retained in the data registry; the participant-level release manifest and the supplement must determine each endpoint's actual eligible set.
+The current public COGITATE data catalogue lists cohort counts of 118 fMRI, 100 MEG and 38 iEEG. These are catalogue cohort counts, not a guarantee that every modality's complete raw/BIDS files are currently available, and not the same thing as the paper's quality-controlled analysis samples. All denominators must be retained in the data registry.
 
-The fMRI release spans Yale and Donders; the MEG/EEG release spans Birmingham and Peking University. The fMRI descriptor reports 118 released participants and includes raw and BIDS data, quality reports, demographics, behavioural records and eye tracking. The MEG/EEG descriptor reports 100 released participants and offers a sample bundle and full bundle. The iEEG dataset is a distinct clinical epilepsy cohort; never present its participants as healthy controls.
+The versioned data-release introduction (V1.3) explicitly says raw/unprocessed and BIDS fMRI for Experiment 1 are released. It lists raw/unprocessed M-EEG batch 1 and batch 2 among future releases, while also linking earlier M-EEG release documents V1.0 and V1.2; therefore exact contents and format must be verified bundle-by-bundle rather than inferred from the catalogue population count. The iEEG release documentation is V1.1. Experiment 2 fMRI and M-EEG formats are listed as future releases. fMRI participants were recruited at Yale and Donders; M-EEG cohort counts span Birmingham and Peking University. The iEEG dataset is a distinct clinical epilepsy cohort; never present its participants as healthy controls.
 
-The official release states CC BY 4.0, but portal download requires an account and acceptance of the terms. Record the exact bundle DOI, version, terms, file manifest and checksums before processing or redistributing derivatives. Public availability does not mean files have been retrieved or analysed.
+The release states CC BY 4.0, but portal download requires an account and acceptance of the terms. Record the exact bundle DOI, version, modality, format, terms, file manifest and checksums before processing or redistributing derivatives. Public catalogue presence does not prove a specific data bundle has been retrieved, checksummed or analysed.
 
 ### Dataset priority
 
@@ -33,9 +33,9 @@ The official release states CC BY 4.0, but portal download requires an account a
 
 ### Network Similarity Index (NSI), 2026
 
-A 2026 Neuron paper introduces a Network Similarity Index for assessing the suitability of precision fMRI data for individual-level functional-connectivity mapping. The index fits seed-to-whole-brain connectivity maps as weighted combinations of canonical network templates using ridge regression, with model fit (R²) as the per-seed quality measure. The work links data quality to reliability growth and expected value of additional scan time.
+A 2026 Neuron paper (Lynch et al., DOI 10.1016/j.neuron.2026.05.020; issue date 11 November 2026) introduces the Network Similarity Index for assessing precision-fMRI data suitability for individual-level functional-connectivity mapping. It fits each seed-to-whole-brain connectivity map as a weighted combination of canonical network templates using ridge regression; per-seed R² is the NSI, and the dataset-level NSI is the median across sampled seeds. The authors provide code in https://github.com/cjl2007/pfm-nsi and processing workflows in https://github.com/cjl2007/pfm-mefmri, with related data/statistics at https://osf.io/qx2et/.
 
-CETB implication: add NSI as an external comparator and quality covariate where its assumptions fit. Do not impose it as a universal gate: it was developed for individual-level precision mapping, not automatically for every task-fMRI, sedation, EEG or clinical dataset. Its original code, parcellation and network templates must be pinned and licensed before adoption.
+CETB implication: add NSI as an external comparator and possible quality covariate where its assumptions fit. Do not impose it as a universal gate: it was developed for large-scale network structure and individual-level FC data quality, not automatically for every task-fMRI, sedation, EEG or clinical dataset. Importantly, it measures recoverable network-template structure and has limitations around atypical network topography; pair it with motion/artifact controls and independent repeatability rather than interpreting a high NSI as proof of biological validity or consciousness.
 
 ### 239-statistic functional-connectivity benchmark
 
@@ -120,3 +120,43 @@ The proposed thresholds are engineering targets, not achieved results. A result 
 - No published COGITATE or ds006623 results were reproduced.
 - No SOTA superiority, consciousness detection or clinical readiness is claimed.
 - Rust compilation, tests and Clippy remain pending until a supported Rust toolchain executes the standalone crate.
+
+
+## 7. Measurement theory extension: repeatability is not validity
+
+RCAF v1.1 is being hardened around three separate questions:
+
+1. **Reliability:** would repeated acquisitions under the same declared condition yield similar estimates?
+2. **Validity / construct sensitivity:** does the representation track the operational construct or a preregistered discriminating prediction, rather than stable artifact?
+3. **Identifiability / transport:** can the measurement distinguish individuals or states on held-out participants/sites without leaking session identity or acquisition signatures?
+
+A reliable artifact can score highly on repeatability. A network-quality index can be high while a task-specific hypothesis is still wrong. Consequently, do not collapse NSI, ICC, RCAF, motion robustness and theory-prediction scores into a single scalar.
+
+### Proposed hierarchical repeatability model
+
+Represent each measurement as Y(participant, condition, session, run, segment, estimator). Condition and estimator are declared analysis factors; participant, session-within-participant, run-within-session and segment-within-run induce nested dependence. Estimate participant-, session-, run- and segment-level variance components with a hierarchical model or generalizability-theory design. Report which components are estimable from the actual sampling design; do not manufacture precision from repeated windows.
+
+Use separate relative-reliability and absolute-agreement quantities where applicable (for example, a predeclared ICC form with confidence intervals, within-participant standard error and minimum detectable change). Pair these with criterion validity and artifact negative controls. An ICC alone is not evidence that a biomarker is meaningful.
+
+### Repeatability surface
+
+Estimate R(duration, temporal_gap, quality) rather than one pooled floor. Duration and temporal gap must be matched when comparing conditions. Quality covariates should include at least motion/censoring and acquisition/site metadata where available. Fit the surface only within observed duration/quality support; do not extrapolate beyond data without an explicit predictive interval and validation.
+
+### Evidence-aware acquisition
+
+Choose an additional scan segment or modality by expected reduction in uncertainty about a specified decision or theory contrast per unit of acquisition cost. Report the acquisition policy, stopping rule, minutes/energy/device cost, achieved calibration and whether the acquired data remain temporally independent of the evaluation set. More data is not automatically more evidence when the same correlated run is repeatedly subdivided.
+
+### Machine-checkable integrity invariants
+
+A report validator must check, in addition to JSON Schema:
+- unique, non-empty participant keys;
+- participant row count equals summary.participant_count;
+- each paired_gap equals within_similarity minus between_similarity within a declared numeric tolerance;
+- positive-gap fraction and sign-test positive/negative/tie counts recompute from participant rows;
+- bootstrap interval ordering and confidence level are valid;
+- acquisition ≥ released ≥ QC-eligible ≥ analysis-included, with exclusion flow fully explained;
+- ROI labels/order digest is the same for every matrix in a comparison;
+- each run uses frozen participant-level membership, phase and modality assignments;
+- no same-participant session/segment crosses train, calibration and test partitions.
+
+JSON Schema validates structure; it does not prove these cross-record and derived-value invariants by itself.
