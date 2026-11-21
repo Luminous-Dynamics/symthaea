@@ -917,12 +917,13 @@ mod tests {
         );
         let selected_score = |batch: &SonataInterventionBatch| {
             let selected_id = batch.selection.recommended_id.as_deref().unwrap();
-            &batch
+            batch
                 .candidates
                 .iter()
                 .find(|candidate| candidate.alternative_id == selected_id)
                 .unwrap()
                 .score
+                .clone()
         };
         assert_ne!(
             selected_score(&repeat_batch),
