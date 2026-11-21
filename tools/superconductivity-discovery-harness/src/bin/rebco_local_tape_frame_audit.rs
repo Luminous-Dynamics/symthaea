@@ -389,7 +389,6 @@ mod tests {
     use super::*;
 
     fn fixture() -> Value {
-        let schema = include_bytes!("../../../../data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json");
         let bytes = include_bytes!("../../fixtures/rebco_local_tape_frame_smoke_v0_1.json");
         serde_json::from_slice(bytes).expect("local tape-frame fixture must parse")
     }
