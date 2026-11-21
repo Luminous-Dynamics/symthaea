@@ -42,7 +42,7 @@ Power at alternative (q) is (P_q(p le 0.05)). The table below enumerates the exa
 | 80 | 0.369 | 0.724 | 0.941 | 0.995 | 1.000 |
 | 100 | 0.462 | 0.828 | 0.979 | 0.999 | 1.000 |
 | 150 | 0.663 | 0.955 | 0.999 | 1.000 | 1.000 |
-| 200 | 0.788 | 0.988 | 1.000 | 1.000 | 1.000 |
+| 200 | 0.787 | 0.988 | 1.000 | 1.000 | 1.000 |
 
 Approximate minimum non-tied sample sizes for at least 80% power under this test:
 
