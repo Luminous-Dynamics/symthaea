@@ -41,6 +41,7 @@ struct Args {
     events: Vec<usize>,
     seed_count: usize,
     output: Option<String>,
+    source_revision: Option<String>,
 }
 
 impl Default for Args {
@@ -52,6 +53,7 @@ impl Default for Args {
             events: DEFAULT_EVENTS.to_vec(),
             seed_count: DEFAULT_SEEDS,
             output: None,
+            source_revision: None,
         }
     }
 }
@@ -88,6 +90,7 @@ struct QueryRecord {
 #[derive(Serialize)]
 struct SummaryRecord {
     schema_version: &'static str,
+    source_revision: Option<String>,
     cohort_id: String,
     seed: u64,
     dimension: usize,
@@ -177,6 +180,11 @@ where
     Ok(values)
 }
 
+fn valid_git_revision(revision: &str) -> bool {
+    matches!(revision.len(), 40 | 64)
+        && revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn parse_args() -> Result<Args, Box<dyn Error>> {
     let mut args = Args::default();
     let mut iter = std::env::args().skip(1);
@@ -186,11 +194,12 @@ fn parse_args() -> Result<Args, Box<dyn Error>> {
             "--help" | "-h" => {
                 println!(
                     "temporal_associative_capacity [--dims 1024,4096] [--loads 4,8,16] \
-                     [--horizons 0,1,10] [--events 1,8] [--seeds 3] [--out results.jsonl]"
+                     [--horizons 0,1,10] [--events 1,8] [--seeds 3] \
+                     [--source-revision <40-or-64-char-git-sha>] [--out results.jsonl]"
                 );
                 std::process::exit(0);
             }
-            "--dims" | "--loads" | "--horizons" | "--events" | "--seeds" | "--out" => {
+            "--dims" | "--loads" | "--horizons" | "--events" | "--seeds" | "--out" | "--source-revision" => {
                 iter.next()
                     .ok_or_else(|| format!("missing value for {flag}"))?
             }
@@ -204,6 +213,7 @@ fn parse_args() -> Result<Args, Box<dyn Error>> {
             "--events" => args.events = parse_list(&value, "event counts")?,
             "--seeds" => args.seed_count = value.parse()?,
             "--out" => args.output = Some(value),
+            "--source-revision" => args.source_revision = Some(value),
             _ => unreachable!("flag was validated above"),
         }
     }
@@ -222,6 +232,13 @@ fn parse_args() -> Result<Args, Box<dyn Error>> {
     }
     if args.seed_count == 0 || args.seed_count > 10_000 {
         return Err("seed count must be in 1..=10000".into());
+    }
+    if args
+        .source_revision
+        .as_deref()
+        .is_some_and(|revision| !valid_git_revision(revision))
+    {
+        return Err("source revision must be a 40- or 64-character hexadecimal Git SHA".into());
     }
     // The experiment holds several full codebooks concurrently, plus an
     // optional distractor input schedule. Bound both allocation surfaces.
@@ -564,6 +581,7 @@ fn cohort_id(
 
 fn run_cohort(
     writer: &mut impl Write,
+    source_revision: Option<&str>,
     memory: &PreparedMemory,
     memory_preparation_wall_ns: u128,
     seed: u64,
@@ -679,6 +697,7 @@ fn run_cohort(
         writer,
         &OutputRecord::Summary(SummaryRecord {
             schema_version: SCHEMA_VERSION,
+            source_revision: source_revision.map(str::to_owned),
             cohort_id: id,
             seed,
             dimension: dim,
@@ -751,6 +770,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ] {
                     run_cohort(
                         &mut writer,
+                        args.source_revision.as_deref(),
                         &memory,
                         memory_preparation_wall_ns,
                         seed,
@@ -767,6 +787,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // shortcut: same state, zero updates and same decode as static.
                 run_cohort(
                     &mut writer,
+                    args.source_revision.as_deref(),
                     &memory,
                     memory_preparation_wall_ns,
                     seed,
@@ -789,6 +810,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             ] {
                                 run_cohort(
                                     &mut writer,
+                                    args.source_revision.as_deref(),
                                     &memory,
                                     memory_preparation_wall_ns,
                                     seed,
@@ -814,6 +836,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn git_revision_validation_accepts_only_full_sha_lengths() {
+        assert!(valid_git_revision(&"a".repeat(40)));
+        assert!(valid_git_revision(&"b".repeat(64)));
+        assert!(!valid_git_revision(&"c".repeat(39)));
+        assert!(!valid_git_revision(&"g".repeat(40)));
+    }
 
     #[test]
     fn seeded_codebooks_and_bundles_are_reproducible() {
