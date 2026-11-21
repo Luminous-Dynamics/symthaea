@@ -106,6 +106,8 @@ struct SummaryRecord {
     plug_in_fano_information_lower_bound_bits: f64,
     api_update_count: u64,
     reported_logical_seconds: f64,
+    model_setup_wall_ns: u128,
+    input_preparation_wall_ns: u128,
     evolution_wall_ns: u128,
     decode_wall_ns: u128,
     interpretation: &'static str,
@@ -115,6 +117,16 @@ struct PreparedMemory {
     keys: Vec<ContinuousHV>,
     values: Vec<ContinuousHV>,
     bundle: ContinuousHV,
+    mismatched_bundle: ContinuousHV,
+}
+
+struct EvolutionOutcome {
+    state: ContinuousHV,
+    api_update_count: u64,
+    reported_logical_seconds: f64,
+    model_setup_wall_ns: u128,
+    input_preparation_wall_ns: u128,
+    evolution_wall_ns: u128,
 }
 
 struct Scores {
@@ -235,10 +247,21 @@ fn prepare_memory(dim: usize, fan_in: usize, seed: u64) -> PreparedMemory {
     let refs: Vec<&ContinuousHV> = bound.iter().collect();
     let bundle = ContinuousHV::bundle(&refs);
 
+    // Cyclically mispair every key with the next value. This is a deterministic
+    // negative control: the query keys are unchanged, but none names its target.
+    let mismatched: Vec<ContinuousHV> = keys
+        .iter()
+        .enumerate()
+        .map(|(index, key)| key.bind(&values[(index + 1) % fan_in]))
+        .collect();
+    let mismatched_refs: Vec<&ContinuousHV> = mismatched.iter().collect();
+    let mismatched_bundle = ContinuousHV::bundle(&mismatched_refs);
+
     PreparedMemory {
         keys,
         values,
         bundle,
+        mismatched_bundle,
     }
 }
 
@@ -432,7 +455,10 @@ fn run_cohort(
     gap_profile: &'static str,
     condition: &'static str,
 ) -> Result<(), Box<dyn Error>> {
-    let event_count = if horizon_seconds == 0.0 || condition == "static_hdc_bundle" {
+    let event_count = if horizon_seconds == 0.0
+        || condition == "static_hdc_bundle"
+        || condition == "static_mismatched_pairing_control"
+    {
         0
     } else {
         requested_events
@@ -447,21 +473,27 @@ fn run_cohort(
         event_count,
     );
 
-    let (state, api_update_count, reported_logical_seconds, evolution_wall_ns) = evolve_state(
+    let initial_bundle = if condition == "static_mismatched_pairing_control" {
+        &memory.mismatched_bundle
+    } else {
+        &memory.bundle
+    };
+    let evolution = evolve_state(
         dim,
-        &memory.bundle,
+        initial_bundle,
         seed,
         horizon_seconds,
         event_count,
         gap_profile,
         condition,
     );
+    let state = &evolution.state;
 
     let decode_start = Instant::now();
     let mut accumulator = Accumulator::default();
 
     for query_index in 0..fan_in {
-        let scores = decode(memory, &state, query_index);
+        let scores = decode(memory, state, query_index);
         if scores.valid {
             accumulator.valid_queries += 1;
             accumulator.target_similarity_sum +=
@@ -538,9 +570,11 @@ fn run_cohort(
                 1.0 - accuracy,
                 fan_in,
             ),
-            api_update_count,
-            reported_logical_seconds,
-            evolution_wall_ns,
+            api_update_count: evolution.api_update_count,
+            reported_logical_seconds: evolution.reported_logical_seconds,
+            model_setup_wall_ns: evolution.model_setup_wall_ns,
+            input_preparation_wall_ns: evolution.input_preparation_wall_ns,
+            evolution_wall_ns: evolution.evolution_wall_ns,
             decode_wall_ns,
             interpretation: "finite-sample plug-in Fano diagnostic; not a confidence-certified information bound",
         }),
@@ -575,6 +609,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 "static_hdc_bundle",
                                 "hdc_ltc_zero_input",
                                 "hdc_ltc_distractor",
+                                "static_mismatched_pairing_control",
                             ] {
                                 run_cohort(
                                     &mut writer,
