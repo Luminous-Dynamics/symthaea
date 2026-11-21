@@ -15,6 +15,7 @@ impl Rng {
 }
 fn sigmoid(x:f64)->f64 {1.0/(1.0+(-x.clamp(-20.0,20.0)).exp())}
 fn make_split(
+    target_model_sha256: &str,
     seed:u64,event:u32,cluster:u64,family:u32,count:u32,shift:f64
 )->Vec<ExampleV1> {
     let mut rng=Rng::new(seed);let mut result=Vec::new();
@@ -47,6 +48,7 @@ fn make_split(
                 cluster_id:cluster+u64::from(c)+1,
                 task_family_id:family+c%8,
                 source_root:SourceRootDigest::from_bytes(root_bytes),
+                target_model_sha256: target_model_sha256.to_owned(),
                 features,
                 future_reused:rng.unit()<sigmoid(z),
             });
@@ -56,9 +58,9 @@ fn make_split(
 }
 #[test]
 fn learned_salience_uses_disjoint_train_calibration_and_heldout_partitions() {
-    let training=make_split(0x51a1,1,1,100,64,0.0);
-    let calibration=make_split(0xc411,100_000,10_000,200,32,0.10);
-    let heldout=make_split(0x7e57,200_000,20_000,300,32,0.05);
+    let training=make_split("a".repeat(64).as_str(),0x51a1,1,1,100,64,0.0);
+    let calibration=make_split("a".repeat(64).as_str(),0xc411,100_000,10_000,200,32,0.10);
+    let heldout=make_split("a".repeat(64).as_str(),0x7e57,200_000,20_000,300,32,0.05);
     let manifest=qualify_splits(&training,&calibration,&heldout).unwrap();
     assert_eq!(manifest.training_clusters,64);
     assert_eq!(manifest.calibration_clusters,32);
@@ -77,8 +79,17 @@ fn learned_salience_uses_disjoint_train_calibration_and_heldout_partitions() {
 }
 #[test]
 fn task_family_overlap_fails_split_qualification() {
-    let training=make_split(0x51a1,1,1,100,64,0.0);
-    let calibration=make_split(0xc411,100_000,10_000,100,32,0.1);
-    let heldout=make_split(0x7e57,200_000,20_000,300,32,0.05);
+    let training=make_split("a".repeat(64).as_str(),0x51a1,1,1,100,64,0.0);
+    let calibration=make_split("a".repeat(64).as_str(),0xc411,100_000,10_000,100,32,0.1);
+    let heldout=make_split("a".repeat(64).as_str(),0x7e57,200_000,20_000,300,32,0.05);
+    assert!(qualify_splits(&training,&calibration,&heldout).is_err());
+}
+
+
+#[test]
+fn target_model_must_be_identical_across_all_memory_splits() {
+    let training=make_split("a".repeat(64).as_str(),0x51a1,1,1,100,64,0.0);
+    let calibration=make_split("a".repeat(64).as_str(),0xc411,100_000,10_000,200,32,0.10);
+    let heldout=make_split("b".repeat(64).as_str(),0x7e57,200_000,20_000,300,32,0.05);
     assert!(qualify_splits(&training,&calibration,&heldout).is_err());
 }

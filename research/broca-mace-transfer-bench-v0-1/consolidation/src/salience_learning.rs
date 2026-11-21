@@ -56,6 +56,7 @@ pub struct ExampleV1 {
     pub cluster_id: u64,
     pub task_family_id: u32,
     pub source_root: SourceRootDigest,
+    pub target_model_sha256: String,
     pub features: FeaturesV1,
     pub future_reused: bool,
 }
@@ -75,7 +76,8 @@ pub enum Reject {
     Empty, BadId, UnknownRoot, BadFeature, DuplicateEvent, MissingClass,
     TooFewClusters, TooFewFamilies, TooFewRoots,
     ClusterOverlap, FamilyOverlap, RootOverlap, EventOverlap,
-    BadConfig, ModelMismatch, InvalidPredictionContext, InvalidPredictionDigest,
+    BadConfig, ModelMismatch, MixedTargetModel, InvalidTargetModelDigest,
+    TargetModelMismatch, InvalidPredictionContext, InvalidPredictionDigest,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Identity {
@@ -83,6 +85,7 @@ struct Identity {
     families: BTreeSet<u32>,
     roots: BTreeSet<SourceRootDigest>,
     events: BTreeSet<u32>,
+    target_model_sha256: String,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Split {
@@ -91,6 +94,7 @@ struct Split {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SplitManifestV1 {
+    pub target_model_sha256: String,
     pub train_sha256: String,
     pub calibration_sha256: String,
     pub heldout_sha256: String,
@@ -104,6 +108,7 @@ pub struct SplitManifestV1 {
 pub struct ModelV1 {
     weights: [f64; 8],
     training: Identity,
+    target_model_sha256: String,
     pub training_base_rate_bps: u16,
     pub model_sha256: String,
 }
@@ -112,6 +117,7 @@ pub struct CalibratorV1 {
     slope: f64,
     intercept: f64,
     model_sha256: String,
+    target_model_sha256: String,
     calibration: Identity,
     pub calibration_sha256: String,
 }
@@ -129,6 +135,13 @@ pub struct MetricsV1 {
 fn sha(bytes: &[u8]) -> String {
     Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
 }
+
+fn is_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| {
+            byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+        })
+}
 fn field(hasher: &mut Sha256, value: &[u8]) {
     hasher.update((value.len() as u64).to_be_bytes());
     hasher.update(value);
@@ -145,6 +158,7 @@ fn identity(rows: &[ExampleV1]) -> Identity {
         families: rows.iter().map(|row| row.task_family_id).collect(),
         roots: rows.iter().map(|row| row.source_root).collect(),
         events: rows.iter().map(|row| row.event_id).collect(),
+        target_model_sha256: rows[0].target_model_sha256.clone(),
     }
 }
 fn dataset_digest(rows: &[ExampleV1]) -> String {
@@ -157,6 +171,7 @@ fn dataset_digest(rows: &[ExampleV1]) -> String {
         hasher.update(row.cluster_id.to_be_bytes());
         hasher.update(row.task_family_id.to_be_bytes());
         hasher.update(row.source_root.as_bytes());
+        field(&mut hasher, row.target_model_sha256.as_bytes());
         hasher.update(row.features.recency_bps.to_be_bytes());
         hasher.update(row.features.frequency_bps.to_be_bytes());
         hasher.update(row.features.task_similarity_bps.to_be_bytes());
@@ -170,6 +185,10 @@ fn dataset_digest(rows: &[ExampleV1]) -> String {
 }
 fn validate(rows: &[ExampleV1], minimum_clusters: usize) -> Result<Split, Reject> {
     if rows.is_empty() { return Err(Reject::Empty); }
+    let target_model = rows[0].target_model_sha256.as_str();
+    if !is_lower_sha256(target_model) {
+        return Err(Reject::InvalidTargetModelDigest);
+    }
     let mut events = BTreeSet::new();
     let mut positive = false;
     let mut negative = false;
@@ -178,6 +197,9 @@ fn validate(rows: &[ExampleV1], minimum_clusters: usize) -> Result<Split, Reject
             return Err(Reject::BadId);
         }
         if !row.source_root.is_known() { return Err(Reject::UnknownRoot); }
+        if row.target_model_sha256 != target_model {
+            return Err(Reject::MixedTargetModel);
+        }
         if !row.features.valid() { return Err(Reject::BadFeature); }
         if !events.insert(row.event_id) { return Err(Reject::DuplicateEvent); }
         positive |= row.future_reused;
@@ -205,6 +227,11 @@ pub fn qualify_splits(
     let train = validate(training, MIN_TRAIN_CLUSTERS)?;
     let cal = validate(calibration, MIN_CALIBRATION_CLUSTERS)?;
     let test = validate(heldout, MIN_HELDOUT_CLUSTERS)?;
+    if train.identity.target_model_sha256 != cal.identity.target_model_sha256
+        || train.identity.target_model_sha256 != test.identity.target_model_sha256
+    {
+        return Err(Reject::MixedTargetModel);
+    }
     ensure_disjoint(&train.identity, &cal.identity)?;
     ensure_disjoint(&train.identity, &test.identity)?;
     ensure_disjoint(&cal.identity, &test.identity)?;
@@ -227,6 +254,7 @@ pub fn qualify_splits(
         }
     }
     Ok(SplitManifestV1 {
+        target_model_sha256: train.identity.target_model_sha256.clone(),
         train_sha256: train.digest,
         calibration_sha256: cal.digest,
         heldout_sha256: test.digest,
@@ -272,6 +300,7 @@ pub fn train(rows: &[ExampleV1], config: ModelConfigV1) -> Result<ModelV1, Rejec
     let mut hasher = Sha256::new();
     hasher.update(b"mace:future-use-model:v1\0");
     field(&mut hasher, split.digest.as_bytes());
+    field(&mut hasher, split.identity.target_model_sha256.as_bytes());
     hasher.update(config.epochs.to_be_bytes());
     hasher.update(config.learning_rate_micros.to_be_bytes());
     hasher.update(config.l2_micros.to_be_bytes());
@@ -279,12 +308,17 @@ pub fn train(rows: &[ExampleV1], config: ModelConfigV1) -> Result<ModelV1, Rejec
     for weight in weights { hasher.update(weight.to_bits().to_be_bytes()); }
     Ok(ModelV1 {
         weights,
+        target_model_sha256: split.identity.target_model_sha256.clone(),
         training: split.identity,
         training_base_rate_bps,
         model_sha256: sha(&hasher.finalize()),
     })
 }
 impl ModelV1 {
+    pub fn target_model_sha256(&self) -> &str {
+        &self.target_model_sha256
+    }
+
     fn logit(&self, features: FeaturesV1) -> Result<f64, Reject> {
         if !features.valid() { return Err(Reject::BadFeature); }
         Ok(dot(&self.weights, &features.vector()))
@@ -292,6 +326,9 @@ impl ModelV1 {
 }
 pub fn calibrate(model: &ModelV1, rows: &[ExampleV1]) -> Result<CalibratorV1, Reject> {
     let split = validate(rows, MIN_CALIBRATION_CLUSTERS)?;
+    if model.target_model_sha256 != split.identity.target_model_sha256 {
+        return Err(Reject::MixedTargetModel);
+    }
     ensure_disjoint(&model.training, &split.identity)?;
     let mut ordered: Vec<_> = rows.iter().collect();
     ordered.sort_by_key(|row| row.event_id);
@@ -314,6 +351,7 @@ pub fn calibrate(model: &ModelV1, rows: &[ExampleV1]) -> Result<CalibratorV1, Re
     let mut hasher = Sha256::new();
     hasher.update(b"mace:future-use-calibrator:v1\0");
     field(&mut hasher, model.model_sha256.as_bytes());
+    field(&mut hasher, model.target_model_sha256.as_bytes());
     field(&mut hasher, split.digest.as_bytes());
     hasher.update(slope.to_bits().to_be_bytes());
     hasher.update(intercept.to_bits().to_be_bytes());
@@ -321,13 +359,23 @@ pub fn calibrate(model: &ModelV1, rows: &[ExampleV1]) -> Result<CalibratorV1, Re
         slope,
         intercept,
         model_sha256: model.model_sha256.clone(),
+        target_model_sha256: model.target_model_sha256.clone(),
         calibration: split.identity,
         calibration_sha256: sha(&hasher.finalize()),
     })
 }
 impl CalibratorV1 {
+    pub fn target_model_sha256(&self) -> &str {
+        &self.target_model_sha256
+    }
+
     pub fn predict_bps(&self, model: &ModelV1, features: FeaturesV1) -> Result<u16, Reject> {
-        if self.model_sha256 != model.model_sha256 { return Err(Reject::ModelMismatch); }
+        if self.model_sha256 != model.model_sha256 {
+            return Err(Reject::ModelMismatch);
+        }
+        if self.target_model_sha256 != model.target_model_sha256 {
+            return Err(Reject::TargetModelMismatch);
+        }
         let probability = sigmoid(self.slope * model.logit(features)? + self.intercept);
         Ok((probability * 10_000.0).round().clamp(0.0, 10_000.0) as u16)
     }
@@ -369,8 +417,16 @@ pub fn evaluate(
     calibrator: &CalibratorV1,
     rows: &[ExampleV1],
 ) -> Result<MetricsV1, Reject> {
-    if calibrator.model_sha256 != model.model_sha256 { return Err(Reject::ModelMismatch); }
+    if calibrator.model_sha256 != model.model_sha256 {
+        return Err(Reject::ModelMismatch);
+    }
+    if calibrator.target_model_sha256 != model.target_model_sha256 {
+        return Err(Reject::TargetModelMismatch);
+    }
     let split = validate(rows, MIN_HELDOUT_CLUSTERS)?;
+    if split.identity.target_model_sha256 != model.target_model_sha256 {
+        return Err(Reject::MixedTargetModel);
+    }
     ensure_disjoint(&model.training, &split.identity)?;
     ensure_disjoint(&calibrator.calibration, &split.identity)?;
     let probabilities: Vec<f64> = rows.iter().map(|row| {
@@ -418,6 +474,7 @@ pub fn evaluate(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RawFutureUsePredictionInputV1 {
     pub event_id: u32,
+    pub target_model_sha256: String,
     pub target_scope: Scope,
     pub predicted_at_ms: i64,
     pub horizon_end_ms: i64,
@@ -437,6 +494,7 @@ pub fn build_raw_prediction(
     input: RawFutureUsePredictionInputV1,
 ) -> Result<FutureUsePredictionV1, Reject> {
     if input.event_id == 0
+        || !is_lower_sha256(&input.target_model_sha256)
         || input.predicted_at_ms < 0
         || input.horizon_end_ms <= input.predicted_at_ms
         || input.rationale_sha256.len() != 64
@@ -446,10 +504,16 @@ pub fn build_raw_prediction(
     {
         return Err(Reject::InvalidPredictionContext);
     }
+    if input.target_model_sha256 != model.target_model_sha256
+        || calibrator.target_model_sha256 != input.target_model_sha256
+    {
+        return Err(Reject::TargetModelMismatch);
+    }
     let probability = calibrator.predict_bps(model, features)?;
     let mut h = Sha256::new();
     h.update(b"mace:learned-salience-pipeline:v1\0");
     field(&mut h, model.model_sha256.as_bytes());
+    field(&mut h, model.target_model_sha256.as_bytes());
     field(&mut h, calibrator.calibration_sha256.as_bytes());
     let pipeline_digest = sha(&h.finalize());
 
@@ -484,6 +548,7 @@ mod tests {
                     cluster_id: cluster + u64::from(c) + 1,
                     task_family_id: family + c % 8,
                     source_root: SourceRootDigest::from_bytes(root),
+                    target_model_sha256: sha(b"unit-test-target-model-v1"),
                     features: FeaturesV1 {
                         recency_bps: 7_000,
                         frequency_bps: 6_000,
@@ -550,6 +615,7 @@ mod tests {
                 horizon_end_ms: 200,
                 expected_value_gain_micros: 500,
                 uncertainty_penalty_micros: 50,
+                target_model_sha256: model.target_model_sha256().to_owned(),
                 rationale_sha256: "a".repeat(64),
                 evidence_sha256: "b".repeat(64),
             },
@@ -587,6 +653,56 @@ mod tests {
             score_a.base_rate_brier_micros,
             score_b.base_rate_brier_micros
         );
+    }
+
+    #[test]
+    fn model_identity_must_match_across_train_calibration_and_heldout() {
+        let training = rows(1, 1, 10);
+        let mut calibration = rows(10_000, 100, 30);
+        let heldout = rows(20_000, 200, 50);
+        calibration[0].target_model_sha256 = sha(b"other-target-model");
+        assert_eq!(
+            qualify_splits(&training, &calibration, &heldout),
+            Err(Reject::MixedTargetModel)
+        );
+    }
+
+    #[test]
+    fn a_training_batch_cannot_mix_target_models() {
+        let mut training = rows(1, 1, 10);
+        training[0].target_model_sha256 = sha(b"other-target-model");
+        assert_eq!(
+            train(&training, ModelConfigV1::default()),
+            Err(Reject::MixedTargetModel)
+        );
+    }
+
+    #[test]
+    fn raw_prediction_is_bound_to_the_model_it_will_be_sent_to() {
+        let training = rows(1, 1, 10);
+        let calibration = rows(10_000, 100, 30);
+        let model = train(&training, ModelConfigV1::default()).unwrap();
+        let calibrator = calibrate(&model, &calibration).unwrap();
+        let result = build_raw_prediction(
+            &model,
+            &calibrator,
+            training[0].features,
+            RawFutureUsePredictionInputV1 {
+                event_id: 78,
+                target_model_sha256: sha(b"another-target-model"),
+                target_scope: Scope {
+                    regime: broca_mace_policy::Regime::Baseline,
+                    objective: broca_mace_policy::Objective::Quality,
+                },
+                predicted_at_ms: 100,
+                horizon_end_ms: 200,
+                expected_value_gain_micros: 500,
+                uncertainty_penalty_micros: 50,
+                rationale_sha256: "c".repeat(64),
+                evidence_sha256: "d".repeat(64),
+            },
+        );
+        assert_eq!(result, Err(Reject::TargetModelMismatch));
     }
 
     #[test]
