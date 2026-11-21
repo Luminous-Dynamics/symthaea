@@ -90,7 +90,7 @@ pub struct FreshnessAtUse {
     pub max_evidence_age_ns: Option<u64>,
     /// Remaining time at consumption before the task deadline.
     /// Zero means consumed exactly at the deadline; None means unknown.
-    pub deadline_slack_at_use_ns: Option<u64>,
+    pub deadline_slack_at_use_ns: Option<i64>,
 }
 
 impl FreshnessAtUse {
@@ -102,7 +102,7 @@ impl FreshnessAtUse {
             self.max_evidence_age_ns,
             self.deadline_slack_at_use_ns,
         ) {
-            (Some(age), Some(max_age), Some(_deadline_slack)) => age <= max_age,
+            (Some(age), Some(max_age), Some(deadline_slack)) => {\n                age <= max_age && deadline_slack >= 0\n            },
             _ => false,
         }
     }
@@ -484,6 +484,16 @@ mod tests {
         ];
         let decision = select_action(Stage::Query, gates, &options).unwrap();
         assert_eq!(decision.action, Action::Abstain);
+    }
+
+    #[test]
+    fn late_decision_is_not_fresh_even_when_evidence_age_is_within_budget() {
+        let freshness = FreshnessAtUse {
+            evidence_age_at_use_ns: Some(50),
+            max_evidence_age_ns: Some(100),
+            deadline_slack_at_use_ns: Some(-1),
+        };
+        assert!(!freshness.is_qualified());
     }
 
     #[test]
