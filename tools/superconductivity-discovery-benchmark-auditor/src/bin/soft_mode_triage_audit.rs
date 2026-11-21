@@ -792,6 +792,10 @@ mod tests {
             value["synthetic_candidates"][1]["phonon_runs"][0]["q_mesh"].clone();
         value["synthetic_candidates"][1]["phonon_runs"][1]["supercell"] =
             value["synthetic_candidates"][1]["phonon_runs"][0]["supercell"].clone();
+        value["synthetic_candidates"][1]["phonon_runs"][1]["electronic_cutoff_ev"] =
+            value["synthetic_candidates"][1]["phonon_runs"][0]["electronic_cutoff_ev"].clone();
+        value["synthetic_candidates"][1]["phonon_runs"][1]["displacement_amplitude_angstrom"] =
+            value["synthetic_candidates"][1]["phonon_runs"][0]["displacement_amplitude_angstrom"].clone();
         let receipt = audit(&value).expect("duplicate settings remain a valid but underconverged record");
         assert_eq!(
             receipt["candidate_dispositions"][1]["disposition"],
