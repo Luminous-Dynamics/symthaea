@@ -69,8 +69,10 @@ pub mod screen_vision;
 pub mod touch_body;
 
 // Decentralized positioning (GPS-independent)
+// The legacy bridge remains in the tree for migration reference but is not
+// exported against the incompatible pre-v2 API.
 #[cfg(feature = "positioning")]
-pub mod positioning_bridge;
+pub mod positioning_v2_adapter;
 
 // Full Broca language center (replaces BrocaLite)
 #[cfg(feature = "broca-full")]
