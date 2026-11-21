@@ -71,6 +71,7 @@ pub enum MmdError {
     InvalidSpatialConcentration,
     InvalidVelocityLengthScale,
     InvalidFeatureCount,
+    InvalidAdaptiveConfig,
     UnsupportedSpatialConcentrationForSampling,
     NonFinitePosition {
         measure: &'static str,
@@ -106,6 +107,7 @@ impl fmt::Display for MmdError {
                 write!(f, "velocity length scale must be finite and positive")
             }
             Self::InvalidFeatureCount => write!(f, "spectral feature count must be positive"),
+            Self::InvalidAdaptiveConfig => write!(f, "adaptive spectral MMD configuration is invalid"),
             Self::UnsupportedSpatialConcentrationForSampling => write!(
                 f,
                 "spatial concentration exceeds the deterministic spectral sampler range"
@@ -574,6 +576,41 @@ fn feature_value(atom: WeightedAtom, feature: SpectralFeature, config: MmdConfig
     (cosine, sine)
 }
 
+fn spectral_squared_signature_difference(
+    candidate_atoms: &[WeightedAtom],
+    reference_atoms: &[WeightedAtom],
+    normalization: f64,
+    feature: SpectralFeature,
+    kernel_config: MmdConfig,
+) -> Result<f64, MmdError> {
+    let mut candidate_real = CompensatedSum::default();
+    let mut candidate_imaginary = CompensatedSum::default();
+    let mut reference_real = CompensatedSum::default();
+    let mut reference_imaginary = CompensatedSum::default();
+
+    for atom in candidate_atoms {
+        let (real, imaginary) = feature_value(*atom, feature, kernel_config);
+        candidate_real.add((atom.weight / normalization) * real);
+        candidate_imaginary.add((atom.weight / normalization) * imaginary);
+    }
+    for atom in reference_atoms {
+        let (real, imaginary) = feature_value(*atom, feature, kernel_config);
+        reference_real.add((atom.weight / normalization) * real);
+        reference_imaginary.add((atom.weight / normalization) * imaginary);
+    }
+
+    let real_difference = candidate_real.total() - reference_real.total();
+    let imaginary_difference = candidate_imaginary.total() - reference_imaginary.total();
+    let squared_difference =
+        real_difference * real_difference + imaginary_difference * imaginary_difference;
+    if !squared_difference.is_finite()
+        || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference)
+    {
+        return Err(MmdError::NonFiniteOutput);
+    }
+    Ok(squared_difference)
+}
+
 /// Compare two phase-space measures using O((N+M)D) spectral features.
 ///
 /// The kernel spectral measure factorizes exactly:
@@ -616,29 +653,13 @@ pub fn compare_phase_space_measures_spectral(
 
     for sample_index in 0..feature_config.feature_count {
         let feature = sample_spectral_feature(kernel_config, &mut rng)?;
-        let mut candidate_real = CompensatedSum::default();
-        let mut candidate_imaginary = CompensatedSum::default();
-        let mut reference_real = CompensatedSum::default();
-        let mut reference_imaginary = CompensatedSum::default();
-
-        for atom in &candidate_atoms {
-            let (real, imaginary) = feature_value(*atom, feature, kernel_config);
-            candidate_real.add((atom.weight / normalization) * real);
-            candidate_imaginary.add((atom.weight / normalization) * imaginary);
-        }
-        for atom in &reference_atoms {
-            let (real, imaginary) = feature_value(*atom, feature, kernel_config);
-            reference_real.add((atom.weight / normalization) * real);
-            reference_imaginary.add((atom.weight / normalization) * imaginary);
-        }
-
-        let real_difference = candidate_real.total() - reference_real.total();
-        let imaginary_difference = candidate_imaginary.total() - reference_imaginary.total();
-        let squared_difference =
-            real_difference * real_difference + imaginary_difference * imaginary_difference;
-        if !squared_difference.is_finite() || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference) {
-            return Err(MmdError::NonFiniteOutput);
-        }
+        let squared_difference = spectral_squared_signature_difference(
+            &candidate_atoms,
+            &reference_atoms,
+            normalization,
+            feature,
+            kernel_config,
+        )?;
 
         // Welford's online variance update avoids storing D samples.
         let count = (sample_index + 1) as f64;
