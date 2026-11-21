@@ -1,0 +1,62 @@
+name: RCAF Research Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/rcaf/**"
+      - ".github/workflows/rcaf-research-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rcaf-research-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-report-and-kernel:
+    name: Report contract and standalone Rust kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/rcaf/requirements-validation.txt
+
+      - name: Install schema validator
+        run: python -m pip install -r research/rcaf/requirements-validation.txt
+
+      - name: Run report-validator unit tests
+        run: python -m unittest discover -s research/rcaf/tools -p 'test_*.py' -v
+
+      - name: Validate synthetic fixture against schema and semantic invariants
+        run: |
+          python research/rcaf/tools/validate_report.py \
+            research/rcaf/fixtures/synthetic-rcaf-report.json \
+            --schema research/rcaf/rcaf-report.schema.json
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Format standalone kernel
+        run: cargo fmt --manifest-path research/rcaf/Cargo.toml -- --check
+
+      - name: Test standalone kernel
+        run: cargo test --manifest-path research/rcaf/Cargo.toml
+
+      - name: Lint standalone kernel
+        run: cargo clippy --manifest-path research/rcaf/Cargo.toml --all-targets -- -D warnings
