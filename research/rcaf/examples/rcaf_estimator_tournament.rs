@@ -4,8 +4,10 @@ use std::fs;
 use std::io::{self, Write};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut config = InjectionRecoveryConfig::default();
-    config.monte_carlo_replicates = 40;
+    let config = InjectionRecoveryConfig {
+        monte_carlo_replicates: 40,
+        ..InjectionRecoveryConfig::default()
+    };
     let tournament = run_estimator_tournament(&config)?;
     let rendered = tournament.to_json_pretty();
 
