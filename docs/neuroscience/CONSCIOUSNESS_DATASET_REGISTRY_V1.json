@@ -163,7 +163,7 @@
         "Integrated Information Theory",
         "Global Neuronal Workspace Theory"
       ],
-      "best_use": "reproduce the preregistered theory-discrimination analysis and test prediction-card/receipt infrastructure",
+      "best_use": "exact reproduction of the published COGITATE Experiment 1 fMRI cross-task stimulus-category decoding on the N=73 replication phase, followed by separate participant-held-out/site-transfer and RCAF measurement-quality extensions",
       "holdout_status": "published_results_are_public; not a new blind holdout",
       "limitations": [
         "acquisition/cohort counts, quality-controlled paper analysis counts and current public release counts are distinct denominators",
@@ -230,7 +230,17 @@
           "status": "not_yet_released_in_v1.3_overview",
           "note": "Raw/BIDS fMRI and M-EEG formats are listed as future releases."
         }
-      }
+      },
+      "replay_protocol": "docs/neuroscience/COGITATE_EXP1_FMRI_REPLAY_PROTOCOL_V0.md",
+      "primary_reproduction_phase": {
+        "modality": "fMRI",
+        "participants": 73,
+        "phase": "replication",
+        "optimization_participants": 35,
+        "endpoint": "cross-task stimulus-category decoding across task-relevant and task-irrelevant conditions",
+        "status": "protocol_authored; data_not_downloaded"
+      },
+      "construct_warning": "task-irrelevant is not an unconscious label; stimulus decoding is not a universal consciousness detector"
     },
     {
       "id": "sleep-edf-hypnos",
