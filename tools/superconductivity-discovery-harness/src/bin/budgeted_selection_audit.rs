@@ -423,12 +423,13 @@ fn calibration_metrics(candidates: &[EvaluationCandidate]) -> Result<Value, Stri
         bin_frequency[bin] += outcome;
     }
     let mut expected_calibration_error = 0.0;
-    for index in 0..5 {
-        if bin_counts[index] > 0 {
-            let count = bin_counts[index] as f64;
+    for (index, bin_count) in bin_counts.iter().enumerate() {
+        if *bin_count > 0 {
+            let count = *bin_count as f64;
             let confidence = bin_confidence[index] / count;
             let frequency = bin_frequency[index] / count;
-            expected_calibration_error += count / scored.len() as f64 * (confidence - frequency).abs();
+            expected_calibration_error +=
+                count / scored.len() as f64 * (confidence - frequency).abs();
         }
     }
     Ok(json!({
