@@ -1,0 +1,350 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Deterministic CPU tessellation from canonical 3D Mycelial Presence curves.
+//!
+//! This module deliberately has no Bevy, wgpu, or GPU dependency. It produces
+//! indexed triangle geometry that any renderer can upload or transform.
+
+use std::error::Error;
+use std::fmt;
+
+use crate::mycelial_model::{MycelialFilament, MycelialModel, SpatialPoint3};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TubeTessellationConfig {
+    /// Number of Bézier intervals along each filament.
+    pub axial_segments: u8,
+    /// Number of vertices around each cross-section.
+    pub radial_segments: u8,
+}
+
+impl Default for TubeTessellationConfig {
+    fn default() -> Self {
+        Self {
+            axial_segments: 12,
+            radial_segments: 6,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TubeTessellationError {
+    AxialResolutionOutOfRange(u8),
+    RadialResolutionOutOfRange(u8),
+    VertexCountOverflow,
+}
+
+impl fmt::Display for TubeTessellationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AxialResolutionOutOfRange(value) => {
+                write!(f, "axial segments must be in 2..=128, got {value}")
+            }
+            Self::RadialResolutionOutOfRange(value) => {
+                write!(f, "radial segments must be in 3..=32, got {value}")
+            }
+            Self::VertexCountOverflow => write!(f, "tube mesh exceeds u32 vertex indexing"),
+        }
+    }
+}
+
+impl Error for TubeTessellationError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilamentMeshRange {
+    pub filament_id: u32,
+    pub parent_id: Option<u32>,
+    pub generation: u8,
+    pub terminal: bool,
+    pub first_vertex: u32,
+    pub vertex_count: u32,
+    pub first_index: u32,
+    pub index_count: u32,
+}
+
+/// Combined indexed triangle mesh. Each filament has a range so renderers can
+/// select, recolor, cull, or animate individual semantic branches.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MycelialTubeMesh {
+    pub positions: Vec<[f32; 3]>,
+    pub normals: Vec<[f32; 3]>,
+    pub indices: Vec<u32>,
+    pub filaments: Vec<FilamentMeshRange>,
+}
+
+impl MycelialTubeMesh {
+    pub fn vertex_count(&self) -> usize {
+        self.positions.len()
+    }
+
+    pub fn triangle_count(&self) -> usize {
+        self.indices.len() / 3
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.positions.is_empty()
+    }
+
+    /// Basic structural validation suitable before a renderer uploads buffers.
+    pub fn validate(&self) -> bool {
+        self.positions.len() == self.normals.len()
+            && self.indices.len() % 3 == 0
+            && self.positions.iter().all(|point| point.iter().all(|v| v.is_finite()))
+            && self.normals.iter().all(|normal| normal.iter().all(|v| v.is_finite()))
+            && self.indices.iter().all(|index| (*index as usize) < self.positions.len())
+            && self.filaments.iter().all(|range| {
+                (range.first_vertex as usize + range.vertex_count as usize) <= self.positions.len()
+                    && (range.first_index as usize + range.index_count as usize) <= self.indices.len()
+            })
+    }
+}
+
+/// Turn every cubic filament into a tapered tube using parallel-transport
+/// frames. This avoids the sudden twists common with independently rebuilt
+/// Frenet frames at low-curvature points.
+pub fn tessellate_mycelial_model(
+    model: &MycelialModel,
+    config: TubeTessellationConfig,
+) -> Result<MycelialTubeMesh, TubeTessellationError> {
+    validate_config(config)?;
+
+    let mut mesh = MycelialTubeMesh {
+        positions: Vec::new(),
+        normals: Vec::new(),
+        indices: Vec::new(),
+        filaments: Vec::with_capacity(model.filaments.len()),
+    };
+
+    for filament in &model.filaments {
+        tessellate_filament(filament, config, &mut mesh)?;
+    }
+
+    debug_assert!(mesh.validate());
+    Ok(mesh)
+}
+
+fn validate_config(config: TubeTessellationConfig) -> Result<(), TubeTessellationError> {
+    if !(2..=128).contains(&config.axial_segments) {
+        return Err(TubeTessellationError::AxialResolutionOutOfRange(
+            config.axial_segments,
+        ));
+    }
+    if !(3..=32).contains(&config.radial_segments) {
+        return Err(TubeTessellationError::RadialResolutionOutOfRange(
+            config.radial_segments,
+        ));
+    }
+    Ok(())
+}
+
+fn tessellate_filament(
+    filament: &MycelialFilament,
+    config: TubeTessellationConfig,
+    mesh: &mut MycelialTubeMesh,
+) -> Result<(), TubeTessellationError> {
+    let axial = config.axial_segments as usize;
+    let radial = config.radial_segments as usize;
+    let filament_vertex_count = (axial + 1) * radial;
+    let filament_index_count = axial * radial * 6;
+
+    let first_vertex = u32::try_from(mesh.positions.len())
+        .map_err(|_| TubeTessellationError::VertexCountOverflow)?;
+    let first_index = u32::try_from(mesh.indices.len())
+        .map_err(|_| TubeTessellationError::VertexCountOverflow)?;
+    let final_vertex_count = mesh
+        .positions
+        .len()
+        .checked_add(filament_vertex_count)
+        .and_then(|count| u32::try_from(count).ok())
+        .ok_or(TubeTessellationError::VertexCountOverflow)?;
+    let final_index_count = mesh
+        .indices
+        .len()
+        .checked_add(filament_index_count)
+        .and_then(|count| u32::try_from(count).ok())
+        .ok_or(TubeTessellationError::VertexCountOverflow)?;
+
+    let mut previous_normal: Option<SpatialPoint3> = None;
+    for axial_index in 0..=axial {
+        let t = axial_index as f32 / axial as f32;
+        let center = cubic_bezier(
+            filament.start,
+            filament.control_a,
+            filament.control_b,
+            filament.end,
+            t,
+        );
+        let tangent = cubic_bezier_tangent(
+            filament.start,
+            filament.control_a,
+            filament.control_b,
+            filament.end,
+            t,
+        )
+        .normalized();
+
+        let normal = transport_normal(tangent, previous_normal);
+        let binormal = tangent.cross(normal).normalized();
+        previous_normal = Some(normal);
+
+        let radius = filament.radius_start
+            + (filament.radius_end - filament.radius_start) * t;
+        for radial_index in 0..radial {
+            let angle = radial_index as f32 * std::f32::consts::TAU / radial as f32;
+            let radial_normal = normal
+                .scale(angle.cos())
+                .add(binormal.scale(angle.sin()))
+                .normalized();
+            let position = center.add(radial_normal.scale(radius));
+            mesh.positions.push([position.x, position.y, position.z]);
+            mesh.normals.push([radial_normal.x, radial_normal.y, radial_normal.z]);
+        }
+    }
+
+    for axial_index in 0..axial {
+        for radial_index in 0..radial {
+            let next_radial = (radial_index + 1) % radial;
+            let a = first_vertex + (axial_index * radial + radial_index) as u32;
+            let b = first_vertex + (axial_index * radial + next_radial) as u32;
+            let c = first_vertex + ((axial_index + 1) * radial + radial_index) as u32;
+            let d = first_vertex + ((axial_index + 1) * radial + next_radial) as u32;
+            // Winding is outward-facing for the chosen tangent/normal basis.
+            mesh.indices.extend_from_slice(&[a, c, b, b, c, d]);
+        }
+    }
+
+    mesh.filaments.push(FilamentMeshRange {
+        filament_id: filament.id,
+        parent_id: filament.parent_id,
+        generation: filament.generation,
+        terminal: filament.terminal,
+        first_vertex,
+        vertex_count: u32::try_from(filament_vertex_count)
+            .map_err(|_| TubeTessellationError::VertexCountOverflow)?,
+        first_index,
+        index_count: u32::try_from(filament_index_count)
+            .map_err(|_| TubeTessellationError::VertexCountOverflow)?,
+    });
+
+    debug_assert_eq!(mesh.positions.len(), final_vertex_count as usize);
+    debug_assert_eq!(mesh.indices.len(), final_index_count as usize);
+    Ok(())
+}
+
+fn cubic_bezier(
+    p0: SpatialPoint3,
+    p1: SpatialPoint3,
+    p2: SpatialPoint3,
+    p3: SpatialPoint3,
+    t: f32,
+) -> SpatialPoint3 {
+    let u = 1.0 - t;
+    p0.scale(u * u * u)
+        .add(p1.scale(3.0 * u * u * t))
+        .add(p2.scale(3.0 * u * t * t))
+        .add(p3.scale(t * t * t))
+}
+
+fn cubic_bezier_tangent(
+    p0: SpatialPoint3,
+    p1: SpatialPoint3,
+    p2: SpatialPoint3,
+    p3: SpatialPoint3,
+    t: f32,
+) -> SpatialPoint3 {
+    let u = 1.0 - t;
+    p1.sub(p0)
+        .scale(3.0 * u * u)
+        .add(p2.sub(p1).scale(6.0 * u * t))
+        .add(p3.sub(p2).scale(3.0 * t * t))
+}
+
+fn transport_normal(
+    tangent: SpatialPoint3,
+    previous_normal: Option<SpatialPoint3>,
+) -> SpatialPoint3 {
+    if let Some(previous) = previous_normal {
+        let projected = previous.sub(tangent.scale(previous.dot(tangent)));
+        if projected.length() > 1.0e-5 {
+            return projected.normalized();
+        }
+    }
+
+    let reference = if tangent.z.abs() > 0.82 {
+        SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 }
+    } else {
+        SpatialPoint3 { x: 0.0, y: 0.0, z: 1.0 }
+    };
+    tangent.cross(reference).normalized()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mycelial_model::{build_mycelial_model, PresenceMode};
+    use crate::embodiment::EmbodimentSnapshot;
+
+    #[test]
+    fn tessellation_has_predictable_topology_and_valid_indices() {
+        let model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        let config = TubeTessellationConfig {
+            axial_segments: 8,
+            radial_segments: 5,
+        };
+        let mesh = tessellate_mycelial_model(&model, config).expect("valid tessellation");
+        let per_filament_vertices = 9 * 5;
+        let per_filament_indices = 8 * 5 * 6;
+        assert_eq!(mesh.filaments.len(), model.filaments.len());
+        assert_eq!(mesh.vertex_count(), model.filaments.len() * per_filament_vertices);
+        assert_eq!(mesh.indices.len(), model.filaments.len() * per_filament_indices);
+        assert_eq!(mesh.triangle_count(), mesh.indices.len() / 3);
+        assert!(mesh.validate());
+    }
+
+    #[test]
+    fn tessellation_is_deterministic_and_normals_are_unit_length() {
+        let model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Conversational,
+        );
+        let config = TubeTessellationConfig::default();
+        let first = tessellate_mycelial_model(&model, config).expect("valid mesh");
+        let second = tessellate_mycelial_model(&model, config).expect("valid mesh");
+        assert_eq!(first, second);
+        assert!(first.normals.iter().all(|normal| {
+            let length = (normal[0] * normal[0]
+                + normal[1] * normal[1]
+                + normal[2] * normal[2])
+                .sqrt();
+            (length - 1.0).abs() < 1.0e-3
+        }));
+    }
+
+    #[test]
+    fn tessellation_rejects_unbounded_resolution_requests() {
+        let model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        assert_eq!(
+            tessellate_mycelial_model(
+                &model,
+                TubeTessellationConfig { axial_segments: 1, radial_segments: 6 },
+            )
+            .unwrap_err(),
+            TubeTessellationError::AxialResolutionOutOfRange(1)
+        );
+        assert_eq!(
+            tessellate_mycelial_model(
+                &model,
+                TubeTessellationConfig { axial_segments: 12, radial_segments: 33 },
+            )
+            .unwrap_err(),
+            TubeTessellationError::RadialResolutionOutOfRange(33)
+        );
+    }
+}
