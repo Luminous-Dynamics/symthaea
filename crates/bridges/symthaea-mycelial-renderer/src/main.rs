@@ -9,7 +9,11 @@
 //! --mode accepts ambient, cognitive, or conversational.
 //! Pass --reduced-motion to disable all renderer-local motion.
 
-use bevy::prelude::*;
+use bevy::{
+    core_pipeline::tonemapping::Tonemapping,
+    post_process::bloom::Bloom,
+    prelude::*,
+};
 use std::f32::consts::TAU;
 use symthaea_canvas::{
     EmbodimentSnapshot, MycelialFilament, MycelialTubeMesh, OrbitalCell, PresenceMode,
@@ -88,6 +92,8 @@ fn setup_presence(
 ) {
     commands.spawn((
         Camera3d::default(),
+        Tonemapping::TonyMcMapface,
+        Bloom::NATURAL,
         Transform::from_xyz(6.4, 4.4, 8.6).looking_at(Vec3::ZERO, Vec3::Y),
     ));
     commands.spawn((
@@ -251,7 +257,8 @@ fn spawn_orbital_cells(
         let mut entity = commands.spawn((
             Mesh3d(cell_mesh.clone()),
             MeshMaterial3d(cell_material.clone()),
-            Transform::from_translation(translation),
+            Transform::from_translation(translation)
+                .with_scale(Vec3::splat(cell.radius * 0.035 / 0.085)),
         ));
         if !reduced_motion {
             let angle = index as f32 * TAU / cells.len().max(1) as f32;
