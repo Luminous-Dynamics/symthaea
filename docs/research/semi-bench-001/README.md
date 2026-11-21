@@ -539,3 +539,18 @@ New preprint review and follow-up: [SEMI-ZS-LLM-001 #13146](https://github.com/L
 ## Closed-loop fab decision-support benchmark
 
 The November 2026 human-supervised autonomous decision-support review motivates benchmarking planning, scheduling, dispatch, process-control feedback and metrology as one coupled system. New follow-up [SEMI-FAB-DECISION-001 #13147](https://github.com/Luminous-Dynamics/symthaea/issues/13147) reuses existing process/equipment/subfab/metrology and Symtropy replay owners. It compares fab-native heuristics, constrained optimization, simulation, quality-aware dispatch, inspection value-of-information and bounded LLM assistance. Its staged evidence progression is synthetic DES -> historical replay -> offline counterfactual -> shadow mode -> human-approved pilot -> preregistered outcome study. No process authority or physical yield claim is implied.
+
+
+## Latest Rust-native integrity gate
+
+Hosted GitHub Actions run [#44934333447](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447) passed on commit `4a7f7029fa8694914f0c85650053d879e399b402`:
+
+- Rust format check: pass.
+- Clippy with warnings denied: pass.
+- Rust unit tests: **18 passed, 0 failed**.
+- Rust binary metrics CLI report: byte-for-byte match with the frozen independent Python reference.
+- The Rust split validator verified the synthetic group-disjoint known answer and the actual 1,567-row source-local SECOM chronological manifest, including 940/313/314 row counts and 76/11/17 failure support.
+- The Rust contrastive-pair validator passed known-answer, cross-split, duplicate-edge, same-lot, time-embargo and clock-domain tests.
+- The Python/reference job in the same run passed 46/46 tests and reproduced its three frozen reports.
+
+These checks ran in a minimal temporary Cargo workspace because the repository root workspace currently references a missing `crates/core/symthaea/Cargo.toml`. The isolated workspace avoided changing unrelated root workspace state. This verifies contract and leakage logic, not a trained model's predictive performance or physical fab outcome.
