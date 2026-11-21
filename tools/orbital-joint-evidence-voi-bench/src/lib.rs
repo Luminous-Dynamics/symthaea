@@ -119,6 +119,10 @@ pub struct ScenarioAudit {
     pub scenario_id: String,
     pub decision_regime: String,
     pub baseline_regret_or_loss: f64,
+    pub selected_action_id: Option<String>,
+    pub selected_action_value: Option<f64>,
+    pub selection_disposition: String,
+    pub selection_matches_oracle: bool,
     pub expected_action_id: String,
     pub expected_action_eligible: bool,
     pub expected_action_value: Option<f64>,
@@ -178,6 +182,77 @@ fn fits_budget(cost: &Resources, budget: &Resources) -> bool {
         && cost.specimen_count <= budget.specimen_count
         && cost.review_hours <= budget.review_hours + EPSILON
         && cost.external_cost_units <= budget.external_cost_units + EPSILON
+}
+
+fn dominates_resource_plan(left: &Resources, right: &Resources) -> bool {
+    let no_more = left.engineering_hours <= right.engineering_hours + EPSILON
+        && left.compute_core_hours <= right.compute_core_hours + EPSILON
+        && left.facility_hours <= right.facility_hours + EPSILON
+        && left.specimen_count <= right.specimen_count
+        && left.review_hours <= right.review_hours + EPSILON
+        && left.external_cost_units <= right.external_cost_units + EPSILON;
+    let strictly_less = left.engineering_hours < right.engineering_hours - EPSILON
+        || left.compute_core_hours < right.compute_core_hours - EPSILON
+        || left.facility_hours < right.facility_hours - EPSILON
+        || left.specimen_count < right.specimen_count
+        || left.review_hours < right.review_hours - EPSILON
+        || left.external_cost_units < right.external_cost_units - EPSILON;
+    no_more && strictly_less
+}
+
+fn select_best_action(
+    audits: &[ActionAudit],
+) -> (Option<String>, Option<f64>, &'static str) {
+    let candidates: Vec<&ActionAudit> = audits
+        .iter()
+        .filter(|audit| {
+            audit.policy_eligible
+                && audit
+                    .decision_value_improvement
+                    .is_some_and(|value| value > EPSILON)
+        })
+        .collect();
+    let Some(best_value) = candidates
+        .iter()
+        .filter_map(|audit| audit.decision_value_improvement)
+        .reduce(f64::max)
+    else {
+        return (None, None, "ABSTAIN_NO_DECISION_VALUE");
+    };
+    let top_value: Vec<&ActionAudit> = candidates
+        .into_iter()
+        .filter(|audit| {
+            audit
+                .decision_value_improvement
+                .is_some_and(|value| (value - best_value).abs() <= EPSILON)
+        })
+        .collect();
+    let pareto_front: Vec<&ActionAudit> = top_value
+        .iter()
+        .copied()
+        .filter(|candidate| {
+            !top_value.iter().any(|other| {
+                other.action_id != candidate.action_id
+                    && dominates_resource_plan(
+                        &other.planned_resources,
+                        &candidate.planned_resources,
+                    )
+            })
+        })
+        .collect();
+    if pareto_front.len() == 1 {
+        let selected = pareto_front[0];
+        return (
+            Some(selected.action_id.clone()),
+            selected.decision_value_improvement,
+            "SELECTED_MAX_VALUE_UNIQUE_PARETO_PLAN",
+        );
+    }
+    (
+        None,
+        Some(best_value),
+        "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE",
+    )
 }
 
 fn actual_resources(action: &Action) -> Result<Option<Resources>, String> {
@@ -812,6 +887,8 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     }
 
     audits.sort_by(|left, right| left.action_id.cmp(&right.action_id));
+    let (selected_action_id, selected_action_value, selection_disposition) =
+        select_best_action(&audits);
     let expected_action_id = scenario.expected.best_action_id.clone();
     let expected_action_eligible = eligible_by_id
         .get(&expected_action_id)
@@ -854,6 +931,11 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
 
     let expected_action_is_sentinel = matches!(expected_action_id.as_str(), "ABSTAIN")
         || expected_action_id.starts_with("REPLAN-");
+    let selection_matches_oracle = if scenario.expected.abstain {
+        selected_action_id.is_none()
+    } else {
+        selected_action_id.as_deref() == Some(expected_action_id.as_str())
+    };
     if !expected_action_is_sentinel && !expected_action_eligible {
         return Err(format!(
             "{} expected action is not eligible",
@@ -916,15 +998,21 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
 
     let action_count = audits.len();
     let eligible_action_count = audits.iter().filter(|audit| audit.policy_eligible).count();
-    let oracle_matched = if scenario.expected.abstain {
-        abstain_correct
-    } else {
-        expected_action_eligible && expected_action_value.is_some_and(|value| value > EPSILON)
-    };
+    let oracle_matched = selection_matches_oracle
+        && if scenario.expected.abstain {
+            abstain_correct
+        } else {
+            expected_action_eligible
+                && expected_action_value.is_some_and(|value| value > EPSILON)
+        };
     Ok(ScenarioAudit {
         scenario_id: scenario.scenario_id.clone(),
         decision_regime: scenario.decision_regime.clone(),
         baseline_regret_or_loss: baseline,
+        selected_action_id,
+        selected_action_value,
+        selection_disposition: selection_disposition.to_owned(),
+        selection_matches_oracle,
         expected_action_id,
         expected_action_eligible,
         expected_action_value,
@@ -1173,6 +1261,151 @@ mod tests {
         action.remove("observed_execution_state");
         let changed = serde_json::to_vec(&value).unwrap();
         assert!(run_audit(&changed, SOURCE).is_err());
+    }
+
+    #[test]
+    fn one_step_selector_picks_decision_value_not_prediction_variance() {
+        let receipt = run_audit(FIXTURE, SOURCE).unwrap();
+        let first = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-001")
+            .unwrap();
+        assert_eq!(
+            first.selected_action_id.as_deref(),
+            Some("A-COUPON-INTERACTION")
+        );
+        assert_eq!(
+            first.selection_disposition,
+            "SELECTED_MAX_VALUE_UNIQUE_PARETO_PLAN"
+        );
+        assert!(first.selection_matches_oracle);
+
+        let campaign = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-009")
+            .unwrap();
+        assert_eq!(
+            campaign.selected_action_id.as_deref(),
+            Some("A-CRITICAL-INTERACTION-COVERAGE")
+        );
+    }
+
+    #[test]
+    fn one_step_selector_abstains_when_every_admissible_action_has_zero_value() {
+        let receipt = run_audit(FIXTURE, SOURCE).unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-003")
+            .unwrap();
+        assert_eq!(case.selected_action_id, None);
+        assert_eq!(case.selection_disposition, "ABSTAIN_NO_DECISION_VALUE");
+        assert!(case.selection_matches_oracle);
+    }
+
+    #[test]
+    fn unique_pareto_dominating_action_breaks_equal_value_tie_without_cost_scalarization() {
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        let scenario = value["scenarios"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["scenario_id"] == "JEV-001")
+            .unwrap();
+        let mut cheaper = scenario["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["action_id"] == "A-COUPON-INTERACTION")
+            .unwrap()
+            .clone();
+        cheaper["action_id"] = Value::String("A-CHEAPER-COUPON".to_owned());
+        cheaper["resources"]["engineering_hours"] = Value::from(0.5);
+        cheaper["resources"]["facility_hours"] = Value::from(0.5);
+        scenario["actions"].as_array_mut().unwrap().push(cheaper);
+        scenario["expected"]["best_action_id"] = Value::String("A-CHEAPER-COUPON".to_owned());
+        let changed = serde_json::to_vec(&value).unwrap();
+        let receipt = run_audit(&changed, SOURCE).unwrap();
+        let first = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-001")
+            .unwrap();
+        assert_eq!(
+            first.selected_action_id.as_deref(),
+            Some("A-CHEAPER-COUPON")
+        );
+        assert!(first.selection_matches_oracle);
+    }
+
+    #[test]
+    fn incomparable_equal_value_resource_plans_require_human_review() {
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        let scenario = value["scenarios"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["scenario_id"] == "JEV-001")
+            .unwrap();
+        let original = scenario["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["action_id"] == "A-COUPON-INTERACTION")
+            .unwrap()
+            .clone();
+        let mut lower_engineering = original.clone();
+        lower_engineering["action_id"] = Value::String("A-LOW-ENG-HIGH-FACILITY".to_owned());
+        lower_engineering["resources"]["engineering_hours"] = Value::from(0.5);
+        lower_engineering["resources"]["facility_hours"] = Value::from(1.5);
+        let mut lower_facility = original;
+        lower_facility["action_id"] = Value::String("A-HIGH-ENG-LOW-FACILITY".to_owned());
+        lower_facility["resources"]["engineering_hours"] = Value::from(1.5);
+        lower_facility["resources"]["facility_hours"] = Value::from(0.5);
+        let actions = scenario["actions"].as_array_mut().unwrap();
+        actions.push(lower_engineering);
+        actions.push(lower_facility);
+        let changed = serde_json::to_vec(&value).unwrap();
+        let receipt = run_audit(&changed, SOURCE).unwrap();
+        let first = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-001")
+            .unwrap();
+        assert_eq!(first.selected_action_id, None);
+        assert_eq!(
+            first.selection_disposition,
+            "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE"
+        );
+        assert!(!first.selection_matches_oracle);
+    }
+
+    #[test]
+    fn action_order_does_not_change_selected_action() {
+        let original = run_audit(FIXTURE, SOURCE).unwrap();
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        let scenario = value["scenarios"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["scenario_id"] == "JEV-001")
+            .unwrap();
+        scenario["actions"].as_array_mut().unwrap().reverse();
+        let reversed = serde_json::to_vec(&value).unwrap();
+        let second = run_audit(&reversed, SOURCE).unwrap();
+        let first_choice = original
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-001")
+            .unwrap();
+        let second_choice = second
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-001")
+            .unwrap();
+        assert_eq!(first_choice.selected_action_id, second_choice.selected_action_id);
     }
 
     #[test]
