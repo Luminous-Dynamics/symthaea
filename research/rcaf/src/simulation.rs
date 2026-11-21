@@ -55,11 +55,11 @@ pub fn correlation_similarity(
             let mut edge_count = 0usize;
             for (row_index, row) in left.iter().enumerate() {
                 for (&left_value, &right_value) in
-                row.iter().zip(right[row_index].iter()).skip(row_index + 1)
-            {
-                absolute_error += (left_value - right_value).abs();
-                edge_count += 1;
-            }
+                    row.iter().zip(right[row_index].iter()).skip(row_index + 1)
+                {
+                    absolute_error += (left_value - right_value).abs();
+                    edge_count += 1;
+                }
             }
             if edge_count == 0 {
                 return Err(MetricError::TooFewRegions);
