@@ -528,10 +528,7 @@ mod tests {
     fn rejects_wrong_matrix_shape() {
         let mut value = fixture();
         value["stations"][0]["local_to_global_rotation_matrix"] = json!([[1, 0], [0, 1]]);
-        assert_schema_rejects(
-            &value,
-            "/stations/0/local_to_global_rotation_matrix",
-        );
+        assert_schema_rejects(&value, "/stations/0/local_to_global_rotation_matrix");
     }
 
     #[test]
@@ -550,20 +547,14 @@ mod tests {
     fn rejects_negative_frame_uncertainty() {
         let mut value = fixture();
         value["stations"][0]["transform_uncertainty_rad"] = json!(-0.1);
-        assert_schema_rejects(
-            &value,
-            "/stations/0/transform_uncertainty_rad",
-        );
+        assert_schema_rejects(&value, "/stations/0/transform_uncertainty_rad");
     }
 
     #[test]
     fn rejects_malformed_source_digest() {
         let mut value = fixture();
         value["stations"][0]["source_artifact_sha256"] = json!("ABC");
-        assert_schema_rejects(
-            &value,
-            "/stations/0/source_artifact_sha256",
-        );
+        assert_schema_rejects(&value, "/stations/0/source_artifact_sha256");
     }
 
     #[test]
