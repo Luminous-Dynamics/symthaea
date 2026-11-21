@@ -62,6 +62,6 @@ jobs:
           python3 tools/orbital-joint-evidence-voi-bench/tests/reference_oracle.py \
             fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
             "$GITHUB_SHA" > /tmp/evidence-voi-oracle.json
-          jq -e '.scenario_count == 14 and .oracle_matches == 14 and .oracle_mismatches == 0 and (.scenarios | all(.selection_matches_oracle == true)) and ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1) and
+          jq -e '.scenario_count == 15 and .oracle_matches == 15 and .oracle_mismatches == 0 and (.scenarios | all(.selection_matches_oracle == true)) and ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1) and
             ([.scenarios[] | select(.scenario_id == "JEV-015" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1)' \
             /tmp/evidence-voi-oracle.json
