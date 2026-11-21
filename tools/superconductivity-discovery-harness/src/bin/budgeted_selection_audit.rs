@@ -348,8 +348,7 @@ fn select_oracle(candidates: &[EvaluationCandidate], budget: usize) -> Selection
     let mut best_cost = 0usize;
     for (cost, state) in states.into_iter().enumerate() {
         if let Some(indices) = state
-            && (indices.len() > best.len()
-                || (indices.len() == best.len() && cost < best_cost))
+            && (indices.len() > best.len() || (indices.len() == best.len() && cost < best_cost))
         {
             best = indices;
             best_cost = cost;
