@@ -472,3 +472,10 @@ Positive support is 76 failures in train, 11 in validation and 17 in test. This 
 The current hosted reference workflow passed **35/35 tests** in [GitHub Actions run #44899113316](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316), on executable-content commit `b98ca276e416f22113e6ad3065c14380294c6b3c`. The run includes the source-local chronological SECOM manifest test and byte-for-byte reproduction of the binary-metric and inspection-decision reports. No local test execution is claimed.
 
 The actual row-level chronology manifest is frozen at [the SECOM split file](splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json). It contains 1,567 source-row identities with 76/11/17 failures in train/validation/test. It is not a trained-model result and supports only source-local chronological ordering; no timezone, lot, tool or site identity is inferred.
+
+
+## Missingness drift follow-up
+
+The SECOM source audit now includes missing-value profiles by chronological split and month. The sensor-cell missingness rate is 5.14% in train, 3.42% in validation and 3.84% in test; it declines from 5.33% in August to 3.77% in October. All rows have at least one missing sensor value, 28 features are over 50% missing, and 52 features have no missing values. This warrants explicit missingness-only and indicator ablations; it is not a process-cause interpretation.
+
+New workstream: [SEMI-SECOM-MISS-001 #13115](https://github.com/Luminous-Dynamics/symthaea/issues/13115), covering missingness-only shortcuts, MAR/MNAR shifts, train/test observation-regime changes and abstention.
