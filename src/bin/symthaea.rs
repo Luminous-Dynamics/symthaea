@@ -426,6 +426,15 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
         .collect()
 }
 
+const EMPTY_TRANSCRIPT_ERROR: &str = concat!(
+    "No speech transcript available; microphone capture or lexical ASR ",
+    "is not configured, or no speech was detected"
+);
+
+fn transcript_has_content(text: &str) -> bool {
+    !text.trim().is_empty()
+}
+
 fn request_name(request: &Request) -> &'static str {
     match request {
         Request::Query { .. } => "query",
@@ -615,7 +624,12 @@ enum Response {
     /// Speech transcribed (STT complete)
     #[cfg(feature = "voice-tts")]
     #[serde(rename = "transcribed")]
-    Transcribed { text: String, confidence: f32 },
+    Transcribed {
+        text: String,
+        /// Omitted when the active STT path does not provide a calibrated confidence.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        confidence: Option<f32>,
+    },
 
     /// Voice conversation turn complete
     #[cfg(feature = "voice-tts")]
@@ -1410,9 +1424,14 @@ impl ServiceState {
                     let mut voice = self.voice.lock().await;
                     if let Some(ref mut voice) = *voice {
                         match voice.listen() {
-                            Ok(text) => Response::Transcribed {
+                            Ok(text) if transcript_has_content(&text) => Response::Transcribed {
                                 text,
-                                confidence: 0.9,
+                                // VoiceConversation::listen currently exposes no measured ASR
+                                // confidence. Do not invent one for a successful-looking response.
+                                confidence: None,
+                            },
+                            Ok(_) => Response::Error {
+                                message: EMPTY_TRANSCRIPT_ERROR.into(),
                             },
                             Err(e) => Response::Error {
                                 message: format!("STT error: {}", e),
@@ -1453,6 +1472,12 @@ impl ServiceState {
                             };
                         }
                     };
+
+                    if !transcript_has_content(&user_said) {
+                        return Response::Error {
+                            message: EMPTY_TRANSCRIPT_ERROR.into(),
+                        };
+                    }
 
                     let start = Instant::now();
                     let (assistant_said, phi) = {
@@ -2690,6 +2715,26 @@ mod protocol_tests {
 
     fn response_json(response: &Response) -> serde_json::Value {
         serde_json::to_value(response).expect("response JSON")
+    }
+
+    #[test]
+    fn transcript_content_guard_rejects_empty_and_whitespace() {
+        assert!(!transcript_has_content(""));
+        assert!(!transcript_has_content("  \n\t  "));
+        assert!(transcript_has_content("hello"));
+        assert!(transcript_has_content("  hello  "));
+    }
+
+    #[cfg(feature = "voice-tts")]
+    #[test]
+    fn transcribed_response_omits_unmeasured_confidence() {
+        let response = Response::Transcribed {
+            text: "hello".into(),
+            confidence: None,
+        };
+        let value = response_json(&response);
+        assert_eq!(value["text"], "hello");
+        assert!(value.get("confidence").is_none());
     }
 
     #[tokio::test]
