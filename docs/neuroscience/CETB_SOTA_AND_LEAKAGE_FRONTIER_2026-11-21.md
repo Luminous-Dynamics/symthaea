@@ -113,6 +113,20 @@ RCAF now compares three estimator semantics on identical simulated matrices: abs
 The matched-input tournament runs null false-positive and injected-change sensitivity for each estimator, preserving a common seed. CETB should extend this tournament to Pearson, Spearman, shrinkage covariance/precision and modality-appropriate pyspi estimators once the data representation and estimand are matched. Do not select a universal winner from synthetic performance alone.
 
 
+### Direct pipeline benchmark baselines
+
+CETB should explicitly benchmark against the *end-to-end pipeline* literature, not only estimator libraries.
+
+- The 2024 systematic connectomics study compared **768** network-construction pipelines across **13,824** pipeline/criterion/data evaluations. It assessed repeatability, motion sensitivity, subject discrimination and sensitivity to experimental effects across multiple datasets and timescales. Many pipelines failed at least one criterion, and some could report a reproducible effect in the wrong direction. This is a particularly close methodological precedent for CETB's multidimensional qualification envelope. DOI: [10.1038/s41467-024-48781-5](https://doi.org/10.1038/s41467-024-48781-5).
+- A 2026 two-site resting-state study compared **256** FC pipelines for eyes-open/eyes-closed classification and reported approximately 90% accuracy for top configurations under cross-site evaluation. This is a useful pipeline-robustness benchmark, but eye-state classification is a different endpoint from propofol-state repeatability or consciousness inference. DOI: [10.1186/s40708-026-00305-1](https://doi.org/10.1186/s40708-026-00305-1).
+- The pyspi-based 239-statistic study benchmarked 239 interaction statistics across several FC properties on HCP participants; it establishes that estimator performance depends on the scientific criterion rather than supplying a single universal winner. DOI: [10.1038/s41592-025-02704-4](https://doi.org/10.1038/s41592-025-02704-4).
+
+CETB's opportunity is to turn these precedents into an explicit assurance layer that reports calibration, repeatability, direction-of-effect, artifact-only rejection, selection integrity and external transportability as separate dimensions. We must not compare a two-site eye-state AUC directly with an RCAF repeatability result or describe either as a consciousness score.
+
+### PFM-NSI input compatibility
+
+The public PFM-NSI README describes a default CIFTI `.dtseries.nii` fsLR-32k input and an optional fsaverage6 input path that uses Connectome Workbench for resampling. The ds003171 v2.0.1 BIDS release tree contains BOLD NIfTI `.nii.gz` files and no `.dtseries.nii` files. Therefore NSI is **not directly applicable to the released ds003171 inputs**. It remains a precision-fMRI sufficiency reference, but its status for this cohort is `not_assessed` until a compatible, independently qualified input conversion exists. Do not silently convert NIfTI volumes and treat the resulting NSI values as validated.
+
 ## 5. Separate measurement qualification axes
 
 CETB now has a claim-scoped receipt schema at `research/cetb/measurement_qualification/measurement-qualification.schema.json`. It requires separate records for measurement sufficiency, participant-level repeatability, construct validity and three transportability lanes (participant holdout, site holdout, independent cohort). It explicitly forbids a composite score.
