@@ -484,10 +484,7 @@ fn validate_change_impact_receipt(impact: &ChangeImpact) -> Result<(), String> {
     {
         return Err("change-impact claims are duplicate, empty or overlapping".to_owned());
     }
-    if impact.completeness == "INCOMPLETE"
-        && required.is_empty()
-        && unaffected.is_empty()
-    {
+    if impact.completeness == "INCOMPLETE" && required.is_empty() && unaffected.is_empty() {
         return Err("incomplete change-impact receipt has no retained claim context".to_owned());
     }
     Ok(())
@@ -520,7 +517,10 @@ fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), S
             return Err("proposal decision context is incomplete".to_owned());
         }
     }
-    if proposal.target_claim_ids.iter().any(|claim| claim.trim().is_empty())
+    if proposal
+        .target_claim_ids
+        .iter()
+        .any(|claim| claim.trim().is_empty())
         || proposal
             .target_claim_ids
             .iter()
@@ -531,20 +531,35 @@ fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), S
         return Err("proposal target claim IDs are empty or duplicated".to_owned());
     }
     if !valid_contract_reference(&proposal.method_ref)
-        || proposal.admissibility.evidence_refs.iter().any(|r| !valid_contract_reference(r))
+        || proposal
+            .admissibility
+            .evidence_refs
+            .iter()
+            .any(|r| !valid_contract_reference(r))
         || proposal.owner_approvals.iter().any(|approval| {
             !valid_contract_reference(&approval.owner_ref)
-                || approval.approval_evidence_refs.iter().any(|r| !valid_contract_reference(r))
+                || approval
+                    .approval_evidence_refs
+                    .iter()
+                    .any(|r| !valid_contract_reference(r))
         })
         || proposal.expected_outputs.iter().any(|output| {
             output.output_id.trim().is_empty()
                 || output.semantic_type.trim().is_empty()
                 || !valid_contract_reference(&output.verifier_ref)
-                || output.frame_ref.as_ref().is_some_and(|r| !valid_contract_reference(r))
-                || output.coverage_ref.as_ref().is_some_and(|r| !valid_contract_reference(r))
+                || output
+                    .frame_ref
+                    .as_ref()
+                    .is_some_and(|r| !valid_contract_reference(r))
+                || output
+                    .coverage_ref
+                    .as_ref()
+                    .is_some_and(|r| !valid_contract_reference(r))
         })
     {
-        return Err("proposal contains an invalid reference or expected-output identity".to_owned());
+        return Err(
+            "proposal contains an invalid reference or expected-output identity".to_owned(),
+        );
     }
     match proposal.admissibility.state.as_str() {
         "ADMISSIBLE" if !proposal.admissibility.reason_codes.is_empty() => {
@@ -565,7 +580,9 @@ fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), S
     if let Some(impact) = &proposal.change_impact {
         validate_change_impact_receipt(impact)?;
         if impact.completeness != "COMPLETE" && proposal.admissibility.state == "ADMISSIBLE" {
-            return Err("proposal cannot be admissible under an incomplete change frontier".to_owned());
+            return Err(
+                "proposal cannot be admissible under an incomplete change frontier".to_owned(),
+            );
         }
         let covered: BTreeSet<&str> = proposal
             .requalification_claims_covered
@@ -581,7 +598,9 @@ fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), S
             return Err("proposal does not cover every required requalification claim".to_owned());
         }
     } else if !proposal.requalification_claims_covered.is_empty() {
-        return Err("proposal lists requalification claims without a change-impact receipt".to_owned());
+        return Err(
+            "proposal lists requalification claims without a change-impact receipt".to_owned(),
+        );
     }
     match &proposal.predicted_value {
         PredictedValue::CalibratedProbability {
@@ -597,9 +616,13 @@ fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), S
                 || value_unit.trim().is_empty()
                 || !valid_contract_reference(probability_model_ref)
                 || calibration_evidence_refs.is_empty()
-                || calibration_evidence_refs.iter().any(|r| !valid_contract_reference(r))
+                || calibration_evidence_refs
+                    .iter()
+                    .any(|r| !valid_contract_reference(r))
             {
-                return Err("calibrated EVSI proposal lacks valid model/calibration evidence".to_owned());
+                return Err(
+                    "calibrated EVSI proposal lacks valid model/calibration evidence".to_owned(),
+                );
             }
         }
         PredictedValue::DistributionFree {
@@ -614,7 +637,9 @@ fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), S
                 || value_unit.trim().is_empty()
                 || !valid_contract_reference(uncertainty_set_ref)
             {
-                return Err("distribution-free proposal lacks a valid uncertainty-set reference".to_owned());
+                return Err(
+                    "distribution-free proposal lacks a valid uncertainty-set reference".to_owned(),
+                );
             }
         }
     }
@@ -629,7 +654,9 @@ fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), Stri
         || outcome.authority_granted
         || !valid_contract_reference(&outcome.proposal_ref)
     {
-        return Err("outcome schema, identity, claim ceiling or authority boundary is invalid".to_owned());
+        return Err(
+            "outcome schema, identity, claim ceiling or authority boundary is invalid".to_owned(),
+        );
     }
     for value in [
         &outcome.decision_context.profile_ref,
@@ -645,10 +672,22 @@ fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), Stri
         true => {
             if !matches!(
                 outcome.execution_state.as_str(),
-                "EXECUTED" | "COMPLETED" | "FAILED" | "ABORTED" | "INVALID"
-                    | "CENSORED" | "OUT_OF_DOMAIN" | "DISPUTED"
-            ) || outcome.actual_resources.as_ref().is_none_or(|r| !valid_resources(r))
-                || outcome.executing_owner.as_ref().is_none_or(|r| !valid_contract_reference(r))
+                "EXECUTED"
+                    | "COMPLETED"
+                    | "FAILED"
+                    | "ABORTED"
+                    | "INVALID"
+                    | "CENSORED"
+                    | "OUT_OF_DOMAIN"
+                    | "DISPUTED"
+            ) || outcome
+                .actual_resources
+                .as_ref()
+                .is_none_or(|r| !valid_resources(r))
+                || outcome
+                    .executing_owner
+                    .as_ref()
+                    .is_none_or(|r| !valid_contract_reference(r))
                 || outcome
                     .execution_authority_ref
                     .as_ref()
@@ -664,11 +703,16 @@ fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), Stri
             ) || outcome.actual_resources.is_some()
                 || outcome.execution_authority_ref.is_some()
             {
-                return Err("non-executed outcome cannot carry execution cost or authority".to_owned());
+                return Err(
+                    "non-executed outcome cannot carry execution cost or authority".to_owned(),
+                );
             }
         }
     }
-    if outcome.result_evidence_refs.iter().any(|r| !valid_contract_reference(r))
+    if outcome
+        .result_evidence_refs
+        .iter()
+        .any(|r| !valid_contract_reference(r))
         || outcome
             .verification
             .verifier_ref
@@ -1010,8 +1054,11 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             .iter()
             .map(String::as_str)
             .collect();
-        let unaffected: BTreeSet<&str> =
-            impact.unaffected_claims.iter().map(String::as_str).collect();
+        let unaffected: BTreeSet<&str> = impact
+            .unaffected_claims
+            .iter()
+            .map(String::as_str)
+            .collect();
         if required.len() != impact.required_requalification_claims.len()
             || unaffected.len() != impact.unaffected_claims.len()
             || required.iter().any(|claim| claim.trim().is_empty())
@@ -1593,10 +1640,12 @@ mod tests {
 
     const FIXTURE: &[u8] =
         include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json");
-    const PROPOSAL_FIXTURE: &[u8] =
-        include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json");
-    const OUTCOME_FIXTURE: &[u8] =
-        include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json");
+    const PROPOSAL_FIXTURE: &[u8] = include_bytes!(
+        "../../../fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json"
+    );
+    const OUTCOME_FIXTURE: &[u8] = include_bytes!(
+        "../../../fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json"
+    );
     const SOURCE: &str = "0123456789abcdef0123456789abcdef01234567";
 
     #[test]
@@ -1982,7 +2031,12 @@ mod tests {
         assert!(!action.change_frontier_complete);
         assert!(!action.requalification_claims_covered);
         assert!(!action.policy_eligible);
-        assert!(action.reasons.iter().any(|reason| reason == "CHANGE_FRONTIER_INCOMPLETE"));
+        assert!(
+            action
+                .reasons
+                .iter()
+                .any(|reason| reason == "CHANGE_FRONTIER_INCOMPLETE")
+        );
     }
 
     #[test]
@@ -2011,7 +2065,12 @@ mod tests {
         assert!(unrelated.change_frontier_complete);
         assert!(!unrelated.requalification_claims_covered);
         assert!(!unrelated.policy_eligible);
-        assert!(unrelated.reasons.iter().any(|reason| reason == "REQUALIFICATION_CLAIM_NOT_COVERED"));
+        assert!(
+            unrelated
+                .reasons
+                .iter()
+                .any(|reason| reason == "REQUALIFICATION_CLAIM_NOT_COVERED")
+        );
         assert!(targeted.change_frontier_complete);
         assert!(targeted.requalification_claims_covered);
         assert!(targeted.policy_eligible);
@@ -2053,8 +2112,7 @@ mod tests {
 
     #[test]
     fn attempted_outcome_without_actual_resources_is_rejected() {
-        let mut outcome: EvidenceActionOutcomeV1 =
-            serde_json::from_slice(OUTCOME_FIXTURE).unwrap();
+        let mut outcome: EvidenceActionOutcomeV1 = serde_json::from_slice(OUTCOME_FIXTURE).unwrap();
         outcome.actual_resources = None;
         assert!(validate_action_outcome(&outcome).is_err());
     }
