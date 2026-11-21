@@ -744,16 +744,18 @@ fn read(path: &PathBuf) -> Vec<u8> {
 }
 fn usage(program: &str) {
     eprintln!("Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]");
+    eprintln!("   or: {program} --graph-receipt <source-audit-receipt.json> [--out <receipt.json>]");
 }
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut schema_path = None;
     let mut fixture_path = None;
+    let mut graph_receipt_path = None;
     let mut output_path = None;
     let mut index = 1;
     while index < args.len() {
         match args[index].as_str() {
-            "--schema" | "--fixture" | "--out" => {
+            "--schema" | "--fixture" | "--graph-receipt" | "--out" => {
                 if index + 1 >= args.len() {
                     usage(&args[0]);
                     process::exit(2);
@@ -762,6 +764,7 @@ fn main() {
                 match args[index].as_str() {
                     "--schema" => schema_path = Some(path),
                     "--fixture" => fixture_path = Some(path),
+                    "--graph-receipt" => graph_receipt_path = Some(path),
                     "--out" => output_path = Some(path),
                     _ => unreachable!(),
                 }
@@ -778,11 +781,23 @@ fn main() {
             }
         }
     }
-    let (Some(schema_path), Some(fixture_path)) = (schema_path, fixture_path) else {
-        usage(&args[0]);
-        process::exit(2);
-    };
-    let receipt = audit(&read(&schema_path), &read(&fixture_path)).unwrap_or_else(|error| {
+    let receipt = match graph_receipt_path {
+        Some(path) => {
+            if schema_path.is_some() || fixture_path.is_some() {
+                eprintln!("--graph-receipt cannot be combined with --schema or --fixture");
+                usage(&args[0]);
+                process::exit(2);
+            }
+            audit_graph_receipt(&read(&path))
+        }
+        None => match (schema_path, fixture_path) {
+            (Some(schema), Some(fixture)) => audit(&read(&schema), &read(&fixture)),
+            _ => {
+                usage(&args[0]);
+                process::exit(2);
+            }
+        },
+    }.unwrap_or_else(|error| {
         eprintln!("SC-PRECURSOR-GRAPH-SCORE-FAIL: {error}");
         process::exit(1);
     });
