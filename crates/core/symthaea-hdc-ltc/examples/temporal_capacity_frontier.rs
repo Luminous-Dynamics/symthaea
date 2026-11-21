@@ -150,7 +150,11 @@ struct K95Record {
     event_count: usize,
     target_per_seed_accuracy: f64,
     target_seed_reliability: f64,
-    confidence_level: f64,
+    familywise_confidence_level: f64,
+    per_level_alpha: f64,
+    tested_level_count: usize,
+    multiplicity_correction: &'static str,
+    minimum_seeds_if_all_pass: usize,
     tested_fan_in_levels: Vec<usize>,
     common_seed_count: usize,
     paired_seed_sets: bool,
@@ -170,7 +174,11 @@ struct T90Record {
     event_count: usize,
     target_per_seed_accuracy: f64,
     target_seed_reliability: f64,
-    confidence_level: f64,
+    familywise_confidence_level: f64,
+    per_level_alpha: f64,
+    tested_level_count: usize,
+    multiplicity_correction: &'static str,
+    minimum_seeds_if_all_pass: usize,
     tested_horizon_seconds: Vec<f64>,
     common_seed_count: usize,
     paired_seed_sets: bool,
@@ -455,6 +463,7 @@ fn clopper_pearson_lower(successes: usize, trials: usize, alpha: f64) -> f64 {
 fn reliability(
     accuracies: &[f64],
     target_accuracy: f64,
+    alpha: f64,
 ) -> Result<(usize, f64), Box<dyn Error>> {
     if accuracies.is_empty() {
         return Err("cannot compute seed reliability from zero seeds".into());
@@ -465,8 +474,12 @@ fn reliability(
         .count();
     Ok((
         successes,
-        clopper_pearson_lower(successes, accuracies.len(), ALPHA),
+        clopper_pearson_lower(successes, accuracies.len(), alpha),
     ))
+}
+
+fn minimum_seeds_for_zero_failures(alpha: f64, target_reliability: f64) -> usize {
+    (alpha.ln() / target_reliability.ln()).ceil() as usize
 }
 
 fn seed_set(data: &CohortData) -> BTreeSet<u64> {
@@ -485,8 +498,10 @@ fn analyze(
 
     for (key, data) in cohorts {
         let accuracies: Vec<f64> = data.seed_accuracy.values().copied().collect();
-        let (passing_95, lower_95) = reliability(&accuracies, K95_PER_SEED_ACCURACY)?;
-        let (passing_90, lower_90) = reliability(&accuracies, T90_PER_SEED_ACCURACY)?;
+        let (passing_95, lower_95) =
+            reliability(&accuracies, K95_PER_SEED_ACCURACY, ALPHA)?;
+        let (passing_90, lower_90) =
+            reliability(&accuracies, T90_PER_SEED_ACCURACY, ALPHA)?;
         let count = accuracies.len();
         let mean_accuracy = accuracies.iter().sum::<f64>() / count as f64;
         let min_accuracy = accuracies.iter().copied().fold(f64::INFINITY, f64::min);
@@ -555,19 +570,25 @@ fn analyze(
 
     for (family, levels) in k95_families {
         let tested_levels: Vec<usize> = levels.keys().copied().collect();
+        let tested_level_count = levels.len();
         let seed_sets: Vec<BTreeSet<u64>> = levels.values().map(|data| seed_set(data)).collect();
         let common_seeds = seed_sets.first().cloned().unwrap_or_default();
         let paired = seed_sets.iter().all(|set| *set == common_seeds);
-        let enough = common_seeds.len() >= min_seeds && levels.len() >= 2;
+        let familywise_alpha = ALPHA;
+        let per_level_alpha = familywise_alpha / tested_level_count as f64;
+        let minimum_seeds_if_all_pass =
+            minimum_seeds_for_zero_failures(per_level_alpha, REQUIRED_SEED_RELIABILITY);
+        let required_seed_count = min_seeds.max(minimum_seeds_if_all_pass);
+        let sample_gate = common_seeds.len() >= required_seed_count && tested_level_count >= 2;
         let mut qualified_k95 = None;
 
-        if paired && enough {
+        if paired && sample_gate {
             for (fan_in, data) in &levels {
                 let accuracies: Vec<f64> = common_seeds
                     .iter()
                     .map(|seed| data.seed_accuracy[seed])
                     .collect();
-                let (_, lower) = reliability(&accuracies, K95_PER_SEED_ACCURACY)?;
+                let (_, lower) = reliability(&accuracies, K95_PER_SEED_ACCURACY, per_level_alpha)?;
                 if lower >= REQUIRED_SEED_RELIABILITY {
                     qualified_k95 = Some(*fan_in);
                 }
@@ -584,13 +605,17 @@ fn analyze(
             event_count: family.event_count,
             target_per_seed_accuracy: K95_PER_SEED_ACCURACY,
             target_seed_reliability: REQUIRED_SEED_RELIABILITY,
-            confidence_level: 1.0 - ALPHA,
+            familywise_confidence_level: 1.0 - familywise_alpha,
+            per_level_alpha,
+            tested_level_count,
+            multiplicity_correction: "Bonferroni within the fixed D/condition/gap/horizon/event family",
+            minimum_seeds_if_all_pass,
             tested_fan_in_levels: tested_levels,
             common_seed_count: common_seeds.len(),
             paired_seed_sets: paired,
-            confirmatory_sample_gate_met: enough && paired,
+            confirmatory_sample_gate_met: sample_gate && paired,
             qualified_k95,
-            interpretation: "maximum tested fan-in for which the one-sided exact 95% lower confidence bound on the independent-seed success probability is at least 95%; null means no tested point qualified",
+            interpretation: "maximum tested fan-in meeting the per-seed accuracy and seed-reliability targets using one-sided exact Clopper-Pearson lower bounds with Bonferroni family-wise alpha; null means no tested point qualified",
         }));
     }
 
@@ -601,20 +626,26 @@ fn analyze(
             .collect();
         tested.sort_by(|a, b| a.0.total_cmp(&b.0));
         let tested_horizons: Vec<f64> = tested.iter().map(|(horizon, _)| *horizon).collect();
+        let tested_level_count = levels.len();
         let seed_sets: Vec<BTreeSet<u64>> = levels.values().map(|data| seed_set(data)).collect();
         let common_seeds = seed_sets.first().cloned().unwrap_or_default();
         let paired = seed_sets.iter().all(|set| *set == common_seeds);
-        let enough = common_seeds.len() >= min_seeds && levels.len() >= 2;
+        let familywise_alpha = ALPHA;
+        let per_level_alpha = familywise_alpha / tested_level_count as f64;
+        let minimum_seeds_if_all_pass =
+            minimum_seeds_for_zero_failures(per_level_alpha, REQUIRED_SEED_RELIABILITY);
+        let required_seed_count = min_seeds.max(minimum_seeds_if_all_pass);
+        let sample_gate = common_seeds.len() >= required_seed_count && tested_level_count >= 2;
         let mut qualified_t90_seconds = None;
 
-        if paired && enough {
+        if paired && sample_gate {
             for (horizon, bits) in &tested {
                 let data = levels[bits];
                 let accuracies: Vec<f64> = common_seeds
                     .iter()
                     .map(|seed| data.seed_accuracy[seed])
                     .collect();
-                let (_, lower) = reliability(&accuracies, T90_PER_SEED_ACCURACY)?;
+                let (_, lower) = reliability(&accuracies, T90_PER_SEED_ACCURACY, per_level_alpha)?;
                 if lower >= REQUIRED_SEED_RELIABILITY {
                     qualified_t90_seconds = Some(*horizon);
                 }
@@ -631,13 +662,17 @@ fn analyze(
             event_count: family.event_count,
             target_per_seed_accuracy: T90_PER_SEED_ACCURACY,
             target_seed_reliability: REQUIRED_SEED_RELIABILITY,
-            confidence_level: 1.0 - ALPHA,
+            familywise_confidence_level: 1.0 - familywise_alpha,
+            per_level_alpha,
+            tested_level_count,
+            multiplicity_correction: "Bonferroni within the fixed D/condition/gap/fan-in/event family",
+            minimum_seeds_if_all_pass,
             tested_horizon_seconds: tested_horizons,
             common_seed_count: common_seeds.len(),
             paired_seed_sets: paired,
-            confirmatory_sample_gate_met: enough && paired,
+            confirmatory_sample_gate_met: sample_gate && paired,
             qualified_t90_seconds,
-            interpretation: "maximum tested horizon for which the one-sided exact 95% lower confidence bound on the independent-seed success probability is at least 95%; null means no tested point qualified",
+            interpretation: "maximum tested horizon meeting the per-seed accuracy and seed-reliability targets using one-sided exact Clopper-Pearson lower bounds with Bonferroni family-wise alpha; null means no tested point qualified",
         }));
     }
 
@@ -675,9 +710,13 @@ mod tests {
     fn clopper_pearson_all_successes_requires_about_59_seeds_for_95_95() {
         let thirty = clopper_pearson_lower(30, 30, ALPHA);
         let fifty_nine = clopper_pearson_lower(59, 59, ALPHA);
+        let two_level_alpha = ALPHA / 2.0;
         assert!((thirty - 0.904966).abs() < 1.0e-5);
         assert!(thirty < REQUIRED_SEED_RELIABILITY);
         assert!(fifty_nine >= REQUIRED_SEED_RELIABILITY);
+        assert_eq!(minimum_seeds_for_zero_failures(ALPHA, 0.95), 59);
+        assert_eq!(minimum_seeds_for_zero_failures(two_level_alpha, 0.95), 72);
+        assert_eq!(minimum_seeds_for_zero_failures(ALPHA / 3.0, 0.95), 80);
     }
 
     #[test]
@@ -716,7 +755,7 @@ mod tests {
                     chance_accuracy: Some(1.0 / fan_in as f64),
                     ..CohortData::default()
                 };
-                for seed in 0..59u64 {
+                for seed in 0..80u64 {
                     data.seed_accuracy.insert(seed, 1.0);
                     data.cohort_ids.insert(format!("seed-{seed}"));
                 }
@@ -724,7 +763,7 @@ mod tests {
             }
         }
 
-        let records = analyze(&cohorts, 59).expect("paired 59-seed frontier should analyze");
+        let records = analyze(&cohorts, 59).expect("paired Bonferroni-adjusted frontier should analyze");
         let k95 = records.iter().find_map(|record| match record {
             OutputRecord::K95(row)
                 if row.dimension == 1_024
