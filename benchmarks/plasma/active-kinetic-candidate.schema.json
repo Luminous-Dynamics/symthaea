@@ -1,0 +1,610 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/active-kinetic-candidate.schema.json",
+  "title": "Active kinetic simulation candidate",
+  "description": "A source- and cost-qualified proposal for one complete kinetic plasma simulation. New acquisition proposals may target training or development/validation only; sealed test acquisition is forbidden.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_id",
+    "parent_experiment_id",
+    "physics_lane",
+    "governing_equation_version",
+    "physical_parameters",
+    "initial_condition_id",
+    "boundary_condition_id",
+    "geometry",
+    "resolution",
+    "kinetic_fidelity",
+    "solver",
+    "random_seed",
+    "target_observables",
+    "cost_estimate",
+    "acquisition",
+    "split_role",
+    "rights_state",
+    "selection_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "parent_experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "physics_lane": {
+      "enum": [
+        "landau_damping_1d_electrostatic",
+        "magnetosheath_2d3v_pressure_tensor",
+        "icf_nonlocal_electron_heat_transport",
+        "pic_field_solver_warm_start"
+      ]
+    },
+    "governing_equation_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "physical_parameters": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": [
+          "number",
+          "string",
+          "boolean",
+          "array",
+          "object",
+          "null"
+        ]
+      }
+    },
+    "initial_condition_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "boundary_condition_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension",
+        "grid_size",
+        "geometry_id"
+      ],
+      "properties": {
+        "geometry_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "grid_size": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 2
+          }
+        },
+        "cell_spacing": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "domain_size": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_resolution_id",
+        "time_step_seconds"
+      ],
+      "properties": {
+        "spatial_resolution_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_step_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "output_cadence_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "downsampling": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "integer",
+              "number",
+              "string"
+            ]
+          }
+        },
+        "phase_space_resolution": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "integer",
+              "number",
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "kinetic_fidelity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "fidelity_id"
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "PIC",
+            "Vlasov",
+            "VFP",
+            "other_declared_kinetic"
+          ]
+        },
+        "fidelity_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "particles_per_cell": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "phase_space_resolution": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "integer",
+              "number",
+              "string"
+            ]
+          }
+        },
+        "noise_or_discretisation_notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "const": "PIC"
+              }
+            },
+            "required": [
+              "method"
+            ]
+          },
+          "then": {
+            "required": [
+              "particles_per_cell"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "enum": [
+                  "Vlasov",
+                  "VFP"
+                ]
+              }
+            },
+            "required": [
+              "method"
+            ]
+          },
+          "then": {
+            "required": [
+              "phase_space_resolution"
+            ]
+          }
+        }
+      ]
+    },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "revision",
+        "solver_name",
+        "build_id",
+        "numerical_options"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{40}$"
+        },
+        "solver_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "compiler_runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "numerical_options": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "random_seed_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "random_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_observables": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cost_estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_basis",
+        "cpu_core_hours",
+        "gpu_hours",
+        "wall_seconds",
+        "peak_memory_bytes",
+        "data_volume_bytes"
+      ],
+      "properties": {
+        "cpu_core_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "gpu_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wall_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "data_volume_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cost_estimator_revision": {
+          "type": "string"
+        },
+        "measurement_basis": {
+          "const": "raw_resource_units"
+        }
+      }
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_revision",
+        "reason_codes",
+        "evidence_receipts",
+        "signal_values"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{40}$"
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "random",
+              "space_filling",
+              "committee_disagreement",
+              "calibrated_uncertainty",
+              "physical_residual",
+              "admissibility_failure",
+              "support_distance",
+              "multifidelity_value",
+              "pareto_diversity"
+            ]
+          }
+        },
+        "evidence_receipts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "receipt_id",
+              "sha256"
+            ],
+            "properties": {
+              "receipt_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{64}$"
+              }
+            }
+          }
+        },
+        "signal_values": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "selection_rationale": {
+          "type": "string"
+        }
+      }
+    },
+    "split_role": {
+      "enum": [
+        "training",
+        "development_validation"
+      ]
+    },
+    "rights_state": {
+      "enum": [
+        "verified",
+        "permission_pending",
+        "restricted",
+        "unknown"
+      ]
+    },
+    "selection_status": {
+      "enum": [
+        "proposed",
+        "selected",
+        "rejected",
+        "unaffordable",
+        "cancelled",
+        "executed",
+        "failed"
+      ]
+    },
+    "execution_receipt_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "selection_status": {
+            "enum": [
+              "selected",
+              "executed",
+              "failed"
+            ]
+          }
+        },
+        "required": [
+          "selection_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rights_state": {
+            "const": "verified"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "selection_status": {
+            "enum": [
+              "executed",
+              "failed"
+            ]
+          }
+        },
+        "required": [
+          "selection_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "execution_receipt_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "dimension": {
+                "const": 1
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          }
+        },
+        "required": [
+          "geometry"
+        ]
+      },
+      "then": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "grid_size": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "cell_spacing": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "domain_size": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "dimension": {
+                "const": 2
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          }
+        },
+        "required": [
+          "geometry"
+        ]
+      },
+      "then": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "grid_size": {
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "cell_spacing": {
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "domain_size": {
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "dimension": {
+                "const": 3
+              }
+            },
+            "required": [
+              "dimension"
+            ]
+          }
+        },
+        "required": [
+          "geometry"
+        ]
+      },
+      "then": {
+        "properties": {
+          "geometry": {
+            "properties": {
+              "grid_size": {
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "cell_spacing": {
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "domain_size": {
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

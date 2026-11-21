@@ -1,0 +1,84 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "active-kinetic-simulation-design-v0.1",
+  "created_at": "2026-11-20",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12944",
+  "status": "protocol_only",
+  "task_lanes": [
+    "landau_damping_1d_electrostatic",
+    "magnetosheath_2d3v_pressure_tensor",
+    "icf_nonlocal_electron_heat_transport",
+    "pic_field_solver_warm_start"
+  ],
+  "candidate_run_contract": {
+    "required_fields": [
+      "candidate_id",
+      "parent_experiment_id",
+      "physics_lane",
+      "governing_equation_version",
+      "parameters",
+      "initial_condition_id",
+      "boundary_condition_id",
+      "geometry_domain_resolution",
+      "timestep",
+      "kinetic_fidelity",
+      "particles_per_cell_or_phase_space_resolution",
+      "solver_revision_build_runtime",
+      "numerical_options",
+      "random_seed",
+      "target_observables_output_schema",
+      "estimated_cpu_gpu_wall_time_memory_data_volume",
+      "acquisition_reason",
+      "acquisition_policy_revision",
+      "triggering_evidence_receipts",
+      "split_role",
+      "artifact_rights_state"
+    ],
+    "allowed_new_acquisition_split_roles": ["training", "development_validation"],
+    "sealed_test_acquisition_allowed": false
+  },
+  "acquisition_strategies": [
+    "random",
+    "latin_hypercube_or_sobol_space_filling",
+    "committee_disagreement",
+    "calibrated_epistemic_uncertainty",
+    "exact_solver_residual_hotspots",
+    "physical_admissibility_failures",
+    "support_distance_regime_boundary",
+    "cost_aware_multifidelity_bayesian",
+    "pareto_diversity_uncertainty_residual"
+  ],
+  "multi_fidelity_rules": [
+    "preserve_fidelity_and_source_lineage",
+    "matched_conditions_for_fidelity_discrepancy",
+    "particle_count_is_fidelity_noise_intervention",
+    "measure_cross_fidelity_discrepancy",
+    "compare_single_and_multifidelity_at_equal_total_and_high_fidelity_budgets",
+    "monitor_false_safe_increase_from_low_fidelity_confidence"
+  ],
+  "metrics": [
+    "error_reduction_per_high_fidelity_run",
+    "physical_gate_improvement_per_pic_vlasov_gpu_hour",
+    "cost_to_fixed_accuracy_admissibility_false_safe_target",
+    "qualified_parameter_envelope_fraction",
+    "support_distance_at_first_failure",
+    "OOD_selective_risk_false_safe_abstention",
+    "acquisition_diversity_and_redundancy",
+    "seed_variance",
+    "full_rollout_and_solver_gate_improvement"
+  ],
+  "leakage_guardrails": [
+    "split_by_complete_simulation_cohort",
+    "freeze_sealed_test_before_acquisition",
+    "sealed_test_never_used_for_acquisition_or_threshold_tuning",
+    "retain_failed_rejected_cancelled_and_unaffordable_candidates",
+    "record_policy_revision_and_random_seed"
+  ],
+  "execution": {
+    "candidate_pool": "not_created",
+    "high_fidelity_runs": "none_selected_or_executed",
+    "acquisition_comparison": "not_performed",
+    "qualified_envelope_gain": "not_measured"
+  },
+  "claim_ceiling": "protocol_only_no_active_learning_superiority_claim"
+}

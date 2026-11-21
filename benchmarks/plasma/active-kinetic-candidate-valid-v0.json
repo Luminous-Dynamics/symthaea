@@ -1,0 +1,84 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_id": "landau-pic-random-baseline-001",
+  "parent_experiment_id": "landau-development-v0",
+  "physics_lane": "landau_damping_1d_electrostatic",
+  "governing_equation_version": "vlasov-poisson-1d-v1",
+  "physical_parameters": {
+    "amplitude": 0.05,
+    "wavenumber": 0.5
+  },
+  "initial_condition_id": "weak-landau-alpha-0.05",
+  "boundary_condition_id": "periodic",
+  "geometry": {
+    "geometry_id": "periodic-1d",
+    "dimension": 1,
+    "grid_size": [
+      256
+    ],
+    "cell_spacing": [
+      0.02454369260617026
+    ],
+    "domain_size": [
+      6.283185307179586
+    ],
+    "coordinate_frame_id": "x-periodic"
+  },
+  "resolution": {
+    "spatial_resolution_id": "nx-256",
+    "time_step_seconds": 0.05,
+    "output_cadence_seconds": 0.05
+  },
+  "kinetic_fidelity": {
+    "method": "PIC",
+    "fidelity_id": "pic-100k-ppc-v1",
+    "particles_per_cell": 100000,
+    "noise_or_discretisation_notes": "Synthetic proposal fixture only."
+  },
+  "solver": {
+    "repository": "https://github.com/example/kinetic-solver",
+    "revision": "0123456789abcdef0123456789abcdef01234567",
+    "solver_name": "vlasov-poisson-pic",
+    "build_id": "fixture-build-v1",
+    "compiler_runtime": "rust-1.96",
+    "numerical_options": {
+      "integrator": "leapfrog",
+      "shape_function": "CIC"
+    },
+    "random_seed_policy": "fixed_seed"
+  },
+  "random_seed": 7,
+  "target_observables": [
+    "electric_field",
+    "field_energy"
+  ],
+  "cost_estimate": {
+    "measurement_basis": "raw_resource_units",
+    "cpu_core_hours": 2,
+    "gpu_hours": 0.5,
+    "wall_seconds": 7200,
+    "peak_memory_bytes": 8000000000,
+    "data_volume_bytes": 1000000000,
+    "cost_estimator_revision": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "acquisition": {
+    "policy_id": "random-baseline-v1",
+    "policy_revision": "0123456789abcdef0123456789abcdef01234567",
+    "reason_codes": [
+      "random"
+    ],
+    "evidence_receipts": [
+      {
+        "receipt_id": "dev-envelope-receipt-1",
+        "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      }
+    ],
+    "signal_values": {
+      "diversity_score": 0.5
+    },
+    "selection_rationale": "Synthetic fixture for candidate contract tests."
+  },
+  "split_role": "training",
+  "rights_state": "verified",
+  "selection_status": "proposed"
+}
