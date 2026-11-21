@@ -1,0 +1,11 @@
+[package]
+name = "plasma-phase-space-invariants"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "MIT OR Apache-2.0"
+description = "Small-N weighted phase-space moment reference for kinetic plasma diagnostics"
+
+[lib]
+name = "plasma_phase_space_invariants"
+path = "src/lib.rs"
