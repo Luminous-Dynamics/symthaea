@@ -1,0 +1,149 @@
+{
+  "schema": "muse-edit-evidence-case-v1",
+  "case_id": "synthetic.velocity.part10.001",
+  "dataset_version": "muse-edit-evidence-v1.0.0-dev",
+  "split": "development",
+  "source_work_id": "synthetic-work-001",
+  "composer_id": null,
+  "rights": {
+    "basis": "synthetic_owned",
+    "license_id": "Luminous-Synthetic-CC0-1.0",
+    "attribution": null,
+    "consent_record_sha256": null,
+    "derivative_policy": "redistributable"
+  },
+  "source": {
+    "audio": {
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "duration_ms": 16000,
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "encoding": "wav_pcm16"
+    },
+    "score_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "stems": [
+      {
+        "track_id": "melody",
+        "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "score_part_id": 10
+      },
+      {
+        "track_id": "bass",
+        "audio_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "score_part_id": 20
+      }
+    ]
+  },
+  "instruction": {
+    "text": "Make the melody in part 10 slightly softer while leaving the bass and all timing unchanged.",
+    "locale": "en",
+    "operation_family": "velocity",
+    "strength": "subtle"
+  },
+  "edit_contract": {
+    "target_scopes": [
+      {
+        "part_id": 10,
+        "start": {
+          "numerator": 0,
+          "denominator": 1
+        },
+        "end": {
+          "numerator": 4,
+          "denominator": 1
+        }
+      }
+    ],
+    "protected_scopes": [
+      {
+        "part_id": 20,
+        "start": {
+          "numerator": 0,
+          "denominator": 1
+        },
+        "end": {
+          "numerator": 4,
+          "denominator": 1
+        }
+      }
+    ],
+    "parameters": {
+      "scale_numerator": 8,
+      "scale_denominator": 9,
+      "description": "Multiply source melody velocities by 8/9; no clamping, timing or pitch changes."
+    }
+  },
+  "target": {
+    "target_kind": "exact_score_and_audio",
+    "expected_score_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "expected_audio_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "acceptable_audio_sha256": [],
+    "event_correspondence": [
+      {
+        "source_note_ordinals": [
+          0
+        ],
+        "target_note_ordinals": [
+          0
+        ],
+        "relation": "modify"
+      },
+      {
+        "source_note_ordinals": [
+          1
+        ],
+        "target_note_ordinals": [
+          1
+        ],
+        "relation": "modify"
+      },
+      {
+        "source_note_ordinals": [
+          2
+        ],
+        "target_note_ordinals": [
+          2
+        ],
+        "relation": "preserve"
+      }
+    ]
+  },
+  "render_profile": {
+    "renderer_id": "synthetic-renderer",
+    "renderer_version": "1.0.0",
+    "binary_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "environment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "configuration_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "asset_sha256": null
+  },
+  "evaluation": {
+    "target_metrics": [
+      "exact_event_accuracy",
+      "velocity_accuracy",
+      "instruction_rubric_pass"
+    ],
+    "preservation_metrics": [
+      "protected_event_agreement",
+      "outside_scope_event_agreement",
+      "collateral_change_rate"
+    ],
+    "correspondence_required": true,
+    "tolerances": {
+      "onset_ms": 10,
+      "pitch_cents": 25,
+      "velocity_0_to_127": 1,
+      "minimum_correspondence_coverage": 0.99
+    },
+    "human_evaluation": {
+      "required": true,
+      "raters_per_item": 3,
+      "questions": [
+        "edit_perceptibility",
+        "instruction_recognition",
+        "musical_validity",
+        "collateral_change",
+        "overall_preference"
+      ]
+    }
+  }
+}

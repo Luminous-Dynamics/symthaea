@@ -1,0 +1,90 @@
+{
+  "schema": "muse-edit-evidence-result-v1",
+  "case_id": "synthetic.velocity.part10.001",
+  "system": {
+    "system_id": "muse-symbolic-baseline",
+    "version": "0.1.0",
+    "track": "symbolic_editor",
+    "compute_budget_ms": 25,
+    "candidate_budget": 1
+  },
+  "artifacts": {
+    "case_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+    "case_digest_schema": "muse-edit-evidence-case-serde-json-sha256-v1",
+    "source_score_sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+    "score_digest_schema": "muse-score-serde-json-sha256-v1",
+    "candidate_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidate_score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "render_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evaluation_receipt_sha256": null
+  },
+  "integrity": {
+    "verdict": "pass",
+    "verifier_id": "muse-render-receipt",
+    "verifier_version": "0.1.0",
+    "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "target": [
+    {
+      "metric_id": "velocity_accuracy",
+      "numerator": 8,
+      "denominator": 8,
+      "score": 1,
+      "threshold": 0.95,
+      "passed": true
+    },
+    {
+      "metric_id": "instruction_rubric_pass",
+      "numerator": 1,
+      "denominator": 1,
+      "score": 1,
+      "threshold": 1,
+      "passed": true
+    }
+  ],
+  "preservation": [
+    {
+      "metric_id": "protected_event_agreement",
+      "numerator": 16,
+      "denominator": 16,
+      "score": 1,
+      "threshold": 0.99,
+      "passed": true
+    },
+    {
+      "metric_id": "collateral_change_rate",
+      "numerator": 0,
+      "denominator": 16,
+      "score": 0,
+      "threshold": 0.01,
+      "passed": true
+    }
+  ],
+  "correspondence": {
+    "expected_source_events": 24,
+    "mapped_source_events": 24,
+    "unresolved_source_events": 0,
+    "coverage": 1,
+    "minimum_coverage_passed": true
+  },
+  "instruction_compatibility": {
+    "verdict": "pass",
+    "evaluator_id": "synthetic-rule-evaluator",
+    "evaluator_version": "1",
+    "receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "human_evaluation": {
+    "status": "pending",
+    "rater_count": 0,
+    "questions": []
+  },
+  "outcome": {
+    "target_pass": true,
+    "preservation_pass": true,
+    "correspondence_pass": true,
+    "integrity_pass": true,
+    "strict_sample_exact_match": true,
+    "human_gate_pass": null,
+    "abstention_reason": null
+  }
+}
