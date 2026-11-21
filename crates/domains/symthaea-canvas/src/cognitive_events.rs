@@ -19,6 +19,7 @@ use crate::cognitive_topology::{
     MAX_COGNITIVE_EDGES, MAX_COGNITIVE_EPISODES, MAX_COGNITIVE_NODES,
 };
 
+pub const COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION: u16 = 1;
 pub const MAX_COGNITIVE_EVENTS_PER_BATCH: usize = 64;
 pub const MAX_COGNITIVE_EVENT_LOG: usize = 4_096;
 
@@ -26,6 +27,8 @@ pub const MAX_COGNITIVE_EVENT_LOG: usize = 4_096;
 /// independent of renderer frames and visual interpolation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CognitiveTopologyEvent {
+    pub schema_version: u16,
+    pub session_id: String,
     pub evidence: CognitiveEvidence,
     pub change: CognitiveTopologyChange,
 }
@@ -232,6 +235,9 @@ impl CognitiveTopologyReducer {
     ) -> Result<CognitiveEventApplyOutcome, CognitiveEventError> {
         validate_event(&event)?;
 
+        if event.session_id != self.topology.session_id {
+            return Err(CognitiveEventError::InvalidEventIdentifier);
+        }
         let digest = event_digest(&event);
         for previous in &self.events {
             if previous.evidence.event_id == event.evidence.event_id {
@@ -321,6 +327,15 @@ impl CognitiveTopologyReducer {
 }
 
 fn validate_event(event: &CognitiveTopologyEvent) -> Result<(), CognitiveEventError> {
+    if event.schema_version != COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION {
+        return Err(CognitiveEventError::InvalidSequence);
+    }
+    if event.session_id.is_empty()
+        || event.session_id.len() > 128
+        || event.session_id.chars().any(char::is_control)
+    {
+        return Err(CognitiveEventError::InvalidEventIdentifier);
+    }
     if event.evidence.event_id.is_empty()
         || event.evidence.event_id.len() > 128
         || event.evidence.event_id.chars().any(char::is_control)
@@ -554,6 +569,8 @@ fn latest_evidence_time(topology: &CognitiveTopology) -> u64 {
 fn event_digest(event: &CognitiveTopologyEvent) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-cognitive-event-v1");
+    hasher.update(&event.schema_version.to_le_bytes());
+    hash_string(&mut hasher, &event.session_id);
     hash_evidence(&mut hasher, &event.evidence);
     match &event.change {
         CognitiveTopologyChange::NodeAdded {
@@ -785,6 +802,8 @@ mod tests {
 
     fn add_node(sequence: u64, id: &str) -> CognitiveTopologyEvent {
         CognitiveTopologyEvent {
+            schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+            session_id: "event-reducer-test".to_string(),
             evidence: evidence(sequence, &format!("event:{sequence}")),
             change: CognitiveTopologyChange::NodeAdded {
                 node_id: id.to_string(),
@@ -858,6 +877,8 @@ mod tests {
         let batch = [
             add_node(1, "memory:a"),
             CognitiveTopologyEvent {
+                schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+                session_id: "event-reducer-test".to_string(),
                 evidence: evidence(2, "event:2"),
                 change: CognitiveTopologyChange::EdgeAdded {
                     edge_id: "edge:missing".to_string(),
@@ -883,6 +904,8 @@ mod tests {
             add_node(1, "memory:a"),
             add_node(2, "concept:b"),
             CognitiveTopologyEvent {
+                schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+                session_id: "event-reducer-test".to_string(),
                 evidence: evidence(3, "event:3"),
                 change: CognitiveTopologyChange::EdgeAdded {
                     edge_id: "edge:a-b".to_string(),
@@ -929,6 +952,8 @@ mod tests {
     fn episode_lifecycle_requires_expected_state_and_valid_transition() {
         let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
         let start = CognitiveTopologyEvent {
+            schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+            session_id: "event-reducer-test".to_string(),
             evidence: evidence(1, "event:episode-start"),
             change: CognitiveTopologyChange::EpisodeStarted {
                 episode_id: "episode:tool".to_string(),
@@ -940,6 +965,8 @@ mod tests {
         reducer.apply_event(start).unwrap();
 
         let invalid = CognitiveTopologyEvent {
+            schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+            session_id: "event-reducer-test".to_string(),
             evidence: evidence(2, "event:episode-invalid"),
             change: CognitiveTopologyChange::EpisodeStateChanged {
                 episode_id: "episode:tool".to_string(),
@@ -954,6 +981,8 @@ mod tests {
         assert_eq!(reducer.snapshot().episodes[0].state, CognitiveEpisodeState::Started);
 
         let complete = CognitiveTopologyEvent {
+            schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+            session_id: "event-reducer-test".to_string(),
             evidence: evidence(2, "event:episode-complete"),
             change: CognitiveTopologyChange::EpisodeStateChanged {
                 episode_id: "episode:tool".to_string(),
@@ -973,6 +1002,8 @@ mod tests {
         reducer.apply_event(synthetic).unwrap();
 
         let runtime_update = CognitiveTopologyEvent {
+            schema_version: COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION,
+            session_id: "event-reducer-test".to_string(),
             evidence: evidence(2, "event:runtime-update"),
             change: CognitiveTopologyChange::NodeStatusChanged {
                 node_id: "memory:fixture".to_string(),
