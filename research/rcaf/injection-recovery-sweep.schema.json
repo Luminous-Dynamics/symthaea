@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "rcaf.injection-recovery-sweep/0.1.0"
+      "const": "rcaf.injection-recovery-sweep/0.2.0"
     },
     "effect_size_points": {
       "type": "integer",
@@ -63,7 +63,7 @@
         ],
         "properties": {
           "schema_version": {
-            "const": "rcaf.injection-recovery/0.1.0"
+            "const": "rcaf.injection-recovery/0.2.0"
           },
           "seed": {
             "type": "integer",
