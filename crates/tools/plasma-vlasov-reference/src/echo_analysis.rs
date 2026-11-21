@@ -1062,7 +1062,9 @@ mod tests {
             .advance_free_streaming(post_pulse_time)
             .unwrap();
 
-        let with_pulse = pulsed.electric_mode_coefficient(prediction.echo_mode as usize).unwrap();
+        let with_pulse = pulsed
+            .electric_mode_coefficient(prediction.echo_mode as usize)
+            .unwrap();
         let control = no_second_pulse
             .electric_mode_coefficient(prediction.echo_mode as usize)
             .unwrap();
@@ -1082,8 +1084,7 @@ mod tests {
             "unexpected in-phase echo component: {response_real:e}"
         );
         assert!(
-            (response_imaginary - expected_imaginary).abs()
-                < 0.02 * expected_imaginary.abs(),
+            (response_imaginary - expected_imaginary).abs() < 0.02 * expected_imaginary.abs(),
             "observed echo response {response_imaginary:e}, expected {expected_imaginary:e}"
         );
         assert!((pulsed.time() - prediction.echo_time).abs() < 1.0e-14);
