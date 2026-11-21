@@ -122,7 +122,8 @@
     "periodic coordinate representatives x and x+kL",
     "common weight rescaling scales raw moments and total variation",
     "Galilean velocity boost: M1' = M1 + u*M0 and K2' = K2 + u*M1 + 0.5*u^2*M0",
-    "zero-weight particles do not change the represented measure"
+    "zero-weight particles do not change the represented measure",
+    "free streaming with unchanged particle velocities preserves the complete moment vector across periodic position wraps"
   ],
   "fail_closed_cases": [
     "non-finite positions, velocities or weights",
