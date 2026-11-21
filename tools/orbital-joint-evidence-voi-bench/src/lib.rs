@@ -66,6 +66,118 @@ pub struct ChangeImpact {
     pub unaffected_claims: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContractReference {
+    pub id: String,
+    pub kind: String,
+    #[serde(default)]
+    pub revision: Option<String>,
+    #[serde(default)]
+    pub sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProposalAdmissibility {
+    pub state: String,
+    pub reason_codes: Vec<String>,
+    pub evidence_refs: Vec<ContractReference>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "regime")]
+pub enum PredictedValue {
+    #[serde(rename = "calibrated_probability")]
+    CalibratedProbability {
+        metric: String,
+        value: f64,
+        value_unit: String,
+        probability_model_ref: ContractReference,
+        calibration_evidence_refs: Vec<ContractReference>,
+    },
+    #[serde(rename = "distribution_free")]
+    DistributionFree {
+        metric: String,
+        value: f64,
+        value_unit: String,
+        uncertainty_set_ref: ContractReference,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExpectedOutput {
+    pub output_id: String,
+    pub semantic_type: String,
+    pub unit: Option<String>,
+    pub frame_ref: Option<ContractReference>,
+    pub coverage_ref: Option<ContractReference>,
+    pub verifier_ref: ContractReference,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnerApproval {
+    pub owner_ref: ContractReference,
+    pub approval_state: String,
+    pub approval_evidence_refs: Vec<ContractReference>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceActionProposalV1 {
+    pub schema: String,
+    pub record_kind: String,
+    pub action_id: String,
+    pub policy_id: String,
+    pub policy_version: String,
+    pub proposal_generation: u64,
+    pub decision_context: DecisionContext,
+    pub target_claim_ids: Vec<String>,
+    pub action_class: String,
+    pub method_ref: ContractReference,
+    pub admissibility: ProposalAdmissibility,
+    pub change_impact: Option<ChangeImpact>,
+    pub requalification_claims_covered: Vec<String>,
+    pub expected_outputs: Vec<ExpectedOutput>,
+    pub predicted_value: PredictedValue,
+    pub resource_plan: Resources,
+    pub remaining_budget: Resources,
+    pub owner_approvals: Vec<OwnerApproval>,
+    pub claim_ceiling: String,
+    pub no_actuation: bool,
+    pub authority_granted: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OutcomeVerification {
+    pub state: String,
+    pub verifier_ref: Option<ContractReference>,
+    pub reason_codes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceActionOutcomeV1 {
+    pub schema: String,
+    pub record_kind: String,
+    pub outcome_id: String,
+    pub proposal_ref: ContractReference,
+    pub decision_context: DecisionContext,
+    pub execution_state: String,
+    pub execution_attempted: bool,
+    pub actual_resources: Option<Resources>,
+    pub executing_owner: Option<ContractReference>,
+    pub execution_authority_ref: Option<ContractReference>,
+    pub result_evidence_refs: Vec<ContractReference>,
+    pub verification: OutcomeVerification,
+    pub discrepancy_ref: Option<ContractReference>,
+    pub claim_ceiling: String,
+    pub authority_granted: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Action {
     pub action_id: String,
@@ -333,6 +445,251 @@ fn accumulate_resources(total: &mut Resources, actual: &Resources) -> Result<(),
     total.external_cost_units += actual.external_cost_units;
     if !valid_resources(total) {
         return Err("accumulated actual resource total is non-finite".to_owned());
+    }
+    Ok(())
+}
+
+fn valid_contract_reference(reference: &ContractReference) -> bool {
+    !reference.id.trim().is_empty()
+        && !reference.kind.trim().is_empty()
+        && reference
+            .sha256
+            .as_deref()
+            .is_none_or(|digest| valid_sha256(digest))
+}
+
+fn validate_change_impact_receipt(impact: &ChangeImpact) -> Result<(), String> {
+    if impact.source_owner != "mycelix:6219"
+        || impact.receipt_ref.trim().is_empty()
+        || impact.event_frontier_ref.trim().is_empty()
+        || !matches!(impact.completeness.as_str(), "COMPLETE" | "INCOMPLETE")
+    {
+        return Err("invalid owner-native change-impact receipt".to_owned());
+    }
+    let required: BTreeSet<&str> = impact
+        .required_requalification_claims
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let unaffected: BTreeSet<&str> = impact
+        .unaffected_claims
+        .iter()
+        .map(String::as_str)
+        .collect();
+    if required.len() != impact.required_requalification_claims.len()
+        || unaffected.len() != impact.unaffected_claims.len()
+        || required.iter().any(|claim| claim.trim().is_empty())
+        || unaffected.iter().any(|claim| claim.trim().is_empty())
+        || !required.is_disjoint(&unaffected)
+    {
+        return Err("change-impact claims are duplicate, empty or overlapping".to_owned());
+    }
+    if impact.completeness == "INCOMPLETE"
+        && required.is_empty()
+        && unaffected.is_empty()
+    {
+        return Err("incomplete change-impact receipt has no retained claim context".to_owned());
+    }
+    Ok(())
+}
+
+fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), String> {
+    if proposal.schema != "EvidenceActionProposalOutcomeV1"
+        || proposal.record_kind != "PROPOSAL"
+        || proposal.claim_ceiling != "proposal_only_no_qualification_authority"
+        || !proposal.no_actuation
+        || proposal.authority_granted
+    {
+        return Err("proposal schema, claim ceiling or authority boundary is invalid".to_owned());
+    }
+    if proposal.action_id.trim().is_empty()
+        || proposal.policy_id.trim().is_empty()
+        || proposal.policy_version.trim().is_empty()
+        || proposal.target_claim_ids.is_empty()
+        || proposal.expected_outputs.is_empty()
+    {
+        return Err("proposal identity, target claims or expected outputs are missing".to_owned());
+    }
+    for value in [
+        &proposal.decision_context.profile_ref,
+        &proposal.decision_context.article_subject_ref,
+        &proposal.decision_context.configuration_id,
+        &proposal.decision_context.icd_revision,
+    ] {
+        if value.trim().is_empty() {
+            return Err("proposal decision context is incomplete".to_owned());
+        }
+    }
+    if proposal.target_claim_ids.iter().any(|claim| claim.trim().is_empty())
+        || proposal
+            .target_claim_ids
+            .iter()
+            .collect::<BTreeSet<_>>()
+            .len()
+            != proposal.target_claim_ids.len()
+    {
+        return Err("proposal target claim IDs are empty or duplicated".to_owned());
+    }
+    if !valid_contract_reference(&proposal.method_ref)
+        || proposal.admissibility.evidence_refs.iter().any(|r| !valid_contract_reference(r))
+        || proposal.owner_approvals.iter().any(|approval| {
+            !valid_contract_reference(&approval.owner_ref)
+                || approval.approval_evidence_refs.iter().any(|r| !valid_contract_reference(r))
+        })
+        || proposal.expected_outputs.iter().any(|output| {
+            output.output_id.trim().is_empty()
+                || output.semantic_type.trim().is_empty()
+                || !valid_contract_reference(&output.verifier_ref)
+                || output.frame_ref.as_ref().is_some_and(|r| !valid_contract_reference(r))
+                || output.coverage_ref.as_ref().is_some_and(|r| !valid_contract_reference(r))
+        })
+    {
+        return Err("proposal contains an invalid reference or expected-output identity".to_owned());
+    }
+    match proposal.admissibility.state.as_str() {
+        "ADMISSIBLE" if !proposal.admissibility.reason_codes.is_empty() => {
+            return Err("admissible proposal has blocking reason codes".to_owned());
+        }
+        "INADMISSIBLE" | "INDETERMINATE" if proposal.admissibility.reason_codes.is_empty() => {
+            return Err("blocked proposal has no reason codes".to_owned());
+        }
+        "ADMISSIBLE" | "INADMISSIBLE" | "INDETERMINATE" => {}
+        _ => return Err("proposal has unknown admissibility state".to_owned()),
+    }
+    if !valid_resources(&proposal.resource_plan)
+        || !valid_resources(&proposal.remaining_budget)
+        || !fits_budget(&proposal.resource_plan, &proposal.remaining_budget)
+    {
+        return Err("proposal resource plan is invalid or exceeds remaining budget".to_owned());
+    }
+    if let Some(impact) = &proposal.change_impact {
+        validate_change_impact_receipt(impact)?;
+        if impact.completeness != "COMPLETE" && proposal.admissibility.state == "ADMISSIBLE" {
+            return Err("proposal cannot be admissible under an incomplete change frontier".to_owned());
+        }
+        let covered: BTreeSet<&str> = proposal
+            .requalification_claims_covered
+            .iter()
+            .map(String::as_str)
+            .collect();
+        if covered.len() != proposal.requalification_claims_covered.len()
+            || impact
+                .required_requalification_claims
+                .iter()
+                .any(|claim| !covered.contains(claim.as_str()))
+        {
+            return Err("proposal does not cover every required requalification claim".to_owned());
+        }
+    } else if !proposal.requalification_claims_covered.is_empty() {
+        return Err("proposal lists requalification claims without a change-impact receipt".to_owned());
+    }
+    match &proposal.predicted_value {
+        PredictedValue::CalibratedProbability {
+            metric,
+            value,
+            value_unit,
+            probability_model_ref,
+            calibration_evidence_refs,
+        } => {
+            if metric != "EVSI"
+                || !value.is_finite()
+                || *value < 0.0
+                || value_unit.trim().is_empty()
+                || !valid_contract_reference(probability_model_ref)
+                || calibration_evidence_refs.is_empty()
+                || calibration_evidence_refs.iter().any(|r| !valid_contract_reference(r))
+            {
+                return Err("calibrated EVSI proposal lacks valid model/calibration evidence".to_owned());
+            }
+        }
+        PredictedValue::DistributionFree {
+            metric,
+            value,
+            value_unit,
+            uncertainty_set_ref,
+        } => {
+            if metric != "MINIMAX_REGRET_REDUCTION"
+                || !value.is_finite()
+                || *value < 0.0
+                || value_unit.trim().is_empty()
+                || !valid_contract_reference(uncertainty_set_ref)
+            {
+                return Err("distribution-free proposal lacks a valid uncertainty-set reference".to_owned());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), String> {
+    if outcome.schema != "EvidenceActionProposalOutcomeV1"
+        || outcome.record_kind != "OUTCOME"
+        || outcome.outcome_id.trim().is_empty()
+        || outcome.claim_ceiling != "execution_record_only_no_qualification_promotion"
+        || outcome.authority_granted
+        || !valid_contract_reference(&outcome.proposal_ref)
+    {
+        return Err("outcome schema, identity, claim ceiling or authority boundary is invalid".to_owned());
+    }
+    for value in [
+        &outcome.decision_context.profile_ref,
+        &outcome.decision_context.article_subject_ref,
+        &outcome.decision_context.configuration_id,
+        &outcome.decision_context.icd_revision,
+    ] {
+        if value.trim().is_empty() {
+            return Err("outcome decision context is incomplete".to_owned());
+        }
+    }
+    match outcome.execution_attempted {
+        true => {
+            if !matches!(
+                outcome.execution_state.as_str(),
+                "EXECUTED" | "COMPLETED" | "FAILED" | "ABORTED" | "INVALID"
+                    | "CENSORED" | "OUT_OF_DOMAIN" | "DISPUTED"
+            ) || outcome.actual_resources.as_ref().is_none_or(|r| !valid_resources(r))
+                || outcome.executing_owner.as_ref().is_none_or(|r| !valid_contract_reference(r))
+                || outcome
+                    .execution_authority_ref
+                    .as_ref()
+                    .is_none_or(|r| !valid_contract_reference(r))
+            {
+                return Err("attempted outcome requires a terminal state, actual cost and external authority".to_owned());
+            }
+        }
+        false => {
+            if !matches!(
+                outcome.execution_state.as_str(),
+                "PLANNED" | "ADMITTED" | "NOT_RUN"
+            ) || outcome.actual_resources.is_some()
+                || outcome.execution_authority_ref.is_some()
+            {
+                return Err("non-executed outcome cannot carry execution cost or authority".to_owned());
+            }
+        }
+    }
+    if outcome.result_evidence_refs.iter().any(|r| !valid_contract_reference(r))
+        || outcome
+            .verification
+            .verifier_ref
+            .as_ref()
+            .is_some_and(|r| !valid_contract_reference(r))
+        || outcome
+            .discrepancy_ref
+            .as_ref()
+            .is_some_and(|r| !valid_contract_reference(r))
+    {
+        return Err("outcome contains an invalid evidence/verifier reference".to_owned());
+    }
+    if outcome.verification.state == "VERIFIED_WITHIN_SCOPE"
+        && outcome.verification.verifier_ref.is_none()
+    {
+        return Err("verified outcome has no verifier reference".to_owned());
+    }
+    if outcome.verification.state != "VERIFIED_WITHIN_SCOPE"
+        && outcome.verification.reason_codes.is_empty()
+    {
+        return Err("unverified outcome must preserve an explicit reason".to_owned());
     }
     Ok(())
 }
