@@ -5,6 +5,7 @@ from eig import (
     DesignValidationError,
     evaluate_design_scenarios,
     expected_information_gain_bits,
+    evaluate_design_manifest,
     theory_entropy_bits,
     weighted_lower_quantile,
 )
@@ -117,6 +118,63 @@ class ExpectedInformationGainTests(unittest.TestCase):
             evaluate_design_scenarios({"A": 1.0}, [(1.0, {"A": {"yes": 1.0}})], cost=True)
         with self.assertRaises(DesignValidationError):
             expected_information_gain_bits({"A": 1.0}, {"A": {"yes": 1.0}}, tolerance=-1.0)
+
+
+    def test_manifest_runner_ranks_multiple_designs(self):
+        manifest = {
+            "schema_version": "cetb.theory-design-run/0.1.0",
+            "status": "synthetic_fixture",
+            "theory_prior": {"A": 0.5, "B": 0.5},
+            "designs": [
+                {
+                    "design_id": "high-cost",
+                    "cost": 5.0,
+                    "lower_quantile": 0.25,
+                    "nuisance_scenarios": [
+                        {"weight": 0.75, "likelihoods": {
+                            "A": {"yes": 0.9, "no": 0.05, "missing": 0.05},
+                            "B": {"yes": 0.1, "no": 0.85, "missing": 0.05},
+                        }},
+                        {"weight": 0.25, "likelihoods": {
+                            "A": {"yes": 0.7, "no": 0.2, "missing": 0.1},
+                            "B": {"yes": 0.2, "no": 0.7, "missing": 0.1},
+                        }},
+                    ],
+                },
+                {
+                    "design_id": "low-cost",
+                    "cost": 1.0,
+                    "lower_quantile": 0.25,
+                    "nuisance_scenarios": [
+                        {"weight": 1.0, "likelihoods": {
+                            "A": {"yes": 0.65, "no": 0.25, "missing": 0.1},
+                            "B": {"yes": 0.35, "no": 0.55, "missing": 0.1},
+                        }},
+                    ],
+                },
+            ],
+        }
+        result = evaluate_design_manifest(manifest)
+        self.assertEqual(result["source_status"], "synthetic_fixture")
+        self.assertEqual([item["rank"] for item in result["results"]], [1, 2])
+        self.assertGreaterEqual(
+            result["results"][0]["lower_quantile_eig_bits_per_cost"],
+            result["results"][1]["lower_quantile_eig_bits_per_cost"],
+        )
+
+    def test_manifest_rejects_duplicate_design_ids(self):
+        design = {
+            "design_id": "same",
+            "cost": 1.0,
+            "nuisance_scenarios": [{"weight": 1.0, "likelihoods": {"A": {"yes": 1.0}}}],
+        }
+        with self.assertRaisesRegex(DesignValidationError, "duplicate design_id"):
+            evaluate_design_manifest({
+                "schema_version": "cetb.theory-design-run/0.1.0",
+                "status": "synthetic_fixture",
+                "theory_prior": {"A": 1.0},
+                "designs": [design, dict(design)],
+            })
 
 
 if __name__ == "__main__":
