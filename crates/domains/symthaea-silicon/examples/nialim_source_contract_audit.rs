@@ -108,6 +108,24 @@ fn line_number(source: &str, needle: &str) -> Option<usize> {
     source.lines().position(|line| line.contains(needle)).map(|index| index + 1)
 }
 
+/// Match only a direct statement in the method body. A guarded fallback such
+/// as "if timespans is None: timespans = ones(...)" must not be called an
+/// unconditional overwrite.
+fn has_direct_method_statement(method: &str, statement: &str) -> bool {
+    let lines: Vec<&str> = method.lines().collect();
+    let Some(first) = lines.first() else {
+        return false;
+    };
+    let method_indent = leading_spaces(first);
+    let expected = normalize_whitespace(statement);
+
+    lines.iter().skip(1).any(|line| {
+        !line.trim().is_empty()
+            && leading_spaces(line) == method_indent + 4
+            && normalize_whitespace(line) == expected
+    })
+}
+
 fn json_string(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len() + 2);
     escaped.push('"');
@@ -186,9 +204,8 @@ fn run(root: PathBuf) -> Result<bool, AuditError> {
     )
     .ok_or_else(|| AuditError(format!("PhysioNet _prepare_batch not found in {PHYSIONET_PATH}")))?;
 
-    let overwrite_normalized = normalize_whitespace(OVERWRITE_STATEMENT);
-    let dfa_overwrites = normalize_whitespace(&dfa_forward).contains(&overwrite_normalized);
-    let prdfa_overwrites = normalize_whitespace(&prdfa_forward).contains(&overwrite_normalized);
+    let dfa_overwrites = has_direct_method_statement(&dfa_forward, OVERWRITE_STATEMENT);
+    let prdfa_overwrites = has_direct_method_statement(&prdfa_forward, OVERWRITE_STATEMENT);
 
     let trainer_computes_elapsed = physionet_prepare
         .contains("t_elapsed = tt[:, 1:] - tt[:, :-1]");
@@ -202,14 +219,16 @@ fn run(root: PathBuf) -> Result<bool, AuditError> {
     let dfa_line = line_number(&dfa_forward, "timespans = torch.ones");
     let prdfa_line = line_number(&prdfa_forward, "timespans = torch.ones");
 
+    // The supplied PhysioNet script imports DFA, not PRDFA. Keep the PRDFA
+    // finding visible, but do not infer that it is on this specific call path.
     let static_mismatch = trainer_computes_elapsed
         && trainer_returns_elapsed
         && trainer_passes_elapsed
         && trainer_uses_dfa
-        && (dfa_overwrites || prdfa_overwrites);
+        && dfa_overwrites;
 
     let verdict = if static_mismatch {
-        "elapsed_time_argument_discarded_in_public_forward_path"
+        "dfa_elapsed_time_argument_discarded_in_public_physionet_path"
     } else {
         "no_matching_static_overwrite_detected_dynamic_test_still_required"
     };
