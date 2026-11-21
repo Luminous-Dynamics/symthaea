@@ -38,3 +38,22 @@ Positive paired gap means between-state similarity is lower than the within-stat
 The report contract is `rcaf-report.schema.json`. The accompanying `fixtures/synthetic-rcaf-report.json` contains synthetic values only and must never be presented as a biological observation.
 
 The kernel now has fourteen authored unit-test cases. They are not yet compiled or executed in this environment.
+
+
+## Executable report validation
+
+The isolated research-data validator is at `tools/validate_report.py`. It checks the Draft 2020-12 report schema (when supplied) and semantic invariants that schemas cannot enforce: participant-key uniqueness, per-row gap arithmetic, denominator consistency, recomputed medians and sign-test counts/p-values, interval ordering, and claim ceilings.
+
+It is a research validation helper, not a production Symthaea dependency. It uses the Python standard library for semantic checks; schema checking uses the optional development dependency in `requirements-validation.txt`.
+
+Run:
+
+```sh
+python3 -m pip install -r research/rcaf/requirements-validation.txt
+python3 research/rcaf/tools/validate_report.py \
+  research/rcaf/fixtures/synthetic-rcaf-report.json \
+  --schema research/rcaf/rcaf-report.schema.json
+python3 -m unittest discover -s research/rcaf/tools -p 'test_*.py'
+```
+
+The validator never promotes a synthetic fixture to biological evidence. It also does not prove source-data truth, correct preprocessing, absence of hidden confounds, or clinical validity; these require separate evidence gates.
