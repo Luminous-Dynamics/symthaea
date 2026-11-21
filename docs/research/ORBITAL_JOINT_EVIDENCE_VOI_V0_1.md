@@ -257,7 +257,7 @@ Report, separately:
 
 The one-step selector is not enough for campaigns where two individually uninformative tests can be valuable as a contingent sequence. A separate bounded sequential fixture now exercises that case under two different declared frequency profiles.
 
-**SEQ-001** has four synthetic states (healthy, axial-capacity defect, thermal-wear defect and joint-retention defect), two actions, and an ACCEPT/REJECT loss matrix. Either action alone leaves worst-case minimax regret at 5, so the myopic one-step rule stops. The fixed two-test campaign reaches regret 0. An exact depth-two policy also reaches regret 0, but executes the thermal inspection only after the first screen returns PASS; FAIL terminates at REJECT.
+**SEQ-001** has four synthetic states (healthy, axial-capacity defect, thermal-wear defect and joint-retention defect), two actions, and an ACCEPT/REJECT/HOLD loss matrix. With no evidence, HOLD has worst-case minimax regret 2. Either action alone leaves worst-case minimax regret at 2, so the myopic one-step rule stops. The fixed two-test campaign reaches regret 0. An exact depth-two policy also reaches regret 0, but executes the thermal inspection only after the first screen returns PASS; FAIL produces a rejection-basis obligation and terminates at REJECT; without a rejection basis or complete acceptance obligations, the decision is HOLD.
 
 The deterministic finite-horizon planner uses:
 - the full residual hidden-state set at every branch;
