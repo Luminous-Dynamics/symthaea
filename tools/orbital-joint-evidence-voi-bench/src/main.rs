@@ -22,7 +22,8 @@ fn run() -> Result<(), String> {
     if args.next().is_some() {
         return Err("unexpected trailing arguments".to_owned());
     }
-    let bytes = fs::read(&input_path).map_err(|error| format!("cannot read {input_path}: {error}"))?;
+    let bytes =
+        fs::read(&input_path).map_err(|error| format!("cannot read {input_path}: {error}"))?;
     let receipt = run_audit(&bytes, &source_commit)?;
     println!(
         "{}",
