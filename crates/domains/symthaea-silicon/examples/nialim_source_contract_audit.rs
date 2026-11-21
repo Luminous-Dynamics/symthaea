@@ -332,30 +332,36 @@ mod tests {
     }
 
     #[test]
-    fn whitespace_normalization_handles_wrapped_python_statements() {
-        let source = "timespans = torch.ones( (batch_size,\n seq_len) ).to(device)";
-        assert!(normalize_whitespace(source).contains(
-            &normalize_whitespace(OVERWRITE_STATEMENT)
-        ));
+    fn whitespace_normalization_handles_line_wrapped_python_statements() {
+        let source = "timespans = torch.ones((batch_size,\\n seq_len)).to(device)";
+        assert_eq!(
+            normalize_whitespace(source),
+            normalize_whitespace(OVERWRITE_STATEMENT)
+        );
     }
 
     #[test]
     fn absent_signature_is_not_mistaken_for_a_clean_method() {
-        assert!(extract_python_method("class Empty:\n    pass\n", FORWARD_SIGNATURE).is_none());
+        assert!(extract_python_method("class Empty:\\n    pass\\n", FORWARD_SIGNATURE).is_none());
     }
 
     #[test]
-    fn a_time_preserving_forward_method_does_not_match_the_overwrite_rule() {
+    fn guarded_default_does_not_match_unconditional_overwrite_rule() {
         let method = concat!(
-            "    def forward(self, x, timespans=None, mask=None):\n",
-            "        if timespans is None:\n",
-            "            timespans = torch.ones((batch_size, seq_len)).to(device)\n",
+            "    def forward(self, x, timespans=None, mask=None):\\n",
+            "        if timespans is None:\\n",
+            "            timespans = torch.ones((batch_size, seq_len)).to(device)\\n",
         );
-        // The method still contains the fallback assignment. A production
-        // source auditor must not call this safe: check the assignment's
-        // control-flow context or require a data-flow-aware audit.
-        assert!(normalize_whitespace(method).contains(
-            &normalize_whitespace(OVERWRITE_STATEMENT)
-        ));
+        assert!(!has_direct_method_statement(method, OVERWRITE_STATEMENT));
+    }
+
+    #[test]
+    fn direct_unconditional_overwrite_is_detected() {
+        let method = concat!(
+            "    def forward(self, x, timespans=None, mask=None):\\n",
+            "        timespans = torch.ones((batch_size, seq_len)).to(device)\\n",
+            "        for t in range(seq_len):\\n",
+        );
+        assert!(has_direct_method_statement(method, OVERWRITE_STATEMENT));
     }
 }
