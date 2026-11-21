@@ -613,14 +613,30 @@ pub fn select_for_qualified_model_budget(
     if runtime_target_model_sha256 != budget.target_model_sha256 {
         return Err(ModelBudgetSurfacingReject::TargetModelMismatch);
     }
-    let plan = select_for_context(
-        candidates,
-        mode,
-        target_scope,
-        as_known,
-        budget.selected_context_budget_tokens,
-    )
-    .map_err(ModelBudgetSurfacingReject::Selection)?;
+    let plan = if budget.selected_context_budget_tokens == 0 {
+        let mut empty_plan = MemorySurfacingPlanV1 {
+            schema_version: 1,
+            mode,
+            target_scope,
+            as_known,
+            context_budget_tokens: 0,
+            context_tokens_used: 0,
+            predicted_net_value_micros: 0,
+            surfaced: Vec::new(),
+            plan_sha256: String::new(),
+        };
+        empty_plan.plan_sha256 = empty_plan.canonical_digest();
+        empty_plan
+    } else {
+        select_for_context(
+            candidates,
+            mode,
+            target_scope,
+            as_known,
+            budget.selected_context_budget_tokens,
+        )
+        .map_err(ModelBudgetSurfacingReject::Selection)?
+    };
     let fields = [
         plan.canonical_digest(),
         budget.target_model_sha256.clone(),
@@ -853,6 +869,47 @@ mod tests {
             result,
             Err(ModelBudgetSurfacingReject::TargetModelMismatch)
         );
+    }
+
+    #[test]
+    fn qualified_zero_memory_budget_produces_a_valid_empty_surfacing_plan() {
+        let model = digest("zero-memory-model");
+        let pipeline = digest("memory-pipeline");
+        let calibration =
+            rows(&model, &pipeline, 1, 1, 10, 100, [20_000, 10_000, -10_000, -20_000]);
+        let heldout =
+            rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [18_000, 8_000, -12_000, -22_000]);
+        let profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let qualified =
+            qualify_model_memory_budget(&profile, &calibration, &heldout).unwrap();
+        assert_eq!(qualified.context_budget_tokens(), 0);
+
+        let scope = Scope {
+            regime: broca_mace_policy::Regime::Baseline,
+            objective: broca_mace_policy::Objective::Quality,
+        };
+        let result = select_for_qualified_model_budget(
+            &[],
+            MemorySurfacingModeV1::PredictedFutureValue,
+            scope,
+            broca_mace_policy::AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
+            &model,
+            &qualified,
+        )
+        .unwrap();
+
+        assert_eq!(result.plan.context_budget_tokens, 0);
+        assert_eq!(result.plan.context_tokens_used, 0);
+        assert!(result.plan.surfaced.is_empty());
+        assert_eq!(
+            result.plan.plan_sha256,
+            result.plan.canonical_digest()
+        );
+        assert_eq!(result.heldout_dataset_sha256, qualified.heldout_dataset_sha256());
+        assert_eq!(result.plan_sha256, result.canonical_digest());
     }
 
     #[test]
