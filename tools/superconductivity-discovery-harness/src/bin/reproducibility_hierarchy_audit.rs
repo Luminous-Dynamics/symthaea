@@ -246,7 +246,7 @@ fn validate_task(
                 ));
             }
             require_same_single(&train_specimens, &test_specimens, "specimen")?;
-            require_same_single(&train_states, &test_states, "material state")?;
+            require_same_single(&train_states, &test_states, "paired material state")?;
             require_same_single(&train_batches, &test_batches, "batch")?;
             require_same_single(&train_campaigns, &test_campaigns, "campaign")?;
             require_same_single(&train_labs, &test_labs, "laboratory")?;
