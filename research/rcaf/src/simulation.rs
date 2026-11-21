@@ -30,18 +30,12 @@ pub fn correlation_similarity(
     estimator: SimilarityEstimator,
 ) -> Result<f64, MetricError> {
     match estimator {
-        SimilarityEstimator::AbsoluteWeightedJaccard => weighted_jaccard_correlation_matrices(
-            left,
-            right,
-            CorrelationWjMode::Absolute,
-            1,
-        ),
-        SimilarityEstimator::SignedShiftWeightedJaccard => weighted_jaccard_correlation_matrices(
-            left,
-            right,
-            CorrelationWjMode::SignedShift,
-            1,
-        ),
+        SimilarityEstimator::AbsoluteWeightedJaccard => {
+            weighted_jaccard_correlation_matrices(left, right, CorrelationWjMode::Absolute, 1)
+        }
+        SimilarityEstimator::SignedShiftWeightedJaccard => {
+            weighted_jaccard_correlation_matrices(left, right, CorrelationWjMode::SignedShift, 1)
+        }
         SimilarityEstimator::NormalizedMeanAbsoluteEdgeError => {
             let left_size = super::validate_correlation_matrix(left)?;
             let right_size = super::validate_correlation_matrix(right)?;
@@ -436,8 +430,7 @@ pub fn run_injection_recovery(
                 config.temporal_autocorrelation,
             );
 
-            let within_similarity =
-                correlation_similarity(&repeat_a, &repeat_b, config.estimator)?;
+            let within_similarity = correlation_similarity(&repeat_a, &repeat_b, config.estimator)?;
             let null_between_similarity =
                 correlation_similarity(&repeat_a, &null_c, config.estimator)?;
             let injected_between_similarity =
@@ -528,9 +521,7 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "loading_jitter must be finite and non-negative",
         });
     }
-    if !config.temporal_autocorrelation.is_finite()
-        || config.temporal_autocorrelation.abs() >= 1.0
-    {
+    if !config.temporal_autocorrelation.is_finite() || config.temporal_autocorrelation.abs() >= 1.0 {
         return Err(MetricError::InvalidSimulationConfig {
             reason: "temporal_autocorrelation must be finite and strictly between -1 and 1",
         });
@@ -565,8 +556,7 @@ fn sample_correlation_matrix(
     let regions = global_loadings.len();
     let mut sums = vec![0.0; regions];
     let mut cross_products = vec![0.0; regions * regions];
-    let innovation_scale =
-        (1.0 - temporal_autocorrelation * temporal_autocorrelation).sqrt();
+    let innovation_scale = (1.0 - temporal_autocorrelation * temporal_autocorrelation).sqrt();
     let mut previous_global = rng.normal();
     let mut previous_module = rng.normal();
     let mut previous_residuals: Vec<f64> = (0..regions).map(|_| rng.normal()).collect();
@@ -588,8 +578,9 @@ fn sample_correlation_matrix(
             let residual = (1.0 - global * global - module * module).sqrt();
             previous_residuals[region] = temporal_autocorrelation * previous_residuals[region]
                 + innovation_scale * rng.normal();
-            let value =
-                global * global_factor + module * module_factor + residual * previous_residuals[region];
+            let value = global * global_factor
+                + module * module_factor
+                + residual * previous_residuals[region];
             observation.push(value);
             *sum += value;
         }
@@ -838,7 +829,11 @@ mod tests {
         assert_eq!(tournament.results[0].seed, tournament.results[1].seed);
         assert_eq!(tournament.results[1].seed, tournament.results[2].seed);
         assert_eq!(
-            tournament.results.iter().map(|r| r.estimator).collect::<Vec<_>>(),
+            tournament
+                .results
+                .iter()
+                .map(|r| r.estimator)
+                .collect::<Vec<_>>(),
             vec![
                 "absolute_weighted_jaccard",
                 "signed_shift_weighted_jaccard",
@@ -851,12 +846,9 @@ mod tests {
     fn matched_estimators_represent_polarity_differences_differently() {
         let left = vec![vec![1.0, 0.5], vec![0.5, 1.0]];
         let right = vec![vec![1.0, -0.5], vec![-0.5, 1.0]];
-        let absolute = correlation_similarity(
-            &left,
-            &right,
-            SimilarityEstimator::AbsoluteWeightedJaccard,
-        )
-        .unwrap();
+        let absolute =
+            correlation_similarity(&left, &right, SimilarityEstimator::AbsoluteWeightedJaccard)
+                .unwrap();
         let signed = correlation_similarity(
             &left,
             &right,
