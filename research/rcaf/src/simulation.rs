@@ -137,7 +137,6 @@ pub struct InjectionRecoveryConfig {
     /// Stationary AR(1) coefficient applied to factors and residuals.
     pub temporal_autocorrelation: f64,
     pub injection_loading_delta: f64,
-    pub temporal_autocorrelation: f64,
     pub alpha: f64,
     pub seed: u64,
 }
