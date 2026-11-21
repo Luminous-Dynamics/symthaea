@@ -669,7 +669,7 @@ fn single_filament_failure_metrics(
 
     let baseline_components = count_components_without(&adjacency, None);
     let mut articulation_count = 0;
-    let mut worst_components = baseline_components;
+    let mut worst_components = 0;
     for removed in filament_ids {
         let components = count_components_without(&adjacency, Some(*removed));
         worst_components = worst_components.max(components);
@@ -831,6 +831,23 @@ mod tests {
             ],
             orbital_cells: Vec::<OrbitalCell>::new(),
         }
+    }
+
+    #[test]
+    fn deleting_the_only_filament_leaves_zero_components() {
+        let graph = MycelialNetworkGraph {
+            schema_version: MYCELIAL_NETWORK_SCHEMA_VERSION,
+            source_model_version: MYCELIAL_MODEL_VERSION,
+            filament_ids: vec![7],
+            connections: Vec::new(),
+            anastomoses: Vec::new(),
+        };
+        let metrics = graph.metrics();
+        assert_eq!(metrics.filament_count, 1);
+        assert_eq!(metrics.connected_components, 1);
+        assert_eq!(metrics.cycle_rank, 0);
+        assert_eq!(metrics.articulation_filament_count, 0);
+        assert_eq!(metrics.max_components_after_single_filament_failure, 0);
     }
 
     #[test]
