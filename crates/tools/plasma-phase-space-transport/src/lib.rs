@@ -441,7 +441,8 @@ fn min_cost_transport(
 
         node = sink;
         while node != source {
-            let (previous, edge_index) = predecessor[node].ok_or(TransportError::NoAugmentingPath)?;
+            let (previous, edge_index) =
+                predecessor[node].ok_or(TransportError::NoAugmentingPath)?;
             let (to, reverse_index, unit_cost) = {
                 let edge = &graph[previous][edge_index];
                 (edge.to, edge.reverse_index, edge.unit_cost)
