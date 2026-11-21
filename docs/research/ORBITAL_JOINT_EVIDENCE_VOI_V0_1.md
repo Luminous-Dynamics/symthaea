@@ -124,6 +124,26 @@ These are candidate mappings requiring owner-reviewed edges, not universal rules
 
 The selector's own frozen context tuple (profile reference, physical serial, configuration, ICD revision) is a final consumer-side false-join gate; it is not a substitute for #6219 dependency closure. Symthaea only ranks actions after the owner-native invalidation result and affected claim set are supplied. It must not promote a claim or decide which dependencies exist. JEV-016 freezes an incomplete event-frontier receipt and blocks selection; JEV-017 freezes a complete receipt requiring one structural claim to be requalified while an unrelated design claim remains unaffected.
 
+
+### Change-impact consumer contract v0.1
+
+The current synthetic selector accepts a benchmark-only `ChangeImpact` record with:
+- `source_owner = mycelix:6219`;
+- a receipt reference and event-frontier reference;
+- `completeness = COMPLETE | INCOMPLETE`;
+- exact `required_requalification_claims` and `unaffected_claims`.
+
+This is a consumer-side fixture contract, **not** a replacement for the Mycelix #6219 event schema, dependency graph, temporal model, evidence leases or invalidation oracle. References in the synthetic fixture are not authenticated or resolved against a production service.
+
+The selection rule is deliberately fail-closed:
+1. If the owner-native event frontier is incomplete, no action is eligible—even when a proposed test looks informative.
+2. If the frontier is complete, a requalification action must explicitly cover every required affected claim.
+3. A check of an unrelated or unaffected claim cannot satisfy the affected requalification obligation.
+4. Historical evidence remains historical; invalidation is not proof of physical failure.
+5. The adapter cannot infer dependency edges, decide that a claim is unaffected, or set the change-frontier completeness flag. Those are owner-native inputs.
+
+JEV-016 checks abstention under incomplete event coverage. JEV-017 checks that the target structural claim is requalified while an explicitly unaffected design-identity claim is not needlessly repeated. The production adapter remains future work and requires exact schema mapping plus authenticated, independently reviewed receipts from Mycelix #6219 and domain rules from Symtropy #5371/#6484/#4263.
+
 ## 5. Resource accounting
 
 Keep the resource vector explicit:
@@ -149,6 +169,8 @@ A future versioned action request should contain:
 
 - `action_id`, policy ID/version and proposal generation;
 - exact decision-context, requirement, provider/client profile, article, configuration and ICD references;
+- optional owner-native change-impact receipt reference, event/evidence frontier references, completeness state, affected claim set and unaffected claim set; a known change with an incomplete event frontier forces abstention until reconciled;
+- exact list of affected claims the proposed requalification action resolves; it must cover the full required requalification set, not only the easiest subset;
 - unresolved claim and why its resolution could change the decision;
 - action class and exact method/model/procedure revision;
 - applicability and admissibility evidence references;
@@ -326,7 +348,7 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 
 P0: this contract and owner map.  
 P1: machine-readable action and outcome schema plus 17 frozen synthetic scenarios.  
-P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 17 known-answer scenarios. No solver or physical execution is invoked.  
+P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 17 known-answer scenarios, including incomplete change-frontier abstention and complete-frontier targeted requalification. No solver or physical execution is invoked.  
 P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
 P5: only after review, authorized human-supervised physical evidence handoff.
