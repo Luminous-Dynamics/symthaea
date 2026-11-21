@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-perception-parity-v1.schema.json",
+  "title": "Melothaea Paired Audio-Symbolic Perception Parity v1",
+  "description": "Strict case and run schemas for evaluating the same musical task through audio and symbolic MIDI modalities.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "task": {
+      "type": "string",
+      "enum": [
+        "SyncopationScoring",
+        "TranspositionDetection",
+        "ChordQualityIdentification"
+      ]
+    },
+    "modality": {
+      "type": "string",
+      "enum": [
+        "Audio",
+        "SymbolicMidi"
+      ]
+    },
+    "answer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "task",
+            "level"
+          ],
+          "properties": {
+            "task": {
+              "const": "syncopation_level"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "task",
+            "detected"
+          ],
+          "properties": {
+            "task": {
+              "const": "transposition_detected"
+            },
+            "detected": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "task",
+            "quality"
+          ],
+          "properties": {
+            "task": {
+              "const": "chord_quality"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "Major",
+                "Minor",
+                "Dominant",
+                "Diminished"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "case_id",
+        "task",
+        "split",
+        "source_score_sha256",
+        "audio_input_sha256",
+        "symbolic_input_sha256",
+        "renderer_recipe_sha256",
+        "ground_truth"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task": {
+          "$ref": "#/$defs/task"
+        },
+        "split": {
+          "type": "string",
+          "enum": [
+            "Development",
+            "Validation",
+            "Test"
+          ]
+        },
+        "source_score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "audio_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "symbolic_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "renderer_recipe_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ground_truth": {
+          "$ref": "#/$defs/answer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "model_identity": {
+      "type": "object",
+      "required": [
+        "system_id",
+        "system_version",
+        "model_identity_sha256",
+        "preprocessing_identity_sha256",
+        "prompt_or_policy_sha256"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "preprocessing_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "prompt_or_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    },
+    "prediction": {
+      "type": "object",
+      "required": [
+        "case_id",
+        "modality",
+        "input_sha256",
+        "answer",
+        "confidence"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modality": {
+          "$ref": "#/$defs/modality"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "answer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/answer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Frozen benchmark suite",
+      "type": "object",
+      "required": [
+        "schema",
+        "suite_id",
+        "benchmark_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "const": "mel-perception-parity-v1"
+        },
+        "suite_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/case"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Immutable model run",
+      "type": "object",
+      "required": [
+        "schema",
+        "run_id",
+        "suite_id",
+        "model",
+        "predictions"
+      ],
+      "properties": {
+        "schema": {
+          "const": "mel-perception-parity-v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suite_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "$ref": "#/$defs/model_identity"
+        },
+        "predictions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/prediction"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
