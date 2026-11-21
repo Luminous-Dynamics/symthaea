@@ -598,21 +598,43 @@ pub fn run_injection_recovery(
                 config.temporal_autocorrelation,
                 0.0,
             );
+            // The latent global/module loadings stay fixed. Only an independent shared
+            // observation nuisance is added to this repeat. At zero strength, reuse the
+            // exact same null sample so the control is deterministic and identical.
+            let nuisance_c = if config.common_mode_nuisance_loading == 0.0 {
+                null_c.clone()
+            } else {
+                sample_correlation_matrix(
+                    &mut rng,
+                    config.samples_per_segment,
+                    &global_loadings,
+                    &module_loadings,
+                    config.temporal_autocorrelation,
+                    config.common_mode_nuisance_loading,
+                )
+            };
 
             let within_similarity = correlation_similarity(&repeat_a, &repeat_b, config.estimator)?;
             let null_between_similarity =
                 correlation_similarity(&repeat_a, &null_c, config.estimator)?;
             let injected_between_similarity =
                 correlation_similarity(&repeat_a, &injected_c, config.estimator)?;
+            let nuisance_between_similarity =
+                correlation_similarity(&repeat_a, &nuisance_c, config.estimator)?;
 
             null_gaps.push(within_similarity - null_between_similarity);
+            nuisance_gaps.push(within_similarity - nuisance_between_similarity);
             injected_gaps.push(within_similarity - injected_between_similarity);
         }
 
         let null_test = exact_sign_test(&null_gaps)?;
+        let nuisance_test = exact_sign_test(&nuisance_gaps)?;
         let injected_test = exact_sign_test(&injected_gaps)?;
         if null_test.p_two_sided_exact < config.alpha {
             null_rejections += 1;
+        }
+        if nuisance_test.p_two_sided_exact < config.alpha {
+            nuisance_rejections += 1;
         }
         if injected_test.p_two_sided_exact < config.alpha {
             injection_rejections += 1;
@@ -634,11 +656,12 @@ pub fn run_injection_recovery(
         injected_positive_fractions
             .push(injected_test.positive_count as f64 / config.participants as f64);
         null_median_gaps.push(median(&null_gaps));
+        nuisance_median_gaps.push(median(&nuisance_gaps));
         injected_median_gaps.push(median(&injected_gaps));
     }
 
     Ok(InjectionRecoveryReport {
-        schema_version: "rcaf.injection-recovery/0.2.0",
+        schema_version: "rcaf.injection-recovery/0.3.0",
         seed: config.seed,
         participants_per_replicate: config.participants,
         regions: config.regions,
@@ -649,11 +672,16 @@ pub fn run_injection_recovery(
         global_loading: config.global_loading,
         module_loading: config.module_loading,
         loading_jitter: config.loading_jitter,
+        common_mode_nuisance_loading: config.common_mode_nuisance_loading,
         estimator: config.estimator.as_str(),
         injection_loading_delta: config.injection_loading_delta,
         temporal_autocorrelation: config.temporal_autocorrelation,
         alpha: config.alpha,
         null_false_positive_rate: wilson_rate(null_rejections, config.monte_carlo_replicates),
+        nuisance_only_rejection_rate: wilson_rate(
+            nuisance_rejections,
+            config.monte_carlo_replicates,
+        ),
         injection_detection_power: wilson_rate(injection_rejections, config.monte_carlo_replicates),
         injection_directional_detection_power: wilson_rate(
             directional_injection_rejections,
@@ -664,6 +692,7 @@ pub fn run_injection_recovery(
             config.monte_carlo_replicates,
         ),
         median_null_paired_gap: median(&null_median_gaps),
+        median_nuisance_only_paired_gap: median(&nuisance_median_gaps),
         median_injected_paired_gap: median(&injected_median_gaps),
         median_null_positive_gap_fraction: median(&null_positive_fractions),
         median_injected_positive_gap_fraction: median(&injected_positive_fractions),
@@ -716,6 +745,13 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "loading_jitter must be finite and non-negative",
         });
     }
+    if !config.common_mode_nuisance_loading.is_finite()
+        || config.common_mode_nuisance_loading < 0.0
+    {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "common_mode_nuisance_loading must be finite and non-negative",
+        });
+    }
     if !config.temporal_autocorrelation.is_finite() || config.temporal_autocorrelation.abs() >= 1.0
     {
         return Err(MetricError::InvalidSimulationConfig {
@@ -734,7 +770,8 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
     let max_global = config.global_loading + config.loading_jitter / 2.0;
     let max_module =
         config.module_loading + config.loading_jitter / 2.0 + config.injection_loading_delta;
-    if max_global.powi(2) + max_module.powi(2) >= 1.0 {
+    let nuisance_loading = config.common_mode_nuisance_loading;
+    if max_global.powi(2) + max_module.powi(2) + nuisance_loading.powi(2) >= 1.0 {
         return Err(MetricError::InvalidSimulationConfig {
             reason: "factor loadings must leave positive residual variance",
         });
@@ -748,6 +785,7 @@ fn sample_correlation_matrix(
     global_loadings: &[f64],
     module_loadings: &[f64],
     temporal_autocorrelation: f64,
+    common_mode_nuisance_loading: f64,
 ) -> Vec<Vec<f64>> {
     let regions = global_loadings.len();
     let mut sums = vec![0.0; regions];
@@ -755,6 +793,11 @@ fn sample_correlation_matrix(
     let innovation_scale = (1.0 - temporal_autocorrelation * temporal_autocorrelation).sqrt();
     let mut previous_global = rng.normal();
     let mut previous_module = rng.normal();
+    let mut previous_nuisance = if common_mode_nuisance_loading > 0.0 {
+        rng.normal()
+    } else {
+        0.0
+    };
     let mut previous_residuals: Vec<f64> = (0..regions).map(|_| rng.normal()).collect();
 
     for _ in 0..samples {
@@ -762,8 +805,13 @@ fn sample_correlation_matrix(
             temporal_autocorrelation * previous_global + innovation_scale * rng.normal();
         previous_module =
             temporal_autocorrelation * previous_module + innovation_scale * rng.normal();
+        if common_mode_nuisance_loading > 0.0 {
+            previous_nuisance = temporal_autocorrelation * previous_nuisance
+                + innovation_scale * rng.normal();
+        }
         let global_factor = previous_global;
         let module_factor = previous_module;
+        let nuisance_factor = previous_nuisance;
         let mut observation = Vec::with_capacity(regions);
         for ((region, (&global, &module)), sum) in global_loadings
             .iter()
@@ -771,11 +819,16 @@ fn sample_correlation_matrix(
             .enumerate()
             .zip(sums.iter_mut())
         {
-            let residual = (1.0 - global * global - module * module).sqrt();
+            let residual = (1.0
+                - global * global
+                - module * module
+                - common_mode_nuisance_loading * common_mode_nuisance_loading)
+                .sqrt();
             previous_residuals[region] = temporal_autocorrelation * previous_residuals[region]
                 + innovation_scale * rng.normal();
             let value = global * global_factor
                 + module * module_factor
+                + common_mode_nuisance_loading * nuisance_factor
                 + residual * previous_residuals[region];
             observation.push(value);
             *sum += value;
@@ -991,6 +1044,33 @@ mod tests {
         );
         assert!(!correct, "non-significant positive imbalance is not recovery");
         assert!(!wrong);
+    }
+
+    #[test]
+    fn zero_strength_common_mode_nuisance_reuses_the_exact_null_control() {
+        let mut config = test_config();
+        config.monte_carlo_replicates = 30;
+        config.common_mode_nuisance_loading = 0.0;
+        let report = run_injection_recovery(&config).unwrap();
+        assert_eq!(
+            report.nuisance_only_rejection_rate,
+            report.null_false_positive_rate
+        );
+        assert_eq!(
+            report.median_nuisance_only_paired_gap,
+            report.median_null_paired_gap
+        );
+    }
+
+    #[test]
+    fn common_mode_nuisance_is_reported_separately_from_latent_injection() {
+        let report = run_injection_recovery(&test_config()).unwrap();
+        assert_eq!(report.common_mode_nuisance_loading, 0.20);
+        assert_eq!(report.nuisance_only_rejection_rate.trials, report.monte_carlo_replicates);
+        assert!(report.median_nuisance_only_paired_gap.is_finite());
+        let json = report.to_json_pretty();
+        assert!(json.contains("\"nuisance_only_rejection_rate\""));
+        assert!(json.contains("\"common_mode_nuisance_loading\""));
     }
 
     #[test]
