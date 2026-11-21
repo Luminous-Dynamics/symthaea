@@ -1,0 +1,89 @@
+{
+  "schema": "plasma-phase-space-transport-profile-v0.1",
+  "status": "small_n_reference_not_a_solver_acceptance_contract",
+  "domain": {
+    "position": "one-dimensional periodic domain S^1_L",
+    "velocity": "one-dimensional unbounded real line"
+  },
+  "ground_metric": {
+    "distance": "sqrt((shortest_periodic_position_arc/position_length_scale)^2 + (velocity_delta/velocity_length_scale)^2)",
+    "position_arc": "min(abs(x-x') mod L, L - (abs(x-x') mod L))",
+    "position_length_scale": 0.5,
+    "velocity_length_scale": 1
+  },
+  "measure_contract": {
+    "weights": "nonnegative only",
+    "signed_delta_f": "rejected; use characteristic MMD lane",
+    "support_canonicalization": "periodic position reduction, deterministic sort, co-located weight aggregation",
+    "mass_match": "relative total mass mismatch must be at most 1e-12",
+    "normalization": "balanced measures are normalized to probability mass after strict original-mass match",
+    "mass_mismatch_output": "original candidate/reference total masses and relative mismatch are retained",
+    "empty_measure": "two empty measures have zero cost; one empty and one nonempty is rejected",
+    "minimum_normalized_weight": "If normalization underflows any positive atom to zero or non-finite, fail closed rather than dropping it."
+  },
+  "solver": {
+    "algorithm": "successive-shortest-augmenting-path min-cost flow",
+    "shortest_path": "Bellman-Ford on residual graph with negative reverse arcs",
+    "complexity_scope": "small_n dense transportation LP reference",
+    "not_claimed": "production Sinkhorn, GPU OT, NUFFT OT or large-scale solver",
+    "flow_completion": "Continue until the representable source residual capacity is exactly exhausted; verify all destination residual capacities are zero. No fixed total-flow epsilon may truncate small normalized weights; unresolved residual supply or demand returns ResidualMassUnresolved.",
+    "probability_normalization": "Divide weights by each original total mass, sum with compensated accumulation, correct the largest normalized atom for residual sum roundoff, and verify the normalized sum is within 16*f64::EPSILON of one."
+  },
+  "diagnostics": [
+    "normalized_w1",
+    "normalized_transport_cost",
+    "candidate_total_mass",
+    "reference_total_mass",
+    "relative_mass_mismatch",
+    "transported_fraction",
+    "candidate_atom_count",
+    "reference_atom_count",
+    "ground_cost_evaluations",
+    "augmenting_path_count",
+    "shortest_path_relaxations"
+  ],
+  "claim_limits": [
+    "Balanced W1 is defined only for nonnegative equal-mass measures under the admitted tolerance.",
+    "The ground metric and scales are part of the benchmark identity.",
+    "Signed delta-f measures are not supported by this API.",
+    "The small-N reference is not a production-scale transport algorithm or a physical solver certificate.",
+    "Transport is a separate fidelity observable from characteristic MMD and physical residuals.",
+    "The min-cost-flow routine does not truncate residual source mass by a fixed epsilon; unresolved destination residual capacity fails closed."
+  ],
+  "provenance": {
+    "implementation": "standalone dependency-free Rust crate",
+    "rust_toolchain": "1.96.0"
+  },
+  "stress_controls": [
+    {
+      "id": "tiny_mass_large_velocity_separation",
+      "epsilon": "2^-50",
+      "candidate": [
+        {
+          "position": 0,
+          "velocity": 0,
+          "weight": "1-epsilon"
+        },
+        {
+          "position": 0,
+          "velocity": 0,
+          "weight": "epsilon"
+        }
+      ],
+      "reference": [
+        {
+          "position": 0,
+          "velocity": 0,
+          "weight": "1-epsilon"
+        },
+        {
+          "position": 0,
+          "velocity": 1000000000000000,
+          "weight": "epsilon"
+        }
+      ],
+      "expected_normalized_w1": "epsilon*1e15",
+      "purpose": "Demonstrates that a sub-1e-12 normalized atom is not ignored when its ground displacement makes its W1 contribution order one."
+    }
+  ]
+}
