@@ -1,0 +1,94 @@
+name: MEL Score Transaction Receipts
+
+on:
+  pull_request:
+    branches:
+      - main
+      - research/mel-sonata-cognitive-subintent-20261121
+    paths:
+      - "crates/domains/symthaea-muse/src/score_transaction.rs"
+      - "crates/domains/symthaea-muse/src/sonata_intervention.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/MEL_SCORE_TRANSACTION_RECEIPTS_V1_2026-11-21.md"
+      - ".github/workflows/mel-score-transaction-receipts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-score-transaction-receipts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact merge-head score transaction qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact PR merge head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify exact merge and source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "${{ github.sha }}"
+          printf 'merge_head=%s\n' "$actual" > "$RUNNER_TEMP/source-identities.txt"
+          printf 'pr_head=%s\n' "${{ github.event.pull_request.head.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'base_head=%s\n' "${{ github.event.pull_request.base.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Resolve actual workspace under committed lockfile
+        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
+
+      - name: Check touched source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/score_transaction.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/sonata_intervention.rs
+
+      - name: Compile actual Muse library
+        run: cargo check --locked -p symthaea-muse --features theory --lib
+
+      - name: Run score transaction receipt tests
+        run: cargo test --locked -p symthaea-muse --features theory --lib score_transaction::tests
+
+      - name: Run Sonata candidate receipt integration tests
+        run: cargo test --locked -p symthaea-muse --features theory --lib sonata_intervention::tests
+
+      - name: Test-compile all Muse library tests
+        run: cargo test --locked -p symthaea-muse --features theory --lib --no-run
+
+      - name: Record exact merge-head evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-score-transaction-evidence"
+          mkdir -p "$evidence"
+          cp Cargo.toml "$evidence/Cargo.toml"
+          cp Cargo.lock "$evidence/Cargo.lock"
+          cp crates/domains/symthaea-muse/src/score_transaction.rs "$evidence/score_transaction.rs"
+          cp crates/domains/symthaea-muse/src/sonata_intervention.rs "$evidence/sonata_intervention.rs"
+          cp "$RUNNER_TEMP/workspace-metadata.json" "$evidence/workspace-metadata.json"
+          cp "$RUNNER_TEMP/source-identities.txt" "$evidence/source-identities.txt"
+          (
+            cd "$evidence"
+            sha256sum Cargo.toml Cargo.lock score_transaction.rs sonata_intervention.rs workspace-metadata.json source-identities.txt > SHA256SUMS
+          )
+
+      - name: Upload exact merge-head score transaction evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-score-transaction-receipts-${{ github.sha }}
+          path: ${{ runner.temp }}/mel-score-transaction-evidence/
+          if-no-files-found: error
+          retention-days: 90

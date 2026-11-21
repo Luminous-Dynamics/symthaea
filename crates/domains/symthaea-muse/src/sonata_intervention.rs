@@ -23,6 +23,9 @@ use crate::musical_policy::{
     MusicalPolicyPreference, MusicalPolicySelection, PolicyCandidateEvidence,
     select_by_musical_policy,
 };
+use crate::score_transaction::{
+    ScorePatchErrorV1, ScorePatchReceiptV1, create_score_patch_receipt,
+};
 use serde::{Deserialize, Serialize};
 use symthaea_music_theory::{
     MotifReturnEvidence, ObligationKind, Pitch, ReturnTransformation, Score, ScoreNote,
@@ -110,6 +113,8 @@ pub struct SonataInterventionCandidate {
     pub preserved_invariants: bool,
     pub measurement: SymbolicMeasurementEvidence,
     pub prediction: InterventionCalibrationEvidence,
+    /// Source-bound, independently verifiable note-level edit transaction.
+    pub patch_receipt: ScorePatchReceiptV1,
 }
 
 impl SonataInterventionCandidate {
@@ -138,6 +143,7 @@ pub enum SonataInterventionError {
     MissingSourceMelody,
     MissingTargetMelody,
     InvalidMeasurementRegion,
+    ScorePatchRejected(ScorePatchErrorV1),
 }
 
 impl From<ClosedLoopError> for SonataInterventionError {
@@ -241,6 +247,8 @@ pub fn generate_and_rank_sonata_return_with_model(
     let mut candidates = Vec::with_capacity(generated.len());
     let mut policy_evidence = Vec::with_capacity(generated.len());
     for (alternative_id, strategy, score) in generated {
+        let patch_receipt = create_score_patch_receipt(&realization.score, &score, &target_indices)
+            .map_err(SonataInterventionError::ScorePatchRejected)?;
         let motif_return = compare_melodic_regions(
             &score,
             source.start,
@@ -303,6 +311,7 @@ pub fn generate_and_rank_sonata_return_with_model(
             preserved_invariants,
             measurement,
             prediction,
+            patch_receipt,
         });
     }
 
@@ -711,7 +720,43 @@ mod tests {
         SymbolicMusicObservation,
     };
     use crate::musical_inference::MusicAction;
+    use crate::score_transaction::verify_score_patch_receipt;
     use symthaea_music_theory::{MusicalIntent, Style, compose_sonata_with_plan};
+
+    fn candidate_gate_diagnostics(batch: &SonataInterventionBatch) -> String {
+        batch
+            .candidates
+            .iter()
+            .map(|candidate| {
+                let target_verified = candidate
+                    .verification
+                    .iter()
+                    .find(|item| Some(item.obligation_id) == batch.driving_obligation_id)
+                    .map(|item| item.verified);
+                let assessment = batch
+                    .selection
+                    .assessments
+                    .iter()
+                    .find(|item| item.alternative_id == candidate.alternative_id);
+                format!(
+                    "{}:{:?}:theory={}:issues={:?}:preserved={}:verified={:?}:assessment={:?}",
+                    candidate.alternative_id,
+                    candidate.strategy,
+                    candidate.theory_validation.valid,
+                    candidate
+                        .theory_validation
+                        .issues
+                        .iter()
+                        .map(|issue| format!("{:?}:{}", issue.rule, issue.message))
+                        .collect::<Vec<_>>(),
+                    candidate.preserved_invariants,
+                    target_verified,
+                    assessment.map(|item| (item.eligible, item.target_obligation_verified))
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" | ")
+    }
 
     fn return_trace(realization: &SonataRealization) -> CognitiveDecisionTrace {
         let obligation = realization
@@ -807,7 +852,38 @@ mod tests {
 
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
+        eprintln!(
+            "Sonata subintent gates: {}",
+            candidate_gate_diagnostics(&batch)
+        );
         assert_eq!(batch.candidates.len(), 5);
+        let source_digest = batch.candidates[0]
+            .patch_receipt
+            .source_score_sha256
+            .clone();
+        let protected_digest = batch.candidates[0]
+            .patch_receipt
+            .protected_complement_sha256
+            .clone();
+        for candidate in &batch.candidates {
+            verify_score_patch_receipt(
+                &realization.score,
+                &candidate.score,
+                &candidate.patch_receipt,
+            )
+            .unwrap();
+            assert_eq!(candidate.patch_receipt.source_score_sha256, source_digest);
+            assert_eq!(
+                candidate.patch_receipt.protected_complement_sha256,
+                protected_digest
+            );
+            assert!(candidate.patch_receipt.changed_events.iter().all(|event| {
+                candidate
+                    .patch_receipt
+                    .target_event_indices
+                    .contains(&event.event.source_index)
+            }));
+        }
         assert_eq!(
             batch.cognitive_subintent.schema,
             SONATA_RETURN_SUBINTENT_SCHEMA_V1
@@ -858,11 +934,19 @@ mod tests {
         let mut repeat_trace = return_trace(&realization);
         repeat_trace.inference.source_action = MusicAction::RepeatMotif;
         let repeat_batch = generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
+        eprintln!(
+            "RepeatMotif gates: {}",
+            candidate_gate_diagnostics(&repeat_batch)
+        );
 
         let mut maintain_trace = repeat_trace.clone();
         maintain_trace.inference.source_action = MusicAction::Maintain;
         let maintain_batch =
             generate_and_rank_sonata_return(&realization, &maintain_trace).unwrap();
+        eprintln!(
+            "Maintain gates: {}",
+            candidate_gate_diagnostics(&maintain_batch)
+        );
 
         assert_eq!(
             repeat_batch.cognitive_subintent.disposition,
@@ -880,12 +964,13 @@ mod tests {
         );
         let selected_score = |batch: &SonataInterventionBatch| {
             let selected_id = batch.selection.recommended_id.as_deref().unwrap();
-            &batch
+            batch
                 .candidates
                 .iter()
                 .find(|candidate| candidate.alternative_id == selected_id)
                 .unwrap()
                 .score
+                .clone()
         };
         assert_ne!(
             selected_score(&repeat_batch),
