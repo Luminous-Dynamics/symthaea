@@ -130,3 +130,18 @@ The current branch adds the split-local pair manifest validator and an executabl
 ## Current complete hosted verification
 
 The clean-base PR #13126 run [#44917273962](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962) passed all 46 unit tests. The job also reproduced the binary-metric, inspection-decision and contrastive-pair validation reports byte-for-byte. The exact tested commit is `5f8ffa91bac2cb8cee923d0f1968d2f57fd01149`.
+
+
+## Latest Rust-native integrity gate
+
+Hosted GitHub Actions run [#44934333447](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447) passed on commit `4a7f7029fa8694914f0c85650053d879e399b402`:
+
+- Rust format check: pass.
+- Clippy with warnings denied: pass.
+- Rust unit tests: **18 passed, 0 failed**.
+- Rust binary metrics CLI report: byte-for-byte match with the frozen independent Python reference.
+- The Rust split validator verified the synthetic group-disjoint known answer and the actual 1,567-row source-local SECOM chronological manifest, including 940/313/314 row counts and 76/11/17 failure support.
+- The Rust contrastive-pair validator passed known-answer, cross-split, duplicate-edge, same-lot, time-embargo and clock-domain tests.
+- The Python/reference job in the same run passed 46/46 tests and reproduced its three frozen reports.
+
+These checks ran in a minimal temporary Cargo workspace because the repository root workspace currently references a missing `crates/core/symthaea/Cargo.toml`. The isolated workspace avoided changing unrelated root workspace state. This verifies contract and leakage logic, not a trained model's predictive performance or physical fab outcome.
