@@ -46,9 +46,9 @@ pub use cognitive_layout::{
     layout_cognitive_topology, project_cognitive_topology,
 };
 pub use cognitive_events::{
-    MAX_COGNITIVE_EVENT_LOG, MAX_COGNITIVE_EVENTS_PER_BATCH, CognitiveEventApplyOutcome,
-    CognitiveEventError, CognitiveTopologyChange, CognitiveTopologyEvent,
-    CognitiveTopologyReducer,
+    COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION, MAX_COGNITIVE_EVENT_LOG,
+    MAX_COGNITIVE_EVENTS_PER_BATCH, CognitiveEventApplyOutcome, CognitiveEventError,
+    CognitiveTopologyChange, CognitiveTopologyEvent, CognitiveTopologyReducer,
 };
 pub use cognitive_svg::{CognitiveSvgError, CognitiveSvgOptions, render_cognitive_projection_svg};
 pub use cognitive_topology::{
