@@ -549,10 +549,29 @@
       "reference_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
       "hosted_ci_status": "success",
       "claim_ceiling": "metric contract parity only; no dataset model or manufacturing claim",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44933592943",
-      "hosted_ci_test_count": 6,
-      "test_result": "6/6 Rust tests passed; format, clippy and byte-for-byte CLI report parity passed",
-      "tested_commit": "b0d17926ccedd5bd283556aec275302ea294a199"
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
+      "hosted_ci_test_count": 18,
+      "test_result": "18/18 Rust tests passed across binary metrics, split-manifest integrity and contrastive-pair integrity; fmt/clippy and binary CLI reference parity passed",
+      "tested_commit": "4a7f7029fa8694914f0c85650053d879e399b402"
+    },
+    "rust_split_manifest_validator": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json",
+      "source_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
+      "test_count": 6,
+      "claim_ceiling": "split integrity only; no predictive performance or generalization claim"
+    },
+    "rust_contrastive_pair_validator": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/pair_manifest.rs",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
+      "test_count": 6,
+      "claim_ceiling": "pair integrity only; no model quality/causality claim"
     }
   },
   "reproducibility_artifacts": [
