@@ -1150,8 +1150,8 @@ mod tests {
     #[test]
     fn all_frozen_scenarios_pass_the_independent_semantic_contract() {
         let receipt = run_audit(FIXTURE, SOURCE).expect("scenario catalogue must audit");
-        assert_eq!(receipt.scenario_count, 14);
-        assert_eq!(receipt.oracle_matches, 14);
+        assert_eq!(receipt.scenario_count, 15);
+        assert_eq!(receipt.oracle_matches, 15);
         assert_eq!(receipt.oracle_mismatches, 0);
         assert!(!receipt.authority_granted);
     }
@@ -1449,6 +1449,41 @@ mod tests {
             first_choice.selected_action_id,
             second_choice.selected_action_id
         );
+    }
+
+    #[test]
+    fn exact_profile_serial_configuration_and_icd_context_block_false_joins() {
+        let receipt = run_audit(FIXTURE, SOURCE).unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "JEV-015")
+            .unwrap();
+        assert_eq!(case.eligible_action_count, 0);
+        assert_eq!(case.selected_action_id, None);
+        assert_eq!(case.selection_disposition, "ABSTAIN_NO_DECISION_VALUE");
+        assert!(case.selection_matches_oracle);
+        for action in &case.actions {
+            assert!(!action.policy_eligible);
+            assert_eq!(action.admissibility_state, "ADMISSIBLE");
+            assert!(action.target_claim_matches);
+            assert_eq!(
+                action.profile_matches,
+                action.action_id != "A-WRONG-PROFILE"
+            );
+            assert_eq!(
+                action.article_subject_matches,
+                action.action_id != "A-WRONG-SERIAL"
+            );
+            assert_eq!(
+                action.configuration_matches,
+                action.action_id != "A-WRONG-CONFIGURATION"
+            );
+            assert_eq!(
+                action.icd_revision_matches,
+                action.action_id != "A-WRONG-ICD-REVISION"
+            );
+        }
     }
 
     #[test]
