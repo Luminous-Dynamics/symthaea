@@ -62,6 +62,17 @@ No prediction is silently dropped. Duplicate case/modality outputs, unknown case
 
 The all-case denominator is intentional. An evaluator must not improve its reported accuracy by abstaining on hard audio inputs or by omitting failures.
 
+## Confidence and calibration metrics
+
+The evaluator now calculates confidence calibration separately for every task and modality, using answered predictions only:
+- **Brier score:** mean squared error between the predicted confidence in the top-label and whether that answer was correct.
+- **Expected calibration error (ECE):** weighted absolute gap between mean confidence and empirical accuracy across ten fixed [0.0, 1.0] bins.
+- **Reliability bins:** sample count, mean confidence and empirical accuracy for each bin.
+
+Abstentions and missing predictions do not receive synthetic confidence values. They are excluded from Brier/ECE but remain in the all-case accuracy denominator and reduce coverage. Each calibration metric reports its own evaluated count, so a high ECE score on a tiny answered subset cannot be confused with broad model coverage.
+
+These are top-label confidence calibration metrics. They do not establish probability calibration over the full answer class distribution; a future extension should add class-wise Brier scores, log loss, and calibration-stratified selective-risk curves once the answer payloads expose full class probabilities.
+
 ## Engineering already implemented
 
 The Rust module provides:
