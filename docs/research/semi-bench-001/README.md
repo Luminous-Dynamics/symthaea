@@ -479,3 +479,16 @@ The actual row-level chronology manifest is frozen at [the SECOM split file](spl
 The SECOM source audit now includes missing-value profiles by chronological split and month. The sensor-cell missingness rate is 5.14% in train, 3.42% in validation and 3.84% in test; it declines from 5.33% in August to 3.77% in October. All rows have at least one missing sensor value, 28 features are over 50% missing, and 52 features have no missing values. This warrants explicit missingness-only and indicator ablations; it is not a process-cause interpretation.
 
 New workstream: [SEMI-SECOM-MISS-001 #13115](https://github.com/Luminous-Dynamics/symthaea/issues/13115), covering missingness-only shortcuts, MAR/MNAR shifts, train/test observation-regime changes and abstention.
+
+
+## Lot-disjoint, open-world and multi-view wafer frontier
+
+See [2026-wafer-lot-and-multiview-frontier.md](2026-wafer-lot-and-multiview-frontier.md). The new follow-up workstreams separate three capabilities:
+
+- [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122): unseen-lot and time-forward wafer-map generalization, including split-local contrastive pairs and OOD calibration integrity.
+- [SEMI-MULTIVIEW-001 #13123](https://github.com/Luminous-Dynamics/symthaea/issues/13123): item-wise CP/DFC map fusion, missing-view robustness and industrial open-world inspection.
+- [SEMI-WBM-COMP-001 #13113](https://github.com/Luminous-Dynamics/symthaea/issues/13113) and [SEMI-OPENSET-001 #13121](https://github.com/Luminous-Dynamics/symthaea/issues/13121): unseen compositions, unknown defects and continual learning.
+
+The 2026 GNN wafer-map paper reports 98.6% accuracy and 89.3% LOCO OOD detection, but its reported split is sample-level stratified rather than lot-disjoint. A review of the released OOD script also found an apparent calibration mismatch: the paper describes a validation-derived threshold, while the public script appears to derive the 5th-percentile threshold from test in-distribution scores. This is a paper/repository reproduction discrepancy to resolve, not evidence that the published result itself is invalid.
+
+The PPAPlace-5000 data release provides 5,000 complete placements with post-GRT timing/power/area labels across ten ChiPBench circuits. Its Hugging Face license metadata is “other”; exact terms must be reviewed before downloading, caching or redistributing the 8.47 GiB release.
