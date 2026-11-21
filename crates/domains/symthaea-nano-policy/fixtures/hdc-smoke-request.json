@@ -1,0 +1,13 @@
+{
+  "schema_version": "nano-selection-input-v1",
+  "policy": "hdc_maximin",
+  "budget": 2,
+  "seed": 7,
+  "already_selected": [],
+  "candidates": [
+    {"id": "geometry-a", "features": [0.0, 0.0]},
+    {"id": "geometry-b", "features": [0.1, 0.2]},
+    {"id": "geometry-c", "features": [0.8, 0.9]},
+    {"id": "geometry-d", "features": [1.0, 1.0]}
+  ]
+}
