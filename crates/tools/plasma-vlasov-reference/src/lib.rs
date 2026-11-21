@@ -119,6 +119,34 @@ impl FourierModeCoefficient {
     }
 }
 
+
+/// Spectral-tail energy observations for one phase-space axis.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpectralAxisTail {
+    /// Sum of squared Fourier coefficients over all modes.
+    pub total_spectral_energy: f64,
+    /// Sum of squared coefficients in the configured high-frequency band.
+    pub high_frequency_energy: f64,
+    /// High-frequency energy divided by total spectral energy, or zero for a
+    /// zero-energy axis.
+    pub high_frequency_fraction: f64,
+    /// Nyquist-mode energy divided by total spectral energy, or zero for a
+    /// zero-energy axis.
+    pub nyquist_energy_fraction: f64,
+}
+
+/// Independent spectral-tail measurements along x and v.
+///
+/// This is a resolution-warning diagnostic, not a rigorous truncation-error
+/// bound and not an automatic grid-expansion decision.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhaseSpaceSpectralTail {
+    /// Modes with |k| >= ceil(tail_start_fraction * Nyquist) count as high.
+    pub tail_start_fraction: f64,
+    pub x: SpectralAxisTail,
+    pub velocity: SpectralAxisTail,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SolverError {
     InvalidGrid {
@@ -149,6 +177,7 @@ pub enum SolverError {
         mode: usize,
         maximum_exclusive: usize,
     },
+    InvalidSpectralTailFraction,
     NonFiniteState,
 }
 
@@ -198,6 +227,10 @@ impl fmt::Display for SolverError {
             } => write!(
                 f,
                 "electric mode {mode} must be positive and less than {maximum_exclusive}"
+            ),
+            Self::InvalidSpectralTailFraction => write!(
+                f,
+                "spectral tail start fraction must be finite and in (0, 1]"
             ),
             Self::NonFiniteState => write!(f, "solver produced a non-finite state"),
         }
@@ -365,6 +398,37 @@ impl VlasovPoisson1d1v {
     /// peak amplitude) for the requested electric-field mode.
     pub fn electric_mode_amplitude(&self, mode: usize) -> Result<f64, SolverError> {
         Ok(self.electric_mode_coefficient(mode)?.amplitude())
+    }
+
+    /// Measure phase-space spectral-tail energy independently along x and v.
+    ///
+    /// tail_start_fraction is a fixed diagnostic band threshold in (0, 1].
+    /// For example, 0.75 counts modes whose absolute index is at least 75% of
+    /// the Nyquist index. It must be frozen in the run profile. The returned
+    /// fractions are observed spectral occupancy, not a physical error bound.
+    pub fn spectral_tail_diagnostics(
+        &self,
+        tail_start_fraction: f64,
+    ) -> Result<PhaseSpaceSpectralTail, SolverError> {
+        if !tail_start_fraction.is_finite()
+            || tail_start_fraction <= 0.0
+            || tail_start_fraction > 1.0
+        {
+            return Err(SolverError::InvalidSpectralTailFraction);
+        }
+
+        let x_start = ((tail_start_fraction * (self.config.nx / 2) as f64).ceil() as usize)
+            .max(1);
+        let v_start = ((tail_start_fraction * (self.config.nv / 2) as f64).ceil() as usize)
+            .max(1);
+        let x = spectral_tail_axis_x(&self.distribution, self.config, x_start)?;
+        let velocity = spectral_tail_axis_v(&self.distribution, self.config, v_start)?;
+
+        Ok(PhaseSpaceSpectralTail {
+            tail_start_fraction,
+            x,
+            velocity,
+        })
     }
 
     pub fn diagnostics(&self) -> Result<VlasovPoissonDiagnostics, SolverError> {
@@ -586,6 +650,101 @@ pub fn solve_periodic_poisson_spectral(
         return Err(SolverError::NonFiniteState);
     }
     Ok(field)
+}
+
+fn spectral_tail_axis_x(
+    distribution: &[f64],
+    config: VlasovPoissonConfig,
+    tail_start_mode: usize,
+) -> Result<SpectralAxisTail, SolverError> {
+    let mut total = 0.0;
+    let mut high = 0.0;
+    let mut nyquist = 0.0;
+    let mut line = vec![Complex::ZERO; config.nx];
+
+    for iv in 0..config.nv {
+        for (ix, value) in line.iter_mut().enumerate() {
+            *value = Complex::new(distribution[ix * config.nv + iv], 0.0);
+        }
+        fft(&mut line, false);
+        for (mode, coefficient) in line.iter().enumerate() {
+            let power = coefficient
+                .re
+                .mul_add(coefficient.re, coefficient.im * coefficient.im);
+            if !power.is_finite() {
+                return Err(SolverError::NonFiniteState);
+            }
+            total += power;
+            if signed_mode(mode, config.nx).unsigned_abs() >= tail_start_mode {
+                high += power;
+            }
+            if mode == config.nx / 2 {
+                nyquist += power;
+            }
+        }
+    }
+
+    spectral_axis_result(total, high, nyquist)
+}
+
+fn spectral_tail_axis_v(
+    distribution: &[f64],
+    config: VlasovPoissonConfig,
+    tail_start_mode: usize,
+) -> Result<SpectralAxisTail, SolverError> {
+    let mut total = 0.0;
+    let mut high = 0.0;
+    let mut nyquist = 0.0;
+    let mut line = vec![Complex::ZERO; config.nv];
+
+    for ix in 0..config.nx {
+        let row = &distribution[ix * config.nv..(ix + 1) * config.nv];
+        for (value, sample) in line.iter_mut().zip(row) {
+            *value = Complex::new(*sample, 0.0);
+        }
+        fft(&mut line, false);
+        for (mode, coefficient) in line.iter().enumerate() {
+            let power = coefficient
+                .re
+                .mul_add(coefficient.re, coefficient.im * coefficient.im);
+            if !power.is_finite() {
+                return Err(SolverError::NonFiniteState);
+            }
+            total += power;
+            if signed_mode(mode, config.nv).unsigned_abs() >= tail_start_mode {
+                high += power;
+            }
+            if mode == config.nv / 2 {
+                nyquist += power;
+            }
+        }
+    }
+
+    spectral_axis_result(total, high, nyquist)
+}
+
+fn spectral_axis_result(
+    total: f64,
+    high: f64,
+    nyquist: f64,
+) -> Result<SpectralAxisTail, SolverError> {
+    if !total.is_finite() || !high.is_finite() || !nyquist.is_finite() {
+        return Err(SolverError::NonFiniteState);
+    }
+    let (high_fraction, nyquist_fraction) = if total > 0.0 {
+        (high / total, nyquist / total)
+    } else {
+        (0.0, 0.0)
+    };
+    if !high_fraction.is_finite() || !nyquist_fraction.is_finite() {
+        return Err(SolverError::NonFiniteState);
+    }
+    Ok(SpectralAxisTail {
+        total_spectral_energy: total,
+        high_frequency_energy: high,
+        high_frequency_fraction: high_fraction,
+        nyquist_energy_fraction: nyquist_fraction,
+    })
 }
 
 fn validate_dt(dt: f64) -> Result<(), SolverError> {
@@ -855,6 +1014,48 @@ mod tests {
             config.validate(),
             Err(SolverError::GridSizeOverflow)
         ));
+    }
+
+    #[test]
+    fn spectral_tail_diagnostic_separates_x_and_velocity_high_modes() {
+        let config = test_config(32, 32);
+        let x_mode = 14usize;
+        let x_high: Vec<f64> = (0..config.nx)
+            .flat_map(|ix| {
+                let value = (TAU * x_mode as f64 * ix as f64 / config.nx as f64).cos();
+                std::iter::repeat_n(value, config.nv)
+            })
+            .collect();
+        let x_solver = VlasovPoisson1d1v::new(config, x_high).unwrap();
+        let x_tail = x_solver.spectral_tail_diagnostics(0.75).unwrap();
+        assert!(x_tail.x.high_frequency_fraction > 0.999_999);
+        assert!(x_tail.velocity.high_frequency_fraction < 1.0e-12);
+
+        let v_mode = 14usize;
+        let mut v_high = vec![0.0; config.nx * config.nv];
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                v_high[ix * config.nv + iv] =
+                    (TAU * v_mode as f64 * iv as f64 / config.nv as f64).cos();
+            }
+        }
+        let v_solver = VlasovPoisson1d1v::new(config, v_high).unwrap();
+        let v_tail = v_solver.spectral_tail_diagnostics(0.75).unwrap();
+        assert!(v_tail.velocity.high_frequency_fraction > 0.999_999);
+        assert!(v_tail.x.high_frequency_fraction < 1.0e-12);
+    }
+
+    #[test]
+    fn spectral_tail_fraction_is_validated() {
+        let config = test_config(16, 32);
+        let initial = maxwellian_perturbation(config, 0.0, 1, 1.0).unwrap();
+        let solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        for invalid in [0.0, -0.1, 1.1, f64::NAN, f64::INFINITY] {
+            assert!(matches!(
+                solver.spectral_tail_diagnostics(invalid),
+                Err(SolverError::InvalidSpectralTailFraction)
+            ));
+        }
     }
 
     #[test]
