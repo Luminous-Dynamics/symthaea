@@ -341,18 +341,28 @@ All targets are research gates, not achieved results or current SOTA claims.
 - [ ] Test whether a non-humanoid topology improves process comprehension and reduces anthropomorphic over-attribution.
 - [ ] Publish MPES traces, scripts, scoring criteria, hardware metadata and negative results.
 
-## 9. Immediate next implementation slice
+## 9. First implementation slice — source added
 
-The next code increment should be intentionally small and testable:
+The first bounded slice is now present on the public research branch. It is **source-level implementation, pending exact-head formatting, compilation and test validation**.
 
-1. Introduce a versioned `CognitiveTopology` data type with bounded nodes, edges, and episodes; do not connect unimplemented runtime producers.
-2. Add a fixture with three cases: retrieval path, competing association candidates, and unresolved prediction.
-3. Add a deterministic layout adapter mapping stable graph IDs to spatial anchors and branch descriptors.
-4. Add tests proving that renderer mode, camera, colour, animation phase, and display LOD cannot change topology identity or provenance.
-5. Add a CLI that replays the fixture and emits canonical topology and geometry digests.
-6. Render the fixture statically before attempting live animation.
+Implemented in source:
+1. `cognitive_topology.rs`: schema-v1 nodes, edges and episodes; bounded collections; explicit RuntimeEvent, RuntimeDerived and SyntheticFixture provenance; fail-closed validation for IDs, duplicate references, dangling links, event metadata consistency, sequence/time ordering, activation ranges, trace digests and resource limits.
+2. `tests/fixtures/cognitive_topology_v1.json`: a clearly synthetic retrieval path, two competing associations and one unresolved prediction.
+3. `CognitiveTopology::canonical_digest`: BLAKE3 digest over canonical ID-sorted semantic state, independent of array ordering and renderer configuration.
+4. `cognitive_layout.rs`: a deliberately simple hash-anchored 3D projection; stable node IDs retain their anchors when new nodes are appended, and links carry source event/provenance/status.
+5. `examples/cognitive_topology_replay.rs`: validates the fixture and prints topology and projection digests/counts.
+6. Unit-test source covers checked-in fixture parity, order-independent digest, semantic mutation, dangling endpoints, renderer-local provenance rejection, conflicting metadata, non-monotonic times, invalid activation and oversized graph bounds.
 
-This creates an independently testable artifact while the native Bevy build is being validated. It also creates the foundation for a real Cognitive Instrument without waiting for every Symthaea subsystem to expose events.
+This is not yet a graph-optimized layout, smooth morphogenesis engine, live cognitive producer or human-validated instrument. The hash-anchor map is a stable baseline for comparing relation-aware layouts. The synthetic fixture is not live Symthaea cognition.
+
+Remaining:
+- exact-head format/test/Clippy validation;
+- a real retrieval producer from its owning subsystem;
+- relation-aware space-colonization / other layouts and temporal stability metrics;
+- static render and selection/provenance interaction;
+- a matched human-factors study.
+
+Implementation and follow-on research are tracked in [#13066](https://github.com/Luminous-Dynamics/symthaea/issues/13066), [#13077](https://github.com/Luminous-Dynamics/symthaea/issues/13077), and [#13079](https://github.com/Luminous-Dynamics/symthaea/issues/13079).
 
 ## 10. Non-negotiable invariants
 
