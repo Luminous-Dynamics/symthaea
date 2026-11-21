@@ -999,6 +999,131 @@ mod tests {
         }
     }
 
+    fn manufactured_echo_solver_config() -> crate::VlasovPoissonConfig {
+        crate::VlasovPoissonConfig {
+            nx: 64,
+            nv: 256,
+            domain_length: 4.0 * PI,
+            velocity_min: -6.0,
+            velocity_max: 6.0,
+            charge_to_mass: -1.0,
+            permittivity: 1.0,
+            background_density: 1.0,
+        }
+    }
+
+    fn manufactured_velocity_kick(
+        config: crate::VlasovPoissonConfig,
+        spatial_mode: usize,
+        amplitude: f64,
+    ) -> Vec<f64> {
+        (0..config.nx)
+            .map(|index| {
+                amplitude
+                    * (TAU * spatial_mode as f64 * config.x(index) / config.domain_length).sin()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn manufactured_free_streaming_echo_matches_linearized_phase_rephasing_response() {
+        let config = manufactured_echo_solver_config();
+        let alpha = 1.0e-3;
+        let second_pulse_time = 2.0;
+        let impulse_amplitude = 0.05;
+        let pulses = EchoPulsePair {
+            first_mode: 1,
+            second_mode: 2,
+            first_time: 0.0,
+            second_time: second_pulse_time,
+        };
+        let prediction = predict_two_pulse_echo(pulses).unwrap();
+        assert_eq!(prediction.echo_mode, 1);
+        assert!((prediction.echo_time - 4.0).abs() < 1.0e-14);
+
+        let initial =
+            crate::maxwellian_perturbation(config, alpha, 1, 1.0).expect("valid Maxwellian");
+        let mut pulsed =
+            crate::VlasovPoisson1d1v::new(config, initial.clone()).expect("valid solver");
+        let mut no_second_pulse =
+            crate::VlasovPoisson1d1v::new(config, initial).expect("valid control solver");
+
+        pulsed.advance_free_streaming(second_pulse_time).unwrap();
+        no_second_pulse
+            .advance_free_streaming(second_pulse_time)
+            .unwrap();
+
+        let kick = manufactured_velocity_kick(config, 2, impulse_amplitude);
+        pulsed.apply_velocity_impulse(&kick).unwrap();
+
+        let post_pulse_time = prediction.echo_time - second_pulse_time;
+        pulsed.advance_free_streaming(post_pulse_time).unwrap();
+        no_second_pulse
+            .advance_free_streaming(post_pulse_time)
+            .unwrap();
+
+        let with_pulse = pulsed.electric_mode_coefficient(prediction.echo_mode as usize).unwrap();
+        let control = no_second_pulse
+            .electric_mode_coefficient(prediction.echo_mode as usize)
+            .unwrap();
+        let response_real = with_pulse.real - control.real;
+        let response_imaginary = with_pulse.imaginary - control.imaginary;
+
+        // First-order small-pulse characteristic result for this normalized
+        // Maxwellian cohort. The finite-grid result includes higher-order
+        // pulse terms and roundoff, so compare within a preregistered 2%.
+        let k1 = TAU / config.domain_length;
+        let k_echo = f64::from(prediction.echo_mode) * TAU / config.domain_length;
+        let expected_imaginary =
+            -alpha * k1 * second_pulse_time * impulse_amplitude / (4.0 * k_echo);
+
+        assert!(
+            response_real.abs() < 0.02 * expected_imaginary.abs(),
+            "unexpected in-phase echo component: {response_real:e}"
+        );
+        assert!(
+            (response_imaginary - expected_imaginary).abs()
+                < 0.02 * expected_imaginary.abs(),
+            "observed echo response {response_imaginary:e}, expected {expected_imaginary:e}"
+        );
+        assert!((pulsed.time() - prediction.echo_time).abs() < 1.0e-14);
+        assert!((no_second_pulse.time() - prediction.echo_time).abs() < 1.0e-14);
+    }
+
+    #[test]
+    fn wrong_second_pulse_mode_does_not_create_the_registered_echo_branch() {
+        let config = manufactured_echo_solver_config();
+        let alpha = 1.0e-3;
+        let pulse_time = 2.0;
+        let kick_amplitude = 0.05;
+        let initial =
+            crate::maxwellian_perturbation(config, alpha, 1, 1.0).expect("valid Maxwellian");
+        let mut mismatched =
+            crate::VlasovPoisson1d1v::new(config, initial.clone()).expect("valid solver");
+        let mut no_pulse =
+            crate::VlasovPoisson1d1v::new(config, initial).expect("valid control solver");
+
+        mismatched.advance_free_streaming(pulse_time).unwrap();
+        no_pulse.advance_free_streaming(pulse_time).unwrap();
+        mismatched
+            .apply_velocity_impulse(&manufactured_velocity_kick(config, 3, kick_amplitude))
+            .unwrap();
+        mismatched.advance_free_streaming(2.0).unwrap();
+        no_pulse.advance_free_streaming(2.0).unwrap();
+
+        let mismatched_mode = mismatched.electric_mode_coefficient(1).unwrap();
+        let control_mode = no_pulse.electric_mode_coefficient(1).unwrap();
+        let response = (mismatched_mode.real - control_mode.real)
+            .hypot(mismatched_mode.imaginary - control_mode.imaginary);
+
+        // A mode-3 second pulse couples the first mode to different sidebands;
+        // it must not be scored as the mode-1 branch from the mode-2 protocol.
+        assert!(
+            response < 5.0e-7,
+            "wrong-mode control leaked into the registered echo branch: {response:e}"
+        );
+    }
+
     #[test]
     fn echo_phase_uses_atan2_and_remains_in_principal_interval() {
         let phases = [-PI, -2.7, -1.2, 0.0, 0.8, 2.9];
