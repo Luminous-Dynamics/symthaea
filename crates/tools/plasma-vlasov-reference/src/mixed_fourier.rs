@@ -65,6 +65,16 @@ impl RealSpaceCoefficientFields {
         self.spatial_count
     }
 
+    /// Immutable upstream revision whose transform convention this represents.
+    pub fn source_commit(&self) -> &'static str {
+        ADEPT_FOURIER_SOURCE_COMMIT
+    }
+
+    /// Source-pinned FFT normalization and mode-ordering identity.
+    pub fn convention(&self) -> &'static str {
+        ADEPT_FOURIER_CONVENTION
+    }
+
     pub fn coefficients(&self) -> &[f64] {
         &self.coefficients
     }
@@ -315,6 +325,8 @@ mod tests {
         }
         assert!(real.maximum_imaginary_residual() <= 1.0e-13);
         close(real.maximum_real_magnitude(), 2.5, 1.0e-13);
+        assert_eq!(real.source_commit(), ADEPT_FOURIER_SOURCE_COMMIT);
+        assert_eq!(real.convention(), ADEPT_FOURIER_CONVENTION);
     }
 
     #[test]
