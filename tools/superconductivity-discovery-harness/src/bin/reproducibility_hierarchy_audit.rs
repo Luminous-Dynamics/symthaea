@@ -60,7 +60,7 @@ fn canonical_utc(value: &str) -> bool {
     ) else {
         return false;
     };
-    if !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 || day == 0 {
+    if year == 0 || !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 || day == 0 {
         return false;
     }
     let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
@@ -267,6 +267,7 @@ fn validate_task(
             }
             require_disjoint(&train_specimens, &test_specimens, "specimen")?;
             require_same_single(&train_batches, &test_batches, "batch")?;
+            require_same_single(&train_campaigns, &test_campaigns, "campaign")?;
         }
         "between_batch_holdout" => {
             if paired {
@@ -287,6 +288,10 @@ fn validate_task(
             require_disjoint(&train_labs, &test_labs, "laboratory")?;
             if paired {
                 require_same_single(&train_specimens, &test_specimens, "paired specimen")?;
+                require_same_single(&train_batches, &test_batches, "batch")?;
+                require_same_single(&train_campaigns, &test_campaigns, "campaign")?;
+                require_same_single(&train_conditions, &test_conditions, "condition")?;
+                require_same_single(&train_protocols, &test_protocols, "protocol")?;
             } else {
                 require_disjoint(&train_specimens, &test_specimens, "specimen")?;
             }
@@ -301,6 +306,8 @@ fn validate_task(
             if paired {
                 return Err(format!("{task_id}: time-forward holdout cannot declare paired specimen transfer"));
             }
+            require_disjoint(&train_specimens, &test_specimens, "specimen")?;
+            require_disjoint(&train_batches, &test_batches, "batch")?;
             validate_time_forward(&train, &test)?;
         }
         other => return Err(format!("{task_id}: unsupported task_type {other}")),
