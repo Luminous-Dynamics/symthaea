@@ -120,18 +120,40 @@ impl MixedDistribution {
 ///
 /// This routine expects coefficients after any source-specific inverse spatial
 /// Fourier transform. It does not interpret FFT ordering or normalization.
+/// Coefficient fields in row-major (mode, x) layout.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MixedCoefficientFields<'a> {
+    pub spatial_count: usize,
+    pub hermite_modes: usize,
+    pub hermite_coefficients: &'a [f64],
+    pub legendre_modes: usize,
+    pub legendre_coefficients: &'a [f64],
+}
+
+/// Physical velocity nodes and basis-coordinate configuration.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MixedVelocityGrid<'a> {
+    pub velocities: &'a [f64],
+    pub shift: f64,
+    pub scale: f64,
+    pub velocity_min: f64,
+    pub velocity_max: f64,
+}
+
 pub fn reconstruct_mixed_distribution(
-    spatial_count: usize,
-    velocities: &[f64],
-    hermite_modes: usize,
-    hermite_coefficients: &[f64],
-    legendre_modes: usize,
-    legendre_coefficients: &[f64],
-    shift: f64,
-    scale: f64,
-    velocity_min: f64,
-    velocity_max: f64,
+    coefficients: MixedCoefficientFields<'_>,
+    grid: MixedVelocityGrid<'_>,
 ) -> Result<MixedDistribution, MixedReconstructionError> {
+    let spatial_count = coefficients.spatial_count;
+    let velocities = grid.velocities;
+    let hermite_modes = coefficients.hermite_modes;
+    let hermite_coefficients = coefficients.hermite_coefficients;
+    let legendre_modes = coefficients.legendre_modes;
+    let legendre_coefficients = coefficients.legendre_coefficients;
+    let shift = grid.shift;
+    let scale = grid.scale;
+    let velocity_min = grid.velocity_min;
+    let velocity_max = grid.velocity_max;
     if spatial_count == 0 {
         return Err(MixedReconstructionError::EmptySpatialGrid);
     }
