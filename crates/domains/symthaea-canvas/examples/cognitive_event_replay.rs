@@ -15,10 +15,9 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveLayoutConfig,
-    CognitiveMorphologyConfig, CognitiveSvgOptions, CognitiveTopology, CognitiveTopologyEvent,
-    CognitiveTopologyReducer, build_cognitive_morphology, layout_cognitive_topology,
-    render_cognitive_morphology_svg,
+    COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveLayoutConfig, CognitiveMorphologyConfig,
+    CognitiveSvgOptions, CognitiveTopology, CognitiveTopologyEvent, CognitiveTopologyReducer,
+    build_cognitive_morphology, layout_cognitive_topology, render_cognitive_morphology_svg,
 };
 
 const DEFAULT_EVENTS: &str =
@@ -91,18 +90,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     let reducer = final_reducer.expect("sample count is non-zero");
     let snapshot = reducer.snapshot();
     let spatial = layout_cognitive_topology(snapshot, None, CognitiveLayoutConfig::default())?;
-    let morphology = build_cognitive_morphology(
-        snapshot,
-        &spatial,
-        CognitiveMorphologyConfig::default(),
-    )?;
+    let morphology =
+        build_cognitive_morphology(snapshot, &spatial, CognitiveMorphologyConfig::default())?;
     let semantic_digest = reducer.snapshot_digest_hex()?;
     let event_log_digest = reducer.event_log_digest_hex()?;
+    let replay_verifier =
+        CognitiveTopologyReducer::replay(black_box(base.clone()), black_box(&events))?;
+    let replay_trace_agreement =
+        replay_verifier.event_log_digest_hex()? == event_log_digest;
+    let replay_projection_agreement =
+        replay_verifier.snapshot_digest_hex()? == semantic_digest;
+    if !replay_trace_agreement || !replay_projection_agreement {
+        return Err("independent projection replay diverged".into());
+    }
     let geometry_digest = morphology.geometry_digest_hex()?;
 
     if let Some(path) = &svg_path {
-        let svg =
-            render_cognitive_morphology_svg(&morphology, CognitiveSvgOptions::default())?;
+        let svg = render_cognitive_morphology_svg(&morphology, CognitiveSvgOptions::default())?;
         fs::write(path, svg)?;
     }
 
@@ -122,6 +126,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("last_sequence: {}", snapshot.last_sequence);
     println!("semantic_snapshot_digest: {semantic_digest}");
     println!("event_log_digest: {event_log_digest}");
+    println!("replay_assurance_schema_version: 1");
+    println!("replay_assurance_scope: same-binary same-process projection replay");
+    println!("replay_assertion.byte_identity: not_assessed");
+    println!(
+        "replay_assertion.trace_identity: {}",
+        if replay_trace_agreement { "established_for_accepted_log" } else { "failed" }
+    );
+    println!(
+        "replay_assertion.projection: {}",
+        if replay_projection_agreement { "established_in_process" } else { "failed" }
+    );
+    println!("replay_assertion.path_identity: not_assessed");
+    println!("replay_assertion.decision_equivalence: not_assessed");
+    println!("replay_assertion.execution_replay: not_assessed_no_effect_receipts");
+    println!("replay_assertion.external_environment: not_assessed");
     println!("layout_algorithm: deterministic-force-v1");
     println!("morphology_algorithm: cognitive-bezier-hypha-v1");
     println!("morphology_nodes: {}", morphology.nodes.len());
