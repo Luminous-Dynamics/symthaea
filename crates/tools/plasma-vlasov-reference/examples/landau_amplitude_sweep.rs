@@ -21,7 +21,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         "case,alpha,step,time,electric_mode_real,electric_mode_imag,electric_mode_amplitude,electric_mode_phase,mass,momentum,total_energy,poisson_residual,velocity_boundary_ratio,x_high_tail_fraction,v_high_tail_fraction"
     );
 
-    for (case, alpha) in [("weak_alpha_1e-3", 1.0e-3), ("paper_amplitude_1e-2", 1.0e-2)] {
+    for (case, alpha) in [
+        ("weak_alpha_1e-3", 1.0e-3),
+        ("paper_amplitude_1e-2", 1.0e-2),
+    ] {
         let initial = maxwellian_perturbation(config, alpha, mode, 1.0)?;
         let mut solver = VlasovPoisson1d1v::new(config, initial)?;
 
