@@ -526,7 +526,7 @@ The earlier planning direction in ENG-SEMI #5671 proposed a semiconductor/device
 - Its Rust tests load the frozen independent Python input/output fixtures and compare the complete JSON report, plus invalid-input and order-invariance tests.
 - The Python scorer remains a test/reference oracle; it is not a production dependency.
 
-The first Rust CI attempt found that the current root workspace cannot be resolved because Cargo's workspace glob includes a missing `crates/core/symthaea/Cargo.toml` on main. The new SEMI-BENCH workflow now tests this crate in a minimal temporary workspace copied from the exact checkout, avoiding an unrelated repository-wide manifest repair. Formatting, clippy and crate tests are still awaiting the isolated hosted result; no Rust pass is claimed yet.
+The first Rust CI attempt found that the current root workspace cannot be resolved because Cargo's workspace glob includes a missing `crates/core/symthaea/Cargo.toml` on main. The new SEMI-BENCH workflow now tests this crate in a minimal temporary workspace copied from the exact checkout, avoiding an unrelated repository-wide manifest repair. Hosted run [#44933592943](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44933592943) passed on commit `b0d17926ccedd5bd283556aec275302ea294a199`: rustfmt passed, clippy passed with warnings denied, all six Rust unit tests passed, and the Rust CLI reproduced the frozen Python report byte-for-byte. The checks ran in a minimal temporary workspace because the root workspace references a missing `crates/core/symthaea/Cargo.toml`; no unrelated workspace fix was made.
 
 Tracked by [SEMI-RUST-001 #13129](https://github.com/Luminous-Dynamics/symthaea/issues/13129).
 
