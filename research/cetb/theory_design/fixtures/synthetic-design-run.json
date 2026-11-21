@@ -1,0 +1,74 @@
+{
+  "schema_version": "cetb.theory-design-run/0.1.0",
+  "status": "synthetic_fixture",
+  "theory_prior": {
+    "IIT": 0.5,
+    "GNWT": 0.5
+  },
+  "designs": [
+    {
+      "design_id": "two-context-visual-decoding-high-cost",
+      "cost": 5,
+      "lower_quantile": 0.25,
+      "nuisance_scenarios": [
+        {
+          "weight": 0.75,
+          "likelihoods": {
+            "IIT": {
+              "cross_context_decode": 0.9,
+              "no_cross_context_decode": 0.05,
+              "measurement_unusable": 0.05
+            },
+            "GNWT": {
+              "cross_context_decode": 0.1,
+              "no_cross_context_decode": 0.85,
+              "measurement_unusable": 0.05
+            }
+          }
+        },
+        {
+          "weight": 0.25,
+          "likelihoods": {
+            "IIT": {
+              "cross_context_decode": 0.7,
+              "no_cross_context_decode": 0.2,
+              "measurement_unusable": 0.1
+            },
+            "GNWT": {
+              "cross_context_decode": 0.2,
+              "no_cross_context_decode": 0.7,
+              "measurement_unusable": 0.1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "design_id": "lower-cost-weaker-discrimination",
+      "cost": 1,
+      "lower_quantile": 0.25,
+      "nuisance_scenarios": [
+        {
+          "weight": 1,
+          "likelihoods": {
+            "IIT": {
+              "cross_context_decode": 0.65,
+              "no_cross_context_decode": 0.25,
+              "measurement_unusable": 0.1
+            },
+            "GNWT": {
+              "cross_context_decode": 0.35,
+              "no_cross_context_decode": 0.55,
+              "measurement_unusable": 0.1
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "claim_limits": [
+    "fully synthetic design fixture",
+    "no human prediction or experimental evidence",
+    "model rankings depend on supplied priors and likelihoods"
+  ]
+}
