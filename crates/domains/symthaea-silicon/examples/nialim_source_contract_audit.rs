@@ -317,15 +317,14 @@ mod tests {
 
     #[test]
     fn method_extraction_stops_at_dedented_class_method_boundary() {
-        let source = concat!(
-            "class Model:\n",
-            "    def forward(self, x, timespans=None, mask=None):\n",
-            "        timespans = torch.ones((batch_size, seq_len)).to(device)\n",
-            "        return timespans\n",
-            "\n",
-            "    def next_method(self):\n",
-            "        return 1\n",
-        );
+        let source = r#"class Model:
+    def forward(self, x, timespans=None, mask=None):
+        timespans = torch.ones((batch_size, seq_len)).to(device)
+        return timespans
+
+    def next_method(self):
+        return 1
+"#;
         let method = extract_python_method(source, FORWARD_SIGNATURE).unwrap();
         assert!(method.contains("timespans = torch.ones"));
         assert!(!method.contains("def next_method"));
@@ -333,7 +332,8 @@ mod tests {
 
     #[test]
     fn whitespace_normalization_handles_line_wrapped_python_statements() {
-        let source = "timespans = torch.ones((batch_size,\\n seq_len)).to(device)";
+        let source = r#"timespans = torch.ones((batch_size,
+ seq_len)).to(device)"#;
         assert_eq!(
             normalize_whitespace(source),
             normalize_whitespace(OVERWRITE_STATEMENT)
@@ -342,26 +342,26 @@ mod tests {
 
     #[test]
     fn absent_signature_is_not_mistaken_for_a_clean_method() {
-        assert!(extract_python_method("class Empty:\\n    pass\\n", FORWARD_SIGNATURE).is_none());
+        assert!(extract_python_method(r#"class Empty:
+    pass
+"#, FORWARD_SIGNATURE).is_none());
     }
 
     #[test]
     fn guarded_default_does_not_match_unconditional_overwrite_rule() {
-        let method = concat!(
-            "    def forward(self, x, timespans=None, mask=None):\\n",
-            "        if timespans is None:\\n",
-            "            timespans = torch.ones((batch_size, seq_len)).to(device)\\n",
-        );
+        let method = r#"    def forward(self, x, timespans=None, mask=None):
+        if timespans is None:
+            timespans = torch.ones((batch_size, seq_len)).to(device)
+"#;
         assert!(!has_direct_method_statement(method, OVERWRITE_STATEMENT));
     }
 
     #[test]
     fn direct_unconditional_overwrite_is_detected() {
-        let method = concat!(
-            "    def forward(self, x, timespans=None, mask=None):\\n",
-            "        timespans = torch.ones((batch_size, seq_len)).to(device)\\n",
-            "        for t in range(seq_len):\\n",
-        );
+        let method = r#"    def forward(self, x, timespans=None, mask=None):
+        timespans = torch.ones((batch_size, seq_len)).to(device)
+        for t in range(seq_len):
+"#;
         assert!(has_direct_method_statement(method, OVERWRITE_STATEMENT));
     }
 }
