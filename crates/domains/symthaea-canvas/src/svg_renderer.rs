@@ -128,8 +128,8 @@ fn write_css_animations(buf: &mut String, consciousness: f64, options: SvgRender
       to {{ transform: rotate(360deg); }}
     }}
     @keyframes {hyphae_pulse_name} {{
-      0%, 100% {{ opacity: 0.82; }}
-      50% {{ opacity: 1.0; }}
+      0%, 100% {{ transform: scale(0.996); }}
+      50% {{ transform: scale(1.006); }}
     }}
     @keyframes {star_twinkle_name} {{
       0%, 100% {{ opacity: 0.45; }}
@@ -138,8 +138,12 @@ fn write_css_animations(buf: &mut String, consciousness: f64, options: SvgRender
     #{bloom_id} {{ animation: {breathe_name} {breath_dur:.1}s ease-in-out infinite; animation-delay: {breath_delay:.3}s; transform-origin: center; }}
     #{rings_id} > ellipse {{ animation: {orbit_name} {orbit_dur:.1}s linear infinite; animation-delay: {orbit_delay:.3}s; transform-origin: center; }}
     #{particles_id} > circle {{ animation: {particle_orbit_name} {particle_dur:.1}s linear infinite; animation-delay: {particle_delay:.3}s; transform-origin: center; }}
-    #{hyphae_id} {{ animation: {hyphae_pulse_name} 7.0s ease-in-out infinite; }}
-    #{starfield_id} > circle {{ animation: {star_twinkle_name} 5.5s ease-in-out infinite; }}
+    #{hyphae_id} {{ animation: {hyphae_pulse_name} 7.0s ease-in-out infinite; transform-origin: center; }}
+    #{starfield_id} > .spore-phase-0 {{ animation: {star_twinkle_name} 5.5s ease-in-out -0.0s infinite; }}
+    #{starfield_id} > .spore-phase-1 {{ animation: {star_twinkle_name} 5.5s ease-in-out -1.1s infinite; }}
+    #{starfield_id} > .spore-phase-2 {{ animation: {star_twinkle_name} 5.5s ease-in-out -2.2s infinite; }}
+    #{starfield_id} > .spore-phase-3 {{ animation: {star_twinkle_name} 5.5s ease-in-out -3.3s infinite; }}
+    #{starfield_id} > .spore-phase-4 {{ animation: {star_twinkle_name} 5.5s ease-in-out -4.4s infinite; }}
     @media (prefers-reduced-motion: reduce) {{
       #{bloom_id}, #{rings_id} > ellipse, #{particles_id} > circle, #{hyphae_id}, #{starfield_id} > circle {{ animation: none; }}
     }}
