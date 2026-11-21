@@ -84,9 +84,11 @@ fn write_css_animations(buf: &mut String, consciousness: f64, options: SvgRender
         let bloom_id = qualified_id(options, "bloom");
         let rings_id = qualified_id(options, "rings");
         let particles_id = qualified_id(options, "particles");
+        let hyphae_id = qualified_id(options, "hyphae");
+        let starfield_id = qualified_id(options, "starfield");
         let _ = writeln!(
             buf,
-            "  <style>#{bloom_id}, #{rings_id} > ellipse, #{particles_id} > circle {{ animation: none; }}</style>"
+            "  <style>#{bloom_id}, #{rings_id} > ellipse, #{particles_id} > circle, #{hyphae_id}, #{starfield_id} > circle {{ animation: none; }}</style>"
         );
         return;
     }
@@ -102,9 +104,13 @@ fn write_css_animations(buf: &mut String, consciousness: f64, options: SvgRender
     let bloom_id = qualified_id(options, "bloom");
     let rings_id = qualified_id(options, "rings");
     let particles_id = qualified_id(options, "particles");
+    let hyphae_id = qualified_id(options, "hyphae");
+    let starfield_id = qualified_id(options, "starfield");
     let breathe_name = qualified_id(options, "breathe");
     let orbit_name = qualified_id(options, "orbit");
     let particle_orbit_name = qualified_id(options, "particle-orbit");
+    let hyphae_pulse_name = qualified_id(options, "hyphae-pulse");
+    let star_twinkle_name = qualified_id(options, "star-twinkle");
 
     let _ = write!(
         buf,
@@ -121,11 +127,21 @@ fn write_css_animations(buf: &mut String, consciousness: f64, options: SvgRender
       from {{ transform: rotate(0deg); }}
       to {{ transform: rotate(360deg); }}
     }}
+    @keyframes {hyphae_pulse_name} {{
+      0%, 100% {{ opacity: 0.82; }}
+      50% {{ opacity: 1.0; }}
+    }}
+    @keyframes {star_twinkle_name} {{
+      0%, 100% {{ opacity: 0.45; }}
+      50% {{ opacity: 0.82; }}
+    }}
     #{bloom_id} {{ animation: {breathe_name} {breath_dur:.1}s ease-in-out infinite; animation-delay: {breath_delay:.3}s; transform-origin: center; }}
     #{rings_id} > ellipse {{ animation: {orbit_name} {orbit_dur:.1}s linear infinite; animation-delay: {orbit_delay:.3}s; transform-origin: center; }}
     #{particles_id} > circle {{ animation: {particle_orbit_name} {particle_dur:.1}s linear infinite; animation-delay: {particle_delay:.3}s; transform-origin: center; }}
+    #{hyphae_id} {{ animation: {hyphae_pulse_name} 7.0s ease-in-out infinite; }}
+    #{starfield_id} > circle {{ animation: {star_twinkle_name} 5.5s ease-in-out infinite; }}
     @media (prefers-reduced-motion: reduce) {{
-      #{bloom_id}, #{rings_id} > ellipse, #{particles_id} > circle {{ animation: none; }}
+      #{bloom_id}, #{rings_id} > ellipse, #{particles_id} > circle, #{hyphae_id}, #{starfield_id} > circle {{ animation: none; }}
     }}
   </style>
 "##,
