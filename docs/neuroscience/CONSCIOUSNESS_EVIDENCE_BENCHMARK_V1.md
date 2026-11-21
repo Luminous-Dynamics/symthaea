@@ -103,6 +103,8 @@ Use matched baselines for the exact endpoint and dataset:
 - established EEG or fMRI feature baselines;
 - HDC-only, CfC/LTC-only and HDC–CfC variants as model candidates, not presumed winners.
 
+For estimator/model tournaments with many candidate representations, all statistic-family selection, region-pair selection, feature selection, scaling, hyperparameter tuning and calibration must occur within inner participant-grouped training folds. The outer participant-grouped fold evaluates the entire selection procedure. Report every candidate and selection frequency; never report only the peak among thousands of combinations as an unbiased generalization estimate.
+
 Report metrics by outcome shape:
 
 - Binary / categorical forecasts: Brier score, log score, AUROC, AUPRC, balanced accuracy, sensitivity, specificity and Matthews correlation.
@@ -136,6 +138,7 @@ CETB should not claim that it is a better consciousness detector than existing r
 
 - COGITATE is the adversarial-theory and multimodal preregistration reference.
 - Published ISD work is the main fMRI network-state comparator; its paper reports an AUC of 0.77 for awake versus loss-of-responsiveness discrimination in a specified dataset/protocol. Replicate the exact task and split before comparing.
+- Bryant & Whyte (2026), DOI 10.1093/nc/niag029, is a same-COGITATE-cohort MEG comparator: 246 pyspi statistics retained from 262 candidates, 35,280 model configurations, barycenter-derived measures among the strongest stimulus decoders. Its corrected supplement (niag071, 2026-10-15) is mandatory for reproduction. CETB adds a nested participant-grouped estimator tournament to qualify the measure-selection procedure; this secondary analysis is not independent replication.
 - TMS–EEG PCI is a physical perturbation-based clinical research method. A 2026 clinical-translation review places it in an advanced translational phase while still identifying the need for larger multicentre validation and practical protocol qualification. It is not interchangeable with digital PCI.
 - OpenNeuro/BIDS, NEMAR/DataLad, fMRIPrep/XCP-D, MNE, EEGLAB and FieldTrip already solve important data and signal-processing problems. CETB should interoperate with them rather than rebuild them.
 
@@ -191,3 +194,10 @@ These are proposed gates, not achieved results:
 The machine-readable registry now distinguishes (a) acquisition/cohort counts in the Nature paper, (b) quality-controlled primary-analysis counts, (c) optimization versus replication phase counts, and (d) current public-release counts. Never quote one of these as another. For endpoint-specific iEEG analyses, retain the actual participant flow rather than reusing a modality-wide N.
 
 The current COGITATE release documentation states CC BY 4.0 and provides raw/BIDS bundles, but account registration and agreement to the data terms are required to retrieve them. Freeze the exact bundle DOI/version and terms at intake. A metadata page or public DOI does not prove that the files have been downloaded, checksummed or analyzed.
+
+
+## 13. Selection-aware estimator evaluation
+
+The 2026 COGITATE MEG comparison of 246 pairwise statistics is a reason to treat estimator choice as part of the learning procedure, not as a preprocessing constant. The full candidate set, all exclusions, all region/condition/window combinations and all model fits must be logged. The inner grouped folds select the statistic family and model; outer grouped folds evaluate the selection policy on participants not used for that selection. A separate untouched dataset or cohort is required for independent confirmation.
+
+A high peak among many candidate models is an exploratory observation until this nested and independent evaluation is complete. Cross-task transfer on the same participants is useful but is not the same as participant-held-out transfer. The corrected supplement and article correction must be pinned in any replay.
