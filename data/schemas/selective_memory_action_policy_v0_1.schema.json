@@ -271,6 +271,17 @@
         "memory_bytes_written": {
           "type": "integer",
           "minimum": 0
+        },
+        "candidate_reported_evidence_age_at_use_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_reported_max_evidence_age_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_reported_deadline_slack_at_use_ns": {
+          "type": "integer"
         }
       },
       "allOf": [
@@ -435,7 +446,9 @@
         "tool_call_matches_action",
         "timely_abstention",
         "evaluation_validity",
-        "persistence_receipt_valid"
+        "persistence_receipt_valid",
+        "freshness_valid_at_use",
+        "fresh_correct_on_time"
       ],
       "properties": {
         "schema_version": {
@@ -554,6 +567,50 @@
             "boolean",
             "null"
           ]
+        },
+        "actual_evidence_age_at_use_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_evidence_age_budget_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "deadline_slack_at_use_ns": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "freshness_valid_at_use": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "fresh_correct_on_time": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "wrong_belief_exposure_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_output_exposure_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "abstention_exposure_micros": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "allOf": [
