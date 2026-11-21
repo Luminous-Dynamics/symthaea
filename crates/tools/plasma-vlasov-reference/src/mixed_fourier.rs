@@ -560,6 +560,20 @@ mod tests {
     }
 
     #[test]
+    fn coefficient_shape_overflow_is_rejected_before_allocation() {
+        let spatial_count = 1usize << (usize::BITS - 1);
+        let error = adept_shifted_fourier_to_real_space(
+            ShiftedFourierCoefficientFields {
+                mode_count: 2,
+                spatial_count,
+                coefficients: &[],
+            },
+            1.0e-12,
+        );
+        assert_eq!(error, Err(FourierAdapterError::ShapeOverflow));
+    }
+
+    #[test]
     fn multiplication_by_spatial_count_is_required_for_adept_inverse_convention() {
         let spatial_count = 32;
         let physical_constant = -0.625;
