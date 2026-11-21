@@ -193,8 +193,8 @@ impl From<CognitiveTopologyError> for CognitiveEventError {
 }
 
 /// Replayable reducer state. Persist the base snapshot and accepted events
-/// together; reconstruct with replay() rather than serializing renderer state.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// together; reconstruct with replay() rather than deserializing unchecked state.
+#[derive(Debug, Clone, PartialEq)]
 pub struct CognitiveTopologyReducer {
     base_snapshot: CognitiveTopology,
     topology: CognitiveTopology,
@@ -228,8 +228,8 @@ impl CognitiveTopologyReducer {
         Ok(self.topology.canonical_digest_hex()?)
     }
 
-    /// Hash-chain the base snapshot digest and each accepted event in sequence.
-    /// This digest is not the same as the materialized snapshot digest.
+    /// Hash the base snapshot digest and accepted events in sequence.
+    /// This digest is distinct from the materialized snapshot digest.
     pub fn event_log_digest_hex(&self) -> Result<String, CognitiveEventError> {
         let base_digest = self.base_snapshot.canonical_digest()?;
         let mut hasher = blake3::Hasher::new();
