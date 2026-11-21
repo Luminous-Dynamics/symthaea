@@ -83,3 +83,7 @@ The crate exposes exact and spectral mixture APIs using a finite positive combin
 - The spectral result includes the per-component feature draw counts, seed and feature-sampling error report.
 
 The exact oracle must equal the positive weighted sum of the independent exact component MMD² values, within floating-point tolerance. The mixture is a new versioned diagnostic profile; it does not replace the baseline single-scale profile. Freeze scales and weights using training/calibration fixtures, never held-out trajectories. Report per-component MMD beside aggregate mixture MMD so the aggregate cannot hide a scale-specific failure.
+
+
+The mixture API also reports exact per-component MMD² and, for spectral evaluation, per-component conditional estimates and feature counts. Component-conditional estimates are descriptive; the mixture-wide Hoeffding bound does not apply independently to each component estimate. Report every component alongside the aggregate so a favorable aggregate cannot conceal a scale-specific defect.
+
