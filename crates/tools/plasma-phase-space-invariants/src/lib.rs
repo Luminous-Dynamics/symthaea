@@ -288,12 +288,9 @@ pub fn evaluate_phase_space_moments(
             for atom in &atoms {
                 let centered_velocity = atom.velocity - mean;
                 let normalized_centered_velocity = centered_velocity / config.velocity_scale;
-                let central_term =
-                    0.5 * atom.weight * centered_velocity * centered_velocity;
-                let normalized_term = 0.5
-                    * atom.weight
-                    * normalized_centered_velocity
-                    * normalized_centered_velocity;
+                let central_term = 0.5 * atom.weight * centered_velocity * centered_velocity;
+                let normalized_term =
+                    0.5 * atom.weight * normalized_centered_velocity * normalized_centered_velocity;
                 if !central_term.is_finite() || !normalized_term.is_finite() {
                     return Err(MomentError::MomentOverflow);
                 }
@@ -459,9 +456,11 @@ mod tests {
         assert_near(report.half_second_velocity_moment, -0.5, 1.0e-14);
         assert!(report.mean_velocity.is_none());
         assert!(report.half_second_central_velocity_moment.is_none());
-        assert!(report
-            .normalized_half_second_central_velocity_moment
-            .is_none());
+        assert!(
+            report
+                .normalized_half_second_central_velocity_moment
+                .is_none()
+        );
         assert!(!report.is_nonnegative_measure);
         assert_near(report.total_variation, 1.5, 1.0e-14);
     }
