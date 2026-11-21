@@ -196,7 +196,7 @@ fn run(root: PathBuf) -> Result<bool, AuditError> {
     let tree = git_text(&root, &["rev-parse", "HEAD^{tree}"])?;
     if commit != EXPECTED_COMMIT {
         emit_revision_mismatch(&commit, &tree);
-        return Ok(false);
+        return Ok(2);
     }
 
     let dfa_source = read_source(&root, DFA_PATH)?;
@@ -294,7 +294,7 @@ fn run(root: PathBuf) -> Result<bool, AuditError> {
         json_string(verdict)
     );
 
-    Ok(!static_mismatch)
+    Ok(if static_mismatch { 1 } else { 0 })
 }
 
 fn main() -> ExitCode {
@@ -311,8 +311,7 @@ fn main() -> ExitCode {
     }
 
     match run(PathBuf::from(root)) {
-        Ok(true) => ExitCode::SUCCESS,
-        Ok(false) => ExitCode::from(1),
+        Ok(code) => ExitCode::from(code),
         Err(error) => {
             eprintln!("source audit blocked: {error}");
             ExitCode::from(2)
