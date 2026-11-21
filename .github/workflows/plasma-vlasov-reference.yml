@@ -30,3 +30,16 @@ jobs:
         run: cargo test --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --all-targets -- -D warnings
+      - name: Create reproducible trajectory artifacts
+        run: mkdir -p artifacts/plasma-vlasov-reference
+      - name: Run weak-Landau reference trajectory
+        run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_reference > artifacts/plasma-vlasov-reference/landau-reference.csv
+      - name: Run independent resolution and timestep probes
+        run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example refinement_probe > artifacts/plasma-vlasov-reference/refinement-probe.csv
+      - name: Upload reproducible trajectory traces
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-vlasov-reference-${{ github.sha }}
+          path: artifacts/plasma-vlasov-reference/*.csv
+          if-no-files-found: error
+          retention-days: 30
