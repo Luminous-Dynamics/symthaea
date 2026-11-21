@@ -102,3 +102,7 @@ Rust compile/tests/rustfmt have not run in this environment. Source-level checks
 - [Official Add/Search API guide](https://agentmemories.ai/api-guide)
 - [Cycle 2 rules](https://agentmemories.ai/rules)
 - [Cycle 1 public leaderboard](https://agentmemories.ai/)
+
+### Textual Add must bind the frozen word counter
+
+The Textual word limit is enforced at every Add lifecycle boundary, not only by an optional chunking helper. Reservation, write/search visibility verification, completion and abandonment require the injected frozen adapter word counter. The unqualified Textual methods return `WordCounterVersionMissing`; counter-bound methods enforce the per-chunk 20-message and 2,000-word limits. The counter version is bound into idempotency state and the opaque verified visibility token, so a retry or completion cannot silently switch counting implementations mid-flight.

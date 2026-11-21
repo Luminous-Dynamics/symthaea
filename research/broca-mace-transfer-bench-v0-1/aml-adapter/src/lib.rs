@@ -101,6 +101,7 @@ pub trait AddVisibilityVerifierV1 {
 pub struct VerifiedAddVisibilityV1 {
     receipt: AddVisibilityReceiptV1,
     response: AddResponse,
+    word_counter_version: Option<String>,
 }
 
 impl VerifiedAddVisibilityV1 {
@@ -114,6 +115,10 @@ impl VerifiedAddVisibilityV1 {
 
     pub fn request_payload_digest(&self) -> &str {
         &self.receipt.request_payload_digest
+    }
+
+    pub fn word_counter_version(&self) -> Option<&str> {
+        self.word_counter_version.as_deref()
     }
 }
 
@@ -176,6 +181,7 @@ pub enum AmlReject {
     UnknownRequestId,
     AddAlreadyCompleted,
     WordCounterVersionMissing,
+    WordCounterVersionMismatch,
     SingleMessageWordLimitExceeded,
 }
 
@@ -424,6 +430,40 @@ pub fn validate_add_response(
     receipt: &AddVisibilityReceiptV1,
     verifier: &impl AddVisibilityVerifierV1,
 ) -> Result<VerifiedAddVisibilityV1, AmlReject> {
+    if track == Track::Textual {
+        return Err(AmlReject::WordCounterVersionMissing);
+    }
+    validate_add_response_inner(track, request, response, receipt, verifier, None)
+}
+
+/// Textual visibility verification is permitted only after the exact frozen
+/// adapter word counter and per-chunk limits have been checked.
+pub fn validate_textual_add_response(
+    request: &AddRequest,
+    response: &AddResponse,
+    receipt: &AddVisibilityReceiptV1,
+    verifier: &impl AddVisibilityVerifierV1,
+    counter: &impl FrozenAdapterWordCounter,
+) -> Result<VerifiedAddVisibilityV1, AmlReject> {
+    validate_textual_chunk(request, counter)?;
+    validate_add_response_inner(
+        Track::Textual,
+        request,
+        response,
+        receipt,
+        verifier,
+        Some(counter.adapter_version()),
+    )
+}
+
+fn validate_add_response_inner(
+    track: Track,
+    request: &AddRequest,
+    response: &AddResponse,
+    receipt: &AddVisibilityReceiptV1,
+    verifier: &impl AddVisibilityVerifierV1,
+    word_counter_version: Option<&str>,
+) -> Result<VerifiedAddVisibilityV1, AmlReject> {
     validate_add_request(track, request)?;
     if !response.success {
         return Err(AmlReject::AddResponseNotSuccessful);
@@ -471,18 +511,32 @@ pub fn validate_add_response(
         .map_err(|_| AmlReject::AddVisibilityVerificationFailed)?;
 
     Ok(VerifiedAddVisibilityV1 {
-        track,
-        request_id: request.request_id.clone(),
-        user_id: request.user_id.clone(),
-        session_id: request.session_id.clone(),
-        request_payload_digest: payload_digest,
+        receipt: receipt.clone(),
         response: response.clone(),
-        visible_memory_ids: receipt.visible_memory_ids.clone(),
+        word_counter_version: word_counter_version.map(str::to_owned),
     })
 }
 
 /// Request-body identity for idempotent Add retries. Length-prefixing prevents
 /// delimiter ambiguity; a request ID cannot be rebound to different content.
+fn idempotency_payload_digest(
+    track: Track,
+    request: &AddRequest,
+    word_counter_version: Option<&str>,
+) -> String {
+    let payload = add_payload_digest(track, request);
+    let version = word_counter_version.unwrap_or("");
+    let mut hasher = Sha256::new();
+    hasher.update(b"aml:add-idempotency:v1\\0");
+    hash_field(&mut hasher, &payload);
+    hash_field(&mut hasher, version);
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 pub fn add_payload_digest(track: Track, request: &AddRequest) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"aml:add-request:v2\0");
@@ -554,13 +608,36 @@ fn idempotency_key(track: Track, request: &AddRequest) -> (Track, String, String
 }
 
 impl AddIdempotencyLedger {
+    /// Non-Textual reservation. Textual requests must use `begin_textual` so
+    /// the frozen adapter word counter is part of the reservation identity.
     pub fn begin(
         &mut self,
         track: Track,
         request: &AddRequest,
     ) -> Result<AddRetryState, AmlReject> {
+        if track == Track::Textual {
+            return Err(AmlReject::WordCounterVersionMissing);
+        }
+        self.begin_validated(track, request, None)
+    }
+
+    pub fn begin_textual(
+        &mut self,
+        request: &AddRequest,
+        counter: &impl FrozenAdapterWordCounter,
+    ) -> Result<AddRetryState, AmlReject> {
+        validate_textual_chunk(request, counter)?;
+        self.begin_validated(Track::Textual, request, Some(counter.adapter_version()))
+    }
+
+    fn begin_validated(
+        &mut self,
+        track: Track,
+        request: &AddRequest,
+        word_counter_version: Option<&str>,
+    ) -> Result<AddRetryState, AmlReject> {
         validate_add_request(track, request)?;
-        let digest = add_payload_digest(track, request);
+        let digest = idempotency_payload_digest(track, request, word_counter_version);
         let key = idempotency_key(track, request);
         match self.entries.get(&key) {
             Some((existing, Some(receipt))) if existing == &digest => {
@@ -575,20 +652,51 @@ impl AddIdempotencyLedger {
         }
     }
 
-pub fn complete(
+    pub fn complete(
         &mut self,
         track: Track,
         request: &AddRequest,
         verified: VerifiedAddVisibilityV1,
     ) -> Result<(), AmlReject> {
+        if track == Track::Textual {
+            return Err(AmlReject::WordCounterVersionMissing);
+        }
+        self.complete_validated(track, request, verified, None)
+    }
+
+    pub fn complete_textual(
+        &mut self,
+        request: &AddRequest,
+        verified: VerifiedAddVisibilityV1,
+        counter: &impl FrozenAdapterWordCounter,
+    ) -> Result<(), AmlReject> {
+        validate_textual_chunk(request, counter)?;
+        self.complete_validated(
+            Track::Textual,
+            request,
+            verified,
+            Some(counter.adapter_version()),
+        )
+    }
+
+    fn complete_validated(
+        &mut self,
+        track: Track,
+        request: &AddRequest,
+        verified: VerifiedAddVisibilityV1,
+        word_counter_version: Option<&str>,
+    ) -> Result<(), AmlReject> {
         validate_add_request(track, request)?;
+        if verified.word_counter_version.as_deref() != word_counter_version {
+            return Err(AmlReject::WordCounterVersionMismatch);
+        }
         let receipt = verified.receipt();
-        let digest = add_payload_digest(track, request);
+        let digest = idempotency_payload_digest(track, request, word_counter_version);
         if receipt.track != track
             || receipt.request_id != request.request_id
             || receipt.user_id != request.user_id
             || receipt.session_id != request.session_id
-            || receipt.request_payload_digest != digest
+            || receipt.request_payload_digest != add_payload_digest(track, request)
         {
             return Err(AmlReject::AddVisibilityBindingMismatch);
         }
@@ -607,14 +715,33 @@ pub fn complete(
         Ok(())
     }
 
-    /// Remove only a matching in-flight reservation after a definite failure.
-    /// An unknown/committed/different payload is never removed.
     pub fn abandon(
         &mut self,
         track: Track,
         request: &AddRequest,
     ) -> Result<(), AmlReject> {
-        let digest = add_payload_digest(track, request);
+        if track == Track::Textual {
+            return Err(AmlReject::WordCounterVersionMissing);
+        }
+        self.abandon_validated(track, request, None)
+    }
+
+    pub fn abandon_textual(
+        &mut self,
+        request: &AddRequest,
+        counter: &impl FrozenAdapterWordCounter,
+    ) -> Result<(), AmlReject> {
+        validate_textual_chunk(request, counter)?;
+        self.abandon_validated(Track::Textual, request, Some(counter.adapter_version()))
+    }
+
+    fn abandon_validated(
+        &mut self,
+        track: Track,
+        request: &AddRequest,
+        word_counter_version: Option<&str>,
+    ) -> Result<(), AmlReject> {
+        let digest = idempotency_payload_digest(track, request, word_counter_version);
         let key = idempotency_key(track, request);
         match self.entries.get(&key) {
             Some((stored, None)) if stored == &digest => {
@@ -872,14 +999,58 @@ mod tests {
         track: Track,
         request: &AddRequest,
     ) -> VerifiedAddVisibilityV1 {
-        validate_add_response(
-            track,
-            request,
-            &ack(request),
-            &visibility_receipt(track, request),
-            &TestAddVisibilityVerifier,
-        )
-        .expect("fixture write/search receipts should verify")
+        let result = if track == Track::Textual {
+            validate_textual_add_response(
+                request,
+                &ack(request),
+                &visibility_receipt(track, request),
+                &TestAddVisibilityVerifier,
+                &WhitespaceCounter,
+            )
+        } else {
+            validate_add_response(
+                track,
+                request,
+                &ack(request),
+                &visibility_receipt(track, request),
+                &TestAddVisibilityVerifier,
+            )
+        };
+        result.expect("fixture write/search receipts should verify")
+    }
+
+    fn begin_textual(
+        ledger: &mut AddIdempotencyLedger,
+        request: &AddRequest,
+    ) -> Result<AddRetryState, AmlReject> {
+        ledger.begin_textual(request, &WhitespaceCounter)
+    }
+
+    fn complete_textual(
+        ledger: &mut AddIdempotencyLedger,
+        request: &AddRequest,
+        verified: VerifiedAddVisibilityV1,
+    ) -> Result<(), AmlReject> {
+        ledger.complete_textual(request, verified, &WhitespaceCounter)
+    }
+
+    fn abandon_textual(
+        ledger: &mut AddIdempotencyLedger,
+        request: &AddRequest,
+    ) -> Result<(), AmlReject> {
+        ledger.abandon_textual(request, &WhitespaceCounter)
+    }
+
+    struct AlternateWhitespaceCounter;
+
+    impl FrozenAdapterWordCounter for AlternateWhitespaceCounter {
+        fn adapter_version(&self) -> &str {
+            "fixture-other-word-counter-v2"
+        }
+
+        fn count_words(&self, messages: &[Message]) -> usize {
+            WhitespaceCounter.count_words(messages)
+        }
     }
 
     #[test]
@@ -903,23 +1074,23 @@ mod tests {
         let mut mismatch = ack(&request);
         mismatch.user_id = "another-user".into();
         assert_eq!(
-            validate_add_response(
-                Track::Textual,
-                &request,
-                &mismatch,
-                &receipt,
-                &TestAddVisibilityVerifier,
-            )
+            validate_textual_add_response(
+        &request,
+        &mismatch,
+        &receipt,
+        &TestAddVisibilityVerifier,
+        &WhitespaceCounter,
+    )
             .err(),
             Some(AmlReject::AddResponseEchoMismatch)
         );
-        let verified = validate_add_response(
-            Track::Textual,
-            &request,
-            &ack(&request),
-            &receipt,
-            &TestAddVisibilityVerifier,
-        )
+        let verified = validate_textual_add_response(
+        &request,
+        &ack(&request),
+        &receipt,
+        &TestAddVisibilityVerifier,
+        &WhitespaceCounter,
+    )
         .unwrap();
         assert_eq!(verified.visible_memory_ids(), &["memory-1".to_owned()]);
     }
@@ -930,13 +1101,13 @@ mod tests {
         let mut wrong_user = visibility_receipt(Track::Textual, &request);
         wrong_user.user_id = "another-user".into();
         assert_eq!(
-            validate_add_response(
-                Track::Textual,
-                &request,
-                &ack(&request),
-                &wrong_user,
-                &TestAddVisibilityVerifier,
-            )
+            validate_textual_add_response(
+        &request,
+        &ack(&request),
+        &wrong_user,
+        &TestAddVisibilityVerifier,
+        &WhitespaceCounter,
+    )
             .err(),
             Some(AmlReject::AddVisibilityBindingMismatch)
         );
@@ -944,13 +1115,13 @@ mod tests {
         let mut empty = visibility_receipt(Track::Textual, &request);
         empty.visible_memory_ids.clear();
         assert_eq!(
-            validate_add_response(
-                Track::Textual,
-                &request,
-                &ack(&request),
-                &empty,
-                &TestAddVisibilityVerifier,
-            )
+            validate_textual_add_response(
+        &request,
+        &ack(&request),
+        &empty,
+        &TestAddVisibilityVerifier,
+        &WhitespaceCounter,
+    )
             .err(),
             Some(AmlReject::AddVisibilityNoSearchableItems)
         );
@@ -958,13 +1129,13 @@ mod tests {
         let mut bad_time = visibility_receipt(Track::Textual, &request);
         bad_time.searchable_at_ms = 9;
         assert_eq!(
-            validate_add_response(
-                Track::Textual,
-                &request,
-                &ack(&request),
-                &bad_time,
-                &TestAddVisibilityVerifier,
-            )
+            validate_textual_add_response(
+        &request,
+        &ack(&request),
+        &bad_time,
+        &TestAddVisibilityVerifier,
+        &WhitespaceCounter,
+    )
             .err(),
             Some(AmlReject::AddVisibilityInvalidTimeOrder)
         );
@@ -972,13 +1143,13 @@ mod tests {
         let mut forged = visibility_receipt(Track::Textual, &request);
         forged.search_visibility_receipt_digest = "0".repeat(64);
         assert_eq!(
-            validate_add_response(
-                Track::Textual,
-                &request,
-                &ack(&request),
-                &forged,
-                &TestAddVisibilityVerifier,
-            )
+            validate_textual_add_response(
+        &request,
+        &ack(&request),
+        &forged,
+        &TestAddVisibilityVerifier,
+        &WhitespaceCounter,
+    )
             .err(),
             Some(AmlReject::AddVisibilityVerificationFailed)
         );
@@ -988,20 +1159,20 @@ mod tests {
     fn add_idempotency_replays_exact_request_and_rejects_payload_rebinding() {
         let request = add_request("write-3");
         let mut ledger = AddIdempotencyLedger::default();
-        assert_eq!(ledger.begin(Track::Textual, &request), Ok(AddRetryState::New));
-        assert_eq!(ledger.begin(Track::Textual, &request), Ok(AddRetryState::InFlight));
+        assert_eq!(begin_textual(&mut ledger, &request), Ok(AddRetryState::New));
+        assert_eq!(begin_textual(&mut ledger, &request), Ok(AddRetryState::InFlight));
         ledger
             .complete(Track::Textual, &request, verified_add(Track::Textual, &request))
             .unwrap();
         assert_eq!(
-            ledger.begin(Track::Textual, &request),
+            begin_textual(&mut ledger, &request),
             Ok(AddRetryState::Committed(verified_add(Track::Textual, &request)))
         );
 
         let mut changed = request.clone();
         changed.messages[0].content = MessageContent::Text("different".into());
         assert_eq!(
-            ledger.begin(Track::Textual, &changed),
+            begin_textual(&mut ledger, &changed),
             Err(AmlReject::RequestIdPayloadConflict)
         );
     }
@@ -1018,11 +1189,11 @@ mod tests {
         let expected_ids = original.visible_memory_ids().to_vec();
 
         let mut ledger = AddIdempotencyLedger::default();
-        ledger.begin(Track::Textual, &request).unwrap();
-        ledger.complete(Track::Textual, &request, original).unwrap();
+        begin_textual(&mut ledger, &request).unwrap();
+        complete_textual(&mut ledger, &request, original).unwrap();
 
         let AddRetryState::Committed(replayed) =
-            ledger.begin(Track::Textual, &request).unwrap()
+            begin_textual(&mut ledger, &request).unwrap()
         else {
             panic!("committed retry must replay the verified receipt token");
         };
@@ -1040,16 +1211,121 @@ mod tests {
         let mut other_user = request.clone();
         other_user.user_id = "eval:user:two".into();
         let mut ledger = AddIdempotencyLedger::default();
-        ledger.begin(Track::Textual, &request).unwrap();
+        begin_textual(&mut ledger, &request).unwrap();
         let foreign = verified_add(Track::Textual, &other_user);
         assert_eq!(
-            ledger.complete(Track::Textual, &request, foreign),
+            complete_textual(&mut ledger, &request, foreign),
             Err(AmlReject::AddVisibilityBindingMismatch)
         );
         assert_eq!(
-            ledger.begin(Track::Textual, &request),
+            begin_textual(&mut ledger, &request),
             Ok(AddRetryState::InFlight)
         );
+    }
+
+    #[test]
+    fn textual_add_requires_frozen_counter_at_every_lifecycle_boundary() {
+        let too_many_words = AddRequest {
+            request_id: "too-many-words".into(),
+            messages: vec![message(
+                Role::User,
+                &vec!["word"; TEXTUAL_MAX_WORDS + 1].join(" "),
+            )],
+            user_id: "eval:user:one".into(),
+            session_id: "eval:session:one".into(),
+        };
+        let response = ack(&too_many_words);
+        let receipt = visibility_receipt(Track::Textual, &too_many_words);
+
+        assert_eq!(
+            validate_add_response(
+                Track::Textual,
+                &too_many_words,
+                &response,
+                &receipt,
+                &TestAddVisibilityVerifier,
+            )
+            .err(),
+            Some(AmlReject::WordCounterVersionMissing)
+        );
+        assert_eq!(
+            validate_textual_add_response(
+                &too_many_words,
+                &response,
+                &receipt,
+                &TestAddVisibilityVerifier,
+                &WhitespaceCounter,
+            )
+            .err(),
+            Some(AmlReject::TooManyWords)
+        );
+        let mut ledger = AddIdempotencyLedger::default();
+        assert_eq!(
+            ledger.begin(Track::Textual, &too_many_words),
+            Err(AmlReject::WordCounterVersionMissing)
+        );
+        assert_eq!(
+            ledger.begin_textual(&too_many_words, &WhitespaceCounter),
+            Err(AmlReject::TooManyWords)
+        );
+
+        let valid = add_request("textual-complete-bypass");
+        let verified = verified_add(Track::Textual, &valid);
+        let mut valid_ledger = AddIdempotencyLedger::default();
+        valid_ledger
+            .begin_textual(&valid, &WhitespaceCounter)
+            .unwrap();
+        assert_eq!(
+            valid_ledger.complete(Track::Textual, &valid, verified.clone()),
+            Err(AmlReject::WordCounterVersionMissing)
+        );
+        valid_ledger
+            .complete_textual(&valid, verified, &WhitespaceCounter)
+            .unwrap();
+    }
+
+    #[test]
+    fn textual_idempotency_and_visibility_bind_the_frozen_counter_version() {
+        let request = add_request("word-counter-version");
+        let mut ledger = AddIdempotencyLedger::default();
+        assert_eq!(
+            ledger.begin_textual(&request, &WhitespaceCounter),
+            Ok(AddRetryState::New)
+        );
+        assert_eq!(
+            ledger.begin_textual(&request, &AlternateWhitespaceCounter),
+            Err(AmlReject::RequestIdPayloadConflict)
+        );
+
+        let foreign_version = validate_textual_add_response(
+            &request,
+            &ack(&request),
+            &visibility_receipt(Track::Textual, &request),
+            &TestAddVisibilityVerifier,
+            &AlternateWhitespaceCounter,
+        )
+        .unwrap();
+        assert_eq!(
+            ledger.complete_textual(
+                &request,
+                foreign_version,
+                &WhitespaceCounter,
+            ),
+            Err(AmlReject::WordCounterVersionMismatch)
+        );
+        assert_eq!(
+            ledger.begin_textual(&request, &WhitespaceCounter),
+            Ok(AddRetryState::InFlight)
+        );
+
+        let verified = verified_add(Track::Textual, &request);
+        ledger
+            .complete_textual(&request, verified, &WhitespaceCounter)
+            .unwrap();
+        assert!(matches!(
+            ledger.begin_textual(&request, &WhitespaceCounter),
+            Ok(AddRetryState::Committed(_))
+        ));
     }
 
     #[test]
@@ -1095,11 +1371,11 @@ mod tests {
         let mut ledger = AddIdempotencyLedger::default();
 
         assert_eq!(
-            ledger.begin(Track::Textual, &user_one),
+            begin_textual(&mut ledger, &user_one),
             Ok(AddRetryState::New)
         );
         assert_eq!(
-            ledger.begin(Track::Textual, &user_two),
+            begin_textual(&mut ledger, &user_two),
             Ok(AddRetryState::New)
         );
 
@@ -1118,11 +1394,11 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            ledger.begin(Track::Textual, &user_one),
+            begin_textual(&mut ledger, &user_one),
             Ok(AddRetryState::Committed(verified_add(Track::Textual, &user_one)))
         );
         assert_eq!(
-            ledger.begin(Track::Textual, &user_two),
+            begin_textual(&mut ledger, &user_two),
             Ok(AddRetryState::Committed(verified_add(Track::Textual, &user_two)))
         );
 
@@ -1159,10 +1435,10 @@ mod tests {
     fn idempotency_abandon_only_removes_matching_inflight_payload() {
         let request = add_request("write-4");
         let mut ledger = AddIdempotencyLedger::default();
-        ledger.begin(Track::Textual, &request).unwrap();
-        assert_eq!(ledger.abandon(Track::Textual, &request), Ok(()));
+        begin_textual(&mut ledger, &request).unwrap();
+        assert_eq!(abandon_textual(&mut ledger, &request), Ok(()));
         assert_eq!(
-            ledger.begin(Track::Textual, &request),
+            begin_textual(&mut ledger, &request),
             Ok(AddRetryState::New)
         );
     }
@@ -1173,12 +1449,12 @@ mod tests {
         invalid.user_id = " ".into();
         let mut ledger = AddIdempotencyLedger::default();
         assert_eq!(
-            ledger.begin(Track::Textual, &invalid),
+            begin_textual(&mut ledger, &invalid),
             Err(AmlReject::EmptyRequestId)
         );
         invalid.request_id = "valid-id".into();
         assert_eq!(
-            ledger.begin(Track::Textual, &invalid),
+            begin_textual(&mut ledger, &invalid),
             Err(AmlReject::EmptyUserId)
         );
     }

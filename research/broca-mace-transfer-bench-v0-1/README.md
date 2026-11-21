@@ -523,3 +523,5 @@ The runtime selector rejects a budget for a different model fingerprint and bind
 The learned future-use model is trained, calibrated and evaluated against one explicit target-agent model digest. Every example carries that digest; mixed fingerprints are rejected within a split and across the train/calibration/held-out partitions. The split manifest, trained model, calibrator and raw-prediction pipeline bind the same target identity. A forecast names the agent it is intended for, and a model/input mismatch fails closed.
 
 This is a qualification-boundary improvement, not a measured performance gain. The next experiment compares pooled, model-conditioned and hierarchical predictors under leave-one-model-family-out evaluation, using measured no-memory baselines and complete memory dose-response curves. Parameter count alone is not a capability metric.
+
+Textual Add lifecycle entry points require the frozen word counter at reservation, visibility verification, completion and abandonment; the counter version is bound into idempotency state.
