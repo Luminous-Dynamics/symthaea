@@ -147,7 +147,7 @@ fn validate(subject: &BinaryScoreSubjectV1) -> Result<(usize, usize), BinaryMetr
         if !(0.0..=1.0).contains(&sample.score) {
             return Err(BinaryMetricsError(format!("samples[{index}].score: must be in [0, 1]")));
         }
-        positives += usize::from(sample.positive);
+        if sample.positive { positives += 1; }
     }
     let negatives = subject.samples.len() - positives;
     if positives == 0 || negatives == 0 {
