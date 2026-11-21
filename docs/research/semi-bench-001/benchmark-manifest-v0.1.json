@@ -682,7 +682,7 @@
     "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
     "mode": "test-only-independent-reference; production implementation remains Rust-first",
     "local_tests": null,
-    "local_status": "not-run",
+    "local_status": "not-run-as-a-full-suite",
     "threshold_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_threshold_policy_reference.py",
       "tests": "benchmarks/semi-bench-001/reference/python/test_semi_threshold_policy_reference.py",
@@ -737,19 +737,18 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316",
-      "run_id": 44899113316,
-      "tested_commit": "b98ca276e416f22113e6ad3065c14380294c6b3c",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962",
+      "run_id": 44917273962,
+      "tested_commit": "5f8ffa91bac2cb8cee923d0f1968d2f57fd01149",
       "conclusion": "success",
-      "test_count": 35,
+      "test_count": 46,
       "passed_steps": [
         "Run reference unit tests",
         "Reproduce binary metric report byte-for-byte",
-        "Reproduce inspection decision report byte-for-byte"
+        "Reproduce inspection decision report byte-for-byte",
+        "Reproduce contrastive-pair validation report byte-for-byte"
       ],
-      "details": "Includes test_frozen_secom_source_clock_manifest_has_expected_support",
-      "latest_verified_test_count": 35,
-      "note": "The latest verified hosted run predates the contrastive-pair validator. The new validator was run locally (11/11 tests plus byte-for-byte CLI report reproduction); the combined 46-test suite has not yet received a verified hosted run."
+      "note": "Hosted GitHub Actions verified 46/46 tests and all three frozen CLI reports on the clean-base v0.2 PR head."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -791,10 +790,9 @@
         "result": "PASS",
         "cli_report_byte_for_byte": true
       },
-      "hosted_ci_status": "not-yet-verified"
-    },
-    "test_count_pending_hosted_ci": 46,
-    "pair_validator_hosted_ci_status": "pending"
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962"
+    }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
   "eda_end_to_end_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
