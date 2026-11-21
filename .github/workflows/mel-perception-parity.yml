@@ -3,7 +3,6 @@ name: MEL Audio-Symbolic Perception Parity
 on:
   pull_request:
     branches:
-      - main
       - fix/workspace-stale-member-exclusion-20261121
       - research/mel-audio-perception-parity-20261121
     paths:
