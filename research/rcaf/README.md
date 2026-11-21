@@ -11,6 +11,7 @@ A dependency-free Rust research crate for repeatability-calibrated comparison of
 - Participant-level bootstrap confidence intervals and exact two-sided sign tests.
 - Direct edge-polarity transition counts, including neutral-band transitions.
 - Synthetic Gaussian-factor null/injection calibration plus a shared observation-only common-mode nuisance challenge in `src/simulation.rs`.
+- Matched signal-plus-nuisance dose response, with the same deterministic innovation stream as its nuisance-only counterfactual and separate direction-aware recovery outputs.
 - Draft 2020-12 schemas and semantic validation for RCAF result receipts.
 
 ## Run the kernel tests
@@ -38,6 +39,8 @@ The first example outputs a JSON report conforming to `injection-recovery.schema
 - two-sided difference detection, expected-direction recovery and wrong-direction rejection under a declared module-loading perturbation;
 - 95% Wilson Monte-Carlo confidence intervals;
 - median participant-paired gaps and positive-gap fractions.
+
+At nuisance dose zero, the signal-plus-nuisance outputs must exactly match the clean injection outputs. At positive doses, the combined signal+nuisance cell is matched to the nuisance-only cell through a shared deterministic innovation stream; only the planted module loading differs. This measures whether nuisance reduces or reverses directional recovery.
 
 The generator creates time-series observations from participant-specific global/module factors and region residuals, then estimates correlation matrices. Latent factors and region residuals use stationary AR(1) dependence (default rho=0.30). A separate common-mode nuisance factor can be injected into one observed repeat while holding latent global/module loadings fixed. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
 
