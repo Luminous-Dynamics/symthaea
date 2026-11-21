@@ -353,7 +353,8 @@ fn evolve_state(
     // Input generation is a distinct measured phase. This prevents random
     // distractor construction from being reported as neuron evolution cost.
     let input_prep_start = Instant::now();
-    let zero_input = ContinuousHV::new(dim);
+    let zero_input = (condition == "hdc_ltc_zero_input")
+        .then(|| ContinuousHV::new(dim));
     let gaps = make_gaps(horizon_seconds, event_count, gap_profile, seed);
     let distractors: Vec<ContinuousHV> = if condition == "hdc_ltc_distractor" {
         (0..event_count)
@@ -375,17 +376,19 @@ fn evolve_state(
 
     let start = Instant::now();
     for (index, dt) in gaps.iter().enumerate() {
-        let input = if condition == "hdc_ltc_zero_input" {
-            &zero_input
+        let input = if let Some(zero) = zero_input.as_ref() {
+            zero
         } else {
             &distractors[index]
         };
         neuron.evolve_closed_form(*dt, input);
     }
+    // Include the state snapshot copy in the evolution-to-decode handoff cost.
+    let state = neuron.state().clone();
     let evolution_wall_ns = start.elapsed().as_nanos();
 
     Ok(EvolutionOutcome {
-        state: neuron.state().clone(),
+        state,
         api_update_count: neuron.update_count(),
         reported_logical_seconds: neuron.total_time(),
         model_setup_wall_ns,
