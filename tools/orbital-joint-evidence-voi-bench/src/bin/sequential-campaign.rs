@@ -11,9 +11,9 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
-    let input_path = args.next().ok_or(
-        "usage: sequential-campaign <campaign.json> --source-commit <40-hex-sha>",
-    )?;
+    let input_path = args
+        .next()
+        .ok_or("usage: sequential-campaign <campaign.json> --source-commit <40-hex-sha>")?;
     let flag = args.next().ok_or("missing --source-commit flag")?;
     if flag != "--source-commit" {
         return Err("expected --source-commit".to_owned());
@@ -22,8 +22,8 @@ fn run() -> Result<(), String> {
     if args.next().is_some() {
         return Err("unexpected trailing arguments".to_owned());
     }
-    let input = fs::read(&input_path)
-        .map_err(|error| format!("cannot read {input_path}: {error}"))?;
+    let input =
+        fs::read(&input_path).map_err(|error| format!("cannot read {input_path}: {error}"))?;
     let receipt = run_sequential_audit(&input, &source_commit)?;
     println!(
         "{}",
