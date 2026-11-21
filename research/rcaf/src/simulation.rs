@@ -1225,7 +1225,7 @@ mod tests {
         };
         let strengths = [0.0, 0.10, 0.20, 0.30];
         let sweep = run_common_mode_nuisance_sweep(&config, &strengths).unwrap();
-        assert_eq!(sweep.nuisance_strengths, strengths);
+        assert_eq!(sweep.nuisance_strengths.as_slice(), &strengths[..]);
         assert_eq!(sweep.schema_version, "rcaf.common-mode-nuisance-sweep/0.1.0");
         assert_eq!(
             sweep.reports[0].nuisance_only_rejection_rate,
