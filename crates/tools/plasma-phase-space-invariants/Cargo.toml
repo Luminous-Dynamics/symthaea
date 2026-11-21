@@ -9,3 +9,5 @@ description = "Small-N weighted phase-space moment reference for kinetic plasma 
 [lib]
 name = "plasma_phase_space_invariants"
 path = "src/lib.rs"
+
+[workspace]
