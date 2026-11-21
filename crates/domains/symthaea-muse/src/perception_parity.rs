@@ -128,12 +128,22 @@ pub struct PerceptionParitySuiteV1 {
 pub enum PerceptionParityErrorV1 {
     InvalidSchema,
     EmptySuite,
-    EmptyIdentity { field: String },
-    InvalidDigest { field: String },
-    DuplicateCaseId { case_id: String },
-    MissingTaskCases { task: PerceptionTaskV1 },
+    EmptyIdentity {
+        field: String,
+    },
+    InvalidDigest {
+        field: String,
+    },
+    DuplicateCaseId {
+        case_id: String,
+    },
+    MissingTaskCases {
+        task: PerceptionTaskV1,
+    },
     RunSuiteMismatch,
-    UnknownCaseId { case_id: String },
+    UnknownCaseId {
+        case_id: String,
+    },
     DuplicatePrediction {
         case_id: String,
         modality: PerceptionModalityV1,
@@ -146,10 +156,19 @@ pub enum PerceptionParityErrorV1 {
         case_id: String,
         task: PerceptionTaskV1,
     },
-    InvalidSyncopationLevel { case_id: String, level: u8 },
-    InvalidConfidence { case_id: String },
-    ConfidenceMissingForAnswer { case_id: String },
-    ConfidencePresentForAbstention { case_id: String },
+    InvalidSyncopationLevel {
+        case_id: String,
+        level: u8,
+    },
+    InvalidConfidence {
+        case_id: String,
+    },
+    ConfidenceMissingForAnswer {
+        case_id: String,
+    },
+    ConfidencePresentForAbstention {
+        case_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -229,13 +248,10 @@ pub fn evaluate_perception_parity(
         let paired: Vec<_> = task_cases
             .iter()
             .filter_map(|case| {
-                let audio_prediction = prediction_for(
-                    &run.predictions,
-                    &case.case_id,
-                    PerceptionModalityV1::Audio,
-                )?
-                .answer
-                .as_ref()?;
+                let audio_prediction =
+                    prediction_for(&run.predictions, &case.case_id, PerceptionModalityV1::Audio)?
+                        .answer
+                        .as_ref()?;
                 let symbolic_prediction = prediction_for(
                     &run.predictions,
                     &case.case_id,
@@ -338,9 +354,7 @@ fn prediction_for<'a>(
         .find(|prediction| prediction.case_id == case_id && prediction.modality == modality)
 }
 
-fn validate_suite(
-    suite: &PerceptionParitySuiteV1,
-) -> Result<(), PerceptionParityErrorV1> {
+fn validate_suite(suite: &PerceptionParitySuiteV1) -> Result<(), PerceptionParityErrorV1> {
     if suite.schema != PERCEPTION_PARITY_SCHEMA_V1
         || suite.suite_id.trim().is_empty()
         || suite.benchmark_version.trim().is_empty()
@@ -631,8 +645,7 @@ mod tests {
             .predictions
             .iter_mut()
             .find(|prediction| {
-                prediction.case_id == "sync-3"
-                    && prediction.modality == PerceptionModalityV1::Audio
+                prediction.case_id == "sync-3" && prediction.modality == PerceptionModalityV1::Audio
             })
             .unwrap();
         abstain.answer = None;
@@ -704,9 +717,8 @@ mod tests {
     fn task_mismatched_answers_and_invalid_confidence_are_rejected() {
         let suite = suite();
         let mut wrong_answer = complete_run(&suite);
-        wrong_answer.predictions[0].answer = Some(PerceptionAnswerV1::TranspositionDetected {
-            detected: true,
-        });
+        wrong_answer.predictions[0].answer =
+            Some(PerceptionAnswerV1::TranspositionDetected { detected: true });
         assert!(matches!(
             evaluate_perception_parity(&suite, &wrong_answer),
             Err(PerceptionParityErrorV1::WrongAnswerTask { .. })
@@ -723,8 +735,7 @@ mod tests {
     #[test]
     fn invalid_syncopation_level_is_rejected() {
         let mut suite = suite();
-        suite.cases[0].ground_truth =
-            PerceptionAnswerV1::SyncopationLevel { level: 5 };
+        suite.cases[0].ground_truth = PerceptionAnswerV1::SyncopationLevel { level: 5 };
         assert!(matches!(
             evaluate_perception_parity(&suite, &complete_run(&suite)),
             Err(PerceptionParityErrorV1::InvalidSyncopationLevel { .. })
