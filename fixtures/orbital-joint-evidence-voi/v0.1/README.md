@@ -58,7 +58,7 @@ These are small deterministic known-answer controls. They do not constitute a st
 
 The loss matrix uses synthetic decision-loss units. It is not currency, a safety factor or an engineering acceptance limit. Only JEV-002 supplies an explicitly labelled synthetic prior and likelihood model; all other scenarios are distribution-free and have `prior: null`. Do not derive probabilities from the other scenarios' hard state sets.
 
-The scenario catalogue separates:
+The sequential campaign additionally separates outcome-specific evidence production from decision disposition: `PASS`/`CLEAR` add affirmative claim obligations; `FAIL`/`INDICATION` add rejection-basis evidence; an empty evidence path produces `HOLD`.\n\nThe scenario catalogue separates:
 - action admissibility from action value;
 - action resource requirements from decision loss;
 - expected-value semantics from distribution-free semantics;
@@ -67,7 +67,7 @@ The scenario catalogue separates:
 - pre-registered test obligations from general information gain;
 - planned actions from actual execution outcomes.
 
-The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. Rust also deserializes the strict proposal/outcome examples: an attempted outcome requires actual cost and external execution authority, while a proposal is permanently non-actuating and carries no authority. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The current sequential evaluator tests one exact finite-horizon example against the fixed and myopic baselines; a broad multi-step matched-budget tournament remains unimplemented. No solver or physical test is called.
+The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. Rust also deserializes the strict proposal/outcome examples: an attempted outcome requires actual cost and external execution authority, while a proposal is permanently non-actuating and carries no authority. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The current sequential evaluator tests two exact finite-horizon frequency variants against the fixed and myopic baselines; a broad multi-step matched-budget tournament remains unimplemented. No solver or physical test is called.
 
 
 ## Finite-horizon sequential campaign proof-of-concept
@@ -86,7 +86,7 @@ The known-answer example is intentionally constructed so both single tests indiv
 | Review hours | 0.30 | 0.24 | 20.0% |
 | External cost units | 1.10 | 0.86 | 21.8% |
 
-These are calculated outcomes of one synthetic fixture, not empirical aerospace savings or SOTA results. Its frequency weights are used exclusively for expected resource accounting; worst-case structural decision regret remains distribution-free over the full state set.
+These are calculated outcomes of two synthetic fixtures, not empirical aerospace savings or SOTA results. Its frequency weights are used exclusively for expected resource accounting; worst-case structural decision regret remains distribution-free over the full state set.
 
 
 **Terminal disposition rule:** no evidence defaults to HOLD. A terminal ACCEPT requires both affirmative obligations to be accumulated along the exact action path. A terminal REJECT requires an outcome-specific rejection-basis obligation. HOLD/INDETERMINATE remains distinct from a proven-defect rejection. Missing or undeclared action obligations are rejected by both the Rust evaluator and its independent Python oracle.
