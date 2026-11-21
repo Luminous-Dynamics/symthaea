@@ -277,7 +277,8 @@ fn build_starfield() -> SceneNode {
         stars.children.push(
             SceneNode::circle(x, y, size).with_style(Style {
                 fill: Some(tint.with_alpha(alpha)),
-                ..Style::default()
+            css_class: Some(format!("spore-phase-{}", index % 5)),
+            ..Style::default()
             }),
         );
     }
@@ -739,6 +740,19 @@ mod tests {
                         && (*r - 27.0).abs() < f32::EPSILON
             ));
         }
+    }
+
+
+    #[test]
+    fn full_motion_svg_has_staggered_spores_and_biomimetic_hyphae_pulse() {
+        let svg = render_mycelial_presence(
+            &EmbodimentSnapshot::default(),
+            SvgRenderOptions::default(),
+        );
+        assert!(svg.contains("spore-phase-0"));
+        assert!(svg.contains("spore-phase-4"));
+        assert!(svg.contains("hyphae-pulse"));
+        assert!(svg.contains("mycelium-soft-glow"));
     }
 
     #[test]
