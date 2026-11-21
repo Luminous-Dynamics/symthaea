@@ -13,7 +13,8 @@ pub mod providers;
 use std::collections::BTreeMap;
 
 use broca_mace_policy::{
-    Action, CausalIdentificationV1, Experience, Scope, SourceRootDigest,
+    Action, CausalIdentificationV1, Experience, Scope, SemanticEstimandV1,
+    SourceRootDigest,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -279,6 +280,8 @@ pub enum IngestReject {
     UnverifiedCalibration,
     InvalidMeasurementBound,
     UnverifiedCausalAssessment,
+    IncompleteSemanticEstimand,
+    SemanticEstimandDigestMismatch,
     UnverifiedOutcome,
     InvalidVerifiedOutcomeValue,
     OutcomeUnitMismatch,
@@ -425,6 +428,14 @@ pub fn ingest_as_known(
         .ok_or(IngestReject::UnverifiedCausalAssessment)?;
     if !is_sha256_hex(&causal.assessment_digest) {
         return Err(IngestReject::UnverifiedCausalAssessment);
+    }
+    if !causal.identification.semantic_estimand.is_complete() {
+        return Err(IngestReject::IncompleteSemanticEstimand);
+    }
+    if causal.identification.semantic_estimand.canonical_digest()
+        != causal.identification.estimand_digest
+    {
+        return Err(IngestReject::SemanticEstimandDigestMismatch);
     }
     let outcome = verifier
         .verify_outcome(
@@ -1127,16 +1138,32 @@ mod tests {
         broca_mace_policy::EvidenceDigest256::from_bytes(bytes)
     }
 
+    fn test_semantic_estimand() -> SemanticEstimandV1 {
+        SemanticEstimandV1::new(
+            1,
+            test_evidence_digest(20),
+            test_evidence_digest(21),
+            test_evidence_digest(22),
+            test_evidence_digest(23),
+            test_evidence_digest(24),
+            30_000,
+            test_evidence_digest(25),
+            test_evidence_digest(26),
+            test_evidence_digest(27),
+        )
+    }
+
     fn test_causal_identification() -> CausalIdentificationV1 {
         CausalIdentificationV1::new(
             broca_mace_policy::IdentificationMethodV1::RandomizedControlledTrial,
             test_evidence_digest(1),
-            test_evidence_digest(2),
+            test_semantic_estimand().canonical_digest(),
             5_000,
             5_000,
             50_000,
             true,
         )
+        .with_semantic_estimand(test_semantic_estimand())
     }
 
     struct TestVerifier {
@@ -1429,16 +1456,43 @@ mod tests {
     }
 
     #[test]
+    fn semantic_estimand_receipt_must_be_complete_and_digest_bound() {
+        let mut incomplete = test_causal_identification();
+        incomplete.semantic_estimand.population_spec_digest =
+            broca_mace_policy::EvidenceDigest256::UNKNOWN;
+        let verifier = TestVerifier {
+            causal_identification: incomplete,
+            ..TestVerifier::default()
+        };
+        assert_eq!(
+            ingest_as_known(&raw(), query(180, 250), &verifier).err(),
+            Some(IngestReject::IncompleteSemanticEstimand)
+        );
+
+        let mut tampered = test_causal_identification();
+        tampered.semantic_estimand.follow_up_horizon_ms += 1;
+        let verifier = TestVerifier {
+            causal_identification: tampered,
+            ..TestVerifier::default()
+        };
+        assert_eq!(
+            ingest_as_known(&raw(), query(180, 250), &verifier).err(),
+            Some(IngestReject::SemanticEstimandDigestMismatch)
+        );
+    }
+
+    #[test]
     fn observational_assessment_is_preserved_but_not_causally_qualified() {
         let identification = CausalIdentificationV1::new(
             broca_mace_policy::IdentificationMethodV1::Observational,
             test_evidence_digest(10),
-            test_evidence_digest(11),
+            test_semantic_estimand().canonical_digest(),
             0,
             10_000,
             500_000,
             false,
-        );
+        )
+        .with_semantic_estimand(test_semantic_estimand());
         let verifier = TestVerifier {
             causal_identification: identification,
             ..TestVerifier::default()

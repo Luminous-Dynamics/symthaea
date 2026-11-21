@@ -16,7 +16,7 @@ use broca_mace_ingress::{
 };
 use broca_mace_policy::{
     Action, CausalIdentificationV1, EvidenceDigest256, Experience,
-    IdentificationMethodV1, Scope,
+    IdentificationMethodV1, Scope, SemanticEstimandV1,
 };
 use sha2::{Digest, Sha256};
 
@@ -231,7 +231,7 @@ fn evidence_digest_code(digest: EvidenceDigest256) -> String {
 /// Canonical serialization of every causal-identification field. These values
 /// are part of the source evidence binding, not optional policy annotations.
 fn causal_identification_fields(identification: CausalIdentificationV1) -> Vec<String> {
-    vec![
+    let mut fields = vec![
         identification_method_code(identification.method).to_owned(),
         evidence_digest_code(identification.design_digest),
         evidence_digest_code(identification.estimand_digest),
@@ -239,7 +239,9 @@ fn causal_identification_fields(identification: CausalIdentificationV1) -> Vec<S
         identification.propensity_max_bps.to_string(),
         identification.max_standardized_mean_difference_micros.to_string(),
         identification.interference_controlled.to_string(),
-    ]
+    ];
+    fields.extend(identification.semantic_estimand.canonical_fields());
+    fields
 }
 
 fn binding_fields(binding: &ConsolidationSourceBindingV1) -> Vec<String> {
@@ -605,7 +607,22 @@ mod tests {
         Action, AsKnownQuery, ConsolidationEvidenceSummaryV1, EvidenceReceiptBundle,
         SourceTrustStatus,
     };
-    use broca_mace_policy::{Objective, Regime, Scope};
+    use broca_mace_policy::{Objective, Regime, Scope, SemanticEstimandV1};
+
+    fn fixture_semantic_estimand() -> SemanticEstimandV1 {
+        SemanticEstimandV1::new(
+            1,
+            EvidenceDigest256::from_bytes([21; 32]),
+            EvidenceDigest256::from_bytes([22; 32]),
+            EvidenceDigest256::from_bytes([23; 32]),
+            EvidenceDigest256::from_bytes([24; 32]),
+            EvidenceDigest256::from_bytes([25; 32]),
+            30_000,
+            EvidenceDigest256::from_bytes([26; 32]),
+            EvidenceDigest256::from_bytes([27; 32]),
+            EvidenceDigest256::from_bytes([28; 32]),
+        )
+    }
 
     fn summary() -> ActionConsolidationEvidenceSummaryV1 {
         ActionConsolidationEvidenceSummaryV1 {
@@ -679,6 +696,64 @@ mod tests {
                 outcome_utility_unit: "normalized_utility".into(),
                 outcome_digest: digest,
             },
+        }
+    }
+
+    #[test]
+    fn canonical_source_binding_covers_every_semantic_estimand_dimension() {
+        let base = fixture_semantic_estimand();
+        let base_digest = digest_fields(
+            b"mycelix:mace:semantic-estimand:v1\\0",
+            &base.canonical_fields(),
+        );
+        let variants = [
+            SemanticEstimandV1 { schema_version: 2, ..base },
+            SemanticEstimandV1 {
+                population_spec_digest: EvidenceDigest256::from_bytes([31; 32]),
+                ..base
+            },
+            SemanticEstimandV1 {
+                treatment_version_digest: EvidenceDigest256::from_bytes([32; 32]),
+                ..base
+            },
+            SemanticEstimandV1 {
+                comparator_version_digest: EvidenceDigest256::from_bytes([33; 32]),
+                ..base
+            },
+            SemanticEstimandV1 {
+                outcome_definition_digest: EvidenceDigest256::from_bytes([34; 32]),
+                ..base
+            },
+            SemanticEstimandV1 {
+                outcome_unit_digest: EvidenceDigest256::from_bytes([35; 32]),
+                ..base
+            },
+            SemanticEstimandV1 {
+                follow_up_horizon_ms: base.follow_up_horizon_ms + 1,
+                ..base
+            },
+            SemanticEstimandV1 {
+                censoring_strategy_digest: EvidenceDigest256::from_bytes([36; 32]),
+                ..base
+            },
+            SemanticEstimandV1 {
+                intercurrent_event_strategy_digest: EvidenceDigest256::from_bytes([37; 32]),
+                ..base
+            },
+            SemanticEstimandV1 {
+                target_weighting_digest: EvidenceDigest256::from_bytes([38; 32]),
+                ..base
+            },
+        ];
+
+        for variant in variants {
+            assert_ne!(
+                digest_fields(
+                    b"mycelix:mace:semantic-estimand:v1\\0",
+                    &variant.canonical_fields(),
+                ),
+                base_digest
+            );
         }
     }
 
