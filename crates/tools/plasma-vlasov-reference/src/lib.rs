@@ -13,6 +13,8 @@
 #![forbid(unsafe_code)]
 
 pub mod mixed_basis;
+pub mod mixed_reconstruction;
+pub mod mixed_fourier;
 pub mod transition;
 pub mod velocity_frame;
 

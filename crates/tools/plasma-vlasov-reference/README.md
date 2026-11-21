@@ -223,3 +223,32 @@ Hermite-to-Legendre closure, solve Poisson, or claim positivity/conservation.
 It is intended to make the source-faithful basis contract independently
 testable before implementing a coefficient reconstruction or trajectory
 adapter.
+
+
+## Mixed Hermite-Legendre coefficient reconstruction oracle
+
+src/mixed_reconstruction.rs synthesizes the physical mixed distribution from
+real-space coefficient fields:
+
+\[
+f_0(x,v)=\sum_n C_n(x)\psi_n(v;u,\alpha),\qquad
+\delta f(x,v)=\sum_m B_m(x)\xi_m(v;v_a,v_b),
+\]
+\[
+f(x,v)=f_0(x,v)+\delta f(x,v).
+\]
+
+Input arrays are row-major (mode, x); output arrays are row-major (x, v).
+The module returns the Hermite bulk, Legendre residual and total distribution
+separately. A pure-Hermite or pure-Legendre control is permitted. Signed
+Legendre residuals are retained without clipping or a positivity projection.
+
+The coefficient arrays are expected to be in physical space already. This
+oracle does not implement ADEPT's Fourier fftshift, inverse FFT, NetCDF reader,
+Hermite-to-Legendre closure, field solve or time integrator. Those are separate
+adapters and physics operations and must not be hidden in this synthesis stage.
+
+Tests cover known mixed-basis reconstruction at multiple spatial points,
+Legendre support outside its finite window, signed residuals, pure-basis
+controls, exact coefficient shapes, non-finite input, non-finite output,
+empty grids and shape overflow.
