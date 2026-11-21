@@ -48,7 +48,7 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
 
     for (index, event) in events.iter().enumerate() {
         let context = format!("observation[{index}]");
-        for error in validator.iter_errors(event) {
+        if let Some(error) = validator.iter_errors(event).next() {
             return Err(format!(
                 "{context}: schema validation failed: {} at {}",
                 error,
