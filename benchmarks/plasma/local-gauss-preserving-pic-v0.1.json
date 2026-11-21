@@ -1,0 +1,63 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "local-gauss-preserving-electrostatic-pic-v0.1",
+  "created_at": "2026-11-20",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12962",
+  "status": "source_review_protocol_only",
+  "source": {
+    "doi": "10.1016/j.cpc.2026.110296",
+    "journal": "Computer Physics Communications",
+    "volume": 327,
+    "article": "110296",
+    "published": "2026-10",
+    "authors": ["Zhonghua Qiao","Zhenli Xu","Qian Yin","Shenggao Zhou"],
+    "code": "not_admitted",
+    "data_and_configs": "not_admitted",
+    "licence": "unknown_pending_artifact_admission"
+  },
+  "physical_scope": {
+    "model": "electrostatic_Vlasov_Ampere",
+    "full_Vlasov_Maxwell_claim": false,
+    "method": "directional_particle_substeps_local_charge_flux_field_updates_local_curl_free_relaxation",
+    "global_Poisson_or_Ampere_solve": "source_reports_avoided",
+    "Gauss_constraint": "source_reports_exact_discrete_preservation_to_machine_precision"
+  },
+  "benchmark_tasks": [
+    "2d2v_Landau_damping",
+    "2d2v_two_stream",
+    "Diocotron_with_source_geometry_and_boundaries",
+    "particle_count_grid_resolution_timestep_sweeps",
+    "domain_decomposition_nearest_neighbor_scaling"
+  ],
+  "candidate_methods": [
+    "source_local_Gauss_preserving_GP_PIC",
+    "standard_CIC_grid_PIC",
+    "PIF_Fourier_PIC",
+    "energy_conserving_Fourier_Vlasov_Ampere_PIC",
+    "NEOPIC_particle_measure_operator",
+    "variational_particle_energy_neural_operator",
+    "neural_proposal_plus_GP_PIC_correction"
+  ],
+  "metrics": [
+    "per_cell_and_max_Gauss_residual",
+    "charge_continuity_residual",
+    "curl_free_residual",
+    "global_charge_and_neutrality",
+    "field_energy_positivity_if_applicable",
+    "total_energy_drift",
+    "momentum_residual",
+    "Landau_damping_rate_and_field_energy_spectrum",
+    "two_stream_growth_saturation_time_and_peak",
+    "Diocotron_mode_frequency_growth_and_confinement",
+    "local_relaxation_sweep_count_and_residual_contraction",
+    "communication_bytes_halos_collectives_and_syncs",
+    "complete_PIC_step_wall_time",
+    "weak_and_strong_scaling"
+  ],
+  "claim_limits": {
+    "source_reproduction": false,
+    "matched_benchmark": false,
+    "communication_scaling_measured": false,
+    "neural_competitor_Gauss_qualified": false
+  }
+}
