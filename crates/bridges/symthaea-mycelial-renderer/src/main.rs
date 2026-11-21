@@ -9,11 +9,7 @@
 //! --mode accepts ambient, cognitive, or conversational.
 //! Pass --reduced-motion to disable all renderer-local motion.
 
-use bevy::{
-    core_pipeline::tonemapping::Tonemapping,
-    post_process::bloom::Bloom,
-    prelude::*,
-};
+use bevy::{core_pipeline::tonemapping::Tonemapping, post_process::bloom::Bloom, prelude::*};
 use std::f32::consts::TAU;
 use symthaea_canvas::{
     EmbodimentSnapshot, MycelialFilament, MycelialTubeMesh, OrbitalCell, PresenceMode,
@@ -81,7 +77,10 @@ fn parse_args() -> RendererConfig {
         }
         index += 1;
     }
-    RendererConfig { mode, reduced_motion }
+    RendererConfig {
+        mode,
+        reduced_motion,
+    }
 }
 
 fn setup_presence(
@@ -115,16 +114,18 @@ fn setup_presence(
 
     let snapshot = EmbodimentSnapshot::default();
     let model = build_mycelial_model(&snapshot, config.mode);
-    let cpu_mesh = tessellate_mycelial_model(
-        &model,
-        TubeTessellationConfig::default(),
-    )
-    .expect("bounded canonical model must tessellate");
+    let cpu_mesh = tessellate_mycelial_model(&model, TubeTessellationConfig::default())
+        .expect("bounded canonical model must tessellate");
     spawn_filament_canopy(&mut commands, &mut meshes, &mut materials, cpu_mesh);
     spawn_branch_junctions(&mut commands, &mut meshes, &mut materials, &model.filaments);
     spawn_terminal_spores(&mut commands, &mut meshes, &mut materials, &model.filaments);
 
-    spawn_core(&mut commands, &mut meshes, &mut materials, config.reduced_motion);
+    spawn_core(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        config.reduced_motion,
+    );
     spawn_orbital_cells(
         &mut commands,
         &mut meshes,
@@ -176,12 +177,8 @@ fn spawn_branch_junctions(
         commands.spawn((
             Mesh3d(junction_mesh.clone()),
             MeshMaterial3d(junction_material.clone()),
-            Transform::from_xyz(
-                position.x * 0.035,
-                position.z * 0.035,
-                position.y * 0.035,
-            )
-            .with_scale(Vec3::splat(radius)),
+            Transform::from_xyz(position.x * 0.035, position.z * 0.035, position.y * 0.035)
+                .with_scale(Vec3::splat(radius)),
         ));
     }
 }
@@ -206,11 +203,7 @@ fn spawn_terminal_spores(
         commands.spawn((
             Mesh3d(spore_mesh.clone()),
             MeshMaterial3d(spore_material.clone()),
-            Transform::from_xyz(
-                position.x * 0.035,
-                position.z * 0.035,
-                position.y * 0.035,
-            ),
+            Transform::from_xyz(position.x * 0.035, position.z * 0.035, position.y * 0.035),
         ));
     }
 }
@@ -252,7 +245,12 @@ fn spawn_core(
         Transform::from_xyz(0.0, 0.02, 0.0),
     ));
 
-    let membrane_mesh = meshes.add(Sphere::new(0.96).mesh().ico(4).expect("valid membrane mesh"));
+    let membrane_mesh = meshes.add(
+        Sphere::new(0.96)
+            .mesh()
+            .ico(4)
+            .expect("valid membrane mesh"),
+    );
     let membrane_material = materials.add(StandardMaterial {
         base_color: Color::srgba(0.12, 0.72, 0.82, 0.075),
         emissive: LinearRgba::rgb(0.015, 0.12, 0.16),
