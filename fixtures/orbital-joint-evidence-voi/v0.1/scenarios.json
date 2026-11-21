@@ -1069,7 +1069,7 @@
         "post_action_worst_case_regret": 5,
         "abstain": true,
         "must_not_select": [
-          "A-ASSUME-PASS-AFTER-ABORT"
+          "A-ABORTED-COUPON-TEST"
         ],
         "notes": "The only attempted test aborted after incurring resources and produced no admissible outcome. Preserve consumed cost and missing evidence; do not infer success."
       },
