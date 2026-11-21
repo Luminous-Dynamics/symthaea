@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [Verified Household Services](household-services/README.md) | Evidence-qualified household appliances, utility resilience and repairability |
 
 ---
 
@@ -248,6 +249,18 @@ See `papers/` directory for 15+ manuscripts in various stages of development.
 1. **Consciousness engineering**: Designing systems for specific Φ profiles
 2. **Artificial general consciousness**: Beyond narrow AI
 3. **Sympoietic partnership**: Validating the core thesis (Φ_dyad > Φ_human + Φ_ai)
+
+---
+
+## Applied Engineering Research — Verified Household Services
+
+The **[Verified Household Services research index](household-services/README.md)** tracks the household appliance and utility-resilience programme: independently verified service outcomes, water/energy/thermal continuity, repair recurrence, metrology, and production/household evidence. Synthetic software qualification remains distinct from physical performance.
+
+Key programme owners:
+- [HOME-SVC-001 #10322](https://github.com/Luminous-Dynamics/symthaea/issues/10322) — verified household-service portfolio.
+- [HOME-UTILITY-COORD-001 #10342](https://github.com/Luminous-Dynamics/symthaea/issues/10342) — household water/energy/thermal resilience.
+- [HOME-SERVICE-CONTINUITY-001 #10445](https://github.com/Luminous-Dynamics/symthaea/issues/10445) — service-floor and recovery benchmark.
+- [HOME-REPAIR-RECURRENCE-001 #10431](https://github.com/Luminous-Dynamics/symthaea/issues/10431) — post-repair durability and recurring repair burden.
 
 ---
 

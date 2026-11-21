@@ -1,0 +1,378 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "HOUSEHOLD-NETWORK-REFILL-001",
+  "owner_issue": 10342,
+  "execution_issue": 10517,
+  "evidence_class": "synthetic_benchmark_design_only",
+  "fixture_status": "proposed_not_executed",
+  "decision_authority": "none_this_manifest_does_not_authorize_live_actuation",
+  "randomness_contract": {
+    "mode": "branch_stable_exogenous",
+    "reference_issue": "https://github.com/Luminous-Dynamics/symtropy/issues/3543",
+    "rule": "Counterfactual policy branches use the same predeclared exogenous random variates and disturbance traces. Policy-branch changes must not shift the random stream consumed by later households.",
+    "identity_privacy": "No global household identity graph is required; use test-only pseudonymous branch IDs in synthetic fixtures."
+  },
+  "policies": [
+    "P0_IMMEDIATE_SYNCHRONIZED",
+    "P1_LOCAL_ENVELOPE_LIMITED",
+    "P2_DECENTRALIZED_STAGGERED",
+    "P3_AUTHORIZED_UTILITY_SIGNAL_AWARE"
+  ],
+  "cohort_sizes": [
+    8,
+    16,
+    32
+  ],
+  "scenarios": [
+    {
+      "id": "RFL-001",
+      "class": "synchronized_restoration",
+      "stimulus": "Every buffer requests refill immediately when the shared source returns.",
+      "inputs": {
+        "source_state": "restored",
+        "households_requesting_refill": 8,
+        "policy": "P0_IMMEDIATE_SYNCHRONIZED"
+      },
+      "expected_decision": "MeasureSharedPeakAndBranchOutcomes",
+      "required_assertions": [
+        "upstream_peak_measured",
+        "all_branch_flows_measured",
+        "reserve_floors_reported_per_household"
+      ],
+      "must_not": [
+        "infer_network_relief_from_one_branch_meter"
+      ]
+    },
+    {
+      "id": "RFL-002",
+      "class": "pressure_envelope",
+      "stimulus": "Local inlet pressure is below the approved refill envelope.",
+      "inputs": {
+        "local_pressure_state": "below_envelope",
+        "flow_state": "adequate"
+      },
+      "expected_decision": "RefillBlockedLocally",
+      "required_assertions": [
+        "no_refill_request",
+        "local_stop_reason_recorded"
+      ],
+      "must_not": [
+        "raise_rate_to_recover_tank_faster"
+      ]
+    },
+    {
+      "id": "RFL-003",
+      "class": "misleading_pressure",
+      "stimulus": "Pressure sensor reports normal while delivered inlet flow is inadequate or Unknown.",
+      "inputs": {
+        "pressure_state": "normal",
+        "flow_state": "inadequate_or_unknown"
+      },
+      "expected_decision": "RefillBlockedOrUnknown",
+      "required_assertions": [
+        "pressure_and_flow_remain_separate",
+        "no_optimistic_refill"
+      ],
+      "must_not": [
+        "infer_flow_from_pressure_alone"
+      ]
+    },
+    {
+      "id": "RFL-004",
+      "class": "heterogeneous_reserve",
+      "stimulus": "One household is near its critical reserve floor while other households have ample reserve.",
+      "inputs": {
+        "cohort_reserve_states": [
+          "critical",
+          "ample",
+          "ample",
+          "ample"
+        ],
+        "policy": "P2_DECENTRALIZED_STAGGERED"
+      },
+      "expected_decision": "PrioritizeByDeclaredReserveNeed",
+      "required_assertions": [
+        "critical_household_floor_preserved",
+        "other_households_delay_bounded",
+        "priority_reason_receipted"
+      ],
+      "must_not": [
+        "arbitrary_device_order"
+      ]
+    },
+    {
+      "id": "RFL-005",
+      "class": "targeted_throttling",
+      "stimulus": "Utility pressure/flow envelope is reduced while a refill schedule remains active.",
+      "inputs": {
+        "approved_envelope_revision": "changed",
+        "old_refill_rate": "above_new_limit"
+      },
+      "expected_decision": "ReevaluateAndRespectNewLocalEnvelope",
+      "required_assertions": [
+        "stale_schedule_invalidated",
+        "new_capability_revision_consumed",
+        "local_controller_final_authority"
+      ],
+      "must_not": [
+        "reuse_old_rate_after_envelope_change"
+      ]
+    },
+    {
+      "id": "RFL-006",
+      "class": "communications_loss",
+      "stimulus": "WAN/coordinator communication disappears during a staggered refill window.",
+      "inputs": {
+        "wan_state": "unavailable",
+        "coordinator_state": "unavailable",
+        "local_power": "available"
+      },
+      "expected_decision": "LocalPolicyFallback",
+      "required_assertions": [
+        "local_limiter_remains_active",
+        "manual_control_remains_available_where_supported",
+        "no_remote_api_dependency_for_local_safety"
+      ],
+      "must_not": [
+        "disable_local_protection"
+      ]
+    },
+    {
+      "id": "RFL-007",
+      "class": "pressure_oscillation",
+      "stimulus": "Noisy pressure readings repeatedly cross the refill threshold.",
+      "inputs": {
+        "pressure_trace": "noisy_threshold_crossings",
+        "sensor_uncertainty": "material"
+      },
+      "expected_decision": "BoundedHysteresisWithoutEnvelopeViolation",
+      "required_assertions": [
+        "cycling_count_measured",
+        "stop_threshold_never_relaxed",
+        "unknown_state_blocks_optimistic_refill"
+      ],
+      "must_not": [
+        "chatter_or_threshold_adaptation_beyond_approved_envelope"
+      ]
+    },
+    {
+      "id": "RFL-008",
+      "class": "identity_clock_bias",
+      "stimulus": "Repeated schedules favour one household because of device ordering, clock skew or stable identity sorting.",
+      "inputs": {
+        "household_clock_skew": "heterogeneous",
+        "identity_order": "fixed"
+      },
+      "expected_decision": "NoPersistentIdentityAdvantage",
+      "required_assertions": [
+        "delay_distribution_reported",
+        "counterfactual_randomness_branch_stable",
+        "worst_household_reported"
+      ],
+      "must_not": [
+        "claim_fairness_from_cohort_mean"
+      ]
+    },
+    {
+      "id": "RFL-009",
+      "class": "unstable_restoration",
+      "stimulus": "Supply returns briefly, refill begins, and shared pressure collapses again.",
+      "inputs": {
+        "source_trace": "restore_collapse_restore",
+        "hysteresis": "declared"
+      },
+      "expected_decision": "StopAndRecoverUnderLocalPolicy",
+      "required_assertions": [
+        "no_unsafe_retry_loop",
+        "recovery_time_measured",
+        "reserve_deficit_updated"
+      ],
+      "must_not": [
+        "mark_network_restored_from_single_pressure_spike"
+      ]
+    },
+    {
+      "id": "RFL-010",
+      "class": "user_override",
+      "stimulus": "A user requests immediate refill while the local envelope is constrained.",
+      "inputs": {
+        "user_override": "immediate",
+        "local_envelope": "constrained"
+      },
+      "expected_decision": "HonorOnlyWithinApprovedEnvelope",
+      "required_assertions": [
+        "override_scope_recorded",
+        "local_safety_envelope_unchanged",
+        "blocked_action_explained"
+      ],
+      "must_not": [
+        "user_override_bypasses_local_safety"
+      ]
+    },
+    {
+      "id": "RFL-011",
+      "class": "local_refusal",
+      "stimulus": "The local controller refuses refill because its approved envelope changed.",
+      "inputs": {
+        "local_controller": "refused",
+        "capability_revision": "new"
+      },
+      "expected_decision": "RespectLocalRefusal",
+      "required_assertions": [
+        "no_retry_as_override",
+        "reason_receipted",
+        "local_manual_path_preserved"
+      ],
+      "must_not": [
+        "retry_with_old_capability_revision"
+      ]
+    },
+    {
+      "id": "RFL-012",
+      "class": "common_mode_power_loss",
+      "stimulus": "Shared pump and controller supply lose power.",
+      "inputs": {
+        "shared_dependency": "pump_controller_power",
+        "state": "failed"
+      },
+      "expected_decision": "DeclareCommonModeLoss",
+      "required_assertions": [
+        "dependent_services_listed",
+        "no_backup_independence_claim",
+        "manual_fallback_state_recorded"
+      ],
+      "must_not": [
+        "treat_shared_dependency_as_independent"
+      ]
+    },
+    {
+      "id": "RFL-013",
+      "class": "unverified_network_benefit",
+      "stimulus": "Simulation reports a lower peak but no upstream physical measurement exists.",
+      "inputs": {
+        "simulation_peak_reduction": "positive",
+        "upstream_measurement": "missing"
+      },
+      "expected_decision": "NetworkBenefitUnknown",
+      "required_assertions": [
+        "simulation_label_preserved",
+        "no_physical_network_relief_claim",
+        "upstream_gap_recorded"
+      ],
+      "must_not": [
+        "claim_measured_network_peak_reduction"
+      ]
+    },
+    {
+      "id": "RFL-014",
+      "class": "reserve_noninferiority",
+      "stimulus": "Staggering reduces peak flow but one household crosses its protected reserve floor.",
+      "inputs": {
+        "cohort_peak_change": "lower",
+        "one_household_floor": "violated"
+      },
+      "expected_decision": "RejectPolicyForServiceRegression",
+      "required_assertions": [
+        "household_floor_failure_is_hard_gate",
+        "aggregate_peak_benefit_not_compensatory",
+        "affected_household_identified"
+      ],
+      "must_not": [
+        "accept_lower_peak_as_compensation_for_service_loss"
+      ]
+    }
+  ],
+  "positive_controls": [
+    {
+      "id": "RFL-POS-001",
+      "class": "safe_staggered_cohort",
+      "stimulus": "A matched cohort safely staggers refill, preserves all declared floors and measures lower upstream peak.",
+      "inputs": {
+        "pressure_flow": "within_envelope",
+        "reserve_floors": "preserved",
+        "upstream_meter": "calibrated",
+        "policy": "P2_DECENTRALIZED_STAGGERED"
+      },
+      "expected_decision": "EligibleForComparativeEvaluation",
+      "required_assertions": [
+        "peak_reduction_computed_from_upstream_meter",
+        "all_household_floors_preserved",
+        "uncertainty_reported"
+      ],
+      "must_not": [
+        "label_simulation_as_physical_result"
+      ]
+    },
+    {
+      "id": "RFL-POS-002",
+      "class": "local_limited_refill",
+      "stimulus": "Local pressure/flow are within approved envelope and refill rate is capped at the current local capability.",
+      "inputs": {
+        "pressure_flow": "within_envelope",
+        "capability_revision": "current",
+        "authorization": "current"
+      },
+      "expected_decision": "EligibleForLocalControllerEvaluation",
+      "required_assertions": [
+        "rate_within_local_cap",
+        "local_controller_decides",
+        "actuator_command_not_emitted_by_benchmark"
+      ],
+      "must_not": [
+        "bypass_local_interlock"
+      ]
+    },
+    {
+      "id": "RFL-POS-003",
+      "class": "authorized_utility_signal",
+      "stimulus": "A documented and authorized utility refill window is available; local envelope and household floors also pass.",
+      "inputs": {
+        "utility_signal": "authorized_current",
+        "local_envelope": "pass",
+        "reserve_floor": "pass"
+      },
+      "expected_decision": "EligibleForLocalControllerEvaluation",
+      "required_assertions": [
+        "signal_authority_and_freshness_bound",
+        "local_controller_final_authority",
+        "user_policy_preserved"
+      ],
+      "must_not": [
+        "treat_public_dashboard_as_authorization"
+      ]
+    }
+  ],
+  "acceptance_gates": {
+    "positive_peak_target": "At least 20% reduction in cohort coincident peak refill flow versus synchronized P0 on matched traces.",
+    "protected_service": "Zero additional reserve-floor breach minutes attributable to P2 relative to the matched policy baseline.",
+    "envelope": "Zero refill requests when local pressure/flow is below or Unknown relative to the approved installation envelope.",
+    "non_inferiority": "No household cumulative qualified-service deficit may worsen beyond a preregistered endpoint-specific uncertainty margin.",
+    "fairness": "No persistent identity/order advantage across repeated branch-stable counterfactual seeds; report max and distribution of delay.",
+    "physical_claim": "Network-level peak reduction requires calibrated measurement at the shared upstream boundary."
+  },
+  "evaluation_outputs": [
+    "cohort_upstream_peak_l_per_min",
+    "branch_peak_l_per_min",
+    "peak_to_average_ratio",
+    "upstream_pressure_deviation",
+    "time_below_approved_envelope",
+    "household_reserve_floor_breach_minutes",
+    "service_deficit_by_household",
+    "refill_start_delay_distribution",
+    "refill_completion_time",
+    "pump_energy_kwh",
+    "cycling_and_stop_events",
+    "manual_override_and_refusal_count",
+    "counterfactual_seed_and_trace_identity",
+    "measurement_uncertainty_and_missingness"
+  ],
+  "interpretation_guardrails": [
+    "Synthetic-only fixtures are not physical feeder measurements.",
+    "No refill policy has field actuation authority.",
+    "A lower aggregate peak cannot compensate for any household crossing a protected floor.",
+    "A household meter alone cannot prove shared-network relief.",
+    "Public utility status dashboards are not control authorizations.",
+    "Use exact approved installation envelopes; do not invent universal pressure thresholds.",
+    "No claim of competitor defect or WaterLoop superiority is established."
+  ]
+}
