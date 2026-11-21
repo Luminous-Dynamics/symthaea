@@ -673,7 +673,6 @@ pub fn compare_phase_space_measures_spectral(
         mean += delta / count;
         let delta_after_update = squared_difference - mean;
         sum_squared_deviation += delta * delta_after_update;
-
     }
 
     if !mean.is_finite() || !sum_squared_deviation.is_finite() {
