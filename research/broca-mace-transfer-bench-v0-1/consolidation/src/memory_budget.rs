@@ -160,11 +160,19 @@ impl QualifiedModelMemoryBudgetV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ModelBudgetSurfacingReject {
+    TargetModelMismatch,
+    InvalidTargetModelDigest,
+    Selection(SalienceReject),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModelBudgetSurfacingPlanV1 {
     pub plan: MemorySurfacingPlanV1,
     pub target_model_sha256: String,
     pub memory_pipeline_sha256: String,
     pub calibration_sha256: String,
+    pub heldout_dataset_sha256: String,
     pub budget_qualification_sha256: String,
     pub plan_sha256: String,
 }
@@ -176,6 +184,7 @@ impl ModelBudgetSurfacingPlanV1 {
             self.target_model_sha256.clone(),
             self.memory_pipeline_sha256.clone(),
             self.calibration_sha256.clone(),
+            self.heldout_dataset_sha256.clone(),
             self.budget_qualification_sha256.clone(),
         ];
         digest_fields(b"mace:model-budget-surfacing-plan:v1\0", &fields)
@@ -595,15 +604,23 @@ pub fn select_for_qualified_model_budget(
     mode: MemorySurfacingModeV1,
     target_scope: Scope,
     as_known: broca_mace_policy::AsKnownQuery,
+    runtime_target_model_sha256: &str,
     budget: &QualifiedModelMemoryBudgetV1,
-) -> Result<ModelBudgetSurfacingPlanV1, SalienceReject> {
+) -> Result<ModelBudgetSurfacingPlanV1, ModelBudgetSurfacingReject> {
+    if !is_lower_sha256(runtime_target_model_sha256) {
+        return Err(ModelBudgetSurfacingReject::InvalidTargetModelDigest);
+    }
+    if runtime_target_model_sha256 != budget.target_model_sha256 {
+        return Err(ModelBudgetSurfacingReject::TargetModelMismatch);
+    }
     let plan = select_for_context(
         candidates,
         mode,
         target_scope,
         as_known,
         budget.selected_context_budget_tokens,
-    )?;
+    )
+    .map_err(ModelBudgetSurfacingReject::Selection)?;
     let fields = [
         plan.canonical_digest(),
         budget.target_model_sha256.clone(),
@@ -619,6 +636,7 @@ pub fn select_for_qualified_model_budget(
         target_model_sha256: budget.target_model_sha256.clone(),
         memory_pipeline_sha256: budget.memory_pipeline_sha256.clone(),
         calibration_sha256: budget.calibration_sha256.clone(),
+        heldout_dataset_sha256: budget.heldout_dataset_sha256.clone(),
         budget_qualification_sha256: budget.qualification_sha256.clone(),
         plan_sha256,
     })
@@ -803,6 +821,38 @@ mod tests {
             qualify_model_memory_budget(&profile, &calibration, &heldout).unwrap();
         assert_eq!(qualified.context_budget_tokens(), 0);
         assert_eq!(qualified.heldout_mean_lift_micros(), 0);
+    }
+
+    #[test]
+    fn qualified_budget_cannot_be_reused_for_a_different_runtime_model() {
+        let model = digest("target-model");
+        let pipeline = digest("memory-pipeline");
+        let calibration =
+            rows(&model, &pipeline, 1, 1, 10, 100, [0, 10_000, 20_000, 30_000]);
+        let heldout =
+            rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [0, 10_000, 20_000, 30_000]);
+        let profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let qualified =
+            qualify_model_memory_budget(&profile, &calibration, &heldout).unwrap();
+        let wrong_runtime_model = digest("different-runtime-model");
+        let result = select_for_qualified_model_budget(
+            &[],
+            MemorySurfacingModeV1::RecencyFirst,
+            Scope {
+                regime: broca_mace_policy::Regime::Baseline,
+                objective: broca_mace_policy::Objective::Quality,
+            },
+            broca_mace_policy::AsKnownQuery {
+                valid_at_ms: 100,
+                known_at_ms: 100,
+            },
+            &wrong_runtime_model,
+            &qualified,
+        );
+        assert_eq!(
+            result,
+            Err(ModelBudgetSurfacingReject::TargetModelMismatch)
+        );
     }
 
     #[test]
