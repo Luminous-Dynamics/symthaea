@@ -131,3 +131,8 @@ This benchmark proves only that a particular software implementation behaves in 
 - empirical data are free of artifacts or confounds;
 - a real participant has changed conscious state;
 - RCAF is clinically validated or superior to existing neuroscience estimators.
+
+
+## 10. Temporal-dependence stress check
+
+The Rust test suite now runs an additional exchangeable-null calibration with AR(1) coefficient `rho=0.65`. It requires the Monte-Carlo null rejection estimate to remain no greater than 0.15 and the absolute median paired null gap to remain below 0.04. This is a second synthetic operating point, not proof of general null calibration. A full autocorrelation grid with Monte-Carlo intervals remains a required benchmark before applying this metric to real time series.
