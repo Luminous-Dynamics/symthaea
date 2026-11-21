@@ -71,6 +71,7 @@ pub enum MmdError {
     InvalidSpatialConcentration,
     InvalidVelocityLengthScale,
     InvalidFeatureCount,
+    InvalidAdaptiveConfig,
     UnsupportedSpatialConcentrationForSampling,
     NonFinitePosition {
         measure: &'static str,
@@ -106,6 +107,9 @@ impl fmt::Display for MmdError {
                 write!(f, "velocity length scale must be finite and positive")
             }
             Self::InvalidFeatureCount => write!(f, "spectral feature count must be positive"),
+            Self::InvalidAdaptiveConfig => {
+                write!(f, "adaptive spectral MMD configuration is invalid")
+            }
             Self::UnsupportedSpatialConcentrationForSampling => write!(
                 f,
                 "spatial concentration exceeds the deterministic spectral sampler range"
@@ -574,6 +578,39 @@ fn feature_value(atom: WeightedAtom, feature: SpectralFeature, config: MmdConfig
     (cosine, sine)
 }
 
+fn spectral_squared_signature_difference(
+    candidate_atoms: &[WeightedAtom],
+    reference_atoms: &[WeightedAtom],
+    normalization: f64,
+    feature: SpectralFeature,
+    kernel_config: MmdConfig,
+) -> Result<f64, MmdError> {
+    let mut candidate_real = CompensatedSum::default();
+    let mut candidate_imaginary = CompensatedSum::default();
+    let mut reference_real = CompensatedSum::default();
+    let mut reference_imaginary = CompensatedSum::default();
+
+    for atom in candidate_atoms {
+        let (real, imaginary) = feature_value(*atom, feature, kernel_config);
+        candidate_real.add((atom.weight / normalization) * real);
+        candidate_imaginary.add((atom.weight / normalization) * imaginary);
+    }
+    for atom in reference_atoms {
+        let (real, imaginary) = feature_value(*atom, feature, kernel_config);
+        reference_real.add((atom.weight / normalization) * real);
+        reference_imaginary.add((atom.weight / normalization) * imaginary);
+    }
+
+    let real_difference = candidate_real.total() - reference_real.total();
+    let imaginary_difference = candidate_imaginary.total() - reference_imaginary.total();
+    let squared_difference =
+        real_difference * real_difference + imaginary_difference * imaginary_difference;
+    if !squared_difference.is_finite() || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference) {
+        return Err(MmdError::NonFiniteOutput);
+    }
+    Ok(squared_difference)
+}
+
 /// Compare two phase-space measures using O((N+M)D) spectral features.
 ///
 /// The kernel spectral measure factorizes exactly:
@@ -616,29 +653,13 @@ pub fn compare_phase_space_measures_spectral(
 
     for sample_index in 0..feature_config.feature_count {
         let feature = sample_spectral_feature(kernel_config, &mut rng)?;
-        let mut candidate_real = CompensatedSum::default();
-        let mut candidate_imaginary = CompensatedSum::default();
-        let mut reference_real = CompensatedSum::default();
-        let mut reference_imaginary = CompensatedSum::default();
-
-        for atom in &candidate_atoms {
-            let (real, imaginary) = feature_value(*atom, feature, kernel_config);
-            candidate_real.add((atom.weight / normalization) * real);
-            candidate_imaginary.add((atom.weight / normalization) * imaginary);
-        }
-        for atom in &reference_atoms {
-            let (real, imaginary) = feature_value(*atom, feature, kernel_config);
-            reference_real.add((atom.weight / normalization) * real);
-            reference_imaginary.add((atom.weight / normalization) * imaginary);
-        }
-
-        let real_difference = candidate_real.total() - reference_real.total();
-        let imaginary_difference = candidate_imaginary.total() - reference_imaginary.total();
-        let squared_difference =
-            real_difference * real_difference + imaginary_difference * imaginary_difference;
-        if !squared_difference.is_finite() || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference) {
-            return Err(MmdError::NonFiniteOutput);
-        }
+        let squared_difference = spectral_squared_signature_difference(
+            &candidate_atoms,
+            &reference_atoms,
+            normalization,
+            feature,
+            kernel_config,
+        )?;
 
         // Welford's online variance update avoids storing D samples.
         let count = (sample_index + 1) as f64;
@@ -698,6 +719,235 @@ pub fn compare_phase_space_measures_spectral(
         candidate_atom_count: candidate_atoms.len(),
         reference_atom_count: reference_atoms.len(),
         particle_feature_evaluations,
+    })
+}
+
+/// Configuration for checkpointed, anytime-valid spectral MMD evaluation.
+///
+/// Checkpoints double from initial_feature_count up to max_feature_count. The
+/// tolerance is applied to normalized squared MMD, not its square root.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AdaptiveSpectralMmdConfig {
+    pub initial_feature_count: usize,
+    pub max_feature_count: usize,
+    pub confidence_level: f64,
+    pub tolerance: f64,
+    pub seed: u64,
+}
+
+/// Decision for the distribution-fidelity sub-gate only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdaptiveMmdDecision {
+    WithinTolerance,
+    AboveTolerance,
+    UnresolvedBudgetExhausted,
+}
+
+/// One inspected checkpoint in the alpha-spending confidence sequence.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AdaptiveMmdCheckpoint {
+    pub feature_count: usize,
+    pub alpha_for_checkpoint: f64,
+    pub cumulative_alpha_spent: f64,
+    pub normalized_mmd_squared_estimate: f64,
+    pub interval_radius: f64,
+    pub interval_lower: f64,
+    pub interval_upper: f64,
+}
+
+/// Result of adaptive spectral MMD with simultaneous checkpoint coverage.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdaptiveSpectralMmdResult {
+    pub decision: AdaptiveMmdDecision,
+    pub normalized_mmd_squared: f64,
+    pub normalized_mmd: f64,
+    pub feature_sample_variance: f64,
+    pub feature_standard_error: f64,
+    pub feature_bound_lower: f64,
+    pub feature_bound_upper: f64,
+    pub tolerance: f64,
+    pub confidence_level: f64,
+    pub alpha_budget: f64,
+    pub alpha_spent: f64,
+    pub feature_count: usize,
+    pub seed: u64,
+    pub candidate_particle_count: usize,
+    pub reference_particle_count: usize,
+    pub candidate_atom_count: usize,
+    pub reference_atom_count: usize,
+    pub particle_feature_evaluations: u128,
+    pub checkpoints: Vec<AdaptiveMmdCheckpoint>,
+}
+
+/// Evaluate normalized squared MMD adaptively with a time-uniform guarantee
+/// over the preregistered geometric checkpoints.
+///
+/// At look t, alpha_t = alpha/(t*(t+1)); the sum over all looks is alpha.
+/// Hoeffding intervals at the inspected checkpoints therefore have simultaneous
+/// coverage at least confidence_level by a union bound. The function only
+/// inspects at checkpoint boundaries; it never peeks mid-batch.
+///
+/// If the interval is wholly below the frozen tolerance, the MMD sub-gate is
+/// within tolerance. If wholly above, it fails. If still overlapping at the
+/// feature budget limit, the result is unresolved and must not be accepted.
+/// This does not authorize a physical trajectory without all other gates.
+pub fn compare_phase_space_measures_spectral_adaptive(
+    candidate: &[PhaseSpaceParticle1d],
+    reference: &[PhaseSpaceParticle1d],
+    kernel_config: MmdConfig,
+    adaptive_config: AdaptiveSpectralMmdConfig,
+) -> Result<AdaptiveSpectralMmdResult, MmdError> {
+    validate_config(kernel_config)?;
+    if adaptive_config.initial_feature_count == 0
+        || adaptive_config.max_feature_count < adaptive_config.initial_feature_count
+        || adaptive_config.max_feature_count > 10_000_000
+        || adaptive_config.max_feature_count == 0
+        || !adaptive_config.confidence_level.is_finite()
+        || !(0.0..1.0).contains(&adaptive_config.confidence_level)
+        || !adaptive_config.tolerance.is_finite()
+        || !(0.0..=4.0).contains(&adaptive_config.tolerance)
+    {
+        return Err(MmdError::InvalidAdaptiveConfig);
+    }
+
+    let (candidate_atoms, candidate_tv) =
+        aggregate_measure(candidate, "candidate", kernel_config.domain_length)?;
+    let (reference_atoms, reference_tv) =
+        aggregate_measure(reference, "reference", kernel_config.domain_length)?;
+    let total_variation_scale = candidate_tv.max(reference_tv);
+    let normalization = if total_variation_scale == 0.0 {
+        1.0
+    } else {
+        total_variation_scale
+    };
+
+    let alpha_budget = 1.0 - adaptive_config.confidence_level;
+    let mut cumulative_alpha_spent = 0.0;
+    let mut rng = SplitMix64::new(adaptive_config.seed);
+    let mut feature_count = 0_usize;
+    let mut target_feature_count = adaptive_config.initial_feature_count;
+    let mut mean = 0.0;
+    let mut sum_squared_deviation = 0.0;
+    let mut look_index = 1_usize;
+    let mut checkpoints = Vec::new();
+    let (decision, final_lower, final_upper) = loop {
+        while feature_count < target_feature_count {
+            let feature = sample_spectral_feature(kernel_config, &mut rng)?;
+            let squared_difference = spectral_squared_signature_difference(
+                &candidate_atoms,
+                &reference_atoms,
+                normalization,
+                feature,
+                kernel_config,
+            )?;
+            feature_count += 1;
+
+            // Welford's online variance update; only the running statistics
+            // are retained, not the individual D feature samples.
+            let count = feature_count as f64;
+            let delta = squared_difference - mean;
+            mean += delta / count;
+            let delta_after_update = squared_difference - mean;
+            sum_squared_deviation += delta * delta_after_update;
+        }
+
+        let look = look_index as f64;
+        let alpha_for_checkpoint = alpha_budget / (look * (look + 1.0));
+        cumulative_alpha_spent += alpha_for_checkpoint;
+        let interval_radius =
+            4.0 * ((2.0 / alpha_for_checkpoint).ln() / (2.0 * feature_count as f64)).sqrt();
+        let final_lower = (mean - interval_radius).max(0.0);
+        let final_upper = (mean + interval_radius).min(4.0);
+
+        if !mean.is_finite()
+            || !sum_squared_deviation.is_finite()
+            || !alpha_for_checkpoint.is_finite()
+            || !interval_radius.is_finite()
+            || !final_lower.is_finite()
+            || !final_upper.is_finite()
+        {
+            return Err(MmdError::NonFiniteOutput);
+        }
+
+        checkpoints.push(AdaptiveMmdCheckpoint {
+            feature_count,
+            alpha_for_checkpoint,
+            cumulative_alpha_spent,
+            normalized_mmd_squared_estimate: mean,
+            interval_radius,
+            interval_lower: final_lower,
+            interval_upper: final_upper,
+        });
+
+        if final_upper <= adaptive_config.tolerance {
+            break (
+                AdaptiveMmdDecision::WithinTolerance,
+                final_lower,
+                final_upper,
+            );
+        }
+        if final_lower > adaptive_config.tolerance {
+            break (
+                AdaptiveMmdDecision::AboveTolerance,
+                final_lower,
+                final_upper,
+            );
+        }
+        if feature_count >= adaptive_config.max_feature_count {
+            break (
+                AdaptiveMmdDecision::UnresolvedBudgetExhausted,
+                final_lower,
+                final_upper,
+            );
+        }
+
+        target_feature_count = target_feature_count
+            .saturating_mul(2)
+            .min(adaptive_config.max_feature_count);
+        look_index = look_index.saturating_add(1);
+    };
+
+    let feature_sample_variance = if feature_count > 1 {
+        (sum_squared_deviation / (feature_count - 1) as f64).max(0.0)
+    } else {
+        0.0
+    };
+    let feature_standard_error = (feature_sample_variance / feature_count as f64).sqrt();
+    let normalized_mmd = mean.sqrt();
+    let particle_feature_evaluations = (candidate_atoms.len() as u128)
+        .checked_add(reference_atoms.len() as u128)
+        .and_then(|count| count.checked_mul(feature_count as u128))
+        .ok_or(MmdError::PairCountOverflow)?;
+
+    if !feature_sample_variance.is_finite()
+        || !feature_standard_error.is_finite()
+        || !normalized_mmd.is_finite()
+        || !cumulative_alpha_spent.is_finite()
+        || cumulative_alpha_spent > alpha_budget + 1.0e-12
+    {
+        return Err(MmdError::NonFiniteOutput);
+    }
+
+    Ok(AdaptiveSpectralMmdResult {
+        decision,
+        normalized_mmd_squared: mean,
+        normalized_mmd,
+        feature_sample_variance,
+        feature_standard_error,
+        feature_bound_lower: final_lower,
+        feature_bound_upper: final_upper,
+        tolerance: adaptive_config.tolerance,
+        confidence_level: adaptive_config.confidence_level,
+        alpha_budget,
+        alpha_spent: cumulative_alpha_spent,
+        feature_count,
+        seed: adaptive_config.seed,
+        candidate_particle_count: candidate.len(),
+        reference_particle_count: reference.len(),
+        candidate_atom_count: candidate_atoms.len(),
+        reference_atom_count: reference_atoms.len(),
+        particle_feature_evaluations,
+        checkpoints,
     })
 }
 
@@ -1179,5 +1429,167 @@ mod tests {
         assert_eq!(result.normalized_mmd_squared, 0.0);
         assert_eq!(result.normalized_mmd, 0.0);
         assert_eq!(result.particle_feature_evaluations, 0);
+    }
+
+    #[test]
+    fn adaptive_mmd_stops_early_when_distribution_is_within_tolerance() {
+        let measure = [particle(0.5, -0.25, 0.4), particle(5.0, 1.5, 0.6)];
+        let result = compare_phase_space_measures_spectral_adaptive(
+            &measure,
+            &measure,
+            config(),
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 4096,
+                confidence_level: 0.95,
+                tolerance: 1.0,
+                seed: 51,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.decision, AdaptiveMmdDecision::WithinTolerance);
+        assert_eq!(result.feature_count, 64);
+        assert_eq!(result.checkpoints.len(), 1);
+        assert_eq!(result.normalized_mmd_squared, 0.0);
+    }
+
+    #[test]
+    fn adaptive_mmd_stops_early_when_distribution_exceeds_tolerance() {
+        let reference = [particle(2.0, -1.0, 1.0)];
+        let result = compare_phase_space_measures_spectral_adaptive(
+            &[],
+            &reference,
+            config(),
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 4096,
+                confidence_level: 0.95,
+                tolerance: 0.1,
+                seed: 52,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.decision, AdaptiveMmdDecision::AboveTolerance);
+        assert_eq!(result.feature_count, 64);
+        assert_eq!(result.normalized_mmd_squared, 1.0);
+    }
+
+    #[test]
+    fn adaptive_mmd_uses_alpha_spending_and_abstains_at_budget() {
+        let reference = [particle(2.0, -1.0, 1.0)];
+        let adaptive_config = AdaptiveSpectralMmdConfig {
+            initial_feature_count: 64,
+            max_feature_count: 256,
+            confidence_level: 0.95,
+            tolerance: 1.0,
+            seed: 53,
+        };
+        let result = compare_phase_space_measures_spectral_adaptive(
+            &[],
+            &reference,
+            config(),
+            adaptive_config,
+        )
+        .unwrap();
+        assert_eq!(
+            result.decision,
+            AdaptiveMmdDecision::UnresolvedBudgetExhausted
+        );
+        assert_eq!(
+            result
+                .checkpoints
+                .iter()
+                .map(|checkpoint| checkpoint.feature_count)
+                .collect::<Vec<_>>(),
+            vec![64, 128, 256]
+        );
+        assert!((result.alpha_spent - 0.0375).abs() <= 1.0e-12);
+        assert!(result.alpha_spent <= result.alpha_budget);
+        assert!(
+            result
+                .checkpoints
+                .windows(2)
+                .all(|pair| { pair[0].cumulative_alpha_spent < pair[1].cumulative_alpha_spent })
+        );
+    }
+
+    #[test]
+    fn adaptive_mmd_matches_the_same_frozen_feature_prefix() {
+        let reference = [particle(2.0, -1.0, 1.0)];
+        let seed = 0x2026_1121;
+        let adaptive = compare_phase_space_measures_spectral_adaptive(
+            &[],
+            &reference,
+            config(),
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 256,
+                confidence_level: 0.95,
+                tolerance: 1.0,
+                seed,
+            },
+        )
+        .unwrap();
+        let fixed = compare_phase_space_measures_spectral(
+            &[],
+            &reference,
+            config(),
+            SpectralMmdConfig {
+                feature_count: 256,
+                seed,
+            },
+        )
+        .unwrap();
+        assert_eq!(adaptive.feature_count, 256);
+        assert_eq!(
+            adaptive.normalized_mmd_squared,
+            fixed.normalized_mmd_squared
+        );
+    }
+
+    #[test]
+    fn adaptive_mmd_rejects_invalid_alpha_threshold_and_budget() {
+        let measure = [particle(0.0, 0.0, 1.0)];
+        let invalid = [
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 0,
+                max_feature_count: 64,
+                confidence_level: 0.95,
+                tolerance: 0.1,
+                seed: 1,
+            },
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 128,
+                max_feature_count: 64,
+                confidence_level: 0.95,
+                tolerance: 0.1,
+                seed: 1,
+            },
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 128,
+                confidence_level: 1.0,
+                tolerance: 0.1,
+                seed: 1,
+            },
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 128,
+                confidence_level: 0.95,
+                tolerance: 4.1,
+                seed: 1,
+            },
+        ];
+        for adaptive_config in invalid {
+            assert_eq!(
+                compare_phase_space_measures_spectral_adaptive(
+                    &measure,
+                    &measure,
+                    config(),
+                    adaptive_config
+                ),
+                Err(MmdError::InvalidAdaptiveConfig)
+            );
+        }
     }
 }

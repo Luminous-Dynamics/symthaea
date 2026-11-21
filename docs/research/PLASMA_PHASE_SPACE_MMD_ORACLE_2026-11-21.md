@@ -329,3 +329,49 @@ The immediate RFF implementation is a baseline, not the endpoint. The next resea
 
 Do not reuse the same seed after tuning on held-out trajectories and call the result independent evaluation. Treat feature count, seed, kernel scales and numerical precision as benchmark inputs.
 
+
+
+## 12. Anytime-valid adaptive spectral feature allocation
+
+The fixed-D Hoeffding interval in the spectral approximation is valid at a feature count frozen before evaluation. It must not be repeatedly inspected while drawing more features and then treated as a nominal 95% interval at a data-dependent stopping time.
+
+The new adaptive controller therefore uses a preregistered geometric checkpoint schedule. At checkpoint t, after D_t features, it spends
+
+\[
+\alpha_t=\frac{\alpha}{t(t+1)},\qquad \sum_{t=1}^{\infty}\alpha_t=\alpha,
+\]
+
+and computes the two-sided Hoeffding radius for q_d in [0,4]:
+
+\[
+r_t=4\sqrt{\frac{\log(2/\alpha_t)}{2D_t}}.
+\]
+
+By the union bound, all inspected checkpoint intervals simultaneously cover the fixed expected normalized squared-MMD with probability at least \(1-\alpha\), under the ideal independent spectral-draw assumption. The code only looks at the interval at declared checkpoint boundaries; there is no mid-batch peeking.
+
+The decision rule is:
+- **within_tolerance:** the interval upper endpoint is at or below the preregistered normalized squared-MMD tolerance;
+- **above_tolerance:** the interval lower endpoint is above tolerance;
+- **unresolved_budget_exhausted:** the interval still overlaps tolerance at the maximum feature count.
+
+Unresolved is an abstention/escalation result, not a pass. This is a distribution-fidelity sub-gate only. The full solver still requires independent field residuals, applicable physical invariants, convergence, calibrated physical risk, and matched-budget trajectory checks.
+
+The implementation consumes one continuous deterministic SplitMix64 feature stream across checkpoints. A fixed seed and final D therefore reproduce the same prefix as a fixed-D call. SplitMix64 is used for reproducibility, not cryptographic randomness; the Hoeffding coverage statement is for ideal independent spectral draws and is not a proof about pseudorandom independence in a deterministic stream. The confidence interval concerns random-feature integration error only.
+
+Five additional tests cover early pass, early fail, unresolved maximum-budget abstention, exact seeded-prefix equivalence, and invalid alpha/tolerance/budget rejection. The controller records each checkpoint's feature count, per-look alpha, cumulative alpha, estimate and interval.
+
+This controller is tracked separately in [#13046](https://github.com/Luminous-Dynamics/symthaea/issues/13046). Its competitive target is lower feature work on clearly safe or unsafe comparisons without compromising the simultaneous coverage guarantee; near-boundary outcomes must consume more compute or abstain.
+
+## 13. Competing approximation and sequential-calibration baselines
+
+The present sampler is a standard random-feature Monte Carlo estimator specialized to the exact mixed spectral law of this periodic × Gaussian kernel. It should not be presented as a new general random-feature family or as better than SOTA without direct comparison.
+
+Relevant baselines:
+- **Standard RFF / Bochner sampling:** the direct comparator. Match the same feature count, spectral law, PRNG/seed protocol and output functional. This crate's Skellam × Gaussian sampler is an explicit sampler for the target product spectrum.
+- **Data-driven RFF error estimation (Yao, Erichson & Lopes, AISTATS 2023):** their bootstrap error estimator supports adaptive feature allocation for kernel-matrix approximation. Reproduce it or a mathematically justified adaptation for the scalar signed-measure MMD functional. Do not transfer its matrix-approximation guarantee to this MMD estimator without a proof. Source: https://proceedings.mlr.press/v206/yao23a.html
+- **Orthogonal / Structured Orthogonal Random Features (Yu et al., NeurIPS 2016):** orthogonalization can reduce Gaussian-kernel approximation error and structured transforms can reduce feature-generation cost. The present spectrum is mixed discrete × one-dimensional Gaussian, not an isotropic multivariate Gaussian; direct ORF/SORF application is not automatic. Test only a derivation valid for this product measure. Sources: https://proceedings.neurips.cc/paper_files/paper/2016/hash/53adaf494dc89ef7196d73636eb2451b-Abstract.html and https://arxiv.org/abs/1610.09072
+- **Time-uniform confidence sequences (Howard et al., Annals of Statistics 2021):** general confidence-sequence methods can give tighter anytime-valid intervals than simple checkpoint-wise alpha spending. The current controller is the transparent union-bound baseline over a preregistered geometric schedule, not the final word. Source: https://doi.org/10.1214/20-AOS1991
+
+The next comparison matrix should include: fixed-D standard RFF; RFF with the Yao-style bootstrap error estimator adapted and validated for this functional; current alpha-spending geometric checkpoint controller; and a proven empirical-Bernstein / mixture confidence sequence. Hold physics cases, kernel scales, seeds, error target and hardware constant. Report achieved coverage across all looks, false-safe rate, mean and p95 feature count, absolute and relative MMD² error versus exact oracle, wall time and memory.
+
+Our credible claim ceiling is narrower and stronger: the implementation provides a measure-aware, full-spectrum sampler for this specific periodic × Gaussian kernel, an exact small-N reference, and a checkpointed optional-stopping-safe budget controller. Competitive superiority remains an empirical question.
