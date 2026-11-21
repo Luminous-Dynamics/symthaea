@@ -434,8 +434,14 @@
       "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
       "test_count": 11,
-      "hosted_ci_status": "pending",
-      "claim_ceiling": "pair-manifest-integrity-only"
+      "hosted_ci_status": "not-yet-verified",
+      "claim_ceiling": "pair-manifest-integrity-only",
+      "local_verification": {
+        "tests_passed": 11,
+        "tests_total": 11,
+        "result": "PASS",
+        "cli_report_byte_for_byte": true
+      }
     }
   },
   "reproducibility_artifacts": [
