@@ -15,6 +15,8 @@ use crate::mycelial_model::{
 
 pub const MAX_MYCELIAL_FILAMENTS: usize = 512;
 pub const MAX_TUBE_MESH_VERTICES: usize = 1_000_000;
+const MAX_FILAMENT_COORDINATE: f32 = 10_000.0;
+const MAX_FILAMENT_RADIUS: f32 = 100.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TubeTessellationConfig {
@@ -187,14 +189,22 @@ pub fn tessellate_mycelial_model(
 }
 
 fn valid_filament_geometry(filament: &MycelialFilament) -> bool {
-    filament.start.is_finite()
-        && filament.control_a.is_finite()
-        && filament.control_b.is_finite()
-        && filament.end.is_finite()
+    let bounded_point = |point: SpatialPoint3| {
+        point.is_finite()
+            && point.x.abs() <= MAX_FILAMENT_COORDINATE
+            && point.y.abs() <= MAX_FILAMENT_COORDINATE
+            && point.z.abs() <= MAX_FILAMENT_COORDINATE
+    };
+    bounded_point(filament.start)
+        && bounded_point(filament.control_a)
+        && bounded_point(filament.control_b)
+        && bounded_point(filament.end)
         && filament.radius_start.is_finite()
         && filament.radius_end.is_finite()
         && filament.radius_start > 0.0
         && filament.radius_end > 0.0
+        && filament.radius_start <= MAX_FILAMENT_RADIUS
+        && filament.radius_end <= MAX_FILAMENT_RADIUS
 }
 
 fn validate_config(config: TubeTessellationConfig) -> Result<(), TubeTessellationError> {
