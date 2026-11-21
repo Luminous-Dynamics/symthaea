@@ -44,7 +44,7 @@ pub struct MycelialAnastomosis {
     pub junction_position: SpatialPoint3,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MycelialConnectionKind {
     ParentBranch,
@@ -341,10 +341,11 @@ impl MycelialNetworkGraph {
             );
         }
 
-        let connected_components = parent
-            .keys()
-            .filter(|id| find_component(&mut parent, **id) == **id)
-            .count();
+        let mut component_roots = BTreeSet::new();
+        for id in &self.filament_ids {
+            component_roots.insert(find_component(&mut parent, *id));
+        }
+        let connected_components = component_roots.len();
         let vertex_count = self.filament_ids.len();
         let connection_count = self.connections.len();
         let cycle_rank = connection_count
@@ -486,9 +487,9 @@ mod tests {
                     3,
                     Some(1),
                     root_end,
-                    SpatialPoint3 { x: 2.0, y: 4.0, z: 0.0 },
-                    SpatialPoint3 { x: 4.0, y: 5.0, z: 0.0 },
-                    SpatialPoint3 { x: 6.0, y: 6.0, z: 0.0 },
+                    SpatialPoint3 { x: 2.0, y: 5.0, z: 0.0 },
+                    SpatialPoint3 { x: 4.0, y: 7.0, z: 0.0 },
+                    SpatialPoint3 { x: 6.0, y: 9.0, z: 0.0 },
                 ),
             ],
             orbital_cells: Vec::<OrbitalCell>::new(),
