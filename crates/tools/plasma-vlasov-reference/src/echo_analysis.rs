@@ -449,7 +449,7 @@ fn interpolate_crossing_time(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::f64::consts::PI;
+    use std::f64::consts::{PI, TAU};
 
     fn canonical_prediction() -> EchoPrediction {
         predict_two_pulse_echo(EchoPulsePair {
