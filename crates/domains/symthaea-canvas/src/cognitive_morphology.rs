@@ -8,7 +8,7 @@
 //! graph edges, infers relations from geometry, or changes CognitiveTopology.
 //! Decorative MycelialModel branches and anastomosis experiments are separate.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::fmt::Write as _;
@@ -353,9 +353,48 @@ impl CognitiveMorphologyProjection {
     /// Digest exact semantic identity plus quantized generated curves. This
     /// excludes camera, renderer, lighting, colour and animation state.
     pub fn geometry_digest_hex(&self) -> Result<String, CognitiveMorphologyError> {
-        if self.schema_version != COGNITIVE_MORPHOLOGY_SCHEMA_VERSION {
+        if self.schema_version != COGNITIVE_MORPHOLOGY_SCHEMA_VERSION
+            || self.session_id.is_empty()
+            || self.topology_digest.len() != 64
+            || !self
+                .topology_digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
             return Err(CognitiveMorphologyError::ProjectionMismatch);
         }
+
+        let mut node_positions = HashMap::with_capacity(self.nodes.len());
+        for node in &self.nodes {
+            if node.node_id.is_empty()
+                || !within_bounds(node.position, 128.0)
+                || node_positions.insert(node.node_id.as_str(), node.position).is_some()
+            {
+                return Err(CognitiveMorphologyError::ProjectionMismatch);
+            }
+        }
+
+        let mut edge_ids = HashSet::with_capacity(self.hyphae.len());
+        for hypha in &self.hyphae {
+            let Some(source) = node_positions.get(hypha.source_node_id.as_str()) else {
+                return Err(CognitiveMorphologyError::ProjectionMismatch);
+            };
+            let Some(target) = node_positions.get(hypha.target_node_id.as_str()) else {
+                return Err(CognitiveMorphologyError::ProjectionMismatch);
+            };
+            if hypha.edge_id.is_empty()
+                || !edge_ids.insert(hypha.edge_id.as_str())
+                || *source != hypha.start
+                || *target != hypha.end
+                || !within_bounds(hypha.control_a, 128.0)
+                || !within_bounds(hypha.control_b, 128.0)
+                || !hypha.radius.is_finite()
+                || !(0.005..=0.5).contains(&hypha.radius)
+            {
+                return Err(CognitiveMorphologyError::ProjectionMismatch);
+            }
+        }
+
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-cognitive-morphology-v1");
         hasher.update(&self.schema_version.to_le_bytes());
@@ -637,6 +676,22 @@ mod tests {
                 &spatial,
                 CognitiveMorphologyConfig::default()
             ),
+            Err(CognitiveMorphologyError::ProjectionMismatch)
+        );
+    }
+
+    #[test]
+    fn malformed_deserialized_morphology_with_dangling_hypha_is_rejected() {
+        let (topology, spatial) = fixture_projection();
+        let mut morphology = build_cognitive_morphology(
+            &topology,
+            &spatial,
+            CognitiveMorphologyConfig::default(),
+        )
+        .unwrap();
+        morphology.hyphae[0].target_node_id = "missing-node".to_string();
+        assert_eq!(
+            morphology.geometry_digest_hex(),
             Err(CognitiveMorphologyError::ProjectionMismatch)
         );
     }
