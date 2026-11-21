@@ -217,8 +217,7 @@ impl MetricObservation {
                 validate_optional_finite(self.upper_error_bound, true)?;
                 validate_optional_finite(self.acceptance_tolerance, true)?;
 
-                if let (Some(lower), Some(upper)) =
-                    (self.lower_error_bound, self.upper_error_bound)
+                if let (Some(lower), Some(upper)) = (self.lower_error_bound, self.upper_error_bound)
                 {
                     if lower > upper {
                         return Err(LedgerError::InvalidErrorInterval);
@@ -421,9 +420,7 @@ impl TrajectoryLedger {
             };
             let reason = match status {
                 QualificationStatus::Pass => None,
-                QualificationStatus::Fail => {
-                    Some("lower error bound exceeds tolerance".to_owned())
-                }
+                QualificationStatus::Fail => Some("lower error bound exceeds tolerance".to_owned()),
                 QualificationStatus::Unresolved => observation
                     .applicability_reason
                     .clone()
@@ -728,11 +725,15 @@ impl fmt::Display for LedgerError {
                 write!(f, "applicable metrics cannot use an unavailable bound")
             }
             Self::InvalidNumericValue => write!(f, "numeric evidence is invalid or non-finite"),
-            Self::InvalidErrorInterval => write!(f, "error interval lower bound exceeds upper bound"),
+            Self::InvalidErrorInterval => {
+                write!(f, "error interval lower bound exceeds upper bound")
+            }
             Self::EstimateOutsideErrorInterval => {
                 write!(f, "error estimate lies outside its declared interval")
             }
-            Self::InvalidTolerance => write!(f, "acceptance tolerance must be finite and nonnegative"),
+            Self::InvalidTolerance => {
+                write!(f, "acceptance tolerance must be finite and nonnegative")
+            }
             Self::InvalidConfidence => write!(f, "confidence level must be finite and in (0,1)"),
             Self::MissingPolicyVersion => write!(f, "cohort policy version must be non-empty"),
             Self::EmptyPolicy => write!(f, "cohort policy must define required metrics"),
@@ -740,15 +741,25 @@ impl fmt::Display for LedgerError {
                 write!(f, "metric {} is required more than once", metric.as_str())
             }
             Self::CohortMismatch => write!(f, "cohort mismatch"),
-            Self::SegmentMismatch => write!(f, "observation time interval differs from trajectory segment"),
+            Self::SegmentMismatch => write!(
+                f,
+                "observation time interval differs from trajectory segment"
+            ),
             Self::DuplicateMetricObservation { metric } => {
-                write!(f, "metric {} is observed more than once in one segment", metric.as_str())
+                write!(
+                    f,
+                    "metric {} is observed more than once in one segment",
+                    metric.as_str()
+                )
             }
             Self::EmptyErrorBudget => write!(f, "error budget must contain at least one component"),
             Self::MissingErrorSource => write!(f, "error component source must be non-empty"),
             Self::InvalidErrorBound => write!(f, "error component upper bound is invalid"),
             Self::UnqualifiedErrorComponent => {
-                write!(f, "empirical/unavailable components cannot enter a qualified error sum")
+                write!(
+                    f,
+                    "empirical/unavailable components cannot enter a qualified error sum"
+                )
             }
             Self::ErrorBudgetCohortMismatch => write!(f, "error-budget cohorts differ"),
             Self::ErrorBudgetTargetMismatch => write!(f, "error-budget target metrics differ"),
@@ -911,7 +922,10 @@ mod tests {
             bound_kind: BoundKind::Unavailable,
             provenance: provenance(),
         };
-        assert_eq!(unavailable.status().unwrap(), QualificationStatus::Unresolved);
+        assert_eq!(
+            unavailable.status().unwrap(),
+            QualificationStatus::Unresolved
+        );
     }
 
     #[test]
@@ -923,7 +937,9 @@ mod tests {
             time_start: 0.0,
             time_end: 1.0,
             applicability: Applicability::NotApplicable,
-            applicability_reason: Some("electrostatic cohort has no evolved magnetic field".to_owned()),
+            applicability_reason: Some(
+                "electrostatic cohort has no evolved magnetic field".to_owned(),
+            ),
             raw_value: None,
             error_estimate: None,
             lower_error_bound: None,
@@ -1039,7 +1055,13 @@ mod tests {
             .qualify(&policy(vec![requirement(MetricId::FieldL2Error, 0.1)]))
             .unwrap();
         assert_eq!(result.status, QualificationStatus::Unresolved);
-        assert!(result.decisions[0].reason.as_deref().unwrap().contains("provenance"));
+        assert!(
+            result.decisions[0]
+                .reason
+                .as_deref()
+                .unwrap()
+                .contains("provenance")
+        );
     }
 
     #[test]
@@ -1054,10 +1076,8 @@ mod tests {
         );
         wrong_cohort.cohort = EquationCohort::VlasovMaxwellPic;
         assert_eq!(
-            ledger(vec![wrong_cohort]).qualify(&policy(vec![requirement(
-                MetricId::FieldL2Error,
-                0.1
-            )])),
+            ledger(vec![wrong_cohort])
+                .qualify(&policy(vec![requirement(MetricId::FieldL2Error, 0.1)])),
             Err(LedgerError::CohortMismatch)
         );
 
@@ -1071,10 +1091,8 @@ mod tests {
         );
         wrong_segment.time_end = 0.5;
         assert_eq!(
-            ledger(vec![wrong_segment]).qualify(&policy(vec![requirement(
-                MetricId::FieldL2Error,
-                0.1
-            )])),
+            ledger(vec![wrong_segment])
+                .qualify(&policy(vec![requirement(MetricId::FieldL2Error, 0.1)])),
             Err(LedgerError::SegmentMismatch)
         );
 
@@ -1237,10 +1255,7 @@ mod tests {
             0.1,
             BoundKind::Deterministic,
         );
-        assert_eq!(
-            invalid.validate(),
-            Err(LedgerError::InvalidErrorInterval)
-        );
+        assert_eq!(invalid.validate(), Err(LedgerError::InvalidErrorInterval));
 
         invalid = observation(
             MetricId::FieldL2Error,
