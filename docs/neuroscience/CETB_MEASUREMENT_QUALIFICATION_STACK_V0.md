@@ -18,9 +18,9 @@ A dataset can be technically clean but unreliable. A measurement can be repeatab
 
 ### NSI — measurement sufficiency for precision fMRI
 
-The Network Similarity Index (Buchanan et al., 2026, DOI 10.1016/j.neuron.2026.05.020) estimates whether an individual fMRI dataset expresses recoverable large-scale network structure needed for precision functional mapping. It was designed to formalize expert quality judgements and inform expected benefit from more data.
+The Network Similarity Index (Buchanan et al., 2026, DOI 10.1016/j.neuron.2026.05.020) estimates whether an individual fMRI dataset expresses recoverable large-scale network structure needed for precision functional mapping. It was designed to formalize expert quality judgements and inform expected benefit from more data. The authors' public [PFM-NSI implementation](https://github.com/cjl2007/pfm-nsi) ships aligned Python and MATLAB implementations, an NSI/usability projection, contextual outputs and an optional reliability projection.
 
-CETB should treat NSI as an imported fMRI measurement-sufficiency method. It is not a general EEG/MEG quality score, not a test–retest ICC, not a state-change metric and not a measure of consciousness. Its use requires matching its acquisition, surface, parcellation and preprocessing assumptions.
+CETB should treat NSI as an imported fMRI measurement-sufficiency method. It is not a general EEG/MEG quality score, not a directly observed test–retest ICC, not a state-change metric and not a measure of consciousness. Its optional reliability projection is a distinct model output and must not be relabelled as observed test–retest reliability without separate validation. Its use requires matching its acquisition, surface, parcellation and preprocessing assumptions.
 
 ### RCAF — participant-level repeatability
 
