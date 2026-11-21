@@ -1,0 +1,103 @@
+{
+  "schema_version": "mel-matched-comparison-run-v1",
+  "run_id": "planned-matched-audio-v1",
+  "run_status": "frozen_plan",
+  "frozen_at": "2026-11-21T10:00:00Z",
+  "benchmark": {
+    "benchmark_id": "matched-instrumental-preference-pilot",
+    "benchmark_version": "1",
+    "task_family": "audio_preference",
+    "task_definition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "scorer_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "comparability_group": "same-prompt-length-budget-renderer-audio-preference",
+    "official_split_id": "pilot-rights-cleared-v1",
+    "official_split_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "dataset": {
+    "dataset_id": "rights-cleared-instrumental-prompts",
+    "dataset_version": "1",
+    "split_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "rights_clearance_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "permitted_uses": [
+      "evaluation",
+      "research_display"
+    ]
+  },
+  "environment": {
+    "source_revision": "0123456789abcdef0123456789abcdef01234567",
+    "rust_toolchain": "1.96.0",
+    "host_os": "linux",
+    "host_arch": "x86_64",
+    "runner_version": "0.1.0",
+    "renderer_id": "common-render-chain",
+    "renderer_version": "1.0.0",
+    "renderer_config_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "environment_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "retry_policy": {
+    "max_attempts_per_arm_case": 2,
+    "retry_on": [
+      "timeout",
+      "transport_error",
+      "provider_error",
+      "parse_error",
+      "render_error"
+    ],
+    "failed_attempts_consume_budget": true
+  },
+  "arms": [
+    {
+      "arm_id": "system-a",
+      "system_name": "Example System A",
+      "system_version": "model-version-pinned",
+      "adapter_version": "adapter-1",
+      "modality": "audio",
+      "execution_surface": "provider_api",
+      "model_identity_state": "provider_declared",
+      "identity_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "control_surface_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "inference_budget": {
+        "max_wall_time_ms": 120000,
+        "max_calls": 2,
+        "max_retries": 1,
+        "max_cost_microusd": 500000,
+        "cost_accounting": "provider_reported"
+      }
+    },
+    {
+      "arm_id": "system-b",
+      "system_name": "Example System B",
+      "system_version": "model-version-pinned",
+      "adapter_version": "adapter-1",
+      "modality": "audio",
+      "execution_surface": "provider_api",
+      "model_identity_state": "provider_declared",
+      "identity_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "control_surface_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "inference_budget": {
+        "max_wall_time_ms": 120000,
+        "max_calls": 2,
+        "max_retries": 1,
+        "max_cost_microusd": 500000,
+        "cost_accounting": "provider_reported"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "prompt-001",
+      "shared_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "task_instance_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "prompt_or_instruction_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "seed": 42,
+      "attempts": []
+    }
+  ],
+  "judgments": [],
+  "metrics": [],
+  "claim_ceiling": [
+    "This is a frozen comparison plan, not an executed benchmark result.",
+    "No system has been evaluated or ranked by this example.",
+    "A future run must retain every timeout, error, abstention, invalid output and retry in the attempt ledger."
+  ]
+}
