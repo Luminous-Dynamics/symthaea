@@ -112,7 +112,7 @@ Report each dimension independently. Do not collapse them into a single quality,
 | Data sufficiency | Expected gain from more data, compared with NSI only for compatible precision-fMRI inputs |
 | Reproducibility | Exact source, input, configuration, environment and output digests |
 
-For a nominal 5% test, a proposed engineering target is an empirical Type-I rate within 0.01 of nominal across the predeclared primary null cells, with Monte-Carlo uncertainty reported. This is a calibration target, not a universal scientific standard. Power should be assessed at a prospectively defined minimally meaningful effect; 80% or 90% may be adopted as a design target only when justified by the intended inference and error costs. A high-power cell cannot compensate for a failed nuisance-only null.
+For a nominal 5% test, a proposed primary-null engineering gate is that the one-sided 95% Monte-Carlo upper confidence bound for the empirical Type-I rate does not exceed 0.06 (nominal alpha + 0.01), using at least 10,000 replicates per critical null cell. This permits a conservative exact test rather than incorrectly requiring the observed rate to equal alpha from below. Use at least 1,000 replicates in other qualification cells and report Monte-Carlo uncertainty. These are proposed design gates, not universal scientific standards. Power should be assessed at a prospectively defined minimally meaningful effect; 80% or 90% may be adopted as a design target only when justified by the intended inference and error costs. A high-power cell cannot compensate for a failed nuisance-only null.
 
 ### Qualification envelope, not a universal score
 
