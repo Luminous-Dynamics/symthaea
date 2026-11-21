@@ -111,6 +111,98 @@
         "rows": 359,
         "fail": 22
       }
+    },
+    "missingness_distribution": {
+      "overall": {
+        "missing_sensor_cells": 41951,
+        "total_sensor_cells": 924530,
+        "missing_fraction": 0.04537548808583821,
+        "rows_with_any_missing": 1567,
+        "mean_missing_features_per_row": 26.771537970644545,
+        "median_missing_features_per_row": 24,
+        "p90_missing_features_per_row": 40
+      },
+      "by_split": {
+        "train": {
+          "rows": 940,
+          "fail": 76,
+          "pass": 864,
+          "missing_cells": 28518,
+          "missing_fraction": 0.05142084385142445,
+          "mean_missing_per_row": 30.338297872340426,
+          "median_missing_per_row": 28,
+          "p90_missing_per_row": 44,
+          "fail_mean_missing": 28.31578947368421,
+          "pass_mean_missing": 30.516203703703702
+        },
+        "validation": {
+          "rows": 313,
+          "fail": 11,
+          "pass": 302,
+          "missing_cells": 6313,
+          "missing_fraction": 0.034185303514377,
+          "mean_missing_per_row": 20.169329073482427,
+          "median_missing_per_row": 16,
+          "p90_missing_per_row": 31,
+          "fail_mean_missing": 18.545454545454547,
+          "pass_mean_missing": 20.228476821192054
+        },
+        "test": {
+          "rows": 314,
+          "fail": 17,
+          "pass": 297,
+          "missing_cells": 7120,
+          "missing_fraction": 0.038432473280794556,
+          "mean_missing_per_row": 22.67515923566879,
+          "median_missing_per_row": 20,
+          "p90_missing_per_row": 32,
+          "fail_mean_missing": 17.176470588235293,
+          "pass_mean_missing": 22.98989898989899
+        }
+      },
+      "by_month": {
+        "2008-07": {
+          "rows": 63,
+          "fail": 14,
+          "missing_cells": 1730,
+          "missing_fraction": 0.04654291094969061,
+          "mean_missing_per_row": 27.46031746031746
+        },
+        "2008-08": {
+          "rows": 555,
+          "fail": 51,
+          "missing_cells": 17440,
+          "missing_fraction": 0.053260039700717667,
+          "mean_missing_per_row": 31.423423423423422
+        },
+        "2008-09": {
+          "rows": 590,
+          "fail": 17,
+          "missing_cells": 14806,
+          "missing_fraction": 0.042533754668198795,
+          "mean_missing_per_row": 25.09491525423729
+        },
+        "2008-10": {
+          "rows": 359,
+          "fail": 22,
+          "missing_cells": 7975,
+          "missing_fraction": 0.037651668948585994,
+          "mean_missing_per_row": 22.214484679665738
+        }
+      },
+      "feature_profile": {
+        "features": 590,
+        "zero_missing_features": 52,
+        "features_over_50pct_missing": 28,
+        "median_missing_rows_per_feature": 6,
+        "p90_missing_rows_per_feature": 51,
+        "max_missing_rows_per_feature": 1429
+      },
+      "fail_vs_pass": {
+        "overall_fail_mean_missing_features": 25.46153846153846,
+        "overall_pass_mean_missing_features": 26.86466165413534,
+        "interpretation": "descriptive only; missingness must not be treated as causal process evidence"
+      }
     }
   },
   "proposed_chronological_partition": {
