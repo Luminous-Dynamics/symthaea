@@ -141,3 +141,29 @@ jobs:
           assert report["monotonic_adjacent_pair_fraction"] >= 0.5
           print("PASS: RCAF synthetic injection-recovery dose-response sweep")
           PY
+
+      - name: Run matched-input RCAF estimator tournament
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament -- "$RUNNER_TEMP/rcaf-estimator-tournament.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/estimator-tournament.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-estimator-tournament.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          results = report["results"]
+          assert report["estimators_compared"] == 3
+          assert [item["estimator"] for item in results] == [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          assert len({item["seed"] for item in results}) == 1
+          assert all(0.0 <= item["null_false_positive_rate"]["estimate"] <= 1.0 for item in results)
+          assert all(0.0 <= item["injection_detection_power"]["estimate"] <= 1.0 for item in results)
+          print("PASS: matched-input RCAF estimator tournament")
+          PY
