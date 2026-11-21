@@ -32,6 +32,7 @@ pub struct Scenario {
     pub decision_regime: String,
     pub target_claim_id: String,
     pub requires_independent_evidence: bool,
+    pub decision_context: DecisionContext,
     pub states: Vec<String>,
     pub loss_matrix: BTreeMap<String, BTreeMap<String, f64>>,
     pub prior: Option<BTreeMap<String, f64>>,
@@ -41,6 +42,15 @@ pub struct Scenario {
     pub budget: Resources,
     pub actions: Vec<Action>,
     pub expected: Expected,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DecisionContext {
+    pub profile_ref: String,
+    pub article_subject_ref: String,
+    pub configuration_id: String,
+    pub icd_revision: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,6 +114,10 @@ pub struct ActionAudit {
     pub actual_exceeds_scenario_budget: bool,
     pub budget_fits: bool,
     pub target_claim_matches: bool,
+    pub profile_matches: bool,
+    pub article_subject_matches: bool,
+    pub configuration_matches: bool,
+    pub icd_revision_matches: bool,
     pub common_cause_conflict: bool,
     pub mandatory_obligations_covered: bool,
     pub decision_informative: bool,
@@ -542,6 +556,10 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     }
     if scenario.scenario_id.trim().is_empty()
         || scenario.target_claim_id.trim().is_empty()
+        || scenario.decision_context.profile_ref.trim().is_empty()
+        || scenario.decision_context.article_subject_ref.trim().is_empty()
+        || scenario.decision_context.configuration_id.trim().is_empty()
+        || scenario.decision_context.icd_revision.trim().is_empty()
         || scenario.states.len() < 2
         || scenario.actions.is_empty()
         || scenario.current_evidence_refs.is_empty()
@@ -764,6 +782,12 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             }
         }
         let target_claim_matches = action.target_claim_id == scenario.target_claim_id;
+        let profile_matches = action.profile_ref == scenario.decision_context.profile_ref;
+        let article_subject_matches =
+            action.article_subject_ref == scenario.decision_context.article_subject_ref;
+        let configuration_matches =
+            action.configuration_id == scenario.decision_context.configuration_id;
+        let icd_revision_matches = action.icd_revision == scenario.decision_context.icd_revision;
         let common_cause_conflict = !action_is_independent(scenario, action);
         let mandatory_obligations_covered = obligations_covered(scenario, action);
         let terminal_nonresult = is_terminal_nonresult(action);
@@ -789,6 +813,18 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         }
         if !target_claim_matches {
             reasons.push("TARGET_CLAIM_MISMATCH".to_owned());
+        }
+        if !profile_matches {
+            reasons.push("PROFILE_REFERENCE_MISMATCH".to_owned());
+        }
+        if !article_subject_matches {
+            reasons.push("ARTICLE_SUBJECT_MISMATCH".to_owned());
+        }
+        if !configuration_matches {
+            reasons.push("CONFIGURATION_IDENTITY_MISMATCH".to_owned());
+        }
+        if !icd_revision_matches {
+            reasons.push("ICD_REVISION_MISMATCH".to_owned());
         }
         if common_cause_conflict {
             reasons.push("COMMON_CAUSE_DEPENDENCY".to_owned());
@@ -817,6 +853,10 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         let policy_eligible = action.admissibility.state == "ADMISSIBLE"
             && budget_fits
             && target_claim_matches
+            && profile_matches
+            && article_subject_matches
+            && configuration_matches
+            && icd_revision_matches
             && !common_cause_conflict
             && mandatory_obligations_covered
             && !terminal_nonresult
@@ -873,6 +913,10 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             actual_exceeds_scenario_budget,
             budget_fits,
             target_claim_matches,
+            profile_matches,
+            article_subject_matches,
+            configuration_matches,
+            icd_revision_matches,
             common_cause_conflict,
             mandatory_obligations_covered,
             decision_informative,
