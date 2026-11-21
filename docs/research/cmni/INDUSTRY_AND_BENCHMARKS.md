@@ -204,3 +204,30 @@ A lower training error, prettier heatmap, more complex model, more AI-generated 
 - ARPA-E Texas Tech project, https://arpa-e.energy.gov/programs-and-initiatives/search-all-projects/advanced-materials-characterization-and-nuclear-product-detection-lenr
 - ARPA-E Energetics Technology Center CATHODE project, https://arpa-e.energy.gov/programs-and-initiatives/search-all-projects/cathode-cathode-scintillator-detector-electrochemistry
 - 2026 dataset record (embargoed until 2026-12-01), https://zenodo.org/records/20435774
+
+
+## 8. Source-specific 2025 detector benchmark and external comparison
+
+The 2025 Thunderbird publication provides a substantial source-grounded detector reference:
+- One EJ-309 liquid-scintillator detector with a PMT and 14-bit / 500 MHz digitizer.
+- Tail/total PSD with per-light-output gamma fits, a `mu_gamma + 5*sigma_gamma` lower boundary, 0.2 PSD-unit upper extension and 50-keVee threshold.
+- MCNP6.2 + DRiFT and Geant4 response modelling; GRAVEL unfolding against a Geant4 response matrix.
+- The article reports >99.9999% gamma rejection for its stated cut and background of 0.21(9) n/s.
+- The SI reports 7-target beam-loading repeatability at about 69.3(2) n/s after 120 min at 0.2 mA; the 0.5 mA three-campaign electrochemical comparisons are separate.
+- Controls include sheath-voltage OFF returning the signal to background and H2O-for-D2O yielding an 88.3(3)% reduction.
+- D/Pd during the actual fusion experiments was not directly measured; ~0.7 was inferred from independent XRD characterization.
+
+This is a valuable reproducible benchmark, but it is not multi-detector independent replication. The highest-value CMNI engineering opportunity is to connect detector response, sample history, beam composition, fuel-state measurements and source time-series into one uncertainty-aware evidence graph.
+
+### How we should exceed the published workflow
+
+Do not claim a higher gamma-rejection figure based on a simulated gate. Instead, target:
+1. Lower blinded false-neutron rates on gamma-only controls at matched neutron detection sensitivity.
+2. Better calibrated count-rate and spectrum uncertainty under threshold/gain/PSD drift.
+3. Cross-validation between independently calibrated detector technologies or geometries.
+4. Source-to-result replay from raw waveform (when available), calibration, background, response matrices, unfolding code and versioned parameters.
+5. Whole-campaign prediction of the seven-target beam-repeatability and H2O/D2O controls, with no mixing of their distinct operating conditions.
+6. Joint inference of target state and nuclear yield that honestly reports the current D/Pd measurement gap.
+
+The source archive is a 14.7 GB file whose internal manifest remains uninspected, and the article's DOI citation differs from the title-matched visible Zenodo v2 record. No raw-waveform reproduction or exact detector-chain replay should be claimed until that discrepancy is resolved and source artifacts are ingested.
+
