@@ -10,7 +10,7 @@
 
 Create a source-pinned, machine-readable reference for the systems and benchmarks that Muse should compare itself against. The ledger distinguishes measured results from documented product/API capabilities and from dataset-size facts. It does not manufacture a single cross-industry ranking.
 
-The dated snapshot now has eleven sources and twenty-one observations (21 November 2026), including temporal-control and reward-model benchmarks.
+The dated snapshot now has thirteen sources and thirty-seven observations (21 November 2026), including audio-generation, symbolic-composition, editing, temporal-control, reward-model and audio-perception references.
 
 ## Snapshot highlights
 
@@ -32,6 +32,27 @@ The reported study is small (8 prompts, 12 participants and 38 ratings per model
 
 Source: https://futuremirex.com/mirex/wiki/2026%3ASymbolic_Music_Generation_Results
 
+### Pairwise reward-model evaluation — MIREX 2026 CMI-RewardBench results
+
+The public MIREX results page reports pairwise human-preference agreement on a 249-comparison core set and separate vocal/instrumental extension subsets (each reported as 300+). The top core results are:
+
+| System | Core accuracy (249) | Vocal extension | Instrumental extension |
+|---|---:|---:|---:|
+| CloudEar-overall | 73.9% | 60.9% | 72.6% |
+| SongEval (Average) | 72.7% | 62.0% | 72.0% |
+| first_submission | 72.3% | 63.3% | 75.4% |
+| CloudEar (Musicality) | 69.9% | 60.6% | 70.7% |
+| CloudEar (Alignment) | 69.5% | 61.6% | 69.5% |
+| Baseline: CMI-RM | 65.9% | 57.2% | 69.2% |
+
+This is a useful correction to any broad claim that the native CMI-RM baseline is automatically the best preference judge: on this specific MIREX public core test, CloudEar-overall and SongEval average score higher. This does not negate the different CMI-RewardBench native correlation/alignment results above; it shows that model ranking depends on the test set and task definition.
+
+The results page also lists a “Random guess (always B)” row at 59.0% on the core set. That is a label-prior diagnostic, not a balanced 50% random baseline. Preference systems should be evaluated against class balance and a majority/label-prior control.
+
+**Implication:** do not crown a single universal reward model. Qualify on held-out human pairs, separately by vocal/instrumental, genre and instruction type; report calibration and cost alongside accuracy.
+
+Source: https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results
+
 ### Reward models — CMI-RewardBench (ICML 2026)
 
 CMI-RewardBench evaluates the evaluators: it tests music reward models over musicality, text–music alignment, and compositional instruction alignment when the generation context may include text, lyrics and reference audio. The paper reports 110k pseudo-labelled preference samples and a separate human-annotated CMI-Pref corpus; pseudo-label volume must not be confused with human-label volume.
@@ -51,6 +72,28 @@ For compositional alignment, CMI-RM's CMI-Pref accuracy is 67.6% (text), 72.8% (
 Sources:
 - [ICML 2026 / PMLR paper](https://proceedings.mlr.press/v306/ma26am.html)
 - [Official CMI-RewardBench release and selected result tables](https://github.com/Haiwen-Xia/CMI-RewardBench)
+
+### Audio perception versus symbolic reasoning — MUSE Benchmark (PMLR 2026)
+
+Carone, Roman and Ripollés compare audio inputs with symbolic MIDI for three relational tasks: syncopation scoring, transposition detection and chord-quality identification. The key result is a modality gap: several models are near ceiling on MIDI while struggling on audio. Reasoning-style changes (Standalone, Chain-of-Thought and LogicLM) and few-shot exposure produce much smaller gains than the input-modality change.
+
+Approximate visual estimates from the paper's Figure 2:
+
+| Model | Task | Audio accuracy | MIDI accuracy |
+|---|---|---:|---:|
+| Gemini 2.5 Flash | Syncopation | ≈29% | ≈98% |
+| Gemini 2.5 Pro | Syncopation | ≈41% | ≈100% |
+| Gemini 2.5 Flash | Transposition | ≈71% | ≈98% |
+| Gemini 2.5 Pro | Transposition | ≈95% | ≈100% |
+| Gemini 2.5 Flash | Chord quality | ≈20% | ≈87% |
+| Gemini 2.5 Pro | Chord quality | ≈35% | ≈99% |
+| Qwen2.5-Omni | Chord quality | ≈24% | ≈51% |
+
+These are approximate chart estimates, not raw sample accuracies or a new leaderboard. The study reports that Gemini 2.5 Pro is unusually strong on audio transposition, approaching MIDI performance, while syncopation and chord extraction remain much harder.
+
+**Implication for Muse:** the benchmark must run the same semantic cases through audio and MIDI separately. A model that reasons perfectly from a score but cannot recover the same information from the waveform has not demonstrated audio-native music understanding.
+
+Source: https://proceedings.mlr.press/v303/carone26a.html
 
 ### Temporal controllability — TimingBench
 
