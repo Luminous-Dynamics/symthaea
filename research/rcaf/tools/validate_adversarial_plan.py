@@ -92,7 +92,7 @@ def validate_semantics(plan: dict[str, Any]) -> None:
     )
 
     outputs = set(plan["required_outputs"])
-    for required in ("type_i_error", "power", "nuisance_false_positives", "execution_receipt"):
+    for required in ("type_i_error", "power", "directional_power", "wrong_direction_rejection_rate", "nuisance_false_positives", "execution_receipt"):
         _need(required in outputs, f"required_outputs must include {required}")
     _need(bool(plan["connectivity_constructors"]), "at least one connectivity constructor is required")
     _need(bool(plan["matrix_comparators"]), "at least one matrix comparator is required")
