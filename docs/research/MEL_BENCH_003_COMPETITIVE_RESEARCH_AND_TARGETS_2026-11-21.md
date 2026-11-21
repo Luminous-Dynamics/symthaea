@@ -58,7 +58,27 @@ Important limitations: the study used eight prompts, 12 participants, and 38 rat
 
 Source: [MIREX 2026 Symbolic Music Generation Results](https://futuremirex.com/mirex/wiki/2026%3ASymbolic_Music_Generation_Results).
 
-### 1.3 Music editing: paired target is now the critical object
+### 1.3 Temporal controllability — a new independent frontier
+
+TimingBench (August 2026) evaluates whether timestamped musical events occur when requested, rather than whether a track merely resembles its text prompt. It contains 250 prompts for fixed 30-second instrumental clips: 100 single-event, 100 timed-sequence, and 50 global-tempo prompts. The prompt set defines 399 timestamped events.
+
+Published system results:
+
+| System | Overall instruction success (95% CI) | Timed events within ±500 ms | Tempo accuracy | FAD |
+|---|---:|---:|---:|---:|
+| Taan | 96.1% (93.3–99.2) | 91.3% | 92.0% | 4.8 |
+| ElevenLabs Music v2 | 28.9% (25.3–32.5) | 12.8% | 87.0% | 3.5 |
+| Google Lyria | 23.9% (20.3–27.5) | 8.6% | 89.7% | 2.6 |
+| ElevenLabs Music v1 | 25.4% (21.9–29.2) | 8.0% | 93.0% | 3.5 |
+| Suno | 22.0% (18.7–25.6) | 6.8% | 86.7% | 3.1 |
+
+This demonstrates that timing control, tempo accuracy and audio fidelity are independent axes. Taan leads the reported timing measures, while Google Lyria has the lowest reported FAD (lower is better). The published event-timing rate uses ±500 ms; it does not represent live MIDI latency or sub-100-ms beat-phase precision.
+
+**Evidence caveat:** TimingBench is published by Taan, one of the evaluated systems. Its public paper reports a 128-event development/calibration validation sample with 4 false credits and 6 false positives, event-family localization floors ranging from single-digit milliseconds to 218 ms median, and an unfinished separate 300-clip annotation study at the evaluation cutoff. Treat the leaderboard as a vendor-published benchmark reference, not independently replicated truth. Reproduce its prompts, event taxonomy, tolerance and detector apparatus before asserting parity or superiority.
+
+Source: [TimingBench paper and August 2026 results](https://taan.ai/research/rushing-or-dragging/).
+
+### 1.4 Music editing: paired target is now the critical object
 
 SMEBench (27 October 2026) introduces controlled music edits by applying known symbolic MIDI interventions and rendering matched source and target audio. It contains 11,160 paired examples, a balanced 3,600-example test set, twelve edit operations covering instrumentation, articulation, dynamics and pitch, and a separate 416-pair real-audio complement.
 
@@ -68,7 +88,7 @@ Source: [SMEBench — Benchmarking Neural Music Editing with Synthesized MIDI Ed
 
 This is a direct warning against using only source similarity, text/audio similarity, or audio quality as a music-edit success metric.
 
-### 1.4 Production tooling is a meaningful competitor
+### 1.5 Production tooling is a meaningful competitor
 
 Suno Studio 2.0 (13 August 2026) is documented as a browser-based production environment with MIDI import/record/edit, MIDI clips used as prompts for audio generation, chat-driven generation and plugin/synth design, audio effects, a wavetable synth, musical typing, and automation.
 
@@ -78,7 +98,7 @@ Sources:
 
 The implication: merely adding MIDI import/export, a chat interface, effects, or a timeline is not a unique product thesis. Melothaea must distinguish itself through verified event-level transformations, stable identity and replay, preservation, causal agency and cross-renderer portability.
 
-### 1.5 Live interaction is also an established research surface
+### 1.6 Live interaction is also an established research surface
 
 Google Lyria RealTime exposes a persistent bidirectional WebSocket stream for continuous instrumental music generation and steering. Weighted prompts can be updated during playback; large changes may be abrupt. BPM/scale changes require resending the complete configuration and resetting context, which produces a hard transition. The documentation explicitly recommends robust buffering for network jitter and variable generation latency.
 
@@ -161,6 +181,7 @@ These are proposed targets, not achieved results. Freeze the exact cohort, sampl
 | Score identity / preservation | MEL Score Transaction Bench | 100% stable event ID retention outside target; 100% exact rollback | Zero silent event replacement; every change has a machine-checkable patch and receipt |
 | Causal reciprocity | RMI-Bench | 100% synthetic known-answer control discrimination; zero negative-control false positives | Real-policy randomized human study beats one-way/yoked controls on preregistered musical-relevance outcomes |
 | Live improvisation | JAM_BOT, Lyria RealTime | Same device/clock/MIDI path; report system, transport and output latency separately | p95 decision latency ≤100 ms for a bounded local symbolic response; p95 beat-relative onset error ≤20 ms after calibrated output compensation |
+| Temporal event control | TimingBench | Reproduce its 250 prompts, 399 events and detector taxonomy; report instruction success, event timing by tolerance, tempo and fidelity separately | 100% score-time event placement in symbolic state; ≥90% rendered events within ±100 ms for event families whose independently measured detector floor supports that tolerance; no timing credit when event identity is ambiguous |
 | Recovery | MEL-TRG-Music | Recover from context reset, clock drift, dropped chunks and device reconnect without state corruption | 100% deterministic state reconciliation; no duplicated, backdated or silently lost committed events |
 | Agency and rights | MEL-CREATIVE-001 | 100% commits have an explicit authority receipt; 100% exact undo | Zero unauthorized commits; zero export/publication without the required permission and provenance receipt |
 | Cost and efficiency | Per-track/per-edit matched budget | Report cost, latency, failure rate and quality separately | Pareto improvement: lower cost/latency without degradation in target correctness, preservation or agency |
