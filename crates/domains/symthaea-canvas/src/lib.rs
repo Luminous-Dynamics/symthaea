@@ -24,6 +24,7 @@ pub mod color;
 pub mod geometry;
 pub mod mycelial_presence;
 pub mod mycelial_model;
+pub mod mycelial_mesh;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
@@ -56,6 +57,10 @@ pub use mycelial_presence::{
 pub use mycelial_model::{
     build_mycelial_model, MycelialFilament, MycelialModel, OrbitalCell,
     PresenceMode, SpatialPoint3, MYCELIAL_MODEL_VERSION,
+};
+pub use mycelial_mesh::{
+    tessellate_mycelial_model, FilamentMeshRange, MycelialTubeMesh,
+    TubeTessellationConfig, TubeTessellationError,
 };
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
