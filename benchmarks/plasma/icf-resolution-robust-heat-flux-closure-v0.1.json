@@ -1,0 +1,139 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "icf-resolution-robust-heat-flux-closure-v0.1",
+  "created_at": "2026-11-20",
+  "status": "source_review_specification_only",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12938",
+  "source": {
+    "doi": "10.1103/9l4n-mnz6",
+    "title": "Resolution-Robust Machine Learning Heat Flux Closure for Inertial Confinement Fusion Plasmas",
+    "journal": "PRX Intelligence",
+    "volume": 1,
+    "article": "013017",
+    "published": "2026-09-03",
+    "article_license": "CC-BY-4.0",
+    "code_artifact": "not_admitted",
+    "data_artifact": "not_admitted",
+    "supplement_admission": "pending"
+  },
+  "physical_task": {
+    "domain": "inertial_confinement_fusion",
+    "kinetic_reference": "OSIRIS_PIC",
+    "learned_map": "electron_temperature_profile_to_divergence_of_electron_heat_flux",
+    "equation": "3/2 * d(Te)/dt + div_x(qe) = S_ext",
+    "solver_mode": "implicit_iterative",
+    "cases": [
+      "hot_spot_relaxation",
+      "Epperlein_Short_temperature_perturbation"
+    ],
+    "reported_nonlinearity": "nonlocal_transport_with_reported_Knudsen_number_around_0.17",
+    "reported_source_cohorts": {
+      "hot_spot_training_alpha": [
+        1,
+        1.25,
+        1.5,
+        1.75,
+        2
+      ],
+      "hot_spot_intermediate_test_alpha": [
+        1.125,
+        1.375,
+        1.625,
+        1.875
+      ],
+      "epperlein_short_beta": [
+        1,
+        4,
+        7,
+        10,
+        13,
+        16
+      ],
+      "epperlein_short_k_lambda0": [
+        0.063,
+        0.251,
+        0.44,
+        0.628,
+        0.817,
+        1
+      ],
+      "reported_coarse_model_name": "F(6,10)",
+      "temporal_training_interval": "(0,20]",
+      "reported_temporal_extrapolation_interval": "(20,30]",
+      "claim_status": "source_article_text_not_independently_reproduced"
+    }
+  },
+  "evaluation_tracks": [
+    "source_faithful_FNO_and_SNB_reproduction",
+    "zero_shot_coarse_to_fine_resolution_transfer",
+    "fine_to_coarse_and_multi_resolution_transfer",
+    "space_time_resolution_shifts_separately",
+    "implicit_solver_in_the_loop",
+    "nonlocal_thermodynamic_operator_qualification",
+    "long_horizon_and_temporal_extrapolation",
+    "OOD_parameter_and_uncertainty_abstention"
+  ],
+  "candidates": [
+    "source_FNO",
+    "LINN_theory_informed_spatiotemporal_kernel",
+    "TCNN_time_embedded_CNN",
+    "SNB_nonlocal_transport",
+    "applicable_local_transport_baseline",
+    "mesh_aware_or_graph_finite_volume_neural_operator",
+    "trusted_implicit_solver_with_neural_initial_guess"
+  ],
+  "metrics": [
+    "heat_flux_divergence_MAE_RMSE_relative_L2",
+    "heat_flux_divergence_spectrum",
+    "integrated_boundary_flux_balance",
+    "electron_temperature_trajectory_error",
+    "peak_temperature_error",
+    "heat_front_position_and_speed",
+    "total_electron_energy_residual",
+    "implicit_iteration_count",
+    "convergence_failure_rate",
+    "time_to_convergence",
+    "zero_shot_fine_grid_error",
+    "temporal_extrapolation_error",
+    "end_to_end_wall_time_including_transfer",
+    "training_and_inference_memory",
+    "prediction_interval_coverage_and_width",
+    "selective_risk_false_safe_and_abstention"
+  ],
+  "fairness_contract": [
+    "same_kinetic_reference",
+    "same_physical_profile",
+    "same_equation_and_boundary_conditions",
+    "same_implicit_solver_and_stopping_tolerance",
+    "same_spatial_and_temporal_test_resolution",
+    "same_end_to_end_cost_accounting"
+  ],
+  "claim_limits": {
+    "reproduction": false,
+    "cross_resolution_replication": false,
+    "implicit_solver_replication": false,
+    "SOTA_superiority": false,
+    "facility_validation": false
+  },
+  "required_prior_art": [
+    {
+      "id": "PRX_FNO_2026",
+      "doi": "10.1103/9l4n-mnz6",
+      "task": "ICF_nonlocal_heat_flux_operator",
+      "status": "primary_source"
+    },
+    {
+      "id": "LINN_2025",
+      "doi": "10.1103/m215-3f6c",
+      "task": "PIC_trained_nonlocal_spatiotemporal_kernel",
+      "status": "required_prior_art_separate_source_reproduction"
+    },
+    {
+      "id": "TCNN_2026",
+      "doi": "10.1103/xx8k-xw91",
+      "task": "time_embedded_CNN_coupled_normalized_heat_flux_and_nonlocality",
+      "status": "required_prior_art_separate_source_reproduction"
+    }
+  ],
+  "comparability_rule": "published_metrics_are_not_head_to_head_comparable_until_PIC_reference_profile_collisionality_equation_solver_split_and_resolution_are_matched"
+}
