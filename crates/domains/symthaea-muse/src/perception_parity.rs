@@ -745,8 +745,8 @@ mod tests {
             .unwrap();
         let calibration = &sync.audio.confidence_calibration;
         assert_eq!(calibration.evaluated_count, 2);
-        assert_eq!(calibration.brier_score, Some(0.9025));
-        assert_eq!(calibration.expected_calibration_error, Some(0.95));
+        assert!((calibration.brier_score.unwrap() - 0.9025).abs() < 1e-6);
+        assert!((calibration.expected_calibration_error.unwrap() - 0.95).abs() < 1e-6);
         assert_eq!(calibration.bins.len(), 10);
         assert_eq!(calibration.bins[9].sample_count, 2);
         assert_eq!(calibration.bins[9].mean_confidence, Some(0.95));
