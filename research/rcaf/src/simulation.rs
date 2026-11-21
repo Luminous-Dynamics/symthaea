@@ -1280,6 +1280,22 @@ mod tests {
             report.median_nuisance_only_paired_gap,
             report.median_null_paired_gap
         );
+        assert_eq!(
+            report.signal_plus_nuisance_detection_power,
+            report.injection_detection_power
+        );
+        assert_eq!(
+            report.signal_plus_nuisance_directional_detection_power,
+            report.injection_directional_detection_power
+        );
+        assert_eq!(
+            report.signal_plus_nuisance_wrong_direction_rejection_rate,
+            report.injection_wrong_direction_rejection_rate
+        );
+        assert_eq!(
+            report.median_signal_plus_nuisance_paired_gap,
+            report.median_injected_paired_gap
+        );
     }
 
     #[test]
@@ -1291,8 +1307,21 @@ mod tests {
             report.monte_carlo_replicates
         );
         assert!(report.median_nuisance_only_paired_gap.is_finite());
+        assert_eq!(
+            report.signal_plus_nuisance_detection_power.trials,
+            report.monte_carlo_replicates
+        );
+        assert_eq!(
+            report.signal_plus_nuisance_directional_detection_power.successes
+                + report.signal_plus_nuisance_wrong_direction_rejection_rate.successes,
+            report.signal_plus_nuisance_detection_power.successes
+        );
+        assert!(report.median_signal_plus_nuisance_paired_gap.is_finite());
         let json = report.to_json_pretty();
         assert!(json.contains("\"nuisance_only_rejection_rate\""));
+        assert!(json.contains("signal_plus_nuisance_directional_detection_power"));
+        assert!(json.contains("signal_plus_nuisance_wrong_direction_rejection_rate"));
+        assert!(json.contains("median_signal_plus_nuisance_paired_gap"));
         assert!(json.contains("\"common_mode_nuisance_loading\""));
     }
 
@@ -1307,7 +1336,7 @@ mod tests {
         assert_eq!(sweep.nuisance_strengths.as_slice(), &strengths[..]);
         assert_eq!(
             sweep.schema_version,
-            "rcaf.common-mode-nuisance-sweep/0.1.0"
+            "rcaf.common-mode-nuisance-sweep/0.2.0"
         );
         assert_eq!(
             sweep.reports[0].nuisance_only_rejection_rate,
@@ -1316,6 +1345,22 @@ mod tests {
         assert_eq!(
             sweep.reports[0].median_nuisance_only_paired_gap,
             sweep.reports[0].median_null_paired_gap
+        );
+        assert_eq!(
+            sweep.reports[0].signal_plus_nuisance_detection_power,
+            sweep.reports[0].injection_detection_power
+        );
+        assert_eq!(
+            sweep.reports[0].signal_plus_nuisance_directional_detection_power,
+            sweep.reports[0].injection_directional_detection_power
+        );
+        assert_eq!(
+            sweep.reports[0].signal_plus_nuisance_wrong_direction_rejection_rate,
+            sweep.reports[0].injection_wrong_direction_rejection_rate
+        );
+        assert_eq!(
+            sweep.reports[0].median_signal_plus_nuisance_paired_gap,
+            sweep.reports[0].median_injected_paired_gap
         );
         for (report, strength) in sweep.reports.iter().zip(strengths) {
             assert_eq!(report.common_mode_nuisance_loading, strength);
