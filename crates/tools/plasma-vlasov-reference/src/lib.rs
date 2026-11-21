@@ -228,6 +228,17 @@ impl fmt::Display for SolverError {
                 write!(f, "distribution value {index} is non-finite")
             }
             Self::InvalidTimeStep => write!(f, "time step must be finite and positive"),
+            Self::VelocityImpulseLengthMismatch { expected, actual } => write!(
+                f,
+                "velocity impulse has {actual} values; expected {expected} (nx)"
+            ),
+            Self::NonFiniteVelocityImpulse { index } => {
+                write!(f, "velocity impulse at spatial index {index} is non-finite")
+            }
+            Self::NonFiniteVelocityImpulsePhase { index } => write!(
+                f,
+                "velocity impulse at spatial index {index} produces a non-finite Fourier phase"
+            ),
             Self::InvalidThermalSpeed => write!(f, "thermal speed must be finite and positive"),
             Self::InvalidPerturbationAmplitude => write!(
                 f,
