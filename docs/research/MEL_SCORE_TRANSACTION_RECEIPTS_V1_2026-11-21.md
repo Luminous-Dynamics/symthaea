@@ -81,3 +81,8 @@ The Sonata integration additionally verifies every candidate receipt in the actu
 ## Qualification boundary
 
 A passing test proves the v1 symbolic note-patch receipt behavior on the tested source/target Scores. It does not prove that the musical transformation is valuable, that the audio renderer is perceptually equivalent, that source event identity persists across arbitrary insert/delete/reorder operations, or that any model has artist approval or export rights.
+
+
+## Stack update
+
+This revision is rebased on the qualified Sonata universal-theory gate. Candidate eligibility uses the music-theory crate's documented universal-invariant policy; style-dependent findings remain present in the full validation report without being treated as cross-style structural corruption.
