@@ -37,13 +37,14 @@ Implemented in `crates/domains/symthaea-canvas/src/mycelial_model.rs`:
 - Cubic 3D Bézier filaments with stable IDs, parent IDs, generation, terminal markers, and tapered start/end radii.
 - A low-discrepancy golden-angle primary arrangement, deterministic branching, and bounded 3D control points.
 - Orbital cells with spatial depth.
+- A pure-Rust tube-mesh tessellator using parallel-transport frames, tapered radii, indexed triangles, stable per-filament submesh ranges, and explicit limits for untrusted or replayed model data.
 - The observed activity, speech lifecycle, viseme, gaze, and uncertainty values remain attached to the model rather than being converted into inferred renderer state.
 - A viseme is forwarded only when the snapshot's speech lifecycle confirms `Playing`.
 - User-selected `Ambient`, `Cognitive`, and `Conversational` modes change presentation complexity, not the meaning or provenance of runtime events.
 
 The SVG adapter now projects these same spatial curves into a lightly depth-compressed 2.5D view. It no longer invents an independent 2D branching topology.
 
-The v1 model does **not** yet emit a GPU mesh, volume texture, or shader material. It gives future renderers an authoritative spatial input from which to build those assets. The 3D renderer is therefore planned, not delivered.
+The v1 model and CPU tessellator now emit a bounded, indexed 3D tube mesh. They do **not** yet upload that mesh to a GPU, apply a 3D shader/material, or present a real 3D scene. The GPU renderer is therefore planned, not delivered.
 
 ## Rendering architecture
 
@@ -55,6 +56,9 @@ Evidence-aware EmbodimentSnapshot + trace
         |
         v
 MycelialModel v1 (renderer-neutral 3D curves + observed signals)
+        |
+        v
+CPU tube tessellator (bounded indexed triangle mesh)
         |
         +--> SVG projection (current, portable fallback/debug/export)
         |
@@ -69,7 +73,7 @@ MycelialModel v1 (renderer-neutral 3D curves + observed signals)
 
 The preferred native experiment is a separate Bevy 0.20 adapter, not a rushed migration of the existing dashboard:
 
-1. Convert cubic Bézier centre-lines into tapered tube or ribbon meshes. Parallel-transport frames are preferable to naïve Frenet frames for stable tube orientation near low curvature.
+1. Upload the existing bounded tube mesh or rebuild it when the model version changes. The CPU tessellator uses parallel-transport frames to avoid the sudden twists common with naïve Frenet frames near low-curvature points. A future GPU compute tessellator can be compared against it, not silently substituted.
 2. Keep topology and mesh identity stable; update per-frame uniforms and a small set of dynamic buffers rather than rebuilding the entire mesh every frame.
 3. Use a restrained emissive core, thin transmissive membrane, grazing-angle rim light, and depth-aware branch materials. Avoid indiscriminate bloom, which destroys branch separation.
 4. Instance terminal spores and orbital cells; apply level-of-detail and a strict particle budget on mobile.
@@ -159,7 +163,7 @@ Targets must be revised only after measuring real supported hardware. Quality/pe
 
 ## Phasing
 
-1. **Completed in this increment:** canonical renderer-neutral 3D spatial model; deterministic branching; shared SVG projection; three presentation modes; gaze and confirmed-playback layers.
+1. **Completed in this increment:** canonical renderer-neutral 3D spatial model; deterministic branching; bounded CPU tube-mesh tessellator; shared SVG projection; three presentation modes; gaze and confirmed-playback layers.
 2. **Next:** render-golden and model-hash fixtures; validate SVG output in Chromium and reduced-motion; compare mode node/geometry budgets.
 3. **Native GPU prototype:** a small, isolated Bevy 0.20 adapter that consumes `MycelialModel`, draws 3D tubular filaments and the nucleus, and reports frame metrics. Keep it out of the core semantic crate.
 4. **Browser GPU adapter:** WebGPU with WebGL 2 fallback and SVG fallback; capability detection and device-loss tests.
