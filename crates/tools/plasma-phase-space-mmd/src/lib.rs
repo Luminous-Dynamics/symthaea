@@ -2103,7 +2103,7 @@ mod tests {
         let reference = [particle(0.25, 0.0, 0.5), particle(4.25, 1.0, 0.5)];
         let feature_config = SpectralMmdConfig {
             feature_count: 2048,
-            seed: 0x51ca_1e,
+            seed: 0x0051_ca1e,
         };
         let first = compare_phase_space_measures_spectral_mixture(
             &candidate,
