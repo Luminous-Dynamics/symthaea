@@ -267,7 +267,8 @@ impl TemporalWorkReceipt {
     /// None is returned when wall time was not observed.
     fn real_time_factor(&self) -> Option<f64> {
         let wall_ns = self.system.wall_elapsed_ns.filter(|value| *value > 0)?;
-        Some(self.logical_seconds()? * 1.0e9 / wall_ns as f64)
+        self.logical_seconds()?;
+        Some(self.logical_duration_ns as f64 / wall_ns as f64)
     }
 
     /// Declared state, parameter and input bytes touched per logical second.
