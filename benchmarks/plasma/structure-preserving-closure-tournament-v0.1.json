@@ -1,0 +1,120 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "structure-preserving-plasma-closure-tournament-v0.1",
+  "created_at": "2026-11-20",
+  "status": "research_protocol_only",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12947",
+  "sources": [
+    {
+      "id": "levermore_1996",
+      "doi": "10.1007/BF02179552",
+      "status": "maximum_entropy_moment_baseline_identified"
+    },
+    {
+      "id": "generic_fno_2026",
+      "arxiv": "2606.08343",
+      "authors": ["Jason Sulskis", "Sathya Ravi"],
+      "status": "non_plasma_preprint_methodological_prior_art_not_plasma_result"
+    },
+    {
+      "id": "vlasov_poisson_landau_discrete_gradient_2026",
+      "doi": "10.1016/j.jcp.2026.114749",
+      "status": "collisional_kinetic_solver_candidate_PETSC_version_and_build_pending"
+    },
+    {
+      "id": "plasma_moment_closure_review_2026",
+      "doi": "10.1017/S0022377826102013",
+      "status": "review_context"
+    }
+  ],
+  "physical_lanes": [
+    {
+      "id": "collisionless_vlasov_poisson_landau",
+      "issues": [12907,12914],
+      "structure": ["reversible_hamiltonian","mass_charge_field_energy_invariants","phase_mixing"],
+      "entropy_gate": "no_blanket_fine_grained_monotonicity_requirement",
+      "candidates": [
+        "hammett_perkins",
+        "markovian",
+        "source_online_fno",
+        "levermore_5_moment",
+        "levermore_10_moment",
+        "positive_distribution",
+        "hamiltonian_operator",
+        "memory_closure"
+      ]
+    },
+    {
+      "id": "collisional_vlasov_poisson_landau",
+      "structure": ["mass_momentum_energy_invariants","collision_operator_entropy_production","discrete_gradient_time_integration"],
+      "entropy_gate": "use_pinned_collision_operator_and_exact_discrete_entropy_law",
+      "candidates": [
+        "exact_kinetic_discrete_gradient_reference",
+        "levermore_maximum_entropy",
+        "unconstrained_neural_closure",
+        "distribution_parameterized_closure",
+        "generic_operator",
+        "hybrid_exact_solver_correction"
+      ],
+      "source_solver": "Finn_et_al_JCP_554_114749"
+    },
+    {
+      "id": "magnetosheath_pressure_tensor",
+      "issues": [12923],
+      "symtropy_issues": [6240,6274],
+      "structure": ["pressure_symmetry","pressure_PSD","frame_symmetry","solver_matched_divergence","pressure_strain_energy"],
+      "entropy_gate": "no_generic_collisionless_entropy_monotonicity_gate"
+    },
+    {
+      "id": "icf_nonlocal_heat_transport",
+      "issues": [12938],
+      "structure": ["global_electron_energy","implicit_solver_residual","derived_nonlocal_thermodynamic_functional"],
+      "entropy_gate": "derive_for_pinned_collisional_nonlocal_transport_operator"
+    }
+  ],
+  "distribution_candidates": [
+    "unconstrained_pressure_or_flux_head",
+    "symmetric_PSD_tensor_factorization",
+    "levermore_5_moment_maxwellian",
+    "levermore_10_moment_anisotropic_gaussian",
+    "positive_gaussian_mixture",
+    "positive_exponential_family",
+    "positive_multiplicative_residual_distribution"
+  ],
+  "operator_candidates": [
+    "unconstrained_FNO_FCNN",
+    "hamiltonian_skew_adjoint_operator",
+    "generic_skew_L_PSD_M_exact_degeneracy",
+    "onsager_positive_dissipative_operator",
+    "learned_closure_plus_discrete_gradient_solver"
+  ],
+  "required_metrics": [
+    "distribution_positivity_and_quadrature_convergence",
+    "normalization_and_moment_reconstruction",
+    "pressure_realizability",
+    "skew_symmetry_residual",
+    "dissipative_symmetry_residual",
+    "dissipative_minimum_eigenvalue",
+    "GENERIC_degeneracy_residuals",
+    "energy_rate",
+    "task_specific_entropy_rate",
+    "discrete_invariant_drift",
+    "a_posteriori_solver_stability",
+    "OOD_selective_risk_and_false_safe_rate",
+    "end_to_end_cost_per_qualified_simulated_time"
+  ],
+  "hard_gate_policy": {
+    "collisionless_entropy_monotonicity_not_assumed": true,
+    "collisional_entropy_law_requires_pinned_collision_operator": true,
+    "continuous_time_identity_not_equal_to_discrete_time_preservation": true,
+    "finite_dimensional_metriplectic_audit_not_a_full_GENERIC_proof": true,
+    "cross_physics_scalar_leaderboard_prohibited": true
+  },
+  "execution": {
+    "plasma_generic_model": "not_implemented",
+    "positive_distribution_model": "not_implemented",
+    "levermore_reproduction": "not_performed",
+    "vpl_discrete_gradient_reproduction": "not_performed",
+    "structure_preserving_tournament": "not_run"
+  }
+}
