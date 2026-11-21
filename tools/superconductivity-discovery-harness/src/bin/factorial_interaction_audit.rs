@@ -724,7 +724,11 @@ mod tests {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"][0]["delivery_readback"]["source_sha256"] =
             json!("not-a-digest");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("SHA-256"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("fixture schema validation failed")
+        );
     }
 
     #[test]
