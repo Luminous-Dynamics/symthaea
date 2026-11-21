@@ -96,31 +96,55 @@ Arguments:
 The JSONL stream contains one `query` record per item followed by one `summary` record for each cohort. Each summary carries the source revision used for the run (or null when the caller did not pin one). A summary with (K) queries uses all (K) queries as its denominator; invalid and tied queries remain visible and cannot improve the correctness count.
 
 ## Capacity targets for the next qualification phase
-**Seed-count warning:** the default three seeds are for smoke-scale exploration and protocol debugging only. They are not enough for a credible K95/T90 claim. Confirmatory runs should use at least 30 independent corpus/model seeds as an initial target, then continue until a preregistered seed-level confidence-interval precision criterion is met. The independent seed/corpus is the statistical unit; the K query outcomes inside one shared bundle are not independent replicates.
 
+**Seed-count warning:** the default three seeds in the raw runner are smoke-scale only. They are not suitable for a confirmatory claim. The independent unit is the corpus/model seed; the (K) queries within one bundled memory are correlated observations and must never be counted as (K) independent replicates.
 
-Do not define capacity as the largest fan-in observed once. The target object is a temporal capacity surface:
+Do not define capacity as the largest fan-in observed once. The target is a temporal capacity surface with a two-level reliability requirement:
 
 ```text
-K95(D, T, E, CV) =
-  largest fan-in K whose seed-level 95% lower confidence bound
-  on semantic top-1 retrieval is at least 95%
+K95(D,T,E,CV) =
+  largest tested fan-in K for which:
+  (1) a seed passes when its semantic top-1 accuracy >= 95%, and
+  (2) the one-sided exact 95% Clopper-Pearson lower bound on
+      the probability that an independent seed passes is >= 95%.
 
-T90(D, K, E, CV) =
-  largest elapsed horizon whose seed-level 95% lower confidence bound
-  on semantic top-1 retrieval is at least 90%
+T90(D,K,E,CV) =
+  largest tested horizon T for which:
+  (1) a seed passes when its semantic top-1 accuracy >= 90%, and
+  (2) the one-sided exact 95% Clopper-Pearson lower bound on
+      the probability that an independent seed passes is >= 95%.
 ```
 
-Here D is representation dimension, T is elapsed horizon, E is event count, and CV is the coefficient of variation of the positive inter-event gaps. Estimates and confidence intervals must be computed across independent corpus/model seeds; queries sharing one bundled memory are correlated observations and must not be treated as independent replicates.
+Here D is representation dimension, T is elapsed horizon, E is event count, and CV is the coefficient of variation of the positive inter-event gaps. The confidence unit is the independent corpus/model seed—not the per-query result.
+
+With zero failures, at least **59 independent seeds** are required for the one-sided exact 95% lower bound on seed-success probability to reach 95% (59/59 gives approximately 0.95049). Any observed seed failures require a larger sample to qualify. The frontier tool defaults to a minimum of 59 seeds and also requires identical seed sets across fan-in levels for K95 and across horizon levels for T90. A missing or unpaired seed set prevents qualification.
+
+The new Rust post-processor is `examples/temporal_capacity_frontier.rs`. It reads the raw JSONL summaries and emits per-cohort seed-reliability records plus discrete K95/T90 records. It never interpolates between untested loads or horizons. A null K95/T90 means no tested point met the full gate; it does not mean the system has zero capacity or zero retention.
+
+Run the raw experiment and frontier analysis from a clean, committed worktree:
+
+```bash
+test -z "$(git status --porcelain)" || { echo "worktree must be clean"; exit 1; }
+cargo run --release --manifest-path crates/core/symthaea-hdc-ltc/Cargo.toml \
+  --example temporal_associative_capacity -- \
+  --dims 1024,4096 --loads 4,8,16 --horizons 1,10 \
+  --events 1,8 --seeds 59 --source-revision "$(git rev-parse HEAD)" \
+  --out temporal-capacity.jsonl
+
+cargo run --release --manifest-path crates/core/symthaea-hdc-ltc/Cargo.toml \
+  --example temporal_capacity_frontier -- \
+  --input temporal-capacity.jsonl --min-seeds 59 \
+  --out temporal-frontier.jsonl
+```
 
 Report the whole capacity surface with:
 - semantic top-1 accuracy and target-vs-best-distractor margin;
 - random-query false-match rate and the number of comparisons performed;
-- plug-in Fano diagnostic plus a separately qualified information estimator when added;
-- information retained per stored byte, per evolution update, and per joule only when physical energy is measured;
-- horizon, event count, irregularity CV and time-to-recovery following a regime change.
+- the plug-in Fano diagnostic, clearly separated from semantic accuracy;
+- information retained per stored byte and per evolution update; report joules only when physical energy is measured;
+- horizon, event count, irregularity CV and time-to-recovery after a regime change.
 
-The 95% / 90% operating points are **proposed qualification targets**, not existing Symthaea results or universal thresholds. A candidate only wins if its confidence-qualified capacity surface and resource frontier outperform the matched baseline under the same workload and measurement boundary.
+The 95% / 90% operating points are **proposed qualification targets**, not existing Symthaea results or universal thresholds. A candidate wins only if its confidence-qualified capacity surface and resource frontier outperform matched baselines under the same workload and measurement boundary.
 
 ## What v0.1 can and cannot establish
 
