@@ -714,6 +714,13 @@ mod tests {
     use symthaea_music_theory::{MusicalIntent, Style, compose_sonata_with_plan};
 
     fn return_trace(realization: &SonataRealization) -> CognitiveDecisionTrace {
+        return_trace_for_motif(realization, "sonata.primary")
+    }
+
+    fn return_trace_for_motif(
+        realization: &SonataRealization,
+        motif_id: &str,
+    ) -> CognitiveDecisionTrace {
         let obligation = realization
             .plan
             .obligations
@@ -722,8 +729,8 @@ mod tests {
             .find(|item| {
                 matches!(
                     &item.kind,
-                    ObligationKind::ReturnMotif { motif_id, .. }
-                        if motif_id == "sonata.primary"
+                    ObligationKind::ReturnMotif { motif_id: candidate, .. }
+                        if candidate == motif_id
                 )
             })
             .unwrap();
@@ -771,7 +778,7 @@ mod tests {
                 ],
                 urgency: 1.0,
                 confidence: 0.7,
-                rationale: vec!["restore the primary subject".into()],
+                rationale: vec![format!("restore the {motif_id} subject")],
             },
             predicted_outcome: PredictedMusicalOutcome {
                 tension_delta: -0.2,
@@ -836,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    fn same_source_score_counterfactual_changes_only_qualified_subintent_selection() {
+    fn invalid_current_return_rejects_maintain_but_allows_qualified_repair() {
         let intent = MusicalIntent {
             seed: 61,
             bars: 4,
@@ -873,6 +880,65 @@ mod tests {
         );
         assert_eq!(
             maintain_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::RejectedByFormalGates
+        );
+        assert_eq!(
+            repeat_batch.selection.recommended_id,
+            maintain_batch.selection.recommended_id
+        );
+        let selected_id = repeat_batch.selection.recommended_id.as_deref().unwrap();
+        let selected = repeat_batch
+            .candidates
+            .iter()
+            .find(|candidate| candidate.alternative_id == selected_id)
+            .unwrap();
+        assert!(selected.hard_constraints_valid());
+        assert!(selected.preserved_invariants);
+        assert!(selected.verification.iter().any(|evidence| {
+            evidence.obligation_id == repeat_batch.driving_obligation_id.unwrap()
+                && evidence.verified
+        }));
+    }
+
+    #[test]
+    fn same_source_transposed_secondary_counterfactual_selects_distinct_valid_scores() {
+        let intent = MusicalIntent {
+            seed: 67,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let mut realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let target =
+            section(&realization.plan, SonataSectionKind::RecapitulationSecondary).unwrap();
+        let target_indices =
+            melody_indices(&realization.score, target.start.beats(), target.end.beats());
+        for index in &target_indices {
+            realization.score.notes[*index].pitch =
+                realization.score.notes[*index].pitch.transpose(-12);
+        }
+        let (resolution, verification) =
+            verify_sonata_obligations(&realization.score, &realization.plan);
+        realization.resolution = resolution;
+        realization.verification = verification;
+
+        let mut repeat_trace = return_trace_for_motif(&realization, "sonata.secondary");
+        repeat_trace.inference.source_action = MusicAction::RepeatMotif;
+        let repeat_batch = generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
+
+        let mut maintain_trace = repeat_trace.clone();
+        maintain_trace.inference.source_action = MusicAction::Maintain;
+        let maintain_batch =
+            generate_and_rank_sonata_return(&realization, &maintain_trace).unwrap();
+
+        assert_eq!(
+            repeat_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "literal-register".into(),
+                selected_strategy: SonataReturnStrategy::LiteralRegister,
+            }
+        );
+        assert_eq!(
+            maintain_batch.cognitive_subintent.disposition,
             SonataReturnSubintentDispositionV1::Applied {
                 selected_alternative_id: "current-score".into(),
                 selected_strategy: SonataReturnStrategy::KeepCurrent,
@@ -880,13 +946,18 @@ mod tests {
         );
         let selected_score = |batch: &SonataInterventionBatch| {
             let selected_id = batch.selection.recommended_id.as_deref().unwrap();
-            &batch
+            batch
                 .candidates
                 .iter()
                 .find(|candidate| candidate.alternative_id == selected_id)
                 .unwrap()
                 .score
+                .clone()
         };
+        assert_ne!(
+            repeat_batch.selection.recommended_id,
+            maintain_batch.selection.recommended_id
+        );
         assert_ne!(
             selected_score(&repeat_batch),
             selected_score(&maintain_batch)
@@ -898,17 +969,12 @@ mod tests {
                 .iter()
                 .find(|candidate| candidate.alternative_id == selected_id)
                 .unwrap();
-            assert!(selected.theory_validation.valid);
+            assert!(selected.hard_constraints_valid());
             assert!(selected.preserved_invariants);
-            assert!(
-                selected
-                    .verification
-                    .iter()
-                    .any(
-                        |evidence| evidence.obligation_id == batch.driving_obligation_id.unwrap()
-                            && evidence.verified
-                    )
-            );
+            assert!(selected.verification.iter().any(|evidence| {
+                evidence.obligation_id == batch.driving_obligation_id.unwrap()
+                    && evidence.verified
+            }));
         }
     }
 
