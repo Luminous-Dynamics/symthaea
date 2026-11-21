@@ -446,9 +446,7 @@ fn expected_post_action_loss(
     Ok(expected)
 }
 
-fn parse_likelihoods(
-    action: &Action,
-) -> Result<Option<ObservationLikelihoods>, String> {
+fn parse_likelihoods(action: &Action) -> Result<Option<ObservationLikelihoods>, String> {
     let Some(value) = action.metadata.get("observation_likelihoods") else {
         return Ok(None);
     };
@@ -1169,7 +1167,9 @@ mod tests {
     #[test]
     fn actual_cost_without_execution_state_is_rejected() {
         let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
-        let action = value["scenarios"][10]["actions"][0].as_object_mut().unwrap();
+        let action = value["scenarios"][10]["actions"][0]
+            .as_object_mut()
+            .unwrap();
         action.remove("observed_execution_state");
         let changed = serde_json::to_vec(&value).unwrap();
         assert!(run_audit(&changed, SOURCE).is_err());
