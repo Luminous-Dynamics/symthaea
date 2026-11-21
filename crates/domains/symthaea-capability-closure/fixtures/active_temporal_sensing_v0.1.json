@@ -1,6 +1,6 @@
 {
   "schema": "symthaea.active_temporal_sensing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "tracking_issue": 9563,
   "status": "candidate_side_prototype_authored_not_executed",
   "package": "research/temporal-sensing",
@@ -18,7 +18,10 @@
       "maximum_gap_us",
       "estimated_observation_energy_nj",
       "remaining_observations",
-      "remaining_energy_nj"
+      "remaining_energy_nj",
+      "opportunity_loss_stddev_us",
+      "model_confidence_ppm",
+      "prediction_horizon_us"
     ],
     "evaluator_fields_allowed": false
   },
@@ -30,7 +33,8 @@
     "novelty_threshold",
     "uncertainty_threshold",
     "past_residual_threshold",
-    "value_of_information_per_nj"
+    "value_of_information_per_nj",
+    "risk_adjusted_value_of_information"
   ],
   "hard_invariants": [
     "causal_observation_history_only",
@@ -86,7 +90,11 @@
     "memory_byte_seconds",
     "p50_p95_p99_decision_latency",
     "aliasing_confusion",
-    "budget_blocked_episodes"
+    "budget_blocked_episodes",
+    "risk_adjusted_voi_per_nj",
+    "belief_state_opportunity_loss_stddev",
+    "model_confidence_ppm",
+    "ignorance_exposure_us"
   ],
   "qualification_targets_not_results": {
     "TED_reduction_at_equal_observation_budget": 0.15,
@@ -105,14 +113,21 @@
     "BrainTrace": "https://www.nature.com/articles/s41467-026-68453-w",
     "STDL": "https://pubmed.ncbi.nlm.nih.gov/41824348/",
     "NeuroBench": "https://neurobench.ai/",
-    "MLPerf_Tiny_v1_4": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/"
+    "MLPerf_Tiny_v1_4": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/",
+    "Li_Parlikad_2026_Active_Sensing": {
+      "doi": "10.1109/TSMC.2026.3745855",
+      "url": "https://doi.org/10.1109/TSMC.2026.3745855",
+      "publication_date": "2026-10-30",
+      "scope": "peer-reviewed risk-adjusted observe-then-plan VoI baseline; candidate heuristic here is inspired by, not a reproduction of, the paper's full method"
+    }
   },
   "implementation": {
-    "test_functions_authored": 14,
+    "test_functions_authored": 18,
     "tests_executed": false,
     "real_sensor_adapter": false,
     "calibrated_energy": false,
     "OS_level_evaluator_isolation": false,
-    "security_dependency_issue": 9437
+    "security_dependency_issue": 9437,
+    "risk_adjusted_voi_arm": true
   }
 }
