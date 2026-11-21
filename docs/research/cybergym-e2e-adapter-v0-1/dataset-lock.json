@@ -1,0 +1,21 @@
+{
+  "schema_version": "luminous.cybergym-e2e.dataset-lock.v0.1",
+  "benchmark_id": "CyberGym-E2E",
+  "benchmark_code_repository": "https://github.com/sunblaze-ucb/cybergym-e2e",
+  "benchmark_code_readme_blob_sha": "6b112b3bf872163d744eea5388e2dab299d6bfac",
+  "dataset_repository": "sunblaze-ucb/cybergym-e2e",
+  "dataset_revision": "29a59f0876f5c3612e44f380aa297ab4faf4b847",
+  "dataset_updated_date": "2026-11-16",
+  "upstream_notice": "Upstream README states task archives were repacked after a reported leakage issue and instructs users to delete earlier downloads and reacquire this revision.",
+  "retrieval_state": "not-retrieved",
+  "retrieved_at": null,
+  "downloaded_artifact_manifest_sha256": null,
+  "per_artifact_digests": [],
+  "permitted_modes": [
+    "e2e",
+    "patch-only"
+  ],
+  "project_license": "Apache-2.0",
+  "dataset_and_upstream_task_terms_reviewed": false,
+  "note": "This lock records the upstream revision and notice only. No benchmark dataset files have been downloaded, reviewed for redistribution, or executed by this research branch."
+}
