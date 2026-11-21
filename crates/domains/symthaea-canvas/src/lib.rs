@@ -19,6 +19,7 @@ pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
 pub mod cognitive_layout;
+pub mod cognitive_events;
 pub mod cognitive_svg;
 pub mod cognitive_topology;
 pub mod color;
@@ -43,6 +44,11 @@ pub use cognitive_layout::{
     COGNITIVE_PROJECTION_SCHEMA_VERSION, CognitiveAnchor, CognitiveLayoutConfig,
     CognitiveLayoutError, CognitiveSpatialLink, CognitiveSpatialProjection,
     layout_cognitive_topology, project_cognitive_topology,
+};
+pub use cognitive_events::{
+    MAX_COGNITIVE_EVENT_LOG, MAX_COGNITIVE_EVENTS_PER_BATCH, CognitiveEventApplyOutcome,
+    CognitiveEventError, CognitiveTopologyChange, CognitiveTopologyEvent,
+    CognitiveTopologyReducer,
 };
 pub use cognitive_svg::{CognitiveSvgError, CognitiveSvgOptions, render_cognitive_projection_svg};
 pub use cognitive_topology::{
