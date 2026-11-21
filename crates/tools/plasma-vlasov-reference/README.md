@@ -53,7 +53,9 @@ The unit suite contains 11 tests:
 - manufactured free-streaming characteristic solution;
 - analytic single-mode spectral Poisson solution;
 - non-neutral periodic negative control;
-- coupled-step mass and residual check;
+- coupled-step mass, momentum, total-energy and residual checks;
+- observed second-order timestep-convergence ratio on a coupled trajectory;
+- phase-space grid-size overflow rejection;
 - invalid grid, non-finite input and invalid timestep rejection;
 - electric-mode diagnostic validation.
 
@@ -80,6 +82,8 @@ cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-referenc
 ```
 
 The refinement example independently varies spatial grid size, velocity grid size, velocity-domain extent, and timestep at a common final time. It reports electric fundamental-mode amplitude, mass, total energy, Poisson residual, velocity-endpoint ratio and minimum distribution. It is an initial convergence probe, not a complete L3 admission study. A full reference admission still requires separate spatial, velocity-grid, velocity-domain and timestep studies; comparison with an independent second formulation; long-horizon drift; and explicit reference uncertainty.
+
+The focused GitHub workflow executes both examples on its exact head after formatting, unit tests and strict Clippy pass, then uploads the generated CSV traces as a workflow artifact. These hosted-runner traces are reproducible measurements for that build, not a substitute for independent physical validation or a matched external baseline.
 
 ## Relationship to the rest of the plasma stack
 
