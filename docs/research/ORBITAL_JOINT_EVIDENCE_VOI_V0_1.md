@@ -238,10 +238,10 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 ## 11. Deliverables
 
 P0: this contract and owner map.  
-P1: machine-readable action and outcome schema plus frozen synthetic scenario catalogue.  
-P2: isolated dry-run adapter over #7803/#10902, with no solver or physical execution.  
-P3: matched-budget policy tournament with an independent oracle.  
+P1: machine-readable action and outcome schema plus 11 frozen synthetic scenarios.  
+P2: executable dry-run preflight that audits admissibility, resource budgets, claim identity, common-cause labels, mandatory obligations, minimax regret and the one explicit calibrated-EVSI case; a separately implemented standard-library Python oracle independently checks the known answers. No solver or physical execution is invoked.  
+P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
 P5: only after review, authorized human-supervised physical evidence handoff.
 
-**Current milestone:** P0 specification and P1 scenario catalogue. No selector performance, physical test or certification claim is yet made.
+**Current milestone:** P0 specification, P1 schema/scenario catalogue and P2 dry-run admissibility/value audit are implemented on a public research branch. The selector-policy tournament remains future work. No selector-performance win, physical test or certification claim is made.
