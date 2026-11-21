@@ -70,6 +70,8 @@ pub enum MmdError {
     InvalidDomainLength,
     InvalidSpatialConcentration,
     InvalidVelocityLengthScale,
+    InvalidFeatureCount,
+    UnsupportedSpatialConcentrationForSampling,
     NonFinitePosition {
         measure: &'static str,
         particle: usize,
@@ -103,6 +105,11 @@ impl fmt::Display for MmdError {
             Self::InvalidVelocityLengthScale => {
                 write!(f, "velocity length scale must be finite and positive")
             }
+            Self::InvalidFeatureCount => write!(f, "spectral feature count must be positive"),
+            Self::UnsupportedSpatialConcentrationForSampling => write!(
+                f,
+                "spatial concentration exceeds the deterministic spectral sampler range"
+            ),
             Self::NonFinitePosition { measure, particle } => {
                 write!(f, "{measure} particle {particle} has a non-finite position")
             }
@@ -380,6 +387,331 @@ pub fn compare_phase_space_measures_mmd(
         pair_evaluations,
         roundoff_tolerance,
         negative_roundoff_clamped,
+    })
+}
+
+
+/// Configuration for the linear-cost spectral MMD approximation.
+///
+/// The seed and feature count are part of the benchmark identity. A run with
+/// the same inputs, kernel configuration, seed and feature count is exactly
+/// reproducible on the same floating-point platform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpectralMmdConfig {
+    pub feature_count: usize,
+    pub seed: u64,
+}
+
+/// Monte Carlo approximation of normalized squared MMD.
+///
+/// Each feature contributes one independent nonnegative sample of the exact
+/// squared MMD spectral integral. The reported Hoeffding radius is a 95%
+/// feature-sampling bound over random feature draws, not a confidence interval
+/// for physical solver error or finite-particle sampling uncertainty.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpectralMmdResult {
+    pub normalized_mmd_squared: f64,
+    pub normalized_mmd: f64,
+    pub feature_sample_variance: f64,
+    pub feature_standard_error: f64,
+    pub hoeffding_95_half_width: f64,
+    pub feature_bound_lower: f64,
+    pub feature_bound_upper: f64,
+    pub feature_count: usize,
+    pub seed: u64,
+    pub candidate_particle_count: usize,
+    pub reference_particle_count: usize,
+    pub candidate_atom_count: usize,
+    pub reference_atom_count: usize,
+    pub particle_feature_evaluations: u128,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SpectralFeature {
+    spatial_harmonic: i64,
+    velocity_frequency: f64,
+}
+
+/// Small, explicit deterministic PRNG. SplitMix64 is used only to make
+/// benchmark feature draws reproducible; it is not a cryptographic generator.
+#[derive(Debug, Clone, Copy)]
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        value ^ (value >> 31)
+    }
+
+    /// Uniform on the open interval (0, 1), avoiding log(0) and endpoint
+    /// singularities in Box-Muller and transformed-rejection sampling.
+    fn uniform_open(&mut self) -> f64 {
+        let mantissa = self.next_u64() >> 11;
+        (mantissa as f64 + 0.5) * (1.0 / 9_007_199_254_740_992.0)
+    }
+
+    fn standard_normal(&mut self) -> f64 {
+        let radius = (-2.0 * self.uniform_open().ln()).sqrt();
+        let angle = std::f64::consts::TAU * self.uniform_open();
+        radius * angle.cos()
+    }
+}
+
+/// log(k!) with direct summation for small k and a high-order Stirling
+/// expansion for larger k. The expansion error is negligible at k >= 256.
+fn log_factorial(k: u64) -> f64 {
+    if k < 256 {
+        return (2..=k).map(|value| (value as f64).ln()).sum();
+    }
+
+    let x = k as f64;
+    let inverse = 1.0 / x;
+    let inverse_squared = inverse * inverse;
+    (x + 0.5) * x.ln() - x
+        + 0.918_938_533_204_672_7
+        + inverse / 12.0
+        - inverse * inverse_squared / 360.0
+        + inverse * inverse_squared * inverse_squared / 1260.0
+        - inverse * inverse_squared * inverse_squared * inverse_squared / 1680.0
+}
+
+/// Draw one Poisson(lambda) value. Knuth inversion is efficient for small
+/// lambda; Hörmann PTRS transformed rejection avoids O(lambda) work for large
+/// lambda. The spatial von Mises spectrum is sampled as a Skellam difference
+/// of two independent Poisson(kappa/2) variates.
+fn sample_poisson(lambda: f64, rng: &mut SplitMix64) -> Result<u64, MmdError> {
+    if !lambda.is_finite() || lambda < 0.0 || lambda > 1.0e12 {
+        return Err(MmdError::UnsupportedSpatialConcentrationForSampling);
+    }
+    if lambda == 0.0 {
+        return Ok(0);
+    }
+
+    if lambda < 10.0 {
+        let limit = (-lambda).exp();
+        let mut product = 1.0;
+        let mut count = 0_u64;
+        loop {
+            count = count.saturating_add(1);
+            product *= rng.uniform_open();
+            if product <= limit {
+                return Ok(count - 1);
+            }
+        }
+    }
+
+    let square_root = lambda.sqrt();
+    let b = 0.931 + 2.53 * square_root;
+    let a = -0.059 + 0.02483 * b;
+    let inverse_alpha = 1.1239 + 1.1328 / (b - 3.4);
+    let quick_acceptance = 0.9277 - 3.6224 / (b - 2.0);
+
+    loop {
+        let u = rng.uniform_open() - 0.5;
+        let v = rng.uniform_open();
+        let distance = 0.5 - u.abs();
+        let proposal = ((2.0 * a / distance + b) * u + lambda + 0.43).floor();
+
+        if proposal < 0.0 || proposal > (i64::MAX as f64) {
+            continue;
+        }
+        let candidate = proposal as u64;
+
+        if distance >= 0.07 && v <= quick_acceptance {
+            return Ok(candidate);
+        }
+        if distance < 0.013 && v > distance {
+            continue;
+        }
+
+        let lhs = (v * inverse_alpha / (a / (distance * distance) + b)).ln();
+        let rhs = -lambda + proposal * lambda.ln() - log_factorial(candidate);
+        if lhs <= rhs {
+            return Ok(candidate);
+        }
+    }
+}
+
+/// Draw from the normalized Fourier spectrum of the periodic von Mises
+/// factor. Its coefficient at integer n is exp(-kappa) I_|n|(kappa), exactly
+/// the Skellam(lambda=kappa/2, lambda=kappa/2) probability mass.
+fn sample_spatial_harmonic(
+    concentration: f64,
+    rng: &mut SplitMix64,
+) -> Result<i64, MmdError> {
+    let lambda = concentration * 0.5;
+    let left = sample_poisson(lambda, rng)?;
+    let right = sample_poisson(lambda, rng)?;
+    let difference = i128::from(left) - i128::from(right);
+    i64::try_from(difference)
+        .map_err(|_| MmdError::UnsupportedSpatialConcentrationForSampling)
+}
+
+fn sample_spectral_feature(
+    config: MmdConfig,
+    rng: &mut SplitMix64,
+) -> Result<SpectralFeature, MmdError> {
+    let spatial_harmonic = sample_spatial_harmonic(config.spatial_concentration, rng)?;
+    let velocity_frequency = rng.standard_normal() / config.velocity_length_scale;
+    if !velocity_frequency.is_finite() {
+        return Err(MmdError::NonFiniteOutput);
+    }
+    Ok(SpectralFeature {
+        spatial_harmonic,
+        velocity_frequency,
+    })
+}
+
+/// Evaluate one complex Fourier feature for a canonical weighted atom.
+fn feature_value(
+    atom: WeightedAtom,
+    feature: SpectralFeature,
+    config: MmdConfig,
+) -> (f64, f64) {
+    let spatial_phase = std::f64::consts::TAU
+        * feature.spatial_harmonic as f64
+        * (atom.position / config.domain_length);
+    let phase = spatial_phase + feature.velocity_frequency * atom.velocity;
+    let (sine, cosine) = phase.sin_cos();
+    (cosine, sine)
+}
+
+/// Compare two phase-space measures using O((N+M)D) spectral features.
+///
+/// The kernel spectral measure factorizes exactly:
+/// - spatial harmonic n follows Skellam(kappa/2, kappa/2), since the periodic
+///   von Mises Fourier coefficients are exp(-kappa) I_|n|(kappa);
+/// - velocity frequency follows Normal(0, 1/ell_v^2), the Fourier spectrum of
+///   the Gaussian velocity kernel.
+///
+/// Both measures use the same sampled features (common random numbers). Each
+/// squared complex signature difference is an unbiased, nonnegative sample of
+/// the normalized squared MMD spectral integral. The input measures are first
+/// canonicalized and co-located signed weights aggregated, exactly as in the
+/// small-N reference oracle.
+pub fn compare_phase_space_measures_spectral(
+    candidate: &[PhaseSpaceParticle1d],
+    reference: &[PhaseSpaceParticle1d],
+    kernel_config: MmdConfig,
+    feature_config: SpectralMmdConfig,
+) -> Result<SpectralMmdResult, MmdError> {
+    validate_config(kernel_config)?;
+    if feature_config.feature_count == 0 || feature_config.feature_count > 10_000_000 {
+        return Err(MmdError::InvalidFeatureCount);
+    }
+
+    let (candidate_atoms, candidate_tv) =
+        aggregate_measure(candidate, "candidate", kernel_config.domain_length)?;
+    let (reference_atoms, reference_tv) =
+        aggregate_measure(reference, "reference", kernel_config.domain_length)?;
+
+    let total_variation_scale = candidate_tv.max(reference_tv);
+    let normalization = if total_variation_scale == 0.0 {
+        1.0
+    } else {
+        total_variation_scale
+    };
+
+    let mut rng = SplitMix64::new(feature_config.seed);
+    let mut mean = 0.0;
+    let mut sum_squared_deviation = 0.0;
+
+    for sample_index in 0..feature_config.feature_count {
+        let feature = sample_spectral_feature(kernel_config, &mut rng)?;
+        let mut candidate_real = CompensatedSum::default();
+        let mut candidate_imaginary = CompensatedSum::default();
+        let mut reference_real = CompensatedSum::default();
+        let mut reference_imaginary = CompensatedSum::default();
+
+        for atom in &candidate_atoms {
+            let (real, imaginary) = feature_value(*atom, feature, kernel_config);
+            candidate_real.add((atom.weight / normalization) * real);
+            candidate_imaginary.add((atom.weight / normalization) * imaginary);
+        }
+        for atom in &reference_atoms {
+            let (real, imaginary) = feature_value(*atom, feature, kernel_config);
+            reference_real.add((atom.weight / normalization) * real);
+            reference_imaginary.add((atom.weight / normalization) * imaginary);
+        }
+
+        let real_difference = candidate_real.total() - reference_real.total();
+        let imaginary_difference =
+            candidate_imaginary.total() - reference_imaginary.total();
+        let squared_difference =
+            real_difference * real_difference + imaginary_difference * imaginary_difference;
+        if !squared_difference.is_finite()
+            || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference)
+        {
+            return Err(MmdError::NonFiniteOutput);
+        }
+
+        // Welford's online variance update avoids storing D samples.
+        let count = (sample_index + 1) as f64;
+        let delta = squared_difference - mean;
+        mean += delta / count;
+        let delta_after_update = squared_difference - mean;
+        sum_squared_deviation += delta * delta_after_update;
+    }
+
+    if !mean.is_finite() || !sum_squared_deviation.is_finite() {
+        return Err(MmdError::NonFiniteOutput);
+    }
+
+    let feature_sample_variance = if feature_config.feature_count > 1 {
+        (sum_squared_deviation / (feature_config.feature_count - 1) as f64).max(0.0)
+    } else {
+        0.0
+    };
+    let feature_standard_error =
+        (feature_sample_variance / feature_config.feature_count as f64).sqrt();
+
+    // Each normalized measure has total variation <= 1. The difference of
+    // two characteristic coefficients has magnitude <= 2, hence q in [0,4].
+    // Hoeffding at alpha=0.05 gives this conservative two-sided feature-sampling
+    // radius; it is not a bound on particle-sampling or physical solver error.
+    let hoeffding_95_half_width =
+        4.0 * ((2.0 / 0.05_f64).ln() / (2.0 * feature_config.feature_count as f64)).sqrt();
+    let feature_bound_lower = (mean - hoeffding_95_half_width).max(0.0);
+    let feature_bound_upper = (mean + hoeffding_95_half_width).min(4.0);
+    let normalized_mmd = mean.sqrt();
+
+    let particle_feature_evaluations = (candidate_atoms.len() as u128)
+        .checked_add(reference_atoms.len() as u128)
+        .and_then(|count| count.checked_mul(feature_config.feature_count as u128))
+        .ok_or(MmdError::PairCountOverflow)?;
+
+    if !normalized_mmd.is_finite()
+        || !feature_sample_variance.is_finite()
+        || !feature_standard_error.is_finite()
+        || !hoeffding_95_half_width.is_finite()
+    {
+        return Err(MmdError::NonFiniteOutput);
+    }
+
+    Ok(SpectralMmdResult {
+        normalized_mmd_squared: mean,
+        normalized_mmd,
+        feature_sample_variance,
+        feature_standard_error,
+        hoeffding_95_half_width,
+        feature_bound_lower,
+        feature_bound_upper,
+        feature_count: feature_config.feature_count,
+        seed: feature_config.seed,
+        candidate_particle_count: candidate.len(),
+        reference_particle_count: reference.len(),
+        candidate_atom_count: candidate_atoms.len(),
+        reference_atom_count: reference_atoms.len(),
+        particle_feature_evaluations,
     })
 }
 
