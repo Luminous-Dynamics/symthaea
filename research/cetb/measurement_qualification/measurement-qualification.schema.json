@@ -1,0 +1,379 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/cetb/measurement_qualification/measurement-qualification.schema.json",
+  "title": "CETB multidimensional measurement qualification receipt",
+  "description": "Keeps measurement sufficiency, repeatability, construct validity and transportability separate. No composite quality or consciousness score is permitted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "evidence_status",
+    "claim",
+    "data_receipt",
+    "measurement_sufficiency",
+    "repeatability",
+    "construct_validity",
+    "transportability",
+    "no_composite_score",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cetb.measurement-qualification/0.1.0"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_status": {
+      "enum": [
+        "synthetic_fixture",
+        "metadata_only",
+        "signal_analysis",
+        "independent_replay"
+      ]
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "endpoint",
+        "modality",
+        "population",
+        "intended_use"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modality": {
+          "enum": [
+            "fmri",
+            "eeg",
+            "meg",
+            "ieeg",
+            "multimodal",
+            "synthetic"
+          ]
+        },
+        "population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intended_use": {
+          "enum": [
+            "method_research",
+            "individual_mapping",
+            "clinical_research",
+            "clinical_decision_support",
+            "other"
+          ]
+        }
+      }
+    },
+    "data_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_version",
+        "access_state",
+        "participant_count",
+        "file_manifest_sha256"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "access_state": {
+          "enum": [
+            "not_downloaded",
+            "metadata_only",
+            "downloaded_verified"
+          ]
+        },
+        "participant_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "file_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "measurement_sufficiency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method_id",
+        "modality_scope",
+        "metric_value",
+        "threshold",
+        "rationale",
+        "provenance"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "adequate",
+            "concern",
+            "inadequate",
+            "inconclusive"
+          ]
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modality_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "repeatability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "estimator_id",
+        "inferential_unit",
+        "within_state_estimate",
+        "confidence_interval",
+        "participant_count",
+        "surface_dimensions",
+        "rationale"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "adequate",
+            "concern",
+            "inadequate",
+            "inconclusive"
+          ]
+        },
+        "estimator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inferential_unit": {
+          "const": "participant"
+        },
+        "within_state_estimate": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "confidence_interval": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "upper",
+            "confidence_level"
+          ],
+          "properties": {
+            "lower": {
+              "type": "number"
+            },
+            "upper": {
+              "type": "number"
+            },
+            "confidence_level": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            }
+          }
+        },
+        "participant_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "surface_dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "construct_validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "operational_construct",
+        "positive_controls",
+        "negative_controls",
+        "reporting_scope",
+        "rationale"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "adequate",
+            "concern",
+            "inadequate",
+            "inconclusive"
+          ]
+        },
+        "operational_construct": {
+          "type": "string",
+          "minLength": 1
+        },
+        "positive_controls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "negative_controls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reporting_scope": {
+          "enum": [
+            "task_processing",
+            "responsiveness",
+            "report",
+            "memory",
+            "physiology",
+            "perturbational_complexity",
+            "phenomenal_experience_not_observed",
+            "other"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "transportability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "participant_holdout",
+        "site_holdout",
+        "independent_cohort"
+      ],
+      "properties": {
+        "participant_holdout": {
+          "$ref": "#/$defs/validationLane"
+        },
+        "site_holdout": {
+          "$ref": "#/$defs/validationLane"
+        },
+        "independent_cohort": {
+          "$ref": "#/$defs/validationLane"
+        }
+      }
+    },
+    "no_composite_score": {
+      "const": true
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "validationLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "sample_size",
+        "source_independence",
+        "details"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "adequate",
+            "concern",
+            "inadequate",
+            "inconclusive"
+          ]
+        },
+        "sample_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_independence": {
+          "enum": [
+            "same_participants_new_split",
+            "same_release_heldout_site",
+            "independent_acquisition_same_cohort",
+            "independent_cohort",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "details": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
