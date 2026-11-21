@@ -122,6 +122,9 @@ jobs:
             fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
             --source-commit "$GITHUB_SHA" > /tmp/sequential-campaign-b.json
           cmp /tmp/sequential-campaign-a.json /tmp/sequential-campaign-b.json
+          echo "SEQUENTIAL_CAMPAIGN_RECEIPT_BEGIN"
+          jq '{scenario_count, oracle_matches, oracle_mismatches, scenarios: [.scenarios[] | {scenario_id, baseline_terminal_disposition, baseline_worst_case_regret, myopic, adaptive_campaign: {first_action_id: .adaptive_campaign.first_action_id, worst_case_regret: .adaptive_campaign.worst_case_regret, expected_resources: .adaptive_campaign.expected_resources, policy: .adaptive_campaign.policy}}]}' /tmp/sequential-campaign-a.json
+          echo "SEQUENTIAL_CAMPAIGN_RECEIPT_END"
           jq -e '
             .scenario_count == 2 and .oracle_matches == 2 and
             .oracle_mismatches == 0 and .authority_granted == false and
