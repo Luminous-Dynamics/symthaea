@@ -404,6 +404,120 @@ pub fn run_injection_recovery_sweep(
     })
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommonModeNuisanceSweepReport {
+    pub schema_version: &'static str,
+    pub nuisance_strengths: Vec<f64>,
+    pub reports: Vec<InjectionRecoveryReport>,
+}
+
+impl CommonModeNuisanceSweepReport {
+    /// Render the nuisance dose-response curve as stable JSON.
+    pub fn to_json_pretty(&self) -> String {
+        let rendered_reports = self
+            .reports
+            .iter()
+            .map(|report| {
+                report
+                    .to_json_pretty()
+                    .lines()
+                    .map(|line| format!("  {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .collect::<Vec<_>>()
+            .join(",\n");
+        let rendered_strengths = self
+            .nuisance_strengths
+            .iter()
+            .map(|value| format!("{value:.12}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            concat!(
+                "{{\n",
+                "  \"schema_version\": \"{}\",\n",
+                "  \"nuisance_strengths\": [{}],\n",
+                "  \"strength_points\": {},\n",
+                "  \"reports\": [\n{}\n  ],\n",
+                "  \"claim_limits\": [\"synthetic_common_mode_observation_nuisance_only\", \"latent_loadings_held_fixed\", \"not_a_biological_artifact_model\", \"not_clinically_validated\"]\n",
+                "}}\n"
+            ),
+            self.schema_version,
+            rendered_strengths,
+            self.nuisance_strengths.len(),
+            rendered_reports
+        )
+    }
+}
+
+/// Evaluate common-mode observation nuisance strengths with matched latent/noise streams.
+///
+/// The first strength must be exactly zero and is the exact same-observation null control.
+/// Nuisance innovations use a deterministic participant/replicate-specific stream, separate
+/// from the latent-signal RNG. Thus latent loadings, repeats, null samples and intended
+/// injections are identical across nuisance doses; only nuisance loading changes.
+pub fn run_common_mode_nuisance_sweep(
+    config: &InjectionRecoveryConfig,
+    nuisance_strengths: &[f64],
+) -> Result<CommonModeNuisanceSweepReport, MetricError> {
+    if nuisance_strengths.len() < 2 {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "at least two nuisance strengths are required for a sweep",
+        });
+    }
+    if nuisance_strengths[0] != 0.0 {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "common-mode nuisance sweep must start with an exact zero-dose control",
+        });
+    }
+    let mut previous = -1.0;
+    for strength in nuisance_strengths {
+        if !strength.is_finite() || *strength < 0.0 || *strength <= previous {
+            return Err(MetricError::InvalidSimulationConfig {
+                reason: "nuisance strengths must be finite, non-negative and strictly increasing",
+            });
+        }
+        previous = *strength;
+    }
+
+    let mut reports = Vec::with_capacity(nuisance_strengths.len());
+    for strength in nuisance_strengths {
+        let mut point_config = config.clone();
+        point_config.common_mode_nuisance_loading = *strength;
+        reports.push(run_injection_recovery(&point_config)?);
+    }
+
+    let baseline = reports
+        .first()
+        .expect("validated nuisance-strength grid is non-empty");
+    for report in reports.iter().skip(1) {
+        let latent_metrics_match = report.null_false_positive_rate == baseline.null_false_positive_rate
+            && report.injection_detection_power == baseline.injection_detection_power
+            && report.injection_directional_detection_power
+                == baseline.injection_directional_detection_power
+            && report.injection_wrong_direction_rejection_rate
+                == baseline.injection_wrong_direction_rejection_rate
+            && report.median_null_paired_gap == baseline.median_null_paired_gap
+            && report.median_injected_paired_gap == baseline.median_injected_paired_gap
+            && report.median_null_positive_gap_fraction
+                == baseline.median_null_positive_gap_fraction
+            && report.median_injected_positive_gap_fraction
+                == baseline.median_injected_positive_gap_fraction;
+        if !latent_metrics_match {
+            return Err(MetricError::InvalidSimulationConfig {
+                reason: "common-mode nuisance sweep failed to preserve matched latent draws",
+            });
+        }
+    }
+
+    Ok(CommonModeNuisanceSweepReport {
+        schema_version: "rcaf.common-mode-nuisance-sweep/0.1.0",
+        nuisance_strengths: nuisance_strengths.to_vec(),
+        reports,
+    })
+}
+
 /// Classify a significant two-sided injection result against its known positive direction.
 ///
 /// A significant result is only a correct recovery when positive paired gaps outnumber
@@ -1097,6 +1211,69 @@ mod tests {
         let json = report.to_json_pretty();
         assert!(json.contains("\"nuisance_only_rejection_rate\""));
         assert!(json.contains("\"common_mode_nuisance_loading\""));
+    }
+
+    #[test]
+    fn common_mode_nuisance_sweep_preserves_matched_latent_draws() {
+        let config = InjectionRecoveryConfig {
+            monte_carlo_replicates: 30,
+            ..test_config()
+        };
+        let strengths = [0.0, 0.10, 0.20, 0.30];
+        let sweep = run_common_mode_nuisance_sweep(&config, &strengths).unwrap();
+        assert_eq!(sweep.nuisance_strengths, strengths);
+        assert_eq!(sweep.schema_version, "rcaf.common-mode-nuisance-sweep/0.1.0");
+        assert_eq!(
+            sweep.reports[0].nuisance_only_rejection_rate,
+            sweep.reports[0].null_false_positive_rate
+        );
+        assert_eq!(
+            sweep.reports[0].median_nuisance_only_paired_gap,
+            sweep.reports[0].median_null_paired_gap
+        );
+        for (report, strength) in sweep.reports.iter().zip(strengths) {
+            assert_eq!(report.common_mode_nuisance_loading, strength);
+            assert_eq!(
+                report.null_false_positive_rate,
+                sweep.reports[0].null_false_positive_rate
+            );
+            assert_eq!(
+                report.injection_detection_power,
+                sweep.reports[0].injection_detection_power
+            );
+            assert_eq!(
+                report.injection_directional_detection_power,
+                sweep.reports[0].injection_directional_detection_power
+            );
+            assert_eq!(
+                report.median_injected_paired_gap,
+                sweep.reports[0].median_injected_paired_gap
+            );
+        }
+        let json = sweep.to_json_pretty();
+        assert!(json.contains("rcaf.common-mode-nuisance-sweep/0.1.0"));
+        assert!(json.contains("\\"nuisance_only_rejection_rate\\""));
+    }
+
+    #[test]
+    fn common_mode_nuisance_sweep_rejects_missing_zero_unsorted_and_short_grids() {
+        let config = test_config();
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.2]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.1, 0.2]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.0, 0.2, 0.1]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.0, f64::NAN]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
     }
 
     #[test]
