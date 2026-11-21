@@ -10,7 +10,7 @@
 use std::error::Error;
 use std::fs;
 
-use symthaea_canvas::CognitiveTopology;
+use symthaea_canvas::{CognitiveTopology, project_cognitive_topology};
 
 const DEFAULT_FIXTURE: &str =
     "crates/domains/symthaea-canvas/tests/fixtures/cognitive_topology_v1.json";
@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let topology: CognitiveTopology = serde_json::from_str(&source)?;
     topology.validate()?;
     let digest = topology.canonical_digest_hex()?;
+    let projection = project_cognitive_topology(&topology)?;
 
     println!("fixture: {path}");
     println!("schema_version: {}", topology.schema_version);
@@ -33,6 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("edges: {}", topology.edges.len());
     println!("episodes: {}", topology.episodes.len());
     println!("semantic_digest: {digest}");
+    println!("projection_schema_version: {}", projection.schema_version);
+    println!("spatial_anchors: {}", projection.anchors.len());
+    println!("spatial_links: {}", projection.links.len());
+    println!("projection_topology_digest: {}", projection.topology_digest);
     println!("provenance: synthetic fixture; no live runtime events asserted");
     Ok(())
 }
