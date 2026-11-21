@@ -19,7 +19,6 @@ pub enum MotionPreference {
     Reduced,
 }
 
-
 /// One explicit visual frame on a monotonic timeline.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct FrameContext {
