@@ -556,7 +556,7 @@ pub fn build_mycelial_presence_with_mode(
     }
 
     if model.mode == PresenceMode::Cognitive {
-        let mut structure_frame = SceneNode::group(Some("cognitive-structure-frame"));
+        let mut structure_frame = SceneNode::group(Some("signal-inspector-guide-rings"));
         for radius in [132.0, 145.0, 158.0] {
             structure_frame.children.push(
                 SceneNode::circle(CENTER_X, CENTER_Y, radius).with_style(Style {
@@ -966,7 +966,7 @@ mod tests {
                 _ => None,
             }
         }).collect();
-        assert!(cognitive_ids.contains(&"cognitive-structure-frame"));
+        assert!(cognitive_ids.contains(&"signal-inspector-guide-rings"));
     }
 
     #[test]
