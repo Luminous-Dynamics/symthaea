@@ -6,14 +6,16 @@ on:
       - research/rmi-bench-track-a-runner-20261121
     paths:
       - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
-      - "crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs"
+      - "crates/domains/symthaea-muse/src/rmi_track_a_runner.rs"
+      - "crates/domains/symthaea-muse/tests/rmi_track_a_replay.rs"
+      - "crates/domains/symthaea-muse/src/bin/rmi_track_a.rs"
       - "scripts/mel_rmi_track_a_qualification.sh"
       - ".github/workflows/muse-rmi-track-a-qualification.yml"
   pull_request:
     branches: [main]
     paths:
       - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
-      - "crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs"
+      - "crates/domains/symthaea-muse/src/bin/rmi_track_a.rs"
       - "scripts/mel_rmi_track_a_qualification.sh"
       - ".github/workflows/muse-rmi-track-a-qualification.yml"
   workflow_dispatch:
