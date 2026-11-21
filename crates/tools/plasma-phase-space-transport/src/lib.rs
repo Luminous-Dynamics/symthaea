@@ -638,7 +638,10 @@ pub fn compare_phase_space_measures_w1(
             .map(|(index, _)| index)
             .ok_or(TransportError::NonFiniteOutput)?;
         normalized[largest_index] += correction;
-        if normalized.iter().any(|weight| !weight.is_finite() || *weight <= 0.0) {
+        if normalized
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight <= 0.0)
+        {
             return Err(TransportError::NonFiniteOutput);
         }
         let mut verified_sum = CompensatedSum::default();
