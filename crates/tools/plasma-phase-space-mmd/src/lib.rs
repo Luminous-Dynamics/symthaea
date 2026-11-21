@@ -2139,4 +2139,61 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn multi_scale_kernel_detects_thin_velocity_structure_lost_by_broad_scale() {
+        let candidate = [particle(1.0, 0.0, 1.0)];
+        let reference = [particle(1.0, 0.1, 1.0)];
+        let broad = compare_phase_space_measures_mmd(
+            &candidate,
+            &reference,
+            MmdConfig {
+                domain_length: 8.0,
+                spatial_concentration: 2.0,
+                velocity_length_scale: 2.0,
+            },
+        )
+        .unwrap();
+        let narrow = compare_phase_space_measures_mmd(
+            &candidate,
+            &reference,
+            MmdConfig {
+                domain_length: 8.0,
+                spatial_concentration: 2.0,
+                velocity_length_scale: 0.1,
+            },
+        )
+        .unwrap();
+        let mixture = compare_phase_space_measures_mmd_mixture(
+            &candidate,
+            &reference,
+            &MmdMixtureConfig {
+                domain_length: 8.0,
+                components: vec![
+                    MmdKernelComponent {
+                        weight: 0.2,
+                        spatial_concentration: 2.0,
+                        velocity_length_scale: 2.0,
+                    },
+                    MmdKernelComponent {
+                        weight: 0.8,
+                        spatial_concentration: 2.0,
+                        velocity_length_scale: 0.1,
+                    },
+                ],
+            },
+        )
+        .unwrap();
+
+        assert!(narrow.normalized_mmd_squared > broad.normalized_mmd_squared);
+        assert!(mixture.normalized_mmd_squared > broad.normalized_mmd_squared);
+        assert!(
+            (mixture.normalized_mmd_squared
+                - (0.2 * broad.normalized_mmd_squared + 0.8 * narrow.normalized_mmd_squared))
+                .abs()
+                <= 1.0e-12
+        );
+    }
+
+
 }
