@@ -1,6 +1,6 @@
 # MUSE observer calibration v1 — false-support and selective-risk evaluation
 
-**Status:** calibration v1 passed exact-head formatting, 17 tests, Clippy, CLI and schema validation at commit `321fcf4726087c735a169d377f31eff736daff3c`. The source-group family-risk extension described below is now authored on branch `research/muse-observer-calibration-v1-mainline-20261121` and awaits its own exact-head run. No real-audio calibration or benchmark win is claimed.
+**Status:** the source-group family-risk extension passed exact-head formatting, all 18 tests, Clippy, CLI and Draft 2020-12 schema/fixture validation at commit `280c5e6524f44f9d01319e16f7ae53d3bf2da31d`. No real-audio calibration or benchmark win is claimed.
 
 **Tracking:** [#12998 — Calibrate acoustic pitch evidence and benchmark false support](https://github.com/Luminous-Dynamics/symthaea/issues/12998).
 
@@ -87,7 +87,7 @@ SMEBench's human validation is an additional warning against equating automatic 
 - Schemas: `docs/research/schemas/muse-observer-calibration-*.schema.json`
 - Exact-head workflow: `.github/workflows/muse-observer-calibration.yml`
 
-Eighteen unit tests are authored, covering monotonic isotonic fitting, threshold selection, unmeasured abstention, group/artifact leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, negative-family attribution, source-group risk bounds, bundle tampering and checked-in fixture replay. The previous v1 source revision passed its exact-head focused workflow. The new source-group family-risk extension remains unqualified until its own exact-head workflow completes; no real-audio calibration result is claimed.
+Eighteen unit tests are authored and passed on the exact PR head, covering monotonic isotonic fitting, threshold selection, unmeasured abstention, group/artifact leakage, duplicate case IDs, invalid/non-finite feature values, no-safe-threshold behavior, held-out separation, negative-family attribution, source-group risk bounds, bundle tampering and checked-in fixture replay. The exact-head workflow also passed formatting, Clippy with warnings denied, CLI help smoke and Draft 2020-12 schema/fixture validation. This qualifies the implementation and synthetic fixture only; no real-audio calibration result is claimed.
 
 ## Next
 
