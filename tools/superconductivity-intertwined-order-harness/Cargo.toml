@@ -1,0 +1,20 @@
+[package]
+name = "superconductivity-intertwined-order-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Static multicomponent gauge-covariant superconducting GL basis auditor"
+
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+jsonschema = { version = "=0.59.0", default-features = false }
+rand = "=0.8.5"
+
+[[bin]]
+name = "sc_intertwined_order_audit"
+path = "src/main.rs"
