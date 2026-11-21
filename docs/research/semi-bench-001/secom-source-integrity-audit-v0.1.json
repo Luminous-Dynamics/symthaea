@@ -1,0 +1,271 @@
+{
+  "schema": "luminous.semi-bench.secom-source-integrity-audit.v0.1",
+  "audit_date": "2026-11-21",
+  "data_origin_claim": "public repository mirror attributed by its own documentation to UCI SECOM; this is not a byte-for-byte comparison against the official UCI download",
+  "mirror": {
+    "repository": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+    "commit": "0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+    "feature_file": {
+      "path": "data/secom.data",
+      "git_blob_sha1": "69fbabe279b3a1a04a51cfa3d8382078cab50c45",
+      "content_characters": 5388416,
+      "ascii_text": true,
+      "rows": 1567,
+      "columns_per_row": 590,
+      "sha256": "4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf"
+    },
+    "labels_file": {
+      "path": "data/secom_labels.data",
+      "git_blob_sha1": "3465abe5f7975bcc61d040e75860160873feb0bf",
+      "content_characters": 39071,
+      "ascii_text": true,
+      "rows": 1567,
+      "columns_per_row": 3,
+      "fields": "label and quoted date/time",
+      "sha256": "2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef"
+    },
+    "uci_source_attribution": {
+      "source": "https://archive.ics.uci.edu/dataset/179/secom",
+      "doi": "10.24432/C54305",
+      "license": "CC-BY-4.0 per official UCI metadata",
+      "byte_identity_to_official_uci_download": "not-verified"
+    },
+    "canonical_snapshot_manifest_sha256": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+    "canonical_snapshot_digest_convention": "SHA256 of UTF-8 canonical string: 'SECOM-MIRROR-SNAPSHOT-v1\\n' + 'data/secom.data\\\\0' + feature-file SHA256 hex + '\\n' + 'data/secom_labels.data\\\\0' + labels-file SHA256 hex + '\\n'. This identifies the two-file mirror snapshot; it is not a claim that the mirror bytes are identical to official UCI files."
+  },
+  "integrity_results": {
+    "feature_and_label_row_alignment": true,
+    "all_feature_rows_have_590_columns": true,
+    "non_numeric_feature_tokens": 0,
+    "missing_sensor_values": 41951,
+    "total_sensor_cells": 924530,
+    "missing_fraction": 0.04537548808583821,
+    "rows_with_at_least_one_missing_value": 1567,
+    "pass_count": 1463,
+    "fail_count": 104,
+    "fail_rate": 0.06636885768985322,
+    "timestamp_format": "DD/MM/YYYY HH:MM:SS",
+    "timestamp_first": "2008-07-19T11:55:00",
+    "timestamp_last": "2008-10-17T06:07:00",
+    "timestamps_non_decreasing_in_source_row_order": true,
+    "unique_timestamps": 1534,
+    "rows_with_repeated_timestamp": 33,
+    "timezone_offset_present": false,
+    "clock_interpretation": "single-source relative ordering only; do not treat timestamps as UTC or compare across clock domains",
+    "missingness_top_features": [
+      {
+        "column_1_based": 158,
+        "missing": 1429
+      },
+      {
+        "column_1_based": 159,
+        "missing": 1429
+      },
+      {
+        "column_1_based": 293,
+        "missing": 1429
+      },
+      {
+        "column_1_based": 294,
+        "missing": 1429
+      },
+      {
+        "column_1_based": 86,
+        "missing": 1341
+      },
+      {
+        "column_1_based": 221,
+        "missing": 1341
+      },
+      {
+        "column_1_based": 359,
+        "missing": 1341
+      },
+      {
+        "column_1_based": 493,
+        "missing": 1341
+      },
+      {
+        "column_1_based": 110,
+        "missing": 1018
+      },
+      {
+        "column_1_based": 111,
+        "missing": 1018
+      }
+    ],
+    "monthly_counts": {
+      "2008-07": {
+        "rows": 63,
+        "fail": 14
+      },
+      "2008-08": {
+        "rows": 555,
+        "fail": 51
+      },
+      "2008-09": {
+        "rows": 590,
+        "fail": 17
+      },
+      "2008-10": {
+        "rows": 359,
+        "fail": 22
+      }
+    },
+    "missingness_distribution": {
+      "overall": {
+        "missing_sensor_cells": 41951,
+        "total_sensor_cells": 924530,
+        "missing_fraction": 0.04537548808583821,
+        "rows_with_any_missing": 1567,
+        "mean_missing_features_per_row": 26.771537970644545,
+        "median_missing_features_per_row": 24,
+        "p90_missing_features_per_row": 40
+      },
+      "by_split": {
+        "train": {
+          "rows": 940,
+          "fail": 76,
+          "pass": 864,
+          "missing_cells": 28518,
+          "missing_fraction": 0.05142084385142445,
+          "mean_missing_per_row": 30.338297872340426,
+          "median_missing_per_row": 28,
+          "p90_missing_per_row": 44,
+          "fail_mean_missing": 28.31578947368421,
+          "pass_mean_missing": 30.516203703703702
+        },
+        "validation": {
+          "rows": 313,
+          "fail": 11,
+          "pass": 302,
+          "missing_cells": 6313,
+          "missing_fraction": 0.034185303514377,
+          "mean_missing_per_row": 20.169329073482427,
+          "median_missing_per_row": 16,
+          "p90_missing_per_row": 31,
+          "fail_mean_missing": 18.545454545454547,
+          "pass_mean_missing": 20.228476821192054
+        },
+        "test": {
+          "rows": 314,
+          "fail": 17,
+          "pass": 297,
+          "missing_cells": 7120,
+          "missing_fraction": 0.038432473280794556,
+          "mean_missing_per_row": 22.67515923566879,
+          "median_missing_per_row": 20,
+          "p90_missing_per_row": 32,
+          "fail_mean_missing": 17.176470588235293,
+          "pass_mean_missing": 22.98989898989899
+        }
+      },
+      "by_month": {
+        "2008-07": {
+          "rows": 63,
+          "fail": 14,
+          "missing_cells": 1730,
+          "missing_fraction": 0.04654291094969061,
+          "mean_missing_per_row": 27.46031746031746
+        },
+        "2008-08": {
+          "rows": 555,
+          "fail": 51,
+          "missing_cells": 17440,
+          "missing_fraction": 0.053260039700717667,
+          "mean_missing_per_row": 31.423423423423422
+        },
+        "2008-09": {
+          "rows": 590,
+          "fail": 17,
+          "missing_cells": 14806,
+          "missing_fraction": 0.042533754668198795,
+          "mean_missing_per_row": 25.09491525423729
+        },
+        "2008-10": {
+          "rows": 359,
+          "fail": 22,
+          "missing_cells": 7975,
+          "missing_fraction": 0.037651668948585994,
+          "mean_missing_per_row": 22.214484679665738
+        }
+      },
+      "feature_profile": {
+        "features": 590,
+        "zero_missing_features": 52,
+        "features_over_50pct_missing": 28,
+        "median_missing_rows_per_feature": 6,
+        "p90_missing_rows_per_feature": 51,
+        "max_missing_rows_per_feature": 1429
+      },
+      "fail_vs_pass": {
+        "overall_fail_mean_missing_features": 25.46153846153846,
+        "overall_pass_mean_missing_features": 26.86466165413534,
+        "interpretation": "descriptive only; missingness must not be treated as causal process evidence"
+      }
+    }
+  },
+  "proposed_chronological_partition": {
+    "method": "contiguous-source-row-order-60-20-20; not model-evaluated",
+    "clock_domain_id": "uci-secom-mirror-single-source-clock",
+    "source_local_naive": true,
+    "partitions": [
+      {
+        "split": "train",
+        "row_index_zero_based_inclusive": [
+          0,
+          939
+        ],
+        "n": 940,
+        "fail": 76,
+        "pass": 864,
+        "fail_rate": 0.08085106382978724,
+        "first": "2008-07-19T11:55:00",
+        "last": "2008-09-20T05:34:00"
+      },
+      {
+        "split": "validation",
+        "row_index_zero_based_inclusive": [
+          940,
+          1252
+        ],
+        "n": 313,
+        "fail": 11,
+        "pass": 302,
+        "fail_rate": 0.03514376996805112,
+        "first": "2008-09-20T06:08:00",
+        "last": "2008-10-02T19:25:00"
+      },
+      {
+        "split": "test",
+        "row_index_zero_based_inclusive": [
+          1253,
+          1566
+        ],
+        "n": 314,
+        "fail": 17,
+        "pass": 297,
+        "fail_rate": 0.054140127388535034,
+        "first": "2008-10-02T20:54:00",
+        "last": "2008-10-17T06:07:00"
+      }
+    ],
+    "claim_limits": [
+      "This is a proposed chronology-only stress split, not a trained-model result.",
+      "Validation (11 failures) and test (17 failures) have low positive support; threshold and recall estimates will have wide uncertainty.",
+      "No wafer/lot/tool/site identifiers are supplied by this mirror audit; do not claim group-disjoint or equipment-held-out generalization.",
+      "The single-source timestamps lack timezone offsets; preserve source-local naive clock ordering only."
+    ],
+    "frozen_manifest_path": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+    "manifest_git_blob_sha1": "7b38864a07347410c5c90c6d8e248c7ad8a5e81e",
+    "manifest_bytes": 303070,
+    "status": "frozen-source-row-level-split-manifest; model-not-yet-evaluated",
+    "row_index_boundaries_are_inclusive": true
+  },
+  "limitations": [
+    "The mirror's code documentation cites UCI, but feature-file byte identity to the official UCI download was not verified.",
+    "No data or split index files were committed to Symthaea by this audit.",
+    "The external model metrics were reviewed from committed reports; they were not reproduced by Luminous.",
+    "A random stratified split remains a separate reproduction track from the chronological split."
+  ]
+}
