@@ -30,6 +30,7 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_reco
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery_sweep
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose_response_tournament
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_common_mode_nuisance_sweep
 ```
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
@@ -130,6 +131,10 @@ Injection-recovery reports use schema version `rcaf.injection-recovery/0.3.0`. T
 
 The two directional rates partition the two-sided detections under the exact sign test. A wrong-direction rejection is never counted as successful recovery. The same fields are carried through the sweep and both estimator tournament reports. The report also records `common_mode_nuisance_loading` and `median_nuisance_only_paired_gap`. At zero nuisance strength, the nuisance control reuses the exact null sample and must match the null rejection rate and median gap exactly. A nonzero nuisance-only rejection rate is evidence of artifact sensitivity, not proof that the latent network changed.
 
+
+
+
+The `rcaf_common_mode_nuisance_sweep` example evaluates nuisance strengths `[0.00, 0.10, 0.20, 0.30]`. It requires an exact zero-dose control. The nuisance RNG is derived from stable participant/replicate-specific streams separate from the latent-signal RNG, so the null and injected outcomes must remain identical across nuisance doses. Only the nuisance loading changes. The result contract is `common-mode-nuisance-sweep.schema.json`. This is still a synthetic common-mode artifact challenge, not a model of all motion, scanner, physiology or preprocessing artifacts.
 
 ### Shared observation-only nuisance challenge
 
