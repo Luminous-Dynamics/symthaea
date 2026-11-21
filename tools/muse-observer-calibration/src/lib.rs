@@ -167,6 +167,16 @@ pub struct NegativeFamilyMetricsV1 {
     pub false_support_count: u64,
     pub false_support_rate_all_negatives: Option<f64>,
     pub false_support_rate_measured_negatives: Option<f64>,
+    /// Independent units with at least one measured negative in this family.
+    pub measured_negative_source_groups: u64,
+    /// Independent units with at least one false-supported measured negative.
+    pub false_support_source_groups: u64,
+    pub false_support_group_rate: Option<f64>,
+    /// One-sided nominal 95% Wilson score upper bound across source groups.
+    pub false_support_group_upper_95_wilson: Option<f64>,
+    /// Status relative to the threshold-selection split's frozen target.
+    pub group_risk_status: String,
+    pub group_risk_interval_method: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -710,6 +720,29 @@ fn average_precision(labels: &[bool], scores: &[f64]) -> Option<f64> {
     Some(sum_precision)
 }
 
+/// One-sided nominal 95% Wilson score upper bound for a binomial rate.
+///
+/// The independent trial is a source group, not an event/note row. This is a
+/// score interval (not an exact Clopper-Pearson bound); callers must preserve
+/// the method label and should not interpret per-family marginal intervals as
+/// simultaneous family-wise coverage.
+fn wilson_score_upper_95(successes: u64, trials: u64) -> Option<f64> {
+    if trials == 0 || successes > trials {
+        return None;
+    }
+    const Z_95_ONE_SIDED: f64 = 1.644_853_626_951_472_2;
+    let n = trials as f64;
+    let observed = successes as f64 / n;
+    let z_squared = Z_95_ONE_SIDED * Z_95_ONE_SIDED;
+    let denominator = 1.0 + z_squared / n;
+    let center = observed + z_squared / (2.0 * n);
+    let margin = Z_95_ONE_SIDED
+        * (observed * (1.0 - observed) / n
+            + z_squared / (4.0 * n * n))
+            .sqrt();
+    Some(((center + margin) / denominator).clamp(0.0, 1.0))
+}
+
 fn held_out_metrics(
     model: &IsotonicModelV1,
     threshold: &ThresholdSelectionV1,
@@ -808,6 +841,42 @@ fn held_out_metrics(
                     })
                 })
                 .count() as u64;
+            let measured_negative_group_ids = family_measured
+                .iter()
+                .map(|row| row.source_group_id.as_str())
+                .collect::<std::collections::BTreeSet<_>>();
+            let mut false_support_group_ids = std::collections::BTreeSet::new();
+            for row in &family_measured {
+                if threshold_value.is_some_and(|t| {
+                    predict(model, row.raw_score_db.expect("measured row has score")) >= t
+                }) {
+                    false_support_group_ids.insert(row.source_group_id.as_str());
+                }
+            }
+            let measured_negative_source_groups = measured_negative_group_ids.len() as u64;
+            let false_support_source_groups = false_support_group_ids.len() as u64;
+            let false_support_group_rate = (measured_negative_source_groups > 0).then_some(
+                false_support_source_groups as f64 / measured_negative_source_groups as f64,
+            );
+            let false_support_group_upper_95_wilson = wilson_score_upper_95(
+                false_support_source_groups,
+                measured_negative_source_groups,
+            );
+            let group_risk_status = match (
+                false_support_group_rate,
+                false_support_group_upper_95_wilson,
+            ) {
+                (None, _) | (_, None) => "insufficient_evidence",
+                (Some(rate), _) if rate > threshold.target_maximum_false_support_rate => {
+                    "observed_risk_exceeds_target"
+                }
+                (_, Some(upper))
+                    if upper <= threshold.target_maximum_false_support_rate =>
+                {
+                    "qualified_at_target"
+                }
+                _ => "insufficient_evidence",
+            };
             NegativeFamilyMetricsV1 {
                 negative_family: family,
                 total_negative_examples: family_rows.len() as u64,
@@ -817,6 +886,12 @@ fn held_out_metrics(
                     .then_some(family_false_support as f64 / family_rows.len() as f64),
                 false_support_rate_measured_negatives: (!family_measured.is_empty())
                     .then_some(family_false_support as f64 / family_measured.len() as f64),
+                measured_negative_source_groups,
+                false_support_source_groups,
+                false_support_group_rate,
+                false_support_group_upper_95_wilson,
+                group_risk_status: group_risk_status.into(),
+                group_risk_interval_method: "wilson_score_one_sided_95".into(),
             }
         })
         .collect::<Vec<_>>();
@@ -1424,6 +1499,25 @@ mod tests {
         assert!(
             (cross_part.false_support_rate_measured_negatives.unwrap() - 1.0 / 3.0).abs() < 1e-9
         );
+        // The three measured note rows come from two independent works;
+        // the false-supported notes are clustered to one work.
+        assert_eq!(cross_part.measured_negative_source_groups, 2);
+        assert_eq!(cross_part.false_support_source_groups, 1);
+        assert!((cross_part.false_support_group_rate.unwrap() - 0.5).abs() < 1e-9);
+        assert_eq!(cross_part.group_risk_status, "observed_risk_exceeds_target");
+        assert_eq!(
+            cross_part.group_risk_interval_method,
+            "wilson_score_one_sided_95"
+        );
+    }
+
+    #[test]
+    fn zero_false_support_requires_a_large_independent_group_cohort() {
+        assert!(wilson_score_upper_95(0, 7).unwrap() > 0.01);
+        assert!(wilson_score_upper_95(0, 299).unwrap() < 0.01);
+        assert!(wilson_score_upper_95(1, 299).unwrap() > 0.01);
+        assert_eq!(wilson_score_upper_95(0, 0), None);
+        assert_eq!(wilson_score_upper_95(2, 1), None);
     }
 
     #[test]
