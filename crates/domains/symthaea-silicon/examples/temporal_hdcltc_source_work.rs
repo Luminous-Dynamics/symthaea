@@ -197,7 +197,9 @@ impl SourceDerivedWork {
 struct LatencyObservation {
     p50_ns: u64,
     p95_ns: u64,
-    p99_ns: u64,
+    /// Withheld until at least 1,000 measured samples are available.
+    p99_ns: Option<u64>,
+    p99_minimum_sample_gate: u64,
     minimum_ns: u64,
     maximum_ns: u64,
     sample_count: u64,
@@ -259,7 +261,12 @@ fn summarize_latency(mut samples: Vec<u64>) -> Result<LatencyObservation, &'stat
     Ok(LatencyObservation {
         p50_ns: percentile(&samples, 50, 100).ok_or("p50 unavailable")?,
         p95_ns: percentile(&samples, 95, 100).ok_or("p95 unavailable")?,
-        p99_ns: percentile(&samples, 99, 100).ok_or("p99 unavailable")?,
+        p99_ns: if samples.len() >= 1_000 {
+            percentile(&samples, 99, 100)
+        } else {
+            None
+        },
+        p99_minimum_sample_gate: 1_000,
         minimum_ns: *samples.first().ok_or("minimum unavailable")?,
         maximum_ns: *samples.last().ok_or("maximum unavailable")?,
         sample_count: samples.len() as u64,
