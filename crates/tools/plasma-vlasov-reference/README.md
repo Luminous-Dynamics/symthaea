@@ -33,6 +33,12 @@ The periodic Poisson equation is solved spectrally with a zero-mean gauge. The z
 
 The in-house radix-2 FFT has no external dependencies. The time integrator is second-order Strang splitting. It is not an energy-preserving discrete-gradient or variational integrator. Small time-step drift must be measured; it must not be described as exact conservation.
 
+## Fourier interpolation / zero-padding oracle
+
+`zero_pad_periodic_line` refines a uniformly sampled real periodic line by zero-padding its Fourier coefficients. It preserves the trigonometric interpolant at old grid nodes and at new nodes, with the source Nyquist coefficient split evenly across the positive and negative target modes. It rejects non-power-of-two grids, coarsening, too-small inputs and non-finite samples.
+
+This is a standalone transfer oracle. It does not mutate the Vlasov state, apply a spectral-tail trigger, or assert that a resolution transition is physically safe. Adaptive expansion requires a separate receipt for mass, momentum, energy, phase-space discrepancy, field consistency and full transfer cost.
+
 ## Diagnostics
 
 The solver reports mass, momentum, kinetic energy, field energy, total energy, integrated net charge, maximum collocation spectral Poisson residual, minimum distribution value and velocity-endpoint occupancy ratio. For a requested spatial mode it also exposes the complex Fourier coefficient (real part, imaginary part, magnitude and principal phase), so oscillatory field modes are not reduced to a magnitude-only time trace. The spectral-tail diagnostic separately reports high-frequency and Nyquist energy fractions along x and v for a frozen mode-band threshold.
@@ -47,7 +53,7 @@ These are raw observations. In particular:
 
 ## Verification tests
 
-The unit suite contains 14 tests:
+The unit suite contains 19 tests:
 - radix-2 FFT forward/inverse round-trip;
 - homogeneous Maxwellian equilibrium;
 - manufactured free-streaming characteristic solution;
@@ -59,7 +65,12 @@ The unit suite contains 14 tests:
 - invalid grid, non-finite input and invalid timestep rejection;
 - complex electric-mode coefficient, phase and amplitude consistency;
 - spectral-tail axis separation for high x-only and v-only modes;
-- invalid spectral-tail threshold rejection.
+- invalid spectral-tail threshold rejection;
+- exact Fourier zero-padding of band-limited signals and old nodes;
+- symmetric Nyquist splitting under refinement;
+- constant-line and identity-grid interpolation;
+- invalid grid/non-finite interpolation rejection;
+- truncated-velocity-domain negative control despite low v spectral tail.
 
 Run with Rust 1.96:
 
@@ -71,7 +82,7 @@ cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo
 
 ## Reproducible probes
 
-Phase-resolved Landau-damping and spectral-tail trace (complex Fourier coefficient, magnitude, phase, x/v tail fractions and Nyquist fractions):
+Longer phase-resolved Landau-damping and spectral-tail trace to t=10 (complex Fourier coefficient, magnitude, phase, x/v tail fractions and Nyquist fractions):
 
 ```sh
 cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_reference
