@@ -303,18 +303,23 @@ This adapter should not try to replace specialist optimizers, model-based system
 SOTA claims require the same held-out problems, action catalogue, physics models, evidence availability, policy overhead and total resource budget. Report uncertainty and effect sizes, not just the best single seed.
 
 
-### 9.1 Standards and product baseline as of 21 November 2026
+### 9.1 Standards and product baseline as of 22 November 2026
 
-The design must now be mapped against the published 2026 standards, not just earlier digital-twin concepts:
+The digital-thread baseline now includes a 2026 revision of the product-definition practice itself:
 
-- **ISO 23247-5:2026** defines digital-thread use to connect manufacturing lifecycle data to digital twins across design, planning, production and testing. It was published in June 2026.
-- **ISO 23247-6:2026** defines digital-twin composition across vendors and systems, including integrated, unified and federated composition approaches; it was published in July 2026.
-- **CAx-IF** provides AP242 recommended practices, persistent-ID guidance (v1.8, March 2026), and published STEP/QIF trace-information Test Cases 7 and 8. These are important independent reference fixtures.
-- **NIST STEP File Analyzer and Viewer 5.41** is a reference analysis tool for STEP AP242 and semantic/graphic PMI; use it and CAx-IF material as external conformance comparators rather than writing a second STEP parser.
+- **ISO 23247-5:2026** specifies digital-thread principles for connecting, managing and maintaining manufacturing digital twins across design, planning, production and testing. Published 24 June 2026.
+- **ISO 23247-6:2026** specifies digital-twin composition and recognizes integrated, unified and federated compositions. It deliberately does not prescribe one common data format or communication protocol; the architecture must therefore preserve owner-native semantics and make mappings explicit. Published 14 July 2026.
+- **ASME Y14.41-2026** is now the listed edition for digital product-definition data practices. It concerns preparation and revision of digital product-definition datasets. Do not treat a STEP exchange profile as a substitute for the governing product-definition practice or project tailoring.
+- **CAx-IF AP242 Persistent IDs v1.8** is dated 13 March 2026. CAx-IF's **Cross-Domain Exchange for Downstream Uses v1.0** (29 January 2026) provides STEP/QIF trace-information practice and Test Cases 7/8 (sample files dated 16 December 2025). Its stated scope is metrology, supporting exchange between STEP AP242 Edition 4 and QIF 3.0; it says manufacturing use cases are a future expansion. Do not present these tests as proof of a complete factory manufacturing/inspection digital thread.
+- **NIST STEP File Analyzer and Viewer 5.41** supports STEP AP242 analysis, semantic and graphic PMI, validation properties and basic file-format checks. It is a useful independent parser/analyser baseline, not an end-to-end product acceptance oracle.
 
-Primary references: [ISO 23247-5:2026](https://www.iso.org/standard/87425.html), [ISO 23247-6:2026](https://www.iso.org/standard/87426.html), [CAx-IF recommended practices and sample files](https://www.mbx-if.org/home/cax/recpractices/), [NIST STEP File Analyzer and Viewer](https://www.nist.gov/services-resources/software/step-file-analyzer-and-viewer).
+Primary references: [ISO 23247-5:2026](https://www.iso.org/standard/87425.html), [ISO 23247-6:2026](https://www.iso.org/standard/87426.html), [ASME Y14.41](https://www.asme.org/codes-standards/find-codes-standards/y14-41-digital-product-definition-data-practices), [CAx-IF recommended practices and sample files](https://www.mbx-if.org/home/cax/recpractices/), [Cross-Domain Exchange v1.0 PDF](https://www.mbx-if.org/home/wp-content/uploads/2026/02/rec_prac_cross-domain_exchange_v10.pdf), [NIST STEP File Analyzer and Viewer 5.41](https://www.nist.gov/services-resources/software/step-file-analyzer-and-viewer).
 
-NIST specifically highlights persistent identifiers, semantic PMI, feature associations, hybrid geometry and secure data-asset traceability as areas where digital-thread capabilities still need work. It notes that checking STEP syntax and QIF well-formedness does not, by itself, check the engineering semantics embedded in those files. That supports a sharply scoped Luminous assurance layer: compare semantic assertions and identity/evidence joins across independently generated outputs, while consuming specialist parsers and metrology tools.
+Hexagon's **PC-DMIS 2026.2** explicitly advertises importing STEP AP242 semantic PMI into QIF-based measurement planning, UUID mapping and Teamcenter traceability; its official version/release page lists **2026.2 SP1 (12 November 2026)** as the latest listed service pack at the time of this review. These are strong existing capabilities and must be treated as a direct commercial comparator, not ignored. The differentiator to test is whether a separate evidence layer can preserve exact serialized-unit/configuration joins, event-frontier invalidation and independently checkable semantic loss across more than one vendor's native systems.
+
+Primary references: [Hexagon PC-DMIS 2026.2 release, 29 October 2026](https://hexagon.com/about/news-media/media-alerts/2026/pc-dmis), [PC-DMIS version and release list](https://supportcenter.nexus.hexagon.com/service/s/article/PC-DMIS-Software-Versions-and-Release-Dates?language=en_US).
+
+NIST's analyser and published cross-domain fixtures should be consumed rather than reimplemented. The Luminous layer should compare normalized semantic assertions and exact identities, record every unsupported/lost assertion as UNKNOWN or an explicit loss, and keep parser/format conformance separate from physical measurement validity and engineering qualification.
 
 ### 9.2 Commercial tools: integrate rather than clone
 
