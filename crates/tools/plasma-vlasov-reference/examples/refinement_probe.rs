@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use plasma_vlasov_reference::{maxwellian_perturbation, VlasovPoisson1d1v, VlasovPoissonConfig};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 #[derive(Debug, Clone, Copy)]
 struct ProbeResult {
@@ -71,7 +71,9 @@ fn print_row(
 
 fn main() -> Result<(), Box<dyn Error>> {
     let final_time = 1.0;
-    println!("sweep,nx,nv,velocity_max,dt,final_time,electric_mode_1,mass,total_energy,poisson_residual,velocity_boundary_ratio,minimum_distribution");
+    println!(
+        "sweep,nx,nv,velocity_max,dt,final_time,electric_mode_1,mass,total_energy,poisson_residual,velocity_boundary_ratio,minimum_distribution"
+    );
 
     // Spatial grid refinement with velocity resolution, domain and timestep fixed.
     for nx in [32, 64, 128] {
@@ -88,7 +90,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Velocity-domain expansion at fixed spatial and velocity grid counts.
     for velocity_max in [4.0, 6.0, 8.0] {
         let result = run(64, 128, velocity_max, 0.01, final_time)?;
-        print_row("velocity_domain", 64, 128, velocity_max, 0.01, final_time, result);
+        print_row(
+            "velocity_domain",
+            64,
+            128,
+            velocity_max,
+            0.01,
+            final_time,
+            result,
+        );
     }
 
     // Independent timestep refinement at fixed phase-space grid and domain.
