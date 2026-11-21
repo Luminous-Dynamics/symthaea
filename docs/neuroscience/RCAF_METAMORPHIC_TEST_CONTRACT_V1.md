@@ -26,7 +26,7 @@ A permutation that is not accompanied by the same label ordering should still fa
 
 For the matrix similarity definitions, exchanging left and right operands should preserve the score. Comparing a matrix with itself should return one, provided the mode has at least one qualifying edge.
 
-These are exact properties of the symmetric weighted-Jaccard construction, not empirical claims.
+These are exact properties of the symmetric weighted-Jaccard construction, not empirical claims. The underlying nonnegative weighted-Jaccard vector kernel is also tested for invariance to a shared positive scaling of both vectors and to a joint edge permutation.
 
 ### 3. Global polarity inversion: invariant versus non-invariant behavior
 
