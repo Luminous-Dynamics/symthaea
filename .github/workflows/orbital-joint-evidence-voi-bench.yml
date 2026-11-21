@@ -119,6 +119,7 @@ jobs:
           jq -e '
             .scenario_count == 2 and .oracle_matches == 2 and
             .oracle_mismatches == 0 and .authority_granted == false and
+            .scenarios[0].baseline_terminal_disposition == "HOLD" and
             .scenarios[0].baseline_worst_case_regret == 2 and
             .scenarios[0].myopic.worst_case_regret == 2 and
             .scenarios[0].myopic.stops_without_action == true and
@@ -133,6 +134,7 @@ jobs:
             (.scenarios[0].adaptive_campaign.policy.branches.PASS.branches.INDICATION.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","REJECTION-BASIS-001"] and
             .scenarios[0].adaptive_campaign.expected_resources.engineering_hours == 1.2 and
             .scenarios[0].adaptive_campaign.expected_resources.facility_hours == 1.55 and
+            .scenarios[1].baseline_terminal_disposition == "HOLD" and
             .scenarios[1].scenario_id == "SEQ-002" and
             .scenarios[1].adaptive_campaign.first_action_id == "B-THERMAL-INSPECTION" and
             .scenarios[1].adaptive_campaign.worst_case_regret == 0 and
@@ -156,6 +158,7 @@ jobs:
             .scenario_count == 2 and .oracle_matches == 2 and .oracle_mismatches == 0 and
             .scenarios[0].adaptive_first_action == "A-COMBINED-LOAD-SCREEN" and
             .scenarios[0].adaptive_worst_case_regret == 0 and
+            .scenarios[0].baseline_terminal_disposition == "HOLD" and
             .scenarios[0].myopic_worst_case_regret == 2 and
             .scenarios[0].fixed_campaign_worst_case_regret == 0 and
             .scenarios[0].adaptive_expected_resources.engineering_hours == 1.2 and
