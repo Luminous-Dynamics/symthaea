@@ -21,7 +21,7 @@ use crate::intervention::{InterventionDescriptor, InterventionStrategy, Obligati
 use crate::musical_inference::MusicAction;
 use crate::musical_policy::{
     MusicalPolicyPreference, MusicalPolicySelection, PolicyCandidateEvidence,
-    select_by_musical_policy,
+    passes_universal_theory_gate, select_by_musical_policy,
 };
 use serde::{Deserialize, Serialize};
 use symthaea_music_theory::{
@@ -114,7 +114,7 @@ pub struct SonataInterventionCandidate {
 
 impl SonataInterventionCandidate {
     pub fn hard_constraints_valid(&self) -> bool {
-        self.theory_validation.valid
+        passes_universal_theory_gate(&self.theory_validation)
     }
 }
 
@@ -402,7 +402,7 @@ fn apply_return_subintent_v1(
 
     let selected = candidates.iter().find(|candidate| {
         candidate.strategy == requested_strategy
-            && candidate.theory_validation.valid
+            && candidate.hard_constraints_valid()
             && candidate.preserved_invariants
             && candidate
                 .verification
