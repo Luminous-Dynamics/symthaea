@@ -43,6 +43,9 @@ impl VlasovPoissonConfig {
                 value: self.nv,
             });
         }
+        if self.nx.checked_mul(self.nv).is_none() {
+            return Err(SolverError::GridSizeOverflow);
+        }
         if !self.domain_length.is_finite() || self.domain_length <= 0.0 {
             return Err(SolverError::InvalidDomainLength);
         }
@@ -106,6 +109,7 @@ pub enum SolverError {
     InvalidChargeToMass,
     InvalidPermittivity,
     InvalidBackgroundDensity,
+    GridSizeOverflow,
     DistributionLengthMismatch {
         expected: usize,
         actual: usize,
@@ -146,6 +150,7 @@ impl fmt::Display for SolverError {
             Self::InvalidBackgroundDensity => {
                 write!(f, "background density must be finite and non-negative")
             }
+            Self::GridSizeOverflow => write!(f, "phase-space grid size nx * nv overflows usize"),
             Self::DistributionLengthMismatch { expected, actual } => write!(
                 f,
                 "distribution has {actual} values; expected {expected} (nx * nv)"
@@ -772,9 +777,47 @@ mod tests {
         }
         let after = solver.diagnostics().unwrap();
         assert!((after.total_mass - before.total_mass).abs() < 5.0e-11);
+        assert!((after.momentum - before.momentum).abs() < 1.0e-9);
+        assert!((after.total_energy - before.total_energy).abs() < 1.0e-7);
         assert!(after.max_poisson_residual < 2.0e-11);
         assert!(after.total_energy.is_finite());
         assert!(after.velocity_boundary_ratio < 1.0e-5);
+    }
+
+    #[test]
+    fn coupled_strang_step_has_second_order_timestep_convergence() {
+        fn final_mode_amplitude(dt: f64) -> f64 {
+            let config = test_config(32, 64);
+            let initial = maxwellian_perturbation(config, 1.0e-3, 1, 1.0).unwrap();
+            let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+            let steps = (1.0 / dt).round() as usize;
+            for _ in 0..steps {
+                solver.step(dt).unwrap();
+            }
+            solver.electric_mode_amplitude(1).unwrap()
+        }
+
+        let coarse = final_mode_amplitude(0.04);
+        let medium = final_mode_amplitude(0.02);
+        let fine = final_mode_amplitude(0.01);
+        let coarse_difference = (coarse - medium).abs();
+        let fine_difference = (medium - fine).abs();
+        let observed_ratio = coarse_difference / fine_difference;
+
+        assert!(fine_difference > 0.0);
+        assert!(
+            (3.0..=5.0).contains(&observed_ratio),
+            "expected second-order refinement ratio near 4, got {observed_ratio}"
+        );
+    }
+
+    #[test]
+    fn phase_space_grid_size_overflow_is_rejected() {
+        let side = 1usize << (usize::BITS / 2);
+        let mut config = test_config(side, side);
+        config.nx = side;
+        config.nv = side;
+        assert!(matches!(config.validate(), Err(SolverError::GridSizeOverflow)));
     }
 
     #[test]
