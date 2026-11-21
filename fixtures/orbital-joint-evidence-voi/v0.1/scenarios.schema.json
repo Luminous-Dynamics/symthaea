@@ -117,7 +117,9 @@
         "actions",
         "expected",
         "current_evidence_dependency_groups",
-        "required_obligations"
+        "required_obligations",
+        "target_claim_id",
+        "requires_independent_evidence"
       ],
       "properties": {
         "scenario_id": {
@@ -209,6 +211,13 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "target_claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requires_independent_evidence": {
+          "type": "boolean"
         }
       },
       "allOf": [
@@ -391,6 +400,14 @@
         },
         "evidence_disposition": {
           "type": "string"
+        },
+        "obligations_covered": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "allOf": [
