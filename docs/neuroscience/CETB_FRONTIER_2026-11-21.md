@@ -204,3 +204,12 @@ The MEG tournament JSON and dataset registry now record the author repository co
 The new `research/cetb/theory_design/eig.py` utility implements categorical expected information gain in bits, including explicit missing/ambiguous/failure outcome categories and nuisance-scenario aggregation. It reports expected EIG, a predeclared lower-quantile robustness summary and acquisition cost separately. Eight synthetic unit tests cover identical and opposing theory predictions, partial discrimination, explicit missingness, nuisance sensitivity, cost, ordering invariance and invalid probability mass.
 
 The tool is a reference calculator only. It does not provide or calibrate theory predictions, choose priors, validate the measurement model or identify which theory is true. It is wired into the focused research validation workflow.
+
+
+## 11. Synthetic RCAF null and injection–recovery calibration
+
+A new standalone Rust research module, `research/rcaf/src/simulation.rs`, generates positive-semidefinite correlation matrices from a Gaussian two-factor model and finite samples. For each participant it compares two independent baseline segments, an independent same-state null segment, and a segment with a known module-loading injection. It reports exact sign-test false-positive frequency and injection-recovery power across Monte-Carlo replicates with Wilson intervals.
+
+The runnable example is `research/rcaf/examples/rcaf_injection_recovery.rs`; its output contract is `research/rcaf/injection-recovery.schema.json`. The fixed smoke fixture uses 24 participants, 12 regions, 160 time points per segment, module-loading increment 0.40 and 100 replicates by default. These are synthetic software checks only. It does not model all neuroimaging artifacts or biological state transitions.
+
+The protocol, assumptions, smoke-test thresholds and next simulation dimensions are specified in `RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
