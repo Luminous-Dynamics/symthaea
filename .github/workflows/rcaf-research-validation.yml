@@ -6,6 +6,7 @@ on:
     paths:
       - "research/rcaf/**"
       - "research/cetb/theory_design/**"
+      - "research/cetb/multiverse/**"
       - ".github/workflows/rcaf-research-validation.yml"
   workflow_dispatch:
 
@@ -43,6 +44,13 @@ jobs:
 
       - name: Run theory-design EIG reference tests
         run: python -m unittest discover -s research/cetb/theory_design -p 'test_*.py' -v
+
+      - name: Validate defensible multiverse manifest
+        run: |
+          python -m unittest discover -s research/cetb/multiverse -p 'test_*.py' -v
+          python research/cetb/multiverse/validate_manifest.py \
+            research/cetb/multiverse/fixtures/synthetic-multiverse.json \
+            research/cetb/multiverse/multiverse.schema.json
 
       - name: Validate theory-design manifest and execute synthetic ranking
         run: |
