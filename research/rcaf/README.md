@@ -1,100 +1,77 @@
-# CETB RCAF kernel
+# CETB RCAF research kernel
 
-A small, dependency-free Rust reference kernel for Repeatability-Calibrated Architecture Fidelity (RCAF).
+A dependency-free Rust research crate for repeatability-calibrated comparison of already-computed correlation matrices. RCAF is not a consciousness detector, clinical classifier, neuroimaging preprocessor or correlation estimator.
 
-This is a research metric library, not a consciousness detector. It does not read EEG/fMRI files, estimate correlation matrices, perform preprocessing, or make clinical classifications. It consumes already-computed correlation matrices / edge weights and participant-level within- and between-condition similarities.
-
-## Contents
+## Implemented components
 
 - Weighted Jaccard for non-negative edge-weight vectors.
-- Pair-aware correlation-matrix modes: absolute, positive edges in both matrices, negative edges in both matrices, and signed-shift.
-- Matrix validation for symmetry, correlation range and shape.
-- Participant-paired repeatability summaries and deterministic percentile bootstrap intervals for the median paired gap.
-- Nine unit-test cases for hand-computed values, sign-mask semantics, invalid inputs and paired summaries.
+- Absolute, shared-positive, shared-negative and signed-shift correlation-matrix comparisons.
+- Labeled ROI comparison that rejects mismatched order, duplicate labels and invalid dimensions.
+- Participant-keyed within/between similarity summaries.
+- Participant-level bootstrap confidence intervals and exact two-sided sign tests.
+- Direct edge-polarity transition counts, including neutral-band transitions.
+- Synthetic Gaussian-factor null and injection-recovery calibration in `src/simulation.rs`.
+- Draft 2020-12 schemas and semantic validation for RCAF result receipts.
 
-The positive-only and negative-only modes apply a shared sign mask: an edge is included only when it has the requested sign in both matrices. This matches the pairwise masking convention used in the published ds006623 revision code. It is not equivalent to replacing non-matching edges with zero and including them in the denominator.
-
-## Run
-
-The crate is intentionally outside the root Cargo workspace and has no third-party dependencies:
-
-    cargo test --manifest-path research/rcaf/Cargo.toml
-
-No such command has been run in the current environment because rustc/cargo are unavailable. The source is staged for review; it is not represented as compiled or tested.
-
-## Statistical contract
-
-For each participant, first collapse repeated segment placements using the prespecified within-condition and between-condition summaries. Then pass equal-length participant vectors to summarize_rcaf. The participant is the inferential unit; repeated windows must never be passed as independent participants.
-
-Positive paired gap means between-state similarity is lower than the within-state reference. The normalized excess-distance fraction is descriptive only; it is not a variance decomposition or causal attribution.
-
-
-## v1.2 alignment-safe diagnostics
-
-- `exact_sign_test` computes a two-sided exact participant-level sign test on paired gaps. Exact-zero gaps are ties and excluded from the binomial denominator. This is a distribution-free supplement to the effect distribution and participant bootstrap; it is not a randomization or causal test.
-- `summarize_edge_sign_transitions` counts polarity reversals and transitions to/from a neutral correlation band. Evaluate a neutral-threshold grid frozen before inspecting state contrasts.
-- Pair-aware positive/negative WJ still excludes polarity-reversed edges from that selected-edge denominator. Therefore report direct sign transitions beside sign-filtered WJ; do not interpret either metric alone.
-
-The report contract is `rcaf-report.schema.json`. The accompanying `fixtures/synthetic-rcaf-report.json` contains synthetic values only and must never be presented as a biological observation.
-
-The kernel now has fourteen authored unit-test cases. They are not yet compiled or executed in this environment.
-
-
-## Executable report validation
-
-The isolated research-data validator is at `tools/validate_report.py`. It checks the Draft 2020-12 report schema (when supplied) and semantic invariants that schemas cannot enforce: participant-key uniqueness, per-row gap arithmetic, denominator consistency, recomputed medians and sign-test counts/p-values, interval ordering, and claim ceilings.
-
-It is a research validation helper, not a production Symthaea dependency. It uses the Python standard library for semantic checks; schema checking uses the optional development dependency in `requirements-validation.txt`.
-
-Run:
+## Run the kernel tests
 
 ```sh
-python3 -m pip install -r research/rcaf/requirements-validation.txt
-python3 research/rcaf/tools/validate_report.py \
-  research/rcaf/fixtures/synthetic-rcaf-report.json \
-  --schema research/rcaf/rcaf-report.schema.json
-python3 -m unittest discover -s research/rcaf/tools -p 'test_*.py'
+cargo fmt --manifest-path research/rcaf/Cargo.toml -- --check
+cargo test --manifest-path research/rcaf/Cargo.toml
+cargo clippy --manifest-path research/rcaf/Cargo.toml --all-targets -- -D warnings
 ```
 
-The validator never promotes a synthetic fixture to biological evidence. It also does not prove source-data truth, correct preprocessing, absence of hidden confounds, or clinical validity; these require separate evidence gates.
+The crate is deliberately isolated from the root Cargo workspace and has no third-party Rust dependencies.
 
-
-## Focused validation workflow
-
-`.github/workflows/rcaf-research-validation.yml` runs only for changes to the standalone RCAF research package. It checks:
-- the Python report-validator unit tests;
-- the synthetic report against the committed Draft 2020-12 schema and semantic validator;
-- Rust 1.96 formatting, all kernel tests and strict Clippy.
-
-This workflow does not add the standalone crate to the root Cargo workspace or alter production CI. A workflow run is evidence only for the exact commit it checks; skipped, queued or absent runs are not passes.
-
-
-## Exact sign-test power calculator
-
-`tools/sign_test_power.py` computes the two-sided exact-binomial power of the participant sign test and can regenerate the machine-readable power grid:
+## Run synthetic injection-recovery calibration
 
 ```sh
-python research/rcaf/tools/sign_test_power.py \
-  --output docs/neuroscience/RCAF_SIGN_TEST_POWER_V0.json
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery
 ```
 
-It is a design aid for non-tied independent participant pairs; it does not power the median-gap confidence interval or a hierarchical repeated-measures model. The unit tests verify the reported N=23 and minimum-N examples.
+The example outputs a JSON report conforming to `injection-recovery.schema.json`. It estimates:
+- null false-positive frequency under exchangeable same-state samples;
+- detection power under a declared module-loading perturbation;
+- 95% Wilson Monte-Carlo confidence intervals;
+- median participant-paired gaps and positive-gap fractions.
 
+The generator creates valid correlation matrices from a Gaussian two-factor model and finite time series. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
 
-## Evidence-status and replay receipt rules
+This is a software calibration world, not a model of biological consciousness. A passed injection test cannot establish that an empirical network shift is real, causal or clinically meaningful. A single Gaussian factor model does not characterize the full range of acquisition artifacts, autocorrelation, nonstationarity or preprocessing choices.
 
-The semantic validator distinguishes metadata-only work from signal analysis and independent replay:
-- `signal_analysis` and `independent_replay` require a `downloaded_verified` source state and a lowercase SHA-256 manifest digest.
-- `independent_replay` also requires a non-empty code revision, configuration digest, environment digest and top-level result digest.
-- Participant attrition is reported as the unique total difference between acquired/recruited and analysis-included participants; a separate flow note explains intermediate exclusion stages.
-- If edge-polarity results are included, their neutral threshold must equal the analysis-level frozen threshold.
+## Statistical unit
 
-A schema-valid report is still not a scientific result by itself. The validator checks arithmetic and declared provenance fields, not source-data truth or the correctness of the underlying neuroimaging pipeline.
+Each observation passed to participant-level inference must already be reduced within participant. Repeated windows, segment placements and trials are nested measurements; they must not be counted as independent people.
 
+For participant p:
 
-## Current research test inventory
+```text
+paired_gap[p] = within_similarity[p] - between_similarity[p]
+```
 
-- Rust kernel: 14 authored unit tests. Exact-head focused workflow run `44889597933` passed all 14 on source commit `c6397e9a4c65a36658f207a5a56482568a16a26a`, including strict rustfmt and Clippy.
-- Python report validator: 13 tests after adding verified-download, attrition, independent-replay receipt and threshold-consistency checks.
-- Exact sign-test power calculator: 5 tests.
-- The combined 18-test Python suite after the latest semantic-hardening commit still requires a fresh exact-head run. Do not transfer the earlier 14-test workflow result to these newer validator changes.
+Positive gap means the between-condition network estimate is less similar than the within-condition repeat. Exact-zero gaps are ties in the sign test.
+
+The descriptive normalized excess-distance fraction is not a variance decomposition, causal quantity or percentage of brain changed.
+
+## Report integrity
+
+`tools/validate_report.py` checks Draft 2020-12 shape and semantic invariants. Empirical signal analysis requires a verified source-data manifest. Independent replay additionally requires immutable code, configuration, environment and result digests.
+
+Run the Python research checks:
+
+```sh
+python -m pip install -r research/rcaf/requirements-validation.txt
+python -m unittest discover -s research/rcaf/tools -p 'test_*.py' -v
+python -m unittest discover -s research/cetb/theory_design -p 'test_*.py' -v
+```
+
+## Evidence boundaries
+
+The current kernel and synthetic harness establish only that the code behaves as specified on declared fixtures and simulated data. They do not establish:
+- correctness of a neuroimaging preprocessing pipeline;
+- calibration against EEG, MEG or fMRI signals;
+- biological validity, causal attribution or consciousness inference;
+- independent cohort reproducibility;
+- clinical utility or superiority over established estimators.
+
+A workflow result applies only to the exact source commit checked. Skipped, queued, absent or earlier-head jobs are not passes.
