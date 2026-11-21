@@ -124,4 +124,9 @@ Reproduce the pair-manifest validation report:
 
 ## Contrastive-pair provenance validator
 
-The current branch adds the split-local pair manifest validator and an executable CLI. Local verification of the new component: **11/11 unit tests passed**, and CLI output matched the frozen expected report byte-for-byte. The combined suite is now 46 tests; the last hosted CI run passed the previous 35-test suite, before this addition. The new full-suite CI result is not yet verified.
+The current branch adds the split-local pair manifest validator and an executable CLI. Local verification of the new component: **11/11 unit tests passed**, and CLI output matched the frozen expected report byte-for-byte. The combined suite contains 46 tests; the last hosted CI run passed the previous 35-test suite, before this addition. The new full-suite CI result is not yet verified.
+
+
+## Current complete hosted verification
+
+The clean-base PR #13126 run [#44917273962](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962) passed all 46 unit tests. The job also reproduced the binary-metric, inspection-decision and contrastive-pair validation reports byte-for-byte. The exact tested commit is `5f8ffa91bac2cb8cee923d0f1968d2f57fd01149`.
