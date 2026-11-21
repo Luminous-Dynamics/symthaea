@@ -14,6 +14,8 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReferenceError {
     InvalidInterval,
@@ -176,6 +178,361 @@ fn rk4_quadratic_target(
     state
 }
 
+
+// ---------------------------------------------------------------------------
+// Deterministic irregular-input benchmark fixture.
+// ---------------------------------------------------------------------------
+//
+// The oracle knots are evaluator-only. Candidate methods receive only the
+// delivered observations, in availability order. When a new observation
+// arrives, a method may retrospectively evolve its latent state over the
+// preceding source-time interval; the result is usable only after that
+// observation's availability time. This is causal at decision time, but not
+// zero-latency. Source-to-availability delay is reported separately.
+//
+// This fixture measures numerical work counts (RHS evaluations / analytic
+// interval updates). It does not measure wall-clock time, DRAM traffic or joules.
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum SamplingProfile {
+    Regular,
+    Jittered,
+    Bursty,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OracleKnot {
+    time: u64,
+    target: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CandidateObservation {
+    event_id: u64,
+    source_time: u64,
+    available_at: u64,
+    target: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MethodResult {
+    method: String,
+    analytic_interval_updates: u64,
+    euler_rhs_evaluations: u64,
+    rk4_rhs_evaluations: u64,
+    max_abs_state_error: f64,
+    terminal_abs_state_error: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TraceResult {
+    profile: SamplingProfile,
+    scheduled_events: u64,
+    dropped_events: u64,
+    delivered_events: u64,
+    max_source_to_availability_delay: u64,
+    methods: Vec<MethodResult>,
+}
+
+fn oracle_knots() -> Vec<OracleKnot> {
+    vec![
+        OracleKnot { time: 0, target: 0.0 },
+        OracleKnot { time: 115, target: 0.85 },
+        OracleKnot { time: 260, target: -0.45 },
+        OracleKnot { time: 410, target: 1.10 },
+        OracleKnot { time: 590, target: -0.80 },
+        OracleKnot { time: 780, target: 0.35 },
+        OracleKnot { time: 1_000, target: 0.65 },
+    ]
+}
+
+/// Evaluator-only target value on the frozen piecewise-linear oracle signal.
+fn oracle_target_at(knots: &[OracleKnot], time: u64) -> Result<f64, &'static str> {
+    if knots.len() < 2 || time < knots[0].time || time > knots[knots.len() - 1].time {
+        return Err("time outside oracle trace");
+    }
+    for pair in knots.windows(2) {
+        let left = pair[0];
+        let right = pair[1];
+        if time >= left.time && time <= right.time {
+            let width = (right.time - left.time) as f64;
+            let alpha = (time - left.time) as f64 / width;
+            return Ok(left.target + (right.target - left.target) * alpha);
+        }
+    }
+    Err("oracle interval not found")
+}
+
+/// Exact reference state for the isolated leaky scalar system, integrated
+/// across every hidden oracle knot up to the requested logical time.
+fn oracle_state_at(
+    knots: &[OracleKnot],
+    initial_state: f64,
+    tau: f64,
+    time: u64,
+) -> Result<f64, &'static str> {
+    if !initial_state.is_finite() || !tau.is_finite() || tau <= 0.0 {
+        return Err("invalid oracle state or time constant");
+    }
+    if knots.len() < 2 || time < knots[0].time || time > knots[knots.len() - 1].time {
+        return Err("time outside oracle trace");
+    }
+
+    let mut state = initial_state;
+    for pair in knots.windows(2) {
+        let left = pair[0];
+        if time <= left.time {
+            break;
+        }
+        let right = pair[1];
+        let end = time.min(right.time);
+        let g0 = oracle_target_at(knots, left.time)?;
+        let g1 = oracle_target_at(knots, end)?;
+        let h = (end - left.time) as f64;
+        state = linear_target_update(state, g0, g1, tau, h)
+            .map_err(|_| "analytic oracle integration failed")?;
+        if end == time {
+            break;
+        }
+    }
+    Ok(state)
+}
+
+fn scheduled_times(profile: SamplingProfile) -> Vec<u64> {
+    match profile {
+        SamplingProfile::Regular => (0..=10).map(|index| index * 100).collect(),
+        SamplingProfile::Jittered => {
+            vec![0, 77, 181, 296, 394, 501, 627, 744, 851, 931, 1_000]
+        }
+        SamplingProfile::Bursty => {
+            vec![0, 20, 40, 60, 240, 260, 280, 720, 740, 760, 1_000]
+        }
+    }
+}
+
+fn dropped_indices(profile: SamplingProfile) -> &'static [usize] {
+    match profile {
+        SamplingProfile::Regular => &[],
+        SamplingProfile::Jittered => &[5],
+        SamplingProfile::Bursty => &[2, 7],
+    }
+}
+
+/// Build a candidate-visible observation stream. The hidden oracle knots are
+/// used only by the evaluator. Delivery delay is deterministic and bounded.
+fn generate_observations(
+    profile: SamplingProfile,
+    knots: &[OracleKnot],
+) -> Result<(Vec<CandidateObservation>, u64), &'static str> {
+    if knots.len() < 2 {
+        return Err("oracle requires at least two knots");
+    }
+    for pair in knots.windows(2) {
+        if pair[1].time <= pair[0].time
+            || !pair[0].target.is_finite()
+            || !pair[1].target.is_finite()
+        {
+            return Err("oracle knots must be finite and strictly increasing");
+        }
+    }
+
+    let schedule = scheduled_times(profile);
+    let dropped = dropped_indices(profile);
+    let mut observations = Vec::new();
+    let mut max_delay = 0_u64;
+    for (index, source_time) in schedule.iter().copied().enumerate() {
+        if dropped.contains(&index) {
+            continue;
+        }
+        let delay = match profile {
+            SamplingProfile::Regular => 2 + (index as u64 % 3),
+            SamplingProfile::Jittered => 2 + ((index as u64 * 7) % 13),
+            SamplingProfile::Bursty => 1 + (index as u64 % 5),
+        };
+        let available_at = source_time
+            .checked_add(delay)
+            .ok_or("availability time overflow")?;
+        max_delay = max_delay.max(delay);
+        observations.push(CandidateObservation {
+            event_id: index as u64,
+            source_time,
+            available_at,
+            target: oracle_target_at(knots, source_time)?,
+        });
+    }
+
+    for pair in observations.windows(2) {
+        if pair[1].source_time <= pair[0].source_time {
+            return Err("candidate source times must be strictly increasing");
+        }
+        if pair[1].available_at <= pair[0].available_at {
+            return Err("candidate availability times must be strictly increasing");
+        }
+    }
+    Ok((observations, max_delay))
+}
+
+fn euler_linear_target(
+    z0: f64,
+    g0: f64,
+    g1: f64,
+    tau: f64,
+    interval: f64,
+    steps: usize,
+) -> f64 {
+    let step = interval / steps as f64;
+    let mut state = z0;
+    for index in 0..steps {
+        let local_time = index as f64 * step;
+        let target = g0 + (g1 - g0) * (local_time / interval);
+        state += step * (target - state) / tau;
+    }
+    state
+}
+
+fn run_trace(profile: SamplingProfile) -> Result<TraceResult, &'static str> {
+    const INITIAL_STATE: f64 = -0.25;
+    const TAU: f64 = 140.0;
+    const EULER_STEPS_PER_INTERVAL: usize = 4;
+    const RK4_STEPS_PER_INTERVAL: usize = 4;
+
+    let knots = oracle_knots();
+    let (observations, max_delay) = generate_observations(profile, &knots)?;
+    if observations.len() < 2 {
+        return Err("at least two observations are required");
+    }
+
+    let mut z_zoh = INITIAL_STATE;
+    let mut z_linear_exact = INITIAL_STATE;
+    let mut z_euler = INITIAL_STATE;
+    let mut z_rk4 = INITIAL_STATE;
+    let mut errors = [0.0_f64; 4];
+    let mut analytic_updates = 0_u64;
+    let mut euler_evaluations = 0_u64;
+    let mut rk4_evaluations = 0_u64;
+
+    for pair in observations.windows(2) {
+        let previous = pair[0];
+        let current = pair[1];
+        let interval = (current.source_time - previous.source_time) as f64;
+        if interval <= 0.0 {
+            return Err("candidate observation interval must be positive");
+        }
+
+        // ZOH control: exact integration of the held previous observation.
+        z_zoh = linear_target_update(
+            z_zoh,
+            previous.target,
+            previous.target,
+            TAU,
+            interval,
+        )
+        .map_err(|_| "ZOH reference update failed")?;
+
+        // Piecewise-linear interpolation using the two observations that are
+        // now both available. This state is publishable only at current.available_at.
+        z_linear_exact = linear_target_update(
+            z_linear_exact,
+            previous.target,
+            current.target,
+            TAU,
+            interval,
+        )
+        .map_err(|_| "linear exact update failed")?;
+
+        z_euler = euler_linear_target(
+            z_euler,
+            previous.target,
+            current.target,
+            TAU,
+            interval,
+            EULER_STEPS_PER_INTERVAL,
+        );
+        euler_evaluations = euler_evaluations
+            .checked_add(EULER_STEPS_PER_INTERVAL as u64)
+            .ok_or("Euler work counter overflow")?;
+
+        z_rk4 = rk4_linear_target(
+            z_rk4,
+            previous.target,
+            current.target,
+            TAU,
+            interval,
+            RK4_STEPS_PER_INTERVAL,
+        );
+        rk4_evaluations = rk4_evaluations
+            .checked_add((4 * RK4_STEPS_PER_INTERVAL) as u64)
+            .ok_or("RK4 work counter overflow")?;
+
+        analytic_updates = analytic_updates
+            .checked_add(2)
+            .ok_or("analytic update counter overflow")?;
+
+        let reference = oracle_state_at(&knots, INITIAL_STATE, TAU, current.source_time)?;
+        errors[0] = errors[0].max((z_zoh - reference).abs());
+        errors[1] = errors[1].max((z_linear_exact - reference).abs());
+        errors[2] = errors[2].max((z_euler - reference).abs());
+        errors[3] = errors[3].max((z_rk4 - reference).abs());
+    }
+
+    let last = *observations.last().ok_or("observation stream empty")?;
+    let final_reference = oracle_state_at(&knots, INITIAL_STATE, TAU, last.source_time)?;
+    let terminal_errors = [
+        (z_zoh - final_reference).abs(),
+        (z_linear_exact - final_reference).abs(),
+        (z_euler - final_reference).abs(),
+        (z_rk4 - final_reference).abs(),
+    ];
+    let scheduled = scheduled_times(profile).len() as u64;
+
+    Ok(TraceResult {
+        profile,
+        scheduled_events: scheduled,
+        dropped_events: dropped_indices(profile).len() as u64,
+        delivered_events: observations.len() as u64,
+        max_source_to_availability_delay: max_delay,
+        methods: vec![
+            MethodResult {
+                method: "zero_order_hold_exact".to_owned(),
+                analytic_interval_updates: (observations.len() - 1) as u64,
+                euler_rhs_evaluations: 0,
+                rk4_rhs_evaluations: 0,
+                max_abs_state_error: errors[0],
+                terminal_abs_state_error: terminal_errors[0],
+            },
+            MethodResult {
+                method: "linear_interpolation_exact_scalar".to_owned(),
+                analytic_interval_updates: (observations.len() - 1) as u64,
+                euler_rhs_evaluations: 0,
+                rk4_rhs_evaluations: 0,
+                max_abs_state_error: errors[1],
+                terminal_abs_state_error: terminal_errors[1],
+            },
+            MethodResult {
+                method: format!("linear_interpolation_euler_{EULER_STEPS_PER_INTERVAL}"),
+                analytic_interval_updates: 0,
+                euler_rhs_evaluations: euler_evaluations,
+                rk4_rhs_evaluations: 0,
+                max_abs_state_error: errors[2],
+                terminal_abs_state_error: terminal_errors[2],
+            },
+            MethodResult {
+                method: format!("linear_interpolation_rk4_{RK4_STEPS_PER_INTERVAL}"),
+                analytic_interval_updates: 0,
+                euler_rhs_evaluations: 0,
+                rk4_rhs_evaluations: rk4_evaluations,
+                max_abs_state_error: errors[3],
+                terminal_abs_state_error: terminal_errors[3],
+            },
+        ],
+    })
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let z0 = -0.4;
     let g0 = 0.2;
@@ -186,7 +543,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let bound = linear_interpolation_error_bound(0.8, tau, h)?;
     println!("isolated leaky linear-target endpoint: {result:.12}");
     println!("illustrative bound for curvature <= 0.8: {bound:.12}");
-    println!("scope: scalar analytic reference only; not HDC-LTC qualification");
+    println!("deterministic irregular-input reference profiles:");
+    for profile in [
+        SamplingProfile::Regular,
+        SamplingProfile::Jittered,
+        SamplingProfile::Bursty,
+    ] {
+        let result = run_trace(profile)?;
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    }
+    println!("scope: scalar analytic reference and synthetic input fixture only; not HDC-LTC qualification");
     Ok(())
 }
 
@@ -284,6 +650,86 @@ mod tests {
         assert_eq!(
             linear_interpolation_error_bound(-1.0, 1.0, 1.0),
             Err(ReferenceError::InvalidCurvatureBound)
+        );
+    }
+
+    #[test]
+    fn deterministic_schedules_cover_regular_jittered_and_bursty_inputs() {
+        let knots = oracle_knots();
+        for profile in [
+            SamplingProfile::Regular,
+            SamplingProfile::Jittered,
+            SamplingProfile::Bursty,
+        ] {
+            let (observations, _) = generate_observations(profile, &knots).unwrap();
+            assert!(observations.len() >= 2);
+            for pair in observations.windows(2) {
+                assert!(pair[1].source_time > pair[0].source_time);
+                assert!(pair[1].available_at > pair[0].available_at);
+            }
+        }
+        assert_eq!(generate_observations(SamplingProfile::Regular, &knots).unwrap().0.len(), 11);
+        assert_eq!(generate_observations(SamplingProfile::Jittered, &knots).unwrap().0.len(), 10);
+        assert_eq!(generate_observations(SamplingProfile::Bursty, &knots).unwrap().0.len(), 9);
+    }
+
+    #[test]
+    fn candidate_receives_only_delivered_observations_and_missing_events_remain_counted() {
+        let knots = oracle_knots();
+        let (jittered, _) = generate_observations(SamplingProfile::Jittered, &knots).unwrap();
+        let (bursty, _) = generate_observations(SamplingProfile::Bursty, &knots).unwrap();
+        assert_eq!(jittered.len() as u64 + 1, scheduled_times(SamplingProfile::Jittered).len() as u64);
+        assert_eq!(bursty.len() as u64 + 2, scheduled_times(SamplingProfile::Bursty).len() as u64);
+        assert!(jittered.iter().all(|event| event.available_at >= event.source_time));
+    }
+
+    #[test]
+    fn trace_harness_reports_distinct_solver_work_and_finite_errors() {
+        for profile in [
+            SamplingProfile::Regular,
+            SamplingProfile::Jittered,
+            SamplingProfile::Bursty,
+        ] {
+            let result = run_trace(profile).unwrap();
+            let intervals = result.delivered_events - 1;
+            assert_eq!(result.methods[0].analytic_interval_updates, intervals);
+            assert_eq!(result.methods[1].analytic_interval_updates, intervals);
+            assert_eq!(result.methods[2].euler_rhs_evaluations, intervals * 4);
+            assert_eq!(result.methods[3].rk4_rhs_evaluations, intervals * 16);
+            assert!(result.methods.iter().all(|method| {
+                method.max_abs_state_error.is_finite()
+                    && method.terminal_abs_state_error.is_finite()
+            }));
+        }
+    }
+
+    #[test]
+    fn deterministic_trace_profiles_serialize_identically() {
+        for profile in [
+            SamplingProfile::Regular,
+            SamplingProfile::Jittered,
+            SamplingProfile::Bursty,
+        ] {
+            let first = serde_json::to_string(&run_trace(profile).unwrap()).unwrap();
+            let second = serde_json::to_string(&run_trace(profile).unwrap()).unwrap();
+            assert_eq!(first, second);
+        }
+    }
+
+    #[test]
+    fn rejects_nonmonotonic_or_invalid_oracle_knots() {
+        let mut knots = oracle_knots();
+        knots[2].time = knots[1].time;
+        assert_eq!(
+            generate_observations(SamplingProfile::Regular, &knots),
+            Err("oracle knots must be finite and strictly increasing")
+        );
+
+        let mut knots = oracle_knots();
+        knots[1].target = f64::NAN;
+        assert_eq!(
+            generate_observations(SamplingProfile::Regular, &knots),
+            Err("oracle knots must be finite and strictly increasing")
         );
     }
 
