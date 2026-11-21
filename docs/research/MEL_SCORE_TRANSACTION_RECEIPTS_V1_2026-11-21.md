@@ -94,3 +94,8 @@ This revision is rebased on the qualified Sonata universal-theory gate. Candidat
 ## Exact-head test intent
 
 The receipt and Sonata integration gates must run together against the same event SHA and committed lockfile. A standalone receipt unit-test pass is not sufficient: each candidate receipt is independently recomputed inside the Sonata intervention tests before the selected candidate can be accepted.
+
+
+## Execution routing
+
+The receipt qualification job is scoped to the receipt feature branch for pull-request runs. The qualified Sonata parent contains the workflow definition but not the receipt module and therefore does not run the receipt-specific test target. Pull-request source identity is verified against the PR head SHA; push runs verify against the pushed SHA.
