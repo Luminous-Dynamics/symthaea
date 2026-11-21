@@ -754,8 +754,8 @@ mod tests {
 
         controller
             .ingest(event(
-                3,
-                30,
+                4,
+                40,
                 EmbodimentEventKind::SpeechOutputChanged {
                     state: SpeechOutputState::Completed,
                 },
