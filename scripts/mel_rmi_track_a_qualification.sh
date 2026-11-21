@@ -21,14 +21,17 @@ if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --
 fi
 
 BASE_TMP="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
-STAGE_ROOT="$BASE_TMP/mel-rmi-track-a-$SOURCE_COMMIT"
+STAGE_ROOT="$(mktemp -d "${BASE_TMP%/}/mel-rmi-track-a.XXXXXX")"
 STAGE_CRATE="$STAGE_ROOT/crates/domains/symthaea-muse"
 MANIFEST="$STAGE_CRATE/Cargo.toml"
 EVIDENCE_DIR="${MEL_RMI_EVIDENCE_DIR:-$BASE_TMP/mel-rmi-track-a-evidence-$SOURCE_COMMIT}"
 TRIALS_PER_TARGET="${MEL_RMI_TRIALS_PER_TARGET:-8}"
 SEED_ROOT="${MEL_RMI_SEED_ROOT:-42}"
 
-rm -rf "$STAGE_ROOT" "$EVIDENCE_DIR"
+if [[ -e "$EVIDENCE_DIR" ]]; then
+  echo "evidence destination already exists; refusing to overwrite: $EVIDENCE_DIR" >&2
+  exit 2
+fi
 mkdir -p "$STAGE_CRATE/src/bin" "$STAGE_CRATE/tests" "$EVIDENCE_DIR"
 
 cp crates/domains/symthaea-muse/src/rmi_benchmark.rs "$STAGE_CRATE/src/rmi_benchmark.rs"
