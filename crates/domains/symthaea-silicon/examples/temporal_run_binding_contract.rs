@@ -247,6 +247,12 @@ fn join_receipts(
 
     let decision_contract_id = string_field(&freshness, "decision_contract_id")?;
     let independent_verifier_id = string_field(&freshness, "independent_verifier_id")?;
+    let work_quality = object_value(&work, "quality")?;
+    if string_field(work_quality, "decision_contract_id")? != decision_contract_id
+        || string_field(work_quality, "independent_verifier_id")? != independent_verifier_id
+    {
+        return Err(BindingError::IdentityMismatch("decision contract / verifier identity"));
+    }
     if decision_contract_id.trim().is_empty() || independent_verifier_id.trim().is_empty() {
         return Err(BindingError::MissingField(
             "decision contract / verifier identity",
@@ -299,11 +305,49 @@ fn example_receipts(
         "seed": 17_u64,
         "logical_duration_ns": 1_000_u64,
         "work": {
+            "input_events": 2_u64,
+            "accepted_observations": 2_u64,
+            "fast_state_updates": 2_u64,
+            "slow_context_refreshes": 0_u64,
+            "interpolation_evaluations": 0_u64,
+            "solver_substeps": 2_u64,
+            "gate_evaluations": 2_u64,
+            "leak_updates": 2_u64,
             "decision_opportunities": 2_u64,
             "output_decisions": 2_u64,
             "late_decisions": 0_u64,
             "abstained_decisions": 0_u64,
-            "unserved_decisions": 0_u64
+            "unserved_decisions": 0_u64,
+            "independently_verified_correct_decisions": 2_u64,
+            "independently_verified_incorrect_decisions": 0_u64,
+            "state_bytes_read": 0_u64,
+            "state_bytes_written": 0_u64,
+            "parameter_bytes_read": 0_u64,
+            "input_bytes_read": 0_u64,
+            "peak_scratch_bytes": 0_u64,
+            "operations": {
+                "scalar_add_sub": 0_u64,
+                "scalar_multiply": 0_u64,
+                "scalar_divide": 0_u64,
+                "scalar_exponential": 0_u64,
+                "scalar_comparison": 0_u64,
+                "vector_lanes_updated": 0_u64
+            }
+        },
+        "quality": {
+            "task_metric_name": null,
+            "task_metric_value": null,
+            "trajectory_max_abs_error": null,
+            "decision_contract_id": "fixture-decision-contract-v1",
+            "independent_verifier_id": "fixture-independent-verifier-v1"
+        },
+        "system": {
+            "wall_elapsed_ns": null,
+            "event_to_decision_latency": null,
+            "deadline_count": 2_u64,
+            "deadline_misses": 0_u64,
+            "peak_queue_depth": null,
+            "direct_energy": null
         }
     });
     let work_bytes = serde_json::to_vec(&work)?;
@@ -319,7 +363,34 @@ fn example_receipts(
         "independent_verifier_id": "fixture-independent-verifier-v1",
         "temporal_work_receipt_sha256": work_digest,
         "logical_horizon_end_ns": 1_000_u64,
-        "opportunities": [{ "opportunity_id": 0 }, { "opportunity_id": 1 }]
+        "opportunities": [
+            {
+                "opportunity_id": 0_u64,
+                "source_event_time_ns": 100_u64,
+                "available_at_ns": 110_u64,
+                "deadline_at_ns": 160_u64,
+                "freshness_budget_ns": 30_u64,
+                "disposition": "answered",
+                "emitted_at_ns": 111_u64,
+                "consumed_at_ns": 115_u64,
+                "evidence_source_time_ns": 108_u64,
+                "evidence_available_at_ns": 110_u64,
+                "correctness": "correct"
+            },
+            {
+                "opportunity_id": 1_u64,
+                "source_event_time_ns": 200_u64,
+                "available_at_ns": 210_u64,
+                "deadline_at_ns": 260_u64,
+                "freshness_budget_ns": 30_u64,
+                "disposition": "answered",
+                "emitted_at_ns": 211_u64,
+                "consumed_at_ns": 215_u64,
+                "evidence_source_time_ns": 208_u64,
+                "evidence_available_at_ns": 210_u64,
+                "correctness": "correct"
+            }
+        ]
     });
     Ok((work_bytes, serde_json::to_vec(&freshness)?))
 }
