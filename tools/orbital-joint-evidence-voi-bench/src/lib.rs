@@ -1024,8 +1024,8 @@ mod tests {
     #[test]
     fn all_frozen_scenarios_pass_the_independent_semantic_contract() {
         let receipt = run_audit(FIXTURE, SOURCE).expect("scenario catalogue must audit");
-        assert_eq!(receipt.scenario_count, 11);
-        assert_eq!(receipt.oracle_matches, 11);
+        assert_eq!(receipt.scenario_count, 13);
+        assert_eq!(receipt.oracle_matches, 13);
         assert_eq!(receipt.oracle_mismatches, 0);
         assert!(!receipt.authority_granted);
     }
@@ -1114,6 +1114,63 @@ mod tests {
             .unwrap();
         assert!(repeated.policy_eligible);
         assert!(!first.policy_eligible);
+    }
+
+    #[test]
+    fn aborted_actual_resources_are_preserved_and_variance_is_reported() {
+        let receipt = run_audit(FIXTURE, SOURCE).unwrap();
+        let over_plan = receipt
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "JEV-012")
+            .unwrap();
+        let over_plan_action = over_plan
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-ABORTED-OVER-PLAN")
+            .unwrap();
+        assert!(over_plan_action.actual_exceeds_plan);
+        assert!(!over_plan_action.actual_exceeds_scenario_budget);
+        assert!(!over_plan.actual_resources_over_scenario_budget);
+        assert_eq!(over_plan.actual_over_plan_action_count, 1);
+        assert_eq!(over_plan.actions_with_actual_resource_records, 1);
+        assert_eq!(over_plan.actual_resources_consumed.engineering_hours, 1.2);
+        assert_eq!(over_plan.actual_resources_consumed.facility_hours, 0.8);
+        assert_eq!(over_plan.actual_resources_consumed.external_cost_units, 0.5);
+
+        let over_budget = receipt
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "JEV-013")
+            .unwrap();
+        let over_budget_action = over_budget
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-ABORTED-OVER-BUDGET")
+            .unwrap();
+        assert!(over_budget_action.actual_exceeds_plan);
+        assert!(over_budget_action.actual_exceeds_scenario_budget);
+        assert!(over_budget.actual_resources_over_scenario_budget);
+        assert_eq!(over_budget.actual_resources_consumed.engineering_hours, 2.4);
+        assert_eq!(over_budget.actual_resources_consumed.specimen_count, 2);
+    }
+
+    #[test]
+    fn execution_state_without_actual_cost_is_rejected() {
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        let action = value["scenarios"][10]["actions"][0].as_object_mut().unwrap();
+        action.remove("actual_resources");
+        let changed = serde_json::to_vec(&value).unwrap();
+        assert!(run_audit(&changed, SOURCE).is_err());
+    }
+
+    #[test]
+    fn actual_cost_without_execution_state_is_rejected() {
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        let action = value["scenarios"][10]["actions"][0].as_object_mut().unwrap();
+        action.remove("observed_execution_state");
+        let changed = serde_json::to_vec(&value).unwrap();
+        assert!(run_audit(&changed, SOURCE).is_err());
     }
 
     #[test]
