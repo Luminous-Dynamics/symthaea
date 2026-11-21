@@ -518,7 +518,25 @@
         "reference unit tests",
         "byte-for-byte frozen report reproduction"
       ]
-    }
+    },
+    "inspection_decision_policy": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_inspection_decision_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json",
+      "method": "exact-exhaustive-subset-optimization-for-at-most-18-candidates",
+      "constraints": [
+        "cash-budget",
+        "inspection-time-budget",
+        "per-group-capacity"
+      ],
+      "comparator": "matched-budget-risk-only-greedy",
+      "test_count": 10,
+      "claim_ceiling": "synthetic model-based expected value only; no physical savings or inspection authorization"
+    },
+    "total_test_count": 31,
+    "test_count_pending_hosted_ci": 31,
+    "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler"
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
   "eda_end_to_end_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
