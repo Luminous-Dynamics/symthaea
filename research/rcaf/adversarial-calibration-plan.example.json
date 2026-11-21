@@ -1,0 +1,192 @@
+{
+  "schema_version": "rcaf.adversarial-calibration-plan/0.1.0",
+  "plan_id": "rcaf-adversarial-instrument-calibration-v1",
+  "status": "proposed",
+  "seed_policy": {
+    "development_seed": 271828,
+    "confirmatory_seed": 314159,
+    "pilot_replicates": 200,
+    "qualification_replicates": 1000,
+    "critical_null_replicates": 10000
+  },
+  "sample_sizes": [
+    24,
+    48,
+    96
+  ],
+  "segment_lengths": [
+    80,
+    160,
+    320
+  ],
+  "temporal_ar1_coefficients": [
+    -0.3,
+    0,
+    0.3,
+    0.6,
+    0.8
+  ],
+  "missingness_rates": [
+    0,
+    0.05,
+    0.2
+  ],
+  "missingness_mechanisms": [
+    "none",
+    "MCAR",
+    "MAR",
+    "MNAR"
+  ],
+  "response_fractions": [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1
+  ],
+  "latent_scenarios": [
+    {
+      "scenario_id": "exact-same-state-null",
+      "truth_class": "null",
+      "mechanism": "none",
+      "injection_stage": "none",
+      "response_fraction": 0,
+      "dose_points": [
+        0
+      ],
+      "description": "Same latent participant network; finite-sample variation only."
+    },
+    {
+      "scenario_id": "module-loading-response",
+      "truth_class": "effect",
+      "mechanism": "localized_module",
+      "injection_stage": "parcel_time_series",
+      "response_fraction": 1,
+      "dose_points": [
+        0,
+        0.1,
+        0.2,
+        0.3,
+        0.4
+      ],
+      "description": "Known module loading shift injected before connectivity construction."
+    },
+    {
+      "scenario_id": "partial-responder-response",
+      "truth_class": "effect",
+      "mechanism": "partial_response",
+      "injection_stage": "parcel_time_series",
+      "response_fraction": 0.5,
+      "dose_points": [
+        0,
+        0.1,
+        0.2,
+        0.3,
+        0.4
+      ],
+      "description": "Only half of participants receive the known network perturbation."
+    },
+    {
+      "scenario_id": "polarity-only-matrix-control",
+      "truth_class": "effect",
+      "mechanism": "polarity_change",
+      "injection_stage": "connectivity_matrix",
+      "response_fraction": 1,
+      "dose_points": [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1
+      ],
+      "description": "Representation-level polarity control to isolate matrix-comparator semantics."
+    }
+  ],
+  "nuisance_scenarios": [
+    {
+      "scenario_id": "global-nuisance-null",
+      "preserves_latent_target": true,
+      "mechanisms": [
+        "global_common_mode",
+        "snr_change"
+      ],
+      "description": "Shared nuisance and signal-to-noise change without a latent network change."
+    },
+    {
+      "scenario_id": "site-shift-null",
+      "preserves_latent_target": true,
+      "mechanisms": [
+        "site_gain",
+        "scanner_scale",
+        "preprocessing_variation"
+      ],
+      "description": "Acquisition-site and preprocessing shifts with fixed latent connectivity."
+    },
+    {
+      "scenario_id": "missingness-and-drift-null",
+      "preserves_latent_target": true,
+      "mechanisms": [
+        "parcel_dropout",
+        "edge_dropout",
+        "censoring",
+        "temporal_drift",
+        "nonstationarity"
+      ],
+      "description": "Structured missingness and temporal degradation without a target change."
+    }
+  ],
+  "connectivity_constructors": [
+    "pearson",
+    "spearman",
+    "shrinkage_covariance",
+    "oas_precision",
+    "partial_correlation"
+  ],
+  "matrix_comparators": [
+    "absolute_weighted_jaccard",
+    "signed_shift_weighted_jaccard",
+    "normalized_mean_absolute_edge_error",
+    "matrix_spearman",
+    "frobenius_distance"
+  ],
+  "leakage_challenges": [
+    "participant_overlap",
+    "site_overlap",
+    "preprocessing_before_split",
+    "imputation_before_split",
+    "harmonization_before_split",
+    "feature_selection_on_test",
+    "estimator_selection_on_test",
+    "threshold_or_calibration_on_test",
+    "checkpoint_selection_on_test",
+    "target_predictor_circularity",
+    "fusion_fit_on_test"
+  ],
+  "required_outputs": [
+    "type_i_error",
+    "power",
+    "wrong_direction_rejection_rate",
+    "directional_power",
+    "effect_bias",
+    "effect_rmse",
+    "interval_coverage",
+    "interval_width",
+    "dose_response",
+    "nuisance_false_positives",
+    "heterogeneity_recovery",
+    "site_transportability",
+    "independent_cohort_transportability",
+    "leakage_detection",
+    "selection_optimism",
+    "abstention",
+    "data_sufficiency",
+    "execution_receipt"
+  ],
+  "claim_limits": [
+    "This is a proposed plan, not an executed calibration result.",
+    "Matrix-level injection does not qualify time-series estimation or preprocessing.",
+    "Nuisance-only scenarios preserve the declared latent target and must be scored as null controls.",
+    "NSI reuse is limited to compatible precision-fMRI inputs and does not establish repeatability or construct validity.",
+    "No synthetic result establishes consciousness detection, causality, clinical utility or biological generalization."
+  ]
+}
