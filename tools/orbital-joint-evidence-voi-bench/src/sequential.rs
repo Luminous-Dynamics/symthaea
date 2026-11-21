@@ -1,6 +1,5 @@
 use super::Resources;
 use serde::Deserialize;
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -846,6 +845,7 @@ pub fn run_sequential_audit(input: &[u8], source_commit: &str) -> Result<Sequent
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     const FIXTURE: &[u8] =
         include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json");
