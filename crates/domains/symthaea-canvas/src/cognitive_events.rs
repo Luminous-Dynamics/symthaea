@@ -742,7 +742,9 @@ fn event_digest(event: &CognitiveTopologyEvent) -> [u8; 32] {
             hasher.update(&[1]);
             hash_string(&mut hasher, cause_id);
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
     hash_evidence(&mut hasher, &event.evidence);
     match &event.change {
