@@ -85,7 +85,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("layout_algorithm: deterministic-force-v1");
     println!("layout_iterations: {}", config.iterations);
     println!("geometry_digest_1e-3: {geometry_digest}");
-    println!("svg_output: {}", svg_output.as_deref().unwrap_or("not requested"));
+    println!(
+        "svg_output: {}",
+        svg_output.as_deref().unwrap_or("not requested")
+    );
     println!("layout_warmup_runs: {WARMUP_RUNS}");
     println!("layout_samples: {samples}");
     println!("layout_time_ns_p50: {}", percentile(&durations_ns, 50));
