@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use serde::Serialize;
-use symthaea_canvas::{EmbodimentTrace, EMBODIMENT_TRACE_SCHEMA_VERSION};
+use symthaea_canvas::{EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentTrace};
 
 const MAX_TRACE_FILE_BYTES: u64 = 16 * 1024 * 1024;
 const DEFAULT_ITERATIONS: usize = 100;
@@ -54,7 +54,9 @@ fn run() -> Result<(), String> {
     while let Some(argument) = args.next() {
         match argument.as_str() {
             "--trace" => {
-                let value = args.next().ok_or_else(|| "--trace requires a path".to_string())?;
+                let value = args
+                    .next()
+                    .ok_or_else(|| "--trace requires a path".to_string())?;
                 trace_path = Some(PathBuf::from(value));
             }
             "--iterations" => {
@@ -72,10 +74,7 @@ fn run() -> Result<(), String> {
     }
 
     if iterations == 0 || iterations > MAX_ITERATIONS {
-        return Err(format!(
-            "--iterations must be within 1..={MAX_ITERATIONS}"
-        )
-        );
+        return Err(format!("--iterations must be within 1..={MAX_ITERATIONS}"));
     }
     let trace_path = trace_path.ok_or_else(|| "--trace is required".to_string())?;
     let metadata = fs::metadata(&trace_path).map_err(|error| error.to_string())?;
@@ -84,8 +83,7 @@ fn run() -> Result<(), String> {
             "trace file is {} bytes; maximum is {} bytes",
             metadata.len(),
             MAX_TRACE_FILE_BYTES
-        )
-        );
+        ));
     }
 
     let bytes = fs::read(&trace_path).map_err(|error| error.to_string())?;
@@ -165,11 +163,9 @@ fn percentile(sorted_samples: &[u64], percentile: usize) -> u64 {
 }
 
 fn print_usage() {
-    println!(
-        concat!(
-            "Usage: embodiment_trace_replay --trace PATH [--iterations N]\n",
-            "Replays one valid trace and reports semantic-reducer latency (P50/P95).\n",
-            "This excludes SVG/browser/GPU/audio/human-perception latency."
-        )
-    );
+    println!(concat!(
+        "Usage: embodiment_trace_replay --trace PATH [--iterations N]\n",
+        "Replays one valid trace and reports semantic-reducer latency (P50/P95).\n",
+        "This excludes SVG/browser/GPU/audio/human-perception latency."
+    ));
 }
