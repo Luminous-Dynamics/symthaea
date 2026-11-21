@@ -405,10 +405,7 @@ impl VlasovPoisson1d1v {
     /// The finite periodic velocity interval and its Nyquist-mode projection
     /// are the same as the existing velocity-advection subflow. Inputs and
     /// transformed candidate rows are validated before the state is committed.
-    pub fn apply_velocity_impulse(
-        &mut self,
-        velocity_impulses: &[f64],
-    ) -> Result<(), SolverError> {
+    pub fn apply_velocity_impulse(&mut self, velocity_impulses: &[f64]) -> Result<(), SolverError> {
         let config = self.config;
         if velocity_impulses.len() != config.nx {
             return Err(SolverError::VelocityImpulseLengthMismatch {
@@ -1160,10 +1157,7 @@ mod tests {
         );
     }
 
-    fn periodic_velocity_mode_initial_state(
-        config: VlasovPoissonConfig,
-        mode: usize,
-    ) -> Vec<f64> {
+    fn periodic_velocity_mode_initial_state(config: VlasovPoissonConfig, mode: usize) -> Vec<f64> {
         let period = config.velocity_max - config.velocity_min;
         let eta = TAU * mode as f64 / period;
         let base = 1.0 / period;
@@ -1171,8 +1165,7 @@ mod tests {
         (0..config.nx)
             .flat_map(|_| {
                 (0..config.nv).map(move |iv| {
-                    base + amplitude
-                        * (eta * (config.velocity(iv) - config.velocity_min)).cos()
+                    base + amplitude * (eta * (config.velocity(iv) - config.velocity_min)).cos()
                 })
             })
             .collect()
@@ -1200,8 +1193,7 @@ mod tests {
         let mut maximum_error: f64 = 0.0;
         for ix in 0..config.nx {
             for iv in 0..config.nv {
-                let shifted_velocity =
-                    config.velocity(iv) - config.velocity_min - impulse;
+                let shifted_velocity = config.velocity(iv) - config.velocity_min - impulse;
                 let expected = base + amplitude * (eta * shifted_velocity).cos();
                 let actual = solver.distribution()[ix * config.nv + iv];
                 maximum_error = maximum_error.max((actual - expected).abs());
