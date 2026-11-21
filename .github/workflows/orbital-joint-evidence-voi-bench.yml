@@ -113,7 +113,7 @@ jobs:
             --source-commit "$GITHUB_SHA" > /tmp/sequential-campaign-b.json
           cmp /tmp/sequential-campaign-a.json /tmp/sequential-campaign-b.json
           jq -e '
-            .scenario_count == 1 and .oracle_matches == 1 and
+            .scenario_count == 2 and .oracle_matches == 2 and
             .oracle_mismatches == 0 and .authority_granted == false and
             .scenarios[0].baseline_worst_case_regret == 5 and
             .scenarios[0].myopic.worst_case_regret == 5 and
@@ -124,7 +124,12 @@ jobs:
             .scenarios[0].adaptive_campaign.policy.branches.FAIL.decision == "REJECT" and
             .scenarios[0].adaptive_campaign.policy.branches.PASS.action_id == "B-THERMAL-INSPECTION" and
             .scenarios[0].adaptive_campaign.expected_resources.engineering_hours == 1.2 and
-            .scenarios[0].adaptive_campaign.expected_resources.facility_hours == 1.55
+            .scenarios[0].adaptive_campaign.expected_resources.facility_hours == 1.55 and
+            .scenarios[1].scenario_id == "SEQ-002" and
+            .scenarios[1].adaptive_campaign.first_action_id == "B-THERMAL-INSPECTION" and
+            .scenarios[1].adaptive_campaign.worst_case_regret == 0 and
+            .scenarios[1].adaptive_campaign.expected_resources.engineering_hours == 1.15 and
+            .scenarios[1].adaptive_campaign.expected_resources.facility_hours == 1.65
           ' /tmp/sequential-campaign-a.json
       - name: Independent stdlib sequential campaign oracle
         run: |
@@ -132,11 +137,16 @@ jobs:
             fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
             "$GITHUB_SHA" > /tmp/sequential-campaign-oracle.json
           jq -e '
-            .scenario_count == 1 and .oracle_matches == 1 and .oracle_mismatches == 0 and
+            .scenario_count == 2 and .oracle_matches == 2 and .oracle_mismatches == 0 and
             .scenarios[0].adaptive_first_action == "A-COMBINED-LOAD-SCREEN" and
             .scenarios[0].adaptive_worst_case_regret == 0 and
             .scenarios[0].myopic_worst_case_regret == 5 and
             .scenarios[0].fixed_campaign_worst_case_regret == 0 and
             .scenarios[0].adaptive_expected_resources.engineering_hours == 1.2 and
-            .scenarios[0].adaptive_expected_resources.facility_hours == 1.55
+            .scenarios[0].adaptive_expected_resources.facility_hours == 1.55 and
+            .scenarios[1].scenario_id == "SEQ-002" and
+            .scenarios[1].adaptive_first_action == "B-THERMAL-INSPECTION" and
+            .scenarios[1].adaptive_worst_case_regret == 0 and
+            .scenarios[1].adaptive_expected_resources.engineering_hours == 1.15 and
+            .scenarios[1].adaptive_expected_resources.facility_hours == 1.65
           ' /tmp/sequential-campaign-oracle.json
