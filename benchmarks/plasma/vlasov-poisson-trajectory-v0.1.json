@@ -187,9 +187,16 @@
     {
       "component": "dense_distribution_space_vlasov_poisson_reference_prototype",
       "pr": 13103,
-      "head_sha": "59200805851679c4f2df8a9a82875bdd5cb2ec78",
+      "head_sha": "2c2b91ce43890b3d9175b4949b1354fd09fdc2c4",
       "state_at_profile_creation": "open",
-      "claim_ceiling": "Spectral-Strang reference prototype; latest source adds second-order timestep and conservation checks, but exact-head validation of 11 tests remains pending. Not yet L3-admitted."
+      "claim_ceiling": "Spectral-Strang distribution-space prototype with phase-resolved electric modes and diagnostic x/v spectral-tail monitoring. Latest exact-head validation remains pending; not yet L3-admitted."
+    },
+    {
+      "component": "phase_space_spectral_tail_monitor",
+      "pr": 13103,
+      "head_sha": "2c2b91ce43890b3d9175b4949b1354fd09fdc2c4",
+      "state_at_profile_creation": "implementation_in_progress",
+      "claim_ceiling": "Diagnostic-only x/v high-frequency and Nyquist energy fractions. Not a truncation-error certificate and not an adaptive expansion policy."
     }
   ],
   "initial_condition_suite": [
@@ -465,6 +472,18 @@
         "landau_tt_blob": "a1745409ea245a919068e53ad5df9d15227689f3",
         "landau_dense_reference_blob": "1f2bcf8acb17ab321861bae2b9937b821b7e1973"
       }
+    },
+    {
+      "name": "Adaptive Fourier spectral Vlasov-Poisson zero-padding method",
+      "source": "https://arxiv.org/abs/2607.12368",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "admission_rule": "Pin source revision and reproduce spectral-tail trigger, zero-padding, filter behavior and invariant claims on matched complete trajectories."
+    },
+    {
+      "name": "Positivity-preserving dynamical low-rank Vlasov",
+      "source": "https://arxiv.org/abs/2606.31662",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "admission_rule": "Compare on nonnegative distribution f only, preserving exact equation/cohort; do not impose positivity on signed delta-f states."
     }
   ],
   "execution_receipt": {
@@ -508,25 +527,49 @@
     "https://doi.org/10.1017/S002237781700040X",
     "https://github.com/erikasgrim/VlasovTT.jl/tree/99aa077b6f5e4ae4dfc8330590e502267caf298b",
     "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
-    "https://github.com/Luminous-Dynamics/symthaea/pull/13105"
+    "https://github.com/Luminous-Dynamics/symthaea/pull/13105",
+    "https://arxiv.org/abs/2607.12368",
+    "https://arxiv.org/abs/2606.31662",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13106"
   ],
   "representation_tournament": {
     "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
-    "purpose": "Compare dense spectral, TT/MPS, Fourier-Hermite, particle-measure and learned particle-field representations on one admitted 1D1V Vlasov-Poisson cohort.",
-    "key_rule": "A representation transition is a numerical operation with its own error, conservation, positivity and compute cost; it must be qualified before use.",
+    "adaptive_resolution_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13106",
+    "purpose": "Compare dense spectral, adaptive Fourier zero-padding, TT/MPS, Fourier-Hermite, positivity-preserving low rank, particle-measure and learned field representations on one admitted 1D1V Vlasov-Poisson cohort.",
     "methods": [
-      "dense_spectral_distribution",
+      "dense_spectral_fixed_grid",
+      "adaptive_fourier_spectral_zero_padding",
       "tensor_train_mps_quantics",
+      "positivity_preserving_dynamical_low_rank",
       "fourier_hermite_velocity",
       "weighted_particle_measure",
       "learned_particle_measure_field"
     ],
-    "mandatory_metrics": [
+    "new_research_comparators": [
+      {
+        "name": "Adaptive Fourier spectral Vlasov-Poisson",
+        "paper": "https://arxiv.org/abs/2607.12368",
+        "method": "spectral-tail-triggered Fourier wavenumber-domain expansion by zero-padding",
+        "source_claim_status": "paper_reported_not_reproduced",
+        "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13106"
+      },
+      {
+        "name": "Positivity-preserving dynamical low-rank Vlasov",
+        "paper": "https://arxiv.org/abs/2606.31662",
+        "method": "constrained quadratic-program correction of low-rank states; one scheme also preserves mass and momentum",
+        "applicability": "nonnegative f only; signed delta-f needs another contract",
+        "source_claim_status": "paper_reported_not_reproduced"
+      }
+    ],
+    "transition_rule": "Any representation or resolution transition must have its own discrepancy, invariant, positivity/applicability and complete compute-cost receipt. No representation is permitted to claim correctness outside its qualified envelope.",
+    "diagnostics": [
       "phase_space_distribution_error",
       "mass_momentum_energy",
       "minimum_distribution_and_negative_mass",
       "velocity_tail_truncation",
       "compression_rank_and_truncation_residual",
+      "x_and_velocity_spectral_tail_fractions",
+      "spectral_nyquist_energy_fractions",
       "representation_transition_error",
       "representation_transition_runtime",
       "p50_p95_runtime_peak_memory_energy",
