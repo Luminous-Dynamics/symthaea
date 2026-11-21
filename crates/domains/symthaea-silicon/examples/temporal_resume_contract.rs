@@ -733,6 +733,72 @@ mod tests {
     }
 
     #[test]
+    fn generation_overflow_does_not_advance_checkpoint_store() {
+        let mut token = fixture();
+        token.checkpoint_generation = u64::MAX;
+        let mut registry = ContinuationRegistry::default();
+        registry.register(&token).unwrap();
+        assert_eq!(
+            registry.advance(
+                &token,
+                &ResumeRequest::from(&token),
+                progress(1, 1, 1, 1),
+            ),
+            Err(ResumeError::CounterOverflow)
+        );
+        assert_eq!(
+            registry.current_generation("trajectory-001"),
+            Some(u64::MAX)
+        );
+    }
+
+    #[test]
+    fn completed_substep_counter_overflow_fails_before_commit() {
+        let mut token = fixture();
+        token.max_substeps = u64::MAX;
+        token.completed_substeps = u64::MAX;
+        token.committed_logical_time_ns = 7;
+        token.state = ContinuationState::YieldedAtSafePoint;
+        token.recurrent_snapshot_ref = "snapshot-max".to_owned();
+        let mut registry = ContinuationRegistry::default();
+        registry.register(&token).unwrap();
+        assert_eq!(
+            registry.advance(
+                &token,
+                &ResumeRequest::from(&token),
+                progress(1, 8, 8, 1),
+            ),
+            Err(ResumeError::CounterOverflow)
+        );
+        assert_eq!(
+            registry.current_generation("trajectory-001"),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn zero_checkpoint_timing_is_not_accepted_as_a_measurement() {
+        let mut token = fixture();
+        token.checkpoint_capture_wall_ns = Some(0);
+        assert_eq!(token.validate(), Err(ResumeError::InvalidMeasurement));
+
+        let token = fixture();
+        let mut registry = ContinuationRegistry::default();
+        registry.register(&token).unwrap();
+        let mut observed_progress = progress(1, 1, 1, 1);
+        observed_progress.checkpoint_restore_wall_ns = Some(0);
+        assert_eq!(
+            registry.advance(
+                &token,
+                &ResumeRequest::from(&token),
+                observed_progress,
+            ),
+            Err(ResumeError::InvalidMeasurement)
+        );
+        assert_eq!(registry.current_generation("trajectory-001"), Some(0));
+    }
+
+    #[test]
     fn deterministic_serialization_of_frozen_continuation() {
         let token = fixture();
         let first = serde_json::to_string(&token).unwrap();
