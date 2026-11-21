@@ -57,8 +57,14 @@ jobs:
       - name: Resolve standalone validator lockfile
         run: cargo generate-lockfile --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml
 
-      - name: Check validator formatting
-        run: cargo fmt --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml --check
+      - name: Preserve original validator source
+        run: cp tools/mel-external-capability-ledger-validator/src/main.rs "$RUNNER_TEMP/validator-main.source.rs"
+
+      - name: Normalize temporary checkout formatting and check
+        run: |
+          cargo fmt --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml
+          cargo fmt --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml --check
+
 
       - name: Run strict validator tests
         run: cargo test --locked --manifest-path tools/mel-external-capability-ledger-validator/Cargo.toml
@@ -73,8 +79,20 @@ jobs:
           evidence="$RUNNER_TEMP/mel-external-capability-ledger-evidence"
           mkdir -p "$evidence"
           cp tools/mel-external-capability-ledger-validator/Cargo.lock "$evidence/Cargo.lock"
-          sha256sum             benchmarks/mel/external-capability-ledger-2026-11-21.json             benchmarks/mel/schemas/external-capability-ledger-v1.schema.json             tools/mel-external-capability-ledger-validator/Cargo.toml             tools/mel-external-capability-ledger-validator/src/main.rs             "$evidence/Cargo.lock" > "$evidence/SHA256SUMS"
-          printf 'exact_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identities.txt"
+          cp "$RUNNER_TEMP/validator-main.source.rs" "$evidence/validator-main.source.rs"
+          cp tools/mel-external-capability-ledger-validator/src/main.rs "$evidence/validator-main.formatted.rs"
+          sha256sum \
+            benchmarks/mel/external-capability-ledger-2026-11-21.json \
+            benchmarks/mel/schemas/external-capability-ledger-v1.schema.json \
+            tools/mel-external-capability-ledger-validator/Cargo.toml \
+            "$evidence/validator-main.source.rs" \
+            "$evidence/validator-main.formatted.rs" \
+            "$evidence/Cargo.lock" > "$evidence/SHA256SUMS"
+          printf 'exact_head=%s\nsource_main_sha256=%s\nformatted_main_sha256=%s\n' \
+            "$(git rev-parse HEAD)" \
+            "$(sha256sum "$evidence/validator-main.source.rs" | awk '{print $1}')" \
+            "$(sha256sum "$evidence/validator-main.formatted.rs" | awk '{print $1}')" \
+            > "$evidence/source-identities.txt"
 
       - name: Upload exact-head ledger evidence
         uses: actions/upload-artifact@v4
