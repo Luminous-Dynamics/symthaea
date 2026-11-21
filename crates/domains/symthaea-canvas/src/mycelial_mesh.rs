@@ -292,8 +292,8 @@ fn tessellate_filament(
             let b = first_vertex + (axial_index * radial + next_radial) as u32;
             let c = first_vertex + ((axial_index + 1) * radial + radial_index) as u32;
             let d = first_vertex + ((axial_index + 1) * radial + next_radial) as u32;
-            // Winding is outward-facing for the chosen tangent/normal basis.
-            mesh.indices.extend_from_slice(&[a, c, b, b, c, d]);
+            // Circumferential-then-axial winding matches the generated outward normals.
+            mesh.indices.extend_from_slice(&[a, b, c, b, d, c]);
         }
     }
 
@@ -521,6 +521,62 @@ mod tests {
             tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
             TubeTessellationError::InvalidFilamentTopology
         );
+    }
+
+    #[test]
+    fn tube_triangle_winding_agrees_with_vertex_normals() {
+        let filament = MycelialFilament {
+            id: 7,
+            parent_id: None,
+            generation: 0,
+            terminal: true,
+            start: SpatialPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+            control_a: SpatialPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+            control_b: SpatialPoint3 { x: 2.0, y: 0.0, z: 0.0 },
+            end: SpatialPoint3 { x: 3.0, y: 0.0, z: 0.0 },
+            radius_start: 1.0,
+            radius_end: 1.0,
+        };
+        let config = TubeTessellationConfig {
+            axial_segments: 2,
+            radial_segments: 4,
+        };
+        let mut mesh = MycelialTubeMesh {
+            positions: Vec::new(),
+            normals: Vec::new(),
+            indices: Vec::new(),
+            filaments: Vec::new(),
+        };
+        tessellate_filament(&filament, config, &mut mesh).expect("valid straight tube");
+
+        let [a, b, c] = [
+            mesh.indices[0] as usize,
+            mesh.indices[1] as usize,
+            mesh.indices[2] as usize,
+        ];
+        let edge_ab = sub3(mesh.positions[b], mesh.positions[a]);
+        let edge_ac = sub3(mesh.positions[c], mesh.positions[a]);
+        let face_normal = cross3(edge_ab, edge_ac);
+        assert!(
+            dot3(face_normal, mesh.normals[a]) > 0.0,
+            "triangle face normal must point with the generated outward vertex normal"
+        );
+    }
+
+    fn sub3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+        [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+    }
+
+    fn cross3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+    }
+
+    fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
+        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
     }
 
 }
