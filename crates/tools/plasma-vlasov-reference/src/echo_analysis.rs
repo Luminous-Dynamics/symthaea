@@ -129,6 +129,12 @@ pub enum EchoAnalysisError {
     NonFiniteTraceSample {
         index: usize,
     },
+    NonFiniteTraceInterval {
+        index: usize,
+    },
+    NonFiniteEchoTime,
+    ZeroPredictedEchoMode,
+    InvalidPeakMeasurement,
     NonIncreasingTraceTime {
         index: usize,
     },
@@ -202,6 +208,16 @@ pub fn predict_two_pulse_echo(
     })
 }
 
+fn validate_prediction(prediction: EchoPrediction) -> Result<(), EchoAnalysisError> {
+    if prediction.echo_mode == 0 {
+        return Err(EchoAnalysisError::ZeroPredictedEchoMode);
+    }
+    if !prediction.echo_time.is_finite() {
+        return Err(EchoAnalysisError::NonFiniteEchoTime);
+    }
+    Ok(())
+}
+
 /// Measure the largest sampled complex-mode response in a preregistered window.
 ///
 /// The input trace must have at least three finite samples, strictly increasing
@@ -213,6 +229,7 @@ pub fn measure_echo_trace(
     trace: EchoModeTrace<'_>,
     config: EchoMeasurementConfig,
 ) -> Result<EchoMeasurement, EchoAnalysisError> {
+    validate_prediction(prediction)?;
     if trace.spatial_mode != prediction.echo_mode {
         return Err(EchoAnalysisError::WrongEchoMode {
             expected: prediction.echo_mode,
@@ -236,8 +253,14 @@ pub fn measure_echo_trace(
         {
             return Err(EchoAnalysisError::NonFiniteTraceSample { index });
         }
-        if index > 0 && sample.time <= trace.samples[index - 1].time {
-            return Err(EchoAnalysisError::NonIncreasingTraceTime { index });
+        if index > 0 {
+            let previous_time = trace.samples[index - 1].time;
+            if sample.time <= previous_time {
+                return Err(EchoAnalysisError::NonIncreasingTraceTime { index });
+            }
+            if !(sample.time - previous_time).is_finite() {
+                return Err(EchoAnalysisError::NonFiniteTraceInterval { index });
+            }
         }
     }
 
@@ -274,13 +297,20 @@ pub fn measure_echo_trace(
     };
     let peak_sampling_interval = left_interval.max(right_interval);
 
-    let half_maximum = 0.5 * peak_amplitude;
-    let left_crossing = find_left_half_maximum_crossing(trace.samples, peak_index, half_maximum);
-    let right_crossing =
-        find_right_half_maximum_crossing(trace.samples, peak_index, half_maximum);
-    let full_width_half_maximum = match (left_crossing, right_crossing) {
-        (Some(left), Some(right)) if right >= left => Some(right - left),
-        _ => None,
+    let detected = peak_amplitude > config.minimum_peak_amplitude;
+    let (left_crossing, right_crossing, full_width_half_maximum) = if detected {
+        let half_maximum = 0.5 * peak_amplitude;
+        let left = find_left_half_maximum_crossing(trace.samples, peak_index, half_maximum);
+        let right = find_right_half_maximum_crossing(trace.samples, peak_index, half_maximum);
+        let width = match (left, right) {
+            (Some(left_time), Some(right_time)) if right_time >= left_time => {
+                Some(right_time - left_time)
+            }
+            _ => None,
+        };
+        (left, right, width)
+    } else {
+        (None, None, None)
     };
 
     Ok(EchoMeasurement {
@@ -289,7 +319,7 @@ pub fn measure_echo_trace(
         peak_amplitude,
         peak_phase_radians: peak.phase(),
         minimum_peak_amplitude: config.minimum_peak_amplitude,
-        detected: peak_amplitude > config.minimum_peak_amplitude,
+        detected,
         peak_sampling_interval,
         full_width_half_maximum,
         left_half_maximum_time: left_crossing,
@@ -306,6 +336,7 @@ pub fn qualify_echo_peak_time(
     measurement: EchoMeasurement,
     tolerance: EchoTimeTolerance,
 ) -> Result<(), EchoAnalysisError> {
+    validate_prediction(prediction)?;
     if measurement.echo_mode != prediction.echo_mode {
         return Err(EchoAnalysisError::WrongEchoMode {
             expected: prediction.echo_mode,
@@ -318,6 +349,14 @@ pub fn qualify_echo_peak_time(
         || tolerance.relative < 0.0
     {
         return Err(EchoAnalysisError::InvalidTimeTolerance);
+    }
+    if !measurement.sampled_peak_time.is_finite()
+        || !measurement.peak_amplitude.is_finite()
+        || !measurement.minimum_peak_amplitude.is_finite()
+        || measurement.peak_amplitude < 0.0
+        || measurement.minimum_peak_amplitude < 0.0
+    {
+        return Err(EchoAnalysisError::InvalidPeakMeasurement);
     }
     if !measurement.detected {
         return Err(EchoAnalysisError::EchoNotDetected {
@@ -615,6 +654,123 @@ mod tests {
         )
         .unwrap();
         assert!((measurement.peak_phase_radians + 3.0).abs() < 1.0e-14);
+    }
+
+    #[test]
+    fn invalid_prediction_is_rejected_by_measurement_and_qualification() {
+        let trace = canonical_trace();
+        let zero_mode = EchoPrediction {
+            echo_mode: 0,
+            echo_time: 2.0,
+        };
+        assert_eq!(
+            measure_echo_trace(
+                zero_mode,
+                EchoModeTrace {
+                    spatial_mode: 0,
+                    samples: &trace,
+                },
+                EchoMeasurementConfig {
+                    minimum_peak_amplitude: 0.01,
+                },
+            ),
+            Err(EchoAnalysisError::ZeroPredictedEchoMode)
+        );
+
+        let non_finite_time = EchoPrediction {
+            echo_mode: 1,
+            echo_time: f64::NAN,
+        };
+        assert_eq!(
+            measure_echo_trace(
+                non_finite_time,
+                EchoModeTrace {
+                    spatial_mode: 1,
+                    samples: &trace,
+                },
+                EchoMeasurementConfig {
+                    minimum_peak_amplitude: 0.01,
+                },
+            ),
+            Err(EchoAnalysisError::NonFiniteEchoTime)
+        );
+        assert_eq!(
+            qualify_echo_peak_time(
+                non_finite_time,
+                canonical_measurement(),
+                EchoTimeTolerance {
+                    absolute: 0.1,
+                    relative: 0.01,
+                },
+            ),
+            Err(EchoAnalysisError::NonFiniteEchoTime)
+        );
+    }
+
+    #[test]
+    fn non_finite_time_span_is_rejected() {
+        let trace = [
+            phased_sample(-f64::MAX, 0.1, 0.0),
+            phased_sample(f64::MAX, 1.0, 0.0),
+            phased_sample(f64::MAX / 2.0, 0.1, 0.0),
+        ];
+        assert!(matches!(
+            measure_echo_trace(
+                canonical_prediction(),
+                EchoModeTrace {
+                    spatial_mode: 1,
+                    samples: &trace,
+                },
+                EchoMeasurementConfig {
+                    minimum_peak_amplitude: 0.01,
+                },
+            ),
+            Err(EchoAnalysisError::NonIncreasingTraceTime { .. })
+                | Err(EchoAnalysisError::NonFiniteTraceInterval { .. })
+        ));
+    }
+
+    #[test]
+    fn undetected_signal_does_not_report_a_fwhm() {
+        let trace = [
+            phased_sample(1.0, 0.0, 0.0),
+            phased_sample(1.5, 0.0, 0.0),
+            phased_sample(2.0, 0.0, 0.0),
+            phased_sample(2.5, 0.0, 0.0),
+            phased_sample(3.0, 0.0, 0.0),
+        ];
+        let measurement = measure_echo_trace(
+            canonical_prediction(),
+            EchoModeTrace {
+                spatial_mode: 1,
+                samples: &trace,
+            },
+            EchoMeasurementConfig {
+                minimum_peak_amplitude: 0.0,
+            },
+        )
+        .unwrap();
+        assert!(!measurement.detected);
+        assert_eq!(measurement.full_width_half_maximum, None);
+    }
+
+    #[test]
+    fn manually_invalid_peak_measurement_is_rejected() {
+        let measurement = EchoMeasurement {
+            sampled_peak_time: f64::NAN,
+            ..canonical_measurement()
+        };
+        assert_eq!(
+            qualify_echo_peak_time(
+                canonical_prediction(),
+                measurement,
+                EchoTimeTolerance {
+                    absolute: 0.1,
+                    relative: 0.01,
+                },
+            ),
+            Err(EchoAnalysisError::InvalidPeakMeasurement)
+        );
     }
 
     #[test]
