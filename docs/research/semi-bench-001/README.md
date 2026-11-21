@@ -398,3 +398,8 @@ The current source and rights register is [data-source-register-v0.1.json](data-
 The test-only independent binary metric reference scorer is in `../../benchmarks/semi-bench-001/reference/`. It freezes threshold metrics, average precision, ROC AUC, Brier score, fixed-bin ECE, FPR at target recall and tie-grouped risk-coverage semantics. Eleven local unit tests passed; the path-filtered GitHub Actions workflow is `.github/workflows/semi-bench-reference.yml`.
 
 The Python code is an independent test/reference oracle only. The production implementation remains Rust-first. Synthetic known-answer results are not empirical SECOM or wafer-map results.
+
+
+## Validation-selected operating-point policy
+
+The reference evaluator now includes a separate validation-only selector that maximizes recall subject to a declared minimum precision, groups equal-score ties, rejects validation/test identity overlap and records an explicit fallback when no observed threshold is feasible. A frozen 10-validation / 10-test known-answer fixture covers this policy. It directly addresses the 2026 SECOM supplementary finding where a high-precision validation operating point produced zero test recall with only 21 positive test observations. The selector does not make a scarce validation sample statistically reliable; confidence intervals and operating-point stability remain required.
