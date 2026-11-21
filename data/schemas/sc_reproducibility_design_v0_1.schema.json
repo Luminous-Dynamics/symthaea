@@ -8,7 +8,7 @@
     "schema_version",
     "evidence_class",
     "claim_ceiling",
-    "material_state",
+    "material_profile",
     "observations",
     "tasks"
   ],
@@ -22,34 +22,6 @@
     "claim_ceiling": {
       "const": "group-split-and-reproducibility-design-semantics-only"
     },
-    "material_state": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "material_id",
-        "state_id",
-        "property_id",
-        "property_unit"
-      ],
-      "properties": {
-        "material_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "state_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "property_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "property_unit": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
     "observations": {
       "type": "array",
       "minItems": 2,
@@ -58,6 +30,7 @@
         "additionalProperties": false,
         "required": [
           "observation_id",
+          "material_id",
           "material_state_id",
           "specimen_id",
           "batch_id",
@@ -139,6 +112,10 @@
           "material_state_id": {
             "type": "string",
             "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -194,6 +171,29 @@
           "paired_specimen_transfer": {
             "type": "boolean"
           }
+        }
+      }
+    },
+    "material_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material_id",
+        "property_id",
+        "property_unit"
+      ],
+      "properties": {
+        "material_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property_unit": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
