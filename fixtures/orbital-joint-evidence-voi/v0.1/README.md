@@ -52,3 +52,22 @@ The scenario catalogue separates:
 - planned actions from actual execution outcomes.
 
 The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. Rust also deserializes the strict proposal/outcome examples: an attempted outcome requires actual cost and external execution authority, while a proposal is permanently non-actuating and carries no authority. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The multi-step matched-budget policy tournament remains unimplemented; no solver or physical test is called.
+
+
+## Finite-horizon sequential campaign proof-of-concept
+
+- `sequential-campaign.schema.json` and `sequential-campaign.synthetic.json` define one four-state/two-action example.
+- `tools/orbital-joint-evidence-voi-bench/src/sequential.rs` implements exact finite-horizon minimax-regret planning with observation-contingent branches, stop decisions, exact profile/article/configuration/ICD binding and full path budgets.
+- `src/bin/sequential-campaign.rs` emits a deterministic receipt; `tests/sequential_reference_oracle.py` independently recomputes the policy.
+
+The known-answer example is intentionally constructed so both single tests individually leave worst-case minimax regret at 5. A myopic one-step policy therefore stops. A two-step adaptive policy performs the combined-load screen first, rejects immediately on `FAIL`, and performs thermal inspection only on `PASS`. It reaches worst-case regret 0, matching the fixed two-test campaign, while reducing expected resource use under the explicitly synthetic frequency model:
+
+| Resource | Fixed campaign | Adaptive policy | Expected reduction |
+|---|---:|---:|---:|
+| Engineering hours | 1.50 | 1.20 | 20.0% |
+| Facility hours | 2.00 | 1.55 | 22.5% |
+| Specimen units | 2.00 | 1.70 | 15.0% |
+| Review hours | 0.30 | 0.24 | 20.0% |
+| External cost units | 1.10 | 0.86 | 21.8% |
+
+These are calculated outcomes of one synthetic fixture, not empirical aerospace savings or SOTA results. Its frequency weights are used exclusively for expected resource accounting; worst-case structural decision regret remains distribution-free over the full state set.
