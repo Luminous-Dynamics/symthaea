@@ -12,7 +12,8 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Write as _;
 
-use crate::cognitive_layout::{CognitiveSpatialLink, CognitiveSpatialProjection};
+use crate::cognitive_layout::{CognitiveAnchor, CognitiveSpatialLink, CognitiveSpatialProjection};
+use crate::cognitive_morphology::{CognitiveHypha, CognitiveMorphologyProjection};
 use crate::cognitive_topology::{
     CognitiveNodeKind, CognitiveProvenance, CognitiveRelation, EpistemicStatus,
 };
@@ -186,6 +187,198 @@ pub fn render_cognitive_projection_svg(
     render_legend(&mut output, options.width, options.height, has_synthetic);
     output.push_str("</svg>\n");
     Ok(output)
+}
+
+/// Render the direct CognitiveMorphologyProjection as a static cubic-hypha SVG.
+/// Unlike the overview graph view, each semantic edge is represented by the
+/// exact Bézier curve produced by the morphology adapter.
+pub fn render_cognitive_morphology_svg(
+    projection: &CognitiveMorphologyProjection,
+    options: CognitiveSvgOptions,
+) -> Result<String, CognitiveSvgError> {
+    if !(320..=4096).contains(&options.width)
+        || !(240..=4096).contains(&options.height)
+        || !options.padding.is_finite()
+        || !(16.0..=256.0).contains(&options.padding)
+        || options.padding * 2.0 >= options.width as f32
+        || options.padding * 2.0 >= options.height as f32
+    {
+        return Err(CognitiveSvgError::InvalidOptions);
+    }
+    let geometry_digest = projection
+        .geometry_digest_hex()
+        .map_err(|_| CognitiveSvgError::InvalidProjection)?;
+
+    let mut points = Vec::with_capacity(projection.nodes.len() + projection.hyphae.len() * 4);
+    points.extend(projection.nodes.iter().map(|node| node.position));
+    for hypha in &projection.hyphae {
+        points.extend([
+            hypha.start,
+            hypha.control_a,
+            hypha.control_b,
+            hypha.end,
+        ]);
+    }
+    let (min_x, max_x, min_y, max_y) = if points.is_empty() {
+        (-1.0f32, 1.0f32, -1.0f32, 1.0f32)
+    } else {
+        (
+            points.iter().map(|point| point.x).fold(f32::INFINITY, f32::min),
+            points
+                .iter()
+                .map(|point| point.x)
+                .fold(f32::NEG_INFINITY, f32::max),
+            points.iter().map(|point| point.y).fold(f32::INFINITY, f32::min),
+            points
+                .iter()
+                .map(|point| point.y)
+                .fold(f32::NEG_INFINITY, f32::max),
+        )
+    };
+    let available_width = options.width as f32 - options.padding * 2.0;
+    let available_height = options.height as f32 - options.padding * 2.0;
+    let span_x = (max_x - min_x).max(1.0);
+    let span_y = (max_y - min_y).max(1.0);
+    let scale = (available_width / span_x).min(available_height / span_y);
+    let content_width = span_x * scale;
+    let content_height = span_y * scale;
+    let offset_x = (options.width as f32 - content_width) * 0.5;
+    let offset_y = (options.height as f32 - content_height) * 0.5;
+    let project_point = |point: crate::mycelial_model::SpatialPoint3| {
+        (
+            offset_x + (point.x - min_x) * scale,
+            offset_y + (point.y - min_y) * scale,
+        )
+    };
+
+    let has_synthetic = projection.nodes.iter().any(|node| {
+        node.evidence.provenance == CognitiveProvenance::SyntheticFixture
+    }) || projection.hyphae.iter().any(|hypha| {
+        hypha.evidence.provenance == CognitiveProvenance::SyntheticFixture
+    });
+
+    let mut output = String::with_capacity(
+        projection.nodes.len() * 320 + projection.hyphae.len() * 520 + 1_400,
+    );
+    writeln!(
+        &mut output,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mycelial evidence morphology" width="{}" height="{}" viewBox="0 0 {} {}">"#,
+        options.width, options.height, options.width, options.height
+    )
+    .expect("writing to String cannot fail");
+    output.push_str("<title>Mycelial Presence — Evidence Morphology</title>\n");
+    output.push_str("<desc>Static cubic-hypha projection. Every curve corresponds to one validated semantic edge and retains its source event and epistemic status.</desc>\n");
+    writeln!(
+        &mut output,
+        r#"<metadata data-session="{}" data-topology-digest="{}" data-geometry-digest="{}"/>"#,
+        escape_xml(&projection.session_id),
+        escape_xml(&projection.topology_digest),
+        geometry_digest
+    )
+    .expect("writing to String cannot fail");
+    output.push_str(r##"<rect x="0" y="0" width="100%" height="100%" fill="#071321"/>"##);
+    output.push('\n');
+
+    if has_synthetic {
+        writeln!(
+            &mut output,
+            r##"<g class="fixture-warning"><text x="{}" y="34" text-anchor="middle" fill="#ffd18a" font-family="sans-serif" font-size="15">SYNTHETIC FIXTURE — NOT LIVE COGNITIVE TELEMETRY</text></g>"##,
+            options.width / 2
+        )
+        .expect("writing to String cannot fail");
+    }
+
+    let mut hyphae: Vec<_> = projection.hyphae.iter().collect();
+    hyphae.sort_by(|left, right| left.edge_id.cmp(&right.edge_id));
+    for hypha in hyphae {
+        render_cognitive_hypha(&mut output, hypha, &project_point);
+    }
+
+    let mut nodes: Vec<_> = projection.nodes.iter().collect();
+    nodes.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+    for node in nodes {
+        let anchor = CognitiveAnchor {
+            node_id: node.node_id.clone(),
+            node_kind: node.kind,
+            label: node.label.clone(),
+            status: node.status,
+            position: node.position,
+            source_event_id: node.evidence.event_id.clone(),
+            source_producer: node.evidence.producer.clone(),
+            source_sequence: node.evidence.sequence,
+            provenance: node.evidence.provenance,
+        };
+        let (x, y) = project_point(node.position);
+        render_anchor(&mut output, &anchor, x, y, options.show_labels);
+    }
+    render_legend(&mut output, options.width, options.height, has_synthetic);
+    output.push_str("</svg>\n");
+    Ok(output)
+}
+
+fn render_cognitive_hypha(
+    output: &mut String,
+    hypha: &CognitiveHypha,
+    project_point: &impl Fn(crate::mycelial_model::SpatialPoint3) -> (f32, f32),
+) {
+    let (sx, sy) = project_point(hypha.start);
+    let (a_x, a_y) = project_point(hypha.control_a);
+    let (b_x, b_y) = project_point(hypha.control_b);
+    let (tx, ty) = project_point(hypha.end);
+    let (color, width) = relation_style(hypha.relation);
+    let opacity = status_opacity(hypha.status);
+    let dash = status_dash(hypha.status);
+    let title = format!(
+        "{}: {:?} {} → {}; status={:?}; event={}; producer={}; sequence={}; provenance={:?}",
+        hypha.edge_id,
+        hypha.relation,
+        hypha.source_node_id,
+        hypha.target_node_id,
+        hypha.status,
+        hypha.evidence.event_id,
+        hypha.evidence.producer,
+        hypha.evidence.sequence,
+        hypha.evidence.provenance
+    );
+    let _ = writeln!(
+        output,
+        r#"<g class="cognitive-hypha" data-edge-id="{}" data-source-node="{}" data-target-node="{}" data-event-id="{}" data-producer="{}" data-sequence="{}" data-provenance="{}" data-status="{:?}" data-relation="{:?}"><title>{}</title><path d="M {:.2} {:.2} C {:.2} {:.2}, {:.2} {:.2}, {:.2} {:.2}" fill="none" stroke="{}" stroke-width="{:.2}" stroke-linecap="round" stroke-opacity="{:.2}"{} /></g>"#,
+        escape_xml(&hypha.edge_id),
+        escape_xml(&hypha.source_node_id),
+        escape_xml(&hypha.target_node_id),
+        escape_xml(&hypha.evidence.event_id),
+        escape_xml(&hypha.evidence.producer),
+        hypha.evidence.sequence,
+        provenance_name(hypha.evidence.provenance),
+        hypha.status,
+        hypha.relation,
+        escape_xml(&title),
+        sx,
+        sy,
+        a_x,
+        a_y,
+        b_x,
+        b_y,
+        tx,
+        ty,
+        color,
+        width,
+        opacity,
+        dash
+    );
+}
+
+fn relation_style(relation: CognitiveRelation) -> (&'static str, f32) {
+    match relation {
+        CognitiveRelation::Predicts => ("#ffc778", 2.4),
+        CognitiveRelation::Contradicts => ("#ff827e", 2.6),
+        CognitiveRelation::RetrievedFrom => ("#62d9ce", 2.8),
+        CognitiveRelation::Supports => ("#8dc8ff", 2.3),
+        CognitiveRelation::DependsOn => ("#a9b9d4", 2.0),
+        CognitiveRelation::ExecutedBy => ("#d2a0f5", 2.2),
+        CognitiveRelation::AssociatedWith => ("#79b6e8", 2.0),
+        CognitiveRelation::CandidateRelation => ("#ffc778", 1.9),
+    }
 }
 
 fn render_link(
@@ -525,6 +718,36 @@ mod tests {
         assert!(svg.contains(r#"class="relation""#));
         assert!(!svg.contains("<animate"));
         assert!(!svg.contains("@keyframes"));
+    }
+
+    #[test]
+    fn morphology_svg_renders_cubic_hyphae_and_preserves_event_metadata() {
+        let topology: crate::cognitive_topology::CognitiveTopology =
+            serde_json::from_str(include_str!("../tests/fixtures/cognitive_topology_v1.json"))
+                .expect("checked-in cognitive topology fixture");
+        let spatial = crate::cognitive_layout::layout_cognitive_topology(
+            &topology,
+            None,
+            crate::cognitive_layout::CognitiveLayoutConfig::default(),
+        )
+        .expect("valid spatial projection");
+        let morphology = crate::cognitive_morphology::build_cognitive_morphology(
+            &topology,
+            &spatial,
+            crate::cognitive_morphology::CognitiveMorphologyConfig::default(),
+        )
+        .expect("valid morphology");
+        let svg = render_cognitive_morphology_svg(
+            &morphology,
+            CognitiveSvgOptions::default(),
+        )
+        .expect("morphology SVG");
+        assert!(svg.contains(" C "));
+        assert!(svg.contains(r#"class="cognitive-hypha""#));
+        assert!(svg.contains(r#"data-provenance="synthetic_fixture""#));
+        assert!(svg.contains(r#"data-status="Candidate""#));
+        assert!(svg.contains("SYNTHETIC FIXTURE"));
+        assert!(!svg.contains("<animate"));
     }
 
     #[test]
