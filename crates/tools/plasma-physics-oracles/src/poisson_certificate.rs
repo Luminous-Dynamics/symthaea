@@ -29,9 +29,14 @@ impl fmt::Display for PoissonCertificateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LengthMismatch { potential, charge } => {
-                write!(f, "potential has {potential} cells but charge has {charge} cells")
+                write!(
+                    f,
+                    "potential has {potential} cells but charge has {charge} cells"
+                )
             }
-            Self::TooFewCells => write!(f, "periodic Poisson certificate requires at least 3 cells"),
+            Self::TooFewCells => {
+                write!(f, "periodic Poisson certificate requires at least 3 cells")
+            }
             Self::InvalidCellWidth => write!(f, "cell width must be finite and positive"),
             Self::InvalidPermittivity => write!(f, "permittivity must be finite and positive"),
             Self::InvalidNeutralityTolerance => {
@@ -46,9 +51,14 @@ impl fmt::Display for PoissonCertificateError {
             Self::NonFiniteChargeDensity { cell } => {
                 write!(f, "charge density in cell {cell} is non-finite")
             }
-            Self::NonFiniteIntermediate => write!(f, "Poisson certificate intermediate is non-finite"),
+            Self::NonFiniteIntermediate => {
+                write!(f, "Poisson certificate intermediate is non-finite")
+            }
             Self::ProjectionExceedsTolerance { kind } => {
-                write!(f, "{kind} zero-mode projection exceeds the declared tolerance")
+                write!(
+                    f,
+                    "{kind} zero-mode projection exceeds the declared tolerance"
+                )
             }
         }
     }
@@ -150,10 +160,14 @@ pub fn certify_periodic_1d_poisson(
         return Err(PoissonCertificateError::NonFiniteIntermediate);
     }
     if potential_mean.abs() > gauge_tolerance {
-        return Err(PoissonCertificateError::ProjectionExceedsTolerance { kind: "potential gauge" });
+        return Err(PoissonCertificateError::ProjectionExceedsTolerance {
+            kind: "potential gauge",
+        });
     }
     if charge_mean.abs() > neutrality_tolerance {
-        return Err(PoissonCertificateError::ProjectionExceedsTolerance { kind: "charge neutrality" });
+        return Err(PoissonCertificateError::ProjectionExceedsTolerance {
+            kind: "charge neutrality",
+        });
     }
 
     let potential: Vec<f64> = potential_estimate
@@ -179,12 +193,8 @@ pub fn certify_periodic_1d_poisson(
     }
 
     let residual_l2 = residual_squared.sqrt();
-    let lambda_min_nonzero =
-        4.0 * (PI / n).sin().powi(2) * inverse_dx_squared;
-    if !residual_l2.is_finite()
-        || !lambda_min_nonzero.is_finite()
-        || lambda_min_nonzero <= 0.0
-    {
+    let lambda_min_nonzero = 4.0 * (PI / n).sin().powi(2) * inverse_dx_squared;
+    if !residual_l2.is_finite() || !lambda_min_nonzero.is_finite() || lambda_min_nonzero <= 0.0 {
         return Err(PoissonCertificateError::NonFiniteIntermediate);
     }
 
@@ -223,15 +233,13 @@ mod tests {
     fn mode(count: usize, mode_number: usize, amplitude: f64) -> Vec<f64> {
         (0..count)
             .map(|cell| {
-                amplitude
-                    * (2.0 * PI * mode_number as f64 * cell as f64 / count as f64).cos()
+                amplitude * (2.0 * PI * mode_number as f64 * cell as f64 / count as f64).cos()
             })
             .collect()
     }
 
     fn discrete_lambda(count: usize, mode_number: usize, cell_width: f64) -> f64 {
-        4.0 * (PI * mode_number as f64 / count as f64).sin().powi(2)
-            / (cell_width * cell_width)
+        4.0 * (PI * mode_number as f64 / count as f64).sin().powi(2) / (cell_width * cell_width)
     }
 
     #[test]
@@ -241,7 +249,10 @@ mod tests {
         let epsilon = 2.0;
         let potential = mode(count, 1, 0.75);
         let lambda = discrete_lambda(count, 1, dx);
-        let charge: Vec<f64> = potential.iter().map(|value| epsilon * lambda * value).collect();
+        let charge: Vec<f64> = potential
+            .iter()
+            .map(|value| epsilon * lambda * value)
+            .collect();
 
         let certificate =
             certify_periodic_1d_poisson(&potential, &charge, dx, epsilon, 1.0e-12, 1.0e-12)
@@ -269,8 +280,7 @@ mod tests {
             .collect();
 
         let certificate =
-            certify_periodic_1d_poisson(&estimate, &charge, dx, epsilon, 1.0e-12, 1.0e-12)
-                .unwrap();
+            certify_periodic_1d_poisson(&estimate, &charge, dx, epsilon, 1.0e-12, 1.0e-12).unwrap();
 
         let potential_error = l2(&perturbation);
         let field_error_values: Vec<f64> = perturbation
@@ -300,20 +310,12 @@ mod tests {
             *value += 1.0e-9;
         }
 
-        let certificate = certify_periodic_1d_poisson(
-            &potential,
-            &charge,
-            dx,
-            1.0,
-            1.0e-8,
-            1.0e-7,
-        )
-        .unwrap();
+        let certificate =
+            certify_periodic_1d_poisson(&potential, &charge, dx, 1.0, 1.0e-8, 1.0e-7).unwrap();
         assert!((certificate.removed_potential_mean - 1.0e-8).abs() < 1.0e-14);
         assert!((certificate.removed_charge_density_mean - 1.0e-9).abs() < 1.0e-14);
         assert!(
-            (certificate.net_charge_before_projection - 1.0e-9 * count as f64 * dx).abs()
-                < 1.0e-14
+            (certificate.net_charge_before_projection - 1.0e-9 * count as f64 * dx).abs() < 1.0e-14
         );
     }
 
@@ -332,8 +334,7 @@ mod tests {
         let gauged: Vec<f64> = potential.iter().map(|value| value + 0.1).collect();
         let neutral = mode(8, 1, 1.0);
         assert_eq!(
-            certify_periodic_1d_poisson(&gauged, &neutral, 1.0, 1.0, 1.0, 1.0e-3)
-                .unwrap_err(),
+            certify_periodic_1d_poisson(&gauged, &neutral, 1.0, 1.0, 1.0, 1.0e-3).unwrap_err(),
             PoissonCertificateError::ProjectionExceedsTolerance {
                 kind: "potential gauge"
             }
@@ -350,8 +351,7 @@ mod tests {
             }
         );
         assert_eq!(
-            certify_periodic_1d_poisson(&[0.0, 1.0], &[0.0, 0.0], 1.0, 1.0, 0.0, 0.0)
-                .unwrap_err(),
+            certify_periodic_1d_poisson(&[0.0, 1.0], &[0.0, 0.0], 1.0, 1.0, 0.0, 0.0).unwrap_err(),
             PoissonCertificateError::TooFewCells
         );
         assert_eq!(
@@ -360,15 +360,8 @@ mod tests {
             PoissonCertificateError::NonFinitePotential { cell: 1 }
         );
         assert_eq!(
-            certify_periodic_1d_poisson(
-                &[0.0; 3],
-                &[0.0, f64::INFINITY, 0.0],
-                1.0,
-                1.0,
-                0.0,
-                0.0
-            )
-            .unwrap_err(),
+            certify_periodic_1d_poisson(&[0.0; 3], &[0.0, f64::INFINITY, 0.0], 1.0, 1.0, 0.0, 0.0)
+                .unwrap_err(),
             PoissonCertificateError::NonFiniteChargeDensity { cell: 1 }
         );
     }
