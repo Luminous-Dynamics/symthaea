@@ -1,0 +1,263 @@
+{
+  "contract": "SC-ONSET-PREDICTION-AUDIT-0.1",
+  "benchmark_id": "synthetic_interval_censored_onset_calibration_001",
+  "fixture_only": true,
+  "temperature_unit": "kelvin",
+  "source_reference": "Method inspiration only: https://arxiv.org/abs/2611.23527",
+  "pairs": [
+    {
+      "pair_id": "synthetic_pair_01",
+      "precursor_ids": [
+        "synthetic_precursor_a",
+        "synthetic_precursor_b"
+      ],
+      "evidence_kind": "left_censored",
+      "lower_bound_k": null,
+      "upper_bound_k": 900,
+      "exact_onset_k": null,
+      "evidence_observations": [
+        {
+          "observation_id": "synthetic_xrd_trial_01",
+          "sample_id": "synthetic_sample_1",
+          "execution_run_id": "synthetic_run_1",
+          "conditions_id": "synthetic_conditions_1",
+          "characterization_method": "powder_xrd",
+          "outcome": "cross_precursor_product_detected",
+          "dwell_temperature_k": 900,
+          "observed_onset_k": null,
+          "measurement_uncertainty_k": null,
+          "detection_limit_wt_percent": 1,
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "pair_id": "synthetic_pair_02",
+      "precursor_ids": [
+        "synthetic_precursor_c",
+        "synthetic_precursor_d"
+      ],
+      "evidence_kind": "right_censored",
+      "lower_bound_k": 1150,
+      "upper_bound_k": null,
+      "exact_onset_k": null,
+      "evidence_observations": [
+        {
+          "observation_id": "synthetic_xrd_trial_02",
+          "sample_id": "synthetic_sample_2",
+          "execution_run_id": "synthetic_run_2",
+          "conditions_id": "synthetic_conditions_2",
+          "characterization_method": "powder_xrd",
+          "outcome": "no_cross_precursor_product",
+          "dwell_temperature_k": 1150,
+          "observed_onset_k": null,
+          "measurement_uncertainty_k": null,
+          "detection_limit_wt_percent": 1,
+          "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ]
+    },
+    {
+      "pair_id": "synthetic_pair_03",
+      "precursor_ids": [
+        "synthetic_precursor_e",
+        "synthetic_precursor_f"
+      ],
+      "evidence_kind": "interval_censored",
+      "lower_bound_k": 700,
+      "upper_bound_k": 850,
+      "exact_onset_k": null,
+      "evidence_observations": [
+        {
+          "observation_id": "synthetic_xrd_trial_03_low",
+          "sample_id": "synthetic_sample_3",
+          "execution_run_id": "synthetic_run_3",
+          "conditions_id": "synthetic_conditions_3",
+          "characterization_method": "powder_xrd",
+          "outcome": "no_cross_precursor_product",
+          "dwell_temperature_k": 700,
+          "observed_onset_k": null,
+          "measurement_uncertainty_k": null,
+          "detection_limit_wt_percent": 1,
+          "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        {
+          "observation_id": "synthetic_xrd_trial_03_high",
+          "sample_id": "synthetic_sample_4",
+          "execution_run_id": "synthetic_run_4",
+          "conditions_id": "synthetic_conditions_4",
+          "characterization_method": "powder_xrd",
+          "outcome": "cross_precursor_product_detected",
+          "dwell_temperature_k": 850,
+          "observed_onset_k": null,
+          "measurement_uncertainty_k": null,
+          "detection_limit_wt_percent": 1,
+          "raw_data_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ]
+    },
+    {
+      "pair_id": "synthetic_pair_04",
+      "precursor_ids": [
+        "synthetic_precursor_g",
+        "synthetic_precursor_h"
+      ],
+      "evidence_kind": "exact",
+      "lower_bound_k": null,
+      "upper_bound_k": null,
+      "exact_onset_k": 650,
+      "evidence_observations": [
+        {
+          "observation_id": "synthetic_in_situ_xrd_04",
+          "sample_id": "synthetic_sample_5",
+          "execution_run_id": "synthetic_run_5",
+          "conditions_id": "synthetic_conditions_5",
+          "characterization_method": "in_situ_xrd",
+          "outcome": "exact_onset_measured",
+          "dwell_temperature_k": 650,
+          "observed_onset_k": 650,
+          "measurement_uncertainty_k": 5,
+          "detection_limit_wt_percent": 1,
+          "raw_data_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "pair_id": "synthetic_pair_05",
+      "precursor_ids": [
+        "synthetic_precursor_i",
+        "synthetic_precursor_j"
+      ],
+      "evidence_kind": "exact",
+      "lower_bound_k": null,
+      "upper_bound_k": null,
+      "exact_onset_k": 930,
+      "evidence_observations": [
+        {
+          "observation_id": "synthetic_in_situ_xrd_05",
+          "sample_id": "synthetic_sample_6",
+          "execution_run_id": "synthetic_run_6",
+          "conditions_id": "synthetic_conditions_6",
+          "characterization_method": "in_situ_xrd",
+          "outcome": "exact_onset_measured",
+          "dwell_temperature_k": 930,
+          "observed_onset_k": 930,
+          "measurement_uncertainty_k": 10,
+          "detection_limit_wt_percent": 1,
+          "raw_data_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "pair_id": "synthetic_pair_06",
+      "precursor_ids": [
+        "synthetic_precursor_k",
+        "synthetic_precursor_l"
+      ],
+      "evidence_kind": "left_censored",
+      "lower_bound_k": null,
+      "upper_bound_k": 520,
+      "exact_onset_k": null,
+      "evidence_observations": [
+        {
+          "observation_id": "synthetic_xrd_trial_06",
+          "sample_id": "synthetic_sample_7",
+          "execution_run_id": "synthetic_run_7",
+          "conditions_id": "synthetic_conditions_7",
+          "characterization_method": "powder_xrd",
+          "outcome": "cross_precursor_product_detected",
+          "dwell_temperature_k": 520,
+          "observed_onset_k": null,
+          "measurement_uncertainty_k": null,
+          "detection_limit_wt_percent": 1,
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "model_id": "synthetic_compact_aft",
+      "model_artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "uncertainty_method": "synthetic_predeclared_log_normal_scale; not fitted to external data",
+      "training_pair_ids": [
+        "synthetic_training_pair_101",
+        "synthetic_training_pair_102"
+      ],
+      "predictions": [
+        {
+          "pair_id": "synthetic_pair_01",
+          "median_onset_k": 760,
+          "log_sigma": 0.15
+        },
+        {
+          "pair_id": "synthetic_pair_02",
+          "median_onset_k": 1400,
+          "log_sigma": 0.15
+        },
+        {
+          "pair_id": "synthetic_pair_03",
+          "median_onset_k": 770,
+          "log_sigma": 0.15
+        },
+        {
+          "pair_id": "synthetic_pair_04",
+          "median_onset_k": 670,
+          "log_sigma": 0.12
+        },
+        {
+          "pair_id": "synthetic_pair_05",
+          "median_onset_k": 890,
+          "log_sigma": 0.12
+        },
+        {
+          "pair_id": "synthetic_pair_06",
+          "median_onset_k": 500,
+          "log_sigma": 0.15
+        }
+      ]
+    },
+    {
+      "model_id": "synthetic_tammann_reference",
+      "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "uncertainty_method": "synthetic_predeclared_residual_scale; not fitted to external data",
+      "training_pair_ids": [
+        "synthetic_training_pair_201",
+        "synthetic_training_pair_202"
+      ],
+      "predictions": [
+        {
+          "pair_id": "synthetic_pair_01",
+          "median_onset_k": 1100,
+          "log_sigma": 0.3
+        },
+        {
+          "pair_id": "synthetic_pair_02",
+          "median_onset_k": 1000,
+          "log_sigma": 0.3
+        },
+        {
+          "pair_id": "synthetic_pair_03",
+          "median_onset_k": 1000,
+          "log_sigma": 0.3
+        },
+        {
+          "pair_id": "synthetic_pair_04",
+          "median_onset_k": 900,
+          "log_sigma": 0.3
+        },
+        {
+          "pair_id": "synthetic_pair_05",
+          "median_onset_k": 1000,
+          "log_sigma": 0.3
+        },
+        {
+          "pair_id": "synthetic_pair_06",
+          "median_onset_k": 650,
+          "log_sigma": 0.3
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic onset-evaluation plumbing only; no real reaction onset, model accuracy, phase yield, material synthesizability or laboratory outcome is established."
+}

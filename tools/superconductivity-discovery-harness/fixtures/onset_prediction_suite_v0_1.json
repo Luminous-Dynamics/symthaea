@@ -1,0 +1,21 @@
+{
+  "contract": "SC-ONSET-PREDICTION-SUITE-0.1",
+  "suite_id": "superconductivity_onset_prediction_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/superconductivity_onset_prediction_v0_1.schema.json",
+  "fixtures": [
+    {
+      "benchmark_id": "synthetic_interval_censored_onset_calibration_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/onset_prediction_smoke_v0_1.json",
+      "expected": [
+        "left_censored_event_likelihood",
+        "right_censored_survival_likelihood",
+        "interval_censored_probability",
+        "exact_only_mae_rmse_and_coverage",
+        "model_training_evaluation_leakage_rejection",
+        "evidence_and_model_digest_binding"
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic onset-evaluation plumbing only; no real reaction onset, model accuracy, phase yield, material synthesizability or laboratory outcome is established."
+}

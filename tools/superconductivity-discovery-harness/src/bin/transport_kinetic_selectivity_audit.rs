@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
@@ -87,43 +87,56 @@ struct CaseResult {
 }
 
 fn text_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value.get(key).and_then(Value::as_str).filter(|s| !s.trim().is_empty())
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| format!("missing or empty string field {key}"))
 }
 fn number_field(value: &Value, key: &str) -> Result<f64, String> {
-    let x = value.get(key).and_then(Value::as_f64)
+    let x = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("missing numeric field {key}"))?;
-    if !x.is_finite() { return Err(format!("{key} must be finite")); }
+    if !x.is_finite() {
+        return Err(format!("{key} must be finite"));
+    }
     Ok(x)
 }
 fn interval(value: &Value, label: &str) -> Result<Interval, String> {
     let lower = number_field(value, "lower")?;
     let upper = number_field(value, "upper")?;
-    if lower > upper { return Err(format!("{label} interval lower bound exceeds upper bound")); }
+    if lower > upper {
+        return Err(format!("{label} interval lower bound exceeds upper bound"));
+    }
     Ok(Interval { lower, upper })
 }
 fn exp_rate(prefactor: f64, activation: f64, k_b: f64, temperature: f64) -> f64 {
     prefactor * (-activation / (k_b * temperature)).exp()
 }
 fn transport_survival(diffusion_rate: f64, reaction_rate: f64, time: f64) -> f64 {
-    if time <= 0.0 { return 1.0; }
+    if time <= 0.0 {
+        return 1.0;
+    }
     let scale = diffusion_rate.max(reaction_rate).max(1.0e-300);
     if (diffusion_rate - reaction_rate).abs() <= 1.0e-10 * scale {
         return ((-diffusion_rate * time).exp() * (1.0 + diffusion_rate * time)).clamp(0.0, 1.0);
     }
-    let value = (
-        reaction_rate * (-diffusion_rate * time).exp()
-            - diffusion_rate * (-reaction_rate * time).exp()
-    ) / (reaction_rate - diffusion_rate);
+    let value = (reaction_rate * (-diffusion_rate * time).exp()
+        - diffusion_rate * (-reaction_rate * time).exp())
+        / (reaction_rate - diffusion_rate);
     value.clamp(0.0, 1.0)
 }
 fn transport_density(diffusion_rate: f64, reaction_rate: f64, time: f64) -> f64 {
-    if time <= 0.0 { return 0.0; }
+    if time <= 0.0 {
+        return 0.0;
+    }
     let scale = diffusion_rate.max(reaction_rate).max(1.0e-300);
     if (diffusion_rate - reaction_rate).abs() <= 1.0e-10 * scale {
         return (diffusion_rate * diffusion_rate * time * (-diffusion_rate * time).exp()).max(0.0);
     }
-    let value = diffusion_rate * reaction_rate
+    let value = diffusion_rate
+        * reaction_rate
         * ((-diffusion_rate * time).exp() - (-reaction_rate * time).exp())
         / (reaction_rate - diffusion_rate);
     value.max(0.0)
@@ -146,16 +159,38 @@ fn competing_route_fractions(
     steps: usize,
 ) -> PhaseFractions {
     let target_density = |t: f64| transport_density(target_transport_rate, target_reaction_rate, t);
-    let target_survival = |t: f64| transport_survival(target_transport_rate, target_reaction_rate, t);
-    let competitor_density = |t: f64| transport_density(competitor_transport_rate, competitor_reaction_rate, t);
-    let competitor_survival = |t: f64| transport_survival(competitor_transport_rate, competitor_reaction_rate, t);
-    let target = simpson(|t| target_density(t) * competitor_survival(t), hold_time, steps).clamp(0.0, 1.0);
-    let competitor = simpson(|t| competitor_density(t) * target_survival(t), hold_time, steps).clamp(0.0, 1.0);
+    let target_survival =
+        |t: f64| transport_survival(target_transport_rate, target_reaction_rate, t);
+    let competitor_density =
+        |t: f64| transport_density(competitor_transport_rate, competitor_reaction_rate, t);
+    let competitor_survival =
+        |t: f64| transport_survival(competitor_transport_rate, competitor_reaction_rate, t);
+    let target = simpson(
+        |t| target_density(t) * competitor_survival(t),
+        hold_time,
+        steps,
+    )
+    .clamp(0.0, 1.0);
+    let competitor = simpson(
+        |t| competitor_density(t) * target_survival(t),
+        hold_time,
+        steps,
+    )
+    .clamp(0.0, 1.0);
     let unreacted = (target_survival(hold_time) * competitor_survival(hold_time)).clamp(0.0, 1.0);
     let total = target + competitor + unreacted;
-    PhaseFractions { target, competitor, unreacted, total }
+    PhaseFractions {
+        target,
+        competitor,
+        unreacted,
+        total,
+    }
 }
-fn reaction_only_fractions(target_rate: f64, competitor_rate: f64, hold_time: f64) -> PhaseFractions {
+fn reaction_only_fractions(
+    target_rate: f64,
+    competitor_rate: f64,
+    hold_time: f64,
+) -> PhaseFractions {
     let total_rate = target_rate + competitor_rate;
     let unreacted = (-total_rate * hold_time).exp();
     let converted = 1.0 - unreacted;
@@ -177,14 +212,19 @@ fn thermodynamic_status(target: Interval, competitor: Interval, margin: f64) -> 
 }
 fn parse_route(value: &Value, label: &str) -> Result<Route, String> {
     let delta_g = interval(
-        value.get("delta_g_interval_eV_per_route_extent")
+        value
+            .get("delta_g_interval_eV_per_route_extent")
             .ok_or_else(|| format!("{label} missing ΔG interval"))?,
         &format!("{label} ΔG"),
     )?;
     let activation_barrier = number_field(value, "reaction_activation_barrier_eV")?;
-    if activation_barrier < 0.0 { return Err(format!("{label} activation barrier must be non-negative")); }
+    if activation_barrier < 0.0 {
+        return Err(format!("{label} activation barrier must be non-negative"));
+    }
     let prefactor = number_field(value, "reaction_prefactor_s_inverse")?;
-    if prefactor <= 0.0 { return Err(format!("{label} reaction prefactor must be positive")); }
+    if prefactor <= 0.0 {
+        return Err(format!("{label} reaction prefactor must be positive"));
+    }
     let availability = number_field(value, "availability_fraction")?;
     if availability <= 0.0 || availability > 1.0 {
         return Err(format!("{label} availability fraction must be in (0,1]"));
@@ -203,15 +243,27 @@ fn parse_route(value: &Value, label: &str) -> Result<Route, String> {
 }
 fn parse_case(value: &Value) -> Result<Case, String> {
     let transport = value.get("transport").ok_or("case missing transport")?;
-    let target_route = parse_route(value.get("target_route").ok_or("case missing target_route")?, "target route")?;
-    let competitor_route = parse_route(value.get("competitor_route").ok_or("case missing competitor_route")?, "competitor route")?;
+    let target_route = parse_route(
+        value
+            .get("target_route")
+            .ok_or("case missing target_route")?,
+        "target route",
+    )?;
+    let competitor_route = parse_route(
+        value
+            .get("competitor_route")
+            .ok_or("case missing competitor_route")?,
+        "competitor route",
+    )?;
     if target_route.mobile_requirement != "co_transport_a_b" {
         return Err("v0.1 target route must require co-transport of A and B".to_owned());
     }
     if competitor_route.mobile_requirement != "species_a_only" {
         return Err("v0.1 competitor route must require species A only".to_owned());
     }
-    if target_route.id == competitor_route.id { return Err("target and competitor route IDs must differ".to_owned()); }
+    if target_route.id == competitor_route.id {
+        return Err("target and competitor route IDs must differ".to_owned());
+    }
     let transport = Transport {
         species_a: TransportSpecies {
             diffusivity_prefactor: number_field(transport, "species_a_diffusivity_prefactor_m2_s")?,
@@ -226,7 +278,8 @@ fn parse_case(value: &Value) -> Result<Case, String> {
     if transport.species_a.diffusivity_prefactor <= 0.0
         || transport.species_b.diffusivity_prefactor <= 0.0
         || transport.species_a.diffusion_activation < 0.0
-        || transport.species_b.diffusion_activation < 0.0 {
+        || transport.species_b.diffusion_activation < 0.0
+    {
         return Err("diffusivity prefactors must be positive and diffusion activation energies non-negative".to_owned());
     }
     if transport.cross_correlation.abs() >= 1.0 {
@@ -243,20 +296,35 @@ fn parse_case(value: &Value) -> Result<Case, String> {
         competitor: competitor_route,
         selectivity_margin: number_field(value, "thermodynamic_selectivity_margin_eV")?,
     };
-    if case.temperature <= 0.0 || case.hold_time <= 0.0 || case.layer_thickness <= 0.0
-        || case.selectivity_margin < 0.0 {
-        return Err(format!("case {} has invalid temperature, hold time, layer thickness or selectivity margin", case.id));
+    if case.temperature <= 0.0
+        || case.hold_time <= 0.0
+        || case.layer_thickness <= 0.0
+        || case.selectivity_margin < 0.0
+    {
+        return Err(format!(
+            "case {} has invalid temperature, hold time, layer thickness or selectivity margin",
+            case.id
+        ));
     }
     for route in [&case.target, &case.competitor] {
         if route.thermodynamic_conditions_id != case.thermodynamic_conditions_id {
-            return Err(format!("case {} route {} thermodynamic conditions do not match the case", case.id, route.id));
+            return Err(format!(
+                "case {} route {} thermodynamic conditions do not match the case",
+                case.id, route.id
+            ));
         }
     }
     if case.target.reaction_extent_basis_id != case.competitor.reaction_extent_basis_id {
-        return Err(format!("case {} target and competitor reaction extent bases do not match", case.id));
+        return Err(format!(
+            "case {} target and competitor reaction extent bases do not match",
+            case.id
+        ));
     }
     if case.target.standard_state_id != case.competitor.standard_state_id {
-        return Err(format!("case {} target and competitor standard states do not match", case.id));
+        return Err(format!(
+            "case {} target and competitor standard states do not match",
+            case.id
+        ));
     }
     Ok(case)
 }
@@ -280,11 +348,17 @@ fn evaluate_case(case: &Case, k_b: f64, steps: usize) -> Result<CaseResult, Stri
     let eigenvalue_min = (trace - discriminant) / 2.0;
     let eigenvalue_max = (trace + discriminant) / 2.0;
     if determinant <= 0.0 || eigenvalue_min <= 0.0 {
-        return Err(format!("case {} transport matrix is not positive definite", case.id));
+        return Err(format!(
+            "case {} transport matrix is not positive definite",
+            case.id
+        ));
     }
     let effective_target_diffusivity = (d_a + d_b + 2.0 * d_ab) / 2.0;
     if effective_target_diffusivity <= 0.0 {
-        return Err(format!("case {} co-transport projection is not positive", case.id));
+        return Err(format!(
+            "case {} co-transport projection is not positive",
+            case.id
+        ));
     }
     let target_transport_rate = 2.0 * effective_target_diffusivity / case.layer_thickness.powi(2);
     let competitor_transport_rate = 2.0 * d_a / case.layer_thickness.powi(2);
@@ -300,9 +374,15 @@ fn evaluate_case(case: &Case, k_b: f64, steps: usize) -> Result<CaseResult, Stri
         k_b,
         case.temperature,
     ) * case.competitor.availability;
-    if target_transport_rate <= 0.0 || competitor_transport_rate <= 0.0
-        || target_reaction_rate <= 0.0 || competitor_reaction_rate <= 0.0 {
-        return Err(format!("case {} generated a non-positive route rate", case.id));
+    if target_transport_rate <= 0.0
+        || competitor_transport_rate <= 0.0
+        || target_reaction_rate <= 0.0
+        || competitor_reaction_rate <= 0.0
+    {
+        return Err(format!(
+            "case {} generated a non-positive route rate",
+            case.id
+        ));
     }
     let coupled = competing_route_fractions(
         target_transport_rate,
@@ -313,7 +393,8 @@ fn evaluate_case(case: &Case, k_b: f64, steps: usize) -> Result<CaseResult, Stri
         steps,
     );
     let diagonal_target_diffusivity = (d_a + d_b) / 2.0;
-    let diagonal_target_transport_rate = 2.0 * diagonal_target_diffusivity / case.layer_thickness.powi(2);
+    let diagonal_target_transport_rate =
+        2.0 * diagonal_target_diffusivity / case.layer_thickness.powi(2);
     let diagonal = competing_route_fractions(
         diagonal_target_transport_rate,
         target_reaction_rate,
@@ -331,17 +412,22 @@ fn evaluate_case(case: &Case, k_b: f64, steps: usize) -> Result<CaseResult, Stri
         case.target.delta_g,
         case.competitor.delta_g,
         case.selectivity_margin,
-    ).to_owned();
+    )
+    .to_owned();
     let kinetic_phase_ranking = if coupled.target > coupled.competitor {
         "target_phase_fraction_exceeds_competitor"
     } else if coupled.competitor > coupled.target {
         "competitor_phase_fraction_exceeds_target"
     } else {
         "target_competitor_phase_fraction_tie"
-    }.to_owned();
+    }
+    .to_owned();
     let conservation_error = (coupled.total - 1.0).abs();
     if conservation_error > 1.0e-6 || (diagonal.total - 1.0).abs() > 1.0e-6 {
-        return Err(format!("case {} competing-risk phase fractions do not sum to one", case.id));
+        return Err(format!(
+            "case {} competing-risk phase fractions do not sum to one",
+            case.id
+        ));
     }
     Ok(CaseResult {
         transport: TransportState {
@@ -355,7 +441,10 @@ fn evaluate_case(case: &Case, k_b: f64, steps: usize) -> Result<CaseResult, Stri
             target_transport_rate,
             competitor_transport_rate,
         },
-        kinetics: RouteKinetics { target_reaction_rate, competitor_reaction_rate },
+        kinetics: RouteKinetics {
+            target_reaction_rate,
+            competitor_reaction_rate,
+        },
         coupled,
         diagonal,
         reaction_only,
@@ -429,15 +518,21 @@ fn case_receipt(case: &Case, result: &CaseResult) -> Value {
     })
 }
 fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
-    let schema: Value = serde_json::from_slice(schema_bytes).map_err(|e| format!("schema JSON parse failed: {e}"))?;
-    let fixture: Value = serde_json::from_slice(fixture_bytes).map_err(|e| format!("fixture JSON parse failed: {e}"))?;
+    let schema: Value = serde_json::from_slice(schema_bytes)
+        .map_err(|e| format!("schema JSON parse failed: {e}"))?;
+    let fixture: Value = serde_json::from_slice(fixture_bytes)
+        .map_err(|e| format!("fixture JSON parse failed: {e}"))?;
     const DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema).map_err(|e| format!("schema compilation failed: {e}"))?;
+    let validator =
+        validator_for(&schema).map_err(|e| format!("schema compilation failed: {e}"))?;
     if let Some(error) = validator.iter_errors(&fixture).next() {
-        return Err(format!("transport kinetics schema validation failed: {error} at {}", error.instance_path()));
+        return Err(format!(
+            "transport kinetics schema validation failed: {error} at {}",
+            error.instance_path()
+        ));
     }
     if fixture.get("fixture_only").and_then(Value::as_bool) != Some(true) {
         return Err("transport kinetics auditor accepts synthetic fixtures only".to_owned());
@@ -446,17 +541,27 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         return Err("unsupported transport kinetic selectivity contract".to_owned());
     }
     let k_b = number_field(&fixture, "boltzmann_constant_eV_per_K")?;
-    let steps = fixture.get("integration_steps").and_then(Value::as_u64)
+    let steps = fixture
+        .get("integration_steps")
+        .and_then(Value::as_u64)
         .ok_or("integration_steps must be an integer")? as usize;
     if k_b <= 0.0 || steps < 100 || steps > 100_000 || steps % 2 != 0 {
-        return Err("Boltzmann constant must be positive and integration steps even in [100,100000]".to_owned());
+        return Err(
+            "Boltzmann constant must be positive and integration steps even in [100,100000]"
+                .to_owned(),
+        );
     }
-    let rows = fixture.get("cases").and_then(Value::as_array).ok_or("cases must be array")?;
+    let rows = fixture
+        .get("cases")
+        .and_then(Value::as_array)
+        .ok_or("cases must be array")?;
     let mut seen = std::collections::HashSet::new();
     let mut receipts = Vec::new();
     for row in rows {
         let case = parse_case(row)?;
-        if !seen.insert(case.id.clone()) { return Err(format!("duplicate transport case {}", case.id)); }
+        if !seen.insert(case.id.clone()) {
+            return Err(format!("duplicate transport case {}", case.id));
+        }
         let result = evaluate_case(&case, k_b, steps)?;
         receipts.push(case_receipt(&case, &result));
     }
@@ -494,7 +599,9 @@ fn read(path: &PathBuf) -> Vec<u8> {
     })
 }
 fn usage(program: &str) {
-    eprintln!("Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]");
+    eprintln!(
+        "Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]"
+    );
 }
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -505,8 +612,11 @@ fn main() {
     while index < args.len() {
         match args[index].as_str() {
             "--schema" | "--fixture" | "--out" => {
-                if index + 1 >= args.len() { usage(&args[0]); process::exit(2); }
-                let path = PathBuf::from(&args[index+1]);
+                if index + 1 >= args.len() {
+                    usage(&args[0]);
+                    process::exit(2);
+                }
+                let path = PathBuf::from(&args[index + 1]);
                 match args[index].as_str() {
                     "--schema" => schema_path = Some(path),
                     "--fixture" => fixture_path = Some(path),
@@ -515,18 +625,27 @@ fn main() {
                 }
                 index += 2;
             }
-            "--help" | "-h" => { usage(&args[0]); return; }
-            other => { eprintln!("unknown argument {other}"); usage(&args[0]); process::exit(2); }
+            "--help" | "-h" => {
+                usage(&args[0]);
+                return;
+            }
+            other => {
+                eprintln!("unknown argument {other}");
+                usage(&args[0]);
+                process::exit(2);
+            }
         }
     }
     let (Some(schema_path), Some(fixture_path)) = (schema_path, fixture_path) else {
-        usage(&args[0]); process::exit(2);
+        usage(&args[0]);
+        process::exit(2);
     };
     let receipt = audit(&read(&schema_path), &read(&fixture_path)).unwrap_or_else(|e| {
         eprintln!("SC-TRANSPORT-KINETIC-SELECTIVITY-FAIL: {e}");
         process::exit(1);
     });
-    let rendered = serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
+    let rendered =
+        serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
     if let Some(path) = output_path {
         if let Err(error) = fs::write(&path, format!("{rendered}\n")) {
             eprintln!("could not write {}: {error}", path.display());
@@ -544,8 +663,15 @@ mod tests {
     fn inputs_for(filename: &str) -> (Vec<u8>, Vec<u8>) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         (
-            fs::read(root.join("data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json")).unwrap(),
-            fs::read(root.join("tools/superconductivity-discovery-harness/fixtures").join(filename)).unwrap(),
+            fs::read(root.join(
+                "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json",
+            ))
+            .unwrap(),
+            fs::read(
+                root.join("tools/superconductivity-discovery-harness/fixtures")
+                    .join(filename),
+            )
+            .unwrap(),
         )
     }
     fn inputs() -> (Vec<u8>, Vec<u8>) {
@@ -557,12 +683,24 @@ mod tests {
         let (schema, fixture) = inputs();
         let receipt = audit(&schema, &fixture).unwrap();
         let cases = receipt["cases"].as_array().unwrap();
-        let negative = cases.iter().find(|x| x["case_id"] == "negative_cross_correlation_long_hold_competitor_takes_over").unwrap();
-        let positive = cases.iter().find(|x| x["case_id"] == "positive_cross_correlation_target_co_transport_wins").unwrap();
+        let negative = cases
+            .iter()
+            .find(|x| x["case_id"] == "negative_cross_correlation_long_hold_competitor_takes_over")
+            .unwrap();
+        let positive = cases
+            .iter()
+            .find(|x| x["case_id"] == "positive_cross_correlation_target_co_transport_wins")
+            .unwrap();
         assert!(negative["transport_matrix_at_temperature"]["target_co_transport_projection_m2_s"].as_f64().unwrap()
             < positive["transport_matrix_at_temperature"]["target_co_transport_projection_m2_s"].as_f64().unwrap());
-        assert!(negative["coupled_transport_competing_risks"]["target_phase_fraction"].as_f64().unwrap()
-            < positive["coupled_transport_competing_risks"]["target_phase_fraction"].as_f64().unwrap());
+        assert!(
+            negative["coupled_transport_competing_risks"]["target_phase_fraction"]
+                .as_f64()
+                .unwrap()
+                < positive["coupled_transport_competing_risks"]["target_phase_fraction"]
+                    .as_f64()
+                    .unwrap()
+        );
     }
 
     #[test]
@@ -570,14 +708,40 @@ mod tests {
         let (schema, fixture) = inputs();
         let receipt = audit(&schema, &fixture).unwrap();
         let cases = receipt["cases"].as_array().unwrap();
-        let short = cases.iter().find(|x| x["case_id"] == "negative_cross_correlation_short_hold_target_initially_leads").unwrap();
-        let long = cases.iter().find(|x| x["case_id"] == "negative_cross_correlation_long_hold_competitor_takes_over").unwrap();
-        assert_eq!(short["thermodynamic_selectivity"], "target_reaction_robustly_favored");
-        assert_eq!(long["thermodynamic_selectivity"], "target_reaction_robustly_favored");
-        assert!(short["coupled_transport_competing_risks"]["target_phase_fraction"].as_f64().unwrap()
-            > short["coupled_transport_competing_risks"]["competitor_phase_fraction"].as_f64().unwrap());
-        assert!(long["coupled_transport_competing_risks"]["target_phase_fraction"].as_f64().unwrap()
-            < long["coupled_transport_competing_risks"]["competitor_phase_fraction"].as_f64().unwrap());
+        let short = cases
+            .iter()
+            .find(|x| {
+                x["case_id"] == "negative_cross_correlation_short_hold_target_initially_leads"
+            })
+            .unwrap();
+        let long = cases
+            .iter()
+            .find(|x| x["case_id"] == "negative_cross_correlation_long_hold_competitor_takes_over")
+            .unwrap();
+        assert_eq!(
+            short["thermodynamic_selectivity"],
+            "target_reaction_robustly_favored"
+        );
+        assert_eq!(
+            long["thermodynamic_selectivity"],
+            "target_reaction_robustly_favored"
+        );
+        assert!(
+            short["coupled_transport_competing_risks"]["target_phase_fraction"]
+                .as_f64()
+                .unwrap()
+                > short["coupled_transport_competing_risks"]["competitor_phase_fraction"]
+                    .as_f64()
+                    .unwrap()
+        );
+        assert!(
+            long["coupled_transport_competing_risks"]["target_phase_fraction"]
+                .as_f64()
+                .unwrap()
+                < long["coupled_transport_competing_risks"]["competitor_phase_fraction"]
+                    .as_f64()
+                    .unwrap()
+        );
     }
 
     #[test]
@@ -597,11 +761,23 @@ mod tests {
     fn diagonal_transport_and_reaction_only_baselines_are_separate() {
         let (schema, fixture) = inputs();
         let receipt = audit(&schema, &fixture).unwrap();
-        let negative = receipt["cases"].as_array().unwrap().iter()
-            .find(|x| x["case_id"] == "negative_cross_correlation_long_hold_competitor_takes_over").unwrap();
-        let coupled = negative["coupled_transport_competing_risks"]["target_phase_fraction"].as_f64().unwrap();
-        let diagonal = negative["diagonal_diffusion_baseline_cross_term_zero"]["target_phase_fraction"].as_f64().unwrap();
-        let reaction_only = negative["reaction_only_baseline_transport_ignored"]["target_phase_fraction"].as_f64().unwrap();
+        let negative = receipt["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["case_id"] == "negative_cross_correlation_long_hold_competitor_takes_over")
+            .unwrap();
+        let coupled = negative["coupled_transport_competing_risks"]["target_phase_fraction"]
+            .as_f64()
+            .unwrap();
+        let diagonal =
+            negative["diagonal_diffusion_baseline_cross_term_zero"]["target_phase_fraction"]
+                .as_f64()
+                .unwrap();
+        let reaction_only =
+            negative["reaction_only_baseline_transport_ignored"]["target_phase_fraction"]
+                .as_f64()
+                .unwrap();
         assert!(coupled < diagonal);
         assert!(coupled < reaction_only);
     }
@@ -628,7 +804,8 @@ mod tests {
         assert!(error.contains("reaction extent bases do not match"));
 
         let mut data: Value = serde_json::from_slice(&fixture).unwrap();
-        data["cases"][0]["target_route"]["thermodynamic_conditions_id"] = json!("different_conditions");
+        data["cases"][0]["target_route"]["thermodynamic_conditions_id"] =
+            json!("different_conditions");
         let error = audit(&schema, &serde_json::to_vec(&data).unwrap()).unwrap_err();
         assert!(error.contains("thermodynamic conditions do not match"));
     }
@@ -641,6 +818,6 @@ mod tests {
         let expected = (-d * t).exp() * (1.0 + d * t);
         assert!((s - expected).abs() < 1.0e-12);
         let f = transport_density(d, d, t);
-        assert!((f - d*d*t*(-d*t).exp()).abs() < 1.0e-12);
+        assert!((f - d * d * t * (-d * t).exp()).abs() < 1.0e-12);
     }
 }
