@@ -325,8 +325,13 @@ def main():
         "scenarios": results,
     }
     print(json.dumps(report, sort_keys=True, indent=2))
-    if len(results) != 1 or report["oracle_matches"] != 1:
+    if len(results) != 2 or report["oracle_matches"] != 2:
         raise SystemExit(1)
+    by_id = {item["scenario_id"]: item for item in results}
+    if by_id["SEQ-001"]["adaptive_first_action"] != "A-COMBINED-LOAD-SCREEN":
+        raise SystemExit("SEQ-001 first action mismatch")
+    if by_id["SEQ-002"]["adaptive_first_action"] != "B-THERMAL-INSPECTION":
+        raise SystemExit("SEQ-002 first action mismatch")
 
 
 if __name__ == "__main__":
