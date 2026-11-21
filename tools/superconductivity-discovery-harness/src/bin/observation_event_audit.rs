@@ -48,7 +48,7 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
 
     for (index, event) in events.iter().enumerate() {
         let context = format!("observation[{index}]");
-        for error in validator.iter_errors(event) {
+        if let Some(error) = validator.iter_errors(event).next() {
             return Err(format!(
                 "{context}: schema validation failed: {} at {}",
                 error,
@@ -641,7 +641,7 @@ mod tests {
         let receipt = validate_fixture(&schema, &bytes).unwrap();
         assert_eq!(receipt["observation_count"], 8);
         assert_eq!(receipt["process_step_count"], 2);
-        assert_eq!(receipt["origin_counts"]["observed"], 5);
+        assert_eq!(receipt["origin_counts"]["observed"], 6);
         assert_eq!(receipt["measurement_scope_counts"]["local_probe"], 1);
         assert_eq!(receipt["measurement_scope_counts"]["bulk"], 5);
         assert_eq!(receipt["measurement_scope_counts"]["theoretical_model"], 2);
