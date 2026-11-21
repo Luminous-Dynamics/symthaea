@@ -313,7 +313,24 @@
         "held-out-design-leakage",
         "mismatched-pdk-or-constraints"
       ],
-      "claim_ceiling": "end-to-end software-flow result for exact design/PDK/constraints only; no fabricated-silicon or foundry-yield claim"
+      "claim_ceiling": "end-to-end software-flow result for exact design/PDK/constraints only; no fabricated-silicon or foundry-yield claim",
+      "training_data_reference": {
+        "name": "PPAPlace-5000",
+        "url": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+        "placements": 5000,
+        "circuits": 10,
+        "placements_per_circuit": 500,
+        "compressed_archive_size_gib": 8.47,
+        "labels": [
+          "post-global-routing-WNS",
+          "post-global-routing-TNS",
+          "power",
+          "area"
+        ],
+        "license_metadata": "other",
+        "rights_gate": "review exact dataset card and associated design/tool restrictions before caching or redistribution",
+        "claim_status": "public-release-described; exact license terms and dataset snapshot digest not yet frozen"
+      }
     },
     {
       "id": "adaptive-wafer-inspection-and-latent-risk",
@@ -476,6 +493,112 @@
         "water-energy-chemical-intensity-per-accepted-wafer"
       ],
       "claim_ceiling": "literature/simulation or exact measured substrate test only; no electronic-grade purification or qualified substrate production claim"
+    },
+    {
+      "id": "wm811k-graph-contrastive-lot-time-generalization",
+      "sources": [
+        "https://doi.org/10.1007/s10845-026-02906-3",
+        "https://github.com/irjawais/wafer-gnn-contrastive"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+      "published_protocol": {
+        "maps": 811457,
+        "lots": 46293,
+        "sample_fraction": 0.3,
+        "sampled_maps": 243437,
+        "split": "stratified-60-20-20-sample-level",
+        "train": 146062,
+        "validation": 48687,
+        "test": 48688,
+        "reported_metrics": {
+          "clustering_ari": 0.89,
+          "clustering_nmi": 0.87,
+          "fine_tuned_accuracy": 0.986,
+          "fine_tuned_ari": 0.98,
+          "fine_tuned_nmi": 0.96,
+          "accuracy_at_25_percent_labels": 0.957,
+          "macro_f1": 0.975,
+          "loco_ood_detection_at_95_percent_id_retention": 0.893,
+          "loco_ood_auroc": 0.927,
+          "inference_latency_ms": 8.3,
+          "memory_mb": 387
+        },
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "implementation_audit": {
+        "repo": "https://github.com/irjawais/wafer-gnn-contrastive",
+        "uses_lot_name_for_production_proximity": true,
+        "stratified_sample_split_not_lot_disjoint": true,
+        "ood_script_threshold_source": "public script appears to compute MSP 5th percentile from test_in; paper text says validation ID",
+        "discrepancy_status": "paper-versus-released-script-requires-resolution",
+        "source_code_license": "not-yet-verified; do not copy code until checked"
+      },
+      "tasks": [
+        "exact-stratified-paper-reproduction",
+        "lot-disjoint-holdout",
+        "time-forward-with-embargo",
+        "split-local-contrastive-pairs",
+        "context-aware-vs-context-blind",
+        "leave-one-class-out-ood"
+      ],
+      "metrics": [
+        "per-lot-macro-f1",
+        "worst-decile-lot-performance",
+        "temporal-degradation",
+        "ood-auroc-aupr",
+        "fpr-at-95-percent-id-tpr",
+        "oscr",
+        "calibration",
+        "confidence-intervals"
+      ],
+      "integrity_gates": [
+        "cross-split-lot-overlap-zero",
+        "cross-split-source-identity-overlap-zero",
+        "training-pairs-only-from-training-lots-and-time-windows",
+        "validation-only-ood-threshold",
+        "test-set-untouched"
+      ],
+      "claim_ceiling": "sample-level and group/time-held-out results are separate; no fab-transfer, yield or root-cause claim"
+    },
+    {
+      "id": "industrial-cp-dfc-multiview-open-world-wafer-maps",
+      "source": "https://doi.org/10.1016/j.eswa.2026.131994",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+      "reported_method": {
+        "known_class_model": "M3Net multi-task, multi-scale, multi-label",
+        "novel_class_detector": "Parallel SVM (PSVM)",
+        "observation_views": [
+          "Chip-Probe-CP-map",
+          "Delta-Fuse-Count-DFC-map"
+        ],
+        "claim_status": "paper-abstract-reported-industrial-dataset; detailed protocol and results not independently reproduced"
+      },
+      "acquisition": {
+        "raw_data_available_publicly": "not-verified",
+        "sample_lineage": "not-verified",
+        "dataset_license": "not-verified",
+        "redistribution": "not-authorized-until-verified",
+        "physical_test_campaign": "not-accessible-to-this-benchmark"
+      },
+      "tasks": [
+        "cp-only",
+        "dfc-only",
+        "late-fusion",
+        "cross-view-attention",
+        "missing-view-robustness",
+        "contradictory-view-detection",
+        "item-wise-open-set"
+      ],
+      "metrics": [
+        "per-view-macro-f1",
+        "fused-macro-f1",
+        "gain-over-best-single-view",
+        "missing-view-risk-coverage",
+        "cross-view-disagreement",
+        "novelty-fpr-tpr",
+        "per-item-transfer"
+      ],
+      "claim_ceiling": "no industrial-data or physical deployment claim until rights, sample lineage and exact test protocol are verified"
     }
   ],
   "cross_cutting_protocol": {
@@ -656,16 +779,32 @@
   "new_followups": {
     "adaptive_inspection": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
     "ai_sem_detection_limits": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
-    "chiplet_package_testability": "https://github.com/Luminous-Dynamics/symthaea/issues/13085"
+    "chiplet_package_testability": "https://github.com/Luminous-Dynamics/symthaea/issues/13085",
+    "unseen_lot_time_generalization": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+    "industrial_cp_dfc_multiview": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+    "mixed_defect_compositional_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
+    "open_world_wafer_defects": "https://github.com/Luminous-Dynamics/symthaea/issues/13121",
+    "secom_missingness_drift": "https://github.com/Luminous-Dynamics/symthaea/issues/13115",
+    "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
     "mixed_wbm_compositional_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
     "wafer_substrate_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
-    "secom_external_baseline": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python"
+    "secom_external_baseline": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+    "wafer_lot_and_multiview_frontier": "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md",
+    "wafer_gnn_contrastive_paper": "https://doi.org/10.1007/s10845-026-02906-3",
+    "wafer_gnn_public_implementation": "https://github.com/irjawais/wafer-gnn-contrastive",
+    "wafer_gnn_lot_time_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13122",
+    "cp_dfc_open_world_paper": "https://doi.org/10.1016/j.eswa.2026.131994",
+    "cp_dfc_multiview_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
+    "ppaplace_5000_dataset": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+    "ppaplace_dataset_license_note": "Hugging Face dataset card metadata is 'other'; verify exact use/redistribution terms; no raw archive checked in.",
+    "ppaplace_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13069"
   },
   "industry_frontier_reviews": [
-    "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md"
+    "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
+    "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md"
   ],
   "source_integrity_audits": [
     "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
