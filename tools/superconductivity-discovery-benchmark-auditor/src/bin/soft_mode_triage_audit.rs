@@ -15,7 +15,6 @@ const FIXTURE_PATH: &str = "data/research/sc_soft_mode_triage_fixture_v0_1.json"
 #[derive(Debug, Clone)]
 struct PhononRun {
     run_id: String,
-    method_scope: String,
     converged: bool,
     minimum_frequency_cm1: f64,
     frequency_uncertainty_cm1: f64,
@@ -27,7 +26,6 @@ struct Candidate {
     candidate_id: String,
     material_family_id: String,
     condition_profile_id: String,
-    structure_sha256: String,
     reference_case_id: Option<String>,
     runs: Vec<PhononRun>,
     truth_label: String,
@@ -212,7 +210,6 @@ fn parse_run(value: &Value, path: &str) -> Result<PhononRun, String> {
     }
     Ok(PhononRun {
         run_id: text_field(value, "run_id", path)?.to_owned(),
-        method_scope,
         converged: bool_field(value, "converged", path)?,
         minimum_frequency_cm1: number_field(value, "minimum_frequency_cm1", path)?,
         frequency_uncertainty_cm1: nonnegative_number(
@@ -274,7 +271,6 @@ fn parse_candidate(value: &Value, path: &str) -> Result<Candidate, String> {
         candidate_id: text_field(value, "candidate_id", path)?.to_owned(),
         material_family_id: text_field(value, "material_family_id", path)?.to_owned(),
         condition_profile_id: text_field(value, "condition_profile_id", path)?.to_owned(),
-        structure_sha256,
         reference_case_id,
         runs,
         truth_label: truth,
@@ -486,7 +482,6 @@ fn audit(value: &Value) -> Result<Value, String> {
     };
     Ok(json!({
         "schema_version": "sc-soft-mode-triage-receipt.v0.1",
-        "input_sha256": sha256_hex(&serde_json::to_vec(value).unwrap_or_default()),
         "source_reference_case_count": source_ids.len(),
         "synthetic_candidate_count": candidates.len(),
         "known_positive_count": known_positive_count,
