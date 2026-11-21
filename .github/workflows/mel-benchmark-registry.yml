@@ -5,11 +5,7 @@ on:
     paths:
       - "crates/domains/symthaea-muse/src/benchmark_registry.rs"
       - "benchmarks/mel/registry/**"
-      - "benchmarks/mel/schemas/**"
-      - "tools/mel-benchmark-registry-harness/**"
-      - ".github/workflows/mel-benchmark-registry.yml"
   workflow_dispatch:
-
 permissions:
   contents: read
 
