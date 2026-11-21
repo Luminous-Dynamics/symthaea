@@ -736,8 +736,12 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         .flatten()
         .map(String::as_str)
         .collect();
-    if scenario.decision_obligations.values().flatten().any(|value| value.trim().is_empty()) {
-        return Err(format!("{} has an empty decision obligation", scenario.scenario_id));
+    if scenario.decision_obligations.iter().any(|(decision, obligations)| {
+        obligations.iter().any(|value| value.trim().is_empty())
+            || obligations.iter().collect::<BTreeSet<_>>().len() != obligations.len()
+            || (decision == "ACCEPT" && obligations.is_empty())
+    }) {
+        return Err(format!("{} has an empty or duplicate decision obligation", scenario.scenario_id));
     }
     let mut action_ids = BTreeSet::new();
     for action in &scenario.actions {
@@ -747,6 +751,12 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
             || !action_ids.insert(action.action_id.as_str())
             || action.admissibility != "ADMISSIBLE" && action.admissibility != "INADMISSIBLE"
             || !valid_resources(&action.resource_plan)
+            || action.obligations_covered.iter().collect::<BTreeSet<_>>().len()
+                != action.obligations_covered.len()
+            || action
+                .obligations_covered
+                .iter()
+                .any(|value| !declared_obligations.contains(value.as_str()))
             || action.observation_by_state.len() != state_set.len()
             || action
                 .observation_by_state
@@ -1104,6 +1114,42 @@ mod tests {
         let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
         value["scenarios"][0]["resource_frequency_model"]["used_for"] =
             Value::String("DECISION_RISK".to_owned());
+        let changed = serde_json::to_vec(&value).unwrap();
+        assert!(run_sequential_audit(&changed, SOURCE).is_err());
+    }
+
+    #[test]
+    fn accept_leaf_carries_every_required_path_obligation() {
+        let result = receipt();
+        let scenario = &result.scenarios[0];
+        let PolicyNode::Test { branches, .. } = &scenario.adaptive_campaign.policy else {
+            panic!("adaptive policy must start at the combined-load screen");
+        };
+        let Some(PolicyNode::Test { branches, .. }) = branches.get("PASS") else {
+            panic!("PASS branch must execute targeted thermal evidence");
+        };
+        let Some(PolicyNode::Terminal {
+            decision,
+            covered_obligations,
+            ..
+        }) = branches.get("CLEAR") else {
+            panic!("CLEAR branch must end in a terminal disposition");
+        };
+        assert_eq!(decision, "ACCEPT");
+        assert_eq!(
+            covered_obligations.iter().cloned().collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "COMBINED-LOAD-CAPABILITY-001".to_owned(),
+                "THERMAL-WEAR-INSPECTABILITY-001".to_owned(),
+            ])
+        );
+    }
+
+    #[test]
+    fn missing_thermal_coverage_cannot_produce_accept() {
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        value["scenarios"][0]["actions"][1]["obligations_covered"] =
+            serde_json::json!([]);
         let changed = serde_json::to_vec(&value).unwrap();
         assert!(run_sequential_audit(&changed, SOURCE).is_err());
     }
