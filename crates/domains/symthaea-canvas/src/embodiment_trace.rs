@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
-    EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError,
-    EmbodimentSnapshot, SignalProvenance, SpeechOutputState,
+    EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError, EmbodimentSnapshot,
+    SignalProvenance, SpeechOutputState,
 };
 
 /// Current serialized trace schema.
@@ -163,8 +163,7 @@ impl EmbodimentTrace {
                     viseme_event_count = viseme_event_count.saturating_add(1);
                 }
                 EmbodimentEventKind::UncertaintyChanged { .. } => {
-                    uncertainty_observation_count =
-                        uncertainty_observation_count.saturating_add(1);
+                    uncertainty_observation_count = uncertainty_observation_count.saturating_add(1);
                 }
                 _ => {}
             }
@@ -188,9 +187,8 @@ impl EmbodimentTrace {
                 }
             }),
             open_playback: previous_playback.and_then(|(state, started_at_ns)| {
-                (state == SpeechOutputState::Playing).then_some(OpenPlaybackInterval {
-                    started_at_ns,
-                })
+                (state == SpeechOutputState::Playing)
+                    .then_some(OpenPlaybackInterval { started_at_ns })
             }),
             final_snapshot,
         })
@@ -212,7 +210,6 @@ impl EmbodimentTrace {
         Ok(())
     }
 }
-
 
 /// End-to-end semantic embodiment session.
 ///
@@ -319,7 +316,6 @@ impl From<EmbodimentTraceError> for EmbodimentSessionError {
         Self::Trace(value)
     }
 }
-
 
 /// An activity interval still open at the end of a trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -493,8 +489,6 @@ mod tests {
         trace
     }
 
-
-
     #[test]
     fn session_publish_updates_snapshot_and_trace_together() {
         let mut session = EmbodimentSession::new("session-facade-test").unwrap();
@@ -579,7 +573,6 @@ mod tests {
         ));
     }
 
-
     #[test]
     fn sefb_v1_fixture_replays_and_summarizes() {
         let encoded = include_str!("../tests/fixtures/embodiment_trace_v1.json");
@@ -643,7 +636,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn reset_closes_playback_interval_without_counting_a_fake_state_transition() {
         let mut trace = EmbodimentTrace::new("reset-closes-playback");
@@ -693,10 +685,7 @@ mod tests {
     fn blank_session_identifier_is_rejected() {
         let mut trace = sample_trace();
         trace.session_id = "   ".to_string();
-        assert_eq!(
-            trace.replay(),
-            Err(EmbodimentTraceError::InvalidSessionId)
-        );
+        assert_eq!(trace.replay(), Err(EmbodimentTraceError::InvalidSessionId));
     }
 
     #[test]
