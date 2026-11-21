@@ -217,3 +217,16 @@ Strategic response:
 - **All tracks:** use model-conditioned memory dose-response, selective retrieval/abstention, calibration and complete lifecycle cost. A win is a matched Pareto improvement, not a larger vector or more aggressive compression.
 
 Official source: https://agentmemoryleaderboard.ai/results/cycle-2/ (published 2026-11-19; separate track/division leaderboards).
+
+
+### Two-stage leaderboard ambition
+
+Use two explicit promotion levels rather than describing the open-source stretch targets as already beating the commercial frontier:
+
+| Track | Stage 1: +5 vs open leader | Stage 2: exceed commercial/closed leader by at least 1 point |
+|---|---:|---:|
+| Textual | 66.22 / 100 | >70.26 / 100 |
+| Coding | 68.33% resolved | >69.00% resolved |
+| Multimodal | 48.26 / 100 | >54.68 / 100 |
+
+Stage 2 values are arithmetic-derived goals from the same Cycle 2 leaderboard (commercial/closed leaders 69.26, 68.00% and 53.68); they are not forecasts. They are only comparable when evaluated in the same official track, division and cycle. An official leaderboard submission requires the actual hosted Add/Search interface and evaluation process; internal HDC/MACE synthetic runs cannot be substituted.
