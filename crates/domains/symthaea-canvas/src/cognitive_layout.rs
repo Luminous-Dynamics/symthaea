@@ -29,6 +29,7 @@ pub struct CognitiveAnchor {
     pub status: EpistemicStatus,
     pub position: SpatialPoint3,
     pub source_event_id: String,
+    pub source_producer: String,
     pub source_sequence: u64,
     pub provenance: CognitiveProvenance,
 }
@@ -147,6 +148,7 @@ pub fn project_cognitive_topology(
             status: node.status,
             position: stable_anchor(&node.id),
             source_event_id: node.evidence.event_id.clone(),
+            source_producer: node.evidence.producer.clone(),
             source_sequence: node.evidence.sequence,
             provenance: node.evidence.provenance,
         })
@@ -439,6 +441,7 @@ mod tests {
             assert_eq!(anchor.label, node.label);
             assert_eq!(anchor.status, node.status);
             assert_eq!(anchor.source_event_id, node.evidence.event_id);
+            assert_eq!(anchor.source_producer, node.evidence.producer);
             assert_eq!(anchor.source_sequence, node.evidence.sequence);
             assert_eq!(anchor.provenance, node.evidence.provenance);
             assert!(anchor.position.is_finite());
