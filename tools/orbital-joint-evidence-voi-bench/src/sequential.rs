@@ -29,6 +29,7 @@ pub struct SequentialScenario {
     pub decision_context: SequentialDecisionContext,
     pub states: Vec<String>,
     pub decisions: Vec<String>,
+    pub decision_obligations: BTreeMap<String, Vec<String>>,
     pub loss_matrix: LossMatrix,
     pub resource_frequency_model: ResourceFrequencyModel,
     pub budget: Resources,
@@ -66,6 +67,7 @@ pub struct SequentialAction {
     pub admissibility: String,
     pub resource_plan: Resources,
     pub observation_by_state: BTreeMap<String, String>,
+    pub obligations_covered: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, serde::Serialize, PartialEq)]
@@ -101,6 +103,7 @@ pub enum PolicyNode {
         belief_states: Vec<String>,
         decision: String,
         worst_case_regret: f64,
+        covered_obligations: Vec<String>,
     },
     Test {
         action_id: String,
@@ -324,9 +327,20 @@ fn regret(scenario: &SequentialScenario, decision: &str, state: &str) -> Result<
     Ok((actual - best).max(0.0))
 }
 
-fn terminal_plan(scenario: &SequentialScenario, belief: &[String]) -> Result<Plan, String> {
+fn terminal_plan(
+    scenario: &SequentialScenario,
+    belief: &[String],
+    covered_obligations: &BTreeSet<String>,
+) -> Result<Plan, String> {
     let mut candidates = Vec::new();
     for decision in &scenario.decisions {
+        let required = scenario
+            .decision_obligations
+            .get(decision)
+            .ok_or_else(|| format!("{} decision {decision} lacks obligation contract", scenario.scenario_id))?;
+        if !required.iter().all(|obligation| covered_obligations.contains(obligation)) {
+            continue;
+        }
         let mut worst = 0.0_f64;
         for state in belief {
             worst = worst.max(regret(scenario, decision, state)?);
@@ -341,7 +355,7 @@ fn terminal_plan(scenario: &SequentialScenario, belief: &[String]) -> Result<Pla
     let (decision, risk) = candidates
         .into_iter()
         .next()
-        .ok_or_else(|| "no terminal decisions".to_owned())?;
+        .ok_or_else(|| "no terminal decision is supported by covered obligations".to_owned())?;
     Ok(Plan {
         worst_case_regret: risk,
         expected_resources: Some(expected_from_resources(&zero_resources())),
@@ -350,6 +364,7 @@ fn terminal_plan(scenario: &SequentialScenario, belief: &[String]) -> Result<Pla
             belief_states: belief.to_vec(),
             decision,
             worst_case_regret: risk,
+            covered_obligations: covered_obligations.iter().cloned().collect(),
         },
     })
 }
@@ -464,8 +479,9 @@ fn solve(
     remaining_budget: &Resources,
     depth_remaining: usize,
     used: &BTreeSet<String>,
+    covered_obligations: &BTreeSet<String>,
 ) -> Result<Plan, String> {
-    let mut candidates = vec![terminal_plan(scenario, belief)?];
+    let mut candidates = vec![terminal_plan(scenario, belief, covered_obligations)?];
     if depth_remaining == 0 {
         return Ok(candidates.remove(0));
     }
@@ -499,12 +515,15 @@ fn solve(
             child_budget.specimen_count -= action.resource_plan.specimen_count;
             child_budget.review_hours -= action.resource_plan.review_hours;
             child_budget.external_cost_units -= action.resource_plan.external_cost_units;
+            let mut next_covered = covered_obligations.clone();
+            next_covered.extend(action.obligations_covered.iter().cloned());
             let child = solve(
                 scenario,
                 branch_belief,
                 &child_budget,
                 depth_remaining - 1,
                 &next_used,
+                &next_covered,
             )?;
             worst_case_regret = worst_case_regret.max(child.worst_case_regret);
             if let Some(child_expected) = &child.expected_resources {
@@ -552,7 +571,8 @@ fn myopic_policy(scenario: &SequentialScenario, baseline: f64) -> Result<MyopicA
         }
         let mut worst = 0.0_f64;
         for branch in partitions.values() {
-            worst = worst.max(terminal_plan(scenario, branch)?.worst_case_regret);
+            let covered: BTreeSet<String> = action.obligations_covered.iter().cloned().collect();
+            worst = worst.max(terminal_plan(scenario, branch, &covered)?.worst_case_regret);
         }
         scored.push((action.action_id.clone(), worst));
     }
@@ -605,10 +625,16 @@ fn fixed_policy(scenario: &SequentialScenario) -> Result<FixedCampaignAudit, Str
             .collect();
         groups.entry(signature).or_default().push(state.clone());
     }
+    let covered_obligations: BTreeSet<String> = scenario
+        .fixed_campaign_sequence
+        .iter()
+        .flat_map(|action_id| actions_by_id[action_id.as_str()].obligations_covered.iter().cloned())
+        .collect();
     let mut worst_case_regret = 0.0_f64;
     for belief in groups.values() {
-        worst_case_regret =
-            worst_case_regret.max(terminal_plan(scenario, belief)?.worst_case_regret);
+        worst_case_regret = worst_case_regret.max(
+            terminal_plan(scenario, belief, &covered_obligations)?.worst_case_regret,
+        );
     }
     Ok(FixedCampaignAudit {
         sequence: scenario.fixed_campaign_sequence.clone(),
@@ -660,7 +686,13 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
             scenario.scenario_id
         ));
     }
-    if scenario.loss_matrix.len() != decision_set.len() {
+    if scenario.loss_matrix.len() != decision_set.len()
+        || scenario.decision_obligations.len() != decision_set.len()
+        || scenario
+            .decision_obligations
+            .keys()
+            .any(|decision| !decision_set.contains(decision.as_str()))
+    {
         return Err(format!(
             "{} loss matrix has wrong decision count",
             scenario.scenario_id
@@ -697,6 +729,15 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
             "{} has invalid resource-frequency model",
             scenario.scenario_id
         ));
+    }
+    let declared_obligations: BTreeSet<&str> = scenario
+        .decision_obligations
+        .values()
+        .flatten()
+        .map(String::as_str)
+        .collect();
+    if scenario.decision_obligations.values().flatten().any(|value| value.trim().is_empty()) {
+        return Err(format!("{} has an empty decision obligation", scenario.scenario_id));
     }
     let mut action_ids = BTreeSet::new();
     for action in &scenario.actions {
@@ -737,7 +778,9 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         ));
     }
 
-    let baseline = terminal_plan(scenario, &scenario.states)?.worst_case_regret;
+    let no_obligations = BTreeSet::new();
+    let baseline =
+        terminal_plan(scenario, &scenario.states, &no_obligations)?.worst_case_regret;
     let myopic = myopic_policy(scenario, baseline)?;
     let fixed = fixed_policy(scenario)?;
     let adaptive = solve(
@@ -746,6 +789,7 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         &scenario.budget,
         scenario.max_actions,
         &BTreeSet::new(),
+        &no_obligations,
     )?;
     let first_action_id = match &adaptive.node {
         PolicyNode::Test { action_id, .. } => Some(action_id.clone()),
