@@ -49,11 +49,7 @@ fn run() -> Result<(), String> {
                 let value = args
                     .next()
                     .ok_or_else(|| "--through-sequence requires an integer".to_string())?;
-                through_sequence = Some(
-                    value
-                        .parse::<u64>()
-                        .map_err(|error| error.to_string())?,
-                );
+                through_sequence = Some(value.parse::<u64>().map_err(|error| error.to_string())?);
             }
             "--reduced-motion" => reduced_motion = true,
             "--help" | "-h" => {
@@ -83,9 +79,7 @@ fn run() -> Result<(), String> {
     if let Some(sequence) = through_sequence {
         trace.events.retain(|event| event.sequence <= sequence);
         if trace.events.is_empty() {
-            return Err(format!(
-                "no trace events have sequence <= {sequence}"
-            ));
+            return Err(format!("no trace events have sequence <= {sequence}"));
         }
     }
     let snapshot = trace.replay().map_err(|error| error.to_string())?;
@@ -114,11 +108,9 @@ fn run() -> Result<(), String> {
 }
 
 fn print_usage() {
-    println!(
-        concat!(
-            "Usage: mycelial_presence_demo --trace PATH [--through-sequence N] ",
-            "[--output PATH] [--reduced-motion]\n",
-            "Replays a validated trace prefix and exports a self-contained Mycelial Presence SVG."
-        )
-    );
+    println!(concat!(
+        "Usage: mycelial_presence_demo --trace PATH [--through-sequence N] ",
+        "[--output PATH] [--reduced-motion]\n",
+        "Replays a validated trace prefix and exports a self-contained Mycelial Presence SVG."
+    ));
 }
