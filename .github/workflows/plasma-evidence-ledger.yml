@@ -1,0 +1,34 @@
+name: Plasma trajectory evidence ledger
+
+on:
+  push:
+    paths:
+      - "crates/tools/plasma-evidence-ledger/**"
+      - "benchmarks/plasma/evidence-ledger-v0.1.json"
+      - ".github/workflows/plasma-evidence-ledger.yml"
+  pull_request:
+    paths:
+      - "crates/tools/plasma-evidence-ledger/**"
+      - "benchmarks/plasma/evidence-ledger-v0.1.json"
+      - ".github/workflows/plasma-evidence-ledger.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-ledger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Install Rust 1.96 toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Strict format check
+        run: cargo fmt --manifest-path crates/tools/plasma-evidence-ledger/Cargo.toml -- --check
+      - name: Unit tests
+        run: cargo test --locked --manifest-path crates/tools/plasma-evidence-ledger/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path crates/tools/plasma-evidence-ledger/Cargo.toml --all-targets -- -D warnings
