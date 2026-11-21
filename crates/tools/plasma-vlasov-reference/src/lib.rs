@@ -826,11 +826,7 @@ pub fn zero_pad_periodic_line(samples: &[f64], target_len: usize) -> Result<Vec<
     }
 
     // Negative modes retain their signed frequency index on the larger grid.
-    for (source_index, coefficient) in source_spectrum
-        .iter()
-        .enumerate()
-        .skip(source_len / 2 + 1)
-    {
+    for (source_index, coefficient) in source_spectrum.iter().enumerate().skip(source_len / 2 + 1) {
         let negative_mode = source_len - source_index;
         let target_index = target_len - negative_mode;
         target_spectrum[target_index] = coefficient.scale(scale);
