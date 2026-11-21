@@ -943,7 +943,7 @@ mod tests {
     use super::*;
 
     const FIXTURE: &[u8] =
-        include_bytes!("../fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json");
+        include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json");
     const SOURCE: &str = "0123456789abcdef0123456789abcdef01234567";
 
     #[test]
