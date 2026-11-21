@@ -1,0 +1,320 @@
+{
+  "schema_version": "sc-factorial-interaction.v0.1",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "synthetic-factorial-design-and-contrast-arithmetic-only",
+  "benchmark_id": "SYNTH-FACTORIAL-PAIRING-COHERENCE-001",
+  "target_material": {
+    "material_id": "SYNTH-MATERIAL-001",
+    "formula": "A2B3",
+    "family": "synthetic layered quantum material"
+  },
+  "factor_a": {
+    "factor_id": "FACTOR-A-STRAIN",
+    "label": "factor A synthetic strain level",
+    "off_level": 0,
+    "on_level": 0.2,
+    "unit": "percent"
+  },
+  "factor_b": {
+    "factor_id": "FACTOR-B-GATE",
+    "label": "factor B synthetic electrostatic gate level",
+    "off_level": 0,
+    "on_level": 1,
+    "unit": "V_per_nm"
+  },
+  "condition_profile": {
+    "condition_profile_id": "SYNTH-COND-77K-SELF-001",
+    "temperature_k": 77,
+    "field_magnitude_t": 0,
+    "field_orientation": "self-field",
+    "measurement_protocol_id": "SYNTH-PROTOCOL-001"
+  },
+  "blocks": [
+    {
+      "block_id": "BLOCK-001",
+      "batch_id": "BATCH-001",
+      "campaign_id": "CAMPAIGN-001",
+      "laboratory_id": "SYNTH-LAB-001",
+      "instrument_id": "SYNTH-INST-001",
+      "protocol_id": "SYNTH-PROTOCOL-001",
+      "condition_profile_id": "SYNTH-COND-77K-SELF-001",
+      "randomization_seed": 12345,
+      "arms": [
+        {
+          "arm_id": "control",
+          "specimen_id": "BLOCK-001-SPEC-1",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-001-STATE-1",
+          "factor_a_on": false,
+          "factor_b_on": false,
+          "randomization_order": 3,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0,
+            "factor_a_unit": "percent",
+            "factor_b_value": 0,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 10,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 16,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        },
+        {
+          "arm_id": "a_only",
+          "specimen_id": "BLOCK-001-SPEC-2",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-001-STATE-2",
+          "factor_a_on": true,
+          "factor_b_on": false,
+          "randomization_order": 1,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0.2,
+            "factor_a_unit": "percent",
+            "factor_b_value": 0,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 12,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 16.5,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        },
+        {
+          "arm_id": "b_only",
+          "specimen_id": "BLOCK-001-SPEC-3",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-001-STATE-3",
+          "factor_a_on": false,
+          "factor_b_on": true,
+          "randomization_order": 4,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0,
+            "factor_a_unit": "percent",
+            "factor_b_value": 1,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 11,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 17,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        },
+        {
+          "arm_id": "combined",
+          "specimen_id": "BLOCK-001-SPEC-4",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-001-STATE-4",
+          "factor_a_on": true,
+          "factor_b_on": true,
+          "randomization_order": 2,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0.2,
+            "factor_a_unit": "percent",
+            "factor_b_value": 1,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 16,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 17.5,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "BLOCK-002",
+      "batch_id": "BATCH-002",
+      "campaign_id": "CAMPAIGN-002",
+      "laboratory_id": "SYNTH-LAB-001",
+      "instrument_id": "SYNTH-INST-001",
+      "protocol_id": "SYNTH-PROTOCOL-001",
+      "condition_profile_id": "SYNTH-COND-77K-SELF-001",
+      "randomization_seed": 67890,
+      "arms": [
+        {
+          "arm_id": "control",
+          "specimen_id": "BLOCK-002-SPEC-1",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-002-STATE-1",
+          "factor_a_on": false,
+          "factor_b_on": false,
+          "randomization_order": 2,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0,
+            "factor_a_unit": "percent",
+            "factor_b_value": 0,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 11,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 17,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        },
+        {
+          "arm_id": "a_only",
+          "specimen_id": "BLOCK-002-SPEC-2",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-002-STATE-2",
+          "factor_a_on": true,
+          "factor_b_on": false,
+          "randomization_order": 4,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0.2,
+            "factor_a_unit": "percent",
+            "factor_b_value": 0,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 13,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 17.5,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        },
+        {
+          "arm_id": "b_only",
+          "specimen_id": "BLOCK-002-SPEC-3",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-002-STATE-3",
+          "factor_a_on": false,
+          "factor_b_on": true,
+          "randomization_order": 1,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0,
+            "factor_a_unit": "percent",
+            "factor_b_value": 1,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 12,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 18,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        },
+        {
+          "arm_id": "combined",
+          "specimen_id": "BLOCK-002-SPEC-4",
+          "material_id": "SYNTH-MATERIAL-001",
+          "material_state_id": "BLOCK-002-STATE-4",
+          "factor_a_on": true,
+          "factor_b_on": true,
+          "randomization_order": 3,
+          "assignment_state": "sensor_verified",
+          "delivery_readback": {
+            "factor_a_value": 0.2,
+            "factor_a_unit": "percent",
+            "factor_b_value": 1,
+            "factor_b_unit": "V_per_nm",
+            "verification": "sensor_verified",
+            "source_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          "outcomes": [
+            {
+              "response_channel": "local_pairing_gap_mev",
+              "value": 17,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            },
+            {
+              "response_channel": "bulk_superfluid_stiffness_mev",
+              "value": 18.5,
+              "unit": "meV",
+              "evidence_authority": "synthetic_measurement"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "synthetic_truth": {
+    "expected_mean_interaction_by_channel": {
+      "local_pairing_gap_mev": 3,
+      "bulk_superfluid_stiffness_mev": 0
+    }
+  }
+}

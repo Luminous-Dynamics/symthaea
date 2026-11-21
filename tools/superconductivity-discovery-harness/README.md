@@ -195,3 +195,26 @@ This is a **group-split and design-semantics auditor**, not a variance-component
 
 
 Reproducibility fixture semantic note: non-Tc observations (including local pairing energy and superfluid stiffness) use `tc_criterion: not_applicable`; `null` is not used to represent this state. The synthetic predicted-Tc fixture is human-curated and is therefore not labelled as an external database import.
+
+
+## Factorial intervention interaction auditor
+
+The factorial interaction audit validates complete blocked 2×2 intervention designs and computes separate difference-in-differences contrasts for local pairing and bulk phase-coherence responses.
+
+Schema: `data/schemas/sc_factorial_interaction_v0_1.schema.json`.
+
+Synthetic fixture: `tools/superconductivity-discovery-harness/fixtures/factorial_interaction_smoke_v0_1.json`.
+
+Run:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_factorial_interaction_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_factorial_interaction_audit -- \
+  --schema data/schemas/sc_factorial_interaction_v0_1.schema.json \
+  --fixture tools/superconductivity-discovery-harness/fixtures/factorial_interaction_smoke_v0_1.json \
+  --out /tmp/sc-factorial-interaction-smoke.json
+```
+
+Each block must contain exactly one control, A-only, B-only and combined arm with four distinct specimens and a complete randomized order. Delivered factor levels must match declared levels and require sensor-verified readback plus source digest. Blocks must use distinct batches and campaigns. Pairing-gap and superfluid-stiffness outcomes remain separate. The auditor computes per-block and mean interaction contrasts but emits no population confidence interval or physical significance claim.
+
+The fixture is synthetic only. It contains a +3 meV local pairing interaction and a zero bulk superfluid-stiffness interaction. This intentionally demonstrates that a local pairing enhancement does not imply a corresponding bulk phase-coherence enhancement. The generator truth is a smoke-test oracle, not an input to the contrast calculation or a physical material claim.

@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-factorial-interaction-v0.1/data/schemas/sc_factorial_interaction_v0_1.schema.json",
+  "title": "Superconductivity Factorial Interaction Design v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "claim_ceiling",
+    "benchmark_id",
+    "target_material",
+    "factor_a",
+    "factor_b",
+    "condition_profile",
+    "blocks",
+    "synthetic_truth"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sc-factorial-interaction.v0.1"
+    },
+    "evidence_class": {
+      "const": "synthetic"
+    },
+    "claim_ceiling": {
+      "const": "synthetic-factorial-design-and-contrast-arithmetic-only"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material_id",
+        "formula",
+        "family"
+      ],
+      "properties": {
+        "material_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formula": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "factor_a": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factor_id",
+        "label",
+        "off_level",
+        "on_level",
+        "unit"
+      ],
+      "properties": {
+        "factor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "off_level": {
+          "type": "number"
+        },
+        "on_level": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "factor_b": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factor_id",
+        "label",
+        "off_level",
+        "on_level",
+        "unit"
+      ],
+      "properties": {
+        "factor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "off_level": {
+          "type": "number"
+        },
+        "on_level": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "condition_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition_profile_id",
+        "temperature_k",
+        "field_magnitude_t",
+        "field_orientation",
+        "measurement_protocol_id"
+      ],
+      "properties": {
+        "condition_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "temperature_k": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "field_magnitude_t": {
+          "type": "number",
+          "minimum": 0
+        },
+        "field_orientation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_protocol_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "block_id",
+          "batch_id",
+          "campaign_id",
+          "laboratory_id",
+          "instrument_id",
+          "protocol_id",
+          "condition_profile_id",
+          "randomization_seed",
+          "arms"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "campaign_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "laboratory_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instrument_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "condition_profile_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "randomization_seed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "arms": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "arm_id",
+                "specimen_id",
+                "material_id",
+                "material_state_id",
+                "factor_a_on",
+                "factor_b_on",
+                "randomization_order",
+                "assignment_state",
+                "delivery_readback",
+                "outcomes"
+              ],
+              "properties": {
+                "arm_id": {
+                  "enum": [
+                    "control",
+                    "a_only",
+                    "b_only",
+                    "combined"
+                  ]
+                },
+                "specimen_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "material_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "material_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "factor_a_on": {
+                  "type": "boolean"
+                },
+                "factor_b_on": {
+                  "type": "boolean"
+                },
+                "randomization_order": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4
+                },
+                "assignment_state": {
+                  "enum": [
+                    "sensor_verified",
+                    "commanded_only",
+                    "unverified",
+                    "failed",
+                    "aborted"
+                  ]
+                },
+                "delivery_readback": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "factor_a_value",
+                    "factor_a_unit",
+                    "factor_b_value",
+                    "factor_b_unit",
+                    "verification",
+                    "source_sha256"
+                  ],
+                  "properties": {
+                    "factor_a_value": {
+                      "type": "number"
+                    },
+                    "factor_a_unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "factor_b_value": {
+                      "type": "number"
+                    },
+                    "factor_b_unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "verification": {
+                      "enum": [
+                        "sensor_verified",
+                        "commanded",
+                        "unverified"
+                      ]
+                    },
+                    "source_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                "outcomes": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "response_channel",
+                      "value",
+                      "unit",
+                      "evidence_authority"
+                    ],
+                    "properties": {
+                      "response_channel": {
+                        "enum": [
+                          "local_pairing_gap_mev",
+                          "bulk_superfluid_stiffness_mev"
+                        ]
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "evidence_authority": {
+                        "const": "synthetic_measurement"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "synthetic_truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_mean_interaction_by_channel"
+      ],
+      "properties": {
+        "expected_mean_interaction_by_channel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_pairing_gap_mev",
+            "bulk_superfluid_stiffness_mev"
+          ],
+          "properties": {
+            "local_pairing_gap_mev": {
+              "type": "number"
+            },
+            "bulk_superfluid_stiffness_mev": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  }
+}
