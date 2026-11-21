@@ -122,7 +122,7 @@ The aerospace evidence-action consumer should take the following event-to-claim 
 
 These are candidate mappings requiring owner-reviewed edges, not universal rules. A change can make an old claim historical-only or require requalification without proving the physical article has failed. An incomplete change feed is INDETERMINATE, not evidence that nothing changed.
 
-The selector's own frozen context tuple (profile reference, physical serial, configuration, ICD revision) is a final consumer-side false-join gate; it is not a substitute for #6219 dependency closure. Symthaea only ranks actions after the owner-native invalidation result and affected claim set are supplied. It must not promote a claim or decide which dependencies exist.
+The selector's own frozen context tuple (profile reference, physical serial, configuration, ICD revision) is a final consumer-side false-join gate; it is not a substitute for #6219 dependency closure. Symthaea only ranks actions after the owner-native invalidation result and affected claim set are supplied. It must not promote a claim or decide which dependencies exist. JEV-016 freezes an incomplete event-frontier receipt and blocks selection; JEV-017 freezes a complete receipt requiring one structural claim to be requalified while an unrelated design claim remains unaffected.
 
 ## 5. Resource accounting
 
@@ -325,10 +325,10 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 ## 11. Deliverables
 
 P0: this contract and owner map.  
-P1: machine-readable action and outcome schema plus 15 frozen synthetic scenarios.  
-P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 15 known-answer scenarios. No solver or physical execution is invoked.  
+P1: machine-readable action and outcome schema plus 17 frozen synthetic scenarios.  
+P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 17 known-answer scenarios. No solver or physical execution is invoked.  
 P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
 P5: only after review, authorized human-supervised physical evidence handoff.
 
-**Current milestone:** P0 specification, P1 schema/scenario catalogue and P2 dry-run admissibility/value audit with a deterministic one-step selector are implemented on a public research branch. P3 multi-step/matched-budget policy tournament and external adapter evidence remain future work. No selector-performance win over SOTA, physical test or certification claim is made.
+**Current milestone:** P0 specification, P1 schema/scenario catalogue and P2 dry-run admissibility/value audit with a deterministic one-step selector are implemented on a public research branch. P3 multi-step/matched-budget policy tournament and external adapter evidence remain future work. No selector-performance win over SOTA, physical test or certification claim is made. The 17-case audit includes owner-native change-frontier completeness and targeted claim requalification coverage.
