@@ -70,7 +70,11 @@ pub mod touch_body;
 
 // Decentralized positioning (GPS-independent)
 #[cfg(feature = "positioning")]
+#[cfg(feature = "positioning-legacy")]
 pub mod positioning_bridge;
+
+#[cfg(feature = "positioning")]
+pub mod positioning_v2_adapter;
 
 // Full Broca language center (replaces BrocaLite)
 #[cfg(feature = "broca-full")]
