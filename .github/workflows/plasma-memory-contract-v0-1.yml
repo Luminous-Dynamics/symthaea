@@ -1,0 +1,64 @@
+name: Plasma memory contract
+
+on:
+  push:
+    branches: [research/plasma-memory-contract-v0-1-2026-11-19]
+    paths:
+      - "tools/plasma-memory-contract-v0.1/**"
+      - ".github/workflows/plasma-memory-contract-v0-1.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/plasma-memory-contract-v0.1/**"
+      - ".github/workflows/plasma-memory-contract-v0-1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  memory-contract:
+    name: Schema, exact horizon and Rust contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Install pinned JSON Schema validator
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate synthetic mechanism fixtures
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          root = Path("tools/plasma-memory-contract-v0.1")
+          schema = json.loads((root / "schema/memory-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-memory-contracts-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = sorted(
+              Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(fixture),
+              key=lambda error: list(error.path),
+          )
+          if errors:
+              raise SystemExit("\\n".join(error.message for error in errors))
+          contracts = fixture["contracts"]
+          if len(contracts) != 4:
+              raise SystemExit("expected four distinct synthetic memory mechanisms")
+          kinds = {contract["mechanism"]["kind"] for contract in contracts}
+          if kinds != {"markovian", "trailing_history", "prognostic_latent", "fourier_hermite_reservoir"}:
+              raise SystemExit("mechanism families were conflated or omitted")
+          history = next(c["mechanism"] for c in contracts if c["mechanism"]["kind"] == "trailing_history")
+          left = history["sample_count"] * history["sample_period"]["numerator"] * history["physical_horizon"]["denominator"]
+          right = history["physical_horizon"]["numerator"] * history["sample_period"]["denominator"]
+          if left != right:
+              raise SystemExit("trailing-history sample cadence does not equal its physical horizon")
+          PY
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/plasma-memory-contract-v0.1/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path tools/plasma-memory-contract-v0.1/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/plasma-memory-contract-v0.1/Cargo.toml --locked --all-targets -- -D warnings
