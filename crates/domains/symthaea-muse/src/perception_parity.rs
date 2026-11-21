@@ -67,6 +67,8 @@ impl PerceptionAnswerV1 {
     }
 }
 
+/// The same case ID and source-score digest make the audio and MIDI arms a
+/// paired comparison; input digests remain modality-specific.
 /// One underlying musical case with separate, content-addressed inputs for
 /// audio and symbolic MIDI. Both inputs derive from the same source score and
 /// share the same ground truth.
