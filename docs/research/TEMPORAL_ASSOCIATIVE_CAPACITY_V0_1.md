@@ -96,6 +96,8 @@ Arguments:
 The JSONL stream contains one `query` record per item followed by one `summary` record for each cohort. Each summary carries the source revision used for the run (or null when the caller did not pin one). A summary with (K) queries uses all (K) queries as its denominator; invalid and tied queries remain visible and cannot improve the correctness count.
 
 ## Capacity targets for the next qualification phase
+**Seed-count warning:** the default three seeds are for smoke-scale exploration and protocol debugging only. They are not enough for a credible K95/T90 claim. Confirmatory runs should use at least 30 independent corpus/model seeds as an initial target, then continue until a preregistered seed-level confidence-interval precision criterion is met. The independent seed/corpus is the statistical unit; the K query outcomes inside one shared bundle are not independent replicates.
+
 
 Do not define capacity as the largest fan-in observed once. The target object is a temporal capacity surface:
 
