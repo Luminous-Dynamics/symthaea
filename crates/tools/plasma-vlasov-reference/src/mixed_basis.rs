@@ -116,6 +116,13 @@ pub fn asymmetric_hermite_basis_values(
         let psi_zero = std::f64::consts::PI.sqrt().recip() * (-(z * z)).exp();
         basis.values[column] = psi_zero;
 
+        // Once the Gaussian has underflowed, all represented Hermite modes
+        // are below the floating-point dynamic range. Leaving the column at
+        // exact zero also avoids inf * 0 in the recurrence for extreme finite z.
+        if psi_zero == 0.0 {
+            continue;
+        }
+
         if mode_count > 1 {
             basis.values[basis.velocity_count + column] = std::f64::consts::SQRT_2 * z * psi_zero;
         }
@@ -235,6 +242,14 @@ mod tests {
         assert_eq!(basis.get(1, 1), Some(0.0));
         assert_eq!(basis.get(3, 0), None);
         assert_eq!(basis.get(0, 3), None);
+    }
+
+    #[test]
+    fn hermite_gaussian_underflow_produces_exact_zero_column() {
+        let basis = asymmetric_hermite_basis_values(8, &[1.0e308], 0.0, 1.0).unwrap();
+
+        assert!(basis.as_slice().iter().all(|value| *value == 0.0));
+        assert!(basis.as_slice().iter().all(|value| value.is_finite()));
     }
 
     #[test]
