@@ -12,9 +12,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod mixed_basis;
 pub mod transition;
 pub mod velocity_frame;
-pub mod mixed_basis;
 
 use std::error::Error;
 use std::f64::consts::TAU;
