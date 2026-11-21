@@ -1,0 +1,25 @@
+name: SOMA Mycelix Position v2 adapter compatibility
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-soma/**"
+      - "scripts/ci/test-soma-mycelix-position-v2.sh"
+      - ".github/workflows/soma-mycelix-position-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  soma-mycelix-position-v2:
+    name: Compile exact SOMA adapter against real Mycelix Position
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Symthaea
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Format, lint and test exact SOMA adapter source against real Mycelix package
+        run: bash scripts/ci/test-soma-mycelix-position-v2.sh
