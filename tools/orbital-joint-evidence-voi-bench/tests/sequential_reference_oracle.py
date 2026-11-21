@@ -80,10 +80,14 @@ def partitions(belief, action):
 
 def branch_probability(scenario, belief, branch):
     for action in scenario["actions"]:
-        covered = action.get("obligations_covered")
-        if (not isinstance(covered, list) or len(covered) != len(set(covered))
-                or not set(covered).issubset(declared_obligations)):
-            raise ValueError("action contains unknown or duplicate evidence obligations")
+        possible_outcomes = set(action["observation_by_state"].values())
+        mapping = action.get("obligations_by_observation")
+        if not isinstance(mapping, dict) or set(mapping) != possible_outcomes:
+            raise ValueError("action outcome-to-obligation map is incomplete")
+        for covered in mapping.values():
+            if (not isinstance(covered, list) or len(covered) != len(set(covered))
+                    or not set(covered).issubset(declared_obligations)):
+                raise ValueError("action contains unknown or duplicate evidence obligations")
     weights = scenario["resource_frequency_model"]["state_weights"]
     total = sum(weights[state] for state in belief)
     part = sum(weights[state] for state in branch)
@@ -164,7 +168,9 @@ def solve(scenario, belief, remaining_budget, depth, used, covered_obligations):
                 key: remaining_budget[key] - action["resource_plan"][key]
                 for key in RESOURCE_KEYS
             }
-            next_covered = set(covered_obligations) | set(action["obligations_covered"])
+            next_covered = set(covered_obligations) | set(
+                action["obligations_by_observation"][observation]
+            )
             child = solve(scenario, child_belief, child_budget, depth - 1, next_used, next_covered)
             worst_risk = max(worst_risk, child["risk"])
             probability = branch_probability(scenario, belief, child_belief)
@@ -216,8 +222,20 @@ def evaluate_fixed(scenario):
             for action_id in scenario["fixed_campaign_sequence"]
         )
         groups.setdefault(signature, []).append(state)
-    covered = set().union(*(set(by_id[action_id]["obligations_covered"]) for action_id in scenario["fixed_campaign_sequence"]))
-    risk = max(terminal_regret(scenario, belief, covered)[0] for belief in groups.values())
+    grouped_coverage = {}
+    for state in scenario["states"]:
+        signature = tuple(
+            by_id[action_id]["observation_by_state"][state]
+            for action_id in scenario["fixed_campaign_sequence"]
+        )
+        covered = set()
+        for action_id, observation in zip(scenario["fixed_campaign_sequence"], signature):
+            covered.update(by_id[action_id]["obligations_by_observation"][observation])
+        grouped_coverage[signature] = covered
+    risk = max(
+        terminal_regret(scenario, belief, grouped_coverage[signature])[0]
+        for signature, belief in groups.items()
+    )
     return risk, total
 
 
@@ -231,8 +249,14 @@ def evaluate_myopic(scenario, baseline):
         groups = partitions(scenario["states"], action)
         if len(groups) < 2:
             continue
-        coverage = set(action["obligations_covered"])
-        risk = max(terminal_regret(scenario, belief, coverage)[0] for belief in groups.values())
+        risk = max(
+            terminal_regret(
+                scenario,
+                belief,
+                set(action["obligations_by_observation"][observation])
+            )[0]
+            for observation, belief in groups.items()
+        )
         scored.append((risk, action["action_id"]))
     scored.sort()
     if scored and scored[0][0] + TOL < baseline:
@@ -250,7 +274,8 @@ def audit_scenario(scenario):
             or any(not isinstance(items, list) or len(items) != len(set(items))
                    or any(not isinstance(item, str) or not item.strip() for item in items)
                    for items in scenario["decision_obligations"].values())
-            or not scenario["decision_obligations"]["ACCEPT"]):
+            or not scenario["decision_obligations"]["ACCEPT"]
+            or not scenario["decision_obligations"]["REJECT"]):
         raise ValueError("decision acceptance obligations are incomplete or duplicated")
     declared_obligations = set().union(*(set(items) for items in scenario["decision_obligations"].values()))
     if len(states) < 2 or len(set(states)) != len(states):
