@@ -135,6 +135,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "source_revision",
         "record_type",
         "schema_version",
         "cohort_id",
@@ -345,6 +346,14 @@
         "logical_horizon_error_seconds": {
           "type": "number",
           "minimum": 0
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
+          "description": "Git commit SHA used to build/run the experiment; null means not source-pinned."
         }
       }
     }
