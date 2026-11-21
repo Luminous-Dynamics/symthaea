@@ -85,6 +85,7 @@ Compose with [#13091 — decision freshness, correctness-at-use and deadline tai
 A memory may be admissible at retrieval and stale by the time an action consumes it. Therefore:
 
 - Measure the age of the exact evidence supporting the decision **at actual consumption**. Do not substitute retrieval time or response-emission time.
+- Record both age at retrieval and age at use. Their difference exposes queueing, reasoning and dispatch delay that can make once-fresh evidence stale before consumption. Retrieval age is diagnostic; age-at-use controls the use gate.
 - Compare the age to a frozen, task-specific maximum-age budget.
 - Check whether the decision is consumed before its task deadline.
 - Unknown age, unknown age budget or unknown deadline slack means the `use` action is not qualified. Prefer authorized verification, clarification, a bounded probe or abstention according to the expected-loss policy.
