@@ -10,6 +10,9 @@ on:
       - "data/schemas/precursor_genome_graph_score_v0_1.schema.json"
       - "tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_*.json"
       - "research/superconductivity/capability_experiment_planning/precursor_genome_graph_score/**"
+      - "data/schemas/precursor_genome_graph_score_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_*.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome_graph_score/**"
       - ".github/workflows/precursor-genome-audit.yml"
   push:
     branches: [main]
@@ -18,6 +21,9 @@ on:
       - "data/research/precursor_genome_graph_benchmark_v0_1.json"
       - "data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json"
       - "research/superconductivity/capability_experiment_planning/precursor_genome_graph/README.md"
+      - "data/schemas/precursor_genome_graph_score_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_*.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome_graph_score/**"
       - ".github/workflows/precursor-genome-audit.yml"
   workflow_dispatch:
 
