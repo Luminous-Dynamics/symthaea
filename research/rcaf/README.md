@@ -28,6 +28,7 @@ The crate is deliberately isolated from the root Cargo workspace and has no thir
 ```sh
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery_sweep
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament
 ```
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
@@ -76,3 +77,15 @@ The current kernel and synthetic harness establish only that the code behaves as
 - clinical utility or superiority over established estimators.
 
 A workflow result applies only to the exact source commit checked. Skipped, queued, absent or earlier-head jobs are not passes.
+
+
+## Matched-input estimator tournament
+
+`run_estimator_tournament` and the `rcaf_estimator_tournament` example replay the same simulated observations with three declared similarity definitions:
+- absolute Weighted Jaccard: magnitude overlap, ignores polarity;
+- signed-shift Weighted Jaccard: transforms each correlation from [-1, 1] to [0, 2], penalizing sign disagreement;
+- normalized mean absolute edge error: one minus mean upper-triangle absolute error divided by two.
+
+Each estimator receives the same seed, participant draws, and injection configuration. The tournament reports null false-positive frequency, injection-detection power, Monte-Carlo Wilson intervals, and participant-level gap summaries. It does not automatically select a universal winner: different estimators have different construct semantics, and estimator performance must be read together with null calibration and effect sensitivity.
+
+The output contract is `estimator-tournament.schema.json`.
