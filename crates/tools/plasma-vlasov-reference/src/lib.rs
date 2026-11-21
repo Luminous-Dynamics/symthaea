@@ -46,7 +46,7 @@ impl VlasovPoissonConfig {
         {
             return Err(SolverError::InvalidVelocityInterval);
         }
-        if !self.charge_to_mass.is_finite() {
+        if !self.charge_to_mass.is_finite() || self.charge_to_mass >= 0.0 {
             return Err(SolverError::InvalidChargeToMass);
         }
         if !self.permittivity.is_finite() || self.permittivity <= 0.0 {
@@ -105,7 +105,7 @@ impl fmt::Display for SolverError {
             Self::InvalidGrid { axis, value } => write!(f, "{axis}-grid size {value} must be a power of two >= 4"),
             Self::InvalidDomainLength => write!(f, "domain length must be finite and positive"),
             Self::InvalidVelocityInterval => write!(f, "velocity interval endpoints must be finite and increasing"),
-            Self::InvalidChargeToMass => write!(f, "charge-to-mass ratio must be finite"),
+            Self::InvalidChargeToMass => write!(f, "electron charge-to-mass ratio must be finite and negative"),
             Self::InvalidPermittivity => write!(f, "permittivity must be finite and positive"),
             Self::InvalidBackgroundDensity => write!(f, "background density must be finite and non-negative"),
             Self::DistributionLengthMismatch { expected, actual } => write!(f, "distribution has {actual} values; expected {expected} (nx * nv)"),
@@ -245,6 +245,7 @@ impl VlasovPoisson1d1v {
         let config = self.config;
         let dx = config.dx();
         let dv = config.dv();
+        let particle_mass = -1.0 / config.charge_to_mass;
         let mut mass = 0.0;
         let mut momentum = 0.0;
         let mut kinetic_energy = 0.0;
@@ -256,9 +257,9 @@ impl VlasovPoisson1d1v {
             for iv in 0..config.nv {
                 let value = self.distribution[ix * config.nv + iv];
                 let velocity = config.velocity(iv);
-                mass += value * dx * dv;
-                momentum += value * velocity * dx * dv;
-                kinetic_energy += 0.5 * value * velocity * velocity * dx * dv;
+                mass += particle_mass * value * dx * dv;
+                momentum += particle_mass * value * velocity * dx * dv;
+                kinetic_energy += 0.5 * particle_mass * value * velocity * velocity * dx * dv;
                 minimum_distribution = minimum_distribution.min(value);
                 maximum_abs_distribution = maximum_abs_distribution.max(value.abs());
                 if iv == 0 || iv + 1 == config.nv {
@@ -266,7 +267,7 @@ impl VlasovPoisson1d1v {
                 }
             }
         }
-        let field_energy = 0.5 * self.electric_field.iter()
+        let field_energy = 0.5 * config.permittivity * self.electric_field.iter()
             .map(|value| value * value * dx).sum::<f64>();
         let rho = self.charge_density()?;
         let net_charge = rho.iter().sum::<f64>() * dx;
@@ -418,12 +419,12 @@ pub fn solve_periodic_poisson_spectral(
     let mut spectrum: Vec<Complex> = charge_density.iter()
         .map(|value| Complex::new(*value, 0.0)).collect();
     fft(&mut spectrum, false);
-    for mode in 0..config.nx {
+    for (mode, coefficient) in spectrum.iter_mut().enumerate() {
         if mode == 0 || mode == config.nx / 2 {
-            spectrum[mode] = Complex::ZERO;
+            *coefficient = Complex::ZERO;
         } else {
             let k = signed_mode(mode, config.nx) as f64 * TAU / config.domain_length;
-            spectrum[mode] = spectrum[mode].mul(Complex::new(0.0, -1.0 / (k * config.permittivity)));
+            *coefficient = coefficient.mul(Complex::new(0.0, -1.0 / (k * config.permittivity)));
         }
     }
     fft(&mut spectrum, true);
