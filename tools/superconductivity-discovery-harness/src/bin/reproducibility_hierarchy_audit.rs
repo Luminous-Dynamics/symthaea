@@ -442,9 +442,7 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             return Err(format!("duplicate observation_id {observation_id}"));
         }
         specimens.insert(nonempty_text(observation, "specimen_id", &path)?.to_owned());
-        material_states.insert(
-            nonempty_text(observation, "material_state_id", &path)?.to_owned(),
-        );
+        material_states.insert(nonempty_text(observation, "material_state_id", &path)?.to_owned());
         batches.insert(nonempty_text(observation, "batch_id", &path)?.to_owned());
         campaigns.insert(nonempty_text(observation, "campaign_id", &path)?.to_owned());
         labs.insert(nonempty_text(observation, "lab_id", &path)?.to_owned());
