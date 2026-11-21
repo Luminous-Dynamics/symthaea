@@ -313,7 +313,7 @@ impl EyeMovementDetector {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// EMG MUSCLE TONE TRACKER - The Third Pillar of the Trinity Architecture
+// EMG muscle-tone feature tracker
 // ═══════════════════════════════════════════════════════════════════════════════
 //
 // The Physics of Atonia:
@@ -323,7 +323,7 @@ impl EyeMovementDetector {
 //   N2/N3: Low muscle tone (relaxed but not paralyzed)
 //
 // This replaces probability with physiology:
-//   - Atonia Gate: High tone → biologically impossible to be REM
+//   - Higher muscle tone is atypical of REM atonia; used only as a heuristic
 //   - N1 Detection: Dropping tone signals sleep onset
 //
 // Implementation: Leaky integrator on rectified EMG (no full LTC needed)
@@ -786,12 +786,12 @@ fn load_hypnogram_epochs(path: &Path) -> Result<Vec<SleepStage>, String> {
 // SLEEP-STAGE CLASSIFIER (exploratory LTC-inspired implementation)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-//// Signal-feature metrics used by the sleep-stage classifier
+/// Signal-feature metrics used by the sleep-stage classifier
 struct SleepStageFeatures {
     complexity: f64,     // Signal complexity (entropy proxy)
     synchrony: f64,      // Cross-channel correlation
     dominant_freq: f64,  // Dominant frequency band
-    sync_entropy_score: f64,      // Integration measure (complexity × synchrony)
+    sync_entropy_score: f64, // Heuristic product: permutation entropy × cross-channel synchrony
     spectral_ratio: f64, // Alpha/Theta ratio from Multi-Scale LTC
     eog_energy: f64,     // Eye movement energy (high in REM)
     eog_frequency: f64,  // Eye movement frequency (high in REM)
@@ -802,7 +802,7 @@ struct SleepStageFeatures {
     tone_dropping: bool, // True if tone derivative negative (N1 signature)
 }
 
-//// Predicted sleep-stage category
+/// Predicted sleep-stage category
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
 enum PredictedSleepStage {
@@ -823,7 +823,7 @@ impl PredictedSleepStage {
     }
 }
 
-/// Sleep Sentinel - The Trinity Architecture
+/// Sleep Sentinel: multi-channel sleep-stage feature classifier
 /// Brain (EEG) + Eyes (EOG) + Body (EMG) = Complete sleep-stage classification
 ///
 /// The Physics:
@@ -857,7 +857,7 @@ struct SleepSentinel {
     // 2. EYES (EOG): Eye Movement Detector
     eog_detector: EyeMovementDetector,
 
-    // 3. BODY (EMG): Muscle Tone Tracker - The Atonia Gate
+    // 3. BODY (EMG): Muscle Tone Tracker - The EMG atonia heuristic
     emg_tracker: MuscleToneTracker,
 
     // Classification thresholds (tunable)
@@ -887,10 +887,10 @@ impl SleepSentinel {
             state_occipital: 0.0,
             // Multi-Scale LTC for spectral discrimination
             theta_alpha: ThetaAlphaRatio::new(sample_rate),
-            // THE TRINITY:
+            // multi-channel feature pipeline:
             // Eyes - EOG Eye Movement Detector
             eog_detector: EyeMovementDetector::new(sample_rate),
-            // Body - EMG Muscle Tone Tracker (Atonia Gate)
+            // Body - EMG Muscle Tone Tracker (EMG atonia heuristic)
             emg_tracker: MuscleToneTracker::new(sample_rate),
             // Thresholds TUNED FROM REAL SC4001 DATA (empirical):
             delta_power_threshold: 0.35,
@@ -1005,7 +1005,7 @@ impl SleepSentinel {
         let eog_frequency = self.eog_detector.movement_frequency();
         let rem_indicator = self.eog_detector.rem_indicator();
 
-        // Get EMG muscle tone metrics - BODY (The Atonia Gate)
+        // Get EMG muscle tone metrics - BODY (The EMG atonia heuristic)
         let muscle_tone = self.emg_tracker.muscle_tone();
         let is_atonia = self.emg_tracker.is_atonia();
         let tone_dropping = self.emg_tracker.is_tone_dropping();
@@ -1026,8 +1026,8 @@ impl SleepSentinel {
         //
         // Brain (EEG) + Eyes (EOG) + Body (EMG) = Complete sleep-stage classification
         //
-        // THE ATONIA GATE (EMG):
-        //   High muscle tone → biologically IMPOSSIBLE to be REM
+        // EMG atonia heuristic (EMG):
+        //   Higher muscle tone is atypical of REM atonia; this is not a definitive rule
         //   Dropping muscle tone → N1 sleep onset signature
         //   Atonia (< 0.20) → REM paralysis confirmed
         //
@@ -1048,15 +1048,15 @@ impl SleepSentinel {
         } else if metrics.complexity > 0.98 && metrics.synchrony < 0.32 {
             // ══════════════════════════════════════════════════════════════════
             // HIGH ENTROPY STATES: Wake OR REM (EEG alone cannot distinguish)
-            // THE TRINITY RESOLVES THIS!
+            // EMG/EOG add features that may help distinguish these sleep stages
             // ══════════════════════════════════════════════════════════════════
             //
             // EMG atonia is an REM-associated feature, used here as a heuristic only.
             //   Wake = Active Brain + Active Body (HIGH muscle tone)
             //   REM  = Active Brain + Paralysis  (ZERO muscle tone / Atonia)
             //
-            // If muscle tone is HIGH → biologically CANNOT be REM
-            // If atonia (EMG < 0.20) → definitively REM
+            // Higher muscle tone is atypical of REM atonia; retain ambiguous cases
+            // An atonia-like EMG pattern can support, but cannot by itself establish, REM
             //
             if is_atonia {
                 // ══════════════════════════════════════════════════════════════
@@ -1069,7 +1069,7 @@ impl SleepSentinel {
                 // ══════════════════════════════════════════════════════════════
                 // Wake-like pattern: higher muscle tone.
                 // ══════════════════════════════════════════════════════════════
-                // The Atonia Gate: Active body = NOT REM
+                // Higher muscle tone is atypical of REM atonia
                 // Threshold: EMG > 0.90 (empirically tuned - Wake mean is ~1.07)
                 PredictedSleepStage::Awake
             } else {
@@ -1090,7 +1090,7 @@ impl SleepSentinel {
         {
             // ══════════════════════════════════════════════════════════════════
             // TRANSITIONAL STATES: N1 (sleep onset)
-            // THE TRINITY: Dropping muscle tone = N1 signature!
+            // A decrease in muscle tone is one heuristic feature associated with sleep onset
             // ══════════════════════════════════════════════════════════════════
             // N1 avg: sync=0.340, complexity=0.991, EOG=0.254
             //
@@ -1199,14 +1199,14 @@ impl SleepSentinel {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN VALIDATION
+// MAIN SLEEP-STAGE EVALUATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════════════╗");
-    println!("║     PROJECT HYPNOS: Clinical Validation on Sleep-EDF                 ║");
+    println!("║     PROJECT HYPNOS: Exploratory Sleep-Stage Prototype               ║");
     println!("║                                                                      ║");
-    println!("║     Validating LTC sleep-stage classification on REAL Human EEG         ║");
+    println!("║     Running sleep-stage feature classifier on Sleep-EDF EEG           ║");
     println!("╚══════════════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -1267,7 +1267,7 @@ fn main() {
         .or_else(|| psg.get_signal("EOG Horizontal"))
         .unwrap_or(frontal); // Fallback: use frontal if no EOG
 
-    // Find EMG channel for atonia detection (BODY) - THE TRINITY
+    // Identify the EMG channel for muscle-tone feature extraction
     // Sleep-EDF uses "EMG submental" for chin muscle tone
     let emg = psg
         .get_signal("EMG submental")
@@ -1278,7 +1278,7 @@ fn main() {
     let has_eog = eog.label.to_lowercase().contains("eog");
     let has_emg = emg.label.to_lowercase().contains("emg");
 
-    println!("   Using channels (THE TRINITY):");
+    println!("   Using EEG/EOG/EMG channels:");
     println!("      BRAIN  - Frontal:   {}", frontal.label);
     println!("      BRAIN  - Occipital: {}", occipital.label);
     println!(
@@ -1344,7 +1344,7 @@ fn main() {
     let mut sentinel = SleepSentinel::new(sample_rate);
 
     println!("\n═══════════════════════════════════════════════════════════════════════");
-    println!("                     RUNNING CLINICAL VALIDATION");
+    println!("                     RUNNING SLEEP-STAGE FEATURE EVALUATION");
     println!("═══════════════════════════════════════════════════════════════════════\n");
 
     // Confusion matrix: [actual][predicted] for 5-class
@@ -1362,7 +1362,7 @@ fn main() {
     let mut class_spectral: [Vec<f64>; 5] =
         [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
     let mut class_eog: [Vec<f64>; 5] = [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
-    // THE TRINITY: EMG muscle tone statistics
+    // EMG muscle-tone feature statistics
     let mut class_emg: [Vec<f64>; 5] = [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
     let max_epochs = labels.len().min(frontal.data.len() / epoch_samples);
@@ -1375,7 +1375,7 @@ fn main() {
         let emg_start = epoch_idx * emg_samples_per_epoch;
         let emg_end = emg_start + emg_samples_per_epoch;
 
-        // Check all FOUR channels have enough data (THE TRINITY)
+        // Check that all required channels have sufficient data
         if end > frontal.data.len()
             || end > occipital.data.len()
             || end > eog.data.len()
@@ -1390,7 +1390,7 @@ fn main() {
         sentinel.reset_detectors(); // Reset all detectors for fresh epoch analysis
 
         // Stream epoch through sentinel (decimated 5x for speed)
-        // THE TRINITY: Brain (frontal, occipital) + Eyes (eog) + Body (emg)
+        // Combine frontal/occipital EEG with EOG and EMG features
         for i in (start..end).step_by(5) {
             // EMG index: map from EEG sample index to EMG sample index
             // Use nearest-neighbor resampling for the lower-rate EMG
@@ -1417,7 +1417,7 @@ fn main() {
         let actual_idx = actual.index().min(4);
         let pred_idx = predicted.index().min(4);
 
-        // Collect feature statistics per class (THE TRINITY)
+        // Collect feature statistics per sleep-stage class
         class_sync[actual_idx].push(metrics.synchrony);
         class_complexity[actual_idx].push(metrics.complexity);
         class_freq[actual_idx].push(metrics.dominant_freq);
@@ -1556,7 +1556,7 @@ fn main() {
     println!("                    FEATURE STATISTICS PER CLASS");
     println!("═══════════════════════════════════════════════════════════════════════\n");
 
-    println!("   THE TRINITY feature statistics (Brain + Eyes + Body):\n");
+    println!("   multi-channel feature pipeline feature statistics (Brain + Eyes + Body):\n");
     println!("   Stage │ Synchrony  │ Complexity │ EOG REM    │ EMG Tone   │ Notes");
     println!("   ──────┼────────────┼────────────┼────────────┼────────────┼────────────────────");
 
@@ -1652,12 +1652,12 @@ fn main() {
         "   ──────┴────────────┴────────────┴────────────┴────────────┴────────────────────\n"
     );
 
-    // THE ATONIA GATE analysis
+    // EMG atonia-feature summary
     if !class_emg[0].is_empty() && !class_emg[4].is_empty() {
         let wake_emg_mean: f64 = class_emg[0].iter().sum::<f64>() / class_emg[0].len() as f64;
         let rem_emg_mean: f64 = class_emg[4].iter().sum::<f64>() / class_emg[4].len() as f64;
 
-        println!("   🎯 THE ATONIA GATE ANALYSIS:");
+        println!("   🎯 EMG ATONIA-FEATURE SUMMARY:");
         println!(
             "      Wake EMG: {:.3} (should be HIGH > 0.6)",
             wake_emg_mean
@@ -1668,8 +1668,8 @@ fn main() {
         );
 
         if wake_emg_mean > 0.5 && rem_emg_mean < 0.4 {
-            println!("      ✅ ATONIA GATE VALIDATED: Clear separation between Wake and REM!");
-            println!("         This is an REM-associated EMG pattern; it is not a definitive biomarker.");
+            println!("      Observed EMG feature difference between Wake and REM in this run.");
+            println!("         This is an REM-associated EMG pattern; it is not a validated biomarker.");
         } else if rem_emg_mean >= wake_emg_mean {
             println!("      ⚠️ EMG channel may not contain muscle tone data - check signal");
         } else {
