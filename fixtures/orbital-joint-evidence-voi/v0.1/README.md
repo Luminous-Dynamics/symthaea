@@ -39,12 +39,12 @@
 
 ## Sequential campaign result (SEQ-001)
 
-This separate finite-horizon evaluator catches a failure mode the one-step selector cannot: neither test by itself improves worst-case minimax regret, but a contingent two-test policy can. The terminal model separates ACCEPT, REJECT and HOLD; no evidence defaults to HOLD.
+This separate finite-horizon evaluator catches a failure mode the one-step selector cannot: neither test by itself improves worst-case minimax regret, but a contingent two-test policy can. The terminal model separates ACCEPT, REJECT and HOLD; no evidence defaults to HOLD, rejection requires an outcome-specific rejection-basis observation, and acceptance requires both affirmative evidence obligations.
 
 | Policy | Worst-case minimax regret | Expected engineering hours | Expected facility hours |
 |---|---:|---:|---:|
 | Stop now (HOLD) | 2 | 0.00 | 0.00 |
-| Myopic one-step | 2 | 0.00 | 0.00 |
+| Myopic one-step (HOLD) | 2 | 0.00 | 0.00 |
 | Fixed screen + thermal inspection | 0 | 1.50 | 2.00 |
 | Adaptive: screen; thermal only on PASS | 0 | 1.20 | 1.55 |
 
@@ -58,7 +58,9 @@ These are small deterministic known-answer controls. They do not constitute a st
 
 The loss matrix uses synthetic decision-loss units. It is not currency, a safety factor or an engineering acceptance limit. Only JEV-002 supplies an explicitly labelled synthetic prior and likelihood model; all other scenarios are distribution-free and have `prior: null`. Do not derive probabilities from the other scenarios' hard state sets.
 
-The sequential campaign additionally separates outcome-specific evidence production from decision disposition: `PASS`/`CLEAR` add affirmative claim obligations; `FAIL`/`INDICATION` add rejection-basis evidence; an empty evidence path produces `HOLD`.\n\nThe scenario catalogue separates:
+The sequential campaign additionally separates outcome-specific evidence production from decision disposition: `PASS`/`CLEAR` add affirmative claim obligations; `FAIL`/`INDICATION` add rejection-basis evidence; an empty evidence path produces `HOLD`.
+
+The scenario catalogue separates:
 - action admissibility from action value;
 - action resource requirements from decision loss;
 - expected-value semantics from distribution-free semantics;
