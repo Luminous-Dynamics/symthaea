@@ -736,10 +736,8 @@ fn wilson_score_upper_95(successes: u64, trials: u64) -> Option<f64> {
     let z_squared = Z_95_ONE_SIDED * Z_95_ONE_SIDED;
     let denominator = 1.0 + z_squared / n;
     let center = observed + z_squared / (2.0 * n);
-    let margin = Z_95_ONE_SIDED
-        * (observed * (1.0 - observed) / n
-            + z_squared / (4.0 * n * n))
-            .sqrt();
+    let margin =
+        Z_95_ONE_SIDED * (observed * (1.0 - observed) / n + z_squared / (4.0 * n * n)).sqrt();
     Some(((center + margin) / denominator).clamp(0.0, 1.0))
 }
 
@@ -858,10 +856,8 @@ fn held_out_metrics(
             let false_support_group_rate = (measured_negative_source_groups > 0).then_some(
                 false_support_source_groups as f64 / measured_negative_source_groups as f64,
             );
-            let false_support_group_upper_95_wilson = wilson_score_upper_95(
-                false_support_source_groups,
-                measured_negative_source_groups,
-            );
+            let false_support_group_upper_95_wilson =
+                wilson_score_upper_95(false_support_source_groups, measured_negative_source_groups);
             let group_risk_status = match (
                 false_support_group_rate,
                 false_support_group_upper_95_wilson,
@@ -870,9 +866,7 @@ fn held_out_metrics(
                 (Some(rate), _) if rate > threshold.target_maximum_false_support_rate => {
                     "observed_risk_exceeds_target"
                 }
-                (_, Some(upper))
-                    if upper <= threshold.target_maximum_false_support_rate =>
-                {
+                (_, Some(upper)) if upper <= threshold.target_maximum_false_support_rate => {
                     "qualified_at_target"
                 }
                 _ => "insufficient_evidence",
