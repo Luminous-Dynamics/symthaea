@@ -96,6 +96,9 @@ struct SummaryRecord {
     gap_profile: &'static str,
     horizon_seconds: f64,
     event_count: usize,
+    gap_schedule_seconds: Vec<f64>,
+    gap_coefficient_of_variation: Option<f64>,
+    input_seeds: Vec<u64>,
     query_count: usize,
     valid_query_count: usize,
     correct_count: usize,
@@ -128,6 +131,9 @@ struct PreparedMemory {
 
 struct EvolutionOutcome {
     state: ContinuousHV,
+    gap_schedule_seconds: Vec<f64>,
+    gap_coefficient_of_variation: Option<f64>,
+    input_seeds: Vec<u64>,
     api_update_count: u64,
     reported_logical_seconds: f64,
     model_setup_wall_ns: u128,
@@ -334,6 +340,26 @@ fn make_gaps(
     gaps
 }
 
+fn coefficient_of_variation(values: &[f32]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mean = values.iter().map(|&value| value as f64).sum::<f64>()
+        / values.len() as f64;
+    if !mean.is_finite() || mean <= 0.0 {
+        return None;
+    }
+    let variance = values
+        .iter()
+        .map(|&value| {
+            let delta = value as f64 - mean;
+            delta * delta
+        })
+        .sum::<f64>()
+        / values.len() as f64;
+    Some(variance.sqrt() / mean)
+}
+
 fn evolve_state(
     dim: usize,
     memory: &ContinuousHV,
@@ -350,6 +376,9 @@ fn evolve_state(
     {
         return Ok(EvolutionOutcome {
             state: memory.clone(),
+            gap_schedule_seconds: Vec::new(),
+            gap_coefficient_of_variation: None,
+            input_seeds: Vec::new(),
             api_update_count: 0,
             reported_logical_seconds: 0.0,
             model_setup_wall_ns: 0,
@@ -380,13 +409,19 @@ fn evolve_state(
     let zero_input = (condition == "hdc_ltc_zero_input")
         .then(|| ContinuousHV::new(dim));
     let gaps = make_gaps(horizon_seconds, event_count, gap_profile, seed);
-    let distractors: Vec<ContinuousHV> = if condition == "hdc_ltc_distractor" {
+    let input_seeds: Vec<u64> = if condition == "hdc_ltc_distractor" {
         (0..event_count)
-            .map(|index| bipolar_random(dim, derive_seed(seed, 5, index as u64)))
+            .map(|index| derive_seed(seed, 5, index as u64))
             .collect()
     } else {
         Vec::new()
     };
+    let distractors: Vec<ContinuousHV> = input_seeds
+        .iter()
+        .map(|&input_seed| bipolar_random(dim, input_seed))
+        .collect();
+    let gap_schedule_seconds: Vec<f64> = gaps.iter().map(|&dt| dt as f64).collect();
+    let gap_coefficient_of_variation = coefficient_of_variation(&gaps);
     let input_preparation_wall_ns = input_prep_start.elapsed().as_nanos();
 
     if gaps.len() != event_count
@@ -418,6 +453,9 @@ fn evolve_state(
 
     Ok(EvolutionOutcome {
         state,
+        gap_schedule_seconds,
+        gap_coefficient_of_variation,
+        input_seeds,
         api_update_count: neuron.update_count(),
         reported_logical_seconds: neuron.total_time(),
         model_setup_wall_ns,
@@ -639,6 +677,9 @@ fn run_cohort(
             gap_profile,
             horizon_seconds,
             event_count,
+            gap_schedule_seconds: evolution.gap_schedule_seconds,
+            gap_coefficient_of_variation: evolution.gap_coefficient_of_variation,
+            input_seeds: evolution.input_seeds,
             query_count: fan_in,
             valid_query_count: accumulator.valid_queries,
             correct_count: accumulator.correct,
@@ -789,6 +830,15 @@ mod tests {
             let elapsed: f64 = gaps.iter().map(|&dt| dt as f64).sum();
             assert!((elapsed - 12.75).abs() < 1.0e-5);
         }
+    }
+
+    #[test]
+    fn gap_schedule_descriptors_are_replayable() {
+        let regular = make_gaps(4.0, 4, "regular", 12);
+        let irregular = make_gaps(4.0, 4, "irregular", 12);
+
+        assert_eq!(coefficient_of_variation(&regular), Some(0.0));
+        assert!(coefficient_of_variation(&irregular).expect("nonempty gaps") > 0.0);
     }
 
     #[test]
