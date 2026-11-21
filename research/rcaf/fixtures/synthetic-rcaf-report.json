@@ -1,0 +1,140 @@
+{
+  "schema_version": "rcaf.report/1.0.0",
+  "run_id": "synthetic-rcaf-fixture-0001",
+  "evidence_status": "synthetic_fixture",
+  "dataset": {
+    "provider": "CETB synthetic fixture",
+    "dataset_id": "synthetic-paired-neural-state-example",
+    "version": null,
+    "doi": null,
+    "access_state": "not_downloaded",
+    "file_manifest_sha256": null,
+    "participant_flow": {
+      "acquired_or_recruited": 5,
+      "released": 5,
+      "qc_eligible": 5,
+      "analysis_included": 5,
+      "excluded": 0,
+      "flow_note": "Synthetic rows only; this is not a human dataset."
+    }
+  },
+  "analysis": {
+    "protocol_id": "RCAF-SYNTHETIC-KNOWN-ANSWER-01",
+    "metric": "weighted_jaccard",
+    "estimator": "hand-authored synthetic participant summaries",
+    "preprocessing_revision": "none-synthetic",
+    "roi_order_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "segment_volumes": 300,
+    "repeat_placements_per_participant": 5,
+    "minimum_common_edges": 1,
+    "neutral_sign_threshold": 0.05,
+    "quality_metrics": {
+      "status": "synthetic_only"
+    },
+    "code_revision": null,
+    "configuration_sha256": null,
+    "environment_sha256": null
+  },
+  "participants": [
+    {
+      "participant_key": "synthetic-01",
+      "site": "synthetic",
+      "phase": "unknown",
+      "within_similarity": 0.55,
+      "between_similarity": 0.5,
+      "paired_gap": 0.05,
+      "within_repeat_count": 5,
+      "between_repeat_count": 5,
+      "mean_framewise_displacement_mm": null,
+      "censor_fraction": null,
+      "network_similarity_index": null
+    },
+    {
+      "participant_key": "synthetic-02",
+      "site": "synthetic",
+      "phase": "unknown",
+      "within_similarity": 0.55,
+      "between_similarity": 0.5,
+      "paired_gap": 0.05,
+      "within_repeat_count": 5,
+      "between_repeat_count": 5,
+      "mean_framewise_displacement_mm": null,
+      "censor_fraction": null,
+      "network_similarity_index": null
+    },
+    {
+      "participant_key": "synthetic-03",
+      "site": "synthetic",
+      "phase": "unknown",
+      "within_similarity": 0.55,
+      "between_similarity": 0.5,
+      "paired_gap": 0.05,
+      "within_repeat_count": 5,
+      "between_repeat_count": 5,
+      "mean_framewise_displacement_mm": null,
+      "censor_fraction": null,
+      "network_similarity_index": null
+    },
+    {
+      "participant_key": "synthetic-04",
+      "site": "synthetic",
+      "phase": "unknown",
+      "within_similarity": 0.55,
+      "between_similarity": 0.5,
+      "paired_gap": 0.05,
+      "within_repeat_count": 5,
+      "between_repeat_count": 5,
+      "mean_framewise_displacement_mm": null,
+      "censor_fraction": null,
+      "network_similarity_index": null
+    },
+    {
+      "participant_key": "synthetic-05",
+      "site": "synthetic",
+      "phase": "unknown",
+      "within_similarity": 0.55,
+      "between_similarity": 0.5,
+      "paired_gap": 0.05,
+      "within_repeat_count": 5,
+      "between_repeat_count": 5,
+      "mean_framewise_displacement_mm": null,
+      "censor_fraction": null,
+      "network_similarity_index": null
+    }
+  ],
+  "summary": {
+    "participant_count": 5,
+    "median_within_similarity": 0.55,
+    "median_between_similarity": 0.5,
+    "median_paired_gap": 0.05,
+    "positive_gap_fraction": 1,
+    "sign_test": {
+      "positive_count": 5,
+      "negative_count": 0,
+      "tie_count": 0,
+      "non_tied_count": 5,
+      "p_two_sided_exact": 0.0625
+    },
+    "participant_bootstrap_ci": {
+      "lower": 0.05,
+      "upper": 0.05,
+      "confidence_level": 0.95,
+      "draws": 2000,
+      "seed": 42
+    },
+    "edge_sign_transitions": {
+      "total_edges": 3,
+      "polarity_reversal_count": 1,
+      "sign_state_change_count": 2,
+      "neutral_threshold": 0.05
+    }
+  },
+  "claim_limits": {
+    "phenomenal_experience_inference": "not_established_by_rcaf",
+    "causal_interpretation": "not_established_by_observational_similarity",
+    "clinical_use": "not_validated_for_clinical_use",
+    "notes": [
+      "This fixture is synthetic and exists only to test the report contract."
+    ]
+  }
+}
