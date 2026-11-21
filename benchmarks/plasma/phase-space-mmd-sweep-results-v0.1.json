@@ -1,0 +1,214 @@
+{
+  "schema": "plasma-phase-space-mmd-sweep-results-v0.1",
+  "status": "observed_metric_microbenchmark_not_full_solver_benchmark",
+  "observed_at": "2026-11-21",
+  "source": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "pull_request": 13049,
+    "exact_head": "77618c17a26a8d1355b6bca6f6c3eb04cb1c8c20",
+    "workflow_name": "Plasma phase-space characteristic MMD oracle",
+    "workflow_run_id": 44870965231,
+    "workflow_run_number": 81,
+    "focused_workflow_steps": {
+      "rust_1_96_toolchain": "success",
+      "strict_rustfmt": "success",
+      "unit_tests": "success",
+      "strict_clippy": "success",
+      "exact_oracle_spectral_sweep": "success",
+      "artifact_upload": "success"
+    },
+    "broad_ci": "skipped_not_passed",
+    "pr_governance": "skipped_not_passed"
+  },
+  "artifact": {
+    "name": "plasma-phase-space-mmd-sweep",
+    "artifact_id": 14694220651,
+    "artifact_sha256": "07b1cb4aca200b3bdaf2a172f71678e8af445e2d5a348cc4750523be47f2381a",
+    "zip_size_bytes": 13801,
+    "csv_file": "spectral-mmd-sweep.csv",
+    "csv_sha256": "73a0152e912e13c25e28329476e7451c8862b0668d17cadfd578e40e32b95134",
+    "csv_data_rows": 360,
+    "csv_total_lines_including_header": 361
+  },
+  "workload": {
+    "fixtures": [
+      "finite_fourier_alias",
+      "joint_position_velocity_correlation",
+      "signed_colocated_cancellation",
+      "high_spatial_concentration"
+    ],
+    "feature_counts": [
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "seeds": [
+      7,
+      17,
+      29,
+      43,
+      59,
+      71,
+      89,
+      101,
+      2026,
+      20261121
+    ],
+    "rows_per_feature_count": 40,
+    "platform": {
+      "target_arch": "x86_64",
+      "target_os": "linux"
+    },
+    "hardware_note": "GitHub-hosted runner CPU model was not captured; absolute runtimes are not portable cross-run or cross-solver claims."
+  },
+  "aggregate_by_feature_count": [
+    {
+      "D": 64,
+      "n": 40,
+      "mean_absolute_error": 0.035298,
+      "p95_absolute_error": 0.1215,
+      "max_absolute_error": 0.217773,
+      "median_runtime_us": 9,
+      "p95_runtime_us": 25,
+      "mean_particle_feature_evaluations": 352
+    },
+    {
+      "D": 128,
+      "n": 40,
+      "mean_absolute_error": 0.023836,
+      "p95_absolute_error": 0.069038,
+      "max_absolute_error": 0.195854,
+      "median_runtime_us": 17,
+      "p95_runtime_us": 46,
+      "mean_particle_feature_evaluations": 704
+    },
+    {
+      "D": 256,
+      "n": 40,
+      "mean_absolute_error": 0.018426,
+      "p95_absolute_error": 0.065608,
+      "max_absolute_error": 0.146155,
+      "median_runtime_us": 33.5,
+      "p95_runtime_us": 92.05,
+      "mean_particle_feature_evaluations": 1408
+    },
+    {
+      "D": 512,
+      "n": 40,
+      "mean_absolute_error": 0.014006,
+      "p95_absolute_error": 0.0401,
+      "max_absolute_error": 0.058929,
+      "median_runtime_us": 69,
+      "p95_runtime_us": 182.1,
+      "mean_particle_feature_evaluations": 2816
+    },
+    {
+      "D": 1024,
+      "n": 40,
+      "mean_absolute_error": 0.008688,
+      "p95_absolute_error": 0.026871,
+      "max_absolute_error": 0.028865,
+      "median_runtime_us": 136.5,
+      "p95_runtime_us": 359.05,
+      "mean_particle_feature_evaluations": 5632
+    },
+    {
+      "D": 2048,
+      "n": 40,
+      "mean_absolute_error": 0.007416,
+      "p95_absolute_error": 0.025738,
+      "max_absolute_error": 0.031371,
+      "median_runtime_us": 272.5,
+      "p95_runtime_us": 720.05,
+      "mean_particle_feature_evaluations": 11264
+    },
+    {
+      "D": 4096,
+      "n": 40,
+      "mean_absolute_error": 0.004819,
+      "p95_absolute_error": 0.014137,
+      "max_absolute_error": 0.027271,
+      "median_runtime_us": 544.5,
+      "p95_runtime_us": 1429.05,
+      "mean_particle_feature_evaluations": 22528
+    },
+    {
+      "D": 8192,
+      "n": 40,
+      "mean_absolute_error": 0.002841,
+      "p95_absolute_error": 0.008614,
+      "max_absolute_error": 0.011905,
+      "median_runtime_us": 1090.5,
+      "p95_runtime_us": 2862.1,
+      "mean_particle_feature_evaluations": 45056
+    },
+    {
+      "D": 16384,
+      "n": 40,
+      "mean_absolute_error": 0.002192,
+      "p95_absolute_error": 0.006926,
+      "max_absolute_error": 0.014442,
+      "median_runtime_us": 2321,
+      "p95_runtime_us": 5715.3,
+      "mean_particle_feature_evaluations": 90112
+    }
+  ],
+  "by_fixture_at_D_16384": [
+    {
+      "fixture": "finite_fourier_alias",
+      "exact_mmd_squared": 0.05492292553107314,
+      "mean_absolute_error": 0.002488,
+      "p95_absolute_error": 0.005311,
+      "max_absolute_error": 0.005868,
+      "median_runtime_us": 2395.5,
+      "all_rows_within_reported_bound": true
+    },
+    {
+      "fixture": "high_spatial_concentration",
+      "exact_mmd_squared": 0.2204538549791214,
+      "mean_absolute_error": 0.002553,
+      "p95_absolute_error": 0.006744,
+      "max_absolute_error": 0.007168,
+      "median_runtime_us": 5695,
+      "all_rows_within_reported_bound": true
+    },
+    {
+      "fixture": "joint_position_velocity_correlation",
+      "exact_mmd_squared": 0.386263,
+      "mean_absolute_error": 0.003728,
+      "p95_absolute_error": 0.011054,
+      "max_absolute_error": 0.014442,
+      "median_runtime_us": 1971.5,
+      "all_rows_within_reported_bound": true
+    },
+    {
+      "fixture": "signed_colocated_cancellation",
+      "exact_mmd_squared": 0,
+      "mean_absolute_error": 0,
+      "p95_absolute_error": 0,
+      "max_absolute_error": 0,
+      "median_runtime_us": 1499.5,
+      "all_rows_within_reported_bound": true
+    }
+  ],
+  "observed_bound_check": {
+    "rows_with_absolute_error_at_or_below_row_hoeffding_95_half_width": 360,
+    "total_rows": 360,
+    "observed_fraction": 1,
+    "interpretation": "all observed fixed-seed fixture rows fell inside their reported fixed-D feature-sampling radii; this is not a new statistical coverage proof or an estimate of future coverage"
+  },
+  "interpretation_and_limits": [
+    "Errors are in normalized squared MMD, not MMD square-root distance.",
+    "Mean absolute error decreases overall with feature count on this finite fixture set, although per-seed error is stochastic and not necessarily monotone.",
+    "The reported runtime is diagnostic kernel microbenchmark timing on one GitHub-hosted x86_64 Linux runner; no CPU model was captured.",
+    "This does not benchmark a full PIC solver, field/particle time-to-solution, multi-GPU scaling, or superiority over NEOPIC, Smilei or WarpX.",
+    "The Hoeffding radii apply to the random spectral-feature integral under their stated independent-draw assumptions, not finite-particle or physical solver error.",
+    "The 360-row observed bound check is a finite fixture observation, not a proof that the confidence interval is calibrated in every workload."
+  ]
+}
