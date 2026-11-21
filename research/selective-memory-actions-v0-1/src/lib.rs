@@ -424,6 +424,7 @@ mod tests {
             source_qualified: true,
             scope_qualified: true,
             freshness_at_use: FreshnessAtUse {
+                evidence_age_at_retrieval_ns: None,
                 evidence_age_at_use_ns: Some(101),
                 max_evidence_age_ns: Some(100),
                 deadline_slack_at_use_ns: Some(1_000),
@@ -475,6 +476,7 @@ mod tests {
             scope_qualified: true,
             not_revoked_or_erased: true,
             freshness_at_use: FreshnessAtUse {
+                evidence_age_at_retrieval_ns: None,
                 evidence_age_at_use_ns: Some(10),
                 max_evidence_age_ns: Some(100),
                 deadline_slack_at_use_ns: None,
@@ -492,6 +494,7 @@ mod tests {
     #[test]
     fn late_decision_is_not_fresh_even_when_evidence_age_is_within_budget() {
         let freshness = FreshnessAtUse {
+            evidence_age_at_retrieval_ns: None,
             evidence_age_at_use_ns: Some(50),
             max_evidence_age_ns: Some(100),
             deadline_slack_at_use_ns: Some(-1),
@@ -502,6 +505,7 @@ mod tests {
     #[test]
     fn evidence_at_inclusive_age_limit_and_exact_deadline_is_qualified() {
         let freshness = FreshnessAtUse {
+            evidence_age_at_retrieval_ns: None,
             evidence_age_at_use_ns: Some(100),
             max_evidence_age_ns: Some(100),
             deadline_slack_at_use_ns: Some(0),
