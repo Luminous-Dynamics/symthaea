@@ -1,0 +1,139 @@
+{
+  "schema_version": "cetb.defensible-multiverse/0.1.0",
+  "manifest_id": "synthetic-RCAF-estimator-multiverse-example",
+  "status": "synthetic_fixture",
+  "claim": {
+    "claim_id": "synthetic-network-change",
+    "endpoint": "paired within-vs-between correlation-network similarity",
+    "modality": "synthetic correlation matrices",
+    "population": "synthetic independent participants",
+    "primary_estimand": "median participant-paired similarity gap"
+  },
+  "freeze": {
+    "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "registered_at": "2026-11-21T12:00:00+02:00",
+    "confirmatory_outcomes_accessed": false
+  },
+  "generation": {
+    "mode": "enumerate_all_compatible",
+    "seed": 127,
+    "max_pipelines": 16,
+    "sampling_method": "none; enumerate all allowed option combinations"
+  },
+  "decision_nodes": [
+    {
+      "node_id": "estimator",
+      "stage": "estimation",
+      "purpose": "compare declared network-similarity semantics",
+      "applicability": "applicable",
+      "options": [
+        {
+          "option_id": "abs-wj",
+          "implementation": "absolute-edge Weighted Jaccard",
+          "defensibility_rationale": "known non-negative magnitude overlap metric with hand fixtures",
+          "evidence_basis": [
+            "RCAF kernel hand-computed fixtures"
+          ],
+          "expected_construct": "unsigned magnitude overlap",
+          "limitations": [
+            "discards edge polarity"
+          ],
+          "lane": "primary"
+        },
+        {
+          "option_id": "signed-shift-wj",
+          "implementation": "shift correlations from [-1,1] to [0,2] then WJ",
+          "defensibility_rationale": "explicitly retains sign disagreement in non-negative weights",
+          "evidence_basis": [
+            "RCAF kernel signed-shift definition"
+          ],
+          "expected_construct": "signed similarity after fixed shift",
+          "limitations": [
+            "shift changes zero baseline semantics"
+          ],
+          "lane": "sensitivity"
+        }
+      ]
+    },
+    {
+      "node_id": "noise",
+      "stage": "preprocessing",
+      "purpose": "vary declared synthetic sampling duration",
+      "applicability": "applicable",
+      "options": [
+        {
+          "option_id": "160-samples",
+          "implementation": "160 samples per segment",
+          "defensibility_rationale": "fixed baseline segment duration for the simulation fixture",
+          "evidence_basis": [
+            "simulation configuration"
+          ],
+          "expected_construct": "finite-sample correlation estimate",
+          "limitations": [
+            "not a biological acquisition duration"
+          ],
+          "lane": "primary"
+        },
+        {
+          "option_id": "320-samples",
+          "implementation": "320 samples per segment",
+          "defensibility_rationale": "longer segment sensitivity for estimator convergence",
+          "evidence_basis": [
+            "simulation protocol sensitivity target"
+          ],
+          "expected_construct": "finite-sample correlation estimate at higher precision",
+          "limitations": [
+            "increases acquisition analogue"
+          ],
+          "lane": "sensitivity"
+        }
+      ]
+    }
+  ],
+  "compatibility_rules": [
+    {
+      "rule_id": "same-estimand-compare",
+      "effect": "allow",
+      "option_ids": [
+        "abs-wj",
+        "160-samples"
+      ],
+      "rationale": "primary configuration"
+    },
+    {
+      "rule_id": "signed-shift-sensitivity",
+      "effect": "allow",
+      "option_ids": [
+        "signed-shift-wj",
+        "320-samples"
+      ],
+      "rationale": "explicit alternative similarity semantics and segment duration"
+    },
+    {
+      "rule_id": "different-construct-separate",
+      "effect": "separate_estimand",
+      "option_ids": [
+        "abs-wj",
+        "signed-shift-wj"
+      ],
+      "rationale": "unsigned and signed similarity are not automatically equivalent"
+    }
+  ],
+  "equivalence_assessments": [
+    {
+      "assessment_id": "wj-construct",
+      "option_ids": [
+        "abs-wj",
+        "signed-shift-wj"
+      ],
+      "criterion": "construct",
+      "status": "non_equivalent",
+      "rationale": "absolute overlap discards polarity while signed shift penalizes sign disagreement"
+    }
+  ],
+  "claim_limits": [
+    "synthetic protocol fixture only",
+    "pipeline options are examples, not empirical conclusions",
+    "no model selection by best outcome is authorized"
+  ]
+}
