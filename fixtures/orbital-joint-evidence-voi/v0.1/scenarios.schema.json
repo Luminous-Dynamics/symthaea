@@ -119,7 +119,8 @@
         "current_evidence_dependency_groups",
         "required_obligations",
         "target_claim_id",
-        "requires_independent_evidence"
+        "requires_independent_evidence",
+        "decision_context"
       ],
       "properties": {
         "scenario_id": {
@@ -218,6 +219,34 @@
         },
         "requires_independent_evidence": {
           "type": "boolean"
+        },
+        "decision_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile_ref",
+            "article_subject_ref",
+            "configuration_id",
+            "icd_revision"
+          ],
+          "properties": {
+            "profile_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "article_subject_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "configuration_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "icd_revision": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       },
       "allOf": [
