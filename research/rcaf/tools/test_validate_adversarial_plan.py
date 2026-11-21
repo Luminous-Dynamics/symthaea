@@ -70,6 +70,14 @@ class AdversarialPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(PlanValidationError, "must be unique"):
             validate_plan(plan, SCHEMA)
 
+    def test_directional_detection_and_wrong_direction_outputs_are_mandatory(self):
+        for required in ("directional_power", "wrong_direction_rejection_rate"):
+            plan = deepcopy(FIXTURE)
+            plan["required_outputs"].remove(required)
+            with self.subTest(required=required):
+                with self.assertRaisesRegex(PlanValidationError, required):
+                    validate_plan(plan, SCHEMA)
+
     def test_mandatory_outputs_are_present(self):
         plan = deepcopy(FIXTURE)
         plan["required_outputs"].remove("nuisance_false_positives")
