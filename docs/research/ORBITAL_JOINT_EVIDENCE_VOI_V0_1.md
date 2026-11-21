@@ -255,7 +255,7 @@ Report, separately:
 
 ### 7.1 Finite-horizon sequential campaign planning
 
-The one-step selector is not enough for campaigns where two individually uninformative tests can be valuable as a contingent sequence. A separate bounded sequential fixture now exercises that case.
+The one-step selector is not enough for campaigns where two individually uninformative tests can be valuable as a contingent sequence. A separate bounded sequential fixture now exercises that case under two different declared frequency profiles.
 
 **SEQ-001** has four synthetic states (healthy, axial-capacity defect, thermal-wear defect and joint-retention defect), two actions, and an ACCEPT/REJECT loss matrix. Either action alone leaves worst-case minimax regret at 5, so the myopic one-step rule stops. The fixed two-test campaign reaches regret 0. An exact depth-two policy also reaches regret 0, but executes the thermal inspection only after the first screen returns PASS; FAIL terminates at REJECT.
 
@@ -268,7 +268,7 @@ The deterministic finite-horizon planner uses:
 - an explicit stop/terminal action in every belief state;
 - Pareto comparison over expected resource vectors; incomparable plans must escalate to human review rather than being scalarized.
 
-For this known-answer fixture, adaptive expected use is 1.20 engineering hours, 1.55 facility hours, 1.70 specimen units, 0.24 review hours and 0.86 external-cost units. The fixed two-test campaign uses 1.50, 2.00, 2.00, 0.30 and 1.10 respectively. Worst-case decision regret is zero for both. This is an exact result for one hand-authored synthetic example; it is not a measured saving on a physical campaign.
+For SEQ-001, adaptive expected use is 1.20 engineering hours, 1.55 facility hours, 1.70 specimen units, 0.24 review hours and 0.86 external-cost units. For SEQ-002 it is 1.15, 1.65, 1.30, 0.23 and 0.89. The fixed two-test campaign uses 1.50, 2.00, 2.00, 0.30 and 1.10 in both cases. Worst-case decision regret is zero for both adaptive and fixed campaigns. These are exact results for two hand-authored synthetic examples, not measured savings on physical campaigns.
 
 **Current sequential-design research comparator:** Cheng and Huan, *Optimal Stopping for Sequential Bayesian Experimental Design*, arXiv:2509.21734 (submitted 2025; revised June 2026). The work formulates experiment choice and stopping as coupled decisions in a finite-horizon MDP and studies learned policies/continuation values on simulated inference problems. This makes it a relevant SOTA comparator, not a novelty claim for adaptive stopping. The present Luminous fixture differs by maintaining distribution-free terminal decision risk, exact engineering article/configuration scope, hard non-compensatory gates, and vector-valued resource budgets. A future matched-budget tournament must compare against learned Bayesian stopping policies where their assumptions apply, plus fixed, random, space-filling, uncertainty/disagreement, myopic VOI and human-engineer baselines.
 
