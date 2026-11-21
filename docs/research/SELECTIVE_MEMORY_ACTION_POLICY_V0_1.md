@@ -252,6 +252,9 @@ No official benchmark's held-out test material should be used to tune prompts or
 
 ## 7. Metrics and reporting
 
+Every run manifest must bind three separate identities: the canonical time-semantics profile from #9954/#12401, the AoI/QAoI/AoII metric-definition profile, and the task-specific freshness/deadline budget profile. Candidate action records bind the freshness assessment that was actually supplied to the selector. Evaluator records separately bind actual evidence age at retrieval/use, deadline slack and correctness-at-use. Do not let the candidate supply or edit evaluator truth.
+
+
 Report a vector, never a single composite score.
 
 **Commitment quality**
