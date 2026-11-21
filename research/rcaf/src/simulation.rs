@@ -538,12 +538,12 @@ pub fn run_injection_recovery(
     let mut null_positive_fractions = Vec::with_capacity(config.monte_carlo_replicates);
     let mut injected_positive_fractions = Vec::with_capacity(config.monte_carlo_replicates);
 
-    for _ in 0..config.monte_carlo_replicates {
+    for replicate_index in 0..config.monte_carlo_replicates {
         let mut null_gaps = Vec::with_capacity(config.participants);
         let mut nuisance_gaps = Vec::with_capacity(config.participants);
         let mut injected_gaps = Vec::with_capacity(config.participants);
 
-        for _ in 0..config.participants {
+        for participant_index in 0..config.participants {
             let mut global_loadings = Vec::with_capacity(config.regions);
             let mut module_loadings = Vec::with_capacity(config.regions);
             let mut injected_loadings = Vec::with_capacity(config.regions);
@@ -604,8 +604,13 @@ pub fn run_injection_recovery(
             let nuisance_c = if config.common_mode_nuisance_loading == 0.0 {
                 null_c.clone()
             } else {
+                // Domain-separated stream: identical nuisance innovations are reused at
+                // every nuisance dose without consuming or shifting the latent-signal RNG.
+                let nuisance_seed =
+                    derive_nuisance_seed(config.seed, replicate_index, participant_index);
+                let mut nuisance_rng = GaussianRng::new(nuisance_seed);
                 sample_correlation_matrix(
-                    &mut rng,
+                    &mut nuisance_rng,
                     config.samples_per_segment,
                     &global_loadings,
                     &module_loadings,
@@ -859,6 +864,17 @@ fn sample_correlation_matrix(
     }
 
     flat.chunks(regions).map(|row| row.to_vec()).collect()
+}
+
+/// Derive a deterministic, domain-separated RNG stream for a participant's nuisance.
+fn derive_nuisance_seed(seed: u64, replicate_index: usize, participant_index: usize) -> u64 {
+    let mut value = seed
+        ^ 0xD1B5_4A32_D192_ED03
+        ^ (replicate_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (participant_index as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
 }
 
 fn median(values: &[f64]) -> f64 {
