@@ -99,6 +99,31 @@ A safety/structural hard constraint cannot be offset by mass, cost, schedule, ex
 
 Unknown, unsupported, missing, out-of-domain, non-converged or invalid evidence stays unresolved. No evidence is imputed into a favorable result.
 
+
+### Mycelix and Symtropy change-impact owners
+
+Use Mycelix [LISE-ASSURANCE-INVALIDATION-001 #6219](https://github.com/Luminous-Dynamics/mycelix/issues/6219) as the generic owner of event-driven evidence invalidation, dependency closure, historical preservation and targeted requalification. Reuse its existing owners for evidence leases (#181), applicability/subject drift (#1087), evidence epochs and causal ordering (#1207/#2631), bitemporal reconstruction (#6069), source/observer dependencies (#6140) and independent oracle separation (#4835). Do not add another generic graph or currentness service here.
+
+The aviation-specific application is Symtropy [AEROWEFT-MODEL-EVIDENCE-REQUALIFICATION-001 #5371](https://github.com/Luminous-Dynamics/symtropy/issues/5371). Structural lifecycle qualification remains under Symtropy #6484 and as-built structural acceptance under #4263.
+
+The aerospace evidence-action consumer should take the following event-to-claim relationships from those owners, not infer them from names:
+
+| Change event | Potentially affected claims | Non-automatic invalidation boundary |
+|---|---|---|
+| CAD / ICD / configuration revision | PMI joins, geometry/fit, mating, structural-model applicability, assembly plan, inspection coverage | independent sensor calibration, unrelated material history |
+| Serialized unit replacement | unit-specific build, inspection, test, assembly and as-built acceptance | component-family definition and other serial units |
+| Material batch / lot / condition | material/process characterization, process capability, allowables and derived structural claims | unchanged design geometry semantics |
+| Process route, machine or tooling change | process qualification, as-run build, material-state transfer and affected dimensional/structural claims | unchanged interface definition or unrelated instrument calibration |
+| Instrument / reference calibration | measurement claims within that instrument/reference scope | non-measurement design claims |
+| NDE method / procedure / probe / coverage | defect-, orientation- and method-specific inspectability/POD/false-call claims | unrelated structural simulation outputs |
+| Structural solver / mesh / model / material model | model applicability, correlation and derived model claims | independent physical observations |
+| Robot / tool / firmware / task-plan change | grasp, insertion, lock, verification and affected assembly claims | independently qualified material/design facts |
+| Repair / joint replacement | article lifecycle and affected joint acceptance/requalification | unaffected claims with verified independent dependencies |
+
+These are candidate mappings requiring owner-reviewed edges, not universal rules. A change can make an old claim historical-only or require requalification without proving the physical article has failed. An incomplete change feed is INDETERMINATE, not evidence that nothing changed.
+
+The selector's own frozen context tuple (profile reference, physical serial, configuration, ICD revision) is a final consumer-side false-join gate; it is not a substitute for #6219 dependency closure. Symthaea only ranks actions after the owner-native invalidation result and affected claim set are supplied. It must not promote a claim or decide which dependencies exist.
+
 ## 5. Resource accounting
 
 Keep the resource vector explicit:
