@@ -733,6 +733,9 @@ mod tests {
         low.allostatic_load = 0.1;
         low.complexity = 0.1;
         low.warmth = 0.0;
+        // At the second half of the breathing cycle, vitality changes
+        // the amplitude and therefore the outer bloom radius.
+        low.cycle_phase = 1.0;
 
         let mut high = low.clone();
         high.vitality = 1.0;
