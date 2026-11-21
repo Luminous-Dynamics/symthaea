@@ -80,9 +80,11 @@ impl DirectionCountsV1 {
 
 #[derive(Debug, Clone, Serialize)]
 struct TrialReceiptV1 {
+    receipt_id: String,
     trial_id: String,
     seed: u64,
     target: RmiTargetFeatureV1,
+    intervention: RmiInterventionPairV1,
     agent_policy_id: String,
     partner_policy_id: String,
     intervention_pair_sha256: String,
@@ -308,7 +310,6 @@ fn collect_partner<P, H>(
     partner_policy: &H,
     pair: &RmiInterventionPairV1,
     agent_evaluation: &RmiEvaluationEnvelopeV1,
-    agent_class: &str,
     partner_counts: &mut BTreeMap<String, DirectionCountsV1>,
     receipts: &mut Vec<TrialReceiptV1>,
 ) -> Result<(), String>
@@ -333,9 +334,16 @@ where
         reciprocal.payload.partner_collateral_changed_feature_count,
     );
     receipts.push(TrialReceiptV1 {
+        receipt_id: format!(
+            "{}|agent={}|partner={}",
+            pair.trial_id,
+            agent_policy.policy_id(),
+            partner_policy.policy_id()
+        ),
         trial_id: pair.trial_id.clone(),
         seed: pair.seed,
         target,
+        intervention: pair.clone(),
         agent_policy_id: agent_policy.policy_id().to_string(),
         partner_policy_id: partner_policy.policy_id().to_string(),
         intervention_pair_sha256: agent_evaluation
@@ -345,7 +353,6 @@ where
         agent_evaluation: agent_evaluation.clone(),
         reciprocal_evaluation: reciprocal,
     });
-    let _ = agent_class;
     Ok(())
 }
 
@@ -381,7 +388,6 @@ fn collect_agent_policy<P: RmiPolicyV1>(
         &fixed_partner,
         pair,
         &agent_evaluation,
-        "synthetic_trial",
         partner_counts,
         receipts,
     )?;
