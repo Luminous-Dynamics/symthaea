@@ -27,7 +27,7 @@
     "temperature_k": 77,
     "field_magnitude_t": 0,
     "field_orientation": "self-field",
-    "measurement_protocol_id": "SYNTH-MEASUREMENT-001"
+    "measurement_protocol_id": "SYNTH-PROTOCOL-001"
   },
   "blocks": [
     {
