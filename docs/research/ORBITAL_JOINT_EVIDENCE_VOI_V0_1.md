@@ -229,6 +229,68 @@ This adapter should not try to replace specialist optimizers, model-based system
 
 SOTA claims require the same held-out problems, action catalogue, physics models, evidence availability, policy overhead and total resource budget. Report uncertainty and effect sizes, not just the best single seed.
 
+
+### 9.1 Standards and product baseline as of 21 November 2026
+
+The design must now be mapped against the published 2026 standards, not just earlier digital-twin concepts:
+
+- **ISO 23247-5:2026** defines digital-thread use to connect manufacturing lifecycle data to digital twins across design, planning, production and testing. It was published in June 2026.
+- **ISO 23247-6:2026** defines digital-twin composition across vendors and systems, including integrated, unified and federated composition approaches; it was published in July 2026.
+- **CAx-IF** provides AP242 recommended practices, persistent-ID guidance (v1.8, March 2026), and published STEP/QIF trace-information Test Cases 7 and 8. These are important independent reference fixtures.
+- **NIST STEP File Analyzer and Viewer 5.41** is a reference analysis tool for STEP AP242 and semantic/graphic PMI; use it and CAx-IF material as external conformance comparators rather than writing a second STEP parser.
+
+Primary references: [ISO 23247-5:2026](https://www.iso.org/standard/87425.html), [ISO 23247-6:2026](https://www.iso.org/standard/87426.html), [CAx-IF recommended practices and sample files](https://www.mbx-if.org/home/cax/recpractices/), [NIST STEP File Analyzer and Viewer](https://www.nist.gov/services-resources/software/step-file-analyzer-and-viewer).
+
+NIST specifically highlights persistent identifiers, semantic PMI, feature associations, hybrid geometry and secure data-asset traceability as areas where digital-thread capabilities still need work. It notes that checking STEP syntax and QIF well-formedness does not, by itself, check the engineering semantics embedded in those files. That supports a sharply scoped Luminous assurance layer: compare semantic assertions and identity/evidence joins across independently generated outputs, while consuming specialist parsers and metrology tools.
+
+### 9.2 Commercial tools: integrate rather than clone
+
+The competitive baseline is already stronger than a simple CAD-to-QIF bridge:
+
+- **Hexagon PC-DMIS 2026.2** publicly describes STEP AP242 semantic-PMI import into QIF-based measurement planning, UUID mapping, AI-assisted edge detection, advanced point-cloud processing, and tighter Teamcenter traceability. That is the immediate shop-floor interoperability target.
+- **Siemens Teamcenter Simulation/SPDM** manages simulation and physical-test processes/data, multi-discipline traceability and integrated workflows.
+- **Dassault Systèmes 3DEXPERIENCE** is deployed at Airbus across future civil/military aircraft and helicopter programmes, with more than 20,000 users in the announced scope.
+- **Ansys/Minerva** positions simulation process/data management and model-based workflows as a digital-engineering ecosystem.
+
+References: [Hexagon PC-DMIS 2026.2 release](https://hexagon.com/about/news-media/media-alerts/2026/pc-dmis), [Siemens Teamcenter SPDM](https://www.siemens.com/en-us/products/teamcenter/solutions/simulation-process-data-management-spdm/), [Airbus–Dassault partnership](https://www.3ds.com/newsroom/press-releases/dassault-systemes-and-airbus-extend-strategic-partnership-use-virtual-twins-next-generation-programs), [Ansys digital engineering](https://www.ansys.com/blog/defense-digital-engineering).
+
+Do not claim these systems lack provenance, workflow control or evidence management. Their feature scope and commercial deployments are substantial. Luminous should operate as a vendor-neutral qualification/evidence and decision layer at the interfaces between them, preserving their native files and authoritative records.
+
+### 9.3 Luminous composition strategy: federated by default
+
+ISO 23247-6's composition framing supports a deliberate architecture choice:
+
+- **Mycelix** remains the authority for article identity, signer/role authority, custody, provenance and correction/revocation state.
+- **Symtropy** remains the authority for physics/structural/inspection/test calculations and qualification dispositions.
+- **Symthaea** consumes those outputs to propose designs and next evidence actions, with explicit uncertainty/decision regimes.
+- **Sol-Atlas** contributes spatial, facility, logistics and infrastructure context without converting a facility listing into an availability or qualification claim.
+
+Start with **federated composition**: each system retains its native schema and authority; exchanged records carry stable references, revisions, subject/configuration scope, evidence digest and claim ceiling. Introduce unified views for decision workflows only after the exact reference joins are verified. Do not create one monolithic universal twin or let one system overwrite another system's source of truth.
+
+This should be assessed against ISO 23247-5/-6 concepts, not described as standards-conformant without a clause-by-clause assessment. The architecture's differentiator is the non-compensatory evidence contract: a semantically valid link is not a physical pass; a signed record is not a verified measurement; a simulation is not a test; a coupon is not a production joint; and an unresolved claim stays unresolved.
+
+### 9.4 Interoperability tournament and measurable targets
+
+Use CAx-IF Test Cases 7/8 and the NIST SFA sample models as external reference inputs. Use PC-DMIS 2026.2 as a commercial workflow comparator where a rights-cleared evaluation environment or exported result is available. Compare at least:
+1. AP242 semantic-PMI → QIF plan assertion preservation;
+2. persistent UUID and requirement/feature/serial-unit join retention;
+3. measurement-result and calibration/instrument trace retention;
+4. semantic loss, ambiguity and unsupported-feature detection;
+5. stale revision, wrong serial and wrong configuration rejection;
+6. content/digest and custody/change history across exports;
+7. time and human re-entry required to repair broken links;
+8. evidence/action selection quality at matched resource budget.
+
+Proposed benchmark targets, not achieved results:
+- zero false joins across frozen wrong-subject/configuration/revision negatives;
+- 100% preservation of required semantic assertions supported by the declared test-case subset;
+- zero silent drops: every unsupported or lost assertion becomes an explicit loss/Unknown disposition;
+- deterministic outputs across input ordering and repeated replay;
+- 100% correct invalidation of evidence affected by stale/revoked identity or method revision;
+- at least 20% reduction in human reconciliation/review time on held-out cases at equal or higher semantic coverage, measured against a pre-registered manual and vendor-workflow baseline.
+
+Do not claim better semantic PMI conformance than Hexagon or NIST until the same models, assertions, versions and output evidence have been run independently. The stronger near-term claim is a reproducible evidence/decision layer across multiple tools and lifecycle owners, demonstrated with open fixtures.
+
 ## 10. Physical test and safety boundary
 
 Any actual connector coupon, NDE, wear or ground test remains with Symtropy #6256/#5771 and the competent test/safety owners. Initial physical work, if approved, is non-flight, uncrewed and limited to benign, appropriately guarded test articles and rated fixtures. The issue supplies no pressure, force, energy or environmental limits. No propellants, cryogens, live spacecraft, flight-critical article or unsupervised machine actuation are introduced by this adapter.
