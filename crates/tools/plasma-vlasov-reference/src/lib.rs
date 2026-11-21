@@ -1226,8 +1226,7 @@ mod tests {
         let mut maximum_error: f64 = 0.0;
         for (ix, impulse) in impulses.iter().copied().enumerate() {
             for iv in 0..config.nv {
-                let shifted_velocity =
-                    config.velocity(iv) - config.velocity_min - impulse;
+                let shifted_velocity = config.velocity(iv) - config.velocity_min - impulse;
                 let expected = base + amplitude * (eta * shifted_velocity).cos();
                 let actual = solver.distribution()[ix * config.nv + iv];
                 maximum_error = maximum_error.max((actual - expected).abs());
