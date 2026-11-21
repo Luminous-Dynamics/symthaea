@@ -105,3 +105,12 @@ A source-level chronological SECOM manifest now accompanies the synthetic split 
 ## Latest hosted verification
 
 The updated reference suite contains **35 tests** and passed in hosted GitHub Actions run [#44899113316](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316). This run includes the frozen row-level SECOM source-clock manifest test. It also reproduced the binary-metric and inspection-decision reports byte-for-byte. No local test execution is claimed.
+
+
+## Split-local contrastive-pair validator
+
+The independent helper `python/semi_pair_manifest_reference.py` validates pair provenance and split boundaries for graph/contrastive wafer learning. It requires each endpoint to exist in the frozen split manifest, both endpoints to share the declared pair scope, unique sample/pair/unordered-edge identities, no self-pairs, and valid positive/negative relations. If a pair uses production-proximity evidence, its reason must be supported by matching lot identity or timestamps within a declared embargo and clock domain.
+
+The known-answer input/output are `fixtures/contrastive-pair-manifest-known-answer-v1.json` and `fixtures/contrastive-pair-manifest-known-answer-v1.expected.json`. Eleven tests cover cross-split pairs, scope mismatch, duplicate identities/edges, orphan references, self-pairs, same-lot evidence and time-embargo violations.
+
+This establishes pair-manifest integrity only. It does not establish that a positive or negative pair is semantically correct, or that a trained embedding/model performs well.
