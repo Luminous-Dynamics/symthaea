@@ -144,19 +144,20 @@ pub fn tessellate_mycelial_model(
         return Err(TubeTessellationError::FilamentCountExceeded(model.filaments.len()));
     }
 
-    let mut ids = std::collections::HashSet::with_capacity(model.filaments.len());
+    // Parent-before-child order rejects cycles and makes ranges safe to replay.
+    let mut seen_ids = std::collections::HashSet::with_capacity(model.filaments.len());
     for filament in &model.filaments {
-        if !ids.insert(filament.id) {
+        if filament.parent_id.is_some_and(|parent_id| {
+            parent_id == filament.id || !seen_ids.contains(&parent_id)
+        }) {
+            return Err(TubeTessellationError::InvalidFilamentTopology);
+        }
+        if !seen_ids.insert(filament.id) {
             return Err(TubeTessellationError::InvalidFilamentTopology);
         }
         if !valid_filament_geometry(filament) {
             return Err(TubeTessellationError::InvalidFilamentGeometry(filament.id));
         }
-    }
-    if model.filaments.iter().any(|filament| {
-        filament.parent_id.is_some_and(|parent_id| !ids.contains(&parent_id))
-    }) {
-        return Err(TubeTessellationError::InvalidFilamentTopology);
     }
 
     let vertices_per_filament =
