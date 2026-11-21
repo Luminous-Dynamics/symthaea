@@ -1,13 +1,13 @@
 # Orbital Joint Evidence VOI Scenario Corpus v0.1
 
 **Tracker:** [#13111](https://github.com/Luminous-Dynamics/symthaea/issues/13111)  
-**Specification:** [ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md](../../../../docs/research/ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md)  
-**Status:** hand-authored synthetic contract fixtures; not yet executed by an action-selection engine.
+**Specification:** [ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md](../../../docs/research/ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md)  
+**Status:** hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit; not an evaluated adaptive selector.
 
 ## Files
 
 - `scenarios.json`: 11 synthetic scenarios, explicit state/loss contexts, action proposals, resource vectors and expected qualitative/known-answer checks.
-- `scenarios.schema.json`: JSON Schema Draft 2020-12 for the v0.1 corpus.
+- `scenarios.schema.json`: JSON Schema Draft 2020-12 for the v0.1 corpus.\n- [Executable dry-run preflight](https://github.com/Luminous-Dynamics/symthaea/tree/research/orbital-joint-evidence-voi-v0-1/tools/orbital-joint-evidence-voi-bench): resource/admissibility/claim checks, finite-state minimax regret and one explicit calibrated EVSI case.\n- A separately implemented standard-library Python oracle under the same tool directory.
 
 ## Scenario coverage
 
@@ -40,4 +40,4 @@ The scenario catalogue separates:
 - pre-registered test obligations from general information gain;
 - planned actions from actual execution outcomes.
 
-Some expected decisions are qualitative contract targets (for example, `ABSTAIN`) pending the first independently reviewed decision-value oracle. No action-selection policy has yet been evaluated against this corpus. The next implementation step is a dry-run preflight and independently recomputed one-step oracle; it must not call a solver or execute a physical test.
+The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim matching, dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. They do not rank a general action catalogue or claim that one policy is superior. The adaptive selector tournament remains unimplemented; no solver or physical test is called.
