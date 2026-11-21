@@ -515,7 +515,6 @@ mod tests {
         assert!(svg.contains("prefers-reduced-motion"));
     }
 
-
     #[test]
     fn hyphae_and_staggered_spores_animate_but_respect_reduced_motion() {
         let hyphae = SceneNode::group(Some("hyphae"));
@@ -528,11 +527,7 @@ mod tests {
             .with_child(hyphae)
             .with_child(starfield);
 
-        let full = render_svg_with_options(
-            &root,
-            0.5,
-            SvgRenderOptions::default(),
-        );
+        let full = render_svg_with_options(&root, 0.5, SvgRenderOptions::default());
         assert!(full.contains("@keyframes hyphae-pulse"));
         assert!(full.contains("@keyframes star-twinkle"));
         assert!(full.contains(".spore-phase-2"));
