@@ -949,10 +949,9 @@ mod tests {
             CorrelationWjMode::NegativeEdgesInBoth,
             CorrelationWjMode::SignedShift,
         ] {
-            let baseline = weighted_jaccard_labeled_correlation_matrices(
-                &labels, &a, &labels, &b, mode, 1,
-            )
-            .unwrap();
+            let baseline =
+                weighted_jaccard_labeled_correlation_matrices(&labels, &a, &labels, &b, mode, 1)
+                    .unwrap();
             let permuted = weighted_jaccard_labeled_correlation_matrices(
                 &permuted_labels,
                 &permuted_a,
@@ -962,14 +961,12 @@ mod tests {
                 1,
             )
             .unwrap();
-            let swapped = weighted_jaccard_labeled_correlation_matrices(
-                &labels, &b, &labels, &a, mode, 1,
-            )
-            .unwrap();
-            let identity = weighted_jaccard_labeled_correlation_matrices(
-                &labels, &a, &labels, &a, mode, 1,
-            )
-            .unwrap();
+            let swapped =
+                weighted_jaccard_labeled_correlation_matrices(&labels, &b, &labels, &a, mode, 1)
+                    .unwrap();
+            let identity =
+                weighted_jaccard_labeled_correlation_matrices(&labels, &a, &labels, &a, mode, 1)
+                    .unwrap();
 
             assert!((baseline - permuted).abs() < 1e-12, "{mode:?}");
             assert!((baseline - swapped).abs() < 1e-12, "{mode:?}");
@@ -983,13 +980,8 @@ mod tests {
         let inverted_a = invert_off_diagonal_polarity(&a);
         let inverted_b = invert_off_diagonal_polarity(&b);
 
-        let absolute = weighted_jaccard_correlation_matrices(
-            &a,
-            &b,
-            CorrelationWjMode::Absolute,
-            1,
-        )
-        .unwrap();
+        let absolute =
+            weighted_jaccard_correlation_matrices(&a, &b, CorrelationWjMode::Absolute, 1).unwrap();
         let inverted_absolute = weighted_jaccard_correlation_matrices(
             &inverted_a,
             &inverted_b,
@@ -997,13 +989,9 @@ mod tests {
             1,
         )
         .unwrap();
-        let signed_shift = weighted_jaccard_correlation_matrices(
-            &a,
-            &b,
-            CorrelationWjMode::SignedShift,
-            1,
-        )
-        .unwrap();
+        let signed_shift =
+            weighted_jaccard_correlation_matrices(&a, &b, CorrelationWjMode::SignedShift, 1)
+                .unwrap();
         let inverted_signed_shift = weighted_jaccard_correlation_matrices(
             &inverted_a,
             &inverted_b,
@@ -1025,8 +1013,14 @@ mod tests {
         let forward = summarize_edge_sign_transitions(&a, &b, 0.05).unwrap();
         let reverse = summarize_edge_sign_transitions(&b, &a, 0.05).unwrap();
 
-        assert_eq!(forward.polarity_reversal_count, reverse.polarity_reversal_count);
-        assert_eq!(forward.sign_state_change_count, reverse.sign_state_change_count);
+        assert_eq!(
+            forward.polarity_reversal_count,
+            reverse.polarity_reversal_count
+        );
+        assert_eq!(
+            forward.sign_state_change_count,
+            reverse.sign_state_change_count
+        );
         assert_eq!(forward.total_edges, reverse.total_edges);
         assert_eq!(forward.positive_to_negative, reverse.negative_to_positive);
         assert_eq!(forward.negative_to_positive, reverse.positive_to_negative);
