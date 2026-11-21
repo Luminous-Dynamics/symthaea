@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-contagion-001/IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.schema.json",
+  "title": "IG-CONTAGION-001 scenario matrix v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "protocol_id",
+    "protocol_version",
+    "fixture_count",
+    "family_count",
+    "families",
+    "fixtures",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-contagion-scenario-matrix-v0.1"
+    },
+    "status": {
+      "enum": [
+        "synthetic_scenario_design_unexecuted",
+        "synthetic_scenario_design_frozen",
+        "executed"
+      ]
+    },
+    "protocol_id": {
+      "const": "IG-CONTAGION-001"
+    },
+    "protocol_version": {
+      "const": "0.1.0"
+    },
+    "fixture_count": {
+      "type": "integer",
+      "minimum": 50
+    },
+    "family_count": {
+      "type": "integer",
+      "minimum": 9
+    },
+    "families": {
+      "type": "array",
+      "minItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "description",
+          "condition"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20
+          },
+          "condition": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 50,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "family_id",
+          "class",
+          "topology_family",
+          "graph_generator_issue",
+          "graph_profile_ref",
+          "agent_placement",
+          "paired_block_id",
+          "seed",
+          "condition",
+          "expected_measurement_properties",
+          "scenario_note",
+          "paired_content_ref",
+          "task_truth_profile",
+          "paired_message_sha256",
+          "paired_agent_profile_sha256",
+          "paired_evidence_packet_sha256",
+          "centrality_metric_profile",
+          "task_truth_profile"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^IGC-[0-9]{3}$"
+          },
+          "family_id": {
+            "type": "string"
+          },
+          "class": {
+            "enum": [
+              "red_team",
+              "positive_control",
+              "measurement_control",
+              "pluralism_control"
+            ]
+          },
+          "topology_family": {
+            "type": "string"
+          },
+          "graph_generator_issue": {
+            "type": "string",
+            "format": "uri",
+            "const": "https://github.com/Luminous-Dynamics/symthaea/issues/11337"
+          },
+          "graph_profile_ref": {
+            "type": "string",
+            "pattern": "^IG-COMM-TOPOLOGY-001/[a-z_]+/v0\\.1$"
+          },
+          "agent_placement": {
+            "type": "string"
+          },
+          "paired_block_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "condition": {
+            "type": "string"
+          },
+          "expected_measurement_properties": {
+            "type": "array",
+            "minItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "scenario_note": {
+            "type": "string",
+            "minLength": 20
+          },
+          "paired_content_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "task_truth_profile": {
+            "enum": [
+              "measurement_control_no_decision_truth",
+              "synthetic_known_answer",
+              "social_claim_integrity_no_majority_truth",
+              "open_world_indeterminate",
+              "normative_pluralism_no_single_answer"
+            ]
+          },
+          "paired_message_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "paired_agent_profile_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "paired_evidence_packet_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "centrality_metric_profile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "normalized_betweenness_v1",
+              null
+            ]
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 30
+    }
+  }
+}
