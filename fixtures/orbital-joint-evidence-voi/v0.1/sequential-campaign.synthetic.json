@@ -1,0 +1,154 @@
+{
+  "schema": "luminous.orbital-joint-evidence-voi.sequential.v0.1",
+  "benchmark_id": "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "finite_horizon_sequential_campaign_semantics_only",
+  "resource_frequency_semantics": "Synthetic calibrated fixture frequencies are used only for expected resource consumption. Terminal decision risk is distribution-free minimax regret over the full residual state set.",
+  "policies_to_compare": [
+    "FIXED_FULL_CAMPAIGN",
+    "MYOPIC_ONE_STEP_MINIMAX",
+    "ADAPTIVE_FINITE_HORIZON_MINIMAX",
+    "HUMAN_ENGINEER_CAMPAIGN"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "SEQ-001",
+      "evidence_class": "synthetic",
+      "claim_ceiling": "finite_horizon_sequential_campaign_semantics_only",
+      "decision_context": {
+        "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+        "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+        "configuration_id": "CFG-R9",
+        "icd_revision": "R5"
+      },
+      "states": [
+        "HEALTHY",
+        "AXIAL_CAPACITY_DEFECT",
+        "THERMAL_WEAR_DEFECT",
+        "JOINT_RETENTION_DEFECT"
+      ],
+      "decisions": [
+        "ACCEPT",
+        "REJECT"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "HEALTHY": 0,
+          "AXIAL_CAPACITY_DEFECT": 100,
+          "THERMAL_WEAR_DEFECT": 100,
+          "JOINT_RETENTION_DEFECT": 100
+        },
+        "REJECT": {
+          "HEALTHY": 5,
+          "AXIAL_CAPACITY_DEFECT": 0,
+          "THERMAL_WEAR_DEFECT": 0,
+          "JOINT_RETENTION_DEFECT": 0
+        }
+      },
+      "resource_frequency_model": {
+        "model_ref": "synthetic-calibrated-frequency://SEQ-001-v1",
+        "calibration_status": "calibrated_for_fixture_only",
+        "used_for": "EXPECTED_RESOURCE_USE_ONLY",
+        "state_weights": {
+          "HEALTHY": 0.6,
+          "AXIAL_CAPACITY_DEFECT": 0.15,
+          "THERMAL_WEAR_DEFECT": 0.1,
+          "JOINT_RETENTION_DEFECT": 0.15
+        }
+      },
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 0,
+        "facility_hours": 2.5,
+        "specimen_count": 2,
+        "review_hours": 0.5,
+        "external_cost_units": 2
+      },
+      "max_actions": 2,
+      "fixed_campaign_sequence": [
+        "A-COMBINED-LOAD-SCREEN",
+        "B-THERMAL-INSPECTION"
+      ],
+      "actions": [
+        {
+          "action_id": "A-COMBINED-LOAD-SCREEN",
+          "action_class": "COMBINED_LOAD_SCREEN",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+            "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+            "configuration_id": "CFG-R9",
+            "icd_revision": "R5"
+          },
+          "method_ref": "synthetic-method://A-COMBINED-LOAD-SCREEN",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.3
+          },
+          "observation_by_state": {
+            "HEALTHY": "PASS",
+            "AXIAL_CAPACITY_DEFECT": "FAIL",
+            "THERMAL_WEAR_DEFECT": "PASS",
+            "JOINT_RETENTION_DEFECT": "FAIL"
+          }
+        },
+        {
+          "action_id": "B-THERMAL-INSPECTION",
+          "action_class": "THERMAL_INSPECTION",
+          "decision_context": {
+            "profile_ref": "provider-client-profile://P3-C3@cfg-r9",
+            "article_subject_ref": "physical-unit://JOINT-SEQUENTIAL-SPECIMEN-0003",
+            "configuration_id": "CFG-R9",
+            "icd_revision": "R5"
+          },
+          "method_ref": "synthetic-method://B-THERMAL-INSPECTION",
+          "admissibility": "ADMISSIBLE",
+          "resource_plan": {
+            "engineering_hours": 1,
+            "compute_core_hours": 0,
+            "facility_hours": 1.5,
+            "specimen_count": 1,
+            "review_hours": 0.2,
+            "external_cost_units": 0.8
+          },
+          "observation_by_state": {
+            "HEALTHY": "CLEAR",
+            "AXIAL_CAPACITY_DEFECT": "CLEAR",
+            "THERMAL_WEAR_DEFECT": "INDICATION",
+            "JOINT_RETENTION_DEFECT": "CLEAR"
+          }
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret": 5,
+        "myopic_worst_case_regret": 5,
+        "myopic_stops_without_action": true,
+        "fixed_campaign_worst_case_regret": 0,
+        "adaptive_worst_case_regret": 0,
+        "adaptive_first_action": "A-COMBINED-LOAD-SCREEN",
+        "adaptive_expected_resources": {
+          "engineering_hours": 1.2,
+          "compute_core_hours": 0,
+          "facility_hours": 1.55,
+          "specimen_count": 1.7,
+          "review_hours": 0.24,
+          "external_cost_units": 0.86
+        },
+        "fixed_expected_resources": {
+          "engineering_hours": 1.5,
+          "compute_core_hours": 0,
+          "facility_hours": 2,
+          "specimen_count": 2,
+          "review_hours": 0.3,
+          "external_cost_units": 1.1
+        },
+        "require_adaptive_resource_pareto_dominates_fixed": true,
+        "notes": "Neither test alone improves distribution-free minimax regret. A two-step contingent policy screens combined load first; FAIL means every remaining state is defective and terminates at REJECT. PASS leaves healthy/thermal-wear states, so the thermal inspection is then selected and determines ACCEPT versus REJECT. The state-frequency weights are an explicitly synthetic calibrated fixture model used only for expected resource-use accounting; they never enter the minimax-regret/acceptance decision."
+      }
+    }
+  ]
+}
