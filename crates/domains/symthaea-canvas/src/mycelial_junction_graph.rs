@@ -506,7 +506,6 @@ pub fn build_mycelial_junction_hypha_graph(
                     .ok_or(MycelialJunctionGraphError::InvalidGraph(
                         "segment end junction is missing",
                     ))?;
-            let end_is_anastomosis = end_node.kind == JunctionKind::Anastomosis;
             let start_offset = f64::from(point_distance(start_point, start_node.position));
             let end_offset = f64::from(point_distance(end_point, end_node.position));
             let id = format!("hypha:{filament_id}:{}-{}", t_start, t_end);
@@ -528,9 +527,6 @@ pub fn build_mycelial_junction_hypha_graph(
             }
             if let Some(node) = nodes.get_mut(end_junction_id) {
                 node.incident_filament_ids.push(filament_id);
-                if end_is_anastomosis {
-                    node.terminal_filament_ids.push(filament_id);
-                }
             }
         }
     }
@@ -1333,6 +1329,13 @@ mod tests {
         assert_eq!(metrics.hypha_segment_count, 4);
         assert_eq!(metrics.connected_components, 1);
         assert_eq!(metrics.cycle_rank, 1);
+        let fusion_junction = graph
+            .junctions
+            .iter()
+            .find(|junction| junction.id == "anastomosis:17")
+            .expect("accepted fusion junction");
+        assert_eq!(fusion_junction.terminal_filament_ids, vec![2]);
+        assert!(fusion_junction.incident_filament_ids.contains(&3));
         let target_segments: Vec<_> = graph
             .segments
             .iter()
