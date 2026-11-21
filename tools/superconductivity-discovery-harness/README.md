@@ -171,3 +171,28 @@ Measurement scope is now required on every observation assertion. An observed Tc
 Observation events may carry a source.external_catalog object when extraction_method is database_import. It preserves library_id, external_record_id, API version, dataset version, snapshot ID, retrieval time, ETag, X-Data-Version and parent paper/material/sample/state/result IDs.
 
 The Rust observation auditor now requires those fields on database imports, checks X-Data-Version against the declared dataset version, and verifies imported parent material/sample/state/result IDs against the event. A synthetic SCLib-shaped example and negative controls are included. No real external dataset has been downloaded or mirrored.
+
+
+## Budgeted discovery selection auditor
+
+The budgeted selection audit extends deterministic ranking metrics with family/source-disjoint holdouts, explicit target-track semantics, OOD abstention, calibration and fixed-cost policy comparisons.
+
+Schema: `data/schemas/sc_budgeted_selection_v0_1.schema.json`.
+
+Synthetic fixture: `tools/superconductivity-discovery-harness/fixtures/budgeted_selection_smoke_v0_1.json`.
+
+Run:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_budgeted_selection_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_budgeted_selection_audit -- \
+  --schema data/schemas/sc_budgeted_selection_v0_1.schema.json \
+  --fixture tools/superconductivity-discovery-harness/fixtures/budgeted_selection_smoke_v0_1.json \
+  --out /tmp/sc-budgeted-selection-smoke.json
+```
+
+The auditor compares model probability-per-cost, a chemistry heuristic, deterministic random selection and an exact synthetic-truth oracle under the same total follow-up budget. It reports selected count, true positives, precision, recall, positives per cost unit, enrichment versus random and regret against the oracle. Brier score, five-bin expected calibration error, selective classification error and coverage are calculated only for non-abstained evaluation candidates.
+
+Training and evaluation pools are disjoint by family, prototype, reduced formula and source paper. The target track is fixed to conventional electron-phonon superconductor classification in v0.1. Other mechanism and label tracks require separate cohorts; in particular, this audit does not turn BEE-NET's DFT/Allen–Dynes regression error into measured-Tc accuracy. Out-of-domain candidates must abstain with no probability and cannot be selected by the model policy.
+
+The fixture is fully synthetic. The oracle is a scoring ceiling over the hidden synthetic truth, not a deployable model. The audit validates evaluator arithmetic and semantics only; it does not reproduce BEE-NET or demonstrate a real discovery advantage.
