@@ -89,7 +89,8 @@
         "randomization",
         "time_semantics_profile_sha256",
         "freshness_metric_profile_sha256",
-        "freshness_budget_profile_sha256"
+        "freshness_budget_profile_sha256",
+        "resource_budget_profile_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -170,6 +171,9 @@
         },
         "freshness_budget_profile_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "resource_budget_profile_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -191,7 +195,10 @@
         "decision_state_sha256",
         "latency_ns",
         "input_tokens",
-        "tool_calls"
+        "tool_calls",
+        "resource_feasible",
+        "resource_budget_profile_sha256",
+        "resource_feasibility_receipt_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -300,6 +307,15 @@
           "minimum": 0
         },
         "freshness_assessment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "resource_feasible": {
+          "type": "boolean"
+        },
+        "resource_budget_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "resource_feasibility_receipt_sha256": {
           "$ref": "#/$defs/sha256"
         }
       },
@@ -467,7 +483,8 @@
         "evaluation_validity",
         "persistence_receipt_valid",
         "freshness_valid_at_use",
-        "fresh_correct_on_time"
+        "fresh_correct_on_time",
+        "hard_resource_violation_count"
       ],
       "properties": {
         "schema_version": {
@@ -636,6 +653,10 @@
             "integer",
             "null"
           ],
+          "minimum": 0
+        },
+        "hard_resource_violation_count": {
+          "type": "integer",
           "minimum": 0
         }
       },
