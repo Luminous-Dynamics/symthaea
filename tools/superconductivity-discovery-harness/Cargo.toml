@@ -60,3 +60,7 @@ path = "src/bin/onset_prediction_audit.rs"
 [[bin]]
 name = "sc_precursor_genome_graph_audit"
 path = "src/bin/precursor_genome_graph_audit.rs"
+
+[[bin]]
+name = "sc_precursor_genome_graph_score_audit"
+path = "src/bin/precursor_genome_graph_score_audit.rs"

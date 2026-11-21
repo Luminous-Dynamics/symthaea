@@ -1,0 +1,391 @@
+{
+  "contract": "SC-PRECURSOR-GENOME-GRAPH-SCORE-0.1",
+  "benchmark_id": "synthetic_complete_k4_cold_start_scoring_001",
+  "fixture_only": true,
+  "cohort": {
+    "nodes": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "source_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "graph_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "records": [
+      {
+        "record_id": "edge_ab",
+        "sample_id": "PG_SYN_AB",
+        "precursor_a": "A",
+        "precursor_b": "B",
+        "category": "completely_reacted",
+        "cohort_state": "included",
+        "label": 1
+      },
+      {
+        "record_id": "edge_ac",
+        "sample_id": "PG_SYN_AC",
+        "precursor_a": "A",
+        "precursor_b": "C",
+        "category": "transformed",
+        "cohort_state": "included",
+        "label": 0
+      },
+      {
+        "record_id": "edge_ad",
+        "sample_id": "PG_SYN_AD",
+        "precursor_a": "A",
+        "precursor_b": "D",
+        "category": "partially_reacted",
+        "cohort_state": "included",
+        "label": 1
+      },
+      {
+        "record_id": "edge_bc",
+        "sample_id": "PG_SYN_BC",
+        "precursor_a": "B",
+        "precursor_b": "C",
+        "category": "completely_reacted",
+        "cohort_state": "included",
+        "label": 1
+      },
+      {
+        "record_id": "edge_bd",
+        "sample_id": "PG_SYN_BD",
+        "precursor_a": "B",
+        "precursor_b": "D",
+        "category": "unreacted",
+        "cohort_state": "included",
+        "label": 0
+      },
+      {
+        "record_id": "edge_cd",
+        "sample_id": "PG_SYN_CD",
+        "precursor_a": "C",
+        "precursor_b": "D",
+        "category": "transformed",
+        "cohort_state": "included",
+        "label": 0
+      }
+    ]
+  },
+  "models": [
+    {
+      "model_id": "synthetic_node_interaction_pattern",
+      "model_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision_threshold": 0.5,
+      "lopo_folds": [
+        {
+          "fold_id": "lopo:A",
+          "heldout_precursors": [
+            "A"
+          ],
+          "training_precursors": [
+            "B",
+            "C",
+            "D"
+          ],
+          "training_record_count": 3,
+          "predictions": [
+            {
+              "record_id": "edge_ab",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_ac",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_ad",
+              "probability": 0.85
+            }
+          ]
+        },
+        {
+          "fold_id": "lopo:B",
+          "heldout_precursors": [
+            "B"
+          ],
+          "training_precursors": [
+            "A",
+            "C",
+            "D"
+          ],
+          "training_record_count": 3,
+          "predictions": [
+            {
+              "record_id": "edge_ab",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bc",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bd",
+              "probability": 0.15
+            }
+          ]
+        },
+        {
+          "fold_id": "lopo:C",
+          "heldout_precursors": [
+            "C"
+          ],
+          "training_precursors": [
+            "A",
+            "B",
+            "D"
+          ],
+          "training_record_count": 3,
+          "predictions": [
+            {
+              "record_id": "edge_ac",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_bc",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_cd",
+              "probability": 0.15
+            }
+          ]
+        },
+        {
+          "fold_id": "lopo:D",
+          "heldout_precursors": [
+            "D"
+          ],
+          "training_precursors": [
+            "A",
+            "B",
+            "C"
+          ],
+          "training_record_count": 3,
+          "predictions": [
+            {
+              "record_id": "edge_ad",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bd",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_cd",
+              "probability": 0.15
+            }
+          ]
+        }
+      ],
+      "double_node_folds": [
+        {
+          "fold_id": "double:A|B",
+          "heldout_precursors": [
+            "A",
+            "B"
+          ],
+          "training_precursors": [
+            "C",
+            "D"
+          ],
+          "training_record_count": 1,
+          "predictions": [
+            {
+              "record_id": "edge_ab",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_ac",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_ad",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bc",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bd",
+              "probability": 0.15
+            }
+          ]
+        },
+        {
+          "fold_id": "double:A|C",
+          "heldout_precursors": [
+            "A",
+            "C"
+          ],
+          "training_precursors": [
+            "B",
+            "D"
+          ],
+          "training_record_count": 1,
+          "predictions": [
+            {
+              "record_id": "edge_ab",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_ac",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_ad",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bc",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_cd",
+              "probability": 0.15
+            }
+          ]
+        },
+        {
+          "fold_id": "double:A|D",
+          "heldout_precursors": [
+            "A",
+            "D"
+          ],
+          "training_precursors": [
+            "B",
+            "C"
+          ],
+          "training_record_count": 1,
+          "predictions": [
+            {
+              "record_id": "edge_ab",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_ac",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_ad",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bd",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_cd",
+              "probability": 0.15
+            }
+          ]
+        },
+        {
+          "fold_id": "double:B|C",
+          "heldout_precursors": [
+            "B",
+            "C"
+          ],
+          "training_precursors": [
+            "A",
+            "D"
+          ],
+          "training_record_count": 1,
+          "predictions": [
+            {
+              "record_id": "edge_ab",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_ac",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_bc",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bd",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_cd",
+              "probability": 0.15
+            }
+          ]
+        },
+        {
+          "fold_id": "double:B|D",
+          "heldout_precursors": [
+            "B",
+            "D"
+          ],
+          "training_precursors": [
+            "A",
+            "C"
+          ],
+          "training_record_count": 1,
+          "predictions": [
+            {
+              "record_id": "edge_ab",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_ad",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bc",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bd",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_cd",
+              "probability": 0.15
+            }
+          ]
+        },
+        {
+          "fold_id": "double:C|D",
+          "heldout_precursors": [
+            "C",
+            "D"
+          ],
+          "training_precursors": [
+            "A",
+            "B"
+          ],
+          "training_record_count": 1,
+          "predictions": [
+            {
+              "record_id": "edge_ac",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_ad",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bc",
+              "probability": 0.85
+            },
+            {
+              "record_id": "edge_bd",
+              "probability": 0.15
+            },
+            {
+              "record_id": "edge_cd",
+              "probability": 0.15
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic cold-start graph scoring contract only. No real model performance, synthesis recommendation, phase yield, or material discovery is established."
+}

@@ -1,0 +1,23 @@
+{
+  "contract": "SC-PRECURSOR-GENOME-GRAPH-SCORE-SUITE-0.1",
+  "suite_id": "precursor_genome_graph_score_suite_001",
+  "fixture_only": true,
+  "schema_path": "data/schemas/precursor_genome_graph_score_v0_1.schema.json",
+  "fixtures": [
+    {
+      "benchmark_id": "synthetic_complete_k4_cold_start_scoring_001",
+      "path": "tools/superconductivity-discovery-harness/fixtures/precursor_genome_graph_score_smoke_v0_1.json",
+      "expected": [
+        "complete_pair_graph_integrity",
+        "all_leave_one_precursor_out_folds_scored",
+        "all_double_node_holdout_folds_scored",
+        "fold_local_train_test_node_separation",
+        "exact_heldout_prediction_coverage",
+        "proper_probability_scores",
+        "fixed_threshold_classification_metrics",
+        "constant_prevalence_no_skill_reference"
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic cold-start graph scoring contract only. No real model performance, synthesis recommendation, phase yield, or material discovery is established."
+}
