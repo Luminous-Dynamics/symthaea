@@ -174,6 +174,27 @@ pub enum PerceptionParityErrorV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConfidenceCalibrationBinV1 {
+    pub bin_index: u8,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub sample_count: usize,
+    pub mean_confidence: Option<f64>,
+    pub empirical_accuracy: Option<f64>,
+}
+
+/// Top-label confidence calibration over answered predictions only.
+/// Abstentions/missing rows remain visible in modality coverage and are not
+/// assigned fabricated confidence values.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConfidenceCalibrationMetricsV1 {
+    pub evaluated_count: usize,
+    pub brier_score: Option<f64>,
+    pub expected_calibration_error: Option<f64>,
+    pub bins: Vec<ConfidenceCalibrationBinV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModalityParityMetricsV1 {
     pub case_count: usize,
     pub answered_count: usize,
@@ -189,6 +210,8 @@ pub struct ModalityParityMetricsV1 {
     pub coverage: f64,
     /// Defined only for ordinal syncopation levels, over answered rows only.
     pub mean_absolute_error_answered: Option<f64>,
+    /// Calibration of the confidence attached to each answered top-label.
+    pub confidence_calibration: ConfidenceCalibrationMetricsV1,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -307,6 +330,7 @@ fn modality_metrics(
     let mut correct = 0usize;
     let mut absolute_error = 0u64;
     let mut ordinal_answered = 0usize;
+    let mut confidence_outcomes = Vec::with_capacity(cases.len());
 
     for case in cases {
         let Some(prediction) = prediction_for(predictions, &case.case_id, modality) else {
@@ -318,8 +342,12 @@ fn modality_metrics(
             continue;
         };
         answered += 1;
-        if answer == &case.ground_truth {
+        let is_correct = answer == &case.ground_truth;
+        if is_correct {
             correct += 1;
+        }
+        if let Some(confidence) = prediction.confidence {
+            confidence_outcomes.push((f64::from(confidence), is_correct));
         }
         if let (
             PerceptionTaskV1::SyncopationScoring,
@@ -343,6 +371,66 @@ fn modality_metrics(
         coverage: answered as f64 / total as f64,
         mean_absolute_error_answered: (ordinal_answered > 0)
             .then_some(absolute_error as f64 / ordinal_answered as f64),
+        confidence_calibration: confidence_calibration_metrics(&confidence_outcomes),
+    }
+}
+
+fn confidence_calibration_metrics(
+    outcomes: &[(f64, bool)],
+) -> ConfidenceCalibrationMetricsV1 {
+    const BIN_COUNT: usize = 10;
+    let mut bin_counts = [0usize; BIN_COUNT];
+    let mut confidence_sums = [0.0f64; BIN_COUNT];
+    let mut correct_counts = [0usize; BIN_COUNT];
+    let mut brier_sum = 0.0f64;
+
+    for (confidence, is_correct) in outcomes {
+        // Confidence was range-checked when the run was validated. Clamp only
+        // the exact 1.0 endpoint into the final closed bin.
+        let bin_index = ((*confidence * BIN_COUNT as f64).floor() as usize)
+            .min(BIN_COUNT - 1);
+        bin_counts[bin_index] += 1;
+        confidence_sums[bin_index] += confidence;
+        if *is_correct {
+            correct_counts[bin_index] += 1;
+        }
+        let observed = if *is_correct { 1.0 } else { 0.0 };
+        brier_sum += (confidence - observed).powi(2);
+    }
+
+    let evaluated_count = outcomes.len();
+    let bins: Vec<_> = (0..BIN_COUNT)
+        .map(|index| {
+            let count = bin_counts[index];
+            ConfidenceCalibrationBinV1 {
+                bin_index: index as u8,
+                lower_bound: index as f64 / BIN_COUNT as f64,
+                upper_bound: (index + 1) as f64 / BIN_COUNT as f64,
+                sample_count: count,
+                mean_confidence: (count > 0)
+                    .then_some(confidence_sums[index] / count as f64),
+                empirical_accuracy: (count > 0)
+                    .then_some(correct_counts[index] as f64 / count as f64),
+            }
+        })
+        .collect();
+
+    let expected_calibration_error = (evaluated_count > 0).then(|| {
+        bins.iter()
+            .filter(|bin| bin.sample_count > 0)
+            .map(|bin| {
+                (bin.sample_count as f64 / evaluated_count as f64)
+                    * (bin.mean_confidence.unwrap() - bin.empirical_accuracy.unwrap()).abs()
+            })
+            .sum()
+    });
+
+    ConfidenceCalibrationMetricsV1 {
+        evaluated_count,
+        brier_score: (evaluated_count > 0)
+            .then_some(brier_sum / evaluated_count as f64),
+        expected_calibration_error,
+        bins,
     }
 }
 
@@ -637,6 +725,35 @@ mod tests {
     }
 
     #[test]
+    fn confidence_calibration_reports_overconfidence_and_ten_reliability_bins() {
+        let suite = suite();
+        let mut run = complete_run(&suite);
+        for prediction in &mut run.predictions {
+            if prediction.modality == PerceptionModalityV1::Audio
+                && prediction.case_id.starts_with("sync-")
+            {
+                prediction.answer = Some(PerceptionAnswerV1::SyncopationLevel { level: 4 });
+                prediction.confidence = Some(0.95);
+            }
+        }
+
+        let report = evaluate_perception_parity(&suite, &run).unwrap();
+        let sync = report
+            .task_metrics
+            .iter()
+            .find(|metric| metric.task == PerceptionTaskV1::SyncopationScoring)
+            .unwrap();
+        let calibration = &sync.audio.confidence_calibration;
+        assert_eq!(calibration.evaluated_count, 2);
+        assert_eq!(calibration.brier_score, Some(0.9025));
+        assert_eq!(calibration.expected_calibration_error, Some(0.95));
+        assert_eq!(calibration.bins.len(), 10);
+        assert_eq!(calibration.bins[9].sample_count, 2);
+        assert_eq!(calibration.bins[9].mean_confidence, Some(0.95));
+        assert_eq!(calibration.bins[9].empirical_accuracy, Some(0.0));
+    }
+
+    #[test]
     fn missing_and_abstained_predictions_stay_in_all_case_denominator() {
         let suite = suite();
         let mut run = complete_run(&suite);
@@ -666,6 +783,9 @@ mod tests {
         assert_eq!(sync.audio.accuracy_all_cases, 0.0);
         assert_eq!(sync.audio.accuracy_answered_only, None);
         assert_eq!(sync.audio.coverage, 0.0);
+        assert_eq!(sync.audio.confidence_calibration.evaluated_count, 0);
+        assert_eq!(sync.audio.confidence_calibration.brier_score, None);
+        assert_eq!(sync.audio.confidence_calibration.expected_calibration_error, None);
         assert_eq!(sync.symbolic_midi.accuracy_all_cases, 1.0);
         assert_eq!(sync.audio_minus_symbolic_accuracy, -1.0);
     }
