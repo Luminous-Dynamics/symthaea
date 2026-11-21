@@ -28,3 +28,15 @@ python research/cetb/theory_design/eig.py \
 ```
 
 The ranking sorts by lower-quantile EIG per cost, then expected EIG per cost. The returned result preserves expected EIG, lower-quantile EIG, scenario count and cost separately. A ranking is only as sound as the frozen prior and theory likelihoods; the synthetic fixture is not a human prediction.
+
+
+## Current exact-head validation
+
+Focused workflow run `44890416280` on PR source commit `3d2c1af86cfe4a006d2c375e0198b54583672f6f` passed:
+- 13 EIG/theory-design unit tests;
+- schema validation and execution of the synthetic multi-design ranking fixture;
+- 18 RCAF report-validator and exact sign-test power unit tests;
+- RCAF report fixture schema + semantic validation;
+- 14 Rust RCAF unit tests, Rust formatting and strict Clippy.
+
+The EIG fixture contains only synthetic probability tables. These tests validate implementation behavior, not the calibration or scientific fairness of any real theory prediction.
