@@ -99,8 +99,9 @@ pub struct FreshnessAtUse {
 }
 
 impl FreshnessAtUse {
-    /// Freshness is qualified only when age, age budget and deadline slack
-    /// are all known and the evidence is still valid at the actual use point.
+    /// Freshness is qualified only when age, age budget and deadline policy
+    /// are known. An enforced deadline requires known nonnegative slack; a
+    /// no-deadline task must explicitly declare false and supply no slack.
     pub const fn is_qualified(self) -> bool {
         match (
             self.evidence_age_at_use_ns,
@@ -122,7 +123,9 @@ impl FreshnessAtUse {
 /// This is deliberately not an authorization token or cryptographic receipt.
 /// Integrations must not set these fields from model prose or untrusted
 /// candidate output. A production integration must bind this snapshot to the
-/// exact source, scope, time, consent and policy revisions. Freshness is
+/// exact source, scope, time, consent and policy revisions. Source trust,
+/// scope, lifecycle and revocation facts must be rechecked against the
+/// canonical record at consumption, not reused from retrieval. Freshness is
 /// evaluated at consumption, not merely at retrieval.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AdmissionSnapshot {
