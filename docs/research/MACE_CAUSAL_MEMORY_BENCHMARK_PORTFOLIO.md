@@ -477,3 +477,12 @@ MACE now has a per-target-model dose-response protocol. For each target-model di
 The next experiment is a two-dimensional surface: **target-model capability × memory token budget**, with separate measurements for task completion, scenario completion, steps, tokens, latency, stale/poisoned activation and governance violations. Require at least five model families/versions, multiple memory-policy families, at least five independent environment seeds per cell, paired cluster bootstrap, and one external held-out environment. Do not infer model capability from parameter count alone; the model digest and measured no-memory baseline are the operative strata.
 
 Target qualification: each model's selected budget must improve held-out paired net utility over zero-memory with a 95% lower bound greater than zero, while no hard governance/safety metric regresses. Publish the full dose-response curve, not only the winning point. The prototype uses deterministic synthetic paired episodes; it does not establish an empirical relationship across production models.
+
+
+### F. Receipt-qualified model-memory dose response
+
+MACE v0.15.1 requires a `MemoryDoseTrialVerifierV1` before dose-response observations can enter fitting. Each receipt binds the exact trial, episode, environment, evaluation protocol, target model and memory pipeline, with explicit as-known validity. Only opaque `VerifiedMemoryDoseTrialV1` values reach the statistical fitter. Budget arms within a cluster must carry the same episode digest; calibration and held-out partitions are disjoint by cluster, task family, source root, event and episode.
+
+This is a verifier interface, not a live cryptographic implementation. The current fixture verifier creates deterministic test receipts. Production qualification requires an independently authenticated evaluator/run receipt, independent outcome adjudication, and utility accounting for token, latency and execution costs. A self-hashed row is not proof of authenticity.
+
+The runtime selector now rejects a different model fingerprint, binds the held-out dataset digest, and returns a valid empty plan when zero memory is the qualified choice. The dose-response layer is target-model-specific; the predictive-salience model itself remains shared across target models.

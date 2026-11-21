@@ -1021,6 +1021,53 @@ mod tests {
     }
 
     #[test]
+    fn missing_receipt_and_mixed_protocol_are_rejected() {
+        struct MissingVerifier;
+        impl MemoryDoseTrialVerifierV1 for MissingVerifier {
+            fn verify_trial(
+                &self,
+                _trial: &MemoryDoseTrialV1,
+                _as_known_at_ms: i64,
+            ) -> Option<MemoryDoseTrialReceiptV1> {
+                None
+            }
+        }
+
+        let model = digest("protocol-test-model");
+        let pipeline = digest("protocol-test-pipeline");
+        let mut trials = rows(
+            &model,
+            &pipeline,
+            1,
+            1,
+            10,
+            100,
+            [0, 10_000, 20_000, 30_000],
+        );
+        assert_eq!(
+            verify_memory_dose_trials(
+                &trials,
+                AS_KNOWN_AT_MS,
+                &MissingVerifier,
+            ),
+            Err(MemoryBudgetReject::MissingTrialReceipt)
+        );
+
+        trials[0].evaluation_protocol_sha256 = digest("different-protocol");
+        assert_eq!(
+            fit(&trials, &BUDGETS),
+            Err(MemoryBudgetReject::MixedEvaluationProtocol)
+        );
+
+        trials[0].evaluation_protocol_sha256 = digest("memory-dose-protocol-v1");
+        trials[0].environment_sha256 = digest("different-environment");
+        assert_eq!(
+            fit(&trials, &BUDGETS),
+            Err(MemoryBudgetReject::MixedEnvironment)
+        );
+    }
+
+    #[test]
     fn each_target_model_gets_its_own_heldout_qualified_memory_budget() {
         let pipeline = digest("stable-memory-pipeline-v1");
         let weak_model = digest("small-agent-model");

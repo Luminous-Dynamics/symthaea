@@ -498,10 +498,21 @@ MACE v0.14 additionally requires the receipt-bound estimand digest to remain con
 **Semantic-estimand limitation:** the current v0.14 policy compares verified estimand digests; it does not independently decode or validate the semantic specification represented by those digests. The production Mycelix verifier must bind canonical population, treatment versions/contrast, outcome/unit, follow-up horizon, censoring/intercurrent-event strategy and target weighting into the signed assessment before transport is eligible.
 
 
-### Model-conditioned memory dose response (MACE v0.15)
+### Model-conditioned memory dose response (MACE v0.15.1)
 
 The new `memory_budget` module treats context size as a target-model-specific policy parameter rather than a global constant. A frozen candidate set of token budgets (including zero memory) is evaluated on paired calibration episodes from the same task clusters. The best mean net-utility budget is selected using calibration data only, with ties resolved toward the smaller budget. The selected budget is then qualified on a disjoint held-out set; a nonzero recommendation is rejected unless its paired cluster-bootstrap 95% lower bound is above zero.
 
 Every trial binds the target-agent model digest, memory-pipeline digest, episode cluster, task family, upstream source root, token budget and realized net utility after declared costs. Calibration and held-out partitions must be disjoint by cluster, task family, source root and event. The resulting opaque `QualifiedModelMemoryBudgetV1` can be passed to the evidence-bound salience knapsack; the composed surfacing-plan digest binds model, pipeline, calibration, held-out qualification and selected memories.
 
 This directly operationalises the November 19, 2026 IBM Research paper *How Much Should an Agent Remember?*: its AppWorld results report that useful memory quantity varies with target-model capability, and that a smaller selected subset can outperform a full guideline set for a weaker model. MACE's implementation is a deterministic calibration protocol, not a replication of the paper or evidence of an external benchmark gain.
+
+
+### Receipt-qualified model-memory dose response (MACE v0.15.1)
+
+The dose-response calibration does not accept plain utility rows as sufficient evidence. Each trial binds target-model and memory-pipeline digests, frozen environment and evaluation-protocol digests, task-family, upstream source root, cluster and exact episode identity, token budget, and net utility after declared costs.
+
+Before fitting, `verify_memory_dose_trials` requires an injected `MemoryDoseTrialVerifierV1`. It binds the exact trial digest to a time-valid receipt and returns opaque verified trials. The statistical fitter only accepts those opaque records. Budget arms within a cluster must refer to the same episode, and calibration/held-out sets must be disjoint by cluster, family, root, event and episode, using matching environment and evaluation-protocol versions.
+
+The current verifier is a deterministic test fixture, **not** a cryptographic verifier. A production adapter must authenticate an independently signed evaluator/run receipt and independently validate task outcome and utility-cost accounting, including token counts, latency and execution costs. Digest self-consistency alone is not authenticity.
+
+The runtime selector rejects a budget for a different model fingerprint and binds the held-out dataset digest into the surfacing plan. A qualified zero-memory result produces a valid empty surfacing plan. This calibrates token budget per model; the future-use salience predictor itself is still shared across models and remains a separate research gap.
