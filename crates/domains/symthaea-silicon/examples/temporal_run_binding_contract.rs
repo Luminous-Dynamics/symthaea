@@ -570,6 +570,30 @@ mod tests {
     }
 
     #[test]
+    fn rejects_freshness_dispositions_that_disagree_with_work_ledger_counts() {
+        let id = identity();
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let mut value: Value = serde_json::from_slice(&freshness).unwrap();
+        value["opportunities"][0]["disposition"] = Value::String("abstained".to_owned());
+        let modified = serde_json::to_vec(&value).unwrap();
+        let error = join_receipts("run-disposition-mismatch", &id, &work, &modified, None)
+            .unwrap_err();
+        assert_eq!(error, BindingError::DecisionDispositionCountMismatch);
+    }
+
+    #[test]
+    fn rejects_freshness_correctness_that_disagrees_with_verified_work_counts() {
+        let id = identity();
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let mut value: Value = serde_json::from_slice(&freshness).unwrap();
+        value["opportunities"][0]["correctness"] = Value::String("incorrect".to_owned());
+        let modified = serde_json::to_vec(&value).unwrap();
+        let error = join_receipts("run-outcome-mismatch", &id, &work, &modified, None)
+            .unwrap_err();
+        assert_eq!(error, BindingError::VerifiedOutcomeCountMismatch);
+    }
+
+    #[test]
     fn rejects_logical_horizon_beyond_workload_duration() {
         let id = identity();
         let (work, freshness) = example_receipts(&id).unwrap();
