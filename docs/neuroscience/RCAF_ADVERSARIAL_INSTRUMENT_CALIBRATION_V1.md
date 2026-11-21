@@ -151,7 +151,7 @@ CETB's proposed differentiator is the qualification contract joining known-truth
 
 This document defines a proposed protocol only. It does not add an adversarial simulator, implement signal-level injection, validate a preprocessing pipeline, analyse biological data or demonstrate SOTA superiority. The existing Gaussian-factor/AR(1) results remain limited to their declared synthetic generator.
 
-The accompanying `adversarial-calibration-plan.schema.json` defines a machine-readable protocol plan. A future implementation must add a semantic validator, deterministic scenario generators, positive/negative leakage controls, an end-to-end signal-level example and exact-head evidence receipts before any scenario can be described as executed.
+The accompanying `adversarial-calibration-plan.schema.json` and `tools/validate_adversarial_plan.py` now validate the plan's JSON structure and key semantic invariants: distinct development/confirmation seeds, exact null controls, effect scenarios with nonzero doses, pre-estimation signal-level and matrix-level injection controls, nuisance-only scenarios that preserve the latent target, and required output dimensions. Ten focused unit tests cover these invariants. This validation qualifies the plan document, not a simulator or biological pipeline. The next implementation must add deterministic scenario generators, planted-positive and clean-negative leakage controls, an end-to-end signal-level example, and exact-head execution receipts before any scenario can be described as executed.
 
 ## References
 
