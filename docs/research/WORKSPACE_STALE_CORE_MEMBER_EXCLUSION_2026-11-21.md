@@ -45,3 +45,20 @@ The final two commands validate the real package in the root workspace, not a st
 [RMI Track A PR #13070](https://github.com/Luminous-Dynamics/symthaea/pull/13070) has already passed isolated qualification of the exact RMI evaluator and runner: snapshot state isolation, all synthetic controls, 32 paired trials, fresh-process deterministic replay, and warnings-denied Clippy.
 
 It remains draft pending a real-workspace package integration qualification. This exclusion is the minimal repository repair required to make that possible. The isolated pass is not re-labelled as a full package or monorepo pass.
+
+## Lockfile reconciliation
+
+After the wildcard scan and workspace metadata checks passed, the first real package check failed because the committed lockfile omitted one already-declared dependency edge for the existing workspace package `symthaea-epistemic-types`. A separate diagnostic run let Cargo compute the candidate lockfile and completed `cargo check -p symthaea-muse --lib` successfully. The only generated lockfile delta was:
+
+```toml
+[[package]]
+name = "symthaea-epistemic-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+```
+
+This edge is now committed to `Cargo.lock`. The qualification job still uses `--locked`; the diagnostic run did not count as the final locked pass. The new exact-head run must demonstrate that the same real Muse package compiles with the committed lockfile and that the library tests can be test-compiled.
