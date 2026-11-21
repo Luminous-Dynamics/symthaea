@@ -176,7 +176,35 @@ Add independent structural and functional measurements:
 
 Anastomosis must remain a proposed geometric/topological operation requiring explicit acceptance. It must not create semantic relationships. Measure whether a loop restores reachability or alternative routes; do not assume every additional cycle improves resilience.
 
-Later biological comparison should use BMX-compatible image-derived structural metrics, including branch-length and angle distributions, tip density, loop/cycle statistics, component morphology, and—only when implemented—transport behavior. Biological fidelity remains unclaimed until matched data and a validated model exist.
+### Empirical living-network comparator: AMF travelling-wave study
+
+A stronger empirical comparator is Oyarte Galvez et al., *A travelling-wave strategy for plant–fungal trade*, Nature 639, 172–180 (published 26 February 2025; DOI 10.1038/s41586-025-08614-x). The study tracked more than 500,000 fungal nodes and approximately 100,000 cytoplasmic-flow trajectories. It reports self-regulation of hyphal density through fusion, loops that shorten paths to potential new trade partners, maintained transport efficiency back to roots, and higher flux along widened/faster-flowing trunk routes. The key design trade-off is not simply “more loops”: it is **exploration coverage versus root-directed transport efficiency versus construction cost**, evolving over time.
+
+The authors' public analysis repository contains MATLAB scripts for global/root geometric network efficiency. NetworkEfficiency.m builds a weighted graph with hyphal length as edge weight, creates minimum-spanning-tree and Delaunay baselines, computes network shortest-path lengths and Euclidean endpoint distances, and totals construction length. NetworkEfficiencyLoop.m calculates average direct-distance/network-path-distance ratios for connected global pairs and tip-to-nearest-root paths. These are geometric path-efficiency metrics, not measurements of cytoplasmic flow itself.
+
+References:
+- Paper: https://doi.org/10.1038/s41586-025-08614-x
+- Open full text: https://pmc.ncbi.nlm.nih.gov/articles/PMC11882455/
+- Authors' analysis code: https://github.com/Cocopyth/AMFTravellingWave
+- Efficiency implementation: https://github.com/Cocopyth/AMFTravellingWave/blob/master/Figure_plots/Fig4/Efficiency/NetworkEfficiency.m
+- Data DOI recorded in the authors' README: 10.6084/m9.figshare.27889143
+
+### Critical graph-abstraction boundary
+
+The current Symthaea MycelialNetworkGraph uses **filaments as vertices** and parent/anastomosis relations as graph connections. The empirical AMF skeleton/transport analysis uses **junction/end-point nodes and hyphal segments as weighted edges**. These are different graph abstractions. The current graph is suitable for filament-level failure analysis, but its edge cost is not physical hyphal path length and should not be compared directly with the paper's transport-efficiency values.
+
+Keep MycelialNetworkGraph for filament-adjacency and structural failure work. Add a separate, versioned junction–hypha graph for geometric path and transport-style benchmarks. Its vertices should represent tips, branch junctions, and fusion junctions; its weighted edges should represent explicit hyphal curve intervals with physical arc length and stable source-filament identity. Tip-to-side fusion must split a source curve at the declared parameter, create a junction, and preserve the mapping to its original filament and provenance. Geometry-only conversion must leave CognitiveTopology unchanged.
+
+The matched benchmark should calculate:
+- global geometric efficiency: mean Euclidean endpoint separation divided by weighted network shortest-path length for connected pairs;
+- root-directed geometric efficiency: mean Euclidean tip-to-nearest-root separation divided by the corresponding shortest network path;
+- network construction cost: total hyphal segment length;
+- matched MST and Delaunay baselines over the same terminal/junction set and coordinate units;
+- temporal changes in efficiency, cost, loop density and explored area over successive network snapshots.
+
+Only call these geometric path-efficiency measurements unless a separate calibrated transport model or measured flow trajectory is used. Verify data licensing and redistribution terms before importing or vendoring Figshare records. The implementation follow-on is [#13145 — junction–hypha graph adapter and empirical AMF transport-efficiency benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/13145). The related functional-resilience benchmark is [#13144](https://github.com/Luminous-Dynamics/symthaea/issues/13144).
+
+This is a methodological comparator, not a claim that the existing Symthaea graph is biologically equivalent. Biological fidelity remains unclaimed until matched data, the correct graph abstraction, and a validated growth/transport model exist.
 
 ## 7. Benchmark programme
 
