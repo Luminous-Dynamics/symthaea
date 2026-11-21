@@ -674,21 +674,9 @@ pub fn compare_phase_space_measures_spectral(
         let delta_after_update = squared_difference - mean;
         sum_squared_deviation += delta * delta_after_update;
 
-        let component_count = component_feature_counts[component_index] as f64;
-        let component_delta = squared_difference - component_means[component_index];
-        component_means[component_index] += component_delta / component_count;
-        let component_delta_after_update = squared_difference - component_means[component_index];
-        component_sum_squared_deviations[component_index] +=
-            component_delta * component_delta_after_update;
     }
 
-    if !mean.is_finite()
-        || !sum_squared_deviation.is_finite()
-        || component_means.iter().any(|value| !value.is_finite())
-        || component_sum_squared_deviations
-            .iter()
-            .any(|value| !value.is_finite())
-    {
+    if !mean.is_finite() || !sum_squared_deviation.is_finite() {
         return Err(MmdError::NonFiniteOutput);
     }
 
@@ -1282,9 +1270,22 @@ pub fn compare_phase_space_measures_spectral_mixture(
         mean += delta / count;
         let delta_after_update = squared_difference - mean;
         sum_squared_deviation += delta * delta_after_update;
+
+        let component_count = component_feature_counts[component_index] as f64;
+        let component_delta = squared_difference - component_means[component_index];
+        component_means[component_index] += component_delta / component_count;
+        let component_delta_after_update = squared_difference - component_means[component_index];
+        component_sum_squared_deviations[component_index] +=
+            component_delta * component_delta_after_update;
     }
 
-    if !mean.is_finite() || !sum_squared_deviation.is_finite() {
+    if !mean.is_finite()
+        || !sum_squared_deviation.is_finite()
+        || component_means.iter().any(|value| !value.is_finite())
+        || component_sum_squared_deviations
+            .iter()
+            .any(|value| !value.is_finite())
+    {
         return Err(MmdError::NonFiniteOutput);
     }
     let feature_sample_variance = if feature_config.feature_count > 1 {
