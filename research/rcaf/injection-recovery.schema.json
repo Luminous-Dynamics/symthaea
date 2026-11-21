@@ -20,7 +20,8 @@
     "median_injected_paired_gap",
     "median_null_positive_gap_fraction",
     "median_injected_positive_gap_fraction",
-    "claim_limits"
+    "claim_limits",
+    "temporal_autocorrelation"
   ],
   "properties": {
     "schema_version": {
@@ -87,6 +88,11 @@
       "items": {
         "type": "string"
       }
+    },
+    "temporal_autocorrelation": {
+      "type": "number",
+      "exclusiveMinimum": -1,
+      "exclusiveMaximum": 1
     }
   },
   "$defs": {
