@@ -161,9 +161,9 @@ pub fn validate_audio_frontend_evidence(
             }
             AudioFrontEndStatusV1::Abstained => {
                 if estimate.estimate_sha256.is_some() {
-                    return Err(AudioFrontEndEvidenceErrorV1::EstimateDigestPresentWithoutOutput {
-                        stage,
-                    });
+                    return Err(
+                        AudioFrontEndEvidenceErrorV1::EstimateDigestPresentWithoutOutput { stage },
+                    );
                 }
                 if estimate.confidence.is_some() || estimate.uncertainty.is_some() {
                     return Err(AudioFrontEndEvidenceErrorV1::AbstentionHasConfidence { stage });
@@ -202,10 +202,7 @@ pub fn validate_audio_frontend_evidence(
     Ok(())
 }
 
-fn validate_digest(
-    field: &str,
-    value: &str,
-) -> Result<(), AudioFrontEndEvidenceErrorV1> {
+fn validate_digest(field: &str, value: &str) -> Result<(), AudioFrontEndEvidenceErrorV1> {
     if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(AudioFrontEndEvidenceErrorV1::InvalidDigest {
             field: field.to_owned(),
@@ -257,12 +254,8 @@ mod tests {
     #[test]
     fn complete_frontend_evidence_validates_against_exact_audio_input() {
         let record = evidence();
-        validate_audio_frontend_evidence(
-            "paired-case-001",
-            &record.audio_input_sha256,
-            &record,
-        )
-        .unwrap();
+        validate_audio_frontend_evidence("paired-case-001", &record.audio_input_sha256, &record)
+            .unwrap();
     }
 
     #[test]
@@ -302,12 +295,8 @@ mod tests {
             calibration_identity_sha256: None,
             reason: Some("beat grid not requested by this task".into()),
         });
-        validate_audio_frontend_evidence(
-            "paired-case-001",
-            &record.audio_input_sha256,
-            &record,
-        )
-        .unwrap();
+        validate_audio_frontend_evidence("paired-case-001", &record.audio_input_sha256, &record)
+            .unwrap();
     }
 
     #[test]
@@ -324,12 +313,8 @@ mod tests {
         onset.uncertainty = None;
         onset.calibration_identity_sha256 = None;
         onset.reason = Some("low signal-to-noise ratio".into());
-        validate_audio_frontend_evidence(
-            "paired-case-001",
-            &record.audio_input_sha256,
-            &record,
-        )
-        .unwrap();
+        validate_audio_frontend_evidence("paired-case-001", &record.audio_input_sha256, &record)
+            .unwrap();
 
         let onset = record
             .estimates
@@ -381,9 +366,11 @@ mod tests {
     #[test]
     fn uncalibrated_scores_are_explicitly_distinguishable_from_calibrated_ones() {
         let mut calibrated = evidence();
-        assert!(calibrated.estimates[0]
-            .calibration_identity_sha256
-            .is_some());
+        assert!(
+            calibrated.estimates[0]
+                .calibration_identity_sha256
+                .is_some()
+        );
         calibrated.estimates[0].calibration_identity_sha256 = None;
         validate_audio_frontend_evidence(
             "paired-case-001",
