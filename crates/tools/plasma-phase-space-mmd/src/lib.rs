@@ -722,6 +722,231 @@ pub fn compare_phase_space_measures_spectral(
     })
 }
 
+
+/// Configuration for checkpointed, anytime-valid spectral MMD evaluation.
+///
+/// Checkpoints double from initial_feature_count up to max_feature_count. The
+/// tolerance is applied to normalized squared MMD, not its square root.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AdaptiveSpectralMmdConfig {
+    pub initial_feature_count: usize,
+    pub max_feature_count: usize,
+    pub confidence_level: f64,
+    pub tolerance: f64,
+    pub seed: u64,
+}
+
+/// Decision for the distribution-fidelity sub-gate only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdaptiveMmdDecision {
+    WithinTolerance,
+    AboveTolerance,
+    UnresolvedBudgetExhausted,
+}
+
+/// One inspected checkpoint in the alpha-spending confidence sequence.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AdaptiveMmdCheckpoint {
+    pub feature_count: usize,
+    pub alpha_for_checkpoint: f64,
+    pub cumulative_alpha_spent: f64,
+    pub normalized_mmd_squared_estimate: f64,
+    pub interval_radius: f64,
+    pub interval_lower: f64,
+    pub interval_upper: f64,
+}
+
+/// Result of adaptive spectral MMD with simultaneous checkpoint coverage.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdaptiveSpectralMmdResult {
+    pub decision: AdaptiveMmdDecision,
+    pub normalized_mmd_squared: f64,
+    pub normalized_mmd: f64,
+    pub feature_sample_variance: f64,
+    pub feature_standard_error: f64,
+    pub feature_bound_lower: f64,
+    pub feature_bound_upper: f64,
+    pub tolerance: f64,
+    pub confidence_level: f64,
+    pub alpha_budget: f64,
+    pub alpha_spent: f64,
+    pub feature_count: usize,
+    pub seed: u64,
+    pub candidate_particle_count: usize,
+    pub reference_particle_count: usize,
+    pub candidate_atom_count: usize,
+    pub reference_atom_count: usize,
+    pub particle_feature_evaluations: u128,
+    pub checkpoints: Vec<AdaptiveMmdCheckpoint>,
+}
+
+/// Evaluate normalized squared MMD adaptively with a time-uniform guarantee
+/// over the preregistered geometric checkpoints.
+///
+/// At look t, alpha_t = alpha/(t*(t+1)); the sum over all looks is alpha.
+/// Hoeffding intervals at the inspected checkpoints therefore have simultaneous
+/// coverage at least confidence_level by a union bound. The function only
+/// inspects at checkpoint boundaries; it never peeks mid-batch.
+///
+/// If the interval is wholly below the frozen tolerance, the MMD sub-gate is
+/// within tolerance. If wholly above, it fails. If still overlapping at the
+/// feature budget limit, the result is unresolved and must not be accepted.
+/// This does not authorize a physical trajectory without all other gates.
+pub fn compare_phase_space_measures_spectral_adaptive(
+    candidate: &[PhaseSpaceParticle1d],
+    reference: &[PhaseSpaceParticle1d],
+    kernel_config: MmdConfig,
+    adaptive_config: AdaptiveSpectralMmdConfig,
+) -> Result<AdaptiveSpectralMmdResult, MmdError> {
+    validate_config(kernel_config)?;
+    if adaptive_config.initial_feature_count == 0
+        || adaptive_config.max_feature_count < adaptive_config.initial_feature_count
+        || adaptive_config.max_feature_count > 10_000_000
+        || adaptive_config.max_feature_count == 0
+        || !adaptive_config.confidence_level.is_finite()
+        || !(0.0..1.0).contains(&adaptive_config.confidence_level)
+        || !adaptive_config.tolerance.is_finite()
+        || !(0.0..=4.0).contains(&adaptive_config.tolerance)
+    {
+        return Err(MmdError::InvalidAdaptiveConfig);
+    }
+
+    let (candidate_atoms, candidate_tv) =
+        aggregate_measure(candidate, "candidate", kernel_config.domain_length)?;
+    let (reference_atoms, reference_tv) =
+        aggregate_measure(reference, "reference", kernel_config.domain_length)?;
+    let total_variation_scale = candidate_tv.max(reference_tv);
+    let normalization = if total_variation_scale == 0.0 {
+        1.0
+    } else {
+        total_variation_scale
+    };
+
+    let alpha_budget = 1.0 - adaptive_config.confidence_level;
+    let mut cumulative_alpha_spent = 0.0;
+    let mut rng = SplitMix64::new(adaptive_config.seed);
+    let mut feature_count = 0_usize;
+    let mut target_feature_count = adaptive_config.initial_feature_count;
+    let mut mean = 0.0;
+    let mut sum_squared_deviation = 0.0;
+    let mut look_index = 1_usize;
+    let mut checkpoints = Vec::new();
+    let mut decision = AdaptiveMmdDecision::UnresolvedBudgetExhausted;
+    let mut final_lower = 0.0;
+    let mut final_upper = 4.0;
+
+    loop {
+        while feature_count < target_feature_count {
+            let feature = sample_spectral_feature(kernel_config, &mut rng)?;
+            let squared_difference = spectral_squared_signature_difference(
+                &candidate_atoms,
+                &reference_atoms,
+                normalization,
+                feature,
+                kernel_config,
+            )?;
+            feature_count += 1;
+
+            // Welford's online variance update; only the running statistics
+            // are retained, not the individual D feature samples.
+            let count = feature_count as f64;
+            let delta = squared_difference - mean;
+            mean += delta / count;
+            let delta_after_update = squared_difference - mean;
+            sum_squared_deviation += delta * delta_after_update;
+        }
+
+        let look = look_index as f64;
+        let alpha_for_checkpoint = alpha_budget / (look * (look + 1.0));
+        cumulative_alpha_spent += alpha_for_checkpoint;
+        let interval_radius = 4.0
+            * ((2.0 / alpha_for_checkpoint).ln() / (2.0 * feature_count as f64)).sqrt();
+        final_lower = (mean - interval_radius).max(0.0);
+        final_upper = (mean + interval_radius).min(4.0);
+
+        if !mean.is_finite()
+            || !sum_squared_deviation.is_finite()
+            || !alpha_for_checkpoint.is_finite()
+            || !interval_radius.is_finite()
+            || !final_lower.is_finite()
+            || !final_upper.is_finite()
+        {
+            return Err(MmdError::NonFiniteOutput);
+        }
+
+        checkpoints.push(AdaptiveMmdCheckpoint {
+            feature_count,
+            alpha_for_checkpoint,
+            cumulative_alpha_spent,
+            normalized_mmd_squared_estimate: mean,
+            interval_radius,
+            interval_lower: final_lower,
+            interval_upper: final_upper,
+        });
+
+        if final_upper <= adaptive_config.tolerance {
+            decision = AdaptiveMmdDecision::WithinTolerance;
+            break;
+        }
+        if final_lower > adaptive_config.tolerance {
+            decision = AdaptiveMmdDecision::AboveTolerance;
+            break;
+        }
+        if feature_count >= adaptive_config.max_feature_count {
+            decision = AdaptiveMmdDecision::UnresolvedBudgetExhausted;
+            break;
+        }
+
+        target_feature_count = target_feature_count
+            .saturating_mul(2)
+            .min(adaptive_config.max_feature_count);
+        look_index = look_index.saturating_add(1);
+    }
+
+    let feature_sample_variance = if feature_count > 1 {
+        (sum_squared_deviation / (feature_count - 1) as f64).max(0.0)
+    } else {
+        0.0
+    };
+    let feature_standard_error = (feature_sample_variance / feature_count as f64).sqrt();
+    let normalized_mmd = mean.sqrt();
+    let particle_feature_evaluations = (candidate_atoms.len() as u128)
+        .checked_add(reference_atoms.len() as u128)
+        .and_then(|count| count.checked_mul(feature_count as u128))
+        .ok_or(MmdError::PairCountOverflow)?;
+
+    if !feature_sample_variance.is_finite()
+        || !feature_standard_error.is_finite()
+        || !normalized_mmd.is_finite()
+        || !cumulative_alpha_spent.is_finite()
+        || cumulative_alpha_spent > alpha_budget + 1.0e-12
+    {
+        return Err(MmdError::NonFiniteOutput);
+    }
+
+    Ok(AdaptiveSpectralMmdResult {
+        decision,
+        normalized_mmd_squared: mean,
+        normalized_mmd,
+        feature_sample_variance,
+        feature_standard_error,
+        feature_bound_lower: final_lower,
+        feature_bound_upper: final_upper,
+        tolerance: adaptive_config.tolerance,
+        confidence_level: adaptive_config.confidence_level,
+        alpha_budget,
+        alpha_spent: cumulative_alpha_spent,
+        feature_count,
+        seed: adaptive_config.seed,
+        candidate_particle_count: candidate.len(),
+        reference_particle_count: reference.len(),
+        candidate_atom_count: candidate_atoms.len(),
+        reference_atom_count: reference_atoms.len(),
+        particle_feature_evaluations,
+        checkpoints,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
