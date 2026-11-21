@@ -155,6 +155,43 @@
         "flow_config_digest": null
       },
       "evaluation_rule": "Compare only runs with matching designs, constraints, PDK, libraries, corners, tool versions and activity assumptions."
+    },
+    {
+      "id": "NIST-AI-SEM-DETECTION-LIMITS",
+      "title": "Detection Limits of AI Segmentation Models Applied to SEM Image-Based Detection",
+      "official_source": "https://pages.nist.gov/detection_limits/web/index.html",
+      "related_publication": "https://www.nist.gov/publications/detection-limits-ai-based-sem-dimensional-metrology",
+      "related_ongoing_project": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
+      "metadata": {
+        "simulated_image_sets": 6,
+        "images_per_set": 567,
+        "image_dimensions": [
+          512,
+          512
+        ],
+        "trained_unet_models": 3,
+        "approximate_parameters_per_model": 7900000,
+        "visualization_graphs": 540,
+        "compared_observers": [
+          "human",
+          "numerical",
+          "AI"
+        ]
+      },
+      "code_references": [
+        "https://github.com/usnistgov/WIPP-unet-train-plugin",
+        "https://github.com/usnistgov/WIPP-unet-inference-plugin"
+      ],
+      "code_status": "both NIST plugin repositories archived/read-only on 2026-06-12",
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_image_artifact_sha256": null,
+        "exact_model_artifact_sha256": null,
+        "access_status": "public web visualization and metadata reviewed; raw artifact acquisition not completed",
+        "redistribution_status": "verify exact artifact/license terms before caching or redistribution",
+        "dataset_snapshot_status": "not-yet-frozen"
+      },
+      "evidence_class": "public simulated SEM images and reported AI detection-limit visualizations; no independent physical instrument measurement"
     }
   ],
   "benchmark_reference_artifacts": {
@@ -168,7 +205,10 @@
       "implementation_class": "test-only-independent-standard-library-reference; production implementation remains Rust-first",
       "local_test_count": 11,
       "local_test_result": "PASS",
-      "physical_or_dataset_claim": false
+      "physical_or_dataset_claim": false,
+      "test_count": 21,
+      "test_result": "PASS-in-hosted-GitHub-Actions",
+      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44881540564"
     }
   }
 }
