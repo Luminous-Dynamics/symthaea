@@ -82,6 +82,14 @@ cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo
 
 ## Reproducible probes
 
+Matched Landau amplitude sweep at fixed physical/numerical configuration (same Nx, Nv, domain, velocity interval, timestep and horizon), with amplitudes 1e-3 and 1e-2:
+
+```sh
+cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_amplitude_sweep
+```
+
+The 1e-2 lane matches the VlasovTT paper's stated Landau perturbation amplitude, but it does not reproduce the paper's 1024-by-1024 TT/dense numerical configuration.
+
 Longer phase-resolved Landau-damping and spectral-tail trace to t=10 (complex Fourier coefficient, magnitude, phase, x/v tail fractions and Nyquist fractions):
 
 ```sh
