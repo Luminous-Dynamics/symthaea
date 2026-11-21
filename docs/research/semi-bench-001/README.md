@@ -458,3 +458,10 @@ A public UCI-attributed SECOM mirror was audited without importing its raw data 
 A contiguous chronological 60/20/20 proposal contains 76/11/17 failures in train/validation/test. This is a source-clock chronology stress split, not an evaluated model result. Validation/test positive counts are small; no lot/tool IDs are present, and timestamps have no timezone. Full audit: [secom-source-integrity-audit-v0.1.json](secom-source-integrity-audit-v0.1.json).
 
 The split validator now supports either offset-aware timestamps or source-local naive timestamps with an explicit clock-domain ID. The latter establishes ordering only within that declared source clock; it does not create UTC or cross-site time comparability.
+
+
+## Frozen SECOM chronological split manifest
+
+The source audit now has a machine-readable row-level split manifest at [splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json](splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json). It binds all 1,567 row identities, source labels and source-local timestamps to the exact public mirror commit and per-file digests. The split is contiguous by source row/time, with no timestamp group crossing the cut points.
+
+Positive support is 76 failures in train, 11 in validation and 17 in test. This is a frozen chronology stress split—not a trained-model result. The source has no timezone and no lot/tool IDs. It supports only within-source-clock ordering, not UTC, equipment-held-out or lot-held-out claims.
