@@ -1,0 +1,161 @@
+{
+  "run_id": 44895652946,
+  "artifact_id": 14703563532,
+  "artifact_name": "plasma-vlasov-reference-d485da749859d9302a77fb2542ce9cecbf6e3872",
+  "artifact_sha256": "edf9a35c5a9e50b5d0151c0c45d810563ba9fa98a770b019e512401315cfdfeb",
+  "artifact_bytes": 9961,
+  "artifact_expires_at": "2026-12-21T10:43:30Z",
+  "source_commit": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
+  "source_branch": "research/plasma-vp-spectral-reference-v0-1",
+  "workflow": "Plasma Vlasov reference solver",
+  "toolchain": "Rust 1.96.0 (ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96)",
+  "runner": "ubuntu-latest",
+  "target": "x86_64-unknown-linux-gnu",
+  "workflow_conclusion": "success",
+  "gates": {
+    "strict_format": true,
+    "unit_tests": {
+      "passed": 19,
+      "failed": 0
+    },
+    "strict_clippy": true,
+    "long_landau_trace_to_t10": true,
+    "spatial_velocity_domain_timestep_refinement": true,
+    "artifact_upload": true
+  },
+  "landau_configuration": {
+    "equation_cohort": "collisionless electrostatic Vlasov-Poisson 1D1V",
+    "nx": 64,
+    "nv": 128,
+    "domain_length": 12.566370614359172,
+    "x_interval": [
+      0,
+      12.566370614359172
+    ],
+    "velocity_interval": [
+      -6,
+      6
+    ],
+    "charge_to_mass": -1,
+    "permittivity": 1,
+    "background_density": 1,
+    "initial_density_perturbation_amplitude": 0.001,
+    "spatial_mode": 1,
+    "thermal_speed": 1,
+    "dt": 0.01,
+    "steps": 1000,
+    "sampled_every_steps": 10,
+    "final_time": 10,
+    "spectral_tail_start_fraction": 0.75
+  },
+  "initial_condition_comparison": {
+    "paper_landau_amplitude": 0.01,
+    "this_run_amplitude": 0.001,
+    "ratio": "10x lower than paper initial perturbation amplitude",
+    "disposition": "same linear-Landau physical parameters apart from amplitude; not an exact paper-initial-condition reproduction"
+  },
+  "exploratory_peak_fit": {
+    "method": "find local extrema of absolute value of signed imaginary fundamental electric-field Fourier coefficient in the sampled trace; regress ln(peak magnitude) against peak time",
+    "initial_peak_excluded": true,
+    "post_initial_extrema": [
+      {
+        "time": 2.5,
+        "imaginary_coefficient": -0.0005056582033394,
+        "kind": "negative trough"
+      },
+      {
+        "time": 4.7,
+        "imaginary_coefficient": 0.0003532724335582,
+        "kind": "positive peak"
+      },
+      {
+        "time": 7,
+        "imaginary_coefficient": -0.0002510287827752,
+        "kind": "negative trough"
+      },
+      {
+        "time": 9.2,
+        "imaginary_coefficient": 0.0001788269954657,
+        "kind": "positive peak"
+      }
+    ],
+    "four_extrema_fit": {
+      "gamma": -0.15444614642531948,
+      "r_squared": 0.9996701445360365,
+      "standard_error": 0.0019837893715387656,
+      "note": "Descriptive fit only; conventional iid-regression interval is not an uncertainty statement for a deterministic numerical trajectory."
+    },
+    "last_three_extrema_sensitivity_fit": {
+      "gamma": -0.15127273980918007,
+      "r_squared": 0.9998857363264225
+    },
+    "include_initial_condition_fit_sensitivity": {
+      "gamma": -0.18147055017535776,
+      "r_squared": 0.9799715289851922
+    },
+    "paper_reported_linear_amplitude_damping_rate": -0.151,
+    "note": "Exploratory post-transient peak-envelope slope is close to the paper-reported linear Landau rate, but the fit window was selected after observing this run, uses only four post-initial extrema, and the perturbation amplitude differs by 10x. No validated reproduction or SOTA claim."
+  },
+  "observed_diagnostics": {
+    "mass_start": 12.56637061436,
+    "mass_end": 12.56637061436,
+    "momentum_start": -4.294788508911e-8,
+    "momentum_end": -4.296302681837e-8,
+    "total_energy_start": 6.283197404413,
+    "total_energy_end": 6.283197404582,
+    "max_spectral_poisson_residual": 4.734710887244e-16,
+    "velocity_endpoint_ratio_min": 2.661224120739e-8,
+    "velocity_endpoint_ratio_max": 2.684245104113e-8,
+    "x_high_tail_fraction_max": 4.317387750261e-29,
+    "v_high_tail_fraction_min": 2.655134958689e-19,
+    "v_high_tail_fraction_max": 2.658734413673e-19
+  },
+  "refinement_probe": {
+    "final_time": 1,
+    "space_nx": [
+      32,
+      64,
+      128
+    ],
+    "velocity_nv": [
+      64,
+      128,
+      256
+    ],
+    "velocity_max": [
+      4,
+      6,
+      8
+    ],
+    "timestep": [
+      0.04,
+      0.02,
+      0.01,
+      0.005
+    ],
+    "interpretation": "same independent spatial, velocity-grid, velocity-domain, and timestep sweeps as prior run; the t=10 Landau run uses a single 64x128 grid"
+  },
+  "measurement_limits": {
+    "wall_time_recorded": false,
+    "peak_memory_recorded": false,
+    "energy_to_solution_recorded": false,
+    "matched_external_baseline": false,
+    "independent_distribution_reference": false,
+    "replicated_seeds": false,
+    "calibrated_fit_window": false,
+    "paper_exact_amplitude": false
+  },
+  "files_in_artifact": [
+    "landau-reference.csv",
+    "refinement-probe.csv"
+  ],
+  "caveats": [
+    "The trace is a numerical reference-prototype diagnostic, not a continuum accuracy certification.",
+    "The long-horizon envelope fit is exploratory and must not be described as a validated Landau damping reproduction.",
+    "The 0.001 perturbation is ten times smaller than the paper-reported VlasovTT Landau amplitude 0.01.",
+    "The finite periodic velocity interval is truncated.",
+    "The spectral-tail and Nyquist fractions are observed occupancy diagnostics, not truncation-error certificates.",
+    "The x/v grid was not refined at t=10, so this run does not establish long-horizon grid convergence.",
+    "No production solver runtime, memory or energy advantage was measured."
+  ]
+}
