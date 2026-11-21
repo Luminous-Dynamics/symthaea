@@ -532,6 +532,41 @@ mod tests {
     }
 
     #[test]
+    fn free_streaming_preserves_moments_across_periodic_wraps() {
+        let mut measure = [
+            particle(7.5, 0.9, 0.4),
+            particle(0.1, -1.1, 0.35),
+            particle(3.2, 0.2, 0.25),
+        ];
+        let initial = evaluate_phase_space_moments(&measure, config()).unwrap();
+
+        for _ in 0..32 {
+            measure = measure.map(|p| PhaseSpaceParticle1d {
+                position: p.position + 3.7 * p.velocity,
+                ..p
+            });
+            let report = evaluate_phase_space_moments(&measure, config()).unwrap();
+            assert_near(report.zeroth_moment, initial.zeroth_moment, 1.0e-12);
+            assert_near(
+                report.first_velocity_moment,
+                initial.first_velocity_moment,
+                1.0e-12,
+            );
+            assert_near(
+                report.half_second_velocity_moment,
+                initial.half_second_velocity_moment,
+                1.0e-12,
+            );
+            assert_near(report.total_variation, initial.total_variation, 1.0e-12);
+            assert_near(
+                report.half_second_central_velocity_moment.unwrap(),
+                initial.half_second_central_velocity_moment.unwrap(),
+                1.0e-12,
+            );
+        }
+    }
+
+    #[test]
     fn invalid_config_and_non_finite_inputs_fail_closed() {
         let measure = [particle(0.0, 0.0, 1.0)];
         let mut invalid = config();
