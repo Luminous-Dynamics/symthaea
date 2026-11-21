@@ -27,7 +27,9 @@
     "module_size",
     "global_loading",
     "module_loading",
-    "loading_jitter"
+    "loading_jitter",
+    "injection_directional_detection_power",
+    "injection_wrong_direction_rejection_rate"
   ],
   "properties": {
     "schema_version": {
@@ -126,6 +128,78 @@
     "loading_jitter": {
       "type": "number",
       "minimum": 0
+    },
+    "injection_directional_detection_power": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "injection_wrong_direction_rejection_rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
     }
   },
   "$defs": {
