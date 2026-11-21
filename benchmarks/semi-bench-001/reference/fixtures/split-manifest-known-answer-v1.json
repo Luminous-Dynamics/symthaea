@@ -1,0 +1,62 @@
+{
+  "schema": "luminous.semi-bench.split-manifest.v1",
+  "dataset_id": "synthetic-wafer-fixture-v1",
+  "dataset_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "split_scheme": "group_disjoint",
+  "assignments": [
+    {
+      "sample_id": "TR-001",
+      "split": "train",
+      "positive": true,
+      "group_id": "LOT-A"
+    },
+    {
+      "sample_id": "TR-002",
+      "split": "train",
+      "positive": false,
+      "group_id": "LOT-A"
+    },
+    {
+      "sample_id": "TR-003",
+      "split": "train",
+      "positive": true,
+      "group_id": "LOT-B"
+    },
+    {
+      "sample_id": "VA-001",
+      "split": "validation",
+      "positive": true,
+      "group_id": "LOT-C"
+    },
+    {
+      "sample_id": "VA-002",
+      "split": "validation",
+      "positive": false,
+      "group_id": "LOT-C"
+    },
+    {
+      "sample_id": "VA-003",
+      "split": "validation",
+      "positive": false,
+      "group_id": "LOT-D"
+    },
+    {
+      "sample_id": "TE-001",
+      "split": "test",
+      "positive": true,
+      "group_id": "LOT-E"
+    },
+    {
+      "sample_id": "TE-002",
+      "split": "test",
+      "positive": false,
+      "group_id": "LOT-E"
+    },
+    {
+      "sample_id": "TE-003",
+      "split": "test",
+      "positive": false,
+      "group_id": "LOT-F"
+    }
+  ]
+}
