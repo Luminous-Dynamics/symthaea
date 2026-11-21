@@ -2122,6 +2122,20 @@ mod tests {
             first.component_feature_counts.iter().sum::<usize>(),
             feature_config.feature_count
         );
+        assert_eq!(
+            first.component_estimates.len(),
+            first.component_feature_counts.len()
+        );
+        assert!(
+            first
+                .component_estimates
+                .iter()
+                .zip(&first.component_feature_counts)
+                .all(|(estimate, count)| {
+                    estimate.feature_count == *count
+                        && estimate.normalized_mmd_squared_estimate.is_some() == (*count > 0)
+                })
+        );
         assert_eq!(first.estimate.particle_feature_evaluations, 8192);
     }
 
