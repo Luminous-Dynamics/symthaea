@@ -5,70 +5,283 @@
   "description": "Provenance-first run metadata for condensed-matter low-energy nuclear-reaction research. Raw source assets remain immutable and are referenced by digest; synthetic and digitized data are never represented as measured source data.",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schema_version", "experiment_id", "run_id", "source", "sample", "observations", "software"],
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "run_id",
+    "source",
+    "sample",
+    "observations",
+    "software"
+  ],
   "properties": {
-    "schema_version": { "const": "0.1.0" },
-    "experiment_id": { "type": "string", "minLength": 1 },
-    "campaign_id": { "type": ["string", "null"] },
-    "sample_id": { "type": ["string", "null"] },
-    "run_id": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "campaign_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sample_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "source": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["source_kind", "access_state"],
+      "required": [
+        "source_kind",
+        "access_state"
+      ],
       "properties": {
-        "source_kind": { "enum": ["publication", "repository_dataset", "laboratory_record", "synthetic_fixture", "plot_digitization"] },
-        "doi": { "type": ["string", "null"] },
-        "accession": { "type": ["string", "null"] },
-        "version": { "type": ["string", "null"] },
-        "access_state": { "enum": ["public", "embargoed", "restricted", "not_yet_retrieved", "synthetic"] },
-        "retrieved_at": { "type": ["string", "null"], "format": "date-time" },
-        "file_uri": { "type": ["string", "null"] },
-        "sha256": { "type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$" },
-        "licence": { "type": ["string", "null"] }
+        "source_kind": {
+          "enum": [
+            "publication",
+            "repository_dataset",
+            "laboratory_record",
+            "synthetic_fixture",
+            "plot_digitization"
+          ]
+        },
+        "doi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accession": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "access_state": {
+          "enum": [
+            "public",
+            "embargoed",
+            "restricted",
+            "not_yet_retrieved",
+            "synthetic"
+          ]
+        },
+        "retrieved_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "file_uri": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "licence": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "sample": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["host_material"],
+      "required": [
+        "host_material"
+      ],
       "properties": {
-        "host_material": { "type": "string", "minLength": 1 },
-        "purity_fraction": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-        "thickness_um": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-        "geometry": { "type": ["string", "null"] },
-        "isotope": { "type": ["string", "null"] },
-        "loading_ratio": { "type": ["number", "null"], "minimum": 0 },
-        "phase": { "type": ["string", "null"] },
-        "surface_treatment": { "type": ["string", "null"] },
-        "preparation_history": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-        "characterization_artifacts": { "type": "array", "items": { "$ref": "#/$defs/artifact" } }
+        "host_material": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purity_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "thickness_um": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "geometry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isotope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "loading_ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "phase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "surface_treatment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preparation_history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "characterization_artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
       }
     },
     "excitation": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": true,
       "properties": {
-        "species": { "type": ["string", "null"] },
-        "nominal_energy_ev": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-        "energy_distribution_artifact": { "$ref": "#/$defs/artifact" },
-        "relative_energy_spread": { "type": ["number", "null"], "minimum": 0 },
-        "current_a": { "type": ["number", "null"], "minimum": 0 },
-        "integrated_charge_c": { "type": ["number", "null"], "minimum": 0 },
-        "spot_area_cm2": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-        "duration_s": { "type": ["number", "null"], "minimum": 0 }
+        "species": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nominal_energy_ev": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "energy_distribution_artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "relative_energy_spread": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "current_a": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "integrated_charge_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "spot_area_cm2": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "duration_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
       }
     },
     "loading": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": true,
       "properties": {
-        "method": { "type": ["string", "null"] },
-        "electrolyte": { "type": ["string", "null"] },
-        "current_density_a_cm2": { "type": ["number", "null"] },
-        "electrode_potential_v": { "type": ["number", "null"] },
-        "occupancy_measurement_method": { "type": ["string", "null"] },
-        "occupancy_artifact": { "$ref": "#/$defs/artifact" }
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "electrolyte": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_density_a_cm2": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "electrode_potential_v": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "occupancy_measurement_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "occupancy_artifact": {
+          "$ref": "#/$defs/artifact"
+        }
       }
     },
     "detectors": {
@@ -76,18 +289,77 @@
       "items": {
         "type": "object",
         "additionalProperties": true,
-        "required": ["channel", "measurement_role"],
+        "required": [
+          "channel",
+          "measurement_role"
+        ],
         "properties": {
-          "channel": { "enum": ["proton", "neutron", "gamma", "calorimetry", "isotope", "other"] },
-          "measurement_role": { "enum": ["primary", "cross_check", "background", "calibration"] },
-          "energy_min_ev": { "type": ["number", "null"], "minimum": 0 },
-          "energy_max_ev": { "type": ["number", "null"], "minimum": 0 },
-          "calibration_artifact": { "$ref": "#/$defs/artifact" },
-          "efficiency_artifact": { "$ref": "#/$defs/artifact" },
-          "resolution": { "type": ["number", "null"], "minimum": 0 },
-          "live_time_s": { "type": ["number", "null"], "minimum": 0 },
-          "dead_time_fraction": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-          "selection_method": { "type": ["string", "null"] }
+          "channel": {
+            "enum": [
+              "proton",
+              "neutron",
+              "gamma",
+              "calorimetry",
+              "isotope",
+              "other"
+            ]
+          },
+          "measurement_role": {
+            "enum": [
+              "primary",
+              "cross_check",
+              "background",
+              "calibration"
+            ]
+          },
+          "energy_min_ev": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "energy_max_ev": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "calibration_artifact": {
+            "$ref": "#/$defs/artifact"
+          },
+          "efficiency_artifact": {
+            "$ref": "#/$defs/artifact"
+          },
+          "resolution": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "live_time_s": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "dead_time_fraction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "selection_method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         }
       }
     },
@@ -97,44 +369,194 @@
       "items": {
         "type": "object",
         "additionalProperties": true,
-        "required": ["quantity", "value", "unit", "provenance_kind"],
+        "required": [
+          "quantity",
+          "value",
+          "unit",
+          "provenance_kind"
+        ],
         "properties": {
-          "quantity": { "type": "string", "minLength": 1 },
-          "value": { "type": "number" },
-          "unit": { "type": "string", "minLength": 1 },
-          "uncertainty_stat": { "type": ["number", "null"], "minimum": 0 },
-          "uncertainty_systematic": { "type": ["number", "null"], "minimum": 0 },
-          "covariance_group": { "type": ["string", "null"] },
-          "background_subtracted": { "type": ["boolean", "null"] },
-          "provenance_kind": { "enum": ["measured", "derived", "synthetic", "plot_digitized"] },
-          "artifact": { "$ref": "#/$defs/artifact" }
+          "quantity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uncertainty_stat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "uncertainty_systematic": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "covariance_group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "background_subtracted": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "provenance_kind": {
+            "enum": [
+              "measured",
+              "derived",
+              "synthetic",
+              "plot_digitized"
+            ]
+          },
+          "artifact": {
+            "$ref": "#/$defs/artifact"
+          }
         }
       }
     },
     "software": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["analysis_revision"],
+      "required": [
+        "analysis_revision"
+      ],
       "properties": {
-        "analysis_revision": { "type": "string", "minLength": 1 },
-        "pipeline_digest": { "type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$" },
-        "solver_versions": { "type": "array", "items": { "type": "string" } },
-        "parameters_artifact": { "$ref": "#/$defs/artifact" },
-        "random_seed": { "type": ["integer", "null"] }
+        "analysis_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pipeline_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "solver_versions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parameters_artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "random_seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
       }
     },
-    "notes": { "type": ["string", "null"] }
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "uncertainty_model": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional covariance model for correlated statistical and systematic uncertainties. Covariance artifacts are separate from per-observation marginal uncertainty fields.",
+      "properties": {
+        "basis": {
+          "type": "string",
+          "enum": [
+            "linear_observable",
+            "log_observable",
+            "log_relative_yield",
+            "other"
+          ]
+        },
+        "observation_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "covariance_artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "correlation_groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "shared_reference_observation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "construction_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "includes_statistical": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "includes_systematic": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    }
   },
   "$defs": {
     "artifact": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": true,
-      "required": ["uri", "sha256"],
+      "required": [
+        "uri",
+        "sha256"
+      ],
       "properties": {
-        "uri": { "type": "string", "minLength": 1 },
-        "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
-        "media_type": { "type": ["string", "null"] },
-        "size_bytes": { "type": ["integer", "null"], "minimum": 0 }
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "media_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
       }
     }
   }
