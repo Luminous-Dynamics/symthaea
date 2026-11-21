@@ -62,7 +62,29 @@
         "timestamp_order": "non-decreasing-source-row-order",
         "timezone_offset_present": false,
         "byte_identity_to_official_uci": "not-verified",
-        "audit_file": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
+        "audit_file": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+        "feature_sha256": "4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf",
+        "labels_sha256": "2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef",
+        "canonical_snapshot_manifest_sha256": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+        "canonical_snapshot_digest_convention": "SHA256 of UTF-8 canonical string: 'SECOM-MIRROR-SNAPSHOT-v1\\n' + 'data/secom.data\\\\0' + feature-file SHA256 hex + '\\n' + 'data/secom_labels.data\\\\0' + labels-file SHA256 hex + '\\n'. This identifies the two-file mirror snapshot; it is not a claim that the mirror bytes are identical to official UCI files.",
+        "chronological_split_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+        "chronological_split_support": {
+          "train": {
+            "rows": 940,
+            "fail": 76,
+            "pass": 864
+          },
+          "validation": {
+            "rows": 313,
+            "fail": 11,
+            "pass": 302
+          },
+          "test": {
+            "rows": 314,
+            "fail": 17,
+            "pass": 297
+          }
+        }
       }
     },
     {
@@ -362,6 +384,33 @@
         "exact_match": 0.9696
       },
       "caveat": "project explicitly reports dataset is largely GAN-synthesized and saturates quickly; not fab generalization"
+    },
+    {
+      "id": "external-UCI-SECOM-source-clock-chronological-split",
+      "source_snapshot": "Be1an001/semiconductor-pass-fail-prediction-python@0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+      "split_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+      "status": "frozen-row-level-split-manifest; not-model-evaluated",
+      "method": "contiguous-60-20-20-source-row-order",
+      "clock_domain_id": "uci-secom-mirror-single-source-clock",
+      "time_basis": "source_local_naive",
+      "support": {
+        "train": {
+          "rows": 940,
+          "fail": 76,
+          "pass": 864
+        },
+        "validation": {
+          "rows": 313,
+          "fail": 11,
+          "pass": 302
+        },
+        "test": {
+          "rows": 314,
+          "fail": 17,
+          "pass": 297
+        }
+      },
+      "claim_limit": "temporal ordering within one source clock only; no timezone, lot/tool/site identity, or temporal model result"
     }
   ]
 }
