@@ -1420,8 +1420,12 @@ mod tests {
         // The receipt commitment is public and unkeyed. A caller can change a
         // finite salience value and recompute it; structural validation alone
         // cannot detect that the measurement was fabricated.
-        receipt.note_observations[0].fundamental_salience_db =
-            Some(receipt.note_observations[0].fundamental_salience_db.unwrap() + 12.0);
+        receipt.note_observations[0].fundamental_salience_db = Some(
+            receipt.note_observations[0]
+                .fundamental_salience_db
+                .unwrap()
+                + 12.0,
+        );
         receipt.receipt_sha256 = audio_stem_event_observation_commitment_v1(&receipt).unwrap();
 
         assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1).is_empty());
