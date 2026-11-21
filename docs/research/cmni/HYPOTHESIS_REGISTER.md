@@ -102,3 +102,20 @@ For a singly charged ion accelerated through (V) kV, D⁺ has (E_{cm}approx V/2)
 This becomes an explicit competing explanation/nuisance model. The model must be compared at matched total deuteron flux and cannot be described as explaining the low-energy plateau without mass-resolved beam diagnostics and prospective predictions.
 
 Source: Karahadian et al. (2026), Methods, https://doi.org/10.1038/s41467-026-74421-1
+
+
+## H9 — isotope composition, electrolyte contamination and fuel-state uncertainty
+
+| ID | Hypothesis | Distinguishing predictions | Measurements that discriminate | Falsifier / weakening evidence |
+|---|---|---|---|---|
+| H9 | Variations in D2O purity / H2O contamination change D/H occupancy in Pd and explain some between-campaign yield variation, rather than requiring a change in nuclear mechanism | Response varies with measured D2O/H2O composition, water-exposure history and independently characterized D/Pd state; matched H2O controls reduce the beam-driven DD signature | Electrolyte isotope assay before/after use, direct D/H loading measurements, RGA, controlled D2O/H2O mixtures, XRD or depth-sensitive isotope profiling, matched beam and detector conditions | Yield variation remains after isotope composition/fuel state are matched, or controlled D2O/H2O changes fail to predict the observed response within uncertainty |
+
+The 2025 paper reports an 88.3(3)% decrease when 2 M K2CO3 in H2O replaced D2O and suggests ambient H2O contamination of D2O may explain between-campaign variability. It also explicitly states that D/Pd during the fusion runs was not directly measured; ~0.7 was inferred from separate XRD characterization. These are valuable controls and a material-state uncertainty, not proof that every confounder is excluded.
+
+Keep these control types separate:
+- **Sheath voltage OFF:** stops incident D+ implantation; signal returns to background.
+- **Electrochemical cell OFF while beam remains active:** tests persistence of loaded D in Pd; reported variation at most 2%.
+- **H2O instead of D2O:** isotope/material-loading control; reported 88.3(3)% reduction.
+- **Seven-target beam-loading set:** repeatability at 0.2 mA / 120 min; not part of the 0.5 mA three-campaign Phase I/II comparison.
+
+Source: Chen et al. (2025) and Supplementary Information, https://doi.org/10.1038/s41586-025-09042-7
