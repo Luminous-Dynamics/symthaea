@@ -29,7 +29,7 @@ For \(\mu=\sum_i a_i\delta_{z_i}\) and \(\nu=\sum_j b_j\delta_{z_j}\), the oracl
 
 Before computing MMD, co-located periodic phase-space coordinates are canonicalized and their signed coefficients are aggregated. Total variation is the sum of absolute aggregated atom coefficients, not the sum of absolute raw particle weights. This preserves normalization under signed split/merge representations, including cancellation of opposite signs at the same support point. Weights are divided by the larger total variation of the two represented measures before pair accumulation. The zero-measure convention uses scale one.
 
-The implementation uses compensated summation and checks that the squared discrepancy is nonnegative within a conservative roundoff tolerance. Materially negative values fail closed. It reports kernel pair-evaluation count, unique support atom count and raw particle counts as metadata.
+The unnormalized MMD is the RKHS metric for this characteristic kernel. The reported ratio is a pair-normalized discrepancy; because its denominator depends on both inputs, we do not claim that the normalized ratio itself satisfies the triangle inequality.\n\nThe implementation uses compensated summation and checks that the squared discrepancy is nonnegative within a conservative roundoff tolerance. Materially negative values fail closed. It reports kernel pair-evaluation count, unique support atom count and raw particle counts as metadata.
 
 ## Scope and limits
 
