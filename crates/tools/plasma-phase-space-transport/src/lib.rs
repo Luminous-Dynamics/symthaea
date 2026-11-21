@@ -496,6 +496,7 @@ fn min_cost_transport(
         }
 
         node = sink;
+        let mut residual_changed = false;
         while node != source {
             let (previous, edge_index) =
                 predecessor[node].ok_or(TransportError::NoAugmentingPath)?;
@@ -504,9 +505,13 @@ fn min_cost_transport(
                 (edge.to, edge.reverse_index, edge.unit_cost)
             };
             let old_capacity = graph[previous][edge_index].residual_capacity;
-            let next_capacity = (old_capacity - amount).max(0.0);
-            if next_capacity == old_capacity {
-                return Err(TransportError::NoProgress);
+            let next_capacity = if old_capacity.is_infinite() {
+                old_capacity
+            } else {
+                (old_capacity - amount).max(0.0)
+            };
+            if old_capacity.is_finite() && next_capacity < old_capacity {
+                residual_changed = true;
             }
             graph[previous][edge_index].residual_capacity = next_capacity;
             let reverse_capacity = graph[to][reverse_index].residual_capacity + amount;
@@ -515,6 +520,9 @@ fn min_cost_transport(
             }
             graph[to][reverse_index].residual_capacity = reverse_capacity;
             node = previous;
+        }
+        if !residual_changed {
+            return Err(TransportError::NoProgress);
         }
 
         total_cost.add(amount * distance[sink]);
@@ -822,6 +830,22 @@ mod tests {
             compare_phase_space_measures_w1(&non_finite, &measure, config()),
             Err(TransportError::NonFinitePosition { .. })
         ));
+    }
+
+    #[test]
+    fn tiny_normalized_mass_is_not_dropped_at_large_velocity_separation() {
+        let epsilon = 1.0e-15;
+        let candidate = [
+            particle(0.0, 0.0, 1.0 - epsilon),
+            particle(0.0, 0.0, epsilon),
+        ];
+        let reference = [
+            particle(0.0, 0.0, 1.0 - epsilon),
+            particle(0.0, 1.0e15, epsilon),
+        ];
+        let result = compare_phase_space_measures_w1(&candidate, &reference, config()).unwrap();
+        assert_near(result.normalized_w1, 1.0, 1.0e-12);
+        assert_eq!(result.transported_fraction, 1.0);
     }
 
     #[test]
