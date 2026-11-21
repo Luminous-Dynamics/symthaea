@@ -48,19 +48,24 @@ const WARMUP_SAMPLES: usize = 4;
 const MEASURED_SAMPLES: usize = 32;
 
 fn simd_runtime_path() -> &'static str {
-    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    // This crate depends on symthaea-core with its default features enabled;
+    // CPU detection records the runtime dispatch capability without pretending
+    // that this example crate owns symthaea-core's feature cfg.
+    #[cfg(target_arch = "x86_64")]
     {
-        if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
-            return "x86_64_avx2_fma";
+        if std::arch::is_x86_feature_detected!("avx2")
+            && std::arch::is_x86_feature_detected!("fma")
+        {
+            return "x86_64_avx2_fma_available";
         }
-        return "x86_64_scalar_fallback";
+        return "x86_64_scalar_fallback_required";
     }
-    #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+    #[cfg(target_arch = "aarch64")]
     {
-        return "aarch64_neon";
+        return "aarch64_neon_available";
     }
     #[allow(unreachable_code)]
-    "scalar_fallback"
+    "other_arch_scalar_fallback"
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
