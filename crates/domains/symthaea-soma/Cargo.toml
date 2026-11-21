@@ -52,6 +52,7 @@ litert = []
 fusion = ["litert", "broca-full"]
 # Decentralized cooperative positioning (GPS-independent).
 positioning = []
+positioning-legacy = []
 # Property/invariant tests that target unstable or evolving APIs.
 prop-tests = []
 
