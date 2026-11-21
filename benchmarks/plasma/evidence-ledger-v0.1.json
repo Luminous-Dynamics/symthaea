@@ -1,0 +1,127 @@
+{
+  "schema": "plasma-evidence-ledger-profile-v0.1",
+  "status": "evidence_schema_and_policy_examples_not_a_physical_acceptance_contract",
+  "purpose": "Qualify evidence for one bounded trajectory segment using caller-frozen equation-cohort policies.",
+  "cohorts": {
+    "vlasov_poisson_pic": {
+      "candidate_metrics": [
+        "charge_or_mass",
+        "momentum",
+        "kinetic_energy",
+        "field_energy",
+        "total_energy",
+        "gauss_poisson_residual",
+        "charge_continuity_residual",
+        "phase_space_mmd",
+        "phase_space_w1"
+      ],
+      "notes": "Only require energy and field observables that match the selected solver discretization, boundary treatment and normalization. MMD accepts signed measures; balanced W1 accepts nonnegative equal-mass measures."
+    },
+    "vlasov_maxwell_pic": {
+      "candidate_metrics": [
+        "charge_or_mass",
+        "momentum",
+        "kinetic_energy",
+        "field_energy",
+        "total_energy",
+        "gauss_poisson_residual",
+        "charge_continuity_residual",
+        "magnetic_divergence_residual",
+        "phase_space_mmd",
+        "phase_space_w1"
+      ],
+      "notes": "Record the actual discrete Gauss and div(B) constraints, charge-conserving deposition/current correction, Poynting flux and boundary work. Momentum applicability depends on the discretization and boundaries."
+    },
+    "collisional_vlasov_maxwell_landau": {
+      "candidate_metrics": [
+        "charge_or_mass",
+        "momentum",
+        "kinetic_energy",
+        "field_energy",
+        "total_energy",
+        "entropy_production"
+      ],
+      "notes": "Entropy production is collision-model and discretization-specific. Do not impose collisionless entropy conservation on a collisional model."
+    },
+    "reduced_quasineutral_vlasov_ampere": {
+      "candidate_metrics": [
+        "charge_or_mass",
+        "momentum",
+        "kinetic_energy",
+        "field_energy",
+        "total_energy"
+      ],
+      "notes": "Only require constraints and asymptotic properties proved for the reduced equations. Do not inherit full-Maxwell gates without proof."
+    }
+  },
+  "evidence_record": {
+    "required_identity": [
+      "source_revision",
+      "input_digest",
+      "config_digest",
+      "operator_id",
+      "equation_cohort",
+      "metric_id",
+      "units",
+      "time_start",
+      "time_end"
+    ],
+    "numeric_fields": [
+      "raw_value",
+      "error_estimate",
+      "lower_error_bound",
+      "upper_error_bound",
+      "acceptance_tolerance"
+    ],
+    "bound_kinds": [
+      "deterministic",
+      "probabilistic_with_confidence_level",
+      "empirical",
+      "unavailable"
+    ],
+    "applicability": [
+      "applicable",
+      "not_applicable_with_reason",
+      "unavailable_with_reason"
+    ],
+    "statuses": [
+      "pass",
+      "fail",
+      "unresolved",
+      "not_applicable"
+    ]
+  },
+  "qualification": {
+    "pass": "Applicable deterministic or probabilistic upper error bound is no greater than the exact tolerance frozen in the cohort policy.",
+    "fail": "Applicable lower error bound is strictly greater than the frozen tolerance.",
+    "unresolved": "Missing values, empirical-only evidence, tolerance overlap, unavailable data, stale provenance or policy mismatch.",
+    "not_applicable": "Explicitly reasoned not-applicable metric, retained only when the cohort policy permits it.",
+    "fail_closed": "Missing, non-finite, stale, under-specified or incomparable evidence never becomes zero and never passes."
+  },
+  "error_budget": {
+    "permitted": "Conservative upper-bound sum for identical cohort, target metric, units, time segment and provenance.",
+    "deterministic": "Sum deterministic upper bounds.",
+    "probabilistic": "Sum upper bounds and use confidence lower bound 1 - sum(1 - confidence_i), i.e. a union bound without independence.",
+    "rejected": [
+      "empirical-only components",
+      "unavailable components",
+      "mismatched target metrics",
+      "mismatched units",
+      "mismatched cohorts",
+      "mismatched trajectory segments",
+      "mismatched provenance"
+    ],
+    "root_sum_square": "Not implemented; requires a separately verified covariance/independence contract."
+  },
+  "claim_limits": [
+    "This schema and evaluator do not create physical error bounds.",
+    "An upper bound is only as valid as its operator, norm, discretization, boundary, arithmetic and derivation assumptions.",
+    "A probabilistic confidence level is retained and combined only by a union bound.",
+    "The error-budget sum is meaningful only when every component bounds the same target quantity in the same norm and units.",
+    "No generic cross-cohort score or universal tolerance is implied."
+  ],
+  "provenance": {
+    "implementation": "standalone dependency-free Rust crate plasma-evidence-ledger",
+    "rust_toolchain": "1.96.0"
+  }
+}
