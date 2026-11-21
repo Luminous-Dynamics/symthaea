@@ -118,3 +118,10 @@ The matched-input tournament runs null false-positive and injected-change sensit
 CETB now has a claim-scoped receipt schema at `research/cetb/measurement_qualification/measurement-qualification.schema.json`. It requires separate records for measurement sufficiency, participant-level repeatability, construct validity and three transportability lanes (participant holdout, site holdout, independent cohort). It explicitly forbids a composite score.
 
 The framework treats NSI as an imported fMRI measurement-sufficiency method, RCAF as a participant-paired repeatability method, and external validation as a separate transportability test. None substitutes for the others. The protocol is `CETB_MEASUREMENT_QUALIFICATION_STACK_V0.md`.
+
+
+### Estimator-by-effect-size comparison
+
+A matched-input estimator × dose response surface is now implemented as a further extension of the first tournament. It compares absolute WJ, signed-shift WJ and normalized mean absolute edge error at each of five perturbation levels, keeping the random seed and input draws aligned across methods. This will help distinguish useful operating ranges rather than comparing three saturated strong-effect results.
+
+The output contains a full dose-response curve and Monte-Carlo confidence intervals for each metric. It deliberately does not rank or average metrics with different construct semantics.
