@@ -91,20 +91,20 @@ pub struct PeriodicPoissonCertificate {
 /// Certify a potential estimate against the periodic second-order Poisson
 /// operator
 ///
-///     A phi[i] = (2 phi[i] - phi[i-1] - phi[i+1]) / dx^2.
+/// The discrete operator is `A phi[i] = (2 phi[i] - phi[i-1] - phi[i+1]) / dx^2`.
 ///
 /// The right-hand side is rho/epsilon_0. On the mean-zero subspace the
 /// smallest eigenvalue is
 ///
-///     lambda_1 = 4 sin^2(pi/N) / dx^2.
+/// Its smallest nonzero eigenvalue is `lambda_1 = 4 sin^2(pi/N) / dx^2`.
 ///
 /// The residual r = rho_projected/epsilon_0 - A phi_projected gives
 ///
-///     ||phi - phi_hat||_2 <= ||r||_2 / lambda_1
+/// The potential error obeys `||phi - phi_hat||_2 <= ||r||_2 / lambda_1`.
 ///
 /// and, for E[i] = -(phi[i+1]-phi[i])/dx,
 ///
-///     ||E - E_hat||_2 <= ||r||_2 / sqrt(lambda_1).
+/// The field error obeys `||E - E_hat||_2 <= ||r||_2 / sqrt(lambda_1)`.
 ///
 /// The input charge-density mean and potential-estimate mean are projected
 /// out only when their magnitudes are within the caller-declared tolerances.
