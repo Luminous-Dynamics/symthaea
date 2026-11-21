@@ -2,7 +2,7 @@
 
 **Tracker:** [#13111](https://github.com/Luminous-Dynamics/symthaea/issues/13111)  
 **Specification:** [ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md](../../../docs/research/ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md)  
-**Status:** hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit; not an evaluated adaptive selector.
+**Status:** 13 hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit and deterministic one-step action selector; no multi-step adaptive policy tournament yet.
 
 ## Files
 
@@ -40,4 +40,4 @@ The scenario catalogue separates:
 - pre-registered test obligations from general information gain;
 - planned actions from actual execution outcomes.
 
-The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim matching, dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. They do not rank a general action catalogue or claim that one policy is superior. The adaptive selector tournament remains unimplemented; no solver or physical test is called.
+The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim matching, dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The multi-step matched-budget policy tournament remains unimplemented; no solver or physical test is called.
