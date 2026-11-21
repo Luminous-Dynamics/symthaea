@@ -145,3 +145,17 @@ Hosted GitHub Actions run [#44934333447](https://github.com/Luminous-Dynamics/sy
 - The Python/reference job in the same run passed 46/46 tests and reproduced its three frozen reports.
 
 These checks ran in a minimal temporary Cargo workspace because the repository root workspace currently references a missing `crates/core/symthaea/Cargo.toml`. The isolated workspace avoided changing unrelated root workspace state. This verifies contract and leakage logic, not a trained model's predictive performance or physical fab outcome.
+
+
+## Latest complete Rust verification
+
+Hosted run [#44935276557](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557) passed on code commit `162a96cd423daa1f4f9297f00a32e434cd19a5f9`:
+
+- Rustfmt passed.
+- Clippy passed with warnings denied.
+- **23/23 Rust tests passed** across binary metrics, split-manifest integrity, contrastive-pair integrity and SECOM raw-file parsing.
+- The binary-metrics CLI report matched its frozen reference byte-for-byte.
+- The SECOM raw-audit CLI report matched its synthetic expected JSON byte-for-byte.
+- The Python/reference lane passed **46/46 tests** and its three frozen report comparisons.
+
+The latest PR branch head includes later documentation/manifest/source-register updates; the verified Rust code, fixtures and workflow are unchanged from the tested code commit. The full 1,567×590 feature matrix was not retrieved in this runtime, so the parser was verified with synthetic bytes and the frozen real-source split manifest, not with a full real-file model run.
