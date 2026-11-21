@@ -44,6 +44,14 @@ pub struct MycelialAnastomosis {
     pub junction_position: SpatialPoint3,
 }
 
+/// A proximity-based geometric suggestion. It is not an accepted connection
+/// until a caller explicitly supplies its fusion record to the graph builder.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialAnastomosisCandidate {
+    pub fusion: MycelialAnastomosis,
+    pub contact_distance: f32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MycelialConnectionKind {
@@ -167,6 +175,194 @@ impl fmt::Display for MycelialNetworkError {
 }
 
 impl Error for MycelialNetworkError {}
+
+/// Detect possible tip-to-tip and tip-to-side contacts with a deterministic,
+/// bounded closest-point search. Candidates never alter the model or graph;
+/// the caller must explicitly approve them before graph construction.
+pub fn detect_anastomosis_candidates(
+    model: &MycelialModel,
+    config: MycelialNetworkConfig,
+) -> Result<Vec<MycelialAnastomosisCandidate>, MycelialNetworkError> {
+    // Reuse the canonical model/topology checks before running geometric search.
+    build_mycelial_network_graph(model, &[], config)?;
+
+    let mut filaments: Vec<_> = model.filaments.iter().collect();
+    filaments.sort_by_key(|filament| filament.id);
+    let mut candidates = Vec::new();
+
+    for source in &filaments {
+        if !source.terminal {
+            continue;
+        }
+        let source_tip = source.end;
+
+        for target in &filaments {
+            if source.id == target.id
+                || source.parent_id == Some(target.id)
+                || target.parent_id == Some(source.id)
+            {
+                continue;
+            }
+
+            if target.terminal && source.id < target.id {
+                let tip_distance = source_tip.sub(target.end).length();
+                if tip_distance.is_finite() && tip_distance <= config.max_fusion_distance {
+                    let junction = source_tip.add(target.end).scale(0.5);
+                    candidates.push(MycelialAnastomosisCandidate {
+                        fusion: MycelialAnastomosis {
+                            id: 0,
+                            source_filament_id: source.id,
+                            source_t: 1.0,
+                            target_filament_id: target.id,
+                            target_t: 1.0,
+                            kind: AnastomosisKind::TipToTip,
+                            junction_position: junction,
+                        },
+                        contact_distance: tip_distance,
+                    });
+                }
+            }
+
+            if !bounds_may_contact(source_tip, target, config.max_fusion_distance) {
+                continue;
+            }
+            let (target_t, target_point, distance) =
+                nearest_bezier_parameter(target, source_tip);
+            if !distance.is_finite() || distance > config.max_fusion_distance {
+                continue;
+            }
+            if !(INTERIOR_PARAMETER_MARGIN..=(1.0 - INTERIOR_PARAMETER_MARGIN))
+                .contains(&target_t)
+            {
+                continue;
+            }
+
+            let junction = source_tip.add(target_point).scale(0.5);
+            candidates.push(MycelialAnastomosisCandidate {
+                fusion: MycelialAnastomosis {
+                    id: 0,
+                    source_filament_id: source.id,
+                    source_t: 1.0,
+                    target_filament_id: target.id,
+                    target_t,
+                    kind: AnastomosisKind::TipToSide,
+                    junction_position: junction,
+                },
+                contact_distance: distance,
+            });
+        }
+    }
+
+    candidates.sort_by(|left, right| {
+        (
+            left.fusion.source_filament_id,
+            left.fusion.target_filament_id,
+            left.fusion.kind,
+        )
+            .cmp(&(
+                right.fusion.source_filament_id,
+                right.fusion.target_filament_id,
+                right.fusion.kind,
+            ))
+            .then_with(|| left.fusion.target_t.total_cmp(&right.fusion.target_t))
+    });
+    candidates.dedup_by(|left, right| {
+        left.fusion.source_filament_id == right.fusion.source_filament_id
+            && left.fusion.target_filament_id == right.fusion.target_filament_id
+            && left.fusion.kind == right.fusion.kind
+            && (left.fusion.target_t - right.fusion.target_t).abs() < 1.0e-4
+    });
+    if candidates.len() > MAX_MYCELIAL_ANASTOMOSES {
+        return Err(MycelialNetworkError::AnastomosisCountExceeded(
+            candidates.len(),
+        ));
+    }
+    for (index, candidate) in candidates.iter_mut().enumerate() {
+        candidate.fusion.id = index as u32;
+    }
+    Ok(candidates)
+}
+
+fn bounds_may_contact(
+    point: SpatialPoint3,
+    filament: &crate::mycelial_model::MycelialFilament,
+    maximum_distance: f32,
+) -> bool {
+    let xs = [
+        filament.start.x,
+        filament.control_a.x,
+        filament.control_b.x,
+        filament.end.x,
+    ];
+    let ys = [
+        filament.start.y,
+        filament.control_a.y,
+        filament.control_b.y,
+        filament.end.y,
+    ];
+    let zs = [
+        filament.start.z,
+        filament.control_a.z,
+        filament.control_b.z,
+        filament.end.z,
+    ];
+    let distance_to_interval = |value: f32, low: f32, high: f32| {
+        if value < low {
+            low - value
+        } else if value > high {
+            value - high
+        } else {
+            0.0
+        }
+    };
+    let dx = distance_to_interval(point.x, xs.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
+        xs.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance);
+    let dy = distance_to_interval(point.y, ys.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
+        ys.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance);
+    let dz = distance_to_interval(point.z, zs.into_iter().fold(f32::INFINITY, f32::min) - maximum_distance,
+        zs.into_iter().fold(f32::NEG_INFINITY, f32::max) + maximum_distance);
+    dx * dx + dy * dy + dz * dz <= maximum_distance * maximum_distance
+}
+
+fn nearest_bezier_parameter(
+    filament: &crate::mycelial_model::MycelialFilament,
+    query: SpatialPoint3,
+) -> (f32, SpatialPoint3, f32) {
+    let low = INTERIOR_PARAMETER_MARGIN;
+    let high = 1.0 - INTERIOR_PARAMETER_MARGIN;
+    let mut best_t = low;
+    let mut best_point = bezier_point(filament, low);
+    let mut best_distance = best_point.sub(query).length();
+
+    // Fixed coarse scan avoids unpredictable convergence and brackets the
+    // deterministic local refinement used for each fixture/device.
+    const COARSE_STEPS: usize = 48;
+    for index in 1..=COARSE_STEPS {
+        let t = low + (high - low) * index as f32 / COARSE_STEPS as f32;
+        let point = bezier_point(filament, t);
+        let distance = point.sub(query).length();
+        if distance < best_distance {
+            best_t = t;
+            best_point = point;
+            best_distance = distance;
+        }
+    }
+
+    let mut step = (high - low) / COARSE_STEPS as f32;
+    for _ in 0..20 {
+        for candidate_t in [(best_t - step).max(low), (best_t + step).min(high)] {
+            let point = bezier_point(filament, candidate_t);
+            let distance = point.sub(query).length();
+            if distance < best_distance {
+                best_t = candidate_t;
+                best_point = point;
+                best_distance = distance;
+            }
+        }
+        step *= 0.5;
+    }
+    (best_t, best_point, best_distance)
+}
 
 /// Derive a graph from the immutable filament tree plus explicit anastomoses.
 /// Each filament becomes one graph vertex; parent relations are tree edges,
