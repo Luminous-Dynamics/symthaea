@@ -579,9 +579,13 @@
         "forward_time",
         "stratified_sample"
       ],
-      "semantics": "unique-identity; all-splits-non-empty; group-disjoint-check; strict-forward-time-check; timezone-required; deterministic-assignment-digest",
-      "test_count": 7,
-      "empirical_dataset_result": false
+      "semantics": "unique-identity; all-splits-non-empty; group-disjoint-check; strict-forward-time-check; timezone-required; deterministic-assignment-digest; source-local-naive chronology permitted only with explicit clock_domain_id and no UTC/cross-domain claim",
+      "test_count": 10,
+      "empirical_dataset_result": false,
+      "supported_time_basis": [
+        "offset_aware",
+        "source_local_naive-with-explicit-clock_domain_id"
+      ]
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
@@ -611,7 +615,7 @@
       "test_count": 10,
       "claim_ceiling": "synthetic model-based expected value only; no physical savings or inspection authorization"
     },
-    "total_test_count": 31,
+    "total_test_count": 34,
     "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler"
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
@@ -636,5 +640,8 @@
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md"
+  ],
+  "source_integrity_audits": [
+    "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
   ]
 }
