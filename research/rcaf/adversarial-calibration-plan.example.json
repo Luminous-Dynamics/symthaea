@@ -187,7 +187,8 @@
     "selection_optimism",
     "abstention",
     "data_sufficiency",
-    "execution_receipt"
+    "execution_receipt",
+    "signal_plus_nuisance_recovery"
   ],
   "claim_limits": [
     "This is a proposed plan, not an executed calibration result.",
