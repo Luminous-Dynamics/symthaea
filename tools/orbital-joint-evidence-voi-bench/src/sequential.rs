@@ -335,11 +335,16 @@ fn terminal_plan(
 ) -> Result<Plan, String> {
     let mut candidates = Vec::new();
     for decision in &scenario.decisions {
-        let required = scenario
-            .decision_obligations
-            .get(decision)
-            .ok_or_else(|| format!("{} decision {decision} lacks obligation contract", scenario.scenario_id))?;
-        if !required.iter().all(|obligation| covered_obligations.contains(obligation)) {
+        let required = scenario.decision_obligations.get(decision).ok_or_else(|| {
+            format!(
+                "{} decision {decision} lacks obligation contract",
+                scenario.scenario_id
+            )
+        })?;
+        if !required
+            .iter()
+            .all(|obligation| covered_obligations.contains(obligation))
+        {
             continue;
         }
         let mut worst = 0.0_f64;
@@ -520,7 +525,12 @@ fn solve(
             let outcome_obligations = action
                 .obligations_by_observation
                 .get(observation)
-                .ok_or_else(|| format!("{} has no obligation mapping for {observation}", action.action_id))?;
+                .ok_or_else(|| {
+                    format!(
+                        "{} has no obligation mapping for {observation}",
+                        action.action_id
+                    )
+                })?;
             next_covered.extend(outcome_obligations.iter().cloned());
             let child = solve(
                 scenario,
@@ -579,7 +589,12 @@ fn myopic_policy(scenario: &SequentialScenario, baseline: f64) -> Result<MyopicA
             let covered: BTreeSet<String> = action
                 .obligations_by_observation
                 .get(observation)
-                .ok_or_else(|| format!("{} has no obligation mapping for {observation}", action.action_id))?
+                .ok_or_else(|| {
+                    format!(
+                        "{} has no obligation mapping for {observation}",
+                        action.action_id
+                    )
+                })?
                 .iter()
                 .cloned()
                 .collect();
@@ -627,8 +642,7 @@ fn fixed_policy(scenario: &SequentialScenario) -> Result<FixedCampaignAudit, Str
     if !fits_budget(&resources, &scenario.budget) {
         return Err("fixed campaign exceeds total resource budget".to_owned());
     }
-    let mut groups =
-        BTreeMap::<Vec<String>, (Vec<String>, BTreeSet<String>)>::new();
+    let mut groups = BTreeMap::<Vec<String>, (Vec<String>, BTreeSet<String>)>::new();
     for state in &scenario.states {
         let mut signature = Vec::new();
         let mut covered_obligations = BTreeSet::new();
@@ -646,15 +660,16 @@ fn fixed_policy(scenario: &SequentialScenario) -> Result<FixedCampaignAudit, Str
             .entry(signature)
             .or_insert_with(|| (Vec::new(), covered_obligations.clone()));
         if entry.1 != covered_obligations {
-            return Err("identical fixed-campaign outcome signature has inconsistent evidence".to_owned());
+            return Err(
+                "identical fixed-campaign outcome signature has inconsistent evidence".to_owned(),
+            );
         }
         entry.0.push(state.clone());
     }
     let mut worst_case_regret = 0.0_f64;
     for (belief, covered_obligations) in groups.values() {
-        worst_case_regret = worst_case_regret.max(
-            terminal_plan(scenario, belief, covered_obligations)?.worst_case_regret,
-        );
+        worst_case_regret = worst_case_regret
+            .max(terminal_plan(scenario, belief, covered_obligations)?.worst_case_regret);
     }
     Ok(FixedCampaignAudit {
         sequence: scenario.fixed_campaign_sequence.clone(),
@@ -765,28 +780,46 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
         .flatten()
         .map(String::as_str)
         .collect();
-    if scenario.decision_obligations.iter().any(|(decision, obligations)| {
-        obligations.iter().any(|value| value.trim().is_empty())
-            || obligations.iter().collect::<BTreeSet<_>>().len() != obligations.len()
-            || (matches!(decision.as_str(), "ACCEPT" | "REJECT") && obligations.is_empty())
-    }) {
-        return Err(format!("{} has an empty or duplicate decision obligation", scenario.scenario_id));
+    if scenario
+        .decision_obligations
+        .iter()
+        .any(|(decision, obligations)| {
+            obligations.iter().any(|value| value.trim().is_empty())
+                || obligations.iter().collect::<BTreeSet<_>>().len() != obligations.len()
+                || (matches!(decision.as_str(), "ACCEPT" | "REJECT") && obligations.is_empty())
+        })
+    {
+        return Err(format!(
+            "{} has an empty or duplicate decision obligation",
+            scenario.scenario_id
+        ));
     }
     let mut action_ids = BTreeSet::new();
     for action in &scenario.actions {
-        let possible_outcomes: BTreeSet<&str> =
-            action.observation_by_state.values().map(String::as_str).collect();
+        let possible_outcomes: BTreeSet<&str> = action
+            .observation_by_state
+            .values()
+            .map(String::as_str)
+            .collect();
         if action.obligations_by_observation.len() != possible_outcomes.len()
             || action
                 .obligations_by_observation
                 .keys()
                 .any(|outcome| !possible_outcomes.contains(outcome.as_str()))
-            || action.obligations_by_observation.values().any(|obligations| {
-                obligations.iter().collect::<BTreeSet<_>>().len() != obligations.len()
-                    || obligations.iter().any(|value| !declared_obligations.contains(value.as_str()))
-            })
+            || action
+                .obligations_by_observation
+                .values()
+                .any(|obligations| {
+                    obligations.iter().collect::<BTreeSet<_>>().len() != obligations.len()
+                        || obligations
+                            .iter()
+                            .any(|value| !declared_obligations.contains(value.as_str()))
+                })
         {
-            return Err(format!("{} has malformed outcome-specific obligation map", action.action_id));
+            return Err(format!(
+                "{} has malformed outcome-specific obligation map",
+                action.action_id
+            ));
         }
         if action.action_id.trim().is_empty()
             || action.action_class.trim().is_empty()
@@ -1014,14 +1047,12 @@ mod tests {
             decision,
             covered_obligations,
             ..
-        }) = branches.get("FAIL") else {
+        }) = branches.get("FAIL")
+        else {
             panic!("FAIL observation must terminate with rejection basis");
         };
         assert_eq!(decision, "REJECT");
-        assert_eq!(
-            covered_obligations,
-            &vec!["REJECTION-BASIS-001".to_owned()]
-        );
+        assert_eq!(covered_obligations, &vec!["REJECTION-BASIS-001".to_owned()]);
         let Some(PolicyNode::Test {
             action_id,
             branches,
@@ -1038,7 +1069,8 @@ mod tests {
             decision,
             covered_obligations,
             ..
-        }) = branches.get("INDICATION") else {
+        }) = branches.get("INDICATION")
+        else {
             panic!("INDICATION observation must terminate with rejection basis");
         };
         assert_eq!(decision, "REJECT");
@@ -1153,11 +1185,19 @@ mod tests {
         assert_eq!(seq_one.adaptive_campaign.worst_case_regret, 0.0);
         assert_eq!(seq_two.adaptive_campaign.worst_case_regret, 0.0);
         assert!(expected_dominates(
-            seq_one.adaptive_campaign.expected_resources.as_ref().unwrap(),
+            seq_one
+                .adaptive_campaign
+                .expected_resources
+                .as_ref()
+                .unwrap(),
             &seq_one.fixed_campaign.expected_resources
         ));
         assert!(expected_dominates(
-            seq_two.adaptive_campaign.expected_resources.as_ref().unwrap(),
+            seq_two
+                .adaptive_campaign
+                .expected_resources
+                .as_ref()
+                .unwrap(),
             &seq_two.fixed_campaign.expected_resources
         ));
     }
@@ -1184,8 +1224,7 @@ mod tests {
     fn baseline_without_evidence_is_hold_not_reject_or_accept() {
         let corpus: SequentialCorpus = serde_json::from_slice(FIXTURE).unwrap();
         let scenario = &corpus.scenarios[0];
-        let baseline =
-            terminal_plan(scenario, &scenario.states, &BTreeSet::new()).unwrap();
+        let baseline = terminal_plan(scenario, &scenario.states, &BTreeSet::new()).unwrap();
         assert_eq!(baseline.worst_case_regret, 2.0);
         assert!(matches!(
             baseline.node,
@@ -1207,7 +1246,8 @@ mod tests {
             decision,
             covered_obligations,
             ..
-        }) = branches.get("CLEAR") else {
+        }) = branches.get("CLEAR")
+        else {
             panic!("CLEAR branch must end in a terminal disposition");
         };
         assert_eq!(decision, "ACCEPT");
@@ -1225,14 +1265,12 @@ mod tests {
             decision,
             covered_obligations,
             ..
-        }) = branches.get("FAIL") else {
+        }) = branches.get("FAIL")
+        else {
             panic!("FAIL branch must be a terminal rejection");
         };
         assert_eq!(decision, "REJECT");
-        assert_eq!(
-            covered_obligations,
-            &vec!["REJECTION-BASIS-001".to_owned()]
-        );
+        assert_eq!(covered_obligations, &vec!["REJECTION-BASIS-001".to_owned()]);
     }
 
     #[test]
