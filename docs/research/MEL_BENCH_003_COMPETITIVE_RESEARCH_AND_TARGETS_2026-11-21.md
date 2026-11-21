@@ -226,7 +226,41 @@ These are proposed targets, not achieved results. Freeze the exact cohort, sampl
 6. **Build a blinded musician cohort.** Test whether responses are contextually relevant and creatively helpful, not only statistically sensitive to a changed feature.
 7. **Keep the external comparison registry current.** Snapshot provider/API versions, benchmark dates, rights receipts and model identity evidence before each run.
 
-## 5. Stop conditions
+## 5. Reward-model evaluator qualification
+
+CMI-RewardBench shows that no one evaluator is uniformly best across musicality, text adherence and multimodal compositional alignment. Melothaea should therefore qualify its evaluators as carefully as its generators.
+
+### Evaluation protocol
+
+1. Freeze a rights-cleared, human-annotated holdout; keep pseudo-labelled training/augmentation data outside the evaluation denominator.
+2. Have at least three independently qualified listeners judge blinded, randomized candidate pairs. Collect musicality, instruction adherence, motif/structure coherence and preference as separate labels.
+3. Evaluate CMI-RM, SongEval-RM, a general multimodal judge and the deterministic music-theory/preservation verifiers on exactly the same pairs.
+4. Report pairwise accuracy, tie handling, Spearman/Kendall rank correlation, calibration (Brier/log loss or reliability curve), confidence intervals and subgroup results by genre, prompt type, duration, vocal/instrumental, edit operation and participant expertise.
+5. Measure evaluator disagreement against human-human disagreement. A reward model that is highly confident on examples where trained musicians disagree should be calibrated down or abstain.
+6. Test adversarial pairs: unchanged-source candidates, loudness-only changes, high-fidelity but instruction-incorrect audio, exact instruction-following but aesthetically weak audio, and candidates with protected-score violations.
+
+### Governance invariant
+
+Reward-model outputs are **advisory measurements**, never authority:
+- a high reward score cannot bypass formal theory, obligation, preservation, rights or provenance checks;
+- a high reward score cannot turn a preview into an approved edit;
+- reward-model predictions are not artist-preference labels;
+- only an explicit artist approval or previously granted autonomy policy can authorize commit;
+- disagreements between judges remain visible, not collapsed into a single uncalibrated score.
+
+### Prospective targets
+
+| Metric | First gate | Stretch |
+|---|---|---|
+| Human pairwise preference agreement | Reproduce each evaluator's native CMI-RewardBench result on its official split | ≥85% on a larger rights-cleared Melothaea holdout, reported separately per dimension |
+| Rank correlation with human preference | Report SRCC and Kendall τ with 95% confidence intervals | SRCC ≥0.80 on musicality and ≥0.75 on instruction adherence |
+| Calibration | Reliability curves and Brier score; no hidden thresholding | Expected calibration error ≤0.05, with abstention under high disagreement |
+| Subgroup robustness | No aggregate-only report | No subgroup gap >10 percentage points without a documented scope/uncertainty explanation |
+| Authority safety | Reward score can never commit or widen scope | 100% of committed edits still require the independent authorization receipt |
+
+These are prospective qualification objectives, not current results.
+
+## 6. Stop conditions
 
 A task must be marked unavailable or failed—not silently downgraded—when:
 - a provider cannot expose the control surface required by the claimed metric;
