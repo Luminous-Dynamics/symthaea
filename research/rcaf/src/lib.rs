@@ -322,7 +322,7 @@ mod tests {
     #[test]
     fn weighted_jaccard_matches_hand_fixture() {
         let score = weighted_jaccard(&[0.2, 0.5], &[0.1, 0.4]).unwrap();
-        assert!((score - 5.0 / 9.0).abs() < 1e-12);
+        assert!((score - 5.0 / 7.0).abs() < 1e-12);
     }
 
     #[test]
