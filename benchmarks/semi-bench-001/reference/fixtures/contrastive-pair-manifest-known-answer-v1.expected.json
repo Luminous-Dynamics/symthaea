@@ -1,5 +1,10 @@
 {
-  "basis_counts": {"density":1,"production_proximity":2,"spatial":1,"structure":1},
+  "basis_counts": {
+    "density": 1,
+    "production_proximity": 2,
+    "spatial": 1,
+    "structure": 1
+  },
   "claim_limits": {
     "does_not_establish_causal_production_relationship": true,
     "does_not_prove_embedding_quality_or_model_performance": true,
@@ -17,11 +22,18 @@
     "unique_unordered_pair": true
   },
   "pair_count": 3,
-  "pair_counts_by_scope": {"test":1,"train":1,"validation":1},
-  "relation_counts": {"negative":1,"positive":2},
+  "pair_counts_by_scope": {
+    "test": 1,
+    "train": 1,
+    "validation": 1
+  },
+  "relation_counts": {
+    "negative": 1,
+    "positive": 2
+  },
   "sample_count": 6,
   "schema": "luminous.semi-bench.contrastive-pair-validation.v1",
   "split_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "time_basis": "source_local_naive",
-  "time_embargo_minutes": 60.0
+  "time_embargo_minutes": 60
 }
