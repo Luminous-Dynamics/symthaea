@@ -90,9 +90,18 @@ def validate_semantics(plan: dict[str, Any]) -> None:
         any(item["preserves_latent_target"] is True for item in nuisance),
         "at least one nuisance-only null preserving the latent target is required",
     )
+    for item in nuisance:
+        if "global_common_mode" in item["mechanisms"]:
+            doses = item.get("dose_points")
+            _need(
+                isinstance(doses, list)
+                and 0.0 in doses
+                and any(isinstance(dose, (int, float)) and dose > 0.0 for dose in doses),
+                f"common-mode nuisance {item['scenario_id']} requires zero and positive nuisance doses",
+            )
 
     outputs = set(plan["required_outputs"])
-    for required in ("type_i_error", "power", "directional_power", "wrong_direction_rejection_rate", "nuisance_false_positives", "execution_receipt"):
+    for required in ("type_i_error", "power", "directional_power", "wrong_direction_rejection_rate", "nuisance_false_positives", "nuisance_only_rejection_rate", "execution_receipt"):
         _need(required in outputs, f"required_outputs must include {required}")
     _need(bool(plan["connectivity_constructors"]), "at least one connectivity constructor is required")
     _need(bool(plan["matrix_comparators"]), "at least one matrix comparator is required")
