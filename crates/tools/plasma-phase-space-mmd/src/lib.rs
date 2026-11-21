@@ -425,7 +425,7 @@ mod tests {
         let measure = [particle(0.5, -0.25, 0.4), particle(5.0, 1.5, 0.6)];
         let result = compare_phase_space_measures_mmd(&measure, &measure, config()).unwrap();
         assert_mmd_zero(result);
-        assert_eq!(result.pair_evaluations, 8);
+        assert_eq!(result.pair_evaluations, 12);
     }
 
     #[test]
