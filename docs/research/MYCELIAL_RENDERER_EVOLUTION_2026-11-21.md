@@ -75,7 +75,7 @@ An isolated Bevy 0.20.1 preview adapter now lives at `crates/bridges/symthaea-my
 
 Implemented in source:
 1. CPU tube geometry is uploaded as one Bevy `Mesh3d` with `StandardMaterial` PBR shading.
-2. The preview assembles an emissive central nucleus, a translucent outer membrane, orbital cells, and terminal spores; generation metadata drives a restrained teal-to-violet vertex colour ramp.
+2. The preview assembles an emissive central nucleus, a translucent outer membrane, orbital cells, junction bulbs at non-terminal branch endpoints, and terminal spores; generation metadata drives a restrained teal-to-violet vertex colour ramp.
 3. Bevy's natural HDR bloom preset is paired with TonyMcMapface tonemapping; bloom remains low and material emissive values carry local brightness.
 4. Ambient, Cognitive, and Conversational modes are selectable on the command line.
 5. `--reduced-motion` disables renderer-local core breathing and orbital movement.
