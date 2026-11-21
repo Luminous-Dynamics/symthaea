@@ -57,7 +57,8 @@ jobs:
       - name: Stage, test, lint, execute and replay isolated RMI harness
         shell: bash
         env:
-          MEL_RMI_SEED_COUNT: "4"
+          MEL_RMI_TRIALS_PER_TARGET: "8"
+          MEL_RMI_SEED_ROOT: "42"
           MEL_RMI_EVIDENCE_DIR: ${{ runner.temp }}/mel-rmi-track-a-evidence
         run: |
           bash scripts/mel_rmi_track_a_qualification.sh "${{ github.event.pull_request.head.sha || github.sha }}"
