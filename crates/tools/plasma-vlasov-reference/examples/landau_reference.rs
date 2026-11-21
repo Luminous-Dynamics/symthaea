@@ -1,6 +1,8 @@
 use std::error::Error;
 
-use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
+use plasma_vlasov_reference::{
+    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let config = VlasovPoissonConfig {
@@ -20,16 +22,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let steps = 200;
 
     println!(
-        "step,time,electric_mode_1,mass,momentum,total_energy,poisson_residual,velocity_boundary_ratio"
+        "step,time,electric_mode_real,electric_mode_imag,electric_mode_amplitude,electric_mode_phase,mass,momentum,total_energy,poisson_residual,velocity_boundary_ratio"
     );
     for step in 0..=steps {
         if step % 10 == 0 {
             let d = solver.diagnostics()?;
+            let coefficient = solver.electric_mode_coefficient(mode)?;
             println!(
-                "{},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+                "{},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
                 step,
                 d.time,
-                solver.electric_mode_amplitude(mode)?,
+                coefficient.real,
+                coefficient.imaginary,
+                coefficient.amplitude(),
+                coefficient.phase(),
                 d.total_mass,
                 d.momentum,
                 d.total_energy,
