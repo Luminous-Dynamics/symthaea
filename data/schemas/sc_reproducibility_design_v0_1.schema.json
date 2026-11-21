@@ -58,6 +58,7 @@
         "additionalProperties": false,
         "required": [
           "observation_id",
+          "material_state_id",
           "specimen_id",
           "batch_id",
           "campaign_id",
@@ -132,6 +133,10 @@
             "const": "synthetic_measurement"
           },
           "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_state_id": {
             "type": "string",
             "minLength": 1
           }
