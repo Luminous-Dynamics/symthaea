@@ -207,3 +207,8 @@ This supplies a broader integration target for the programme:
 The benchmark should be a multi-fidelity ladder: synthetic DES/replay -> frozen historical trace -> offline counterfactual evaluation -> shadow-mode recommendations -> human-approved limited pilot -> controlled physical outcome study. Report system-level cycle time, WIP, OEE, excursion detection, inspection cost, throughput and delivery reliability jointly; every improvement must preserve quality/safety and respect hard constraints. No autonomous process authority is implied.
 
 Source: https://link.springer.com/article/10.1007/s43684-026-00146-z
+
+
+## 9. Cross-source pseudo-label alignment and boundary safety
+
+The 16 October 2026 IEEE Access paper on pseudo-label-based integration of WM-811K and Mixed38 reports relative gains of 207.75% in silhouette coefficient and 16.19% in Ratkowsky-Lance index. Source: https://doi.org/10.1109/ACCESS.2026.3744016 . These are cluster-structure measures and do not establish pseudo-label precision, correctness or future-lot transfer. The follow-up [SEMI-WM-ALIGN-001 #13148](https://github.com/Luminous-Dynamics/symthaea/issues/13148) benchmarks partial label alignment, boundary-aware pseudo-label admission, unknown preservation, and source/lot-held-out performance.
