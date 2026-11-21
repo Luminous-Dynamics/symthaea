@@ -412,13 +412,12 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
         }
         if let Some(split) =
             group_splits.insert(observation.source_group_id.clone(), observation.split)
+            && split != observation.split
         {
-            if split != observation.split {
-                return Err(format!(
-                    "source_group_id {} leaks across dataset splits",
-                    observation.source_group_id
-                ));
-            }
+            return Err(format!(
+                "source_group_id {} leaks across dataset splits",
+                observation.source_group_id
+            ));
         }
         for (map, digest, label) in [
             (
@@ -433,12 +432,12 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
             ),
         ] {
             let lineage = (observation.split, observation.source_group_id.clone());
-            if let Some(previous) = map.insert(digest.to_string(), lineage.clone()) {
-                if previous != lineage {
-                    return Err(format!(
-                        "{label} digest is assigned to multiple splits or source groups"
-                    ));
-                }
+            if let Some(previous) = map.insert(digest.to_string(), lineage.clone())
+                && previous != lineage
+            {
+                return Err(format!(
+                    "{label} digest is assigned to multiple splits or source groups"
+                ));
             }
         }
     }
@@ -521,14 +520,14 @@ fn fit_isotonic(rows: &[&CalibrationObservationV1]) -> Result<Vec<IsotonicBlockV
 
     let mut pooled: Vec<PooledPoint> = Vec::new();
     for (score, positive) in points {
-        if let Some(last) = pooled.last_mut() {
-            if last.upper == score {
-                last.total += 1;
-                if positive {
-                    last.positive += 1;
-                }
-                continue;
+        if let Some(last) = pooled.last_mut()
+            && last.upper == score
+        {
+            last.total += 1;
+            if positive {
+                last.positive += 1;
             }
+            continue;
         }
         pooled.push(PooledPoint {
             lower: score,
