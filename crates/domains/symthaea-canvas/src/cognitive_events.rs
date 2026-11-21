@@ -204,6 +204,7 @@ pub struct CognitiveTopologyReducer {
 impl CognitiveTopologyReducer {
     pub fn new(base_snapshot: CognitiveTopology) -> Result<Self, CognitiveEventError> {
         base_snapshot.validate()?;
+        validate_topology_provenance(&base_snapshot)?;
         Ok(Self {
             topology: base_snapshot.clone(),
             base_snapshot,
@@ -289,6 +290,7 @@ impl CognitiveTopologyReducer {
             });
         }
 
+        ensure_session_provenance(&self.topology, event.evidence.provenance)?;
         let previous_time = latest_evidence_time(&self.topology);
         if event.evidence.monotonic_ns < previous_time {
             return Err(CognitiveEventError::TimestampRegression {
@@ -603,6 +605,46 @@ fn apply_change(
             episode.state = *state;
             episode.evidence = event.evidence.clone();
         }
+    }
+    Ok(())
+}
+
+fn provenance_is_synthetic(provenance: CognitiveProvenance) -> bool {
+    provenance == CognitiveProvenance::SyntheticFixture
+}
+
+fn validate_topology_provenance(topology: &CognitiveTopology) -> Result<(), CognitiveEventError> {
+    let mut synthetic_class = None;
+    for provenance in topology
+        .nodes
+        .iter()
+        .map(|node| node.evidence.provenance)
+        .chain(topology.edges.iter().map(|edge| edge.evidence.provenance))
+        .chain(topology.episodes.iter().map(|episode| episode.evidence.provenance))
+    {
+        let current = provenance_is_synthetic(provenance);
+        if synthetic_class.is_some_and(|previous| previous != current) {
+            return Err(CognitiveEventError::SessionProvenanceMismatch);
+        }
+        synthetic_class = Some(current);
+    }
+    Ok(())
+}
+
+fn ensure_session_provenance(
+    topology: &CognitiveTopology,
+    next: CognitiveProvenance,
+) -> Result<(), CognitiveEventError> {
+    let next_is_synthetic = provenance_is_synthetic(next);
+    let existing = topology
+        .nodes
+        .iter()
+        .map(|node| node.evidence.provenance)
+        .chain(topology.edges.iter().map(|edge| edge.evidence.provenance))
+        .chain(topology.episodes.iter().map(|episode| episode.evidence.provenance))
+        .next();
+    if existing.is_some_and(|value| provenance_is_synthetic(value) != next_is_synthetic) {
+        return Err(CognitiveEventError::SessionProvenanceMismatch);
     }
     Ok(())
 }
