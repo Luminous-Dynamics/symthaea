@@ -1183,6 +1183,37 @@ mod tests {
     }
 
     #[test]
+    fn constant_velocity_impulse_matches_manufactured_periodic_characteristic() {
+        let config = test_config(16, 64);
+        let velocity_mode = 4usize;
+        let initial = periodic_velocity_mode_initial_state(config, velocity_mode);
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        let period = config.velocity_max - config.velocity_min;
+        let eta = TAU * velocity_mode as f64 / period;
+        let impulse = 0.23;
+        let impulses = vec![impulse; config.nx];
+
+        solver.apply_velocity_impulse(&impulses).unwrap();
+
+        let base = 1.0 / period;
+        let amplitude = 0.1 / period;
+        let mut maximum_error: f64 = 0.0;
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let shifted_velocity =
+                    config.velocity(iv) - config.velocity_min - impulse;
+                let expected = base + amplitude * (eta * shifted_velocity).cos();
+                let actual = solver.distribution()[ix * config.nv + iv];
+                maximum_error = maximum_error.max((actual - expected).abs());
+            }
+        }
+        assert!(
+            maximum_error < 2.0e-12,
+            "constant impulse max error {maximum_error:e}"
+        );
+    }
+
+    #[test]
     fn spatially_varying_velocity_impulse_matches_characteristics_and_preserves_mass() {
         let config = test_config(32, 64);
         let velocity_mode = 3usize;
@@ -1225,7 +1256,8 @@ mod tests {
         let initial = periodic_velocity_mode_initial_state(config, 2);
         let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
         let before_time = solver.time();
-        solver.apply_velocity_impulse(&vec![0.0; config.nx]).unwrap();
+        let zero_impulses = vec![0.0; config.nx];
+        solver.apply_velocity_impulse(&zero_impulses).unwrap();
 
         let maximum_error = solver
             .distribution()
