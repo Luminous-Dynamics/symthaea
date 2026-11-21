@@ -445,6 +445,11 @@
           }
         }
       }
+    },
+    "result_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the exact serialized result bundle; required by semantic validation for independent_replay evidence."
     }
   }
 }
