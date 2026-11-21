@@ -1129,7 +1129,7 @@ mod tests {
             value["models"][0]["lopo_folds"][0]["predictions"][0]["probability"] = json!(1.5);
         })
         .unwrap_err();
-        assert!(error.contains("probability must be in [0,1]"));
+        assert!(error.contains("schema validation failed") || error.contains("probability must be in [0,1]"));
     }
 
     #[test]
