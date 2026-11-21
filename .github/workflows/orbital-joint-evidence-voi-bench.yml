@@ -57,7 +57,7 @@ jobs:
             .title == "OrbitalJointSequentialPlanningCorpusV0_1" and
             ."$defs".scenario.properties.max_actions.maximum == 8 and
             (."$defs".scenario.required | index("decision_obligations") != null) and
-            (."$defs".action.required | index("obligations_covered") != null) and
+            (."$defs".action.required | index("obligations_by_observation") != null) and
             ."$defs".action.properties.admissibility.enum == ["ADMISSIBLE","INADMISSIBLE"]
           ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.schema.json
           jq -e '
@@ -66,7 +66,7 @@ jobs:
             (.scenarios | length == 2) and
             .scenarios[0].resource_frequency_model.used_for == "EXPECTED_RESOURCE_USE_ONLY" and
             (.scenarios | all(.decision_obligations.ACCEPT == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"])) and
-            (.scenarios | all([.actions[].obligations_covered[]] | all(. == "COMBINED-LOAD-CAPABILITY-001" or . == "THERMAL-WEAR-INSPECTABILITY-001"))) and
+            (.scenarios | all(.actions | all(.obligations_by_observation != null))) and
             (.scenarios[0].actions | map(.decision_context) | unique | length == 1)
           ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json
       - name: Format
@@ -130,7 +130,7 @@ jobs:
             .scenarios[0].adaptive_campaign.policy.branches.PASS.action_id == "B-THERMAL-INSPECTION" and
             (.scenarios[0].adaptive_campaign.policy.branches.PASS.branches.CLEAR.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"] and
             .scenarios[0].adaptive_campaign.policy.branches.PASS.branches.CLEAR.decision == "ACCEPT" and
-            (.scenarios[0].adaptive_campaign.policy.branches.PASS.branches.INDICATION.covered_obligations == ["REJECTION-BASIS-001"]) and
+            (.scenarios[0].adaptive_campaign.policy.branches.PASS.branches.INDICATION.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","REJECTION-BASIS-001"] and
             .scenarios[0].adaptive_campaign.expected_resources.engineering_hours == 1.2 and
             .scenarios[0].adaptive_campaign.expected_resources.facility_hours == 1.55 and
             .scenarios[1].scenario_id == "SEQ-002" and
@@ -140,6 +140,9 @@ jobs:
             .scenarios[1].adaptive_campaign.expected_resources.facility_hours == 1.65 and
             .scenarios[1].adaptive_campaign.policy.branches.INDICATION.decision == "REJECT" and
             (.scenarios[1].adaptive_campaign.policy.branches.INDICATION.covered_obligations | sort) == ["REJECTION-BASIS-001"] and
+            .scenarios[1].adaptive_campaign.policy.branches.CLEAR.action_id == "A-COMBINED-LOAD-SCREEN" and
+            .scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.decision == "ACCEPT" and
+            (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"] and
             .scenarios[1].adaptive_campaign.policy.branches.CLEAR.action_id == "A-COMBINED-LOAD-SCREEN" and
             .scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.decision == "ACCEPT" and
             (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"]
