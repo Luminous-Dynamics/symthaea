@@ -42,7 +42,12 @@
           "median_injected_paired_gap",
           "median_null_positive_gap_fraction",
           "median_injected_positive_gap_fraction",
-          "claim_limits"
+          "claim_limits",
+          "module_start",
+          "module_size",
+          "global_loading",
+          "module_loading",
+          "loading_jitter"
         ],
         "properties": {
           "schema_version": {
@@ -121,6 +126,26 @@
             "items": {
               "type": "string"
             }
+          },
+          "module_start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "module_size": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "global_loading": {
+            "type": "number",
+            "minimum": 0
+          },
+          "module_loading": {
+            "type": "number",
+            "minimum": 0
+          },
+          "loading_jitter": {
+            "type": "number",
+            "minimum": 0
           }
         }
       }
