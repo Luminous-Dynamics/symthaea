@@ -86,7 +86,13 @@
           }
         },
         "missingness_profile": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json#integrity_results.missingness_distribution"
-      }
+      },
+      "raw_ingestion_expectations": "docs/research/semi-bench-001/secom-raw-expectations-v1.json",
+      "raw_audit_implementation": "crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs",
+      "raw_audit_cli": "crates/domains/symthaea-semiconductor/src/bin/semi-secom-audit.rs",
+      "feature_sha256": "4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf",
+      "label_sha256": "2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef",
+      "official_byte_identity_to_uci": "not-verified; digests pin the documented public mirror snapshot"
     },
     {
       "id": "WM-811K",
@@ -486,6 +492,22 @@
       "raw_dataset_available": false,
       "benchmark_or_metrics": false,
       "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147"
+    },
+    {
+      "id": "IEEE-WaferMap-Pseudolabel-Integration-2026",
+      "title": "Comparative Study of AI Models for Wafer Map Defect Pattern Classification Using a Novel Pseudo-Labeling-Based Integrated Dataset",
+      "source": "https://doi.org/10.1109/ACCESS.2026.3744016",
+      "publication_date": "2026-10-16",
+      "evidence_class": "paper-abstract-reported",
+      "method": "integrates labeled WM-811K and unlabeled Mixed38 via pseudo-labeling informed by cluster distributions and label boundaries",
+      "reported_metrics": {
+        "silhouette_relative_improvement_percent": 207.75,
+        "ratkowsky_lance_relative_improvement_percent": 16.19
+      },
+      "raw_data_available_publicly": "not-established-from-abstract",
+      "split_protocol": "full-paper protocol requires independent reproduction",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
+      "claim_status": "cluster metric report, not pseudo-label correctness or manufacturing validation"
     }
   ],
   "benchmark_reference_artifacts": {
@@ -572,6 +594,19 @@
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44934333447",
       "test_count": 6,
       "claim_ceiling": "pair integrity only; no model quality/causality claim"
+    },
+    "rust_secom_raw_integrity_audit": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-secom-audit.rs",
+      "expectations": "docs/research/semi-bench-001/secom-raw-expectations-v1.json",
+      "fixtures": [
+        "benchmarks/semi-bench-001/reference/fixtures/secom-mini-features-v1.data",
+        "benchmarks/semi-bench-001/reference/fixtures/secom-mini-labels-v1.data",
+        "benchmarks/semi-bench-001/reference/fixtures/secom-mini-expectations-v1.json"
+      ],
+      "expected_report": "benchmarks/semi-bench-001/reference/fixtures/secom-mini-integrity-report-v1.expected.json",
+      "hosted_ci_status": "pending",
+      "claim_ceiling": "digest-bound ingestion integrity only"
     }
   },
   "reproducibility_artifacts": [
