@@ -1,0 +1,632 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-evidence-bundle-v1.schema.json",
+  "title": "MUSE Evidence Bundle v1",
+  "description": "Sealed cross-layer manifest joining independent symbolic, render, acoustic, score-audio and human evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "bundle_id",
+    "verifier",
+    "digest_recipe",
+    "artifacts",
+    "components",
+    "outcome",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-evidence-bundle-v1"
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verifier_id",
+        "version"
+      ],
+      "properties": {
+        "verifier_id": {
+          "const": "muse-evidence-bundle-verifier"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "digest_recipe": {
+      "const": "muse-evidence-bundle-sorted-json-sha256-v1"
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_sha256",
+        "source_score_sha256",
+        "candidate_score_sha256",
+        "source_audio_sha256",
+        "candidate_audio_sha256",
+        "candidate_midi_sha256"
+      ],
+      "properties": {
+        "case_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_score_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_midi_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbolic_edit",
+        "render_execution",
+        "acoustic_observation",
+        "score_audio_conformance",
+        "human_acceptance"
+      ],
+      "properties": {
+        "symbolic_edit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "receipt_sha256",
+            "producer_id",
+            "producer_version",
+            "case_sha256",
+            "source_score_sha256",
+            "candidate_score_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pass",
+                "fail",
+                "abstain",
+                "not_run"
+              ]
+            },
+            "receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "producer_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "producer_version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "case_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "source_score_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_score_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "render_execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "receipt_sha256",
+            "producer_id",
+            "producer_version",
+            "source_score_sha256",
+            "candidate_score_sha256",
+            "candidate_midi_sha256",
+            "candidate_audio_sha256",
+            "attempt_id"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pass",
+                "fail",
+                "abstain",
+                "not_run"
+              ]
+            },
+            "receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "producer_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "producer_version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "attempt_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 128
+            },
+            "source_score_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_score_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_midi_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_audio_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "acoustic_observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "receipt_sha256",
+            "producer_id",
+            "producer_version",
+            "contract_sha256",
+            "source_audio_sha256",
+            "candidate_audio_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pass",
+                "fail",
+                "abstain",
+                "not_run"
+              ]
+            },
+            "receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "producer_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "producer_version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "contract_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "source_audio_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_audio_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "score_audio_conformance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "receipt_sha256",
+            "producer_id",
+            "producer_version",
+            "candidate_score_sha256",
+            "candidate_audio_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pass",
+                "fail",
+                "abstain",
+                "not_run"
+              ]
+            },
+            "receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "producer_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "producer_version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "candidate_score_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_audio_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "human_acceptance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "receipt_sha256",
+            "producer_id",
+            "producer_version",
+            "case_sha256",
+            "candidate_score_sha256",
+            "candidate_audio_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pass",
+                "fail",
+                "abstain",
+                "not_run"
+              ]
+            },
+            "receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "producer_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "producer_version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "case_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_score_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "candidate_audio_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "required_gate_count",
+        "passed_gate_count",
+        "failed_gate_count",
+        "abstained_gate_count",
+        "reasons"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "abstain"
+          ]
+        },
+        "required_gate_count": {
+          "const": 5
+        },
+        "passed_gate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "failed_gate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "abstained_gate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "passed_gate_count": {
+                "const": 5
+              },
+              "failed_gate_count": {
+                "const": 0
+              },
+              "abstained_gate_count": {
+                "const": 0
+              }
+            }
+          },
+          "components": {
+            "properties": {
+              "symbolic_edit": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "render_execution": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "acoustic_observation": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "score_audio_conformance": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "human_acceptance": {
+                "properties": {
+                  "status": {
+                    "const": "pass"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "producer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "producer_version": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "status": {
+                "const": "fail"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "failed_gate_count": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "status": {
+                "const": "abstain"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "properties": {
+              "failed_gate_count": {
+                "const": 0
+              },
+              "abstained_gate_count": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "muse-evidence-bundle"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent cross-layer verifier for MUSE evidence bundles"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+muse-render-receipt = { path = "../muse-render-receipt" }
+symthaea-muse = { path = "../../crates/domains/symthaea-muse", default-features = false, features = ["theory"] }

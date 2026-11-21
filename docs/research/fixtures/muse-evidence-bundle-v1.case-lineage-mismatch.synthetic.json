@@ -1,0 +1,76 @@
+{
+  "schema": "muse-evidence-bundle-v1",
+  "bundle_id": "synthetic.bundle.case-lineage-mismatch.001",
+  "verifier": {
+    "verifier_id": "muse-evidence-bundle-verifier",
+    "version": "0.1.0"
+  },
+  "digest_recipe": "muse-evidence-bundle-sorted-json-sha256-v1",
+  "artifacts": {
+    "case_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "candidate_score_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "source_audio_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "candidate_audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "candidate_midi_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "components": {
+    "symbolic_edit": {
+      "status": "fail",
+      "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "producer_id": "muse-symbolic-edit-evaluator",
+      "producer_version": "0.3.0",
+      "case_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "source_score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "candidate_score_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "render_execution": {
+      "status": "pass",
+      "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "producer_id": "muse-render-receipt-verifier",
+      "producer_version": "0.1.0",
+      "source_score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "candidate_score_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_midi_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "candidate_audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "attempt_id": "attempt.synthetic.001"
+    },
+    "acoustic_observation": {
+      "status": "pass",
+      "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "producer_id": "muse-windowed-rms-gain-observer",
+      "producer_version": "0.1.0",
+      "contract_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_audio_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "candidate_audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "score_audio_conformance": {
+      "status": "pass",
+      "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "producer_id": "muse-score-audio-conformance",
+      "producer_version": "0.1.0",
+      "candidate_score_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "human_acceptance": {
+      "status": "pass",
+      "receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "producer_id": "muse-blinded-listening-protocol",
+      "producer_version": "0.1.0",
+      "case_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "candidate_score_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "candidate_audio_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  },
+  "outcome": {
+    "status": "fail",
+    "required_gate_count": 5,
+    "passed_gate_count": 4,
+    "failed_gate_count": 1,
+    "abstained_gate_count": 0,
+    "reasons": [
+      "symbolic receipt is bound to a different case digest"
+    ]
+  },
+  "receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+}
