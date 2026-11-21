@@ -165,9 +165,7 @@ pub enum EchoAnalysisError {
 ///
 /// The echo must occur strictly after the second pulse. The relation predicts
 /// kinematics only; it does not supply an echo amplitude or waveform.
-pub fn predict_two_pulse_echo(
-    pulses: EchoPulsePair,
-) -> Result<EchoPrediction, EchoAnalysisError> {
+pub fn predict_two_pulse_echo(pulses: EchoPulsePair) -> Result<EchoPrediction, EchoAnalysisError> {
     if pulses.first_mode == 0 {
         return Err(EchoAnalysisError::ZeroPulseMode { pulse_index: 0 });
     }
@@ -445,8 +443,7 @@ fn interpolate_crossing_time(
     if amplitude_span == 0.0 {
         return 0.5 * (left_time + right_time);
     }
-    left_time
-        + (half_maximum - left_amplitude) * (right_time - left_time) / amplitude_span
+    left_time + (half_maximum - left_amplitude) * (right_time - left_time) / amplitude_span
 }
 
 #[cfg(test)]
@@ -914,10 +911,7 @@ mod tests {
 
     #[test]
     fn measurement_rejects_too_few_samples_and_invalid_signal_floor() {
-        let short = [
-            phased_sample(1.5, 0.5, 0.0),
-            phased_sample(2.0, 1.0, 0.0),
-        ];
+        let short = [phased_sample(1.5, 0.5, 0.0), phased_sample(2.0, 1.0, 0.0)];
         assert_eq!(
             measure_echo_trace(
                 canonical_prediction(),
