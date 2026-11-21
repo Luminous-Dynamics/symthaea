@@ -1136,6 +1136,25 @@ mod tests {
     }
 
     #[test]
+    fn identical_midi_cannot_be_split_into_multiple_source_groups() {
+        let mut data = dataset();
+        data.observations[0].source_midi_sha256 =
+            data.observations[2].source_midi_sha256.clone();
+        data.observations[0].source_group_id = "other-work".into();
+        assert!(seal_calibration_dataset_v1(&mut data).is_err());
+    }
+
+    #[test]
+    fn repeated_source_artifacts_within_the_same_group_are_allowed() {
+        let mut data = dataset();
+        data.observations[1].source_audio_sha256 =
+            data.observations[0].source_audio_sha256.clone();
+        data.observations[1].source_midi_sha256 =
+            data.observations[0].source_midi_sha256.clone();
+        assert!(seal_calibration_dataset_v1(&mut data).is_ok());
+    }
+
+    #[test]
     fn duplicate_case_ids_are_rejected() {
         let mut data = dataset();
         data.observations[1].sample_id = data.observations[0].sample_id.clone();
