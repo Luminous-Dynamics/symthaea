@@ -245,31 +245,36 @@ impl TemporalWorkReceipt {
         Ok(())
     }
 
+    fn logical_seconds(&self) -> Option<f64> {
+        (self.logical_duration_ns > 0)
+            .then_some(self.logical_duration_ns as f64 / 1.0e9)
+    }
+
     /// Number of fast updates plus slow-context refreshes per logical second.
     fn state_updates_per_logical_second(&self) -> Option<f64> {
         let updates = self.work.state_update_total()?;
-        Some(updates as f64 / (self.logical_duration_ns as f64 / 1.0e9))
+        Some(updates as f64 / self.logical_seconds()?)
     }
 
     /// Sum of primitive scalar operation counts per logical second.
     /// This is not a latency, energy or hardware-cost estimate.
     fn scalar_operations_per_logical_second(&self) -> Option<f64> {
         let operations = self.work.primitive_scalar_operations()?;
-        Some(operations as f64 / (self.logical_duration_ns as f64 / 1.0e9))
+        Some(operations as f64 / self.logical_seconds()?)
     }
 
     /// Logical seconds progressed per measured wall-clock second.
     /// None is returned when wall time was not observed.
     fn real_time_factor(&self) -> Option<f64> {
         let wall_ns = self.system.wall_elapsed_ns.filter(|value| *value > 0)?;
-        Some(self.logical_duration_ns as f64 / wall_ns as f64)
+        Some(self.logical_seconds()? * 1.0e9 / wall_ns as f64)
     }
 
     /// Declared state, parameter and input bytes touched per logical second.
     /// This is accounting, not a cache- or DRAM-traffic measurement.
     fn bytes_touched_per_logical_second(&self) -> Option<f64> {
         let bytes = self.work.total_bytes_touched()?;
-        Some(bytes as f64 / (self.logical_duration_ns as f64 / 1.0e9))
+        Some(bytes as f64 / self.logical_seconds()?)
     }
 
     /// Primitive scalar operation count per independently verified correct decision.
@@ -281,10 +286,7 @@ impl TemporalWorkReceipt {
     }
 
     fn events_per_logical_second(&self) -> Option<f64> {
-        Some(
-            self.work.input_events as f64
-                / (self.logical_duration_ns as f64 / 1.0e9),
-        )
+        Some(self.work.input_events as f64 / self.logical_seconds()?)
     }
 }
 
@@ -353,6 +355,16 @@ mod tests {
 
         assert_eq!(receipt.real_time_factor(), Some(5.0));
         assert_eq!(receipt.state_updates_per_logical_second(), Some(22.0));
+    }
+
+    #[test]
+    fn zero_logical_duration_has_no_derived_rates() {
+        let mut receipt = observation();
+        receipt.logical_duration_ns = 0;
+        assert_eq!(receipt.state_updates_per_logical_second(), None);
+        assert_eq!(receipt.scalar_operations_per_logical_second(), None);
+        assert_eq!(receipt.bytes_touched_per_logical_second(), None);
+        assert_eq!(receipt.events_per_logical_second(), None);
     }
 
     #[test]
