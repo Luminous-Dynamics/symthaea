@@ -57,16 +57,16 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/sonata_intervention.rs
 
       - name: Compile actual Muse library
-        run: cargo check --locked -p symthaea-muse --lib
+        run: cargo check --locked -p symthaea-muse --features theory --lib
 
       - name: Run score transaction receipt tests
-        run: cargo test --locked -p symthaea-muse --lib score_transaction::tests
+        run: cargo test --locked -p symthaea-muse --features theory --lib score_transaction::tests
 
       - name: Run Sonata candidate receipt integration tests
-        run: cargo test --locked -p symthaea-muse --lib sonata_intervention::tests
+        run: cargo test --locked -p symthaea-muse --features theory --lib sonata_intervention::tests
 
       - name: Test-compile all Muse library tests
-        run: cargo test --locked -p symthaea-muse --lib --no-run
+        run: cargo test --locked -p symthaea-muse --features theory --lib --no-run
 
       - name: Record exact merge-head evidence
         shell: bash
