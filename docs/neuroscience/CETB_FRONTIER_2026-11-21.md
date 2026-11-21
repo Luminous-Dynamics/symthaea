@@ -47,13 +47,14 @@ CETB implication: Weighted Jaccard is one similarity estimator, not the answer. 
 
 A widely cited meta-analysis found mean edge-level functional-connectivity ICC around 0.29, illustrating why repeatability must be measured rather than assumed. A large two-day sample (N=833) found that only a small portion of the edge-wise connectome had good-to-excellent reliability and that atlas, GSR and thresholding choices mattered. Reliability must be considered alongside validity: stable artifact can be reliable but uninformative.
 
-## 3. RCAF v1.1 additions
+## 3. RCAF v1.2 additions
 
 The kernel now adds:
 
 - An exact participant-level sign test for paired within-minus-between gaps. Ties are excluded from the binomial denominator. This is a distribution-free complement to the paired effect distribution and participant bootstrap; it is not a randomization test or causal test.
 - Edge-sign transition accounting across aligned matrices. This separately counts polarity reversals, transitions to/from a neutral zone, stable positive/negative/neutral edges, and corresponding fractions.
 - A neutral-band parameter that must be selected before looking at the effect and evaluated over a predeclared sensitivity grid.
+- Participant-keyed summary inputs reject empty or duplicate participant identifiers; label-aware matrix APIs reject duplicate, empty or misordered ROI labels even when matrix dimensions agree.
 
 This addresses a limitation of sign-filtered WJ: when only edges with the same sign in both matrices are selected, actual sign reversals are excluded from that WJ denominator. The WJ result must therefore be accompanied by direct sign-transition metrics. Also report edge counts and the ROI-order digest; equal matrix dimensions do not prove parcel alignment.
 
@@ -160,3 +161,5 @@ A report validator must check, in addition to JSON Schema:
 - no same-participant session/segment crosses train, calibration and test partitions.
 
 JSON Schema validates structure; it does not prove these cross-record and derived-value invariants by itself.
+
+The preferred empirical kernel entry points implement participant-key and ROI-order checks before comparison. The report validator remains responsible for cross-row arithmetic and source-to-output provenance.
