@@ -59,7 +59,7 @@ For the candidate's supplied distribution \(p_c\):
 R_c=\max_h\sum_a p_c(a)r(h,a)
 \]
 
-The evaluator uses exponential-weights/no-regret updates for the action player and the hidden-world player. It averages the iterates and quantizes each final distribution to PPM using largest remainders with stable tie-breaking. The solver is approximate; the final strategy distributions are valid, and the evaluator computes outward-rounded bounds using integer arithmetic:
+The evaluator first checks for an action with zero regret in every hidden world. When one exists, it emits that pure action as an exact zero-regret mixed solution and performs zero optimizer iterations. Otherwise it uses exponential-weights/no-regret updates for the action player and the hidden-world player. It averages the iterates and quantizes each final distribution to PPM using largest remainders with stable tie-breaking. The solver is approximate; the final strategy distributions are valid, and the evaluator computes outward-rounded bounds using integer arithmetic:
 
 \[
 \mathrm{LB}=\min_a\sum_h q(h)r(h,a)
@@ -87,7 +87,7 @@ This interval is intentional. A fixed iteration count is not a convergence proof
 
 ## 4. Boundedness and reproducibility
 
-The current profile caps the evaluator at 128 hidden worlds, 64 actions and 8,192 iterations. The default is 4,096 iterations, a 50,000-PPM learning rate and a 10,000-PPM maximum duality gap. The evaluator returns the actual gap even when tolerance is not met.
+The current profile caps the evaluator at 128 hidden worlds, 64 actions and 8,192 optimizer iterations. The default is 4,096 iterations, a 50,000-PPM learning rate and a 10,000-PPM maximum duality gap. The common-optimal-action fast path is exact and reports zero iterations. The evaluator returns the actual gap even when tolerance is not met.
 
 Worlds are sorted by evaluator world ID before floating-point iteration. Action order follows the frozen candidate distribution. Final probabilities are quantized to integer PPM; the returned lower and upper bounds use checked integer accumulation and outward rounding. The floating-point iterative solver is an optimizer, not the source of the final bound arithmetic.
 
