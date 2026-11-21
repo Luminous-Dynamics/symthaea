@@ -189,7 +189,7 @@
       "pr": 13103,
       "head_sha": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
       "state_at_profile_creation": "open",
-      "claim_ceiling": "Spectral-Strang distribution-space prototype with complex electric-mode diagnostics, x/v spectral-tail monitoring and a periodic Fourier zero-padding interpolation oracle. Nineteen tests passed on a preceding exact head; latest iterator/format fixes and t=10 trace are queued for exact-head validation. Not yet L3-admitted."
+      "claim_ceiling": "Rust 1.96 focused workflow passed 19 tests, strict format and Clippy; Landau t=10 and resolution probes executed. Exploratory post-initial peak-envelope slope near linear Landau reference is not yet a validated reproduction. Not yet L3-admitted."
     },
     {
       "component": "phase_space_spectral_tail_monitor",
@@ -202,8 +202,8 @@
       "component": "periodic_fourier_zero_padding_interpolation_oracle",
       "pr": 13103,
       "head_sha": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
-      "state_at_profile_creation": "implemented_validation_pending",
-      "claim_ceiling": "Standalone trigonometric interpolation transfer oracle only. Does not mutate Vlasov state, choose an adaptive trigger or certify physical validity of grid expansion."
+      "state_at_profile_creation": "focused_validation_passed",
+      "claim_ceiling": "Standalone trigonometric interpolation transfer oracle; no live-state mutation, adaptive controller or physical transition certificate."
     }
   ],
   "initial_condition_suite": [
@@ -583,7 +583,7 @@
       "risk_coverage_fallback_and_abstention"
     ],
     "claim_ceiling": "No universal winner or adaptive representation claim before matched-source reproduction and independent trajectory qualification.",
-    "zero_padding_status": "transfer_oracle_implemented_validation_pending",
+    "zero_padding_status": "standalone_transfer_oracle_validated",
     "zero_padding_contract": {
       "source_periodic_line_length": "power-of-two >= 4",
       "target_periodic_line_length": "power-of-two >= source length",
@@ -598,6 +598,36 @@
         "identity grid",
         "invalid grid and non-finite rejection"
       ]
+    },
+    "zero_padding_validation": {
+      "source_head": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
+      "test_coverage": [
+        "band-limited interpolation",
+        "old-node preservation",
+        "symmetric Nyquist splitting",
+        "constant line",
+        "identity grid",
+        "invalid grid",
+        "non-finite input"
+      ],
+      "unit_tests_passed": 19,
+      "limitation": "Transfer oracle only; live-state transition, invariant/error budget and adaptive trigger remain unimplemented."
     }
+  },
+  "reference_run": {
+    "source_head": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
+    "workflow_run": 44895652946,
+    "artifact_id": 14703563532,
+    "artifact_sha256": "edf9a35c5a9e50b5d0151c0c45d810563ba9fa98a770b019e512401315cfdfeb",
+    "unit_tests_passed": 19,
+    "strict_format": true,
+    "strict_clippy": true,
+    "physical_validation_status": "reference_prototype_only",
+    "landau_initial_perturbation": 0.001,
+    "paper_reported_landau_perturbation": 0.01,
+    "exploratory_peak_envelope_gamma": -0.15444614642531948,
+    "late_three_peak_sensitivity_gamma": -0.15127273980918007,
+    "paper_reported_gamma": -0.151,
+    "claim_ceiling": "Exploratory fit from four post-initial extrema at one grid and timestep, with a 10x smaller perturbation than paper. Not a validated paper reproduction or L3 admission."
   }
 }
