@@ -82,7 +82,7 @@ These are deliberately broad smoke-test bounds, not performance claims or accept
 
 ## 5. Required expansion before empirical interpretation
 
-The first implementation is a fixed known-answer calibration point. The next benchmark surface should vary:
+The initial implementation now includes both a fixed default calibration point and a five-point common-random-number sweep over factor-loading increments [0.0, 0.10, 0.20, 0.30, 0.40]. The paired sweep is designed to isolate effect-size changes from Monte-Carlo seed changes. The next benchmark surface should vary:
 - injection size (delta), including zero, weak, moderate and strong effects;
 - participants per replicate;
 - samples per segment;
@@ -108,7 +108,13 @@ Engineering targets—not achieved claims:
 
 A method that is highly sensitive to injections but fails null calibration is not acceptable. A method that controls the null but cannot recover plausible injected changes is also not useful. Reliability cannot be optimized at the expense of validity.
 
-## 7. Run
+## 7. Dose-response sweep
+
+The Rust API `run_injection_recovery_sweep` and example `rcaf_injection_recovery_sweep` run a strictly increasing grid of non-negative loading increments. The same PRNG seed and draw order are reused at every increment, so the baseline loadings and random draws are paired across the curve. The first point at zero is the null-dose control.
+
+The sweep reports each point's null false-positive estimate, injection-detection power, Wilson intervals and median paired gap. It also reports the fraction of adjacent effect-size increments for which the median paired gap increases. A non-monotonic response is retained and reported; it must not be hidden by selecting a favourable subset of points.
+
+## 8. Run
 
 ```sh
 cargo test --manifest-path research/rcaf/Cargo.toml
@@ -117,7 +123,7 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_reco
 
 The example emits JSON conforming to `injection-recovery.schema.json`.
 
-## 8. Claim ceiling
+## 9. Claim ceiling
 
 This benchmark proves only that a particular software implementation behaves in a known synthetic world under stated assumptions. It does not prove:
 - the factor model represents the brain, BOLD, EEG or MEG;
