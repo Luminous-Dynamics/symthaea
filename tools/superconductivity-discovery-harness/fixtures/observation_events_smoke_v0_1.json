@@ -360,7 +360,7 @@
         "strain_state": null
       },
       "provenance": {
-        "extraction_method": "database_import",
+        "extraction_method": "manual_curated",
         "extraction_model": null,
         "extraction_revision": "fixture-v0",
         "extraction_confidence": 1,
