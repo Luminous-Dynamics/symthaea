@@ -492,18 +492,22 @@ pub fn run_common_mode_nuisance_sweep(
         .first()
         .expect("validated nuisance-strength grid is non-empty");
     for report in reports.iter().skip(1) {
-        let latent_metrics_match = report.null_false_positive_rate == baseline.null_false_positive_rate
-            && report.injection_detection_power == baseline.injection_detection_power
-            && report.injection_directional_detection_power
-                == baseline.injection_directional_detection_power
-            && report.injection_wrong_direction_rejection_rate
-                == baseline.injection_wrong_direction_rejection_rate
-            && report.median_null_paired_gap == baseline.median_null_paired_gap
-            && report.median_injected_paired_gap == baseline.median_injected_paired_gap
-            && report.median_null_positive_gap_fraction
-                == baseline.median_null_positive_gap_fraction
-            && report.median_injected_positive_gap_fraction
-                == baseline.median_injected_positive_gap_fraction;
+        let latent_metrics_match = [
+            report.null_false_positive_rate == baseline.null_false_positive_rate,
+            report.injection_detection_power == baseline.injection_detection_power,
+            report.injection_directional_detection_power
+                == baseline.injection_directional_detection_power,
+            report.injection_wrong_direction_rejection_rate
+                == baseline.injection_wrong_direction_rejection_rate,
+            report.median_null_paired_gap == baseline.median_null_paired_gap,
+            report.median_injected_paired_gap == baseline.median_injected_paired_gap,
+            report.median_null_positive_gap_fraction
+                == baseline.median_null_positive_gap_fraction,
+            report.median_injected_positive_gap_fraction
+                == baseline.median_injected_positive_gap_fraction,
+        ]
+        .into_iter()
+        .all(|matches| matches);
         if !latent_metrics_match {
             return Err(MetricError::InvalidSimulationConfig {
                 reason: "common-mode nuisance sweep failed to preserve matched latent draws",
