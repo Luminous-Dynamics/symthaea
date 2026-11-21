@@ -402,7 +402,6 @@ fn collect_agent_policy<P: RmiPolicyV1>(
         &responsive_partner,
         pair,
         &agent_evaluation,
-        "synthetic_trial",
         partner_counts,
         receipts,
     )?;
