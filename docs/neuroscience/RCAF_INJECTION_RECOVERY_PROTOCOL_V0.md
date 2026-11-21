@@ -159,3 +159,15 @@ The focused research workflow records all three simulation JSON outputs and crea
 - file digests and sizes for the single-point, dose-response and estimator-tournament reports.
 
 The artifact name includes the exact checked-out commit SHA. This provides an independently inspectable CI record; it does not prove independent replay, validate a biological pipeline or upgrade a synthetic result to empirical evidence.
+
+
+## 13. Estimator-by-effect-size response surface
+
+The next implementation extends the single-metric dose-response curve into a matched-input estimator × dose matrix. It evaluates:
+- absolute Weighted Jaccard;
+- signed-shift Weighted Jaccard;
+- normalized mean absolute edge error;
+
+at the same predeclared dose grid. Every estimator uses the same seed and the same random-draw order at every dose. The JSON output records a full sweep and Monte-Carlo uncertainty for each estimator, not a single saturated point. The executable is `rcaf_estimator_dose_response_tournament` and its contract is `estimator-dose-response-tournament.schema.json`.
+
+This avoids treating one strong injection as a universal estimator test. Compare weak/moderate sensitivity only after confirming null calibration and construct semantics. Do not average the different estimands or select a universal winner from this synthetic grid.
