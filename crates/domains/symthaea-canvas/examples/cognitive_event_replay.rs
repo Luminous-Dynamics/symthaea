@@ -70,7 +70,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let base = empty_base(session_id.clone());
 
     for _ in 0..WARMUP_RUNS {
-        let reducer = CognitiveTopologyReducer::replay(black_box(base.clone()), black_box(&events))?;
+        let reducer =
+            CognitiveTopologyReducer::replay(black_box(base.clone()), black_box(&events))?;
         black_box(reducer.snapshot_digest_hex()?);
         black_box(reducer.event_log_digest_hex()?);
     }
@@ -79,7 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut final_reducer = None;
     for _ in 0..samples {
         let started = Instant::now();
-        let reducer = CognitiveTopologyReducer::replay(black_box(base.clone()), black_box(&events))?;
+        let reducer =
+            CognitiveTopologyReducer::replay(black_box(base.clone()), black_box(&events))?;
         replay_durations.push(started.elapsed().as_nanos());
         final_reducer = Some(reducer);
     }
@@ -87,20 +89,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let reducer = final_reducer.expect("sample count is non-zero");
     let snapshot = reducer.snapshot();
-    let projection = layout_cognitive_topology(
-        snapshot,
-        None,
-        CognitiveLayoutConfig::default(),
-    )?;
+    let projection = layout_cognitive_topology(snapshot, None, CognitiveLayoutConfig::default())?;
     let semantic_digest = reducer.snapshot_digest_hex()?;
     let event_log_digest = reducer.event_log_digest_hex()?;
     let geometry_digest = projection.geometry_digest_hex()?;
 
     if let Some(path) = &svg_path {
-        let svg = render_cognitive_projection_svg(
-            &projection,
-            CognitiveSvgOptions::default(),
-        )?;
+        let svg = render_cognitive_projection_svg(&projection, CognitiveSvgOptions::default())?;
         fs::write(path, svg)?;
     }
 
@@ -122,7 +117,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("event_log_digest: {event_log_digest}");
     println!("layout_algorithm: deterministic-force-v1");
     println!("geometry_digest_1e-3: {geometry_digest}");
-    println!("svg_output: {}", svg_path.as_deref().unwrap_or("not requested"));
+    println!(
+        "svg_output: {}",
+        svg_path.as_deref().unwrap_or("not requested")
+    );
     println!("replay_warmup_runs: {WARMUP_RUNS}");
     println!("replay_samples: {samples}");
     println!("replay_time_ns_p50: {}", percentile(&replay_durations, 50));
@@ -131,7 +129,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("platform_arch: {}", std::env::consts::ARCH);
     println!(
         "provenance: {}",
-        if synthetic { "synthetic fixture; not live cognitive telemetry" } else { "runtime event log" }
+        if synthetic {
+            "synthetic fixture; not live cognitive telemetry"
+        } else {
+            "runtime event log"
+        }
     );
     Ok(())
 }
