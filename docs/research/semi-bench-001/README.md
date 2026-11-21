@@ -426,3 +426,10 @@ See [2026-inspection-metrology-packaging-frontier.md](2026-inspection-metrology-
 - [SEMI-PKG-TEST-001 #13085](https://github.com/Luminous-Dynamics/symthaea/issues/13085): known-good-die, chiplet package test coverage and lifecycle observability.
 
 These extend the programme from classifying inspected examples to optimizing inspection decisions, measuring AI detection limits and engineering package testability.
+
+
+## Adaptive inspection decision reference
+
+A fourth test-only reference primitive is now included: a budgeted inspection-allocation oracle. It combines modeled defect risk with test sensitivity/specificity, actionability, exposed population, avoidable loss, false-hold cost, direct inspection cost and delay penalty. It computes the exact optimal subset for small finite candidate sets and compares it with a matched-budget risk-only greedy policy. Its synthetic known-answer is part of the SEMI-BENCH-001 workflow; it does not establish physical inspection savings.
+
+See [SEMI-INSPECT-001 #13083](https://github.com/Luminous-Dynamics/symthaea/issues/13083).
