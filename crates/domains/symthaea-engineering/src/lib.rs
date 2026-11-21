@@ -129,6 +129,17 @@ impl EngineeringAssistant {
     }
 }
 
+/// A recalled semantic memory item with its source lineage, when available.
+///
+/// The producer verification flag is metadata only; it is not an independent
+/// verifier receipt, proof of truth, or permission to act.
+#[derive(Debug, Clone)]
+pub struct RecalledWisdom {
+    pub category: String,
+    pub similarity: f32,
+    pub graduation_provenance: Option<symthaea_memory::GraduationProvenance>,
+}
+
 /// Orchestrates engineering reasoning and simulation workflows.
 #[derive(Debug)]
 pub struct EngineeringManager {
@@ -193,19 +204,47 @@ impl EngineeringManager {
         self.causal_model = Some(model);
     }
 
-    pub fn recall_wisdom(&mut self, goal_hv: &symthaea_core::hdc::ContinuousHV) -> Vec<String> {
-        let mut wisdom = Vec::new();
-        let results = self.semantic_memory.find_similar(goal_hv.as_slice(), 5);
-        for (idx, sim) in results {
-            if sim > 0.4 {
-                if let Some(entry) = self.semantic_memory.get(idx) {
-                    if let Some(ref cat) = entry.category {
-                        wisdom.push(format!("(Semantic sim={:.2}) {}", sim, cat));
-                    }
+    /// Recall semantic context with source lineage preserved.
+    pub fn recall_wisdom_with_provenance(
+        &mut self,
+        goal_hv: &symthaea_core::hdc::ContinuousHV,
+    ) -> Vec<RecalledWisdom> {
+        self.semantic_memory
+            .find_similar_with_provenance(goal_hv.as_slice(), 5)
+            .into_iter()
+            .filter_map(|(record, similarity)| {
+                if similarity <= 0.4 {
+                    return None;
                 }
-            }
-        }
-        wisdom
+                record.entry.category.clone().map(|category| RecalledWisdom {
+                    category,
+                    similarity,
+                    graduation_provenance: record.graduation_provenance,
+                })
+            })
+            .collect()
+    }
+
+    /// Legacy display string API. New decision-making callers should use
+    /// recall_wisdom_with_provenance so source metadata remains structured.
+    /// The rendered producer claim is explicitly labelled as not a receipt.
+    pub fn recall_wisdom(&mut self, goal_hv: &symthaea_core::hdc::ContinuousHV) -> Vec<String> {
+        self.recall_wisdom_with_provenance(goal_hv)
+            .into_iter()
+            .map(|item| {
+                let lineage = match item.graduation_provenance {
+                    Some(provenance) => format!(
+                        "source={:?}; producer_verification_claim={} (not an independent receipt)",
+                        provenance.source, provenance.verification_claimed
+                    ),
+                    None => "source=unknown; provenance=absent".to_owned(),
+                };
+                format!(
+                    "(Semantic sim={:.2}; {}) {}",
+                    item.similarity, lineage, item.category
+                )
+            })
+            .collect()
     }
 
     pub fn inject_fabrication_anomaly(
@@ -426,12 +465,17 @@ impl EngineeringManager {
     }
 
     pub fn dream_cycle(&mut self) {
-        let episodes = self.episodic_memory.get_top_episodes(10);
-        for ep in episodes {
-            self.semantic_memory.store(
-                ep.input.as_slice().to_vec(),
-                1.0 - ep.psi as f32,
-                Some(format!("Consolidated Wisdom")),
+        // Use the provenance-bearing episodic API so consolidation into semantic
+        // memory does not silently sever the source-class / producer-claim lineage.
+        // The claim remains descriptive metadata only; it is not source verification
+        // or permission to act.
+        let episodes = self.episodic_memory.get_top_episodes_with_provenance(10);
+        for record in episodes {
+            self.semantic_memory.store_with_provenance(
+                record.episode.input.as_slice().to_vec(),
+                1.0 - record.episode.psi as f32,
+                Some("Consolidated Wisdom".to_owned()),
+                record.graduation_provenance.clone(),
             );
         }
     }
@@ -2087,6 +2131,49 @@ fn estimate_rust_source_complexity(source: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dream_cycle_preserves_episode_lineage_into_semantic_memory() {
+        let mut manager = EngineeringManager::new();
+        let input =
+            symthaea_core::hdc::unified_hv::ContinuousHV::random(64, 314);
+        let output =
+            symthaea_core::hdc::unified_hv::ContinuousHV::random(64, 315);
+        let provenance = symthaea_memory::GraduationProvenance {
+            source: symthaea_memory::MemorySource::WebResearch,
+            verification_claimed: true,
+        };
+
+        assert!(manager.episodic_memory.store_if_significant_with_provenance(
+            Episode::new(input.clone(), output, 0.7, 12),
+            Some(provenance),
+            0.0,
+        ));
+
+        manager.dream_cycle();
+
+        let semantic = manager.semantic_memory.get_with_provenance(0).unwrap();
+        assert_eq!(semantic.entry.hdc_vector.as_slice(), input.as_slice());
+        let lineage = semantic.graduation_provenance.unwrap();
+        assert_eq!(lineage.source, symthaea_memory::MemorySource::WebResearch);
+        assert!(lineage.verification_claimed);
+
+        let recalled = manager.recall_wisdom_with_provenance(&input);
+        assert_eq!(recalled.len(), 1);
+        assert_eq!(recalled[0].category, "Consolidated Wisdom");
+        assert!(
+            recalled[0].similarity > 0.99,
+            "identical episodic-to-semantic vectors should retain near-unit similarity: {}",
+            recalled[0].similarity
+        );
+        let recalled_lineage = recalled[0].graduation_provenance.as_ref().unwrap();
+        assert_eq!(recalled_lineage.source, symthaea_memory::MemorySource::WebResearch);
+        assert!(recalled_lineage.verification_claimed);
+
+        // The legacy string API also exposes the claim ceiling explicitly.
+        let rendered = manager.recall_wisdom(&input);
+        assert!(rendered[0].contains("not an independent receipt"));
+    }
 
     #[test]
     fn evaluate_structural_wires_solver_into_faculty() {

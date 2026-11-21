@@ -25,14 +25,18 @@ pub use coordinator::{
     MemorySource, content_hash,
 };
 pub use episodic_replay::{
-    Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
+    Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, GraduationProvenance,
+    PROVENANCED_EPISODE_SCHEMA_VERSION, ProvenancedEpisode, ReplaySessionResult,
     bath_cosine_similarity,
 };
 #[allow(deprecated)]
 pub use hippocampus::{
     EmotionalValence, HippocampusActor, HippocampusStats, MemoryTrace, RecallQuery, RecallResult,
 };
-pub use semantic::{SemanticEntry, SemanticMemory, SemanticMemoryStats};
+pub use semantic::{
+    PROVENANCED_SEMANTIC_ENTRY_SCHEMA_VERSION, ProvenancedSemanticEntry, SemanticEntry,
+    SemanticMemory, SemanticMemoryInputError, SemanticMemoryStats,
+};
 
 /// Trait abstraction for trainable temporal networks.
 ///

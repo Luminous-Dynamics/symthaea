@@ -23,7 +23,7 @@
 //!                                                  └───────────────┘
 //! ```
 
-use crate::episodic_replay::{Episode, EpisodicMemory};
+use crate::episodic_replay::{Episode, EpisodicMemory, GraduationProvenance};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -231,37 +231,51 @@ impl MemoryCoordinator {
                 continue;
             }
 
-            // Persistence in WM boosts effective phi.
-            // Verified information gets a significant boost to its consolidation strength.
+            // Retain the historical consolidation preference, but do not mix
+            // provenance, persistence, or cross-tier context into the cognitive
+            // state estimate (Psi) or emotional valence.
             let persistence_bonus = (event.steps_survived as f64 / 10.0).min(0.2);
-            let sigma_bonus = self.signals.sigma.map_or(0.0, |s| (s * 0.15).min(0.1));
+            let sigma_bonus = self
+                .signals
+                .sigma
+                .filter(|sigma| sigma.is_finite() && *sigma >= 0.0)
+                .map(|sigma| (sigma * 0.15).clamp(0.0, 0.1))
+                .unwrap_or(0.0);
 
-            let verification_bonus = if event.is_verified {
-                match event.source {
-                    MemorySource::ActionFeedback => 0.3, // "Proven" by reality
-                    MemorySource::WebResearch => 0.2,    // "Verified" by multiple sources
-                    _ => 0.1,
-                }
-            } else {
-                0.0
+            // Only persistence and finite, bounded Sigma may influence replay
+            // retention priority. A producer's verification flag is provenance
+            // telemetry only: it must not boost Phi, valence, or replay priority.
+            let legacy_priority_proxy =
+                (event.psi_at_graduation + persistence_bonus + sigma_bonus).min(1.0);
+            let consolidation_priority_bonus =
+                (legacy_priority_proxy - event.psi_at_graduation).max(0.0) * 0.5;
+
+            // Preserve only the source class and producer's verification claim.
+            // Arbitrary labels may contain user content and are not stable source
+            // identifiers; do not copy them into durable replay metadata.
+            let provenance = GraduationProvenance {
+                source: event.source,
+                verification_claimed: event.is_verified,
             };
 
-            let adjusted_phi =
-                (event.psi_at_graduation + persistence_bonus + sigma_bonus + verification_bonus)
-                    .min(1.0);
-
-            // Create episode from graduation event
+            // Psi stays exactly as measured at graduation; verification is not
+            // an affective state, so valence remains neutral unless supplied by
+            // a separate emotional observation.
             let episode = Episode::with_metadata(
                 event.content.clone(),
                 event.content, // Self-referential output for graduated items
-                adjusted_phi,
+                event.psi_at_graduation,
                 self.signals.step,
                 1.0 - event.final_activation as f32, // Low activation → high surprise
-                if event.is_verified { 0.5 } else { 0.0 }, // Verified = positive valence
+                0.0,
                 event.coherence_at_graduation as f32,
             );
 
-            if episodic.store_if_significant(episode) {
+            if episodic.store_if_significant_with_provenance(
+                episode,
+                Some(provenance),
+                consolidation_priority_bonus,
+            ) {
                 stored += 1;
             }
             self.stats.graduations_processed += 1;
@@ -498,6 +512,12 @@ mod tests {
         assert_eq!(coord.stats.graduations_rejected, 1);
         assert_eq!(coord.stats.graduations_processed, 1);
         assert_eq!(stored, 1);
+        let record = episodic.get_top_episodes_with_provenance(1).pop().unwrap();
+        assert_eq!(
+            record.graduation_provenance.as_ref().unwrap().source,
+            MemorySource::WebResearch
+        );
+        assert!(record.graduation_provenance.as_ref().unwrap().verification_claimed);
     }
 
     #[test]
@@ -554,7 +574,10 @@ mod tests {
         assert_eq!(episodic.len(), 1);
         let top = episodic.get_top_episodes(1);
         assert!(!top.is_empty());
-        assert!(top[0].psi > 0.5, "Episode should have adjusted Phi");
+        assert!(
+            (top[0].psi - 0.6).abs() < 1e-9,
+            "Graduated episode must retain the raw Psi measured at graduation"
+        );
 
         // Record retrieval and check enrichment
         let hash = content_hash(&top[0].input);
@@ -583,7 +606,10 @@ mod tests {
 
         // Simulate multiple WM items graduating at different times
         coord.queue_graduation(make_graduation(1, 5, 0.4, false));
-        coord.queue_graduation(make_graduation(2, 8, 0.7, true)); // Verified = higher adjusted Phi
+        let mut verified_event = make_graduation(2, 5, 0.4, true);
+        verified_event.source = MemorySource::ActionFeedback;
+        verified_event.label = "sensitive-looking arbitrary text that must not persist".to_owned();
+        coord.queue_graduation(verified_event);
         coord.queue_graduation(make_graduation(3, 2, 0.6, false)); // Below min steps
 
         let stored = coord.process_graduations(&mut episodic);
@@ -592,14 +618,76 @@ mod tests {
         assert_eq!(coord.stats.graduations_processed, 2);
         assert_eq!(episodic.len(), 2);
 
-        // Verified item should have higher Phi than unverified (due to verification bonus)
-        let top = episodic.get_top_episodes(2);
-        assert!(
-            top[0].psi > top[1].psi,
-            "Verified item should have higher adjusted Phi: {} vs {}",
-            top[0].psi,
-            top[1].psi
+        // Verification/source signals must not alter the cognitive-state estimate.
+        let top = episodic.get_top_episodes_with_provenance(2);
+        let low = top
+            .iter()
+            .find(|record| {
+                record
+                    .graduation_provenance
+                    .as_ref()
+                    .is_some_and(|p| !p.verification_claimed)
+            })
+            .unwrap();
+        let verified = top
+            .iter()
+            .find(|record| {
+                record
+                    .graduation_provenance
+                    .as_ref()
+                    .is_some_and(|p| p.verification_claimed)
+            })
+            .unwrap();
+        assert_eq!(low.episode.valence, Some(0.0));
+        assert_eq!(verified.episode.valence, Some(0.0));
+        assert_eq!(low.episode.psi, verified.episode.psi);
+        assert_eq!(
+            verified.graduation_provenance.as_ref().unwrap().verification_claimed,
+            true
         );
+        assert_eq!(
+            low.graduation_provenance.as_ref().unwrap().verification_claimed,
+            false
+        );
+        assert_eq!(
+            verified.graduation_provenance.as_ref().unwrap().source,
+            MemorySource::ActionFeedback
+        );
+        assert_eq!(
+            verified.consolidation_priority_bonus,
+            low.consolidation_priority_bonus,
+            "A producer verification claim alone must not increase replay priority"
+        );
+
+        let sampled = episodic.sample_replay_batch_with_provenance(2);
+        assert_eq!(sampled.len(), 2);
+        assert!(sampled.iter().any(|record| {
+            record
+                .graduation_provenance
+                .as_ref()
+                .is_some_and(|p| p.source == MemorySource::ActionFeedback)
+        }));
+    }
+
+    #[test]
+    fn verified_claim_cannot_bypass_raw_psi_admission_threshold() {
+        let mut coord = MemoryCoordinator::default();
+        coord.update_signals(0.9, 0.9);
+
+        let config = crate::episodic_replay::EpisodicReplayConfig {
+            psi_threshold: 0.5,
+            ..Default::default()
+        };
+        let mut episodic = EpisodicMemory::new(config);
+
+        let mut event = make_graduation(77, 8, 0.45, true);
+        event.source = MemorySource::ActionFeedback;
+        event.label = "claimed-verified-low-psi".to_owned();
+        coord.queue_graduation(event);
+
+        let stored = coord.process_graduations(&mut episodic);
+        assert_eq!(stored, 0);
+        assert_eq!(episodic.len(), 0);
     }
 
     #[test]

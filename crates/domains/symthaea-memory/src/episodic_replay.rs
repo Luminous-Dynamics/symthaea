@@ -74,11 +74,25 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
 use crate::TrainableNetwork;
+use crate::coordinator::MemorySource;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EPISODE: A Single High-Phi Moment
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Metadata preserved when a working-memory item graduates into episodic storage.
+///
+/// verification_claimed records the producer's claim at graduation. It is not
+/// an independent verifier receipt, cryptographic attestation, or permission.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraduationProvenance {
+    /// Broad origin class assigned by the producing memory pipeline.
+    pub source: MemorySource,
+    /// Whether the producer marked the item verified at graduation.
+    /// This is a claim only; it is never an independent verifier receipt.
+    pub verification_claimed: bool,
+}
 
 /// An episode representing a single high-consciousness moment in the cognitive loop.
 ///
@@ -136,6 +150,7 @@ pub struct Episode {
     /// Semantic embedding from neural encoder (for embedding-based retrieval).
     #[serde(default)]
     pub semantic_embedding: Option<Vec<f32>>,
+
 }
 
 impl Episode {
@@ -285,6 +300,32 @@ impl Episode {
 struct PrioritizedEpisode {
     episode: Episode,
     score: f64,
+    graduation_provenance: Option<GraduationProvenance>,
+    consolidation_priority_bonus: f64,
+}
+
+/// Version of the provenance-bearing replay envelope.
+pub const PROVENANCED_EPISODE_SCHEMA_VERSION: u16 = 1;
+
+/// Public retrieval envelope that preserves the source and policy-derived replay
+/// metadata without changing the long-standing serialized Episode representation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProvenancedEpisode {
+    pub schema_version: u16,
+    pub episode: Episode,
+    pub graduation_provenance: Option<GraduationProvenance>,
+    pub consolidation_priority_bonus: f64,
+}
+
+impl PrioritizedEpisode {
+    fn as_provenanced_episode(&self) -> ProvenancedEpisode {
+        ProvenancedEpisode {
+            schema_version: PROVENANCED_EPISODE_SCHEMA_VERSION,
+            episode: self.episode.clone(),
+            graduation_provenance: self.graduation_provenance.clone(),
+            consolidation_priority_bonus: self.consolidation_priority_bonus,
+        }
+    }
 }
 
 impl PartialEq for PrioritizedEpisode {
@@ -499,33 +540,62 @@ impl EpisodicMemory {
     ///
     /// Returns true if the episode was stored, false if it was below threshold.
     pub fn store_if_significant(&mut self, episode: Episode) -> bool {
+        self.store_if_significant_with_provenance(episode, None, 0.0)
+    }
+
+    /// Store an episode with optional graduation lineage and an independent
+    /// retention-priority adjustment. Provenance and the bonus cannot bypass
+    /// the raw-Psi admission threshold.
+    pub fn store_if_significant_with_provenance(
+        &mut self,
+        episode: Episode,
+        graduation_provenance: Option<GraduationProvenance>,
+        consolidation_priority_bonus: f64,
+    ) -> bool {
         self.current_cycle = episode.timestamp;
         self.cycles_since_replay += 1;
 
-        // Check Phi threshold
+        // Reject malformed cognitive state before ordered comparisons or heap insertion.
+        // NaN < threshold is false and can otherwise silently bypass a rejection gate.
+        if !episode.psi.is_finite()
+            || !(0.0..=1.0).contains(&episode.psi)
+            || !self.config.psi_threshold.is_finite()
+            || !(0.0..=1.0).contains(&self.config.psi_threshold)
+            || !consolidation_priority_bonus.is_finite()
+            || consolidation_priority_bonus < 0.0
+        {
+            return false;
+        }
+
+        // The raw Psi threshold is authoritative for admission. Neither a
+        // verification claim nor a consolidation-priority bonus can raise Psi.
         if episode.psi < self.config.psi_threshold {
             return false;
         }
 
-        // Calculate priority score
-        let score = episode.priority_score(self.current_cycle, self.config.recency_weight);
+        let base_score = episode.priority_score(self.current_cycle, self.config.recency_weight);
+        let score = base_score + consolidation_priority_bonus;
+        if !score.is_finite() {
+            return false;
+        }
 
-        // Update statistics
+        // Update statistics from the raw cognitive-state estimate.
         let n = self.episodes.len() as f64;
         self.average_psi = (self.average_psi * n + episode.psi) / (n + 1.0);
         if episode.psi < self.min_psi_in_buffer {
             self.min_psi_in_buffer = episode.psi;
         }
 
-        // Store the episode
-        self.episodes.push(PrioritizedEpisode { episode, score });
+        self.episodes.push(PrioritizedEpisode {
+            episode,
+            score,
+            graduation_provenance,
+            consolidation_priority_bonus,
+        });
         self.total_stored += 1;
 
-        // Evict if over capacity
         if self.episodes.len() > self.config.capacity {
-            // Remove lowest priority (we need to rebuild to get min)
-            // For efficiency, we'll let it grow slightly over capacity
-            // Real eviction happens during sampling
+            // Real eviction happens during sampling.
             self.total_evicted += 1;
         }
 
@@ -578,6 +648,17 @@ impl EpisodicMemory {
     ///
     /// Uses either Phi-weighted sampling or uniform sampling based on config.
     pub fn sample_replay_batch(&mut self, batch_size: usize) -> Vec<Episode> {
+        self.sample_replay_batch_with_provenance(batch_size)
+            .into_iter()
+            .map(|record| record.episode)
+            .collect()
+    }
+
+    /// Sample replay entries while retaining their graduation provenance.
+    pub fn sample_replay_batch_with_provenance(
+        &mut self,
+        batch_size: usize,
+    ) -> Vec<ProvenancedEpisode> {
         let batch_size = batch_size.min(self.episodes.len());
         if batch_size == 0 {
             return Vec::new();
@@ -626,7 +707,7 @@ impl EpisodicMemory {
 
                 if !used_indices.contains(&selected_idx) {
                     used_indices.insert(selected_idx);
-                    batch.push(all_episodes[selected_idx].episode.clone());
+                    batch.push(all_episodes[selected_idx].as_provenanced_episode());
                 }
             }
         } else {
@@ -644,7 +725,7 @@ impl EpisodicMemory {
             }
 
             for idx in indices.into_iter().take(batch_size) {
-                batch.push(all_episodes[idx].episode.clone());
+                batch.push(all_episodes[idx].as_provenanced_episode());
             }
         }
 
@@ -663,10 +744,22 @@ impl EpisodicMemory {
         batch_size: usize,
         current_bath: Option<[f32; 9]>,
     ) -> Vec<Episode> {
+        self.sample_replay_batch_conditioned_with_provenance(batch_size, current_bath)
+            .into_iter()
+            .map(|record| record.episode)
+            .collect()
+    }
+
+    /// Sample bath-conditioned replay entries while retaining their source lineage.
+    pub fn sample_replay_batch_conditioned_with_provenance(
+        &mut self,
+        batch_size: usize,
+        current_bath: Option<[f32; 9]>,
+    ) -> Vec<ProvenancedEpisode> {
         // Fall back to standard sampling if no bath state provided
         let current_bath = match current_bath {
             Some(b) => b,
-            None => return self.sample_replay_batch(batch_size),
+            None => return self.sample_replay_batch_with_provenance(batch_size),
         };
 
         let batch_size = batch_size.min(self.episodes.len());
@@ -722,7 +815,7 @@ impl EpisodicMemory {
 
             if !used_indices.contains(&selected_idx) {
                 used_indices.insert(selected_idx);
-                batch.push(all_episodes[selected_idx].episode.clone());
+                batch.push(all_episodes[selected_idx].as_provenanced_episode());
             }
         }
 
@@ -971,7 +1064,8 @@ impl EpisodicMemory {
                 // Recalculate priority score with updated consolidation
                 pe.score = pe
                     .episode
-                    .priority_score(self.current_cycle, self.config.recency_weight);
+                    .priority_score(self.current_cycle, self.config.recency_weight)
+                    + pe.consolidation_priority_bonus;
             }
         }
         self.episodes.extend(all);
@@ -994,13 +1088,24 @@ impl EpisodicMemory {
                 (pe.episode.consolidation_strength + boost).min(5.0);
             pe.score = pe
                 .episode
-                .priority_score(self.current_cycle, self.config.recency_weight);
+                .priority_score(self.current_cycle, self.config.recency_weight)
+                + pe.consolidation_priority_bonus;
         }
         self.episodes.extend(all);
     }
 
     /// Get all episodes sorted by Phi (highest first)
     pub fn get_top_episodes(&self, n: usize) -> Vec<Episode> {
+        self.get_top_episodes_with_provenance(n)
+            .into_iter()
+            .map(|record| record.episode)
+            .collect()
+    }
+
+    /// Retrieve top episodes together with the source-class and verification-claim
+    /// metadata preserved at graduation. This is descriptive lineage, not a
+    /// signed source receipt or permission grant.
+    pub fn get_top_episodes_with_provenance(&self, n: usize) -> Vec<ProvenancedEpisode> {
         let mut sorted: Vec<_> = self.episodes.iter().collect();
         sorted.sort_by(|a, b| {
             b.episode
@@ -1011,7 +1116,7 @@ impl EpisodicMemory {
         sorted
             .into_iter()
             .take(n)
-            .map(|pe| pe.episode.clone())
+            .map(PrioritizedEpisode::as_provenanced_episode)
             .collect()
     }
 
@@ -1026,6 +1131,18 @@ impl EpisodicMemory {
         query: &[f32],
         top_k: usize,
     ) -> Vec<(Episode, f32)> {
+        self.retrieve_by_embedding_similarity_with_provenance(query, top_k)
+            .into_iter()
+            .map(|(record, similarity)| (record.episode, similarity))
+            .collect()
+    }
+
+    /// Embedding retrieval with source lineage and consolidation metadata preserved.
+    pub fn retrieve_by_embedding_similarity_with_provenance(
+        &self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Vec<(ProvenancedEpisode, f32)> {
         if query.is_empty() {
             return Vec::new();
         }
@@ -1034,7 +1151,7 @@ impl EpisodicMemory {
             return Vec::new();
         }
 
-        let mut scored: Vec<(Episode, f32)> = self
+        let mut scored: Vec<(ProvenancedEpisode, f32)> = self
             .episodes
             .iter()
             .filter_map(|pe| {
@@ -1048,7 +1165,7 @@ impl EpisodicMemory {
                     return None;
                 }
                 let sim = dot / (emb_norm * query_norm);
-                Some((pe.episode.clone(), sim))
+                Some((pe.as_provenanced_episode(), sim))
             })
             .collect();
 
@@ -1078,6 +1195,18 @@ impl EpisodicMemory {
     /// information plain state carryover didn't (C1's P1 finding).
     /// Read-only — does not affect consolidation/reconsolidation state.
     pub fn retrieve_by_input_similarity(&self, query: &[f32], top_k: usize) -> Vec<(Episode, f32)> {
+        self.retrieve_by_input_similarity_with_provenance(query, top_k)
+            .into_iter()
+            .map(|(record, similarity)| (record.episode, similarity))
+            .collect()
+    }
+
+    /// Input-vector retrieval with source lineage and consolidation metadata preserved.
+    pub fn retrieve_by_input_similarity_with_provenance(
+        &self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Vec<(ProvenancedEpisode, f32)> {
         if query.is_empty() {
             return Vec::new();
         }
@@ -1085,7 +1214,7 @@ impl EpisodicMemory {
         if query_norm < 1e-12 {
             return Vec::new();
         }
-        let mut scored: Vec<(Episode, f32)> = self
+        let mut scored: Vec<(ProvenancedEpisode, f32)> = self
             .episodes
             .iter()
             .filter_map(|pe| {
@@ -1098,7 +1227,7 @@ impl EpisodicMemory {
                 if input_norm < 1e-12 {
                     return None;
                 }
-                Some((pe.episode.clone(), dot / (input_norm * query_norm)))
+                Some((pe.as_provenanced_episode(), dot / (input_norm * query_norm)))
             })
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -1403,7 +1532,7 @@ mod tests {
 
         memory.clear();
 
-        assert!(memory.is_empty());
+        assert_eq!(memory.len(), 0);
         assert_eq!(memory.len(), 0);
     }
 
@@ -1784,5 +1913,152 @@ mod tests {
         let result = memory.replay_session(&mut net, 0.01);
         assert!(!result.skipped);
         assert!(result.episodes_replayed > 0);
+    }
+}
+
+
+#[cfg(test)]
+mod provenance_envelope_tests {
+    use super::*;
+
+    fn episode(psi: f64, timestamp: u64) -> Episode {
+        Episode::new(
+            ContinuousHV::random(64, timestamp),
+            ContinuousHV::random(64, timestamp + 1),
+            psi,
+            timestamp,
+        )
+    }
+
+    #[test]
+    fn raw_psi_and_invalid_numeric_values_are_enforced_before_heap_insertion() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.5,
+            ..Default::default()
+        });
+
+        assert!(!memory.store_if_significant(episode(f64::NAN, 1)));
+        assert!(!memory.store_if_significant(episode(f64::INFINITY, 2)));
+        assert!(!memory.store_if_significant(episode(-0.01, 3)));
+        assert!(!memory.store_if_significant(episode(1.01, 4)));
+        assert!(memory.is_empty());
+
+        let mut invalid_policy = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: f64::NAN,
+            ..Default::default()
+        });
+        assert!(!invalid_policy.store_if_significant(episode(0.9, 5)));
+        assert_eq!(invalid_policy.len(), 0);
+    }
+
+    #[test]
+    fn provenance_envelope_round_trips_without_changing_episode_layout() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            ..Default::default()
+        });
+        let provenance = GraduationProvenance {
+            source: MemorySource::ActionFeedback,
+            verification_claimed: true,
+        };
+        assert!(memory.store_if_significant_with_provenance(
+            episode(0.7, 11),
+            Some(provenance),
+            0.2,
+        ));
+
+        let records = memory.get_top_episodes_with_provenance(1);
+        assert_eq!(records.len(), 1);
+        let record = &records[0];
+        assert_eq!(record.schema_version, PROVENANCED_EPISODE_SCHEMA_VERSION);
+        assert_eq!(record.episode.psi, 0.7);
+        assert_eq!(
+            record.graduation_provenance.as_ref().unwrap().source,
+            MemorySource::ActionFeedback
+        );
+        assert!(record
+            .graduation_provenance
+            .as_ref()
+            .unwrap()
+            .verification_claimed);
+
+        let encoded = bincode::serialize(record).expect("serialize provenance envelope");
+        let decoded: ProvenancedEpisode =
+            bincode::deserialize(&encoded).expect("deserialize provenance envelope");
+        assert_eq!(decoded.schema_version, PROVENANCED_EPISODE_SCHEMA_VERSION);
+        assert_eq!(decoded.episode.psi, 0.7);
+        assert_eq!(
+            decoded.graduation_provenance.unwrap().source,
+            MemorySource::ActionFeedback
+        );
+        assert_eq!(decoded.consolidation_priority_bonus, 0.2);
+    }
+
+    #[test]
+    fn replay_priority_bonus_survives_reconsolidation_rebuilds() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            recency_weight: 0.2,
+            ..Default::default()
+        });
+        let provenance = GraduationProvenance {
+            source: MemorySource::ActionFeedback,
+            verification_claimed: false,
+        };
+        assert!(memory.store_if_significant_with_provenance(
+            episode(0.7, 11),
+            Some(provenance),
+            0.2,
+        ));
+
+        memory.boost_causal_consolidation(&[11], 0.1);
+        let stored = memory.episodes.iter().next().unwrap();
+        let expected = stored
+            .episode
+            .priority_score(memory.current_cycle, memory.config.recency_weight)
+            + stored.consolidation_priority_bonus;
+        assert_eq!(stored.score, expected);
+
+        memory.boost_recent_consolidation(0.1);
+        let stored = memory.episodes.iter().next().unwrap();
+        let expected = stored
+            .episode
+            .priority_score(memory.current_cycle, memory.config.recency_weight)
+            + stored.consolidation_priority_bonus;
+        assert_eq!(stored.score, expected);
+        assert_eq!(stored.consolidation_priority_bonus, 0.2);
+    }
+
+    #[test]
+    fn legacy_sampling_api_remains_available_and_envelope_sampler_keeps_lineage() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            psi_weighted_sampling: false,
+            ..Default::default()
+        });
+        let provenance = GraduationProvenance {
+            source: MemorySource::WebResearch,
+            verification_claimed: false,
+        };
+        assert!(memory.store_if_significant_with_provenance(
+            episode(0.6, 21),
+            Some(provenance),
+            0.1,
+        ));
+
+        let legacy = memory.sample_replay_batch(1);
+        assert_eq!(legacy.len(), 1);
+        assert_eq!(legacy[0].psi, 0.6);
+
+        let preserved = memory.sample_replay_batch_with_provenance(1);
+        assert_eq!(preserved.len(), 1);
+        assert_eq!(
+            preserved[0].graduation_provenance.as_ref().unwrap().source,
+            MemorySource::WebResearch
+        );
+
+        let conditioned = memory.sample_replay_batch_conditioned_with_provenance(1, None);
+        assert_eq!(conditioned.len(), 1);
+        assert!(conditioned[0].graduation_provenance.is_some());
     }
 }
