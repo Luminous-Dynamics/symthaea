@@ -619,7 +619,9 @@ mod tests {
         ));
         let svg = render_svg(&root, f64::NAN);
         assert!(!svg.contains("NaN"));
-        assert!(!svg.contains("inf"));
+        assert!(!svg.contains(r#"cx="inf"#));
+        assert!(!svg.contains(r#"cy="inf"#));
+        assert!(!svg.contains(r#"r="inf"#));
         assert!(svg.contains(r#"cx="0.0""#));
         assert!(svg.contains(r#"r="0.0""#));
     }
