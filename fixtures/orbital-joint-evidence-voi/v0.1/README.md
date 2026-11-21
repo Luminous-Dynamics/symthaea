@@ -87,3 +87,6 @@ The known-answer example is intentionally constructed so both single tests indiv
 | External cost units | 1.10 | 0.86 | 21.8% |
 
 These are calculated outcomes of one synthetic fixture, not empirical aerospace savings or SOTA results. Its frequency weights are used exclusively for expected resource accounting; worst-case structural decision regret remains distribution-free over the full state set.
+
+
+**Acceptance obligation rule:** a terminal ACCEPT requires every obligation declared for ACCEPT to have been accumulated along the selected action path. REJECT can terminate earlier when its own (possibly empty) evidence obligation set is satisfied. Missing or undeclared action obligations are rejected by both the Rust evaluator and its independent Python oracle.
