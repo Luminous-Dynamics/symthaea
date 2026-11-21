@@ -419,4 +419,61 @@ mod tests {
             TubeTessellationError::RadialResolutionOutOfRange(33)
         );
     }
+    #[test]
+    fn malformed_geometry_and_unsupported_versions_fail_closed() {
+        let mut model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        model.filaments[0].radius_start = f32::NAN;
+        assert_eq!(
+            tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
+            TubeTessellationError::InvalidFilamentGeometry(0)
+        );
+
+        let mut model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        model.schema_version = MYCELIAL_MODEL_VERSION + 1;
+        assert_eq!(
+            tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
+            TubeTessellationError::UnsupportedModelVersion(MYCELIAL_MODEL_VERSION + 1)
+        );
+    }
+
+    #[test]
+    fn mesh_resource_limits_are_checked_before_allocation() {
+        let mut model = build_mycelial_model(
+            &EmbodimentSnapshot::default(),
+            PresenceMode::Ambient,
+        );
+        let seed = model.filaments[0].clone();
+        while model.filaments.len() < MAX_MYCELIAL_FILAMENTS {
+            let mut filament = seed.clone();
+            filament.id = model.filaments.len() as u32;
+            filament.parent_id = None;
+            model.filaments.push(filament);
+        }
+        assert_eq!(
+            tessellate_mycelial_model(
+                &model,
+                TubeTessellationConfig {
+                    axial_segments: 128,
+                    radial_segments: 32,
+                },
+            )
+            .unwrap_err(),
+            TubeTessellationError::MeshVertexLimitExceeded(
+                MAX_MYCELIAL_FILAMENTS * 129 * 32
+            )
+        );
+
+        model.filaments.push(seed);
+        assert_eq!(
+            tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
+            TubeTessellationError::FilamentCountExceeded(MAX_MYCELIAL_FILAMENTS + 1)
+        );
+    }
+
 }
