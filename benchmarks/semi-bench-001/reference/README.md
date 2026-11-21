@@ -120,3 +120,8 @@ Reproduce the pair-manifest validation report:
 
     python benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py \
       benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json
+
+
+## Contrastive-pair provenance validator
+
+The current branch adds the split-local pair manifest validator and an executable CLI. Local verification of the new component: **11/11 unit tests passed**, and CLI output matched the frozen expected report byte-for-byte. The combined suite is now 46 tests; the last hosted CI run passed the previous 35-test suite, before this addition. The new full-suite CI result is not yet verified.
