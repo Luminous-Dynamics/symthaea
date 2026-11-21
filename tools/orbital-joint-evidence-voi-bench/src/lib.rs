@@ -897,12 +897,12 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         .copied()
         .flatten();
     let abstain_correct = if scenario.expected.abstain {
-        audits.iter().all(|action| {
-            !action.policy_eligible
-                || action
-                    .decision_value_improvement
-                    .is_none_or(|value| value <= EPSILON)
-        })
+        selected_action_id.is_none()
+            && matches!(
+                selection_disposition,
+                "ABSTAIN_NO_DECISION_VALUE"
+                    | "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE"
+            )
     } else {
         expected_action_eligible && expected_action_value.is_some_and(|value| value > EPSILON)
     };
@@ -1107,8 +1107,8 @@ mod tests {
     #[test]
     fn all_frozen_scenarios_pass_the_independent_semantic_contract() {
         let receipt = run_audit(FIXTURE, SOURCE).expect("scenario catalogue must audit");
-        assert_eq!(receipt.scenario_count, 13);
-        assert_eq!(receipt.oracle_matches, 13);
+        assert_eq!(receipt.scenario_count, 14);
+        assert_eq!(receipt.oracle_matches, 14);
         assert_eq!(receipt.oracle_mismatches, 0);
         assert!(!receipt.authority_granted);
     }
@@ -1406,6 +1406,24 @@ mod tests {
             first_choice.selected_action_id,
             second_choice.selected_action_id
         );
+    }
+
+    #[test]
+    fn incomparable_resource_tradeoff_is_frozen_as_human_review_not_scalarized() {
+        let receipt = run_audit(FIXTURE, SOURCE).unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "JEV-014")
+            .unwrap();
+        assert_eq!(case.selected_action_id, None);
+        assert_eq!(case.selected_action_value, Some(5.0));
+        assert_eq!(
+            case.selection_disposition,
+            "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE"
+        );
+        assert!(case.selection_matches_oracle);
+        assert!(case.abstention_correct);
     }
 
     #[test]
