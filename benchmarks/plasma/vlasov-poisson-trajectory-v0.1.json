@@ -1,0 +1,633 @@
+{
+  "profile_version": "0.1.0",
+  "benchmark_id": "plasma.vlasov_poisson.1d1v.periodic.trajectory",
+  "profile_date": "2026-11-21",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13072",
+  "parent_programmes": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12976",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13010"
+  ],
+  "status": {
+    "classification": "protocol_only",
+    "solver_implemented": false,
+    "trajectory_executed": false,
+    "physical_validation": "not_run",
+    "external_baselines_reproduced": false,
+    "focused_validation": "not_run",
+    "full_repository_validation": "not_run",
+    "claim_ceiling": "This profile defines a benchmark cohort and evidence contract. It is not an executable solver configuration or a physical result."
+  },
+  "equation_cohort": {
+    "id": "vlasov_poisson_pic",
+    "equations": "collisionless electrostatic Vlasov-Poisson",
+    "dimensions": {
+      "configuration_space": 1,
+      "velocity_space": 1
+    },
+    "distribution": "f(x,v,t)",
+    "kinetic_equation": "dt(f) + v*dx(f) + (q/m)*E*dv(f) = 0",
+    "field_equation": "dx(E) = rho/epsilon_0",
+    "charge_density": "rho(x,t) = q*integral_R(f(x,v,t),dv) + rho_background",
+    "configuration_space": {
+      "topology": "periodic_circle",
+      "domain_length": null,
+      "required_before_execution": [
+        "positive finite domain length",
+        "periodic boundary and seam convention",
+        "zero-mode / neutralising-background convention"
+      ]
+    },
+    "velocity_space": {
+      "physical_domain": "R",
+      "reference_numerical_interval": null,
+      "boundary_treatment": null,
+      "required_before_execution": [
+        "finite numerical interval for distribution-space reference",
+        "velocity boundary treatment",
+        "velocity-domain expansion study",
+        "tail-truncation error estimate or sensitivity study"
+      ]
+    },
+    "normalisation": {
+      "charge": null,
+      "mass": null,
+      "permittivity": null,
+      "velocity_scale": null,
+      "units": null,
+      "required_before_execution": "All constants and units must be explicit and shared across matched methods."
+    },
+    "cohort_exclusions": [
+      "vlasov_maxwell",
+      "vlasov_ampere",
+      "collisional_vlasov_landau",
+      "reduced_quasineutral_vlasov_ampere",
+      "relativistic_vlasov_maxwell"
+    ]
+  },
+  "fidelity_ladder": [
+    {
+      "id": "L0_small_problem_oracles",
+      "role": "Known-answer and metamorphic reference for declared finite operators",
+      "status": "component_prs_open",
+      "components": [
+        {
+          "name": "periodic_particle_field_and_variational_force",
+          "pr": 12974,
+          "head_sha": "ea55f5c050e1f213b1ca11b8c15311b3b2607374",
+          "operator_scope": "zero-mode-removed truncated periodic Fourier particle operator"
+        },
+        {
+          "name": "staggered_gauss_verifier",
+          "pr": 12974,
+          "head_sha": "ea55f5c050e1f213b1ca11b8c15311b3b2607374",
+          "operator_scope": "periodic 1D face-field / cell-centred charge finite-volume divergence"
+        }
+      ],
+      "limitations": [
+        "Not a continuum Vlasov solver",
+        "Not a production kinetic solver",
+        "Fourier and staggered operators are not interchangeable",
+        "The variational pair-energy convention has its own self-interaction and zero-mode contract"
+      ]
+    },
+    {
+      "id": "L1_fast_candidate",
+      "role": "Learned particle-measure field proposal or declared reduced/fast operator",
+      "status": "not_implemented_in_this_cohort",
+      "candidate_families": [
+        "NEOPIC particle-measure neural field operator",
+        "particle-in-Fourier or NUFFT operator",
+        "other reduced operator with a frozen physical contract"
+      ],
+      "required_evidence": [
+        "exact model and source revision",
+        "training-data, preprocessing and configuration digests",
+        "particle-count and representation support",
+        "complete-trajectory calibration artifact",
+        "OOD and unsupported-regime abstention behavior",
+        "teacher-forced and closed-loop results kept separate"
+      ]
+    },
+    {
+      "id": "L2_trusted_discrete_correction",
+      "role": "Pinned classical field solve, correction, or full fallback",
+      "status": "reference_component_open",
+      "poisson_certificate": {
+        "pr": 12974,
+        "head_sha": "ea55f5c050e1f213b1ca11b8c15311b3b2607374",
+        "operator_id": "periodic_1d_fd_poisson_v1",
+        "applicability": "uniform periodic 1D second-order finite-difference Laplacian on the mean-zero subspace",
+        "norm": "Euclidean vector L2",
+        "field_bound_scope": "forward-difference electric-field L2 error",
+        "does_not_cover": [
+          "pointwise particle-force error",
+          "Fourier field operator",
+          "staggered Gauss verifier",
+          "nonuniform mesh",
+          "different boundary or gauge",
+          "higher-dimensional Poisson operators"
+        ]
+      },
+      "routing": [
+        "accept_certified_proposal",
+        "run_trusted_correction",
+        "trusted_fallback",
+        "unresolved"
+      ],
+      "rule": "A correction changes the state; all state-dependent evidence must be recomputed before the segment can pass."
+    },
+    {
+      "id": "L3_independent_kinetic_reference",
+      "role": "Converged distribution-space Vlasov-Poisson trajectory",
+      "status": "not_implemented",
+      "candidate_numerical_family": "spectral-in-space and high-order velocity-space scheme",
+      "required_before_admission": [
+        "pinned algorithm and source revision",
+        "frozen splitting and time integrator",
+        "spatial refinement study",
+        "velocity-grid refinement study",
+        "velocity-domain expansion study",
+        "timestep refinement study",
+        "independent check against analytic/manufactured controls or a second formulation"
+      ]
+    }
+  ],
+  "component_references": [
+    {
+      "component": "physics_oracles",
+      "pr": 12974,
+      "head_sha": "ea55f5c050e1f213b1ca11b8c15311b3b2607374",
+      "state_at_profile_creation": "open"
+    },
+    {
+      "component": "multiscale_characteristic_mmd",
+      "pr": 13051,
+      "head_sha": "509019b514ca89a56f0c795d607b0115f8548d3e",
+      "state_at_profile_creation": "open",
+      "base_branch": "research/plasma-anytime-mmd-v1"
+    },
+    {
+      "component": "balanced_phase_space_w1",
+      "pr": 13056,
+      "head_sha": "521221b169ee4d099460aa4fed5a403ce2348d9d",
+      "state_at_profile_creation": "open"
+    },
+    {
+      "component": "weighted_phase_space_moments",
+      "pr": 13063,
+      "head_sha": "7749a570352811a5d924b4b5b6614d8026298ca0",
+      "state_at_profile_creation": "open"
+    },
+    {
+      "component": "trajectory_evidence_ledger",
+      "pr": 13065,
+      "head_sha": "f6e947173787e6ce3435d4ce7659890cf634ec5d",
+      "state_at_profile_creation": "open"
+    },
+    {
+      "component": "dense_distribution_space_vlasov_poisson_reference_prototype",
+      "pr": 13103,
+      "head_sha": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
+      "state_at_profile_creation": "open",
+      "claim_ceiling": "Rust 1.96 focused workflow passed 19 tests, strict format and Clippy; Landau t=10 and resolution probes executed. Exploratory post-initial peak-envelope slope near linear Landau reference is not yet a validated reproduction. Not yet L3-admitted."
+    },
+    {
+      "component": "phase_space_spectral_tail_monitor",
+      "pr": 13103,
+      "head_sha": "2c2b91ce43890b3d9175b4949b1354fd09fdc2c4",
+      "state_at_profile_creation": "implementation_in_progress",
+      "claim_ceiling": "Diagnostic-only x/v high-frequency and Nyquist energy fractions. Not a truncation-error certificate and not an adaptive expansion policy."
+    },
+    {
+      "component": "periodic_fourier_zero_padding_interpolation_oracle",
+      "pr": 13103,
+      "head_sha": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
+      "state_at_profile_creation": "focused_validation_passed",
+      "claim_ceiling": "Standalone trigonometric interpolation transfer oracle; no live-state mutation, adaptive controller or physical transition certificate."
+    }
+  ],
+  "initial_condition_suite": [
+    {
+      "id": "neutral_homogeneous_equilibrium",
+      "role": "zero-field equilibrium and invariant baseline",
+      "parameter_status": "must_be_frozen_before_execution",
+      "required_checks": [
+        "neutrality",
+        "zero-field consistency",
+        "mass conservation",
+        "momentum consistency",
+        "energy consistency"
+      ]
+    },
+    {
+      "id": "manufactured_free_streaming",
+      "role": "analytic no-self-field transport control",
+      "parameter_status": "manufactured_solution_must_be_pinned",
+      "required_checks": [
+        "analytic characteristic solution",
+        "periodic wrap invariance",
+        "timestep convergence",
+        "phase-space measure invariance"
+      ]
+    },
+    {
+      "id": "weak_landau_damping",
+      "role": "initial coupled linear-instability trajectory",
+      "parameter_status": "exact_initial_condition_and_parameters_must_be_frozen",
+      "required_checks": [
+        "linear damping rate",
+        "electric-field mode amplitude and phase",
+        "phase mixing",
+        "particle and distribution-space comparison",
+        "long-horizon numerical drift"
+      ]
+    },
+    {
+      "id": "two_stream_instability",
+      "role": "initial unstable nonlinear trajectory",
+      "parameter_status": "exact_beam_distribution_perturbation_and_parameters_must_be_frozen",
+      "required_checks": [
+        "linear growth rate",
+        "saturation time and amplitude",
+        "velocity-space trapping structures",
+        "long-horizon distribution fidelity"
+      ]
+    },
+    {
+      "id": "strong_landau_damping",
+      "role": "whole-regime generalisation holdout",
+      "parameter_status": "holdout_parameters_frozen_before_training",
+      "required_checks": [
+        "field mode evolution",
+        "phase mixing and nonlinear response",
+        "OOD detection and selective fallback"
+      ]
+    },
+    {
+      "id": "bump_on_tail",
+      "role": "whole-regime generalisation holdout",
+      "parameter_status": "holdout_parameters_frozen_before_training",
+      "required_checks": [
+        "unstable mode growth",
+        "plateau formation",
+        "velocity-tail fidelity",
+        "OOD detection and selective fallback"
+      ]
+    },
+    {
+      "id": "post_saturation",
+      "role": "long-horizon holdout",
+      "parameter_status": "horizon_and_initial_condition_frozen_before_training",
+      "required_checks": [
+        "long-horizon trajectory drift",
+        "distribution morphology",
+        "invariant and constraint drift",
+        "fallback and failure time"
+      ]
+    }
+  ],
+  "diagnostics": {
+    "moments": {
+      "pr": 13063,
+      "head_sha": "7749a570352811a5d924b4b5b6614d8026298ca0",
+      "metrics": [
+        "zeroth_moment",
+        "first_velocity_moment",
+        "half_second_velocity_moment",
+        "mean_velocity_when_defined",
+        "central_velocity_moment_when_defined",
+        "total_variation"
+      ],
+      "caveat": "Signed delta-f moments are signed contributions and are not automatically positive physical energies."
+    },
+    "phase_space_mmd": {
+      "pr": 13051,
+      "head_sha": "509019b514ca89a56f0c795d607b0115f8548d3e",
+      "metrics": [
+        "exact_small_n_mmd2",
+        "multi_scale_mmd2",
+        "per_component_mmd2",
+        "spectral_approximation_error_interval"
+      ],
+      "caveat": "Distribution discrepancy only; not a field, force, trajectory, or physical-error certificate."
+    },
+    "phase_space_w1": {
+      "pr": 13056,
+      "head_sha": "521221b169ee4d099460aa4fed5a403ce2348d9d",
+      "applicability": "nonnegative measures with equal total mass under the frozen periodic-cylinder ground metric",
+      "caveat": "Signed delta-f is unsupported; unequal mass is rejected unless a separately defined unbalanced metric is added."
+    },
+    "field_constraint": {
+      "required": true,
+      "operator_binding": "The residual must be computed by the exact field operator used in this segment.",
+      "caveat": "Do not transfer a residual/error certificate across a stencil, gauge, boundary, norm, or dimensionality change."
+    }
+  },
+  "error_sources": [
+    "particle_sampling_and_representation",
+    "learned_field_operator_approximation",
+    "discrete_field_solver",
+    "spatial_discretisation",
+    "velocity_discretisation_and_domain_truncation",
+    "temporal_integration_and_splitting",
+    "reference_solution_uncertainty",
+    "diagnostic_estimator_uncertainty"
+  ],
+  "qualification_policy": {
+    "style": "non_compensatory_fail_closed",
+    "actions": [
+      "accept",
+      "refine_diagnostics",
+      "correct",
+      "trusted_fallback",
+      "abstain_unresolved"
+    ],
+    "required_properties": [
+      "all mandatory metrics are independently within their justified tolerance",
+      "all observations match the same run, input, config and trajectory segment",
+      "operator identity, norm and units match the bound",
+      "calibration artifact matches the exact model and preprocessing digests",
+      "out_of_envelope states force fallback or unresolved",
+      "post_correction diagnostics are recomputed"
+    ],
+    "prohibited_shortcuts": [
+      "missing_metric_equals_zero",
+      "empirical_bound_promoted_to_pass",
+      "root_sum_square_without_derived_dependence_model",
+      "cross_cohort_metric_aggregation",
+      "snapshot_random_split",
+      "MMD_or_W1_used_as_deterministic_solver_certificate",
+      "Poisson_certificate_reused_for_a_different_operator"
+    ]
+  },
+  "statistical_protocol": {
+    "independent_unit": "complete trajectory, not snapshot",
+    "split_axes": [
+      "initial_condition_family",
+      "physical_parameter_regime",
+      "random_seed",
+      "particle_count",
+      "numerical_method",
+      "simulation_horizon"
+    ],
+    "false_safe_reporting": {
+      "required": true,
+      "zero_event_one_sided_95_percent_upper_bound": "1 - 0.05^(1/n)",
+      "approximation": "3/n",
+      "note": "Report exact binomial interval and effective independent trajectory count; seed replicates do not replace whole-regime holdouts."
+    }
+  },
+  "performance_targets": {
+    "status": "prospective_targets_not_results",
+    "linear_growth_or_damping_rate_relative_error": 0.01,
+    "observed_false_safe_count_on_curated_adversarial_suite": 0,
+    "end_to_end_speedup_at_matched_physical_fidelity": 2,
+    "required_cost_metrics": [
+      "preprocessing_and_plan_creation",
+      "training_amortisation",
+      "model_inference",
+      "field_solve",
+      "deposition_and_gather",
+      "particle_push",
+      "communication_and_synchronization",
+      "diagnostics",
+      "correction_and_fallback",
+      "output_and_io",
+      "wall_time_p50_p95",
+      "peak_memory",
+      "energy_to_solution"
+    ],
+    "acceptance_note": "Speedup is reported only after equal physical fidelity and qualification coverage have been demonstrated on a named matched workload."
+  },
+  "external_baselines": [
+    {
+      "name": "NEOPIC",
+      "source": "https://arxiv.org/abs/2610.40528",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "admission_rule": "Use only source-faithful tasks, dimensions, preprocessing and parameter conventions."
+    },
+    {
+      "name": "Smilei 5.1",
+      "source": "https://smileipic.github.io/Smilei/Understand/vectorization.html",
+      "source_claim_status": "official_documentation",
+      "admission_rule": "Pin release, compiler, vectorization and adaptive patch/species configuration; compare only on supported matched cohort."
+    },
+    {
+      "name": "WarpX 26.11",
+      "source": "https://warpx.readthedocs.io/en/26.11/usage/parameters.html",
+      "source_claim_status": "official_documentation",
+      "admission_rule": "Pin release, deposition/current-correction/solver choices and include communication and correction costs."
+    },
+    {
+      "name": "GEMPIC",
+      "source": "https://doi.org/10.1017/S002237781700040X",
+      "source_claim_status": "published_structure_preserving_method",
+      "admission_rule": "Keep geometry, equation family, discrete structure and time integration aligned; do not transfer claims across discretisations."
+    },
+    {
+      "name": "Neural score-based Vlasov-Maxwell-Landau",
+      "source": "https://arxiv.org/abs/2603.25832",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "admission_rule": "Separate collisional cohort only; never pool its entropy or performance metrics into collisionless Vlasov-Poisson."
+    },
+    {
+      "name": "VlasovTT.jl tensor-train / MPS fully spectral Vlasov-Poisson",
+      "paper": "https://arxiv.org/abs/2602.13092",
+      "repository": "https://github.com/erikasgrim/VlasovTT.jl",
+      "pinned_repository_head": "99aa077b6f5e4ae4dfc8330590e502267caf298b",
+      "repository_license": "MIT (repository README/license)",
+      "source_claim_status": "paper_reported_and_current_repo_head_inspected_not_reproduced",
+      "paper_reported_setup": {
+        "quantics_bits_per_dimension": 10,
+        "grid_points_per_dimension": 1024,
+        "phase_space_grid_points": 1048576,
+        "timestep": 0.1,
+        "tci_tolerance": 1e-8,
+        "electric_field_maximum_bond_dimension": 32,
+        "landau_initial_amplitude": 0.01,
+        "landau_thermal_speed": 1,
+        "landau_velocity_interval": [
+          -6,
+          6
+        ],
+        "tt_truncation_thresholds": [
+          1e-7,
+          1e-8,
+          1e-9,
+          1e-10
+        ]
+      },
+      "paper_reported_observations": {
+        "linear_landau_field_amplitude_damping_rate": -0.151,
+        "landau_maximum_bond_dimension_range": [
+          15,
+          45
+        ],
+        "two_stream_maximum_bond_dimension_range": [
+          120,
+          150
+        ],
+        "landau_relative_energy_deviation_order": 0.001,
+        "tcifit_acceleration_step_runtime_relative_to_all_tt_mpo_contractions": "approximately one order of magnitude"
+      },
+      "admission_rule": "Reproduce both the paper's TT/MPS and dense-reference paths on identical initial conditions, grids, dt, precision and final time. Retain truncation-induced damping bias, negative distribution mass, rank history, TCI reconstruction cost and full runtime. Paper observations are not independently reproduced here.",
+      "source_default_landau_amplitude": 0.1,
+      "paper_landau_amplitude": 0.01,
+      "reproduction_blocker": "Both current repository scripts examples/landau_damping.jl and examples/reference_landau_damping.jl use A=0.1, while the paper specifies A=0.01. The reproduction must explicitly override A=0.01 for the paper-faithful lane and preserve A=0.1 as a separate source-default lane.",
+      "source_files": {
+        "repository_head": "99aa077b6f5e4ae4dfc8330590e502267caf298b",
+        "landau_tt_blob": "a1745409ea245a919068e53ad5df9d15227689f3",
+        "landau_dense_reference_blob": "1f2bcf8acb17ab321861bae2b9937b821b7e1973"
+      }
+    },
+    {
+      "name": "Adaptive Fourier spectral Vlasov-Poisson zero-padding method",
+      "source": "https://arxiv.org/abs/2607.12368",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "admission_rule": "Pin source revision and reproduce spectral-tail trigger, zero-padding, filter behavior and invariant claims on matched complete trajectories."
+    },
+    {
+      "name": "Positivity-preserving dynamical low-rank Vlasov",
+      "source": "https://arxiv.org/abs/2606.31662",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "admission_rule": "Compare on nonnegative distribution f only, preserving exact equation/cohort; do not impose positivity on signed delta-f states."
+    }
+  ],
+  "execution_receipt": {
+    "required_fields": [
+      "run_id",
+      "input_digest",
+      "configuration_digest",
+      "source_revision_per_solver_and_diagnostic",
+      "operator_id_per_solver_and_diagnostic",
+      "model_digest_and_preprocessing_digest",
+      "initial_condition_id",
+      "seed",
+      "time_interval",
+      "precision_and_runtime",
+      "hardware_record",
+      "step_and_segment_metrics",
+      "error_bounds_and_bound_kind",
+      "correction_history",
+      "fallback_and_abstention_reasons",
+      "runtime_memory_energy",
+      "diagnostic_artifact_digests"
+    ],
+    "state_correction_rule": "Any correction invalidates state-dependent evidence from before the correction."
+  },
+  "blocking_work": [
+    "Admit and pin all component PRs and resolve branch stacking before code integration.",
+    "Implement a converged L3 distribution-space solver and independent convergence evidence.",
+    "Implement a trusted particle solver on identical initial conditions.",
+    "Freeze exact initial-condition parameters and numerical settings before scored runs.",
+    "Implement trajectory adapters, segment receipt emission and adversarial controller tests.",
+    "Reproduce external methods only after exact source/config/data admission."
+  ],
+  "references": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12976",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13010",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13072",
+    "https://arxiv.org/abs/2610.40528",
+    "https://arxiv.org/abs/2603.25832",
+    "https://smileipic.github.io/Smilei/Understand/vectorization.html",
+    "https://warpx.readthedocs.io/en/26.11/usage/parameters.html",
+    "https://doi.org/10.1017/S002237781700040X",
+    "https://github.com/erikasgrim/VlasovTT.jl/tree/99aa077b6f5e4ae4dfc8330590e502267caf298b",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/13105",
+    "https://arxiv.org/abs/2607.12368",
+    "https://arxiv.org/abs/2606.31662",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13106"
+  ],
+  "representation_tournament": {
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
+    "adaptive_resolution_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13106",
+    "purpose": "Compare dense spectral, adaptive Fourier zero-padding, TT/MPS, Fourier-Hermite, positivity-preserving low rank, particle-measure and learned field representations on one admitted 1D1V Vlasov-Poisson cohort.",
+    "methods": [
+      "dense_spectral_fixed_grid",
+      "adaptive_fourier_spectral_zero_padding",
+      "tensor_train_mps_quantics",
+      "positivity_preserving_dynamical_low_rank",
+      "fourier_hermite_velocity",
+      "weighted_particle_measure",
+      "learned_particle_measure_field"
+    ],
+    "new_research_comparators": [
+      {
+        "name": "Adaptive Fourier spectral Vlasov-Poisson",
+        "paper": "https://arxiv.org/abs/2607.12368",
+        "method": "spectral-tail-triggered Fourier wavenumber-domain expansion by zero-padding",
+        "source_claim_status": "paper_reported_not_reproduced",
+        "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13106"
+      },
+      {
+        "name": "Positivity-preserving dynamical low-rank Vlasov",
+        "paper": "https://arxiv.org/abs/2606.31662",
+        "method": "constrained quadratic-program correction of low-rank states; one scheme also preserves mass and momentum",
+        "applicability": "nonnegative f only; signed delta-f needs another contract",
+        "source_claim_status": "paper_reported_not_reproduced"
+      }
+    ],
+    "transition_rule": "Any representation or resolution transition must have its own discrepancy, invariant, positivity/applicability and complete compute-cost receipt. No representation is permitted to claim correctness outside its qualified envelope.",
+    "diagnostics": [
+      "phase_space_distribution_error",
+      "mass_momentum_energy",
+      "minimum_distribution_and_negative_mass",
+      "velocity_tail_truncation",
+      "compression_rank_and_truncation_residual",
+      "x_and_velocity_spectral_tail_fractions",
+      "spectral_nyquist_energy_fractions",
+      "representation_transition_error",
+      "representation_transition_runtime",
+      "p50_p95_runtime_peak_memory_energy",
+      "risk_coverage_fallback_and_abstention"
+    ],
+    "claim_ceiling": "No universal winner or adaptive representation claim before matched-source reproduction and independent trajectory qualification.",
+    "zero_padding_status": "standalone_transfer_oracle_validated",
+    "zero_padding_contract": {
+      "source_periodic_line_length": "power-of-two >= 4",
+      "target_periodic_line_length": "power-of-two >= source length",
+      "nyquist": "split source Nyquist coefficient symmetrically into positive and negative target harmonics",
+      "physical_state_mutation": false,
+      "physical_transition_certificate": false,
+      "tests": [
+        "band-limited reconstruction",
+        "old-node preservation",
+        "Nyquist splitting",
+        "constant line",
+        "identity grid",
+        "invalid grid and non-finite rejection"
+      ]
+    },
+    "zero_padding_validation": {
+      "source_head": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
+      "test_coverage": [
+        "band-limited interpolation",
+        "old-node preservation",
+        "symmetric Nyquist splitting",
+        "constant line",
+        "identity grid",
+        "invalid grid",
+        "non-finite input"
+      ],
+      "unit_tests_passed": 19,
+      "limitation": "Transfer oracle only; live-state transition, invariant/error budget and adaptive trigger remain unimplemented."
+    }
+  },
+  "reference_run": {
+    "source_head": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
+    "workflow_run": 44895652946,
+    "artifact_id": 14703563532,
+    "artifact_sha256": "edf9a35c5a9e50b5d0151c0c45d810563ba9fa98a770b019e512401315cfdfeb",
+    "unit_tests_passed": 19,
+    "strict_format": true,
+    "strict_clippy": true,
+    "physical_validation_status": "reference_prototype_only",
+    "landau_initial_perturbation": 0.001,
+    "paper_reported_landau_perturbation": 0.01,
+    "exploratory_peak_envelope_gamma": -0.15444614642531948,
+    "late_three_peak_sensitivity_gamma": -0.15127273980918007,
+    "paper_reported_gamma": -0.151,
+    "claim_ceiling": "Exploratory fit from four post-initial extrema at one grid and timestep, with a 10x smaller perturbation than paper. Not a validated paper reproduction or L3 admission."
+  }
+}
