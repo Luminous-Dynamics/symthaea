@@ -1,0 +1,100 @@
+name: Precursor Genome Graph Audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/superconductivity-discovery-harness/**"
+      - "data/research/precursor_genome_graph_benchmark_v0_1.json"
+      - "data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome_graph/README.md"
+      - ".github/workflows/precursor-genome-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/superconductivity-discovery-harness/**"
+      - "data/research/precursor_genome_graph_benchmark_v0_1.json"
+      - "data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome_graph/README.md"
+      - ".github/workflows/precursor-genome-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precursor-genome-audit-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  precursor-genome-source-audit:
+    name: Pinned Precursor Genome graph and cohort audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Download immutable upstream ledger
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/precursor-genome"
+          curl --fail --location --silent --show-error --retry 3 \
+            "https://raw.githubusercontent.com/lauren-walters/precursor-genome/78cb026aa6c9b53aa0ec26ea5611d523bc3c320a/ledger_precursor_genome.json" \
+            --output "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
+          wc -c "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
+
+      - name: Check auditor formatting
+        run: rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
+
+      - name: Test graph invariants and endpoint semantics
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit
+
+      - name: Verify pinned source identity and reconcile the paper cohort
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit -- \
+            --manifest data/research/precursor_genome_graph_benchmark_v0_1.json \
+            --manifest-schema data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json \
+            --ledger "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json" \
+            --out "$RUNNER_TEMP/precursor-genome/graph-audit-receipt.json"
+          jq '{status, contract, benchmark_id, source: {repository: .source.repository, commit: .source.commit, ledger_bytes: .source.ledger_bytes, ledger_git_blob_sha1: .source.ledger_git_blob_sha1}, pair_graph: {precursor_count: .pair_graph.precursor_count, unique_unordered_pair_count: .pair_graph.unique_unordered_pair_count, complete_undirected_graph: .pair_graph.complete_undirected_graph, expected_degree: .pair_graph.expected_degree, per_precursor_reactivity_summary: .pair_graph.per_precursor_reactivity_summary}, cohort, sample_record_count: (.sample_records | length), validation_protocols: {leave_one_precursor_out: {fold_count: .validation_protocols.leave_one_precursor_out.fold_count, train_edges_per_fold: .validation_protocols.leave_one_precursor_out.training_edge_count_per_fold, test_edges_per_fold: .validation_protocols.leave_one_precursor_out.test_edge_count_per_fold}, double_node_holdout: {fold_count: .validation_protocols.double_node_holdout.fold_count, train_edges_per_fold: .validation_protocols.double_node_holdout.training_edge_count_per_fold, test_edges_per_fold: .validation_protocols.double_node_holdout.test_edge_count_per_fold}}, quality_and_thermal_diagnostics}' "$RUNNER_TEMP/precursor-genome/graph-audit-receipt.json"
+
+      - name: Clippy graph auditor
+        run: cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit -- -D warnings
+
+      - name: Record exact input and environment identities
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum data/research/precursor_genome_graph_benchmark_v0_1.json
+            sha256sum data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/Cargo.toml
+            sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
+            sha256sum "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
+            if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
+              sha256sum tools/superconductivity-discovery-harness/Cargo.lock
+            fi
+          } > "$RUNNER_TEMP/precursor-genome/identity.txt"
+
+      - name: Upload source identity and audit receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precursor-genome-exact-source-audit
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/precursor-genome/ledger_precursor_genome.json
+            ${{ runner.temp }}/precursor-genome/graph-audit-receipt.json
+            ${{ runner.temp }}/precursor-genome/identity.txt
+            tools/superconductivity-discovery-harness/Cargo.lock

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json",
+  "title": "Pinned Precursor Genome complete-pair-graph benchmark manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "benchmark_id", "source", "expected", "endpoint", "thermal_metadata", "claim_ceiling"],
+  "properties": {
+    "contract": {"const": "SC-PRECURSOR-GENOME-GRAPH-0.1"},
+    "benchmark_id": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "ledger_path", "ledger_git_blob_sha1", "raw_url", "license", "license_url", "attribution", "dataset_doi", "paper_url"],
+      "properties": {
+        "repository": {"const": "lauren-walters/precursor-genome"},
+        "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "ledger_path": {"const": "ledger_precursor_genome.json"},
+        "ledger_git_blob_sha1": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "raw_url": {"type": "string", "format": "uri"},
+        "license": {"const": "CC-BY-4.0"},
+        "license_url": {"type": "string", "format": "uri"},
+        "attribution": {"type": "string", "minLength": 1},
+        "dataset_doi": {"type": "string", "format": "uri"},
+        "paper_url": {"type": "string", "format": "uri"}
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_count", "precursor_count", "edge_count", "degree_per_precursor", "physical_failure_exclusions", "poor_refinement_quality_score", "poor_refinement_exclusions", "analyzable_count", "raw_category_counts", "analyzable_category_counts", "positive_count", "negative_count"],
+      "properties": {
+        "sample_count": {"type": "integer", "minimum": 1},
+        "precursor_count": {"type": "integer", "minimum": 2},
+        "edge_count": {"type": "integer", "minimum": 1},
+        "degree_per_precursor": {"type": "integer", "minimum": 1},
+        "physical_failure_exclusions": {"type": "integer", "minimum": 0},
+        "poor_refinement_quality_score": {"const": 3},
+        "poor_refinement_exclusions": {"type": "integer", "minimum": 0},
+        "analyzable_count": {"type": "integer", "minimum": 1},
+        "raw_category_counts": {
+          "type": "object", "additionalProperties": false,
+          "required": ["transformed", "unreacted", "completely_reacted", "partially_reacted", "unclassified"],
+          "properties": {
+            "transformed": {"type": "integer", "minimum": 0},
+            "unreacted": {"type": "integer", "minimum": 0},
+            "completely_reacted": {"type": "integer", "minimum": 0},
+            "partially_reacted": {"type": "integer", "minimum": 0},
+            "unclassified": {"type": "integer", "minimum": 0}
+          }
+        },
+        "analyzable_category_counts": {
+          "type": "object", "additionalProperties": false,
+          "required": ["transformed", "unreacted", "completely_reacted", "partially_reacted"],
+          "properties": {
+            "transformed": {"type": "integer", "minimum": 0},
+            "unreacted": {"type": "integer", "minimum": 0},
+            "completely_reacted": {"type": "integer", "minimum": 0},
+            "partially_reacted": {"type": "integer", "minimum": 0}
+          }
+        },
+        "positive_count": {"type": "integer", "minimum": 0},
+        "negative_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "endpoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "positive_categories", "negative_categories", "transformed_semantics", "physical_failure_semantics", "poor_refinement_semantics"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "positive_categories": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "negative_categories": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "transformed_semantics": {"type": "string", "minLength": 1},
+        "physical_failure_semantics": {"type": "string", "minLength": 1},
+        "poor_refinement_semantics": {"type": "string", "minLength": 1}
+      }
+    },
+    "thermal_metadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["use_recorded_dwell_field", "warning", "paper_dwell_rule", "audit_policy"],
+      "properties": {
+        "use_recorded_dwell_field": {"type": "string", "minLength": 1},
+        "warning": {"type": "string", "minLength": 1},
+        "paper_dwell_rule": {"type": "string", "minLength": 1},
+        "audit_policy": {"type": "string", "minLength": 1}
+      }
+    },
+    "claim_ceiling": {"type": "string", "minLength": 1}
+  }
+}

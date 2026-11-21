@@ -15,6 +15,9 @@ on:
       - "data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json"
       - "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json"
       - "data/schemas/superconductivity_onset_prediction_v0_1.schema.json"
+      - "data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json"
+      - "data/research/precursor_genome_graph_benchmark_v0_1.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome_graph/README.md"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
@@ -33,6 +36,9 @@ on:
       - "data/schemas/superconductivity_spatial_reaction_diffusion_v0_1.schema.json"
       - "data/schemas/superconductivity_transport_kinetic_selectivity_v0_1.schema.json"
       - "data/schemas/superconductivity_onset_prediction_v0_1.schema.json"
+      - "data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json"
+      - "data/research/precursor_genome_graph_benchmark_v0_1.json"
+      - "research/superconductivity/capability_experiment_planning/precursor_genome_graph/README.md"
       - "tools/superconductivity-discovery-harness/fixtures/thermochemical_network_*.json"
       - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
       - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
@@ -73,6 +79,7 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/transport_kinetic_selectivity_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/spatial_reaction_diffusion_audit.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -106,6 +113,9 @@ jobs:
 
       - name: Test censoring-aware onset prediction evaluation
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit
+
+      - name: Test pinned Precursor Genome graph and cohort audit
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit
 
       - name: Run metrics runner on synthetic plumbing fixture
         run: |
@@ -183,6 +193,21 @@ jobs:
             --out "$RUNNER_TEMP/sc-onset-prediction-smoke.json"
           cat "$RUNNER_TEMP/sc-onset-prediction-smoke.json"
 
+      - name: Download pinned Precursor Genome ledger
+        run: |
+          mkdir -p "$RUNNER_TEMP/precursor-genome"
+          curl --fail --location --silent --show-error --retry 3 \
+            "https://raw.githubusercontent.com/lauren-walters/precursor-genome/78cb026aa6c9b53aa0ec26ea5611d523bc3c320a/ledger_precursor_genome.json" \
+            --output "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
+
+      - name: Verify Precursor Genome source identity and cohort
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit -- \
+            --manifest data/research/precursor_genome_graph_benchmark_v0_1.json \
+            --manifest-schema data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json \
+            --ledger "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json" \
+            --out "$RUNNER_TEMP/precursor-genome/graph-audit-receipt.json"
+          jq '{status, contract, benchmark_id, source: {repository: .source.repository, commit: .source.commit, ledger_bytes: .source.ledger_bytes, ledger_git_blob_sha1: .source.ledger_git_blob_sha1}, pair_graph: {precursor_count: .pair_graph.precursor_count, unique_unordered_pair_count: .pair_graph.unique_unordered_pair_count, complete_undirected_graph: .pair_graph.complete_undirected_graph, expected_degree: .pair_graph.expected_degree, per_precursor_reactivity_summary: .pair_graph.per_precursor_reactivity_summary}, cohort, sample_record_count: (.sample_records | length), validation_protocols: {leave_one_precursor_out: {fold_count: .validation_protocols.leave_one_precursor_out.fold_count, train_edges_per_fold: .validation_protocols.leave_one_precursor_out.training_edge_count_per_fold, test_edges_per_fold: .validation_protocols.leave_one_precursor_out.test_edge_count_per_fold}, double_node_holdout: {fold_count: .validation_protocols.double_node_holdout.fold_count, train_edges_per_fold: .validation_protocols.double_node_holdout.training_edge_count_per_fold, test_edges_per_fold: .validation_protocols.double_node_holdout.test_edge_count_per_fold}}, quality_and_thermal_diagnostics}' "$RUNNER_TEMP/precursor-genome/graph-audit-receipt.json"
       - name: Verify unbalanced reaction negative control is rejected
         run: |
           set +e
@@ -247,6 +272,7 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_transport_kinetic_selectivity_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_spatial_reaction_diffusion_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_onset_prediction_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_precursor_genome_graph_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -289,6 +315,10 @@ jobs:
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_smoke_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/onset_prediction_suite_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
+            sha256sum data/research/precursor_genome_graph_benchmark_v0_1.json
+            sha256sum data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
+            sha256sum "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
@@ -317,6 +347,8 @@ jobs:
             ${{ runner.temp }}/sc-transport-kinetic-smoke.json
             ${{ runner.temp }}/sc-spatial-reaction-diffusion-smoke.json
             ${{ runner.temp }}/sc-onset-prediction-smoke.json
+            ${{ runner.temp }}/precursor-genome/graph-audit-receipt.json
+            ${{ runner.temp }}/precursor-genome/ledger_precursor_genome.json
             ${{ runner.temp }}/sc-thermochemical-unbalanced-negative.log
             ${{ runner.temp }}/sc-thermochemical-charge-negative.log
             ${{ runner.temp }}/sc-thermochemical-disconnected-negative.log
