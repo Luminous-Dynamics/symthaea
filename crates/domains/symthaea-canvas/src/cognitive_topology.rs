@@ -680,6 +680,16 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_fixture_matches_the_reference_topology() {
+        let checked_in: CognitiveTopology = serde_json::from_str(include_str!(
+            "../tests/fixtures/cognitive_topology_v1.json"
+        ))
+        .expect("checked-in cognitive topology fixture must deserialize");
+        assert_eq!(checked_in, fixture());
+        checked_in.validate().expect("checked-in fixture must validate");
+    }
+
+    #[test]
     fn fixture_has_retrieval_competing_associations_and_unresolved_prediction() {
         let topology = fixture();
         topology.validate().expect("fixture must be valid");
@@ -719,7 +729,7 @@ mod tests {
     }
 
     #[test]
-    fn dangling_endpoints_and_renderer_local_provenance_are_not_admitted() {
+    fn dangling_endpoints_are_not_admitted() {
         let mut topology = fixture();
         topology.edges[0].target = "missing-node".to_string();
         assert_eq!(
