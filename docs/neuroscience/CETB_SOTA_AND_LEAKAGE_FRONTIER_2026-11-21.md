@@ -14,7 +14,7 @@ Bryant and Whyte (2026), DOI 10.1093/nc/niag029, compared 246 retained statistic
 
 ### Precision-fMRI data sufficiency
 
-The 2026 *Neuron* Network Similarity Index (NSI), DOI 10.1016/j.neuron.2026.05.020, provides an objective readout of recoverable large-scale network structure and aligns with blinded expert judgements of precision-fMRI map usability. It addresses data sufficiency and quality at an individual level; it is complementary to, not interchangeable with, test–retest reliability or RCAF state-contrast repeatability.
+The 2026 *Neuron* Network Similarity Index (NSI), DOI 10.1016/j.neuron.2026.05.020, provides an objective readout of recoverable large-scale network structure and aligns with blinded expert judgements of precision-fMRI map usability. The authors' public [PFM-NSI tool](https://github.com/cjl2007/pfm-nsi) supplies Python and MATLAB implementations, a usability projection and an optional reliability projection. CETB should reuse it for compatible precision-fMRI data rather than clone it. Its reliability projection remains distinct from directly observed test–retest reliability. NSI addresses data sufficiency and quality at an individual level; it is complementary to, not interchangeable with, RCAF state-contrast repeatability.
 
 ### External validation
 
