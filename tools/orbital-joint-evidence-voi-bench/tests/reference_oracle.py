@@ -245,9 +245,15 @@ def audit_scenario(scenario):
             raise ValueError("computed selection differs from abstention oracle")
         if not scenario["expected"]["abstain"]:
             raise ValueError("abstention sentinel must set abstain")
-        if any(r["eligible"] and r["value"] is not None and r["value"] > TOL
-               for r in audits.values()):
+        has_positive_value = any(
+            result["eligible"] and result["value"] is not None and result["value"] > TOL
+            for result in audits.values()
+        )
+        if has_positive_value and selection_disposition != "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE":
             raise ValueError("abstention hides positive-value eligible action")
+        if (not has_positive_value
+                and selection_disposition != "ABSTAIN_NO_DECISION_VALUE"):
+            raise ValueError("no-value abstention has inconsistent disposition")
         expected_post = (scenario["expected"].get("post_action_worst_case_regret")
                          if regime == "distribution_free"
                          else scenario["expected"].get("post_action_expected_loss"))
@@ -319,7 +325,7 @@ def main():
         "scenarios": results,
     }
     print(json.dumps(report, sort_keys=True, indent=2))
-    if len(results) != 13 or matches != 13:
+    if len(results) != 14 or matches != 14:
         raise SystemExit(1)
 
 
