@@ -110,7 +110,13 @@
         "global_common_mode",
         "snr_change"
       ],
-      "description": "Shared nuisance and signal-to-noise change without a latent network change."
+      "description": "Shared nuisance and signal-to-noise change without a latent network change.",
+      "dose_points": [
+        0,
+        0.1,
+        0.2,
+        0.3
+      ]
     },
     {
       "scenario_id": "site-shift-null",
@@ -173,6 +179,7 @@
     "interval_width",
     "dose_response",
     "nuisance_false_positives",
+    "nuisance_only_rejection_rate",
     "heterogeneity_recovery",
     "site_transportability",
     "independent_cohort_transportability",
