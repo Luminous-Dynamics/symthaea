@@ -382,3 +382,19 @@ This benchmark constitution does not:
 11. KLA, [FY2025 filing](https://www.sec.gov/Archives/edgar/data/319201/000031920126000008/klac-20251231.htm).
 12. IEEE CEDA, [First Commercial Benchmarking — Siemens EDA](https://github.com/ieee-ceda-datc/First-Commercial-Benchmarking-SiemensEDA).
 13. NIST, [Digital twin research and manufacturing VVUQ challenges](https://doi.org/10.6028/NIST.IR.8620).
+
+
+## Current 2026 baseline and source-register updates
+
+The follow-on literature review is in [2026-baseline-review.md](2026-baseline-review.md). Two recent anchors materially affect the benchmark protocol:
+
+- **SECOM:** Park & Baek (24 June 2026) report a supplementary SECOM PR-AUC result of 0.2207 for LightGBM with zero-imputed features. Their 60/20/20 stratified experiment had only 21 fail examples in validation and test; a validation-selected precision-at-least-0.90 threshold produced zero test recall. This is a useful reproduction anchor, not a broad fab-transfer claim.
+- **WM-811K:** Song et al. (31 March 2026) report PSS-HNet Macro-F1 0.9098 ± 0.0008 and Macro-recall 0.8954 ± 0.0034 under an 80/20 stratified sample-level split. Their iFormer baseline Macro-F1 is 0.9044 ± 0.0010. They identify cross-dataset/process-condition generalization and batch-latency variability as remaining work.
+
+The current source and rights register is [data-source-register-v0.1.json](data-source-register-v0.1.json). It distinguishes metadata verification from an exact downloaded dataset snapshot, and leaves exact file digests null until acquisition is completed. Raw datasets are not checked in.
+
+## Executable reference evaluator
+
+The test-only independent binary metric reference scorer is in `../../benchmarks/semi-bench-001/reference/`. It freezes threshold metrics, average precision, ROC AUC, Brier score, fixed-bin ECE, FPR at target recall and tie-grouped risk-coverage semantics. Eleven local unit tests passed; the path-filtered GitHub Actions workflow is `.github/workflows/semi-bench-reference.yml`.
+
+The Python code is an independent test/reference oracle only. The production implementation remains Rust-first. Synthetic known-answer results are not empirical SECOM or wafer-map results.
