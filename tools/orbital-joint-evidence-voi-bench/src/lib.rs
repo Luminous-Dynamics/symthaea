@@ -264,7 +264,10 @@ fn decision_regret(
 fn minimax_regret(scenario: &Scenario) -> Result<f64, String> {
     let decisions: Vec<String> = scenario.loss_matrix.keys().cloned().collect();
     if decisions.len() < 2 || scenario.states.len() < 2 {
-        return Err(format!("{} must have at least two decisions and states", scenario.scenario_id));
+        return Err(format!(
+            "{} must have at least two decisions and states",
+            scenario.scenario_id
+        ));
     }
     let mut best_worst = f64::INFINITY;
     for decision in &decisions {
@@ -283,10 +286,7 @@ fn minimax_regret(scenario: &Scenario) -> Result<f64, String> {
     Ok(best_worst)
 }
 
-fn post_action_minimax_regret(
-    scenario: &Scenario,
-    action: &Action,
-) -> Result<f64, String> {
+fn post_action_minimax_regret(scenario: &Scenario, action: &Action) -> Result<f64, String> {
     let decisions: Vec<String> = scenario.loss_matrix.keys().cloned().collect();
     let mut groups = BTreeMap::<String, Vec<String>>::new();
     for state in &scenario.states {
@@ -320,10 +320,7 @@ fn post_action_minimax_regret(
     Ok(worst_group_regret)
 }
 
-fn expected_loss(
-    scenario: &Scenario,
-    prior: &BTreeMap<String, f64>,
-) -> Result<f64, String> {
+fn expected_loss(scenario: &Scenario, prior: &BTreeMap<String, f64>) -> Result<f64, String> {
     let decisions: Vec<String> = scenario.loss_matrix.keys().cloned().collect();
     decisions
         .iter()
@@ -332,17 +329,21 @@ fn expected_loss(
                 .states
                 .iter()
                 .map(|state| {
-                    let probability = *prior
-                        .get(state)
-                        .ok_or_else(|| format!("{} prior missing state {state}", scenario.scenario_id))?;
+                    let probability = *prior.get(state).ok_or_else(|| {
+                        format!("{} prior missing state {state}", scenario.scenario_id)
+                    })?;
                     let loss = *scenario
                         .loss_matrix
                         .get(decision)
                         .and_then(|row| row.get(state))
-                        .ok_or_else(|| format!("{} loss missing {decision}/{state}", scenario.scenario_id))?;
+                        .ok_or_else(|| {
+                            format!("{} loss missing {decision}/{state}", scenario.scenario_id)
+                        })?;
                     Ok(probability * loss)
                 })
-                .try_fold(0.0, |sum, value: Result<f64, String>| value.map(|v| sum + v))
+                .try_fold(0.0, |sum, value: Result<f64, String>| {
+                    value.map(|v| sum + v)
+                })
         })
         .collect::<Result<Vec<_>, _>>()
         .map(|values| values.into_iter().fold(f64::INFINITY, f64::min))
@@ -372,8 +373,7 @@ fn expected_post_action_loss(
             if !likelihood.is_finite() || *likelihood < 0.0 {
                 return Err(format!("{} has invalid likelihood", scenario.scenario_id));
             }
-            *outcome_probabilities.entry(outcome.clone()).or_default() +=
-                probability * likelihood;
+            *outcome_probabilities.entry(outcome.clone()).or_default() += probability * likelihood;
         }
     }
 
@@ -386,25 +386,38 @@ fn expected_post_action_loss(
         for state in &scenario.states {
             let prior_probability = prior[state];
             let likelihood = likelihoods[state].get(&outcome).copied().unwrap_or(0.0);
-            posterior.insert(state.clone(), prior_probability * likelihood / marginal_probability);
+            posterior.insert(
+                state.clone(),
+                prior_probability * likelihood / marginal_probability,
+            );
         }
         expected += marginal_probability * expected_loss(scenario, &posterior)?;
     }
     Ok(expected)
 }
 
-fn parse_likelihoods(action: &Action) -> Result<Option<BTreeMap<String, BTreeMap<String, f64>>>, String> {
+fn parse_likelihoods(
+    action: &Action,
+) -> Result<Option<BTreeMap<String, BTreeMap<String, f64>>>, String> {
     let Some(value) = action.metadata.get("observation_likelihoods") else {
         return Ok(None);
     };
     serde_json::from_value(value.clone())
         .map(Some)
-        .map_err(|error| format!("{} observation_likelihoods invalid: {error}", action.action_id))
+        .map_err(|error| {
+            format!(
+                "{} observation_likelihoods invalid: {error}",
+                action.action_id
+            )
+        })
 }
 
 fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     if scenario.claim_ceiling != CLAIM_CEILING || scenario.evidence_class != "synthetic" {
-        return Err(format!("{} has unsupported evidence class or claim ceiling", scenario.scenario_id));
+        return Err(format!(
+            "{} has unsupported evidence class or claim ceiling",
+            scenario.scenario_id
+        ));
     }
     if scenario.scenario_id.trim().is_empty()
         || scenario.target_claim_id.trim().is_empty()
@@ -412,60 +425,106 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         || scenario.actions.is_empty()
         || scenario.current_evidence_refs.is_empty()
     {
-        return Err(format!("{} is missing required scenario identity or content", scenario.scenario_id));
+        return Err(format!(
+            "{} is missing required scenario identity or content",
+            scenario.scenario_id
+        ));
     }
     let states: BTreeSet<&str> = scenario.states.iter().map(String::as_str).collect();
     if states.len() != scenario.states.len() {
-        return Err(format!("{} has duplicate hidden states", scenario.scenario_id));
+        return Err(format!(
+            "{} has duplicate hidden states",
+            scenario.scenario_id
+        ));
     }
     if !valid_resources(&scenario.budget) {
         return Err(format!("{} has invalid budget", scenario.scenario_id));
     }
     let decisions: BTreeSet<&str> = scenario.loss_matrix.keys().map(String::as_str).collect();
     if decisions.len() < 2 {
-        return Err(format!("{} has fewer than two decisions", scenario.scenario_id));
+        return Err(format!(
+            "{} has fewer than two decisions",
+            scenario.scenario_id
+        ));
     }
     for (decision, row) in &scenario.loss_matrix {
         if row.len() != states.len()
             || row.keys().any(|state| !states.contains(state.as_str()))
             || row.values().any(|loss| !loss.is_finite() || *loss < 0.0)
         {
-            return Err(format!("{} loss row {decision} is incomplete or invalid", scenario.scenario_id));
+            return Err(format!(
+                "{} loss row {decision} is incomplete or invalid",
+                scenario.scenario_id
+            ));
         }
     }
-    if scenario.current_evidence_refs.iter().collect::<BTreeSet<_>>().len()
+    if scenario
+        .current_evidence_refs
+        .iter()
+        .collect::<BTreeSet<_>>()
+        .len()
         != scenario.current_evidence_refs.len()
     {
-        return Err(format!("{} has duplicate current evidence references", scenario.scenario_id));
+        return Err(format!(
+            "{} has duplicate current evidence references",
+            scenario.scenario_id
+        ));
     }
-    if scenario.current_evidence_dependency_groups.keys().any(|key| {
-        !scenario.current_evidence_refs.iter().any(|reference| reference == key)
-    }) {
-        return Err(format!("{} has dependency groups for unknown evidence refs", scenario.scenario_id));
+    if scenario
+        .current_evidence_dependency_groups
+        .keys()
+        .any(|key| {
+            !scenario
+                .current_evidence_refs
+                .iter()
+                .any(|reference| reference == key)
+        })
+    {
+        return Err(format!(
+            "{} has dependency groups for unknown evidence refs",
+            scenario.scenario_id
+        ));
     }
 
     match scenario.decision_regime.as_str() {
         "distribution_free" => {
             if scenario.prior.is_some() {
-                return Err(format!("{} distribution-free regime must not contain a prior", scenario.scenario_id));
+                return Err(format!(
+                    "{} distribution-free regime must not contain a prior",
+                    scenario.scenario_id
+                ));
             }
         }
         "calibrated_probability" => {
             let prior = scenario.prior.as_ref().ok_or_else(|| {
-                format!("{} calibrated-probability regime requires an explicit prior", scenario.scenario_id)
+                format!(
+                    "{} calibrated-probability regime requires an explicit prior",
+                    scenario.scenario_id
+                )
             })?;
             if prior.len() != states.len()
                 || prior.keys().any(|state| !states.contains(state.as_str()))
                 || prior.values().any(|p| !p.is_finite() || *p <= 0.0)
             {
-                return Err(format!("{} has invalid prior coverage or probabilities", scenario.scenario_id));
+                return Err(format!(
+                    "{} has invalid prior coverage or probabilities",
+                    scenario.scenario_id
+                ));
             }
             let total: f64 = prior.values().sum();
             if (total - 1.0).abs() > 1.0e-9 {
-                return Err(format!("{} prior probabilities do not sum to one", scenario.scenario_id));
+                return Err(format!(
+                    "{} prior probabilities do not sum to one",
+                    scenario.scenario_id
+                ));
             }
         }
-        _ => return Err(format!("{} has an unknown decision regime", scenario.scenario_id)),
+        _ => {
+            return Err(format!(
+                "{} has an unknown decision regime",
+                scenario.scenario_id
+            ));
+        }
     }
 
     let baseline = if scenario.decision_regime == "distribution_free" {
@@ -476,17 +535,29 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     if scenario.decision_regime == "distribution_free" {
         if let Some(expected) = scenario.expected.baseline_minimax_regret {
             if (baseline - expected).abs() > 1.0e-9 {
-                return Err(format!("{} baseline minimax regret differs from oracle", scenario.scenario_id));
+                return Err(format!(
+                    "{} baseline minimax regret differs from oracle",
+                    scenario.scenario_id
+                ));
             }
         } else {
-            return Err(format!("{} distribution-free oracle is missing baseline regret", scenario.scenario_id));
+            return Err(format!(
+                "{} distribution-free oracle is missing baseline regret",
+                scenario.scenario_id
+            ));
         }
     } else if let Some(expected) = scenario.expected.baseline_expected_loss {
         if (baseline - expected).abs() > 1.0e-9 {
-            return Err(format!("{} baseline expected loss differs from oracle", scenario.scenario_id));
+            return Err(format!(
+                "{} baseline expected loss differs from oracle",
+                scenario.scenario_id
+            ));
         }
     } else {
-        return Err(format!("{} calibrated-probability oracle is missing baseline expected loss", scenario.scenario_id));
+        return Err(format!(
+            "{} calibrated-probability oracle is missing baseline expected loss",
+            scenario.scenario_id
+        ));
     }
 
     let mut action_ids = BTreeSet::new();
@@ -497,7 +568,10 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
 
     for action in &scenario.actions {
         if action.action_id.trim().is_empty() || !action_ids.insert(action.action_id.as_str()) {
-            return Err(format!("{} has empty or duplicate action IDs", scenario.scenario_id));
+            return Err(format!(
+                "{} has empty or duplicate action IDs",
+                scenario.scenario_id
+            ));
         }
         for identity in [
             &action.action_class,
@@ -509,33 +583,61 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             &action.method_ref,
         ] {
             if identity.trim().is_empty() {
-                return Err(format!("{} / {} has empty action identity", scenario.scenario_id, action.action_id));
+                return Err(format!(
+                    "{} / {} has empty action identity",
+                    scenario.scenario_id, action.action_id
+                ));
             }
         }
         if !valid_resources(&action.resources) {
-            return Err(format!("{} / {} has invalid resource vector", scenario.scenario_id, action.action_id));
+            return Err(format!(
+                "{} / {} has invalid resource vector",
+                scenario.scenario_id, action.action_id
+            ));
         }
         let budget_fits = fits_budget(&action.resources, &scenario.budget);
         if !budget_fits {
             budget_blocked_count += 1;
         }
-        if !scenario.states.iter().all(|state| action.observation_by_state.contains_key(state))
+        if !scenario
+            .states
+            .iter()
+            .all(|state| action.observation_by_state.contains_key(state))
             || action.observation_by_state.len() != states.len()
         {
-            return Err(format!("{} / {} observation map does not cover exact state set", scenario.scenario_id, action.action_id));
+            return Err(format!(
+                "{} / {} observation map does not cover exact state set",
+                scenario.scenario_id, action.action_id
+            ));
         }
         if action.dependencies.iter().collect::<BTreeSet<_>>().len() != action.dependencies.len() {
-            return Err(format!("{} / {} has duplicate dependency labels", scenario.scenario_id, action.action_id));
+            return Err(format!(
+                "{} / {} has duplicate dependency labels",
+                scenario.scenario_id, action.action_id
+            ));
         }
         match action.admissibility.state.as_str() {
             "ADMISSIBLE" if !action.admissibility.reason_codes.is_empty() => {
-                return Err(format!("{} / {} admissible action has blocking reason codes", scenario.scenario_id, action.action_id));
+                return Err(format!(
+                    "{} / {} admissible action has blocking reason codes",
+                    scenario.scenario_id, action.action_id
+                ));
             }
-            "INADMISSIBLE" | "SOURCE_SCALE_ONLY" if action.admissibility.reason_codes.is_empty() => {
-                return Err(format!("{} / {} blocked/source-scale-only action lacks reason codes", scenario.scenario_id, action.action_id));
+            "INADMISSIBLE" | "SOURCE_SCALE_ONLY"
+                if action.admissibility.reason_codes.is_empty() =>
+            {
+                return Err(format!(
+                    "{} / {} blocked/source-scale-only action lacks reason codes",
+                    scenario.scenario_id, action.action_id
+                ));
             }
             "ADMISSIBLE" | "INADMISSIBLE" | "SOURCE_SCALE_ONLY" => {}
-            _ => return Err(format!("{} / {} has unknown admissibility state", scenario.scenario_id, action.action_id)),
+            _ => {
+                return Err(format!(
+                    "{} / {} has unknown admissibility state",
+                    scenario.scenario_id, action.action_id
+                ));
+            }
         }
         let target_claim_matches = action.target_claim_id == scenario.target_claim_id;
         let common_cause_conflict = !action_is_independent(scenario, action);
@@ -562,7 +664,8 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             && action.admissibility.state == "ADMISSIBLE"
         {
             if metadata_string(action, "probability_model_ref").is_none()
-                || metadata_string(action, "calibration_status") != Some("calibrated_for_fixture_only")
+                || metadata_string(action, "calibration_status")
+                    != Some("calibrated_for_fixture_only")
             {
                 reasons.push("PROBABILITY_MODEL_UNCALIBRATED".to_owned());
             }
@@ -572,7 +675,8 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
 
         let probability_model_calibrated = scenario.decision_regime != "calibrated_probability"
             || (metadata_string(action, "probability_model_ref").is_some()
-                && metadata_string(action, "calibration_status") == Some("calibrated_for_fixture_only"));
+                && metadata_string(action, "calibration_status")
+                    == Some("calibrated_for_fixture_only"));
         let policy_eligible = action.admissibility.state == "ADMISSIBLE"
             && budget_fits
             && target_claim_matches
@@ -641,8 +745,14 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
 
     audits.sort_by(|left, right| left.action_id.cmp(&right.action_id));
     let expected_action_id = scenario.expected.best_action_id.clone();
-    let expected_action_eligible = eligible_by_id.get(&expected_action_id).copied().unwrap_or(false);
-    let expected_action_value = action_value_by_id.get(&expected_action_id).copied().flatten();
+    let expected_action_eligible = eligible_by_id
+        .get(&expected_action_id)
+        .copied()
+        .unwrap_or(false);
+    let expected_action_value = action_value_by_id
+        .get(&expected_action_id)
+        .copied()
+        .flatten();
     let abstain_correct = if scenario.expected.abstain {
         audits.iter().all(|action| {
             !action.policy_eligible
@@ -656,9 +766,15 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
 
     for must_not_select in &scenario.expected.must_not_select {
         if !action_ids.contains(must_not_select.as_str()) {
-            return Err(format!("{} must_not_select references unknown action {must_not_select}", scenario.scenario_id));
+            return Err(format!(
+                "{} must_not_select references unknown action {must_not_select}",
+                scenario.scenario_id
+            ));
         }
-        let eligible = eligible_by_id.get(must_not_select).copied().unwrap_or(false);
+        let eligible = eligible_by_id
+            .get(must_not_select)
+            .copied()
+            .unwrap_or(false);
         let value = action_value_by_id.get(must_not_select).copied().flatten();
         if eligible && value.is_some_and(|score| score > EPSILON) {
             return Err(format!(
@@ -671,13 +787,22 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     let expected_action_is_sentinel = matches!(expected_action_id.as_str(), "ABSTAIN")
         || expected_action_id.starts_with("REPLAN-");
     if !expected_action_is_sentinel && !expected_action_eligible {
-        return Err(format!("{} expected action is not eligible", scenario.scenario_id));
+        return Err(format!(
+            "{} expected action is not eligible",
+            scenario.scenario_id
+        ));
     }
     if expected_action_is_sentinel && !scenario.expected.abstain {
-        return Err(format!("{} sentinel action must set abstain=true", scenario.scenario_id));
+        return Err(format!(
+            "{} sentinel action must set abstain=true",
+            scenario.scenario_id
+        ));
     }
     if scenario.expected.abstain && !abstain_correct {
-        return Err(format!("{} abstention is not supported by action-value audit", scenario.scenario_id));
+        return Err(format!(
+            "{} abstention is not supported by action-value audit",
+            scenario.scenario_id
+        ));
     }
 
     let best_action_post = if scenario.decision_regime == "distribution_free" {
@@ -688,17 +813,26 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     if let Some(expected_post) = best_action_post {
         if expected_action_is_sentinel {
             if (expected_post - baseline).abs() > 1.0e-9 {
-                return Err(format!("{} abstention expected post score differs from baseline", scenario.scenario_id));
+                return Err(format!(
+                    "{} abstention expected post score differs from baseline",
+                    scenario.scenario_id
+                ));
             }
         } else if expected_action_value.is_none() {
-            return Err(format!("{} expected action has no computed decision value", scenario.scenario_id));
+            return Err(format!(
+                "{} expected action has no computed decision value",
+                scenario.scenario_id
+            ));
         } else if let Some(actual_post) = audits
             .iter()
             .find(|audit| audit.action_id == expected_action_id)
             .and_then(|audit| audit.post_action_regret_or_loss)
         {
             if (actual_post - expected_post).abs() > 1.0e-9 {
-                return Err(format!("{} expected post-action score differs from oracle", scenario.scenario_id));
+                return Err(format!(
+                    "{} expected post-action score differs from oracle",
+                    scenario.scenario_id
+                ));
             }
         }
     }
@@ -706,7 +840,10 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     if scenario.decision_regime == "calibrated_probability" {
         if let Some(expected_evsi) = scenario.expected.evsi {
             if expected_action_value.is_none_or(|value| (value - expected_evsi).abs() > 1.0e-9) {
-                return Err(format!("{} EVSI differs from independent one-step oracle", scenario.scenario_id));
+                return Err(format!(
+                    "{} EVSI differs from independent one-step oracle",
+                    scenario.scenario_id
+                ));
             }
         }
     }
@@ -745,7 +882,9 @@ pub fn run_audit(input: &[u8], source_commit: &str) -> Result<Receipt, String> {
         || corpus.evidence_class != "synthetic"
         || corpus.claim_ceiling != CLAIM_CEILING
     {
-        return Err("unsupported corpus schema, benchmark ID, evidence class or claim ceiling".to_owned());
+        return Err(
+            "unsupported corpus schema, benchmark ID, evidence class or claim ceiling".to_owned(),
+        );
     }
     if corpus.resource_dimensions.is_empty()
         || corpus.policies_to_compare.is_empty()
@@ -762,7 +901,10 @@ pub fn run_audit(input: &[u8], source_commit: &str) -> Result<Receipt, String> {
         scenario_audits.push(validate_scenario(scenario)?);
     }
     scenario_audits.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
-    let oracle_matches = scenario_audits.iter().filter(|audit| audit.oracle_matched).count();
+    let oracle_matches = scenario_audits
+        .iter()
+        .filter(|audit| audit.oracle_matched)
+        .count();
     let oracle_mismatches = scenario_audits.len() - oracle_matches;
     let admissible_action_count = scenario_audits
         .iter()
@@ -800,7 +942,8 @@ pub fn run_audit(input: &[u8], source_commit: &str) -> Result<Receipt, String> {
 mod tests {
     use super::*;
 
-    const FIXTURE: &[u8] = include_bytes!("../fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json");
+    const FIXTURE: &[u8] =
+        include_bytes!("../fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json");
     const SOURCE: &str = "0123456789abcdef0123456789abcdef01234567";
 
     #[test]
@@ -820,10 +963,22 @@ mod tests {
     #[test]
     fn robust_value_distinguishes_relevant_from_irrelevant_actions() {
         let receipt = run_audit(FIXTURE, SOURCE).unwrap();
-        let first = receipt.scenarios.iter().find(|case| case.scenario_id == "JEV-001").unwrap();
+        let first = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-001")
+            .unwrap();
         assert_eq!(first.expected_action_id, "A-COUPON-INTERACTION");
-        let coupon = first.actions.iter().find(|action| action.action_id == "A-COUPON-INTERACTION").unwrap();
-        let mass = first.actions.iter().find(|action| action.action_id == "A-MASS-ONLY").unwrap();
+        let coupon = first
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-COUPON-INTERACTION")
+            .unwrap();
+        let mass = first
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-MASS-ONLY")
+            .unwrap();
         assert_eq!(coupon.decision_value_improvement, Some(5.0));
         assert_eq!(mass.decision_value_improvement, Some(0.0));
     }
@@ -831,7 +986,11 @@ mod tests {
     #[test]
     fn calibrated_evsi_uses_explicit_prior_and_likelihoods() {
         let receipt = run_audit(FIXTURE, SOURCE).unwrap();
-        let case = receipt.scenarios.iter().find(|case| case.scenario_id == "JEV-002").unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-002")
+            .unwrap();
         assert!((case.baseline_regret_or_loss - 4.5).abs() < 1.0e-12);
         assert_eq!(case.expected_action_value, Some(4.5));
     }
@@ -839,7 +998,11 @@ mod tests {
     #[test]
     fn no_information_control_requires_abstention() {
         let receipt = run_audit(FIXTURE, SOURCE).unwrap();
-        let case = receipt.scenarios.iter().find(|case| case.scenario_id == "JEV-003").unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-003")
+            .unwrap();
         assert!(case.abstention_correct);
         assert_eq!(case.eligible_action_count, 1);
     }
@@ -847,7 +1010,11 @@ mod tests {
     #[test]
     fn over_budget_action_is_never_policy_eligible() {
         let receipt = run_audit(FIXTURE, SOURCE).unwrap();
-        let case = receipt.scenarios.iter().find(|case| case.scenario_id == "JEV-004").unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-004")
+            .unwrap();
         assert_eq!(case.eligible_action_count, 0);
         assert_eq!(case.budget_blocked_count, 1);
     }
@@ -855,9 +1022,21 @@ mod tests {
     #[test]
     fn serialized_article_and_lifecycle_obligations_are_not_conflated() {
         let receipt = run_audit(FIXTURE, SOURCE).unwrap();
-        let case = receipt.scenarios.iter().find(|case| case.scenario_id == "JEV-010").unwrap();
-        let repeated = case.actions.iter().find(|action| action.action_id == "A-REPEATED-MATING-WEAR").unwrap();
-        let first = case.actions.iter().find(|action| action.action_id == "A-FIRST-CYCLE-ONLY").unwrap();
+        let case = receipt
+            .scenarios
+            .iter()
+            .find(|case| case.scenario_id == "JEV-010")
+            .unwrap();
+        let repeated = case
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-REPEATED-MATING-WEAR")
+            .unwrap();
+        let first = case
+            .actions
+            .iter()
+            .find(|action| action.action_id == "A-FIRST-CYCLE-ONLY")
+            .unwrap();
         assert!(repeated.policy_eligible);
         assert!(!first.policy_eligible);
     }
