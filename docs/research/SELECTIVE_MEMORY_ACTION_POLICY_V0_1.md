@@ -78,6 +78,31 @@ The policy must track both:
 
 An agent that eventually abstains after wasting its budget or causing a side effect is not equivalent to one that stops before the harmful action. A memory that was correct yesterday may be invalid today while remaining correct in a historical as-known query.
 
+### Decision-freshness fence: correct when consumed, not merely when retrieved
+
+Compose with [#13091 — decision freshness, correctness-at-use and deadline tails](https://github.com/Luminous-Dynamics/symthaea/issues/13091), [#9954 — common irregular temporal decision benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/9954), and [#12401 — HDC-LTC time-input validity](https://github.com/Luminous-Dynamics/symthaea/issues/12401). These owners retain canonical timestamp semantics, event/availability-time replay and freshness metrics. This policy does not add another clock authority.
+
+A memory may be admissible at retrieval and stale by the time an action consumes it. Therefore:
+
+- Measure the age of the exact evidence supporting the decision **at actual consumption**. Do not substitute retrieval time or response-emission time.
+- Compare the age to a frozen, task-specific maximum-age budget.
+- Check whether the decision is consumed before its task deadline.
+- Unknown age, unknown age budget or unknown deadline slack means the `use` action is not qualified. Prefer authorized verification, clarification, a bounded probe or abstention according to the expected-loss policy.
+- Preserve historical valid-time/known-time queries; a current freshness failure must not rewrite what was known at an earlier snapshot.
+
+Use established terminology accurately: Age of Information (AoI), Query AoI (QAoI), Age of Incorrect Information (AoII) and deviation-of-information are existing research concepts. The Symthaea extension is their use in evidence-qualified agent decisions, coupled to memory action choice, source-bound receipts and downstream decision utility—not a claim to invent a new freshness metric. See [#13091](https://github.com/Luminous-Dynamics/symthaea/issues/13091) for its source literature and EdgePace comparator.
+
+The result vector must keep these cases separate:
+1. fresh and correct at use;
+2. fresh but incorrect;
+3. correct but stale at use;
+4. fresh/correct but consumed after the task deadline;
+5. abstained, late, missing or unserved.
+
+Do not collapse them into answer accuracy or mean latency. Report QAoI-style evidence age at use, freshness-validity coverage, fresh-correct-on-time opportunity coverage, deadline misses/tails, and AoII-style wrong-belief exposure only where an independent truth trajectory and loss function support it.
+
+The research Rust selector now accepts `FreshnessAtUse`: age-at-use, maximum age and signed deadline slack are supplied as already-canonical durations by upstream time/evidence owners. Every value is optional; unknown values fail closed. `use` is excluded when age exceeds the budget or deadline slack is negative. The crate does not read wall clocks or infer freshness from similarity/retrieval time. This is a non-authoritative reference gate, not a replacement for #9954/#12401 or a production receipt verifier.
+
 ### Calibration and selective risk
 
 Use proper scoring rules and selective-risk curves, not confidence alone:
