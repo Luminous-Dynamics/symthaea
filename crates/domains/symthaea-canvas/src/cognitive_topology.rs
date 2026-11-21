@@ -435,14 +435,13 @@ fn validate_evidence(
     if evidence.sequence == 0 || evidence.sequence > last_sequence {
         return Err(CognitiveTopologyError::InvalidSequence);
     }
-    if let Some(digest) = &evidence.trace_digest {
-        if digest.len() != 64
+    if let Some(digest) = &evidence.trace_digest
+        && (digest.len() != 64
             || !digest
                 .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
-            return Err(CognitiveTopologyError::InvalidTraceDigest);
-        }
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+    {
+        return Err(CognitiveTopologyError::InvalidTraceDigest);
     }
 
     let metadata = (
@@ -452,22 +451,21 @@ fn validate_evidence(
         evidence.provenance,
         evidence.trace_digest.clone(),
     );
-    if let Some(previous) = event_metadata.insert(evidence.event_id.clone(), metadata.clone()) {
-        if previous != metadata {
-            return Err(CognitiveTopologyError::ConflictingEventMetadata);
-        }
+    if let Some(previous) = event_metadata.insert(evidence.event_id.clone(), metadata.clone())
+        && previous != metadata
+    {
+        return Err(CognitiveTopologyError::ConflictingEventMetadata);
     }
     if let Some(previous_event) =
         sequence_events.insert(evidence.sequence, evidence.event_id.clone())
+        && previous_event != evidence.event_id
     {
-        if previous_event != evidence.event_id {
-            return Err(CognitiveTopologyError::ConflictingEventMetadata);
-        }
+        return Err(CognitiveTopologyError::ConflictingEventMetadata);
     }
-    if let Some(previous_time) = sequence_times.insert(evidence.sequence, evidence.monotonic_ns) {
-        if previous_time != evidence.monotonic_ns {
-            return Err(CognitiveTopologyError::ConflictingEventMetadata);
-        }
+    if let Some(previous_time) = sequence_times.insert(evidence.sequence, evidence.monotonic_ns)
+        && previous_time != evidence.monotonic_ns
+    {
+        return Err(CognitiveTopologyError::ConflictingEventMetadata);
     }
     Ok(())
 }
