@@ -52,20 +52,44 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            . -> target
-            crates/bridges/symthaea-mycelial-renderer -> target
+            /tmp/mycelial-renderer-validation -> target
 
-      - name: Check canvas formatting
-        run: cargo fmt --manifest-path Cargo.toml --package symthaea-canvas -- --check
+      - name: Assemble isolated validation workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch=/tmp/mycelial-renderer-validation
+          rm -rf "$scratch"
+          mkdir -p "$scratch/crates/domains" "$scratch/crates/bridges"
+          cp -a crates/domains/symthaea-canvas "$scratch/crates/domains/"
+          cp -a crates/bridges/symthaea-mycelial-renderer "$scratch/crates/bridges/"
+          cat > "$scratch/Cargo.toml" <<'EOF'
+          [workspace]
+          resolver = "2"
+          members = [
+              "crates/domains/symthaea-canvas",
+              "crates/bridges/symthaea-mycelial-renderer",
+          ]
+
+          [workspace.package]
+          edition = "2024"
+          license = "AGPL-3.0-or-later"
+
+          [workspace.dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          blake3 = "1.5"
+          EOF
+          cargo generate-lockfile --manifest-path "$scratch/Cargo.toml"
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path /tmp/mycelial-renderer-validation/Cargo.toml --all -- --check
 
       - name: Test renderer-neutral canvas contract
-        run: cargo test --locked --manifest-path Cargo.toml -p symthaea-canvas --all-targets
-
-      - name: Check native adapter formatting
-        run: cargo fmt --manifest-path crates/bridges/symthaea-mycelial-renderer/Cargo.toml --all -- --check
+        run: cargo test --locked --manifest-path /tmp/mycelial-renderer-validation/Cargo.toml -p symthaea-canvas --all-targets
 
       - name: Test isolated Bevy 0.20.1 adapter
-        run: cargo test --manifest-path crates/bridges/symthaea-mycelial-renderer/Cargo.toml --all-targets
+        run: cargo test --locked --manifest-path /tmp/mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets
 
       - name: Clippy isolated Bevy 0.20.1 adapter
-        run: cargo clippy --manifest-path crates/bridges/symthaea-mycelial-renderer/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path /tmp/mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets -- -D warnings
