@@ -755,11 +755,27 @@ mod tests {
                     chance_accuracy: Some(1.0 / fan_in as f64),
                     ..CohortData::default()
                 };
-                for seed in 0..80u64 {
+                for seed in 0..59u64 {
                     data.seed_accuracy.insert(seed, 1.0);
                     data.cohort_ids.insert(format!("seed-{seed}"));
                 }
                 cohorts.insert(key, data);
+            }
+        }
+
+        // 59/59 succeeds for one pointwise interval, but must not qualify a
+        // two-level family after Bonferroni halves alpha (72 are required).
+        let exploratory = analyze(&cohorts, 59).expect("exploratory frontier should analyze");
+        assert!(exploratory.iter().all(|record| match record {
+            OutputRecord::K95(row) => row.qualified_k95.is_none(),
+            OutputRecord::T90(row) => row.qualified_t90_seconds.is_none(),
+            OutputRecord::CohortReliability(_) => true,
+        }));
+
+        for data in cohorts.values_mut() {
+            for seed in 59..80u64 {
+                data.seed_accuracy.insert(seed, 1.0);
+                data.cohort_ids.insert(format!("seed-{seed}"));
             }
         }
 
@@ -787,6 +803,13 @@ mod tests {
 
         assert_eq!(k95, Some(8));
         assert_eq!(t90, Some(2.0));
+        let required = records.iter().find_map(|record| match record {
+            OutputRecord::K95(row) if row.horizon_seconds == 1.0 => {
+                Some(row.minimum_seeds_if_all_pass)
+            }
+            _ => None,
+        });
+        assert_eq!(required, Some(72));
     }
 
     #[test]
