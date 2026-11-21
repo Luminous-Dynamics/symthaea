@@ -170,9 +170,8 @@ fn parse_graph(cohort: &Value) -> Result<Graph, String> {
                     return Err(format!("excluded record {id} must have a null label"));
                 }
                 required_text(row, "exclusion_reason")?;
-                if category_label(&category).is_some() {
-                    return Err(format!("excluded record {id} must not retain an analyzable category"));
-                }
+                // Preserve the upstream category as descriptive source data,
+                // but never map an excluded specimen into the scored endpoint.
                 false
             }
             _ => return Err(format!("record {id} has unsupported cohort_state {state}")),
