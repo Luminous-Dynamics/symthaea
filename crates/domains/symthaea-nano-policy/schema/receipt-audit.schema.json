@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-policy-receipt-audit:v1",
+  "title": "Nano policy structural receipt audit",
+  "description": "Structural consistency result for a raw request/response pair. A passed audit is not scientific validation or proof of policy quality.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "request_sha256",
+    "checks",
+    "limitations",
+    "response_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "nano-policy-request-v1"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check",
+          "passed",
+          "detail"
+        ],
+        "properties": {
+          "check": {
+            "type": "string",
+            "minLength": 1
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "response_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of exact response-line bytes excluding line terminator."
+    }
+  }
+}

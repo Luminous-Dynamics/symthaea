@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-nano-policy"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version = "1.94"
+description = "Deterministic, evidence-bounded candidate selection policies for nanotechnology research"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }

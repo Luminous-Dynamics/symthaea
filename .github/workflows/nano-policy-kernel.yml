@@ -1,0 +1,47 @@
+name: NANO Policy Kernel
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-nano-policy/**"
+      - ".github/workflows/nano-policy-kernel.yml"
+  push:
+    branches:
+      - "research/nano-policy-kernel"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-nano-policy/**"
+      - ".github/workflows/nano-policy-kernel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nano-policy-kernel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Rust unit tests (locked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-nano-policy/src/lib.rs crates/domains/symthaea-nano-policy/src/main.rs crates/domains/symthaea-nano-policy/src/receipt.rs crates/domains/symthaea-nano-policy/src/metrics.rs crates/domains/symthaea-nano-policy/src/bin/nano-policy-metrics.rs
+      - name: Test selector contract and policies
+        run: cargo test --locked -p symthaea-nano-policy --all-targets
+      - name: Smoke-test independent outcome metrics CLI
+        run: |
+          cargo run --locked --quiet -p symthaea-nano-policy --bin nano-policy-metrics -- --input crates/domains/symthaea-nano-policy/fixtures/synthetic-outcome-ledger.json --bootstrap-replicates 200 --seed 17 > metrics-report.json
+          jq -e '.schema_version == "nano-benchmark-metrics-v1" and (.arms | length == 2) and any(.arms[]; .arm_id == "baseline" and .oracle_attempts == 11 and .failed_attempts == 1) and any(.arms[]; .arm_id == "candidate" and ((.success_rate_at_budget - 0.6) | abs < 0.000000001)) and (.comparisons | length == 3) and any(.comparisons[]; .metric == "best_loss_reduction_at_budget" and .covered_target_count == .total_target_count and .disposition != "insufficient_target_coverage") and (.outcome_ledger_sha256 | test("^[a-f0-9]{64}$"))' metrics-report.json
+      - name: Parse committed ledger and JSON schemas
+        run: |
+          jq empty crates/domains/symthaea-nano-policy/fixtures/synthetic-outcome-ledger.json
+          jq empty crates/domains/symthaea-nano-policy/schema/outcome-ledger.schema.json
+          jq empty crates/domains/symthaea-nano-policy/schema/benchmark-metrics-report.schema.json
+
