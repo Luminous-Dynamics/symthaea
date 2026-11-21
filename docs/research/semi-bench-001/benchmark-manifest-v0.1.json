@@ -670,5 +670,6 @@
   "source_integrity_audits": [
     "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
   ],
-  "secom_integrity_audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
+  "secom_integrity_audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+  "missingness_drift_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13115"
 }
