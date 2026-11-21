@@ -329,3 +329,35 @@ The immediate RFF implementation is a baseline, not the endpoint. The next resea
 
 Do not reuse the same seed after tuning on held-out trajectories and call the result independent evaluation. Treat feature count, seed, kernel scales and numerical precision as benchmark inputs.
 
+
+
+## 12. Anytime-valid adaptive spectral feature allocation
+
+The fixed-D Hoeffding interval in the spectral approximation is valid at a feature count frozen before evaluation. It must not be repeatedly inspected while drawing more features and then treated as a nominal 95% interval at a data-dependent stopping time.
+
+The new adaptive controller therefore uses a preregistered geometric checkpoint schedule. At checkpoint t, after D_t features, it spends
+
+\[
+\alpha_t=\frac{\alpha}{t(t+1)},\qquad \sum_{t=1}^{\infty}\alpha_t=\alpha,
+\]
+
+and computes the two-sided Hoeffding radius for q_d in [0,4]:
+
+\[
+r_t=4\sqrt{\frac{\log(2/\alpha_t)}{2D_t}}.
+\]
+
+By the union bound, all inspected checkpoint intervals simultaneously cover the fixed expected normalized squared-MMD with probability at least \(1-\alpha\), under the ideal independent spectral-draw assumption. The code only looks at the interval at declared checkpoint boundaries; there is no mid-batch peeking.
+
+The decision rule is:
+- **within_tolerance:** the interval upper endpoint is at or below the preregistered normalized squared-MMD tolerance;
+- **above_tolerance:** the interval lower endpoint is above tolerance;
+- **unresolved_budget_exhausted:** the interval still overlaps tolerance at the maximum feature count.
+
+Unresolved is an abstention/escalation result, not a pass. This is a distribution-fidelity sub-gate only. The full solver still requires independent field residuals, applicable physical invariants, convergence, calibrated physical risk, and matched-budget trajectory checks.
+
+The implementation consumes one continuous deterministic SplitMix64 feature stream across checkpoints. A fixed seed and final D therefore reproduce the same prefix as a fixed-D call. SplitMix64 is used for reproducibility, not cryptographic randomness; the Hoeffding coverage statement is for ideal independent spectral draws and is not a proof about pseudorandom independence in a deterministic stream. The confidence interval concerns random-feature integration error only.
+
+Five additional tests cover early pass, early fail, unresolved maximum-budget abstention, exact seeded-prefix equivalence, and invalid alpha/tolerance/budget rejection. The controller records each checkpoint's feature count, per-look alpha, cumulative alpha, estimate and interval.
+
+This controller is tracked separately in [#13046](https://github.com/Luminous-Dynamics/symthaea/issues/13046). Its competitive target is lower feature work on clearly safe or unsafe comparisons without compromising the simultaneous coverage guarantee; near-boundary outcomes must consume more compute or abstain.
