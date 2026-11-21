@@ -1,0 +1,119 @@
+{
+  "schema": "luminous.plasma.vlasov-landau-amplitude-sweep-manifest",
+  "schema_version": "0.1.0",
+  "run": {
+    "workflow_name": "Plasma Vlasov reference solver",
+    "workflow_run_id": 44905069931,
+    "workflow_run_number": 84,
+    "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44905069931",
+    "event": "pull_request",
+    "source_branch": "research/plasma-vp-spectral-reference-v0-1",
+    "source_commit": "dff72ad9a5e42d5e26acb580f9b624f3a1f47676",
+    "tested_checkout_merge_commit": "a7077b7360c3313ffcec518ba26a3321bf706ca9",
+    "tested_checkout_message": "Merge dff72ad9a5e42d5e26acb580f9b624f3a1f47676 into 36eb3adc1dc2d5ad1ae643863fee828d594472d4",
+    "toolchain": "Rust 1.96.0 (ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96)",
+    "runner": "ubuntu-26.04 x86_64-unknown-linux-gnu",
+    "workflow_conclusion": "success",
+    "gates": {
+      "strict_format": true,
+      "unit_tests_passed": 19,
+      "unit_tests_failed": 0,
+      "strict_clippy": true,
+      "landau_reference_to_t10": true,
+      "space_velocity_domain_timestep_probe": true,
+      "matched_amplitude_sweep_to_t10": true,
+      "artifact_upload": true
+    }
+  },
+  "artifact": {
+    "artifact_id": 14707492942,
+    "artifact_name": "plasma-vlasov-reference-a7077b7360c3313ffcec518ba26a3321bf706ca9",
+    "artifact_zip_bytes": 24897,
+    "artifact_zip_sha256": "561a800261722e60bf8d589df65e0dc0106e4cc11a7f2959331007ffa9b933d9",
+    "artifact_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44905069931/artifacts/14707492942",
+    "created_at": "2026-11-21T12:40:48Z",
+    "expires_at": "2026-12-21T12:40:48Z",
+    "files": {
+      "landau-amplitude-sweep.csv": {
+        "sha256": "0abda0447119e98bf2456b954d08d42ed9d2e4c54568fdcd74834e711ab934a8",
+        "rows_including_header": 203,
+        "data_rows": 202
+      },
+      "landau-reference.csv": {
+        "sha256": "d27a590d0f1b32f41b742c827017a74ce91f1518b80e9971af1f5041f8e47a69",
+        "rows_including_header": 102,
+        "data_rows": 101
+      },
+      "refinement-probe.csv": {
+        "sha256": "b9567426d2e382817a7bad112d1071f3d312dd475f9b302d5e13fd04bdbb0202",
+        "rows_including_header": 14,
+        "data_rows": 13
+      }
+    }
+  },
+  "configuration": {
+    "equation_cohort": "collisionless electrostatic Vlasov-Poisson 1D1V",
+    "nx": 64,
+    "nv": 128,
+    "spatial_interval": [0.0, 12.566370614359172],
+    "spatial_period": 12.566370614359172,
+    "velocity_interval": [-6.0, 6.0],
+    "charge_to_mass": -1.0,
+    "permittivity": 1.0,
+    "background_density": 1.0,
+    "thermal_speed": 1.0,
+    "spatial_mode": 1,
+    "dt": 0.01,
+    "steps": 1000,
+    "final_time": 10.0,
+    "sample_interval": 0.1,
+    "spectral_tail_start_fraction": 0.75,
+    "amplitude_cases": [
+      {
+        "name": "weak_alpha_1e-3",
+        "alpha": 0.001,
+        "data_rows": 101
+      },
+      {
+        "name": "paper_amplitude_1e-2",
+        "alpha": 0.01,
+        "data_rows": 101
+      }
+    ]
+  },
+  "descriptive_analysis": {
+    "observable": "Imaginary component and magnitude of the positive fundamental electric-field Fourier coefficient. The coefficient magnitude is not the real-space cosine peak amplitude.",
+    "extrema_extraction": "Local extrema of the absolute imaginary coefficient in the sampled trace; only four post-initial extrema are available.",
+    "post_initial_extrema_times": [2.5, 4.7, 7.0, 9.2],
+    "four_extrema_log_magnitude_fit": {
+      "alpha_0_001_gamma": -0.15444614642531948,
+      "alpha_0_01_gamma": -0.15454296217215693,
+      "note": "Descriptive post-hoc fit; not a preregistered estimator or a validated damping-rate reproduction."
+    },
+    "last_three_extrema_sensitivity_fit": {
+      "alpha_0_001_gamma": -0.15127273980918013,
+      "alpha_0_01_gamma": -0.15139496056433083,
+      "note": "Sensitivity result only; first post-initial extremum excluded."
+    },
+    "linear_amplitude_scaling": {
+      "comparison": "abs(E_k(alpha=0.01)) / (10 * abs(E_k(alpha=0.001)))",
+      "minimum_ratio": 0.9945936095690759,
+      "maximum_ratio": 1.000376856935258,
+      "maximum_absolute_deviation_from_unity": 0.005406390430924057,
+      "final_time_ratio": 0.9993632465527283,
+      "note": "Strong approximate 10x response scaling on this numerical configuration; not proof of continuum linearity or convergence."
+    }
+  },
+  "limitations": [
+    "This PR workflow checks out the PR merge candidate; the tested merge commit is recorded separately from the source branch commit.",
+    "Only the 64x128 grid and fixed dt=0.01 are used for the t=10 amplitude pair.",
+    "The existing space, velocity resolution, velocity-domain and timestep refinement probe ends at t=1, not t=10.",
+    "The envelope extrema and fitting window are post-hoc and only four post-initial extrema are available.",
+    "Sampling is every 0.1 time units; sub-sample peak localization is not implemented.",
+    "No independent distribution-space solver comparison has been run.",
+    "No t=10 grid, timestep or velocity-domain convergence has been established.",
+    "No runtime, peak-memory or energy-to-solution comparison is included.",
+    "The alpha=0.01 profile matches the amplitude stated in the VlasovTT paper, but does not reproduce the paper's 1024x1024 dense/TT numerical configuration."
+  ],
+  "claim_ceiling": "Exploratory paired-amplitude trajectory with a strong approximate linear scaling observation. No validated Landau damping reproduction, long-horizon convergence, adaptive-grid qualification, SOTA superiority or production performance claim."
+}
