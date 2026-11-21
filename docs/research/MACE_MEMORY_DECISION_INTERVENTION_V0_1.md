@@ -183,7 +183,7 @@ The official AML stretch targets already recorded in the parent HDC-LTC protocol
 1. Add this intervention record to the #13128 protocol/schema branch without changing MACE policy or the evaluator.
 2. Implement a deterministic evaluator-side arm scheduler over the existing #12743 MACE policies and world-cluster fixtures.
 3. Start with no-memory, exact-scope, conventional, HDC-LTC and semantic-placebo arms; add pre/post-correction snapshots next.
-4. Emit candidate decisions and evaluator scores as separate JSONL streams under the schema accompanying this document.
+4. Emit candidate decisions and evaluator scores as separate JSONL streams using [`data/schemas/mace_memory_decision_intervention_v0_1.schema.json`](https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_memory_decision_intervention_v0_1.schema.json). The candidate stream contains no evaluator-only labels; the evaluator stream is held outside the candidate's read boundary.
 5. Add tests that fail if candidate input contains hidden labels, if pair blocks differ in any frozen field other than the assigned memory input, or if a decision-support ID is unresolved.
 6. Add the sampled evidence-knockout audit and cluster-bootstrap summary.
 7. Only after a local executable baseline exists, add official benchmark adapters or hardware-specific profiling.
