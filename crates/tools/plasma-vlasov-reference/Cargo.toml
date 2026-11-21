@@ -1,0 +1,12 @@
+[package]
+name = "plasma-vlasov-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent spectral-splitting periodic 1D1V Vlasov-Poisson reference solver"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
