@@ -90,7 +90,7 @@ fn get_group<'a>(observations: &'a [Value], field: &str) -> Result<BTreeSet<&'a 
         .collect()
 }
 
-fn require_disjoint<T: Ord + Clone>(
+fn require_disjoint<T: Ord + Clone + std::fmt::Debug>(
     left: &BTreeSet<T>,
     right: &BTreeSet<T>,
     label: &str,
