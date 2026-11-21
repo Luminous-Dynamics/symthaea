@@ -94,7 +94,7 @@ s=\max\left(\operatorname{TV}(\mu),\operatorname{TV}(\nu)\right).
 
 The returned quantity is \(\operatorname{MMD}_k(\mu,\nu)/s\). If both total variations are zero, the normalization scale is set to one and the distance is zero. This makes the reported value invariant to common positive rescaling of both measures and to equivalent co-located split/merge representations.
 
-Neumaier compensated sums reduce accumulation error. A negative computed MMD-squared is clamped only when it lies within \(128\epsilon\max(1,S_{\mathrm{abs}})\), where \(S_{\mathrm{abs}}\) is the sum of the absolute pair contributions. A more negative value returns an error. This is a fail-closed numerical guard, not a formal floating-point proof.
+The unnormalized MMD is the RKHS metric induced by the characteristic kernel. The reported pair-normalized ratio is a scale-normalized discrepancy; because its denominator depends on both inputs, we do not claim that the ratio itself satisfies the triangle inequality.\n\nNeumaier compensated sums reduce accumulation error. A negative computed MMD-squared is clamped only when it lies within \(128\epsilon\max(1,S_{\mathrm{abs}})\), where \(S_{\mathrm{abs}}\) is the sum of the absolute pair contributions. A more negative value returns an error. This is a fail-closed numerical guard, not a formal floating-point proof.
 
 The direct calculation costs \(U^2+V^2+UV\) kernel evaluations, where \(U,V\) are the unique nonzero support atom counts. Canonical aggregation costs \(O(N\log N+M\log M)\), so the overall worst-case complexity remains \(O(N^2+M^2+NM)\), with \(O(N+M)\) temporary memory. The implementation reports raw particle counts, unique atom counts and kernel evaluation count separately.
 
