@@ -28,5 +28,34 @@
     "does_not_establish_group_or_tool_independence": true,
     "does_not_establish_predictive_performance": true,
     "does_not_establish_causality_or_yield_improvement": true
+  },
+  "missing_sensor_cells_by_feature": [
+    0,
+    1,
+    0
+  ],
+  "features_with_no_missing": 2,
+  "features_over_50_percent_missing": 0,
+  "missingness_by_class": {
+    "fail": {
+      "rows": 1,
+      "missing_cells": 0,
+      "sensor_cells": 3,
+      "missing_fraction": 0
+    },
+    "pass": {
+      "rows": 1,
+      "missing_cells": 1,
+      "sensor_cells": 3,
+      "missing_fraction": 0.3333333333333333
+    }
+  },
+  "missingness_by_month": {
+    "2008-07": {
+      "rows": 2,
+      "missing_cells": 1,
+      "sensor_cells": 6,
+      "missing_fraction": 0.16666666666666666
+    }
   }
 }
