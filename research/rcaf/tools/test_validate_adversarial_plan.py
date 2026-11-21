@@ -78,6 +78,18 @@ class AdversarialPlanTests(unittest.TestCase):
                 with self.assertRaisesRegex(PlanValidationError, required):
                     validate_plan(plan, SCHEMA)
 
+    def test_common_mode_nuisance_requires_zero_and_positive_doses(self):
+        plan = deepcopy(FIXTURE)
+        plan["nuisance_scenarios"][0]["dose_points"] = [0.0]
+        with self.assertRaisesRegex(PlanValidationError, "zero and positive nuisance doses"):
+            validate_plan(plan, SCHEMA)
+
+    def test_nuisance_only_rejection_output_is_mandatory(self):
+        plan = deepcopy(FIXTURE)
+        plan["required_outputs"].remove("nuisance_only_rejection_rate")
+        with self.assertRaisesRegex(PlanValidationError, "nuisance_only_rejection_rate"):
+            validate_plan(plan, SCHEMA)
+
     def test_mandatory_outputs_are_present(self):
         plan = deepcopy(FIXTURE)
         plan["required_outputs"].remove("nuisance_false_positives")
