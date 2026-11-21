@@ -10,7 +10,9 @@
 use std::error::Error;
 use std::fs;
 
-use symthaea_canvas::{CognitiveTopology, project_cognitive_topology};
+use symthaea_canvas::{
+    CognitiveLayoutConfig, CognitiveTopology, layout_cognitive_topology,
+};
 
 const DEFAULT_FIXTURE: &str =
     "crates/domains/symthaea-canvas/tests/fixtures/cognitive_topology_v1.json";
@@ -23,7 +25,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let topology: CognitiveTopology = serde_json::from_str(&source)?;
     topology.validate()?;
     let digest = topology.canonical_digest_hex()?;
-    let projection = project_cognitive_topology(&topology)?;
+    let projection = layout_cognitive_topology(
+        &topology,
+        None,
+        CognitiveLayoutConfig::default(),
+    )?;
+    let geometry_digest = projection.geometry_digest_hex()?;
 
     println!("fixture: {path}");
     println!("schema_version: {}", topology.schema_version);
@@ -38,6 +45,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("spatial_anchors: {}", projection.anchors.len());
     println!("spatial_links: {}", projection.links.len());
     println!("projection_topology_digest: {}", projection.topology_digest);
+    println!("geometry_digest_1e-3: {geometry_digest}");
+    println!("layout_algorithm: deterministic-force-v1");
     println!("provenance: synthetic fixture; no live runtime events asserted");
     Ok(())
 }
