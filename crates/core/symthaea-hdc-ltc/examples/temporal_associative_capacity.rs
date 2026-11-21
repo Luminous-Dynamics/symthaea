@@ -30,6 +30,8 @@ const DEFAULT_EVENTS: &[usize] = &[1, 8];
 const DEFAULT_SEEDS: usize = 3;
 const TIE_EPSILON: f32 = 1.0e-7;
 const NEURON_MIN_DT_SECONDS: f32 = 1.0e-9;
+const MAX_CODEBOOK_COORDINATES: usize = 8_388_608;
+const MAX_EVENT_INPUT_COORDINATES: usize = 8_388_608;
 
 #[derive(Debug)]
 struct Args {
@@ -211,6 +213,22 @@ fn parse_args() -> Result<Args, Box<dyn Error>> {
     if args.seed_count == 0 || args.seed_count > 10_000 {
         return Err("seed count must be in 1..=10000".into());
     }
+    // The experiment holds several full codebooks concurrently, plus an
+    // optional distractor input schedule. Bound both allocation surfaces.
+    if args.dims.iter().any(|&dim| {
+        args.loads
+            .iter()
+            .any(|&load| dim.saturating_mul(load) > MAX_CODEBOOK_COORDINATES)
+    }) {
+        return Err("dimension × memory fan-in exceeds the codebook allocation envelope".into());
+    }
+    if args.dims.iter().any(|&dim| {
+        args.events
+            .iter()
+            .any(|&events| dim.saturating_mul(events) > MAX_EVENT_INPUT_COORDINATES)
+    }) {
+        return Err("dimension × event count exceeds the distractor allocation envelope".into());
+    }
 
     Ok(args)
 }
@@ -340,6 +358,9 @@ fn evolve_state(
 
     if condition != "hdc_ltc_zero_input" && condition != "hdc_ltc_distractor" {
         return Err(format!("unsupported evolution condition: {condition}").into());
+    }
+    if event_count == 0 {
+        return Err("a positive horizon requires at least one evolution event".into());
     }
 
     let setup_start = Instant::now();
@@ -784,6 +805,21 @@ mod tests {
         assert_eq!(outcome.api_update_count, 0);
         assert_eq!(outcome.reported_logical_seconds, 0.0);
         assert_eq!(outcome.evolution_wall_ns, 0);
+    }
+
+    #[test]
+    fn evolution_rejects_intervals_below_the_neuron_time_floor() {
+        let memory = prepare_memory(256, 4, 19);
+        let result = evolve_state(
+            256,
+            &memory.bundle,
+            19,
+            1.0e-10,
+            1,
+            "regular",
+            "hdc_ltc_zero_input",
+        );
+        assert!(result.is_err());
     }
 
     #[test]
