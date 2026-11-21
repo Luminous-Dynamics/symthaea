@@ -449,7 +449,6 @@ impl CognitiveTopologyReducer {
             ));
         }
 
-        ensure_session_provenance(&self.topology, event.evidence.provenance)?;
         let previous_time = latest_evidence_time(&self.topology);
         if event.evidence.monotonic_ns < previous_time {
             return Err(CognitiveEventError::TimestampRegression {
@@ -460,6 +459,9 @@ impl CognitiveTopologyReducer {
 
         let mut next = self.topology.clone();
         apply_change(&mut next, &event)?;
+        // Entity updates enforce the more specific provenance boundary above;
+        // additions are checked here to keep each session provenance-homogeneous.
+        ensure_session_provenance(&next, event.evidence.provenance)?;
         next.revision = next
             .revision
             .checked_add(1)
@@ -1419,14 +1421,22 @@ mod tests {
             reducer.apply_event(add_node(2, "memory:a")),
             Err(CognitiveEventError::SequenceGap { .. })
         ));
-        let mut regressing = add_node(1, "memory:a");
-        regressing.evidence.monotonic_ns = 0;
+
+        let first = add_node(1, "memory:first");
+        reducer.apply_event(first).unwrap();
+        let mut regressing = add_node(2, "memory:second");
+        regressing.evidence.monotonic_ns = 999;
         assert!(matches!(
             reducer.apply_event(regressing),
-            Err(CognitiveEventError::TimestampRegression { .. })
+            Err(CognitiveEventError::TimestampRegression {
+                previous: 1_000,
+                received: 999
+            })
         ));
-        assert!(reducer.snapshot().nodes.is_empty());
-        assert!(reducer.events().is_empty());
+        assert_eq!(reducer.snapshot().nodes.len(), 1);
+        assert_eq!(reducer.snapshot().nodes[0].id, "memory:first");
+        assert_eq!(reducer.snapshot().last_sequence, 1);
+        assert_eq!(reducer.events().len(), 1);
     }
 
     #[test]
