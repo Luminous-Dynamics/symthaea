@@ -144,7 +144,7 @@ fn mutate_target_v1(
     match target {
         RmiTargetFeatureV1::Motif => {
             let note = trial_index % features.motif_intervals.len();
-            let delta = if trial_index % 2 == 0 { 2 } else { -2 };
+            let delta = if trial_index.is_multiple_of(2) { 2 } else { -2 };
             features.motif_intervals[note] += delta;
         }
         RmiTargetFeatureV1::Rhythm => {
@@ -152,7 +152,7 @@ fn mutate_target_v1(
             features.rhythm_onsets[step] = !features.rhythm_onsets[step];
         }
         RmiTargetFeatureV1::Tempo => {
-            let delta = if trial_index % 2 == 0 { 1_500 } else { -1_500 };
+            let delta = if trial_index.is_multiple_of(2) { 1_500 } else { -1_500 };
             features.tempo_milli_bpm = (features.tempo_milli_bpm as i64 + delta) as u32;
         }
         RmiTargetFeatureV1::Role => {
@@ -192,7 +192,7 @@ pub fn make_rmi_track_a_fixture_v1(
         motif_intervals: [2, -1, 3, 0],
         rhythm_onsets: [true, false, true, false, true, false, false, true],
         tempo_milli_bpm: 120_000,
-        role: if trial_index % 2 == 0 { RmiRoleV1::Lead } else { RmiRoleV1::Bass },
+        role: if trial_index.is_multiple_of(2) { RmiRoleV1::Lead } else { RmiRoleV1::Bass },
     };
     // Vary the frozen context without changing the intervention definition.
     control.motif_intervals[0] += (trial_index % 4) as i16;
