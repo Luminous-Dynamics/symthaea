@@ -397,6 +397,42 @@
         "exact_archive_sha256": null,
         "split_manifest_status": "not-yet-frozen"
       }
+    },
+    {
+      "id": "FADNet-Wafer-Defect-Recognition-2026",
+      "title": "FAD-Net: An Efficient Architecture for Defect Recognition in Semiconductor Wafers",
+      "paper": "https://doi.org/10.1002/qre.70321",
+      "publication_date": "2026-07-05",
+      "reported_datasets": [
+        "WM-811K",
+        "MixedWM38"
+      ],
+      "reported_method": [
+        "Dendritic-Neuron-Module",
+        "Feature-Pyramid-Module",
+        "attention"
+      ],
+      "reported_ranges": {
+        "accuracy": [
+          0.9535,
+          0.9863
+        ],
+        "f1": [
+          0.9255,
+          0.9858
+        ],
+        "auc": [
+          0.9971,
+          0.9997
+        ]
+      },
+      "acquisition": {
+        "public_abstract_data_availability": "manuscript/author details requested",
+        "raw_data_available_publicly": "not-established-from-public-abstract",
+        "source_split_protocol": "not-established-from-public-abstract",
+        "source_identity_or_group_split": "not-established-from-public-abstract"
+      },
+      "evidence_class": "paper-reported-ranges; reproduction lead; not directly rankable until per-dataset protocols and source identity are verified"
     }
   ],
   "benchmark_reference_artifacts": {
@@ -450,6 +486,16 @@
       },
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
       "hosted_ci_test_count": 46
+    },
+    "rust_binary_metrics_scorer": {
+      "package": "symthaea-semiconductor",
+      "crate_path": "crates/domains/symthaea-semiconductor",
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+      "reference_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+      "hosted_ci_status": "pending-isolated-workspace-check",
+      "claim_ceiling": "metric contract parity only; no dataset model or manufacturing claim"
     }
   },
   "reproducibility_artifacts": [
