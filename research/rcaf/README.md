@@ -89,3 +89,14 @@ A workflow result applies only to the exact source commit checked. Skipped, queu
 Each estimator receives the same seed, participant draws, and injection configuration. The tournament reports null false-positive frequency, injection-detection power, Monte-Carlo Wilson intervals, and participant-level gap summaries. It does not automatically select a universal winner: different estimators have different construct semantics, and estimator performance must be read together with null calibration and effect sensitivity.
 
 The output contract is `estimator-tournament.schema.json`.
+
+
+## Reproducible CI evidence artifacts
+
+The focused validation workflow runs all three simulation examples and creates:
+- single-point null/injection report;
+- five-point common-random-number dose-response curve;
+- three-estimator matched-input tournament;
+- `rcaf.execution-receipt/0.1.0` manifest hashing the RCAF source tree, exact commit, Rust/Cargo/Python environment and report outputs.
+
+These are uploaded as a workflow artifact named `rcaf-simulation-evidence-<commit SHA>`. The receipt proves provenance of that CI run, not independent replay or biological validity.
