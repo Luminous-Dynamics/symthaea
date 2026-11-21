@@ -57,12 +57,12 @@ The latent network is held fixed. The observation process changes between sessio
 
 The key invariant is that nuisance-only changes do not alter the declared latent target. If the analysis calls them neural network changes, the instrument has failed that challenge even when it detects planted biological effects elsewhere.
 
-### 3.4 Crossed signal × nuisance interaction
+### 3.3 Crossed signal × nuisance interaction
 
 The implementation now evaluates a matched signal-plus-nuisance observation in addition to the signal-only and nuisance-only cells. For each participant/replicate, the nuisance-only and combined observations share the same deterministic innovations; only the planted module loading differs. At zero nuisance dose, the combined observation reuses the exact clean injected observation. Across positive nuisance doses, clean null and clean signal metrics are held matched, while combined-cell directional recovery, wrong-direction rejection and paired-gap magnitude are allowed to change.
 
 This is the crucial interaction test: a method can pass the clean injection and nuisance-only challenges but still fail when an artifact masks, exaggerates or reverses a genuine signal. The current crossed experiment remains limited to the same Gaussian factor model and one shared AR(1) common-mode factor. It does not yet model motion, scanner/site gain, structured spatial artifacts, censoring, physiological waveforms or empirical acquisition.
-### 3.3 Deliberate leakage challenges
+### 3.4 Deliberate leakage challenges
 
 Each leakage pathway must have a planted-positive control and a clean negative control. At minimum test:
 
