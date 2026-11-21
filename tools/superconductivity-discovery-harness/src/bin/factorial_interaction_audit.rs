@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::env;
@@ -12,10 +12,7 @@ const CLAIM_CEILING: &str = "synthetic-factorial-design-and-contrast-arithmetic-
 const DEFAULT_SCHEMA: &str = "data/schemas/sc_factorial_interaction_v0_1.schema.json";
 const DEFAULT_FIXTURE: &str =
     "tools/superconductivity-discovery-harness/fixtures/factorial_interaction_smoke_v0_1.json";
-const RESPONSE_CHANNELS: [&str; 2] = [
-    "local_pairing_gap_mev",
-    "bulk_superfluid_stiffness_mev",
-];
+const RESPONSE_CHANNELS: [&str; 2] = ["local_pairing_gap_mev", "bulk_superfluid_stiffness_mev"];
 
 #[derive(Clone, Debug)]
 struct Factor {
@@ -141,7 +138,10 @@ fn parse_arm(
     let material_id = string_field(value, "material_id", &path)?;
     let material_state_id = string_field(value, "material_state_id", &path)?.to_owned();
     if material_id != target_material_id {
-        return Err(fail(&path, "arm material_id does not match target_material"));
+        return Err(fail(
+            &path,
+            "arm material_id does not match target_material",
+        ));
     }
     if !specimen_ids.insert(specimen_id.clone()) {
         return Err(fail(&path, format!("specimen_id {specimen_id} is reused")));
@@ -167,27 +167,43 @@ fn parse_arm(
         return Err(fail(&path, "randomization_order must be in 1..=4"));
     }
     if string_field(value, "assignment_state", &path)? != "sensor_verified" {
-        return Err(fail(
-            &path,
-            "assignment_state must be sensor_verified",
-        ));
+        return Err(fail(&path, "assignment_state must be sensor_verified"));
     }
 
     let readback = value
         .get("delivery_readback")
         .ok_or_else(|| fail(&path, "delivery_readback is required"))?;
-    if string_field(readback, "verification", &format!("{path}.delivery_readback"))?
-        != "sensor_verified"
+    if string_field(
+        readback,
+        "verification",
+        &format!("{path}.delivery_readback"),
+    )? != "sensor_verified"
     {
         return Err(fail(
             &path,
             "delivery_readback.verification must be sensor_verified",
         ));
     }
-    let a_value = number_field(readback, "factor_a_value", &format!("{path}.delivery_readback"))?;
-    let b_value = number_field(readback, "factor_b_value", &format!("{path}.delivery_readback"))?;
-    let a_unit = string_field(readback, "factor_a_unit", &format!("{path}.delivery_readback"))?;
-    let b_unit = string_field(readback, "factor_b_unit", &format!("{path}.delivery_readback"))?;
+    let a_value = number_field(
+        readback,
+        "factor_a_value",
+        &format!("{path}.delivery_readback"),
+    )?;
+    let b_value = number_field(
+        readback,
+        "factor_b_value",
+        &format!("{path}.delivery_readback"),
+    )?;
+    let a_unit = string_field(
+        readback,
+        "factor_a_unit",
+        &format!("{path}.delivery_readback"),
+    )?;
+    let b_unit = string_field(
+        readback,
+        "factor_b_unit",
+        &format!("{path}.delivery_readback"),
+    )?;
     if a_unit != factor_a.unit || b_unit != factor_b.unit {
         return Err(fail(
             &path,
@@ -211,7 +227,11 @@ fn parse_arm(
         ));
     }
     digest(
-        string_field(readback, "source_sha256", &format!("{path}.delivery_readback"))?,
+        string_field(
+            readback,
+            "source_sha256",
+            &format!("{path}.delivery_readback"),
+        )?,
         &format!("{path}.delivery_readback.source_sha256"),
     )?;
 
@@ -226,7 +246,10 @@ fn parse_arm(
         let outcome_path = format!("{path}.outcomes[{outcome_index}]");
         let channel = string_field(outcome, "response_channel", &outcome_path)?.to_owned();
         if !RESPONSE_CHANNELS.contains(&channel.as_str()) {
-            return Err(fail(&outcome_path, format!("unsupported response channel {channel}")));
+            return Err(fail(
+                &outcome_path,
+                format!("unsupported response channel {channel}"),
+            ));
         }
         let unit = string_field(outcome, "unit", &outcome_path)?;
         if unit != "meV" {
@@ -235,9 +258,7 @@ fn parse_arm(
                 "v0.1 pairing-gap and superfluid-stiffness outcomes must use meV",
             ));
         }
-        if string_field(outcome, "evidence_authority", &outcome_path)?
-            != "synthetic_measurement"
-        {
+        if string_field(outcome, "evidence_authority", &outcome_path)? != "synthetic_measurement" {
             return Err(fail(
                 &outcome_path,
                 "synthetic fixture outcomes require synthetic_measurement authority",
@@ -281,7 +302,8 @@ fn contrast(block: &Block, response_channel: &str) -> Result<f64, String> {
         .arms
         .get("combined")
         .ok_or_else(|| format!("{}: missing combined arm", block.block_id))?;
-    Ok(combined.outcomes[response_channel] - a_only.outcomes[response_channel]
+    Ok(combined.outcomes[response_channel]
+        - a_only.outcomes[response_channel]
         - b_only.outcomes[response_channel]
         + control.outcomes[response_channel])
 }
@@ -294,8 +316,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema)
-        .map_err(|error| format!("schema compilation failed: {error}"))?;
+    let validator =
+        validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
     if let Some(error) = validator.iter_errors(&fixture).next() {
         return Err(format!(
             "fixture schema validation failed: {} at {}",
@@ -332,31 +354,25 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let condition_profile = fixture
         .get("condition_profile")
         .ok_or_else(|| "condition_profile is required".to_owned())?;
-    let condition_profile_id =
-        string_field(condition_profile, "condition_profile_id", "condition_profile")?;
-    let condition_temperature = number_field(
+    let condition_profile_id = string_field(
         condition_profile,
-        "temperature_k",
+        "condition_profile_id",
         "condition_profile",
     )?;
+    let condition_temperature =
+        number_field(condition_profile, "temperature_k", "condition_profile")?;
     if condition_temperature <= 0.0 {
         return Err("condition_profile.temperature_k must be positive".to_owned());
     }
-    if number_field(
-        condition_profile,
-        "field_magnitude_t",
-        "condition_profile",
-    )? < 0.0
-    {
+    if number_field(condition_profile, "field_magnitude_t", "condition_profile")? < 0.0 {
         return Err("condition_profile.field_magnitude_t must be non-negative".to_owned());
     }
-    string_field(
+    string_field(condition_profile, "field_orientation", "condition_profile")?;
+    let measurement_protocol = string_field(
         condition_profile,
-        "field_orientation",
+        "measurement_protocol_id",
         "condition_profile",
     )?;
-    let measurement_protocol =
-        string_field(condition_profile, "measurement_protocol_id", "condition_profile")?;
 
     let block_values = array(
         fixture
@@ -387,19 +403,29 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             return Err(format!("duplicate block_id {block_id}"));
         }
         if !batch_ids.insert(batch_id.clone()) {
-            return Err(format!("batch_id {batch_id} is reused across independent blocks"));
+            return Err(format!(
+                "batch_id {batch_id} is reused across independent blocks"
+            ));
         }
         if !campaign_ids.insert(campaign_id.clone()) {
-            return Err(format!("campaign_id {campaign_id} is reused across independent blocks"));
+            return Err(format!(
+                "campaign_id {campaign_id} is reused across independent blocks"
+            ));
         }
         if !seeds.insert(integer_field(block_value, "randomization_seed", &path)?) {
-            return Err(format!("{path}: randomization_seed must be unique across blocks"));
+            return Err(format!(
+                "{path}: randomization_seed must be unique across blocks"
+            ));
         }
         if string_field(block_value, "condition_profile_id", &path)? != condition_profile_id {
-            return Err(format!("{path}: block condition profile differs from benchmark profile"));
+            return Err(format!(
+                "{path}: block condition profile differs from benchmark profile"
+            ));
         }
         if protocol_id != measurement_protocol {
-            return Err(format!("{path}: block protocol differs from declared measurement protocol"));
+            return Err(format!(
+                "{path}: block protocol differs from declared measurement protocol"
+            ));
         }
         let arms_value = array(
             block_value
@@ -433,7 +459,9 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             }
         }
         if order != BTreeSet::from([1, 2, 3, 4]) {
-            return Err(format!("{path}: randomization_order must contain exactly 1,2,3,4"));
+            return Err(format!(
+                "{path}: randomization_order must contain exactly 1,2,3,4"
+            ));
         }
         if arms.len() != 4
             || !["control", "a_only", "b_only", "combined"]
@@ -454,7 +482,9 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let expected_truth = fixture
         .get("synthetic_truth")
         .and_then(|value| value.get("expected_mean_interaction_by_channel"))
-        .ok_or_else(|| "synthetic_truth.expected_mean_interaction_by_channel is required".to_owned())?;
+        .ok_or_else(|| {
+            "synthetic_truth.expected_mean_interaction_by_channel is required".to_owned()
+        })?;
     for channel in RESPONSE_CHANNELS {
         let mut per_block = Vec::with_capacity(blocks.len());
         let mut sum = 0.0;
@@ -586,20 +616,19 @@ mod tests {
             3.0
         );
         assert_eq!(
-            receipt["response_channels"]["bulk_superfluid_stiffness_mev"]
-                ["mean_interaction_contrast"],
+            receipt["response_channels"]["bulk_superfluid_stiffness_mev"]["mean_interaction_contrast"],
             0.0
         );
-        assert_eq!(
-            receipt["claim_ceiling"],
-            CLAIM_CEILING
-        );
+        assert_eq!(receipt["claim_ceiling"], CLAIM_CEILING);
     }
 
     #[test]
     fn requires_complete_factorial_arms() {
         let mut fixture = fixture_value();
-        fixture["blocks"][0]["arms"].as_array_mut().expect("array").pop();
+        fixture["blocks"][0]["arms"]
+            .as_array_mut()
+            .expect("array")
+            .pop();
         assert!(
             audit_fixture(&fixture)
                 .unwrap_err()
@@ -613,7 +642,11 @@ mod tests {
         fixture["blocks"][0]["arms"][3]["arm_id"] = json!("control");
         fixture["blocks"][0]["arms"][3]["factor_a_on"] = json!(false);
         fixture["blocks"][0]["arms"][3]["factor_b_on"] = json!(false);
-        assert!(audit_fixture(&fixture).unwrap_err().contains("duplicate factorial arm"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("duplicate factorial arm")
+        );
     }
 
     #[test]
@@ -628,7 +661,11 @@ mod tests {
     fn rejects_nominal_material_mismatch() {
         let mut fixture = fixture_value();
         fixture["blocks"][1]["arms"][2]["material_id"] = json!("OTHER-MATERIAL");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("does not match target_material"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("does not match target_material")
+        );
     }
 
     #[test]
@@ -642,34 +679,51 @@ mod tests {
     fn rejects_duplicate_randomization_order() {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"][1]["randomization_order"] = json!(3);
-        assert!(audit_fixture(&fixture).unwrap_err().contains("randomization_order"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("randomization_order")
+        );
     }
 
     #[test]
     fn refuses_commanded_only_treatment_assignment() {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"][0]["assignment_state"] = json!("commanded_only");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("sensor_verified"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("sensor_verified")
+        );
     }
 
     #[test]
     fn refuses_commanded_or_unverified_delivery_readback() {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"][0]["delivery_readback"]["verification"] = json!("commanded");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("must be sensor_verified"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("must be sensor_verified")
+        );
     }
 
     #[test]
     fn refuses_wrong_delivered_factor_level() {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"][3]["delivery_readback"]["factor_a_value"] = json!(0.0);
-        assert!(audit_fixture(&fixture).unwrap_err().contains("delivered levels do not match"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("delivered levels do not match")
+        );
     }
 
     #[test]
     fn refuses_malformed_assignment_receipt_digest() {
         let mut fixture = fixture_value();
-        fixture["blocks"][0]["arms"][0]["delivery_readback"]["source_sha256"] = json!("not-a-digest");
+        fixture["blocks"][0]["arms"][0]["delivery_readback"]["source_sha256"] =
+            json!("not-a-digest");
         assert!(audit_fixture(&fixture).unwrap_err().contains("SHA-256"));
     }
 
@@ -686,7 +740,8 @@ mod tests {
                 arm["outcomes"][0]["value"] = json!(response);
             }
         }
-        fixture["synthetic_truth"]["expected_mean_interaction_by_channel"]["local_pairing_gap_mev"] = json!(0.0);
+        fixture["synthetic_truth"]["expected_mean_interaction_by_channel"]["local_pairing_gap_mev"] =
+            json!(0.0);
         let receipt = audit_fixture(&fixture).expect("additive control must be accepted");
         assert_eq!(
             receipt["response_channels"]["local_pairing_gap_mev"]["mean_interaction_contrast"],
@@ -698,13 +753,21 @@ mod tests {
     fn refuses_response_channel_unit_mixing() {
         let mut fixture = fixture_value();
         fixture["blocks"][0]["arms"][0]["outcomes"][1]["unit"] = json!("K");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("must use meV"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("must use meV")
+        );
     }
 
     #[test]
     fn refuses_changed_condition_profile() {
         let mut fixture = fixture_value();
         fixture["blocks"][1]["condition_profile_id"] = json!("OTHER-CONDITIONS");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("condition profile differs"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("condition profile differs")
+        );
     }
 }
