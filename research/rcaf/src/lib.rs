@@ -253,7 +253,7 @@ pub fn summarize_rcaf(
     for _ in 0..bootstrap_draws {
         sample.clear();
         for _ in 0..n {
-            let index = (rng.next() % n as u64) as usize;
+            let index = rng.index_below(n as u64) as usize;
             sample.push(gaps[index]);
         }
         boot.push(median(&sample));
@@ -312,6 +312,17 @@ impl XorShift64 {
         self.state ^= self.state >> 7;
         self.state ^= self.state << 17;
         self.state
+    }
+
+    /// Rejection sampling removes modulo bias from bootstrap indices.
+    fn index_below(&mut self, upper: u64) -> u64 {
+        let threshold = upper.wrapping_neg() % upper;
+        loop {
+            let value = self.next();
+            if value >= threshold {
+                return value % upper;
+            }
+        }
     }
 }
 
