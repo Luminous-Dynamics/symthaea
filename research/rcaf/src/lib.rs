@@ -113,10 +113,15 @@ fn validate_correlation_matrix(matrix: &[Vec<f64>]) -> Result<usize, MetricError
     if matrix.iter().any(|row| row.len() != n) {
         return Err(MetricError::NonSquareMatrix);
     }
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let a = matrix[i][j];
-            let b = matrix[j][i];
+    for (i, row) in matrix.iter().enumerate() {
+        for (j, (a, row_j)) in row
+            .iter()
+            .enumerate()
+            .skip(i + 1)
+            .zip(matrix.iter().skip(i + 1))
+        {
+            let a = *a;
+            let b = row_j[i];
             if !a.is_finite() || !b.is_finite() {
                 return Err(MetricError::NonFiniteValue { index: i * n + j });
             }
