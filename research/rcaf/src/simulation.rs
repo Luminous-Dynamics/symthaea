@@ -434,28 +434,32 @@ fn sample_correlation_matrix(
     for _ in 0..samples {
         let global_factor = rng.normal();
         let module_factor = rng.normal();
-        let mut observation = vec![0.0; regions];
-        for region in 0..regions {
-            let global = global_loadings[region];
-            let module = module_loadings[region];
+        let mut observation = Vec::with_capacity(regions);
+        for ((_, (&global, &module)), sum) in global_loadings
+            .iter()
+            .zip(module_loadings.iter())
+            .enumerate()
+            .zip(sums.iter_mut())
+        {
             let residual = (1.0 - global * global - module * module).sqrt();
-            observation[region] =
+            let value =
                 global * global_factor + module * module_factor + residual * rng.normal();
-            sums[region] += observation[region];
+            observation.push(value);
+            *sum += value;
         }
-        for i in 0..regions {
-            for j in 0..regions {
-                cross_products[i * regions + j] += observation[i] * observation[j];
+        for (i, &left) in observation.iter().enumerate() {
+            for (j, &right) in observation.iter().enumerate() {
+                cross_products[i * regions + j] += left * right;
             }
         }
     }
 
     let sample_count = samples as f64;
     let mut variances = vec![0.0; regions];
-    for region in 0..regions {
+    for (region, (variance, &sum)) in variances.iter_mut().zip(sums.iter()).enumerate() {
         let centered =
-            cross_products[region * regions + region] - sums[region] * sums[region] / sample_count;
-        variances[region] = centered / (sample_count - 1.0);
+            cross_products[region * regions + region] - sum * sum / sample_count;
+        *variance = centered / (sample_count - 1.0);
     }
 
     let mut flat = vec![0.0; regions * regions];
