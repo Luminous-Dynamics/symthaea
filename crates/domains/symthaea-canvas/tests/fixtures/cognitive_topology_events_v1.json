@@ -1,0 +1,115 @@
+[
+  {
+    "schema_version": 1,
+    "session_id": "synthetic-event-fixture",
+    "evidence": {
+      "event_id": "event:memory-added",
+      "producer": "synthetic-fixture",
+      "sequence": 1,
+      "monotonic_ns": 1000,
+      "provenance": "synthetic_fixture",
+      "trace_digest": null
+    },
+    "change": {
+      "node_added": {
+        "node_id": "memory:forest",
+        "kind": "memory",
+        "label": "Forest restoration notes",
+        "status": "observed",
+        "activation": 0.65
+      }
+    },
+    "caused_by_event_id": null
+  },
+  {
+    "schema_version": 1,
+    "session_id": "synthetic-event-fixture",
+    "evidence": {
+      "event_id": "event:concept-added",
+      "producer": "synthetic-fixture",
+      "sequence": 2,
+      "monotonic_ns": 2000,
+      "provenance": "synthetic_fixture",
+      "trace_digest": null
+    },
+    "change": {
+      "node_added": {
+        "node_id": "concept:mycelium",
+        "kind": "concept",
+        "label": "Mycelial networks",
+        "status": "observed",
+        "activation": null
+      }
+    },
+    "caused_by_event_id": "event:memory-added"
+  },
+  {
+    "schema_version": 1,
+    "session_id": "synthetic-event-fixture",
+    "evidence": {
+      "event_id": "event:retrieval-link",
+      "producer": "synthetic-fixture",
+      "sequence": 3,
+      "monotonic_ns": 3000,
+      "provenance": "synthetic_fixture",
+      "trace_digest": null
+    },
+    "change": {
+      "edge_added": {
+        "edge_id": "edge:retrieved-memory",
+        "source": "concept:mycelium",
+        "target": "memory:forest",
+        "relation": "retrieved_from",
+        "status": "observed",
+        "activation": null
+      }
+    },
+    "caused_by_event_id": "event:concept-added"
+  },
+  {
+    "schema_version": 1,
+    "session_id": "synthetic-event-fixture",
+    "evidence": {
+      "event_id": "event:retrieval-started",
+      "producer": "synthetic-fixture",
+      "sequence": 4,
+      "monotonic_ns": 4000,
+      "provenance": "synthetic_fixture",
+      "trace_digest": null
+    },
+    "change": {
+      "episode_started": {
+        "episode_id": "episode:retrieval",
+        "kind": "retrieval",
+        "node_ids": [
+          "memory:forest",
+          "concept:mycelium"
+        ],
+        "edge_ids": [
+          "edge:retrieved-memory"
+        ]
+      }
+    },
+    "caused_by_event_id": "event:retrieval-link"
+  },
+  {
+    "schema_version": 1,
+    "session_id": "synthetic-event-fixture",
+    "evidence": {
+      "event_id": "event:retrieval-completed",
+      "producer": "synthetic-fixture",
+      "sequence": 5,
+      "monotonic_ns": 5000,
+      "provenance": "synthetic_fixture",
+      "trace_digest": null
+    },
+    "change": {
+      "episode_state_changed": {
+        "episode_id": "episode:retrieval",
+        "expected_state": "started",
+        "state": "completed"
+      }
+    },
+    "caused_by_event_id": "event:retrieval-started"
+  }
+]

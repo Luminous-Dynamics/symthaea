@@ -3,11 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-canvas
 //!
-//! Living topology UI: real-time SVG projection of Symthaea's cognitive geometry.
+//! Renderer-neutral living topology model with deterministic SVG and 3D mesh adapters.
 //!
 //! Converts cognitive telemetry (consciousness level, neuromodulators, Betti numbers,
 //! Cantor depth, harmony activations) into a declarative scene graph, then renders
-//! self-contained animated SVG.
+//! self-contained animated SVG or portable indexed 3D tube geometry.
 //!
 //! Pipeline: `CognitiveSnapshot → AestheticEngine → AestheticState → build_scene() → render_svg()`
 //!
@@ -18,8 +18,19 @@
 pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
+pub mod cognitive_events;
+pub mod cognitive_layout;
+pub mod cognitive_morphology;
+pub mod cognitive_svg;
+pub mod cognitive_topology;
 pub mod color;
+pub mod embodiment;
+pub mod embodiment_trace;
 pub mod geometry;
+pub mod mycelial_mesh;
+pub mod mycelial_model;
+pub mod mycelial_network;
+pub mod mycelial_presence;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
@@ -31,8 +42,62 @@ use serde::{Deserialize, Serialize};
 pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
+pub use cognitive_events::{
+    COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION, CognitiveEventApplyOutcome, CognitiveEventError,
+    CognitiveItemDelta, CognitiveTopologyChange, CognitiveTopologyDiff, CognitiveTopologyEvent,
+    CognitiveTopologyReducer, MAX_COGNITIVE_EVENT_LOG, MAX_COGNITIVE_EVENTS_PER_BATCH,
+    diff_cognitive_topologies,
+};
+pub use cognitive_layout::{
+    COGNITIVE_PROJECTION_SCHEMA_VERSION, CognitiveAnchor, CognitiveLayoutConfig,
+    CognitiveLayoutError, CognitiveSpatialLink, CognitiveSpatialProjection,
+    layout_cognitive_topology, project_cognitive_topology,
+};
+pub use cognitive_morphology::{
+    COGNITIVE_MORPHOLOGY_SCHEMA_VERSION, CognitiveHypha, CognitiveMorphologyConfig,
+    CognitiveMorphologyError, CognitiveMorphologyNode, CognitiveMorphologyProjection,
+    build_cognitive_morphology,
+};
+pub use cognitive_svg::{
+    CognitiveSvgError, CognitiveSvgOptions, render_cognitive_morphology_svg,
+    render_cognitive_projection_svg,
+};
+pub use cognitive_topology::{
+    COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveEdge, CognitiveEpisode, CognitiveEpisodeKind,
+    CognitiveEpisodeState, CognitiveEvidence, CognitiveNode, CognitiveNodeKind,
+    CognitiveProvenance, CognitiveRelation, CognitiveTopology, CognitiveTopologyError,
+    EpistemicStatus, MAX_COGNITIVE_EDGES, MAX_COGNITIVE_EPISODES, MAX_COGNITIVE_NODES,
+};
 pub use color::{Color, Palette};
+pub use embodiment::{
+    EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
+    EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError, EmbodimentSnapshot,
+    GazeTarget, Observed, SignalProvenance, SpeechOutputState, Viseme, VisemeSignal,
+};
+pub use embodiment_trace::{
+    EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentSession, EmbodimentSessionError, EmbodimentTrace,
+    EmbodimentTraceError, EmbodimentTraceSummary, MAX_EMBODIMENT_SESSION_ID_BYTES,
+    MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
+};
 pub use geometry::build_scene;
+pub use mycelial_mesh::{
+    FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
+    TubeTessellationConfig, TubeTessellationError, tessellate_mycelial_model,
+};
+pub use mycelial_model::{
+    MYCELIAL_MODEL_VERSION, MycelialFilament, MycelialModel, OrbitalCell, PresenceMode,
+    SpatialPoint3, build_mycelial_model,
+};
+pub use mycelial_network::{
+    AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MYCELIAL_NETWORK_SCHEMA_VERSION,
+    MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialConnectionKind,
+    MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
+    MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
+};
+pub use mycelial_presence::{
+    build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
+    render_mycelial_presence_with_mode,
+};
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
 pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};

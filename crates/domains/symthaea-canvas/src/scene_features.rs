@@ -185,11 +185,12 @@ impl Accumulator {
     }
 
     fn add_element(&mut self, kind_bin: usize, center: (f32, f32), size: f32) {
+        if !center.0.is_finite() || !center.1.is_finite() || !size.is_finite() || size <= 0.0 {
+            return;
+        }
         self.kind_histogram[kind_bin] += 1.0;
         self.centers.push(center);
-        if size.is_finite() && size > 0.0 {
-            self.element_sizes.push(size);
-        }
+        self.element_sizes.push(size);
     }
 
     fn finish(mut self) -> SceneFeatures {
@@ -253,31 +254,39 @@ fn walk(node: &SceneNode, parent: Affine, acc: &mut Accumulator) {
 
     match &node.kind {
         NodeKind::Circle { cx, cy, r } => {
-            acc.add_element(0, affine.apply((*cx, *cy)), 2.0 * r * affine.scale);
+            acc.add_element(0, affine.apply((*cx, *cy)), 2.0 * r * affine.scale.abs());
         }
         NodeKind::Ellipse { cx, cy, rx, ry } => {
-            acc.add_element(1, affine.apply((*cx, *cy)), (rx + ry) * affine.scale);
+            acc.add_element(1, affine.apply((*cx, *cy)), (rx + ry) * affine.scale.abs());
         }
         NodeKind::Line { x1, y1, x2, y2 } => {
             let mid = affine.apply(((x1 + x2) / 2.0, (y1 + y2) / 2.0));
-            let len = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt() * affine.scale;
+            let len = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt() * affine.scale.abs();
             acc.add_element(2, mid, len);
         }
         NodeKind::Polygon { points, .. } => {
             if let Some((center, diag)) = bbox_center_diag(points) {
-                acc.add_element(3, affine.apply(center), diag * affine.scale);
+                acc.add_element(3, affine.apply(center), diag * affine.scale.abs());
             }
         }
         NodeKind::Rect { x, y, w, h, .. } => {
             let center = affine.apply((x + w / 2.0, y + h / 2.0));
-            // A rect contributes both side lengths to the size hierarchy —
-            // its own aspect ratio participates in golden scoring.
-            acc.kind_histogram[4] += 1.0;
-            acc.centers.push(center);
-            for side in [*w, *h] {
-                let s = side * affine.scale;
-                if s.is_finite() && s > 0.0 {
-                    acc.element_sizes.push(s);
+            let scale = affine.scale.abs();
+            // A rect contributes both side lengths to the size hierarchy.
+            // A zero-scale transform makes the entire subtree non-drawable.
+            if center.0.is_finite()
+                && center.1.is_finite()
+                && scale.is_finite()
+                && scale > 0.0
+                && (w.abs() > 0.0 || h.abs() > 0.0)
+            {
+                acc.kind_histogram[4] += 1.0;
+                acc.centers.push(center);
+                for side in [*w, *h] {
+                    let size = side.abs() * scale;
+                    if size.is_finite() && size > 0.0 {
+                        acc.element_sizes.push(size);
+                    }
                 }
             }
         }
@@ -356,14 +365,17 @@ pub fn extract_element_features(scene: &SceneNode) -> Vec<ElementFeature> {
             | NodeKind::Filter { .. }
             | NodeKind::UseFilter { .. } => None,
         };
-        if let Some((center, size)) = geometry {
-            if size.is_finite() && size > 0.0 && center.0.is_finite() && center.1.is_finite() {
-                out.push(ElementFeature {
-                    center,
-                    size,
-                    color,
-                });
-            }
+        if let Some((center, size)) = geometry
+            && size.is_finite()
+            && size > 0.0
+            && center.0.is_finite()
+            && center.1.is_finite()
+        {
+            out.push(ElementFeature {
+                center,
+                size,
+                color,
+            });
         }
         for child in &node.children {
             walk_elements(child, affine, out);
