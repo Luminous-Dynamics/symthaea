@@ -176,6 +176,33 @@ jobs:
           print("PASS: matched-input RCAF estimator tournament")
           PY
 
+      - name: Run matched-input estimator dose-response surface
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose_response_tournament -- "$RUNNER_TEMP/rcaf-estimator-dose-surface.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/estimator-dose-response-tournament.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-estimator-dose-surface.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["estimators_compared"] == 3
+          assert report["effect_sizes"] == [0.0, 0.10, 0.20, 0.30, 0.40]
+          assert [curve["estimator"] for curve in report["curves"]] == [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          for curve in report["curves"]:
+              rows = curve["sweep"]["reports"]
+              assert [row["injection_loading_delta"] for row in rows] == report["effect_sizes"]
+              assert len({row["seed"] for row in rows}) == 1
+          print("PASS: matched-input estimator-by-effect-size surface")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -184,7 +211,8 @@ jobs:
             --reports \
               "$RUNNER_TEMP/rcaf-injection-report.json" \
               "$RUNNER_TEMP/rcaf-injection-sweep.json" \
-              "$RUNNER_TEMP/rcaf-estimator-tournament.json"
+              "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
+              "$RUNNER_TEMP/rcaf-estimator-dose-surface.json"
           python - <<'PY'
           import json
           import os
@@ -199,7 +227,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 3
+          assert len(receipt["simulation_reports"]) == 4
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -212,6 +240,7 @@ jobs:
             ${{ runner.temp }}/rcaf-injection-report.json
             ${{ runner.temp }}/rcaf-injection-sweep.json
             ${{ runner.temp }}/rcaf-estimator-tournament.json
+            ${{ runner.temp }}/rcaf-estimator-dose-surface.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
