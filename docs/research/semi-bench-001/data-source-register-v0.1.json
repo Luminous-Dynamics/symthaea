@@ -309,6 +309,94 @@
         "data_snapshot_status": "not-yet-frozen"
       },
       "evaluation_rule": "Treat as a derived reasoning/annotation benchmark sharing MixedWM38 image lineage, not an independent physical wafer corpus. Audit image-ID leakage and answer/reference contamination."
+    },
+    {
+      "id": "WM811K-GNN-Contrastive-2026",
+      "title": "Graph-based contrastive learning for self-supervised semiconductor wafer defect detection",
+      "paper": "https://doi.org/10.1007/s10845-026-02906-3",
+      "implementation": "https://github.com/irjawais/wafer-gnn-contrastive",
+      "metadata": {
+        "source_dataset": "WM-811K",
+        "wafer_maps": 811457,
+        "lots": 46293,
+        "sample_fraction": 0.3,
+        "sampled_maps": 243437,
+        "published_split": "stratified-60-20-20-sample-level",
+        "graph_connectivity": 8,
+        "labels": 9
+      },
+      "reported_results": {
+        "unsupervised_clustering_ari": 0.89,
+        "unsupervised_clustering_nmi": 0.87,
+        "fine_tuned_accuracy": 0.986,
+        "macro_f1": 0.975,
+        "accuracy_at_25_percent_labels": 0.957,
+        "loco_ood_detection_at_95_percent_id_retention": 0.893,
+        "loco_ood_auroc": 0.927,
+        "inference_latency_ms": 8.3,
+        "memory_mb": 387
+      },
+      "integrity_notes": [
+        "Paper split is sample-level stratified; no lot-disjoint or campaign-held-out claim follows.",
+        "Public code uses lotName for production proximity but does not implement lot-disjoint splitting.",
+        "Public OOD script appears to derive threshold from test_in while paper text describes validation calibration; resolve before claiming faithful reproduction.",
+        "Source-code license has not been verified; do not copy implementation until verified."
+      ],
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_WM811K_snapshot_sha256": null,
+        "exact_split_manifest_sha256": null,
+        "source_rights": "verify exact WM-811K distributor and license before acquisition"
+      }
+    },
+    {
+      "id": "Industrial-CP-DFC-Wafer-Maps-2026",
+      "title": "Adaptive open-world learning for analyzing wafer map variations",
+      "paper": "https://doi.org/10.1016/j.eswa.2026.131994",
+      "observation_views": [
+        "CP-map",
+        "DFC-map"
+      ],
+      "reported_methods": [
+        "M3Net",
+        "Parallel-SVM"
+      ],
+      "acquisition": {
+        "raw_data_available_publicly": "not-verified",
+        "source_license": "not-verified",
+        "sample_provenance": "not-verified",
+        "raw_data_in_repository": false
+      },
+      "evidence_class": "paper-reported-industrial-dataset; raw source access and licensing not established"
+    },
+    {
+      "id": "PPAPlace-5000",
+      "title": "PPAPlace training dataset",
+      "official_source": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
+      "related_code": "https://github.com/ValleyC/PPAPlace",
+      "metadata": {
+        "placement_samples": 5000,
+        "circuits": 10,
+        "placements_per_circuit": 500,
+        "compressed_archive_size_gib": 8.47,
+        "targets": [
+          "post-GRT-WNS",
+          "post-GRT-TNS",
+          "power",
+          "area"
+        ]
+      },
+      "license": {
+        "dataset_card_field": "other",
+        "exact_terms": "must be reviewed before downloading, caching or redistribution",
+        "status": "not-yet-cleared-for-redistribution"
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_dataset_revision": null,
+        "exact_archive_sha256": null,
+        "split_manifest_status": "not-yet-frozen"
+      }
     }
   ],
   "benchmark_reference_artifacts": {
