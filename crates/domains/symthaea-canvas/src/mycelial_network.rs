@@ -24,7 +24,7 @@ pub const DEFAULT_MAX_FUSION_DISTANCE: f32 = 5.0;
 const TIP_PARAMETER_EPSILON: f32 = 1.0e-4;
 const INTERIOR_PARAMETER_MARGIN: f32 = 0.05;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AnastomosisKind {
     TipToTip,
@@ -826,6 +826,64 @@ mod tests {
         assert_eq!(metrics.articulation_filament_count, 1);
         assert_eq!(metrics.max_components_after_single_filament_failure, 2);
         assert_eq!(model, original);
+    }
+
+    #[test]
+    fn anastomosis_detection_is_deterministic_and_only_proposes_contacts() {
+        let model = fork_model();
+        let original = model.clone();
+        let first = detect_anastomosis_candidates(
+            &model,
+            MycelialNetworkConfig::default(),
+        )
+        .unwrap();
+        let second = detect_anastomosis_candidates(
+            &model,
+            MycelialNetworkConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(first, second);
+        assert!(first.iter().any(|candidate| {
+            candidate.fusion.source_filament_id == 2
+                && candidate.fusion.target_filament_id == 3
+                && candidate.fusion.kind == AnastomosisKind::TipToSide
+                && (candidate.fusion.target_t - 0.5).abs() < 0.02
+                && candidate.contact_distance < 0.05
+        }));
+        assert_eq!(model, original);
+
+        // Detection itself is proposal-only: the tree still has no cycles.
+        let tree = build_mycelial_network_graph(
+            &model,
+            &[],
+            MycelialNetworkConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(tree.metrics().cycle_rank, 0);
+    }
+
+    #[test]
+    fn accepted_candidate_is_the_only_operation_that_adds_network_connectivity() {
+        let model = fork_model();
+        let candidate = detect_anastomosis_candidates(
+            &model,
+            MycelialNetworkConfig::default(),
+        )
+        .unwrap()
+        .into_iter()
+        .find(|candidate| {
+            candidate.fusion.source_filament_id == 2
+                && candidate.fusion.target_filament_id == 3
+                && candidate.fusion.kind == AnastomosisKind::TipToSide
+        })
+        .expect("known geometric contact");
+        let graph = build_mycelial_network_graph(
+            &model,
+            &[candidate.fusion],
+            MycelialNetworkConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(graph.metrics().cycle_rank, 1);
     }
 
     #[test]
