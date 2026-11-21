@@ -98,6 +98,28 @@ pub struct VlasovPoissonDiagnostics {
     pub velocity_boundary_ratio: f64,
 }
 
+
+/// Complex coefficient of a positive spatial Fourier mode of the electric field.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FourierModeCoefficient {
+    /// Real part of the normalised positive-mode coefficient.
+    pub real: f64,
+    /// Imaginary part of the normalised positive-mode coefficient.
+    pub imaginary: f64,
+}
+
+impl FourierModeCoefficient {
+    /// Magnitude of the complex mode coefficient.
+    pub fn amplitude(self) -> f64 {
+        self.real.hypot(self.imaginary)
+    }
+
+    /// Principal phase in radians, in the interval [-pi, pi].
+    pub fn phase(self) -> f64 {
+        self.imaginary.atan2(self.real)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SolverError {
     InvalidGrid {
@@ -312,9 +334,15 @@ impl VlasovPoisson1d1v {
         self.ensure_finite_state()
     }
 
-    /// Magnitude of the positive spatial Fourier coefficient (not cosine
-    /// peak amplitude) for the requested electric-field mode.
-    pub fn electric_mode_amplitude(&self, mode: usize) -> Result<f64, SolverError> {
+    /// Complex positive spatial Fourier coefficient for the requested mode.
+    ///
+    /// Returning real and imaginary parts retains temporal phase information.
+    /// Its magnitude is the Fourier coefficient magnitude, not the real-space
+    /// cosine peak amplitude.
+    pub fn electric_mode_coefficient(
+        &self,
+        mode: usize,
+    ) -> Result<FourierModeCoefficient, SolverError> {
         if mode == 0 || mode >= self.config.nx / 2 {
             return Err(SolverError::InvalidElectricMode {
                 mode,
@@ -327,7 +355,17 @@ impl VlasovPoisson1d1v {
             .map(|value| Complex::new(*value, 0.0))
             .collect();
         fft(&mut spectrum, false);
-        Ok(spectrum[mode].norm() / self.config.nx as f64)
+        let coefficient = spectrum[mode].scale(1.0 / self.config.nx as f64);
+        Ok(FourierModeCoefficient {
+            real: coefficient.re,
+            imaginary: coefficient.im,
+        })
+    }
+
+    /// Magnitude of the positive spatial Fourier coefficient (not cosine
+    /// peak amplitude) for the requested electric-field mode.
+    pub fn electric_mode_amplitude(&self, mode: usize) -> Result<f64, SolverError> {
+        Ok(self.electric_mode_coefficient(mode)?.amplitude())
     }
 
     pub fn diagnostics(&self) -> Result<VlasovPoissonDiagnostics, SolverError> {
@@ -853,6 +891,19 @@ mod tests {
             VlasovPoisson1d1v::new(config, initial),
             Err(SolverError::NonFiniteDistribution { index: 3 })
         ));
+    }
+
+    #[test]
+    fn electric_mode_coefficient_retains_phase_and_matches_amplitude() {
+        let config = test_config(32, 64);
+        let initial = maxwellian_perturbation(config, 1.0e-3, 1, 1.0).unwrap();
+        let solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        let coefficient = solver.electric_mode_coefficient(1).unwrap();
+
+        assert!(coefficient.real.abs() < 1.0e-14);
+        assert!(coefficient.imaginary > 0.0);
+        assert!((coefficient.amplitude() - solver.electric_mode_amplitude(1).unwrap()).abs() < 1.0e-15);
+        assert!(coefficient.phase().is_finite());
     }
 
     #[test]
