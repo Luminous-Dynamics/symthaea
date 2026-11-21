@@ -29,6 +29,50 @@ impl VelocityFrame {
         Ok(())
     }
 
+    /// Return exact first derivatives of the physical raw moments.
+    ///
+    /// The Jacobian is evaluated for fixed source computational moments:
+    /// - dM/dmu is a 3x3 matrix;
+    /// - dM/du is the derivative with respect to the frame shift;
+    /// - dM/dalpha is the derivative with respect to the positive frame scale.
+    ///
+    /// This is an analytic sensitivity for the affine moment map only. It does
+    /// not differentiate a sampled-distribution projection, a time integrator,
+    /// or a discrete representation-selection decision.
+    pub fn moment_jacobian(
+        self,
+        moments: FrameVelocityMoments,
+    ) -> Result<AffineMomentJacobian, VelocityFrameError> {
+        self.validate()?;
+        validate_moments(moments.zeroth, moments.first, moments.second)?;
+
+        let jacobian = AffineMomentJacobian {
+            with_respect_to_frame_moments: [
+                [1.0, 0.0, 0.0],
+                [self.shift, self.scale, 0.0],
+                [
+                    self.shift * self.shift,
+                    2.0 * self.shift * self.scale,
+                    self.scale * self.scale,
+                ],
+            ],
+            with_respect_to_shift: [
+                0.0,
+                moments.zeroth,
+                2.0 * self.shift * moments.zeroth
+                    + 2.0 * self.scale * moments.first,
+            ],
+            with_respect_to_scale: [
+                0.0,
+                moments.first,
+                2.0 * self.shift * moments.first
+                    + 2.0 * self.scale * moments.second,
+            ],
+        };
+        jacobian.validate()?;
+        Ok(jacobian)
+    }
+
     /// Convert moments of g(xi) = scale * f(shift + scale * xi) into
     /// physical-velocity moments of f(v).
     ///
@@ -103,6 +147,33 @@ pub struct PhysicalVelocityMoments {
     pub second: f64,
 }
 
+/// Exact Jacobian of physical moments with respect to source moments and frame parameters.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AffineMomentJacobian {
+    /// Rows are physical moments M0..M2; columns are computational moments mu0..mu2.
+    pub with_respect_to_frame_moments: [[f64; 3]; 3],
+    /// Derivatives of M0..M2 with respect to the frame shift.
+    pub with_respect_to_shift: [f64; 3],
+    /// Derivatives of M0..M2 with respect to the positive frame scale.
+    pub with_respect_to_scale: [f64; 3],
+}
+
+impl AffineMomentJacobian {
+    fn validate(self) -> Result<(), VelocityFrameError> {
+        if self
+            .with_respect_to_frame_moments
+            .iter()
+            .flatten()
+            .chain(self.with_respect_to_shift.iter())
+            .chain(self.with_respect_to_scale.iter())
+            .any(|value| !value.is_finite())
+        {
+            return Err(VelocityFrameError::NonFiniteJacobian);
+        }
+        Ok(())
+    }
+}
+
 /// Invalid affine-frame or moment input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VelocityFrameError {
@@ -111,6 +182,7 @@ pub enum VelocityFrameError {
     NonFiniteZerothMoment,
     NonFiniteFirstMoment,
     NonFiniteSecondMoment,
+    NonFiniteJacobian,
 }
 
 fn validate_moments(zeroth: f64, first: f64, second: f64) -> Result<(), VelocityFrameError> {
@@ -134,6 +206,112 @@ mod tests {
         assert!(
             (actual - expected).abs() <= tolerance,
             "actual={actual:.16e}, expected={expected:.16e}, tolerance={tolerance:.3e}"
+        );
+    }
+
+    #[test]
+    fn affine_moment_jacobian_matches_analytic_known_answer() {
+        let frame = VelocityFrame {
+            shift: 2.0,
+            scale: 0.5,
+        };
+        let moments = FrameVelocityMoments {
+            zeroth: 3.0,
+            first: 4.0,
+            second: 5.0,
+        };
+        let jacobian = frame.moment_jacobian(moments).unwrap();
+
+        assert_eq!(
+            jacobian.with_respect_to_frame_moments,
+            [
+                [1.0, 0.0, 0.0],
+                [2.0, 0.5, 0.0],
+                [4.0, 2.0, 0.25],
+            ]
+        );
+        assert_eq!(jacobian.with_respect_to_shift, [0.0, 3.0, 14.0]);
+        assert_eq!(jacobian.with_respect_to_scale, [0.0, 4.0, 13.0]);
+    }
+
+    #[test]
+    fn affine_shift_and_scale_jacobians_match_central_finite_differences() {
+        let frame = VelocityFrame {
+            shift: -0.7,
+            scale: 1.4,
+        };
+        let moments = FrameVelocityMoments {
+            zeroth: 1.3,
+            first: -0.2,
+            second: 0.9,
+        };
+        let analytic = frame.moment_jacobian(moments).unwrap();
+        let epsilon = 1.0e-6;
+
+        let plus_shift = VelocityFrame {
+            shift: frame.shift + epsilon,
+            ..frame
+        }
+        .frame_to_physical(moments)
+        .unwrap();
+        let minus_shift = VelocityFrame {
+            shift: frame.shift - epsilon,
+            ..frame
+        }
+        .frame_to_physical(moments)
+        .unwrap();
+        let shift_fd = [
+            (plus_shift.zeroth - minus_shift.zeroth) / (2.0 * epsilon),
+            (plus_shift.first - minus_shift.first) / (2.0 * epsilon),
+            (plus_shift.second - minus_shift.second) / (2.0 * epsilon),
+        ];
+
+        let plus_scale = VelocityFrame {
+            scale: frame.scale + epsilon,
+            ..frame
+        }
+        .frame_to_physical(moments)
+        .unwrap();
+        let minus_scale = VelocityFrame {
+            scale: frame.scale - epsilon,
+            ..frame
+        }
+        .frame_to_physical(moments)
+        .unwrap();
+        let scale_fd = [
+            (plus_scale.zeroth - minus_scale.zeroth) / (2.0 * epsilon),
+            (plus_scale.first - minus_scale.first) / (2.0 * epsilon),
+            (plus_scale.second - minus_scale.second) / (2.0 * epsilon),
+        ];
+
+        for index in 0..3 {
+            close(
+                shift_fd[index],
+                analytic.with_respect_to_shift[index],
+                2.0e-9,
+            );
+            close(
+                scale_fd[index],
+                analytic.with_respect_to_scale[index],
+                2.0e-9,
+            );
+        }
+    }
+
+    #[test]
+    fn affine_moment_jacobian_rejects_non_finite_derivatives() {
+        let frame = VelocityFrame {
+            shift: 1.0e200,
+            scale: 1.0,
+        };
+        let moments = FrameVelocityMoments {
+            zeroth: 1.0e200,
+            first: 0.0,
+            second: 1.0,
+        };
+        assert_eq!(
+            frame.moment_jacobian(moments),
+            Err(VelocityFrameError::NonFiniteJacobian)
         );
     }
 
