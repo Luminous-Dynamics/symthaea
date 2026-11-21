@@ -1593,6 +1593,10 @@ mod tests {
 
     const FIXTURE: &[u8] =
         include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json");
+    const PROPOSAL_FIXTURE: &[u8] =
+        include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json");
+    const OUTCOME_FIXTURE: &[u8] =
+        include_bytes!("../../../fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json");
     const SOURCE: &str = "0123456789abcdef0123456789abcdef01234567";
 
     #[test]
@@ -2011,6 +2015,56 @@ mod tests {
         assert!(targeted.change_frontier_complete);
         assert!(targeted.requalification_claims_covered);
         assert!(targeted.policy_eligible);
+    }
+
+    #[test]
+    fn evidence_action_proposal_is_strict_non_actuating_and_claim_scoped() {
+        let proposal: EvidenceActionProposalV1 =
+            serde_json::from_slice(PROPOSAL_FIXTURE).expect("proposal fixture must parse");
+        validate_action_proposal(&proposal).expect("proposal contract must validate");
+        assert_eq!(proposal.record_kind, "PROPOSAL");
+        assert!(proposal.no_actuation);
+        assert!(!proposal.authority_granted);
+        assert_eq!(
+            proposal.requalification_claims_covered,
+            vec!["STRUCTURAL-INTERFACE-CAPABILITY-001"]
+        );
+        assert_eq!(proposal.admissibility.state, "ADMISSIBLE");
+        assert_eq!(
+            proposal.change_impact.as_ref().unwrap().completeness,
+            "COMPLETE"
+        );
+    }
+
+    #[test]
+    fn aborted_action_outcome_preserves_actual_cost_without_qualification_promotion() {
+        let outcome: EvidenceActionOutcomeV1 =
+            serde_json::from_slice(OUTCOME_FIXTURE).expect("outcome fixture must parse");
+        validate_action_outcome(&outcome).expect("aborted outcome contract must validate");
+        assert_eq!(outcome.execution_state, "ABORTED");
+        assert!(outcome.execution_attempted);
+        assert_eq!(
+            outcome.actual_resources.as_ref().unwrap().engineering_hours,
+            1.2
+        );
+        assert_eq!(outcome.verification.state, "INDETERMINATE");
+        assert!(!outcome.authority_granted);
+    }
+
+    #[test]
+    fn attempted_outcome_without_actual_resources_is_rejected() {
+        let mut outcome: EvidenceActionOutcomeV1 =
+            serde_json::from_slice(OUTCOME_FIXTURE).unwrap();
+        outcome.actual_resources = None;
+        assert!(validate_action_outcome(&outcome).is_err());
+    }
+
+    #[test]
+    fn admissible_proposal_cannot_use_incomplete_change_frontier() {
+        let mut proposal: EvidenceActionProposalV1 =
+            serde_json::from_slice(PROPOSAL_FIXTURE).unwrap();
+        proposal.change_impact.as_mut().unwrap().completeness = "INCOMPLETE".to_owned();
+        assert!(validate_action_proposal(&proposal).is_err());
     }
 
     #[test]
