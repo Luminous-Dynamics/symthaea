@@ -547,8 +547,12 @@
       "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
       "reference_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
-      "hosted_ci_status": "pending-isolated-workspace-check",
-      "claim_ceiling": "metric contract parity only; no dataset model or manufacturing claim"
+      "hosted_ci_status": "success",
+      "claim_ceiling": "metric contract parity only; no dataset model or manufacturing claim",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44933592943",
+      "hosted_ci_test_count": 6,
+      "test_result": "6/6 Rust tests passed; format, clippy and byte-for-byte CLI report parity passed",
+      "tested_commit": "b0d17926ccedd5bd283556aec275302ea294a199"
     }
   },
   "reproducibility_artifacts": [
