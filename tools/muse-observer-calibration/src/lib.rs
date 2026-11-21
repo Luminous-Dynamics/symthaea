@@ -442,8 +442,12 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
             }
         }
     }
-    if !is_sha256(&dataset.dataset_sha256) || dataset_digest(dataset)? != dataset.dataset_sha256 {
-        return Err("calibration dataset commitment is invalid".into());
+    let computed_dataset_sha256 = dataset_digest(dataset)?;
+    if !is_sha256(&dataset.dataset_sha256) || computed_dataset_sha256 != dataset.dataset_sha256 {
+        return Err(format!(
+            "calibration dataset commitment is invalid (declared {}, computed {})",
+            dataset.dataset_sha256, computed_dataset_sha256
+        ));
     }
     Ok(())
 }
