@@ -148,6 +148,28 @@ pub fn build_cognitive_morphology(
     }
     spatial.geometry_digest_hex()?;
 
+    let mut link_by_id = HashMap::with_capacity(spatial.links.len());
+    for link in &spatial.links {
+        if link_by_id.insert(link.edge_id.as_str(), link).is_some() {
+            return Err(CognitiveMorphologyError::ProjectionMismatch);
+        }
+    }
+    for edge in &topology.edges {
+        let link = link_by_id
+            .get(edge.id.as_str())
+            .ok_or(CognitiveMorphologyError::ProjectionMismatch)?;
+        if link.source_node_id != edge.source
+            || link.target_node_id != edge.target
+            || link.relation != edge.relation
+            || link.status != edge.status
+            || link.source_event_id != edge.evidence.event_id
+            || link.source_sequence != edge.evidence.sequence
+            || link.provenance != edge.evidence.provenance
+        {
+            return Err(CognitiveMorphologyError::ProjectionMismatch);
+        }
+    }
+
     let mut anchor_by_id = HashMap::with_capacity(spatial.anchors.len());
     for anchor in &spatial.anchors {
         if anchor_by_id.insert(anchor.node_id.as_str(), anchor).is_some() {
@@ -483,9 +505,12 @@ mod tests {
             morphology.nodes.iter().map(|node| node.node_id.as_str()).collect::<Vec<_>>(),
             spatial.anchors.iter().map(|anchor| anchor.node_id.as_str()).collect::<Vec<_>>()
         );
+        let mut semantic_edge_ids: Vec<_> =
+            topology.edges.iter().map(|edge| edge.id.as_str()).collect();
+        semantic_edge_ids.sort_unstable();
         assert_eq!(
             morphology.hyphae.iter().map(|hypha| hypha.edge_id.as_str()).collect::<Vec<_>>(),
-            topology.edges.iter().map(|edge| edge.id.as_str()).collect::<Vec<_>>()
+            semantic_edge_ids
         );
         assert!(morphology.hyphae.iter().all(|hypha| {
             hypha.evidence.provenance == CognitiveProvenance::SyntheticFixture
@@ -591,6 +616,21 @@ mod tests {
     fn stale_or_foreign_spatial_projection_is_rejected() {
         let (topology, mut spatial) = fixture_projection();
         spatial.topology_digest = "0".repeat(64);
+        assert_eq!(
+            build_cognitive_morphology(
+                &topology,
+                &spatial,
+                CognitiveMorphologyConfig::default()
+            ),
+            Err(CognitiveMorphologyError::ProjectionMismatch)
+        );
+    }
+
+    #[test]
+    fn semantically_mismatched_spatial_link_is_rejected() {
+        let (topology, mut spatial) = fixture_projection();
+        let existing_node = topology.nodes[0].id.clone();
+        spatial.links[0].target_node_id = existing_node;
         assert_eq!(
             build_cognitive_morphology(
                 &topology,
