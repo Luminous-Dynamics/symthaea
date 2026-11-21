@@ -349,17 +349,19 @@ Implemented in source:
 1. `cognitive_topology.rs`: schema-v1 nodes, edges and episodes; bounded collections; explicit RuntimeEvent, RuntimeDerived and SyntheticFixture provenance; fail-closed validation for IDs, duplicate references, dangling links, event metadata consistency, sequence/time ordering, activation ranges, trace digests and resource limits.
 2. `tests/fixtures/cognitive_topology_v1.json`: a clearly synthetic retrieval path, two competing associations and one unresolved prediction.
 3. `CognitiveTopology::canonical_digest`: BLAKE3 digest over canonical ID-sorted semantic state, independent of array ordering and renderer configuration.
-4. `cognitive_layout.rs`: a deliberately simple hash-anchored 3D projection; stable node IDs retain their anchors when new nodes are appended, and links carry source event/provenance/status.
-5. `examples/cognitive_topology_replay.rs`: validates the fixture and prints topology and projection digests/counts.
-6. Unit-test source covers checked-in fixture parity, order-independent digest, semantic mutation, dangling endpoints, renderer-local provenance rejection, conflicting metadata, non-monotonic times, invalid activation and oversized graph bounds.
+4. `cognitive_layout.rs`: a hash-anchored baseline plus a deterministic force-directed v1 refinement. The refinement uses bounded pairwise repulsion, relation-edge attraction, and a same-session previous-position regularizer. It does not change the semantic graph or convert epistemic status into force strength.
+5. `CognitiveSpatialProjection` binds session identity and exposes a geometry digest over sorted stable IDs, link endpoints, and coordinates quantized to 0.001 world units.
+6. `examples/cognitive_topology_replay.rs`: validates the fixture, emits semantic and geometry digests, and runs a CPU-only layout microbenchmark (20 warmups, configurable sample count, default 500; P50/P95 reported).
+7. Unit-test source covers checked-in fixture parity, order-independent semantic/layout output, semantic mutation, dangling endpoints, renderer-local provenance rejection, conflicting metadata, non-monotonic times, invalid activation, oversized graph bounds, previous-session rejection, and bounded temporal anchor drift.
 
-This is not yet a graph-optimized layout, smooth morphogenesis engine, live cognitive producer or human-validated instrument. The hash-anchor map is a stable baseline for comparing relation-aware layouts. The synthetic fixture is not live Symthaea cognition.
+This is not yet a smooth morphogenesis engine, live cognitive producer or human-validated instrument. The force layout is an initial relation-aware baseline, not a measured layout winner. The synthetic fixture is not live Symthaea cognition. CPU layout microbenchmark output is not a GPU frame or visual-quality result.
 
 Remaining:
-- exact-head format/test/Clippy validation;
+- exact-head formatting, compilation, all tests, Bevy adapter tests and Clippy;
 - a real retrieval producer from its owning subsystem;
-- relation-aware space-colonization / other layouts and temporal stability metrics;
-- static render and selection/provenance interaction;
+- static graph render and selectable provenance interaction;
+- comparison against space-colonization and Physarum-inspired derived layouts;
+- mesh junction quality and rendered-device benchmarks;
 - a matched human-factors study.
 
 Implementation and follow-on research are tracked in [#13066](https://github.com/Luminous-Dynamics/symthaea/issues/13066), [#13077](https://github.com/Luminous-Dynamics/symthaea/issues/13077), and [#13079](https://github.com/Luminous-Dynamics/symthaea/issues/13079).
