@@ -44,7 +44,7 @@ No new HDC binding or bundling primitive is introduced. The static HDC bundle is
 | `hdc_ltc_zero_input` | Original bundle evolved under zero input | Passive state evolution without new sensory content |
 | `hdc_ltc_distractor` | Original bundle evolved under deterministic unrelated bipolar inputs | Retention under interference |
 
-For dynamic conditions, the same input-event count is run with regular and deterministic irregular time gaps summing approximately to the requested horizon. Each gap is supplied causally; no future input is visible. The current neuron floors each integration interval at (10^{-9}) seconds, so the runner rejects smaller positive gaps to prevent the evolved state and reported logical time from diverging. A positive horizon must contain at least one evolution event. Static controls are emitted once per corpus, not copied into each temporal cohort.
+For dynamic conditions, the same input-event count is run with regular and deterministic irregular time gaps summing approximately to the requested horizon. Each gap is supplied causally; no future input is visible. The current neuron floors each integration interval at (10^{-9}) seconds, so the runner rejects smaller positive gaps to prevent the evolved state and reported logical time from diverging. A positive horizon must contain at least one evolution event. Dimensions below 8 are rejected because the neuron constructor orthogonalizes five internal hypervectors and very small dimensions make that initialization degenerate. Static controls are emitted once per corpus, not copied into each temporal cohort.
 
 The neuron is initialized with the exact same bundle via the existing public state setter and the same deterministic model seed across the two dynamic conditions. Its configuration, weights and state are therefore paired for each seed/dimension/load.
 
@@ -59,7 +59,8 @@ Each cohort also emits:
 - a **finite-sample plug-in Fano diagnostic**;
 - initial/final state L2 norms, so the neuron's post-step global norm cap (5.0 in the current implementation) is visible rather than hidden in a cosine-only metric;
 - neuron API update count and neuron-reported logical time;
-- separate wall-time observations for model setup, input preparation, state evolution and query decoding.
+- separate wall-time observations for codebook construction, model setup, event/gap preparation, state evolution and query decoding;
+- the exact positive interval schedule for each dynamic cohort, its coefficient of variation, and each distractor input seed.
 
 For (K) balanced labels and top-1 error rate (e), the Fano expression is:
 
@@ -70,7 +71,7 @@ max{0,log_2 K-h_2(e)-elog_2(K-1)}.
 
 The JSON field is named `plug_in_fano_information_lower_bound_bits`, but the value is calculated from the finite cohort's observed error rate. It is a descriptive plug-in diagnostic—not a confidence interval, a distribution-free finite-sample guarantee, or a substitute for estimating mutual information under a specified sampling distribution. The diagnostic is not the same as retrieval accuracy: a deterministic but wrong permutation can still preserve information about the label while failing the original semantic lookup. The per-query rows are retained so that uncertainty estimation and alternative estimators can be applied later.
 
-Wall-clock fields are observations from a single process run, not energy measurements. The model setup and input preparation costs are separated from the neuron-evolution loop; the latter includes the neuron method's own post-step statistics work. The API update counter counts public evolution calls, not floating-point operations or internal component operations. The initial and final state norms are diagnostics because the current HDC-LTC implementation rescales a state above its global norm limit after evolution; comparisons across dimension/fan-in must account for this nonlinear amplitude effect.
+Wall-clock fields are observations from a single process run, not energy measurements. The model setup and input preparation costs are separated from the neuron-evolution loop; the latter includes the neuron method's own post-step statistics work. The API update counter counts public evolution calls, not floating-point operations or internal component operations. The seed derivation is domain-separated: key codes use domain 1, value codes domain 2, the gap generator domain 3, neuron initialization domain 4, distractor vectors domain 5, and random null-query keys domain 6. The exact intervals and distractor seeds are emitted in the summary so replay does not depend on reconstructing an implicit schedule. The initial and final state norms are diagnostics because the current HDC-LTC implementation rescales a state above its global norm limit after evolution; comparisons across dimension/fan-in must account for this nonlinear amplitude effect.
 
 ## Running
 
@@ -84,7 +85,7 @@ cargo run --release --manifest-path crates/core/symthaea-hdc-ltc/Cargo.toml \
 ```
 
 Arguments:
-- `--dims`: vector dimensions (2–262144);
+- `--dims`: vector dimensions (8–262144);
 - `--loads`: memory fan-in (2–512);
 - `--horizons`: finite non-negative horizons in seconds; zero is reserved for identity/static controls;
 - `--events`: number of evolution calls for each dynamic cohort; the codebook and event-input arrays are capped at 8,388,608 dimension-elements per configured cohort to avoid unbounded allocations;
