@@ -195,3 +195,27 @@ This is a **group-split and design-semantics auditor**, not a variance-component
 
 
 Reproducibility fixture semantic note: non-Tc observations (including local pairing energy and superfluid stiffness) use `tc_criterion: not_applicable`; `null` is not used to represent this state. The synthetic predicted-Tc fixture is human-curated and is therefore not labelled as an external database import.
+
+
+## REBCO 3D anisotropy: local tape-frame transform contract
+
+Schema: `data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json`
+
+Synthetic geometry fixture: `tools/superconductivity-discovery-harness/fixtures/rebco_local_tape_frame_smoke_v0_1.json`
+
+Auditor: `tools/superconductivity-discovery-harness/src/bin/rebco_local_tape_frame_audit.rs`
+
+Run:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_rebco_local_tape_frame_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_rebco_local_tape_frame_audit -- \
+  --schema data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json \
+  --fixture tools/superconductivity-discovery-harness/fixtures/rebco_local_tape_frame_smoke_v0_1.json
+```
+
+The v0.1 contract fixes a right-handed local tape basis: longitudinal, width, normal. The 3x3 matrix columns are those local unit axes expressed in global coordinates. The auditor verifies finite entries, orthonormality, determinant +1, source digest shape and inverse transform residual, then transforms the global magnetic-field vector into the local tape frame. It emits `theta` from the local tape normal and `phi` in the tape plane from longitudinal toward width.
+
+A zero or near-zero field has no defined orientation; the receipt returns null angles rather than NaN or a fabricated direction. A field parallel to the local normal has undefined in-plane azimuth and returns null `phi`.
+
+This is a **synthetic coordinate-transform and vector-geometry auditor only**. The declared angular uncertainty is preserved but not yet propagated through a surface fit; no (I_c(B,T,\theta,\phi)) data are fitted or extrapolated. No magnetic field solver, as-built winding reconstruction, stress/strain model, conductor margin calculation, or physical coil qualification is performed. The next stage must consume a source-pinned as-built coil path and independently qualified field map, then join only admitted anisotropy measurements within their measured domain.
