@@ -261,7 +261,8 @@ def audit_scenario(scenario):
         raise ValueError("unsupported evidence or claim ceiling")
     states = scenario["states"]
     decisions = scenario["decisions"]
-    if (set(scenario["decision_obligations"]) != set(decisions)
+    if (set(decisions) != {"ACCEPT", "REJECT", "HOLD"}
+            or set(scenario["decision_obligations"]) != set(decisions)
             or any(not isinstance(items, list) or len(items) != len(set(items))
                    or any(not isinstance(item, str) or not item.strip() for item in items)
                    for items in scenario["decision_obligations"].values())
