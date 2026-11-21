@@ -29,6 +29,7 @@ concurrency:
 
 jobs:
   qualify:
+    if: ${{ hashFiles('crates/domains/symthaea-muse/src/score_transaction.rs') != '' }}
     name: Exact-head score transaction qualification
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -44,8 +45,10 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          test "$actual" = "${{ github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
           printf 'source_head=%s\n' "$actual" > "$RUNNER_TEMP/source-identities.txt"
+          printf 'expected_source=%s\n' "$expected" >> "$RUNNER_TEMP/source-identities.txt"
           printf 'event_name=%s\n' "${{ github.event_name }}" >> "$RUNNER_TEMP/source-identities.txt"
           printf 'pr_head=%s\n' "${{ github.event.pull_request.head.sha || '' }}" >> "$RUNNER_TEMP/source-identities.txt"
           printf 'base_head=%s\n' "${{ github.event.pull_request.base.sha || '' }}" >> "$RUNNER_TEMP/source-identities.txt"
