@@ -1112,6 +1112,67 @@ mod tests {
     }
 
     #[test]
+    fn fork_at_sequence_replays_prefix_and_allows_independent_branches() {
+        let base_snapshot = base();
+        let complete_log = vec![
+            add_node(1, "memory:shared"),
+            add_node(2, "memory:original-branch"),
+        ];
+
+        let mut left = CognitiveTopologyReducer::fork_at_sequence(
+            base_snapshot.clone(),
+            &complete_log,
+            1,
+        )
+        .expect("fork at common prefix");
+        let mut right = CognitiveTopologyReducer::fork_at_sequence(
+            base_snapshot.clone(),
+            &complete_log,
+            1,
+        )
+        .expect("second fork at common prefix");
+
+        left.apply_event(add_node(2, "concept:left-hypothesis"))
+            .unwrap();
+        right
+            .apply_event(add_node(2, "concept:right-hypothesis"))
+            .unwrap();
+
+        assert_eq!(left.snapshot().nodes[0], right.snapshot().nodes[0]);
+        assert_ne!(left.snapshot_digest_hex().unwrap(), right.snapshot_digest_hex().unwrap());
+        assert_ne!(left.event_log_digest_hex().unwrap(), right.event_log_digest_hex().unwrap());
+        assert_eq!(base_snapshot.nodes.len(), 0);
+        assert_eq!(complete_log.len(), 2);
+    }
+
+    #[test]
+    fn fork_before_materialized_base_sequence_is_rejected() {
+        let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
+        reducer.apply_event(add_node(1, "memory:base")).unwrap();
+        let materialized_base = reducer.snapshot().clone();
+        assert!(matches!(
+            CognitiveTopologyReducer::fork_at_sequence(materialized_base, &[], 0),
+            Err(CognitiveEventError::ForkBeforeBase {
+                base_sequence: 1,
+                requested_sequence: 0
+            })
+        ));
+    }
+
+    #[test]
+    fn causation_pointer_is_part_of_event_identity() {
+        let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
+        let original = add_node(1, "memory:a");
+        reducer.apply_event(original.clone()).unwrap();
+        let mut different_cause = original;
+        different_cause.caused_by_event_id = Some("event:other-parent".to_string());
+        assert!(matches!(
+            reducer.apply_event(different_cause),
+            Err(CognitiveEventError::ConflictingDuplicate(_))
+        ));
+    }
+
+    #[test]
     fn sequence_gaps_and_timestamp_regressions_fail_without_mutation() {
         let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
         assert!(matches!(
