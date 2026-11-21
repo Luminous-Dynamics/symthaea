@@ -1,0 +1,104 @@
+{
+  "schema": "symthaea.active_sensing_decision_observability_mixed",
+  "version": "0.1.0",
+  "tracking_issue": 9563,
+  "status": "source_authored_not_executed",
+  "parent_pr": 13152,
+  "evaluator_package": "research/temporal-evaluator",
+  "evaluator_module": "research/temporal-evaluator/src/decision_observability_mixed.rs",
+  "public_module_export": "research/temporal-evaluator/src/main.rs",
+  "candidate_fields": [
+    "observation_history_sha256",
+    "recurrent_state_sha256",
+    "model_configuration_sha256",
+    "policy_seed",
+    "candidate_policy_sha256",
+    "candidate_action_distribution"
+  ],
+  "evaluator_only_fields": [
+    "evaluator_world_id",
+    "hidden_world_sha256",
+    "action_losses_ppm"
+  ],
+  "candidate_requirements": {
+    "same_view_across_hidden_worlds": true,
+    "same_policy_identity_across_hidden_worlds": true,
+    "same_probability_kernel_across_hidden_worlds": true,
+    "probability_mass_ppm": 1000000,
+    "common_admissible_action_set": true,
+    "hidden_world_fields_not_candidate_visible": true
+  },
+  "solver": {
+    "family": "simultaneous_exponential_weights_no_regret",
+    "default_iterations": 4096,
+    "max_iterations": 8192,
+    "default_learning_rate_ppm": 50000,
+    "default_duality_gap_tolerance_ppm": 10000,
+    "max_alternatives": 128,
+    "max_actions": 64,
+    "float_optimizer_with_integer_outward_rounded_final_bounds": true,
+    "output": "primal_upper_and_dual_lower_bound_with_measured_gap",
+    "approximate_not_exact": true,
+    "common_optimal_action_fast_path": true,
+    "common_optimal_action_fast_path_iterations": 0
+  },
+  "metrics": [
+    "candidate_worst_case_expected_regret_lower_bound_ppm",
+    "candidate_worst_case_expected_regret_upper_bound_ppm",
+    "deterministic_minimax_regret_ppm",
+    "mixed_minimax_lower_bound_ppm",
+    "mixed_minimax_upper_bound_ppm",
+    "mixed_solver_duality_gap_ppm",
+    "mixed_minimax_strategy",
+    "avoidable_regret_lower_bound_ppm",
+    "avoidable_regret_upper_bound_ppm",
+    "solver_tolerance_met"
+  ],
+  "tests_authored": 11,
+  "tests_executed": false,
+  "benchmark_runs": false,
+  "security_qualified": false,
+  "hardware_measured": false,
+  "energy_measured": false,
+  "sota_claim": false,
+  "prior_art": [
+    {
+      "topic": "no-regret algorithms for finite zero-sum games",
+      "authors": "Daskalakis et al.",
+      "url": "https://arxiv.org/abs/1408.5464",
+      "relevance": "algorithmic prior art; this implementation is not claimed as a new game-solving method"
+    }
+  ],
+  "synthetic_control": {
+    "action_ids": [
+      "left",
+      "right"
+    ],
+    "worlds": [
+      {
+        "world_id": 1,
+        "losses_ppm": {
+          "left": 0,
+          "right": 1000000
+        }
+      },
+      {
+        "world_id": 2,
+        "losses_ppm": {
+          "left": 1000000,
+          "right": 0
+        }
+      }
+    ],
+    "deterministic_minimax_regret_ppm": 1000000,
+    "uniform_mixed_minimax_regret_ppm": 500000,
+    "interpretation": "illustrative finite-matrix unit control, not a benchmark result"
+  },
+  "claim_ceiling": [
+    "finite declared world and action set only",
+    "single-decision probability kernel only",
+    "does not establish completeness of hidden worlds",
+    "does not establish OS or process oracle isolation",
+    "no SOTA, energy, hardware or deployment improvement claim"
+  ]
+}
