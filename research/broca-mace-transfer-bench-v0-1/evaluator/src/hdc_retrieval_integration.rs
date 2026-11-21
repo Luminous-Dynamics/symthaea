@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_hdc_retrieval::{
-    CandidateHit, CandidateIndex, IndexConfig, RepresentationProfile,
+    experience_view_digest, CandidateHit, CandidateIndex, IndexConfig,
+    RepresentationProfile,
 };
 use broca_mace_policy::{decide, Action, Policy};
 
@@ -20,6 +21,9 @@ fn resolve_hits(
         let Some(experience) = canonical.get(&hit.event_id) else {
             return Err(hit.event_id);
         };
+        if experience_view_digest(experience) != hit.view_digest {
+            return Err(hit.event_id);
+        }
         resolved.push(*experience);
     }
     Ok(resolved)
@@ -100,12 +104,38 @@ fn unresolved_hdc_candidate_identifier_fails_closed() {
     let canonical = BTreeMap::new();
     let forged = CandidateHit {
         event_id: u32::MAX,
+        view_digest: [0; 32],
         similarity: 1.0,
         rank: 1,
     };
     assert!(matches!(
         resolve_hits(&[forged], &canonical),
         Err(event_id) if event_id == u32::MAX
+    ));
+}
+
+#[test]
+fn changed_canonical_record_invalidates_a_previously_retrieved_hit() {
+    let case = cases()
+        .into_iter()
+        .find(|item| item.name == "source_retraction")
+        .expect("retraction scenario exists");
+    let index = CandidateIndex::build(&case.session_a, IndexConfig::default()).unwrap();
+    let result = index.retrieve(case.session_b.scope, Action::A, 16);
+    let hit = result.candidates.first().expect("A evidence candidate exists");
+    let mut canonical: BTreeMap<u32, Experience> = case
+        .session_a
+        .iter()
+        .map(|item| (item.event_id, *item))
+        .collect();
+    let changed = canonical
+        .get_mut(&hit.event_id)
+        .expect("candidate resolves before correction");
+    changed.source_retracted = true;
+
+    assert!(matches!(
+        resolve_hits(std::slice::from_ref(hit), &canonical),
+        Err(event_id) if event_id == hit.event_id
     ));
 }
 

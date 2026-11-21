@@ -65,6 +65,7 @@ impl From<&Experience> for BucketKey {
 #[derive(Clone, Debug)]
 struct CandidateCode {
     event_id: u32,
+    view_digest: [u8; 32],
     code: ContinuousHV,
 }
 
@@ -107,6 +108,9 @@ impl std::error::Error for BuildError {}
 #[derive(Clone, Debug)]
 pub struct CandidateHit {
     pub event_id: u32,
+    /// SHA-256 of the candidate-visible Experience view at index-build time.
+    /// A consistency check only; not a source signature or trust attestation.
+    pub view_digest: [u8; 32],
     pub similarity: f32,
     pub rank: usize,
 }
@@ -165,6 +169,7 @@ impl CandidateIndex {
                 .iter()
                 .map(|item| CandidateCode {
                     event_id: item.event_id,
+                    view_digest: experience_view_digest(item),
                     code: event_code(config.dimension, config.codebook_seed, item.event_id),
                 })
                 .collect();
@@ -258,21 +263,22 @@ impl CandidateIndex {
 
         // Bipolar role keys are self-inverse under element-wise multiplication.
         let decoded = bucket.role_key.bind(&bucket.memory_state);
-        let mut ranked: Vec<(u32, f32)> = bucket
+        let mut ranked: Vec<(u32, [u8; 32], f32)> = bucket
             .candidates
             .iter()
             .map(|candidate| {
                 (
                     candidate.event_id,
+                    candidate.view_digest,
                     decoded.similarity(&candidate.code),
                 )
             })
-            .filter(|(_, similarity)| similarity.is_finite())
+            .filter(|(_, _, similarity)| similarity.is_finite())
             .collect();
         ranked.sort_by(|left, right| {
             right
-                .1
-                .total_cmp(&left.1)
+                .2
+                .total_cmp(&left.2)
                 .then_with(|| left.0.cmp(&right.0))
         });
 
@@ -280,8 +286,9 @@ impl CandidateIndex {
             .into_iter()
             .take(top_k)
             .enumerate()
-            .map(|(rank, (event_id, similarity))| CandidateHit {
+            .map(|(rank, (event_id, view_digest, similarity))| CandidateHit {
                 event_id,
+                view_digest,
                 similarity,
                 rank: rank + 1,
             })
@@ -342,6 +349,67 @@ pub fn exact_scan_candidate_ids(
         .take(top_k)
         .map(|item| item.event_id)
         .collect()
+}
+
+/// Fingerprint the candidate-visible Experience view so a resolver can
+/// reject an index hit if the canonical record changed after index construction.
+/// This does not bind raw source bytes and is not a provenance/trust proof.
+pub fn experience_view_digest(item: &Experience) -> [u8; 32] {
+    use broca_mace_policy::IdentificationMethodV1;
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:experience-view:v1\\0");
+    hasher.update(item.event_id.to_be_bytes());
+    hasher.update(item.source_family.to_be_bytes());
+    hasher.update(item.source_root_id.to_be_bytes());
+    hasher.update(item.source_root_digest.as_bytes());
+    hasher.update([
+        match item.scope.regime {
+            Regime::Baseline => 1,
+            Regime::Shifted => 2,
+        },
+        match item.scope.objective {
+            Objective::Quality => 1,
+            Objective::Cost => 2,
+            Objective::Speed => 3,
+        },
+        match item.action {
+            Action::A => 1,
+            Action::B => 2,
+        },
+    ]);
+    hasher.update(item.observed_utility.to_bits().to_be_bytes());
+    hasher.update(item.measurement_error_bound.to_bits().to_be_bytes());
+
+    let identification = item.causal_identification;
+    hasher.update([
+        match identification.method {
+            IdentificationMethodV1::RandomizedControlledTrial => 1,
+            IdentificationMethodV1::QuasiExperimental => 2,
+            IdentificationMethodV1::Observational => 3,
+            IdentificationMethodV1::Unknown => 4,
+        },
+        u8::from(identification.interference_controlled),
+    ]);
+    hasher.update(identification.design_digest.as_bytes());
+    hasher.update(identification.estimand_digest.as_bytes());
+    hasher.update(identification.semantic_estimand.canonical_digest().as_bytes());
+    hasher.update(identification.propensity_min_bps.to_be_bytes());
+    hasher.update(identification.propensity_max_bps.to_be_bytes());
+    hasher.update(identification.max_standardized_mean_difference_micros.to_be_bytes());
+    hasher.update([
+        u8::from(item.intervention),
+        u8::from(item.prediction_pre_registered),
+        u8::from(item.outcome_reconciled),
+        u8::from(item.source_trusted),
+        u8::from(item.source_retracted),
+        u8::from(item.confounders_controlled),
+        u8::from(item.delayed_horizon_complete),
+    ]);
+    let digest = hasher.finalize();
+    let mut output = [0_u8; 32];
+    output.copy_from_slice(&digest);
+    output
 }
 
 fn validate_config(config: IndexConfig) -> Result<(), BuildError> {
@@ -514,6 +582,10 @@ mod tests {
         );
         assert_eq!(result.candidates.len(), 1);
         assert_eq!(result.candidates[0].event_id, 41);
+        assert_eq!(
+            result.candidates[0].view_digest,
+            experience_view_digest(&memory[0])
+        );
         assert!((result.candidates[0].similarity - 1.0).abs() < 1e-5);
         assert!(!result.abstained);
     }

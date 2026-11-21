@@ -30,3 +30,5 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 ```
 
 Tests are authored but have not been executed in the current environment.
+
+Candidate hits also carry a SHA-256 fingerprint of the candidate-visible `Experience` view at index-build time. The consumer compares it to the current canonical record before resolving the ID. A correction or retraction that changes the view invalidates the old hit and requires re-indexing. This is a consistency check only: it does not bind raw source bytes or authenticate source provenance.
