@@ -51,6 +51,18 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Bind exact build identity into the compiled RMI binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          rustc_identity="$(rustc --version)"
+          lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          printf 'SYMTHAEA_MUSE_GIT_REV=%s\n' "$source_sha" >> "$GITHUB_ENV"
+          printf 'RUSTC_VERSION=%s\n' "$rustc_identity" >> "$GITHUB_ENV"
+          printf 'MUSE_RMI_CARGO_LOCK_SHA256=%s\n' "$lock_sha" >> "$GITHUB_ENV"
+          printf 'exact_source=%s\ncompiler=%s\nlock_sha256=%s\n' "$source_sha" "$rustc_identity" "$lock_sha"
+
       - name: Resolve real workspace manifests under the committed lockfile
         run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
 
@@ -85,7 +97,10 @@ jobs:
           cp "$RUNNER_TEMP/source-identities.txt" "$evidence/source-identities.txt"
           cp Cargo.lock "$evidence/Cargo.lock"
           cp "$RUNNER_TEMP/melothaea-rmi-track-a-real-workspace.json" "$evidence/rmi-report.json"
-          sha256sum             "$evidence/workspace-metadata.json"             "$evidence/source-identities.txt"             "$evidence/Cargo.lock"             "$evidence/rmi-report.json" > "$evidence/SHA256SUMS"
+          (
+            cd "$evidence"
+            sha256sum workspace-metadata.json source-identities.txt Cargo.lock rmi-report.json > SHA256SUMS
+          )
 
       - name: Upload exact merge-head integration evidence
         uses: actions/upload-artifact@v4
