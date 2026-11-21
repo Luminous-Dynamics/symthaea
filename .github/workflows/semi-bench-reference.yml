@@ -98,3 +98,11 @@ jobs:
         run: cargo clippy --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --all-targets -- -D warnings
       - name: Test Rust semiconductor scorer
         run: cargo test --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml
+      - name: Reproduce Rust binary metric report byte-for-byte
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-binary-metrics -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json \
+            > /tmp/semi-rust-rust-metrics.json
+          diff -u \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json \
+            /tmp/semi-rust-rust-metrics.json
