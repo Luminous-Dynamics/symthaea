@@ -1,0 +1,112 @@
+{
+  "schema": "EvidenceActionProposalOutcomeV1",
+  "record_kind": "PROPOSAL",
+  "action_id": "JEV-017-A-TARGETED-STRUCTURAL-REQUALIFICATION",
+  "policy_id": "SYMYTHAEA-ORBITAL-JOINT-EVIDENCE-VOI",
+  "policy_version": "0.1",
+  "proposal_generation": 1,
+  "decision_context": {
+    "profile_ref": "provider-client-profile://P2-C2@cfg-r8",
+    "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0002",
+    "configuration_id": "CFG-R8",
+    "icd_revision": "R4"
+  },
+  "target_claim_ids": [
+    "STRUCTURAL-INTERFACE-CAPABILITY-001"
+  ],
+  "action_class": "COUPON_TEST",
+  "method_ref": {
+    "id": "method:combined-load-coupon-v1",
+    "kind": "test_procedure",
+    "revision": "v1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "admissibility": {
+    "state": "ADMISSIBLE",
+    "reason_codes": [],
+    "evidence_refs": [
+      {
+        "id": "mycelix-change-impact://MATERIAL-PROCESS-CHANGE-017",
+        "kind": "change_impact_receipt"
+      },
+      {
+        "id": "symtropy-profile://P2-C2-CFG-R8-ICD-R4",
+        "kind": "structural_interface_profile"
+      }
+    ]
+  },
+  "change_impact": {
+    "source_owner": "mycelix:6219",
+    "receipt_ref": "mycelix-change-impact://MATERIAL-PROCESS-CHANGE-017",
+    "event_frontier_ref": "event-frontier://STRUCTURAL-AERO-COMPLETE-017",
+    "completeness": "COMPLETE",
+    "required_requalification_claims": [
+      "STRUCTURAL-INTERFACE-CAPABILITY-001"
+    ],
+    "unaffected_claims": [
+      "DESIGN-IDENTITY-001"
+    ]
+  },
+  "expected_outputs": [
+    {
+      "output_id": "combined-load-response",
+      "semantic_type": "combined_load_capability",
+      "unit": "N,Nm",
+      "frame_ref": {
+        "id": "frame:joint-interface-v1",
+        "kind": "coordinate_frame",
+        "revision": "v1"
+      },
+      "coverage_ref": {
+        "id": "coverage:combined-load-envelope-v1",
+        "kind": "load_case_coverage"
+      },
+      "verifier_ref": {
+        "id": "verifier:independent-structural-review",
+        "kind": "verification_authority"
+      }
+    }
+  ],
+  "predicted_value": {
+    "regime": "distribution_free",
+    "metric": "MINIMAX_REGRET_REDUCTION",
+    "value": 5,
+    "value_unit": "synthetic_decision_loss_units",
+    "uncertainty_set_ref": {
+      "id": "uncertainty-set:joint-state-v1",
+      "kind": "finite_state_uncertainty_set"
+    }
+  },
+  "resource_plan": {
+    "engineering_hours": 1,
+    "compute_core_hours": 0,
+    "facility_hours": 1,
+    "specimen_count": 1,
+    "review_hours": 0.5,
+    "external_cost_units": 1
+  },
+  "remaining_budget": {
+    "engineering_hours": 2,
+    "compute_core_hours": 1,
+    "facility_hours": 2,
+    "specimen_count": 1,
+    "review_hours": 2,
+    "external_cost_units": 2
+  },
+  "owner_approvals": [
+    {
+      "owner_ref": {
+        "id": "test-authority:qualified-human-owner",
+        "kind": "external_test_authority"
+      },
+      "approval_state": "REVIEW_REQUIRED",
+      "approval_evidence_refs": []
+    }
+  ],
+  "claim_ceiling": "proposal_only_no_qualification_authority",
+  "no_actuation": true,
+  "authority_granted": false,
+  "requalification_claims_covered": [
+    "STRUCTURAL-INTERFACE-CAPABILITY-001"
+  ]
+}

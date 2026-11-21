@@ -1,0 +1,621 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/OrbitalJointEvidenceVoiScenariosV0_1.json",
+  "title": "OrbitalJointEvidenceVoiScenarioCorpusV0_1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "evidence_class",
+    "claim_ceiling",
+    "resource_dimensions",
+    "loss_units",
+    "observation_semantics",
+    "policies_to_compare",
+    "scenarios"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.orbital-joint-evidence-voi.scenarios.v0.1"
+    },
+    "benchmark_id": {
+      "const": "ORBITAL-JOINT-EVIDENCE-VOI-001"
+    },
+    "evidence_class": {
+      "const": "synthetic"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_decision_value_semantics_only"
+    },
+    "resource_dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "loss_units": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_semantics": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policies_to_compare": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    }
+  },
+  "$defs": {
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engineering_hours",
+        "compute_core_hours",
+        "facility_hours",
+        "specimen_count",
+        "review_hours",
+        "external_cost_units"
+      ],
+      "properties": {
+        "engineering_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "compute_core_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "facility_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "specimen_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "review_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "external_cost_units": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "claim_ceiling",
+        "evidence_class",
+        "decision_regime",
+        "states",
+        "loss_matrix",
+        "prior",
+        "current_evidence_refs",
+        "budget",
+        "actions",
+        "expected",
+        "current_evidence_dependency_groups",
+        "required_obligations",
+        "target_claim_id",
+        "requires_independent_evidence",
+        "decision_context"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^JEV-[0-9]{3}$"
+        },
+        "claim_ceiling": {
+          "const": "synthetic_decision_value_semantics_only"
+        },
+        "evidence_class": {
+          "const": "synthetic"
+        },
+        "decision_regime": {
+          "enum": [
+            "distribution_free",
+            "calibrated_probability"
+          ]
+        },
+        "states": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "loss_matrix": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 2,
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "prior": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "minProperties": 2,
+              "additionalProperties": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          ]
+        },
+        "current_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "budget": {
+          "$ref": "#/$defs/resources"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        },
+        "current_evidence_dependency_groups": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target_claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requires_independent_evidence": {
+          "type": "boolean"
+        },
+        "decision_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile_ref",
+            "article_subject_ref",
+            "configuration_id",
+            "icd_revision"
+          ],
+          "properties": {
+            "profile_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "article_subject_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "configuration_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "icd_revision": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "change_impact": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_owner",
+                "receipt_ref",
+                "event_frontier_ref",
+                "completeness",
+                "required_requalification_claims",
+                "unaffected_claims"
+              ],
+              "properties": {
+                "source_owner": {
+                  "const": "mycelix:6219"
+                },
+                "receipt_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "event_frontier_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "completeness": {
+                  "enum": [
+                    "COMPLETE",
+                    "INCOMPLETE"
+                  ]
+                },
+                "required_requalification_claims": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "unaffected_claims": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision_regime": {
+                "const": "distribution_free"
+              }
+            },
+            "required": [
+              "decision_regime"
+            ]
+          },
+          "then": {
+            "properties": {
+              "prior": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision_regime": {
+                "const": "calibrated_probability"
+              }
+            },
+            "required": [
+              "decision_regime"
+            ]
+          },
+          "then": {
+            "properties": {
+              "prior": {
+                "type": "object",
+                "minProperties": 2
+              }
+            }
+          }
+        }
+      ]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "action_class",
+        "target_claim_id",
+        "profile_ref",
+        "article_subject_ref",
+        "configuration_id",
+        "icd_revision",
+        "method_ref",
+        "admissibility",
+        "resources",
+        "observation_by_state",
+        "dependencies"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "article_subject_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "icd_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "admissibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "reason_codes"
+          ],
+          "properties": {
+            "state": {
+              "enum": [
+                "ADMISSIBLE",
+                "INADMISSIBLE",
+                "SOURCE_SCALE_ONLY"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        },
+        "observation_by_state": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "probability_model_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observation_likelihoods": {
+          "type": "object"
+        },
+        "calibration_status": {
+          "type": "string"
+        },
+        "source_scale": {
+          "type": "string"
+        },
+        "target_scale": {
+          "type": "string"
+        },
+        "test_obligations_covered": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "claim_coverage": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "not_covered": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observed_execution_state": {
+          "type": "string"
+        },
+        "actual_resources": {
+          "$ref": "#/$defs/resources"
+        },
+        "evidence_disposition": {
+          "type": "string"
+        },
+        "obligations_covered": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requalification_claims_covered": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "admissibility": {
+                "properties": {
+                  "state": {
+                    "const": "ADMISSIBLE"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            },
+            "required": [
+              "admissibility"
+            ]
+          },
+          "then": {
+            "properties": {
+              "admissibility": {
+                "properties": {
+                  "reason_codes": {
+                    "maxItems": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "admissibility": {
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "INADMISSIBLE",
+                      "SOURCE_SCALE_ONLY"
+                    ]
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            },
+            "required": [
+              "admissibility"
+            ]
+          },
+          "then": {
+            "properties": {
+              "admissibility": {
+                "properties": {
+                  "reason_codes": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "best_action_id",
+        "abstain",
+        "must_not_select",
+        "notes"
+      ],
+      "properties": {
+        "baseline_minimax_regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "baseline_expected_loss": {
+          "type": "number",
+          "minimum": 0
+        },
+        "best_action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "post_action_worst_case_regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "post_action_expected_loss": {
+          "type": "number",
+          "minimum": 0
+        },
+        "evsi": {
+          "type": "number",
+          "minimum": 0
+        },
+        "abstain": {
+          "type": "boolean"
+        },
+        "must_not_select": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

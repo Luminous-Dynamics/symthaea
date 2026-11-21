@@ -1,0 +1,93 @@
+name: orbital-joint-evidence-voi-bench
+
+on:
+  push:
+    paths:
+      - "tools/orbital-joint-evidence-voi-bench/**"
+      - "fixtures/orbital-joint-evidence-voi/**"
+      - ".github/workflows/orbital-joint-evidence-voi-bench.yml"
+  pull_request:
+    paths:
+      - "tools/orbital-joint-evidence-voi-bench/**"
+      - "fixtures/orbital-joint-evidence-voi/**"
+      - ".github/workflows/orbital-joint-evidence-voi-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orbital-joint-evidence-voi-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate standalone action contract and example fixtures
+        run: |
+          jq -e '
+            .title == "EvidenceActionProposalOutcomeV1" and
+            (.oneOf | length == 2) and
+            ."\u0024defs".proposal.properties.no_actuation.const == true and
+            ."\u0024defs".outcome.properties.authority_granted.const == false
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-proposal-outcome.schema.json
+          jq -e '
+            .schema == "EvidenceActionProposalOutcomeV1" and
+            .record_kind == "PROPOSAL" and
+            .no_actuation == true and .authority_granted == false and
+            .change_impact.completeness == "COMPLETE" and
+            (.requalification_claims_covered | index("STRUCTURAL-INTERFACE-CAPABILITY-001") != null)
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json
+          jq -e '
+            .schema == "EvidenceActionProposalOutcomeV1" and
+            .record_kind == "OUTCOME" and
+            .execution_attempted == true and .execution_state == "ABORTED" and
+            .actual_resources != null and .verification.state == "INDETERMINATE" and
+            .authority_granted == false
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json
+      - name: Format
+        run: cargo fmt --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --check
+      - name: Rust tests
+        run: cargo test --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --all-targets -- -D warnings
+      - name: Deterministic CLI and receipt assertions
+        shell: bash
+        run: |
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
+            --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-a.json
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
+            --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-b.json
+          cmp /tmp/evidence-voi-a.json /tmp/evidence-voi-b.json
+          jq -e '
+            .schema == "luminous.orbital-joint-evidence-voi.receipt.v0.1" and
+            .scenario_count == 17 and .oracle_matches == 17 and
+            .oracle_mismatches == 0 and .authority_granted == false and
+            .claim_ceiling == "synthetic_decision_value_semantics_only" and
+            (.scenarios | all(.selection_matches_oracle == true)) and
+            ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-015" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-016" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-017" and .selected_action_id == "A-TARGETED-STRUCTURAL-REQUALIFICATION" and .selection_matches_oracle == true)] | length == 1) and
+            (.input_sha256 | test("^[0-9a-f]{64}$"))
+          ' /tmp/evidence-voi-a.json
+      - name: Independent stdlib action-value oracle
+        run: |
+          python3 tools/orbital-joint-evidence-voi-bench/tests/reference_oracle.py \
+            fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
+            "$GITHUB_SHA" > /tmp/evidence-voi-oracle.json
+          jq -e '.scenario_count == 17 and .oracle_matches == 17 and .oracle_mismatches == 0 and (.scenarios | all(.selection_matches_oracle == true)) and ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-015" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-016" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
+            ([.scenarios[] | select(.scenario_id == "JEV-017" and .selected_action_id == "A-TARGETED-STRUCTURAL-REQUALIFICATION" and .selection_matches_oracle == true)] | length == 1)' \
+            /tmp/evidence-voi-oracle.json
