@@ -33,7 +33,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "rcaf.injection-recovery/0.2.0"
+      "const": "rcaf.injection-recovery/0.3.0"
     },
     "seed": {
       "type": "integer",
