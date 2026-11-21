@@ -675,8 +675,7 @@ pub fn compare_phase_space_measures_spectral(
         let component_count = component_feature_counts[component_index] as f64;
         let component_delta = squared_difference - component_means[component_index];
         component_means[component_index] += component_delta / component_count;
-        let component_delta_after_update =
-            squared_difference - component_means[component_index];
+        let component_delta_after_update = squared_difference - component_means[component_index];
         component_sum_squared_deviations[component_index] +=
             component_delta * component_delta_after_update;
     }
@@ -684,7 +683,9 @@ pub fn compare_phase_space_measures_spectral(
     if !mean.is_finite()
         || !sum_squared_deviation.is_finite()
         || component_means.iter().any(|value| !value.is_finite())
-        || component_sum_squared_deviations.iter().any(|value| !value.is_finite())
+        || component_sum_squared_deviations
+            .iter()
+            .any(|value| !value.is_finite())
     {
         return Err(MmdError::NonFiniteOutput);
     }
@@ -967,7 +968,6 @@ pub fn compare_phase_space_measures_spectral_adaptive(
     })
 }
 
-
 /// One positive component in a frozen characteristic-kernel mixture.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MmdKernelComponent {
@@ -1074,7 +1074,14 @@ fn mixture_kernel(
     let mut sum = CompensatedSum::default();
     for component in &config.components {
         let weight = component.weight / total_weight;
-        sum.add(weight * kernel(left, right, component_config(config.domain_length, *component)));
+        sum.add(
+            weight
+                * kernel(
+                    left,
+                    right,
+                    component_config(config.domain_length, *component),
+                ),
+        );
     }
     sum.total()
 }
@@ -1257,10 +1264,8 @@ pub fn compare_phase_space_measures_spectral_mixture(
     for sample_index in 0..feature_config.feature_count {
         let component_index = sample_mixture_component(mixture, total_weight, &mut rng);
         component_feature_counts[component_index] += 1;
-        let kernel_config = component_config(
-            mixture.domain_length,
-            mixture.components[component_index],
-        );
+        let kernel_config =
+            component_config(mixture.domain_length, mixture.components[component_index]);
         let feature = sample_spectral_feature(kernel_config, &mut rng)?;
         let squared_difference = spectral_squared_signature_difference(
             &candidate_atoms,
@@ -2054,14 +2059,8 @@ mod tests {
 
     #[test]
     fn exact_mixture_preserves_permutation_and_signed_split_invariance() {
-        let candidate = [
-            particle(1.0, 0.25, 0.5),
-            particle(6.0, -0.5, 0.5),
-        ];
-        let permutation = [
-            particle(6.0, -0.5, 0.5),
-            particle(1.0, 0.25, 0.5),
-        ];
+        let candidate = [particle(1.0, 0.25, 0.5), particle(6.0, -0.5, 0.5)];
+        let permutation = [particle(6.0, -0.5, 0.5), particle(1.0, 0.25, 0.5)];
         let signed_split = [
             particle(1.0, 0.25, 0.75),
             particle(1.0, 0.25, -0.25),
@@ -2091,7 +2090,8 @@ mod tests {
         let right =
             compare_phase_space_measures_mmd_mixture(&candidate, &reference, &reversed).unwrap();
         assert!(
-            (left.aggregate.normalized_mmd_squared - right.aggregate.normalized_mmd_squared).abs() <= 1.0e-12
+            (left.aggregate.normalized_mmd_squared - right.aggregate.normalized_mmd_squared).abs()
+                <= 1.0e-12
         );
     }
 
@@ -2164,8 +2164,9 @@ mod tests {
             },
         )
         .unwrap();
-        let error =
-            (approximate.estimate.normalized_mmd_squared - exact.aggregate.normalized_mmd_squared).abs();
+        let error = (approximate.estimate.normalized_mmd_squared
+            - exact.aggregate.normalized_mmd_squared)
+            .abs();
         assert!(
             error <= approximate.estimate.hoeffding_95_half_width,
             "mixture spectral error {error:e} exceeds feature bound {:e}",
@@ -2233,7 +2234,6 @@ mod tests {
     }
 
 
-
     #[test]
     fn multi_scale_kernel_detects_thin_velocity_structure_lost_by_broad_scale() {
         let candidate = [particle(1.0, 0.0, 1.0)];
@@ -2288,6 +2288,5 @@ mod tests {
                 <= 1.0e-12
         );
     }
-
 
 }
