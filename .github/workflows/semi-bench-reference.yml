@@ -31,10 +31,17 @@ jobs:
           python -m unittest discover \
             -s benchmarks/semi-bench-001/reference/python \
             -p 'test_*.py' -v
-      - name: Reproduce frozen output byte-for-byte
+      - name: Reproduce binary metric report byte-for-byte
         run: |
           python benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py \
             > /tmp/semi-bench-binary-report.json
           diff -u \
             benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json \
             /tmp/semi-bench-binary-report.json
+      - name: Reproduce inspection decision report byte-for-byte
+        run: |
+          python benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py \
+            > /tmp/semi-bench-inspection-report.json
+          diff -u \
+            benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json \
+            /tmp/semi-bench-inspection-report.json
