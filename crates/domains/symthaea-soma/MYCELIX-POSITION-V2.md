@@ -22,9 +22,9 @@ Unknown calibration/configuration/provenance and unresolved frames remain Unknow
 
 The dedicated workflow pins Mycelix commit dc28de1165eeb04b27d23011b6f9681fa740d66d, the exact API head whose current mirrored Position workflow passed 94 tests in each workspace.
 
-CI copies the actual Mycelix pure positioning package into a temporary path, renames it to avoid colliding with Symthaea's offline stub, and creates a tiny standalone Cargo harness. The harness imports the exact committed SOMA adapter file with `#[path]`, builds against the real Mycelix source, then runs rustfmt check, Clippy and all-target tests.
+CI copies the actual Mycelix pure positioning package into a temporary path, renames it to avoid colliding with Symthaea's offline stub, and creates a tiny standalone Cargo harness with an optional dependency named `positioning`. The harness imports the exact committed SOMA adapter source under the `positioning` feature and runs three checks: feature-disabled `cargo check` (the optional dependency/module is absent), feature-enabled Clippy, and feature-enabled all-target tests against the real Mycelix source.
 
-This intentionally does not resolve Symthaea's full root workspace: that workspace currently references a missing `crates/core/symthaea/Cargo.toml` member. The isolated harness proves only that the adapter source compiles and tests against the real Mycelix API; it is not a full `symthaea-soma` package or application build.
+This intentionally does not resolve Symthaea's full root workspace: that workspace currently references a missing `crates/core/symthaea/Cargo.toml` member. The harness mirrors the intended optional-feature behavior and proves the adapter source compiles/tests against the real Mycelix API, but it is **not** a full `symthaea-soma` package or application build and does not yet prove the production `symthaea-soma/Cargo.toml` dependency wiring. That remains an explicit integration gate.
 
 ## Claim ceiling
 
