@@ -554,3 +554,19 @@ Hosted GitHub Actions run [#44934333447](https://github.com/Luminous-Dynamics/sy
 - The Python/reference job in the same run passed 46/46 tests and reproduced its three frozen reports.
 
 These checks ran in a minimal temporary Cargo workspace because the repository root workspace currently references a missing `crates/core/symthaea/Cargo.toml`. The isolated workspace avoided changing unrelated root workspace state. This verifies contract and leakage logic, not a trained model's predictive performance or physical fab outcome.
+
+
+## Rust SECOM raw-data admission path
+
+A new Rust parser/auditor has been added at `crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs`, with CLI `semi-secom-audit`. It verifies feature/label file SHA-256 against a frozen expectations file, checks row/column shape and row alignment, preserves sensor NaNs as missing values, enforces source labels {-1,+1}, and keeps timestamps as source-local naive values. It does not normalize, impute, or infer UTC.
+
+The expectations manifest pins the documented mirror files, not verified official UCI byte identity:
+- feature SHA-256: `4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf`
+- label SHA-256: `2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef`
+- 1,567 rows × 590 sensor features; source clock `uci-secom-mirror-single-source-clock`.
+
+The full 5.1 MB feature matrix is not currently retrievable in this runtime, so no full-matrix ingestion report or time-forward predictive model result is claimed. A small two-row synthetic known-answer fixture exercises the parser and CLI contract in CI.
+
+## Cross-dataset pseudo-label alignment frontier
+
+New follow-up [SEMI-WM-ALIGN-001 #13148](https://github.com/Luminous-Dynamics/symthaea/issues/13148) tracks the 16 October 2026 IEEE Access study that integrates labeled WM-811K and unlabeled Mixed38 using pseudo-labeling informed by cluster distributions and inter-label boundaries. It reports 207.75% relative silhouette and 16.19% Ratkowsky-Lance improvements. These are paper-reported cluster metrics, not verified pseudo-label accuracy. Our benchmark requires partial label mappings, boundary uncertainty, held-out pseudo-label audits and explicit unknown classes instead of forced ontology collapse.
