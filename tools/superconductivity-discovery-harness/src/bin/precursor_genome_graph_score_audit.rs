@@ -52,12 +52,16 @@ struct FoldReceipt {
 }
 
 fn required_text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value.get(key).and_then(Value::as_str)
+    value
+        .get(key)
+        .and_then(Value::as_str)
         .filter(|text| !text.trim().is_empty())
         .ok_or_else(|| format!("missing or empty field {key}"))
 }
 fn required_number(value: &Value, key: &str) -> Result<f64, String> {
-    let number = value.get(key).and_then(Value::as_f64)
+    let number = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("missing numeric field {key}"))?;
     if !number.is_finite() {
         return Err(format!("{key} must be finite"));
@@ -65,12 +69,16 @@ fn required_number(value: &Value, key: &str) -> Result<f64, String> {
     Ok(number)
 }
 fn strings(value: &Value, key: &str) -> Result<Vec<String>, String> {
-    let values = value.get(key).and_then(Value::as_array)
+    let values = value
+        .get(key)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{key} must be an array"))?;
     let mut output = Vec::with_capacity(values.len());
     let mut seen = HashSet::new();
     for item in values {
-        let text = item.as_str().filter(|text| !text.trim().is_empty())
+        let text = item
+            .as_str()
+            .filter(|text| !text.trim().is_empty())
             .ok_or_else(|| format!("{key} contains a non-string or empty value"))?;
         if !seen.insert(text.to_owned()) {
             return Err(format!("{key} contains duplicate value {text}"));
@@ -100,16 +108,22 @@ fn category_label(category: &str) -> Option<u8> {
 fn parse_graph(cohort: &Value) -> Result<Graph, String> {
     let nodes = strings(cohort, "nodes")?;
     if nodes.len() < 3 || nodes.len() > 46 {
-        return Err(format!("node count must be in [3,46], found {}", nodes.len()));
+        return Err(format!(
+            "node count must be in [3,46], found {}",
+            nodes.len()
+        ));
     }
     let node_set = nodes.iter().cloned().collect::<BTreeSet<_>>();
-    let rows = cohort.get("records").and_then(Value::as_array)
+    let rows = cohort
+        .get("records")
+        .and_then(Value::as_array)
         .ok_or("cohort records must be an array")?;
     let expected_edges = nodes.len() * (nodes.len() - 1) / 2;
     if rows.len() != expected_edges {
         return Err(format!(
             "complete undirected graph requires {expected_edges} records for {} nodes, found {}",
-            nodes.len(), rows.len()
+            nodes.len(),
+            rows.len()
         ));
     }
     let mut records = Vec::with_capacity(rows.len());
@@ -138,15 +152,21 @@ fn parse_graph(cohort: &Value) -> Result<Graph, String> {
             ));
         }
         if !node_set.contains(&precursor_a) || !node_set.contains(&precursor_b) {
-            return Err(format!("record {id} references a precursor outside the frozen node set"));
+            return Err(format!(
+                "record {id} references a precursor outside the frozen node set"
+            ));
         }
         if !edge_set.insert((precursor_a.clone(), precursor_b.clone())) {
-            return Err(format!("duplicate unordered precursor edge {precursor_a} / {precursor_b}"));
+            return Err(format!(
+                "duplicate unordered precursor edge {precursor_a} / {precursor_b}"
+            ));
         }
         let label = match row.get("label") {
             Some(value) if value.is_null() => None,
             Some(value) => {
-                let number = value.as_u64().ok_or_else(|| format!("record {id} label must be 0, 1, or null"))?;
+                let number = value
+                    .as_u64()
+                    .ok_or_else(|| format!("record {id} label must be 0, 1, or null"))?;
                 if number > 1 {
                     return Err(format!("record {id} label must be 0 or 1"));
                 }
@@ -156,13 +176,20 @@ fn parse_graph(cohort: &Value) -> Result<Graph, String> {
         };
         let included = match state {
             "included" => {
-                let expected = category_label(&category)
-                    .ok_or_else(|| format!("record {id} has unsupported included category {category}"))?;
+                let expected = category_label(&category).ok_or_else(|| {
+                    format!("record {id} has unsupported included category {category}")
+                })?;
                 if label != Some(expected) {
-                    return Err(format!("record {id} category {category} conflicts with label"));
+                    return Err(format!(
+                        "record {id} category {category} conflicts with label"
+                    ));
                 }
                 included_count += 1;
-                if expected == 1 { positive_count += 1; } else { negative_count += 1; }
+                if expected == 1 {
+                    positive_count += 1;
+                } else {
+                    negative_count += 1;
+                }
                 true
             }
             "physical_failure_excluded" | "poor_refinement_excluded" => {
@@ -177,11 +204,20 @@ fn parse_graph(cohort: &Value) -> Result<Graph, String> {
             _ => return Err(format!("record {id} has unsupported cohort_state {state}")),
         };
         records.push(Record {
-            id, sample_id, precursor_a, precursor_b, category, included, label
+            id,
+            sample_id,
+            precursor_a,
+            precursor_b,
+            category,
+            included,
+            label,
         });
     }
     if edge_set.len() != expected_edges {
-        return Err(format!("graph has {} unique edges; expected {expected_edges}", edge_set.len()));
+        return Err(format!(
+            "graph has {} unique edges; expected {expected_edges}",
+            edge_set.len()
+        ));
     }
     for (index, left) in nodes.iter().enumerate() {
         for right in nodes.iter().skip(index + 1) {
@@ -209,29 +245,44 @@ fn fold_id(kind: &str, heldout: &[String]) -> String {
     }
 }
 fn expected_training_nodes(graph: &Graph, heldout: &BTreeSet<String>) -> Vec<String> {
-    graph.nodes.iter().filter(|node| !heldout.contains(*node)).cloned().collect()
+    graph
+        .nodes
+        .iter()
+        .filter(|node| !heldout.contains(*node))
+        .cloned()
+        .collect()
 }
 fn expected_training_ids(graph: &Graph, heldout: &BTreeSet<String>) -> Vec<String> {
-    let mut ids = graph.records.iter()
-        .filter(|record| record.included
-            && !heldout.contains(&record.precursor_a)
-            && !heldout.contains(&record.precursor_b))
+    let mut ids = graph
+        .records
+        .iter()
+        .filter(|record| {
+            record.included
+                && !heldout.contains(&record.precursor_a)
+                && !heldout.contains(&record.precursor_b)
+        })
         .map(|record| record.id.clone())
         .collect::<Vec<_>>();
     ids.sort();
     ids
 }
 fn expected_test_records<'a>(graph: &'a Graph, heldout: &BTreeSet<String>) -> Vec<&'a Record> {
-    graph.records.iter()
-        .filter(|record| record.included
-            && (heldout.contains(&record.precursor_a) || heldout.contains(&record.precursor_b)))
+    graph
+        .records
+        .iter()
+        .filter(|record| {
+            record.included
+                && (heldout.contains(&record.precursor_a) || heldout.contains(&record.precursor_b))
+        })
         .collect()
 }
 fn metric_values(predictions: &[Prediction], threshold: f64) -> Result<Metrics, String> {
     let positive = predictions.iter().filter(|row| row.label == 1).count();
     let negative = predictions.len() - positive;
     if positive == 0 || negative == 0 {
-        return Err("each scoring fold must contain both positive and negative test records".to_owned());
+        return Err(
+            "each scoring fold must contain both positive and negative test records".to_owned(),
+        );
     }
     let mut brier = 0.0;
     let mut log_loss = 0.0;
@@ -265,15 +316,24 @@ fn metric_values(predictions: &[Prediction], threshold: f64) -> Result<Metrics, 
     } else {
         None
     };
-    let positives = predictions.iter().filter(|row| row.label == 1)
-        .map(|row| row.probability).collect::<Vec<_>>();
-    let negatives = predictions.iter().filter(|row| row.label == 0)
-        .map(|row| row.probability).collect::<Vec<_>>();
+    let positives = predictions
+        .iter()
+        .filter(|row| row.label == 1)
+        .map(|row| row.probability)
+        .collect::<Vec<_>>();
+    let negatives = predictions
+        .iter()
+        .filter(|row| row.label == 0)
+        .map(|row| row.probability)
+        .collect::<Vec<_>>();
     let mut auc = 0.0;
     for p in &positives {
         for n in &negatives {
-            if p > n { auc += 1.0; }
-            else if p == n { auc += 0.5; }
+            if p > n {
+                auc += 1.0;
+            } else if p == n {
+                auc += 0.5;
+            }
         }
     }
     auc /= (positive * negative) as f64;
@@ -289,7 +349,9 @@ fn metric_values(predictions: &[Prediction], threshold: f64) -> Result<Metrics, 
         let mut group_total = 0usize;
         while index < ranked.len() && ranked[index].probability == score {
             group_total += 1;
-            if ranked[index].label == 1 { group_positive += 1; }
+            if ranked[index].label == 1 {
+                group_positive += 1;
+            }
             index += 1;
         }
         cumulative_positive += group_positive;
@@ -300,8 +362,15 @@ fn metric_values(predictions: &[Prediction], threshold: f64) -> Result<Metrics, 
         }
     }
     Ok(Metrics {
-        brier, log_loss, roc_auc: auc, average_precision,
-        balanced_accuracy, precision, recall, specificity, mcc
+        brier,
+        log_loss,
+        roc_auc: auc,
+        average_precision,
+        balanced_accuracy,
+        precision,
+        recall,
+        specificity,
+        mcc,
     })
 }
 fn metrics_json(metrics: Metrics) -> Value {
@@ -331,47 +400,69 @@ fn evaluate_fold(
     }
     let heldout = strings(fold, "heldout_precursors")?;
     if heldout != expected_heldout {
-        return Err(format!("fold {id} heldout_precursors do not match the frozen split"));
+        return Err(format!(
+            "fold {id} heldout_precursors do not match the frozen split"
+        ));
     }
     let heldout_set = heldout.iter().cloned().collect::<BTreeSet<_>>();
     let training_nodes = strings(fold, "training_precursors")?;
     let expected_nodes = expected_training_nodes(graph, &heldout_set);
     if training_nodes != expected_nodes {
-        return Err(format!("fold {id} has train/test precursor leakage or an incomplete training node set"));
+        return Err(format!(
+            "fold {id} has train/test precursor leakage or an incomplete training node set"
+        ));
     }
     let training_ids = expected_training_ids(graph, &heldout_set);
     let expected_training_count = training_ids.len();
-    let declared_count = fold.get("training_record_count").and_then(Value::as_u64)
-        .ok_or_else(|| format!("fold {id} training_record_count must be an integer"))? as usize;
+    let declared_count = fold
+        .get("training_record_count")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("fold {id} training_record_count must be an integer"))?
+        as usize;
     if declared_count != expected_training_count {
         return Err(format!(
             "fold {id} training_record_count is {declared_count}; expected {expected_training_count}"
         ));
     }
     let test_records = expected_test_records(graph, &heldout_set);
-    let rows = fold.get("predictions").and_then(Value::as_array)
+    let rows = fold
+        .get("predictions")
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("fold {id} predictions must be an array"))?;
-    let expected_test_ids = test_records.iter().map(|record| record.id.clone()).collect::<HashSet<_>>();
+    let expected_test_ids = test_records
+        .iter()
+        .map(|record| record.id.clone())
+        .collect::<HashSet<_>>();
     if rows.len() != expected_test_ids.len() {
         return Err(format!(
             "fold {id} prediction count is {}; expected {} eligible held-out edges",
-            rows.len(), expected_test_ids.len()
+            rows.len(),
+            expected_test_ids.len()
         ));
     }
-    let labels = test_records.iter().map(|record| (record.id.clone(), record.label.unwrap())).collect::<HashMap<_, _>>();
+    let labels = test_records
+        .iter()
+        .map(|record| (record.id.clone(), record.label.unwrap()))
+        .collect::<HashMap<_, _>>();
     let mut seen = HashSet::new();
     let mut scored = Vec::with_capacity(rows.len());
     for row in rows {
         let record_id = required_text(row, "record_id")?.to_owned();
         if !expected_test_ids.contains(&record_id) {
-            return Err(format!("fold {id} prediction {record_id} is not an eligible held-out edge"));
+            return Err(format!(
+                "fold {id} prediction {record_id} is not an eligible held-out edge"
+            ));
         }
         if !seen.insert(record_id.clone()) {
-            return Err(format!("fold {id} has duplicate prediction for {record_id}"));
+            return Err(format!(
+                "fold {id} has duplicate prediction for {record_id}"
+            ));
         }
         let probability = required_number(row, "probability")?;
         if !(0.0..=1.0).contains(&probability) {
-            return Err(format!("fold {id} prediction {record_id} probability must be in [0,1]"));
+            return Err(format!(
+                "fold {id} prediction {record_id} probability must be in [0,1]"
+            ));
         }
         scored.push(Prediction {
             probability,
@@ -379,7 +470,9 @@ fn evaluate_fold(
         });
     }
     if seen != expected_test_ids {
-        return Err(format!("fold {id} does not predict every eligible held-out edge exactly once"));
+        return Err(format!(
+            "fold {id} does not predict every eligible held-out edge exactly once"
+        ));
     }
     let metrics = metric_values(&scored, threshold)?;
     Ok(FoldReceipt {
@@ -400,7 +493,9 @@ fn evaluate_fold(
 }
 fn mean(values: impl Iterator<Item = f64>) -> Option<f64> {
     let collected = values.collect::<Vec<_>>();
-    if collected.is_empty() { None } else {
+    if collected.is_empty() {
+        None
+    } else {
         Some(collected.iter().sum::<f64>() / collected.len() as f64)
     }
 }
@@ -426,16 +521,25 @@ fn evaluate_model(graph: &Graph, model: &Value) -> Result<Value, String> {
     let model_id = required_text(model, "model_id")?.to_owned();
     let artifact = required_text(model, "model_artifact_sha256")?;
     if !valid_digest(artifact) {
-        return Err(format!("model {model_id} has malformed model_artifact_sha256"));
+        return Err(format!(
+            "model {model_id} has malformed model_artifact_sha256"
+        ));
     }
     let threshold = required_number(model, "decision_threshold")?;
     if !(0.0..1.0).contains(&threshold) {
-        return Err(format!("model {model_id} decision_threshold must be in [0,1)"));
+        return Err(format!(
+            "model {model_id} decision_threshold must be in [0,1)"
+        ));
     }
-    let lopo_rows = model.get("lopo_folds").and_then(Value::as_array)
+    let lopo_rows = model
+        .get("lopo_folds")
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("model {model_id} lopo_folds must be an array"))?;
     if lopo_rows.len() != graph.nodes.len() {
-        return Err(format!("model {model_id} requires exactly {} LOPO folds", graph.nodes.len()));
+        return Err(format!(
+            "model {model_id} requires exactly {} LOPO folds",
+            graph.nodes.len()
+        ));
     }
     let mut lopo_by_id = HashMap::new();
     for row in lopo_rows {
@@ -447,20 +551,34 @@ fn evaluate_model(graph: &Graph, model: &Value) -> Result<Value, String> {
     let mut lopo_folds = Vec::with_capacity(graph.nodes.len());
     for node in &graph.nodes {
         let id = fold_id("lopo", std::slice::from_ref(node));
-        let row = lopo_by_id.get(&id).ok_or_else(|| format!("model {model_id} is missing LOPO fold {id}"))?;
-        lopo_folds.push(evaluate_fold(graph, row, "lopo", std::slice::from_ref(node), threshold)?);
+        let row = lopo_by_id
+            .get(&id)
+            .ok_or_else(|| format!("model {model_id} is missing LOPO fold {id}"))?;
+        lopo_folds.push(evaluate_fold(
+            graph,
+            row,
+            "lopo",
+            std::slice::from_ref(node),
+            threshold,
+        )?);
     }
     let expected_double_count = graph.nodes.len() * (graph.nodes.len() - 1) / 2;
-    let double_rows = model.get("double_node_folds").and_then(Value::as_array)
+    let double_rows = model
+        .get("double_node_folds")
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("model {model_id} double_node_folds must be an array"))?;
     if double_rows.len() != expected_double_count {
-        return Err(format!("model {model_id} requires exactly {expected_double_count} double-node folds"));
+        return Err(format!(
+            "model {model_id} requires exactly {expected_double_count} double-node folds"
+        ));
     }
     let mut double_by_id = HashMap::new();
     for row in double_rows {
         let id = required_text(row, "fold_id")?.to_owned();
         if double_by_id.insert(id.clone(), row).is_some() {
-            return Err(format!("model {model_id} has duplicate double-node fold {id}"));
+            return Err(format!(
+                "model {model_id} has duplicate double-node fold {id}"
+            ));
         }
     }
     let mut double_folds = Vec::with_capacity(expected_double_count);
@@ -468,8 +586,16 @@ fn evaluate_model(graph: &Graph, model: &Value) -> Result<Value, String> {
         for j in i + 1..graph.nodes.len() {
             let heldout = vec![graph.nodes[i].clone(), graph.nodes[j].clone()];
             let id = fold_id("double", &heldout);
-            let row = double_by_id.get(&id).ok_or_else(|| format!("model {model_id} is missing double-node fold {id}"))?;
-            double_folds.push(evaluate_fold(graph, row, "double_node", &heldout, threshold)?);
+            let row = double_by_id
+                .get(&id)
+                .ok_or_else(|| format!("model {model_id} is missing double-node fold {id}"))?;
+            double_folds.push(evaluate_fold(
+                graph,
+                row,
+                "double_node",
+                &heldout,
+                threshold,
+            )?);
         }
     }
     Ok(json!({
@@ -491,13 +617,17 @@ fn graph_from_audit_receipt(receipt: &Value) -> Result<Graph, String> {
     {
         return Err("input is not a passing Precursor Genome graph audit receipt".to_owned());
     }
-    let source = receipt.get("source").ok_or("graph receipt source is missing")?;
+    let source = receipt
+        .get("source")
+        .ok_or("graph receipt source is missing")?;
     if required_text(source, "repository")? != "lauren-walters/precursor-genome" {
         return Err("graph receipt is not from the pinned Precursor Genome repository".to_owned());
     }
     let ledger_commit = required_text(source, "commit")?;
     if ledger_commit != "78cb026aa6c9b53aa0ec26ea5611d523bc3c320a" {
-        return Err(format!("unexpected Precursor Genome source commit {ledger_commit}"));
+        return Err(format!(
+            "unexpected Precursor Genome source commit {ledger_commit}"
+        ));
     }
     if !valid_sha1(required_text(source, "ledger_git_blob_sha1")?) {
         return Err("graph receipt ledger_git_blob_sha1 is malformed".to_owned());
@@ -505,11 +635,21 @@ fn graph_from_audit_receipt(receipt: &Value) -> Result<Graph, String> {
     if !valid_digest(required_text(source, "ledger_sha256")?) {
         return Err("graph receipt ledger_sha256 is malformed".to_owned());
     }
-    let pair_graph = receipt.get("pair_graph").ok_or("graph receipt pair_graph is missing")?;
-    if pair_graph.get("complete_undirected_graph").and_then(Value::as_bool) != Some(true) {
-        return Err("source graph receipt does not establish a complete undirected graph".to_owned());
+    let pair_graph = receipt
+        .get("pair_graph")
+        .ok_or("graph receipt pair_graph is missing")?;
+    if pair_graph
+        .get("complete_undirected_graph")
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return Err(
+            "source graph receipt does not establish a complete undirected graph".to_owned(),
+        );
     }
-    let precursor_rows = pair_graph.get("per_precursor").and_then(Value::as_array)
+    let precursor_rows = pair_graph
+        .get("per_precursor")
+        .and_then(Value::as_array)
         .ok_or("graph receipt pair_graph.per_precursor must be an array")?;
     let mut nodes = Vec::with_capacity(precursor_rows.len());
     for row in precursor_rows {
@@ -518,35 +658,68 @@ fn graph_from_audit_receipt(receipt: &Value) -> Result<Graph, String> {
     nodes.sort();
     let expected_edges = nodes.len() * (nodes.len() - 1) / 2;
     if pair_graph.get("precursor_count").and_then(Value::as_u64) != Some(nodes.len() as u64)
-        || pair_graph.get("unique_unordered_pair_count").and_then(Value::as_u64) != Some(expected_edges as u64)
-        || pair_graph.get("expected_degree").and_then(Value::as_u64) != Some((nodes.len() - 1) as u64)
+        || pair_graph
+            .get("unique_unordered_pair_count")
+            .and_then(Value::as_u64)
+            != Some(expected_edges as u64)
+        || pair_graph.get("expected_degree").and_then(Value::as_u64)
+            != Some((nodes.len() - 1) as u64)
     {
-        return Err("graph receipt node, edge or degree counts do not describe a complete graph".to_owned());
+        return Err(
+            "graph receipt node, edge or degree counts do not describe a complete graph".to_owned(),
+        );
     }
-    let source_rows = receipt.get("sample_records").and_then(Value::as_array)
+    let source_rows = receipt
+        .get("sample_records")
+        .and_then(Value::as_array)
         .ok_or("graph receipt sample_records must be an array")?;
     let mut records = Vec::with_capacity(source_rows.len());
     for row in source_rows {
         let sample_id = required_text(row, "sample_id")?.to_owned();
-        let pair = row.get("precursor_pair_canonical").and_then(Value::as_array)
+        let pair = row
+            .get("precursor_pair_canonical")
+            .and_then(Value::as_array)
             .ok_or_else(|| format!("source sample {sample_id} lacks canonical precursor pair"))?;
         if pair.len() != 2 {
-            return Err(format!("source sample {sample_id} precursor pair must have exactly two values"));
+            return Err(format!(
+                "source sample {sample_id} precursor pair must have exactly two values"
+            ));
         }
-        let precursor_a = pair[0].as_str().ok_or("canonical precursor A must be string")?.to_owned();
-        let precursor_b = pair[1].as_str().ok_or("canonical precursor B must be string")?.to_owned();
-        let category = row.get("raw_reaction_category").and_then(Value::as_str)
-            .unwrap_or("unclassified").to_owned();
+        let precursor_a = pair[0]
+            .as_str()
+            .ok_or("canonical precursor A must be string")?
+            .to_owned();
+        let precursor_b = pair[1]
+            .as_str()
+            .ok_or("canonical precursor B must be string")?
+            .to_owned();
+        let category = row
+            .get("raw_reaction_category")
+            .and_then(Value::as_str)
+            .unwrap_or("unclassified")
+            .to_owned();
         let state = required_text(row, "cohort_status")?;
         let (cohort_state, label, exclusion_reason) = match state {
             "analyzable" => {
-                let endpoint = row.get("cross_precursor_product_endpoint").and_then(Value::as_bool)
-                    .ok_or_else(|| format!("analyzable sample {sample_id} lacks binary cross-precursor endpoint"))?;
+                let endpoint = row
+                    .get("cross_precursor_product_endpoint")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        format!(
+                            "analyzable sample {sample_id} lacks binary cross-precursor endpoint"
+                        )
+                    })?;
                 ("included", json!(u8::from(endpoint)), None)
             }
             "physical_failure_no_powder" => ("physical_failure_excluded", Value::Null, Some(state)),
-            "poor_xrd_refinement_quality_3" => ("poor_refinement_excluded", Value::Null, Some(state)),
-            other => return Err(format!("source sample {sample_id} has unsupported cohort status {other}")),
+            "poor_xrd_refinement_quality_3" => {
+                ("poor_refinement_excluded", Value::Null, Some(state))
+            }
+            other => {
+                return Err(format!(
+                    "source sample {sample_id} has unsupported cohort status {other}"
+                ));
+            }
         };
         let mut item = json!({
             "record_id": sample_id.clone(),
@@ -569,32 +742,52 @@ fn graph_from_audit_receipt(receipt: &Value) -> Result<Graph, String> {
         "graph_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     });
     let graph = parse_graph(&cohort_value)?;
-    let summary = receipt.get("cohort").ok_or("graph receipt cohort summary is missing")?;
+    let summary = receipt
+        .get("cohort")
+        .ok_or("graph receipt cohort summary is missing")?;
     for (field, observed) in [
         ("source_sample_count", graph.records.len()),
         ("analyzable_count", graph.included_count),
-        ("cross_precursor_product_positive_count", graph.positive_count),
-        ("cross_precursor_product_negative_count", graph.negative_count),
+        (
+            "cross_precursor_product_positive_count",
+            graph.positive_count,
+        ),
+        (
+            "cross_precursor_product_negative_count",
+            graph.negative_count,
+        ),
     ] {
         if summary.get(field).and_then(Value::as_u64) != Some(observed as u64) {
-            return Err(format!("graph receipt cohort.{field} conflicts with source sample records"));
+            return Err(format!(
+                "graph receipt cohort.{field} conflicts with source sample records"
+            ));
         }
     }
     Ok(graph)
 }
-fn training_prevalence_fold(graph: &Graph, kind: &str, heldout: &[String]) -> Result<Value, String> {
+fn training_prevalence_fold(
+    graph: &Graph,
+    kind: &str,
+    heldout: &[String],
+) -> Result<Value, String> {
     let heldout_set = heldout.iter().cloned().collect::<BTreeSet<_>>();
     let training_ids = expected_training_ids(graph, &heldout_set);
     if training_ids.is_empty() {
-        return Err(format!("fold {} has no eligible training records", fold_id(kind, heldout)));
+        return Err(format!(
+            "fold {} has no eligible training records",
+            fold_id(kind, heldout)
+        ));
     }
     let training_id_set = training_ids.iter().cloned().collect::<HashSet<_>>();
-    let positives = graph.records.iter()
+    let positives = graph
+        .records
+        .iter()
         .filter(|record| training_id_set.contains(&record.id) && record.label == Some(1))
         .count();
     let probability = positives as f64 / training_ids.len() as f64;
     let training_nodes = expected_training_nodes(graph, &heldout_set);
-    let predictions = expected_test_records(graph, &heldout_set).iter()
+    let predictions = expected_test_records(graph, &heldout_set)
+        .iter()
         .map(|record| json!({"record_id": record.id, "probability": probability}))
         .collect::<Vec<_>>();
     Ok(json!({
@@ -608,7 +801,11 @@ fn training_prevalence_fold(graph: &Graph, kind: &str, heldout: &[String]) -> Re
 fn training_prevalence_model(graph: &Graph, source_identity: &str) -> Result<Value, String> {
     let mut lopo = Vec::with_capacity(graph.nodes.len());
     for node in &graph.nodes {
-        lopo.push(training_prevalence_fold(graph, "lopo", std::slice::from_ref(node))?);
+        lopo.push(training_prevalence_fold(
+            graph,
+            "lopo",
+            std::slice::from_ref(node),
+        )?);
     }
     let mut double_node = Vec::with_capacity(graph.nodes.len() * (graph.nodes.len() - 1) / 2);
     for i in 0..graph.nodes.len() {
@@ -631,13 +828,15 @@ fn audit_graph_receipt(receipt_bytes: &[u8]) -> Result<Value, String> {
         .map_err(|error| format!("graph receipt JSON parse failed: {error}"))?;
     let graph = graph_from_audit_receipt(&receipt)?;
     let receipt_sha256 = sha256_hex(receipt_bytes);
-    let source = receipt.get("source").ok_or("graph receipt source is missing")?;
+    let source = receipt
+        .get("source")
+        .ok_or("graph receipt source is missing")?;
     let model = training_prevalence_model(&graph, &receipt_sha256)?;
     let evaluation = evaluate_model(&graph, &model)?;
     let prevalence = graph.positive_count as f64 / graph.included_count as f64;
     let global_baseline_brier = prevalence * (1.0 - prevalence);
-    let global_baseline_log_loss = -prevalence * prevalence.ln()
-        - (1.0 - prevalence) * (1.0 - prevalence).ln();
+    let global_baseline_log_loss =
+        -prevalence * prevalence.ln() - (1.0 - prevalence) * (1.0 - prevalence).ln();
     Ok(json!({
         "status": "precursor_genome_training_prevalence_baseline_pass",
         "contract": CONTRACT,
@@ -680,9 +879,13 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
+    let validator =
+        validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
     if let Some(error) = validator.iter_errors(&fixture).next() {
-        return Err(format!("graph score schema validation failed: {error} at {}", error.instance_path()));
+        return Err(format!(
+            "graph score schema validation failed: {error} at {}",
+            error.instance_path()
+        ));
     }
     if required_text(&fixture, "contract")? != CONTRACT {
         return Err("unsupported precursor graph score contract".to_owned());
@@ -692,7 +895,10 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     }
     let cohort = fixture.get("cohort").ok_or("fixture cohort is missing")?;
     let graph = parse_graph(cohort)?;
-    let models = fixture.get("models").and_then(Value::as_array).ok_or("models must be an array")?;
+    let models = fixture
+        .get("models")
+        .and_then(Value::as_array)
+        .ok_or("models must be an array")?;
     if models.is_empty() {
         return Err("at least one model is required".to_owned());
     }
@@ -707,7 +913,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     }
     let prevalence = graph.positive_count as f64 / graph.included_count as f64;
     let no_skill_brier = prevalence * (1.0 - prevalence);
-    let no_skill_log_loss = -prevalence * prevalence.ln() - (1.0 - prevalence) * (1.0 - prevalence).ln();
+    let no_skill_log_loss =
+        -prevalence * prevalence.ln() - (1.0 - prevalence) * (1.0 - prevalence).ln();
     Ok(json!({
         "status": "synthetic_precursor_graph_score_pass",
         "contract": CONTRACT,
@@ -743,8 +950,12 @@ fn read(path: &PathBuf) -> Vec<u8> {
     })
 }
 fn usage(program: &str) {
-    eprintln!("Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]");
-    eprintln!("   or: {program} --graph-receipt <source-audit-receipt.json> [--out <receipt.json>]");
+    eprintln!(
+        "Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]"
+    );
+    eprintln!(
+        "   or: {program} --graph-receipt <source-audit-receipt.json> [--out <receipt.json>]"
+    );
 }
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -797,11 +1008,13 @@ fn main() {
                 process::exit(2);
             }
         },
-    }.unwrap_or_else(|error| {
+    }
+    .unwrap_or_else(|error| {
         eprintln!("SC-PRECURSOR-GRAPH-SCORE-FAIL: {error}");
         process::exit(1);
     });
-    let rendered = serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
+    let rendered =
+        serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
     if let Some(path) = output_path {
         if let Err(error) = fs::write(&path, format!("{rendered}\n")) {
             eprintln!("could not write {}: {error}", path.display());
@@ -839,22 +1052,33 @@ mod tests {
         assert_eq!(receipt["models"][0]["lopo"]["fold_count"], 4);
         assert_eq!(receipt["models"][0]["double_node_holdout"]["fold_count"], 6);
         assert_eq!(receipt["models"][0]["lopo"]["mean_fold_roc_auc"], 1.0);
-        assert_eq!(receipt["models"][0]["double_node_holdout"]["mean_fold_average_precision"], 1.0);
+        assert_eq!(
+            receipt["models"][0]["double_node_holdout"]["mean_fold_average_precision"],
+            1.0
+        );
     }
 
     #[test]
     fn heldout_precursor_cannot_appear_in_training_nodes() {
         let error = mutate_fixture(|value| {
-            value["models"][0]["lopo_folds"][0]["training_precursors"].as_array_mut().unwrap().push(json!("A"));
-        }).unwrap_err();
+            value["models"][0]["lopo_folds"][0]["training_precursors"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!("A"));
+        })
+        .unwrap_err();
         assert!(error.contains("train/test precursor leakage"));
     }
 
     #[test]
     fn missing_heldout_prediction_is_rejected() {
         let error = mutate_fixture(|value| {
-            value["models"][0]["lopo_folds"][0]["predictions"].as_array_mut().unwrap().pop();
-        }).unwrap_err();
+            value["models"][0]["lopo_folds"][0]["predictions"]
+                .as_array_mut()
+                .unwrap()
+                .pop();
+        })
+        .unwrap_err();
         assert!(error.contains("prediction count"));
     }
 
@@ -863,25 +1087,39 @@ mod tests {
         let error = mutate_fixture(|value| {
             let mut row = value["models"][0]["lopo_folds"][0]["predictions"][0].clone();
             row["record_id"] = json!("edge_cd");
-            value["models"][0]["lopo_folds"][0]["predictions"].as_array_mut().unwrap().push(row);
-        }).unwrap_err();
-        assert!(error.contains("prediction count") || error.contains("not an eligible held-out edge"));
+            value["models"][0]["lopo_folds"][0]["predictions"]
+                .as_array_mut()
+                .unwrap()
+                .push(row);
+        })
+        .unwrap_err();
+        assert!(
+            error.contains("prediction count") || error.contains("not an eligible held-out edge")
+        );
     }
 
     #[test]
     fn duplicate_folds_are_rejected() {
         let error = mutate_fixture(|value| {
             let duplicate = value["models"][0]["lopo_folds"][0].clone();
-            value["models"][0]["lopo_folds"].as_array_mut().unwrap().push(duplicate);
-        }).unwrap_err();
-        assert!(error.contains("requires exactly 4 LOPO folds") || error.contains("duplicate LOPO fold"));
+            value["models"][0]["lopo_folds"]
+                .as_array_mut()
+                .unwrap()
+                .push(duplicate);
+        })
+        .unwrap_err();
+        assert!(
+            error.contains("requires exactly 4 LOPO folds")
+                || error.contains("duplicate LOPO fold")
+        );
     }
 
     #[test]
     fn incomplete_or_duplicate_graph_edges_are_rejected() {
         let error = mutate_fixture(|value| {
             value["cohort"]["records"].as_array_mut().unwrap().pop();
-        }).unwrap_err();
+        })
+        .unwrap_err();
         assert!(error.contains("complete undirected graph requires"));
     }
 
@@ -889,7 +1127,8 @@ mod tests {
     fn invalid_probability_is_rejected() {
         let error = mutate_fixture(|value| {
             value["models"][0]["lopo_folds"][0]["predictions"][0]["probability"] = json!(1.5);
-        }).unwrap_err();
+        })
+        .unwrap_err();
         assert!(error.contains("probability must be in [0,1]"));
     }
 
@@ -897,7 +1136,8 @@ mod tests {
     fn mismatched_training_record_count_is_rejected() {
         let error = mutate_fixture(|value| {
             value["models"][0]["lopo_folds"][0]["training_record_count"] = json!(0);
-        }).unwrap_err();
+        })
+        .unwrap_err();
         assert!(error.contains("training_record_count"));
     }
 
@@ -907,13 +1147,18 @@ mod tests {
         let cohort = &value["cohort"];
         let nodes = cohort["nodes"].as_array().unwrap().clone();
         let records = cohort["records"].as_array().unwrap();
-        let sample_records = records.iter().map(|row| json!({
-            "sample_id": row["sample_id"],
-            "precursor_pair_canonical": [row["precursor_a"], row["precursor_b"]],
-            "cohort_status": "analyzable",
-            "raw_reaction_category": row["category"],
-            "cross_precursor_product_endpoint": row["label"] == 1
-        })).collect::<Vec<_>>();
+        let sample_records = records
+            .iter()
+            .map(|row| {
+                json!({
+                    "sample_id": row["sample_id"],
+                    "precursor_pair_canonical": [row["precursor_a"], row["precursor_b"]],
+                    "cohort_status": "analyzable",
+                    "raw_reaction_category": row["category"],
+                    "cross_precursor_product_endpoint": row["label"] == 1
+                })
+            })
+            .collect::<Vec<_>>();
         json!({
             "status": "precursor_genome_graph_audit_pass",
             "contract": "SC-PRECURSOR-GENOME-GRAPH-AUDIT-0.1",
@@ -950,9 +1195,18 @@ mod tests {
         let receipt = audit_graph_receipt(&bytes).unwrap();
         assert_eq!(receipt["graph"]["precursor_count"], 4);
         assert_eq!(receipt["graph"]["complete_undirected_edge_count"], 6);
-        assert_eq!(receipt["fold_local_training_prevalence_baseline"]["lopo"]["fold_count"], 4);
-        assert_eq!(receipt["fold_local_training_prevalence_baseline"]["double_node_holdout"]["fold_count"], 6);
-        assert_eq!(receipt["fold_local_training_prevalence_baseline"]["lopo"]["mean_fold_roc_auc"], 0.5);
+        assert_eq!(
+            receipt["fold_local_training_prevalence_baseline"]["lopo"]["fold_count"],
+            4
+        );
+        assert_eq!(
+            receipt["fold_local_training_prevalence_baseline"]["double_node_holdout"]["fold_count"],
+            6
+        );
+        assert_eq!(
+            receipt["fold_local_training_prevalence_baseline"]["lopo"]["mean_fold_roc_auc"],
+            0.5
+        );
     }
 
     #[test]
@@ -969,13 +1223,16 @@ mod tests {
         let data: Value = serde_json::from_slice(&fixture).unwrap();
         let graph = parse_graph(&data["cohort"]).unwrap();
         let model = training_prevalence_model(&graph, "synthetic-source").unwrap();
-        let fold = model["lopo_folds"].as_array().unwrap().iter()
-            .find(|fold| fold["fold_id"] == "lopo:A").unwrap();
+        let fold = model["lopo_folds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|fold| fold["fold_id"] == "lopo:A")
+            .unwrap();
         assert_eq!(fold["training_record_count"], 3);
         for prediction in fold["predictions"].as_array().unwrap() {
             assert_eq!(prediction["probability"], 1.0 / 3.0);
         }
         let _ = schema;
     }
-
 }
