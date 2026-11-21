@@ -7,18 +7,14 @@ on:
     paths:
       - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
       - "crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs"
-      - "crates/domains/symthaea-muse/src/lib.rs"
-      - "crates/domains/symthaea-muse/Cargo.toml"
-      - "Cargo.lock"
+      - "scripts/mel_rmi_track_a_qualification.sh"
       - ".github/workflows/muse-rmi-track-a-qualification.yml"
   pull_request:
     branches: [main]
     paths:
       - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
       - "crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs"
-      - "crates/domains/symthaea-muse/src/lib.rs"
-      - "crates/domains/symthaea-muse/Cargo.toml"
-      - "Cargo.lock"
+      - "scripts/mel_rmi_track_a_qualification.sh"
       - ".github/workflows/muse-rmi-track-a-qualification.yml"
   workflow_dispatch:
 
@@ -35,8 +31,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout exact tested head
+      - name: Checkout exact tested PR head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "exact source head: $actual"
 
       - name: Verify pinned Rust toolchain
         run: |
@@ -44,32 +52,18 @@ jobs:
           cargo --version
           rustfmt --version
 
-      - name: Check runner formatting
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs
-
-      - name: Run RMI evaluator module tests
-        run: cargo test --locked -p symthaea-muse --lib rmi_benchmark::tests
-
-      - name: Run focused runner tests
-        run: cargo test --locked -p symthaea-muse --bin rmi_bench_track_a
-
-      - name: Run focused Clippy
-        run: cargo clippy --locked -p symthaea-muse --bin rmi_bench_track_a -- -D warnings
-
-      - name: Execute frozen fixture suite and fresh-process replay
+      - name: Stage, test, lint, execute and replay isolated RMI harness
+        shell: bash
+        env:
+          MEL_RMI_SEED_COUNT: "4"
+          MEL_RMI_EVIDENCE_DIR: ${{ runner.temp }}/mel-rmi-track-a-evidence
         run: |
-          source_commit="$(git rev-parse HEAD)"
-          cargo run --locked -p symthaea-muse --bin rmi_bench_track_a -- \
-            --source-commit "$source_commit" \
-            --seed-count 4 \
-            --output "$RUNNER_TEMP/melothaea-rmi-track-a.json" \
-            --self-check
-          sha256sum "$RUNNER_TEMP/melothaea-rmi-track-a.json"
+          bash scripts/mel_rmi_track_a_qualification.sh "${{ github.event.pull_request.head.sha || github.sha }}"
 
-      - name: Upload exact-head report
+      - name: Upload exact-head RMI qualification evidence
         uses: actions/upload-artifact@v4
         with:
           name: melothaea-rmi-track-a-${{ github.sha }}
-          path: ${{ runner.temp }}/melothaea-rmi-track-a.json
+          path: ${{ runner.temp }}/mel-rmi-track-a-evidence/
           if-no-files-found: error
           retention-days: 30
