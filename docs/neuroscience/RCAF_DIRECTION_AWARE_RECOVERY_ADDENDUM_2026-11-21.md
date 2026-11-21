@@ -26,7 +26,7 @@ The two directional counts partition the two-sided detection count. Wrong-direct
 
 ## 3. Implementation
 
-The standalone Rust kernel now classifies each injected replicate into the two-sided detection, expected-direction or wrong-direction outcomes. The JSON serializer includes both new binomial rates with Wilson intervals. The injection, sweep, estimator-tournament and estimator-by-dose schemas all carry the fields and were advanced to 0.2.0.
+The standalone Rust kernel now classifies each injected replicate into the two-sided detection, expected-direction or wrong-direction outcomes. The JSON serializer includes both new binomial rates with Wilson intervals. The injection, sweep, estimator-tournament and estimator-by-dose schemas all carry the fields and were advanced to 0.3.0.
 
 Focused Rust tests cover:
 - significant positive recovery;
@@ -47,7 +47,7 @@ When nuisance strength is zero, the implementation reuses the exact same null sa
 
 The 2026-11-21 synthetic calibration report predates this correction. Its 45%, 85% and 92.5% values at delta=0.30 are two-sided difference-detection rates. The saved aggregate report does not provide the per-replicate sign direction needed to decompose those historical values into expected-direction and wrong-direction detections. They must not be relabelled retroactively as directional power.
 
-The updated generator must be rerun on a new exact-head workflow to obtain directional results. No new numerical result is claimed by this addendum.
+The updated generator must be rerun on a new exact-head workflow to obtain directional and nuisance-only results. The 0.3.0 report also introduces a common-mode observation nuisance challenge with unchanged latent loadings, recorded as `nuisance_only_rejection_rate`; this is separate from the exact same-observation Type-I null. No new numerical result is claimed by this addendum.
 
 ## 6. Claim limits
 
