@@ -91,7 +91,9 @@ jobs:
         run: |
           cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_rebco_local_tape_frame_audit -- \
             --schema data/schemas/sc_rebco_local_tape_frame_v0_1.schema.json \
-            --fixture tools/superconductivity-discovery-harness/fixtures/rebco_local_tape_frame_smoke_v0_1.json
+            --fixture tools/superconductivity-discovery-harness/fixtures/rebco_local_tape_frame_smoke_v0_1.json \
+            > "$RUNNER_TEMP/sc-rebco-local-tape-frame-smoke.json"
+          cat "$RUNNER_TEMP/sc-rebco-local-tape-frame-smoke.json"
 
       - name: Run synthetic reproducibility hierarchy audit
         run: |
