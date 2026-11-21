@@ -9,7 +9,7 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::str;
 use thiserror::Error;
 
@@ -47,6 +47,36 @@ pub struct SecomClassCountsV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SecomMissingnessProfileV1 {
+    pub rows: usize,
+    pub missing_cells: usize,
+    pub sensor_cells: usize,
+    pub missing_fraction: f64,
+}
+
+#[derive(Clone, Debug, Default)]
+struct MissingnessAccumulator {
+    rows: usize,
+    missing_cells: usize,
+    sensor_cells: usize,
+}
+
+impl MissingnessAccumulator {
+    fn report(&self) -> SecomMissingnessProfileV1 {
+        SecomMissingnessProfileV1 {
+            rows: self.rows,
+            missing_cells: self.missing_cells,
+            sensor_cells: self.sensor_cells,
+            missing_fraction: if self.sensor_cells == 0 {
+                0.0
+            } else {
+                self.missing_cells as f64 / self.sensor_cells as f64
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SecomRawIntegrityReportV1 {
     pub schema: String,
     pub dataset_id: String,
@@ -58,6 +88,11 @@ pub struct SecomRawIntegrityReportV1 {
     pub total_sensor_cells: usize,
     pub missing_fraction: f64,
     pub rows_with_any_missing: usize,
+    pub missing_sensor_cells_by_feature: Vec<usize>,
+    pub features_with_no_missing: usize,
+    pub features_over_50_percent_missing: usize,
+    pub missingness_by_class: BTreeMap<String, SecomMissingnessProfileV1>,
+    pub missingness_by_month: BTreeMap<String, SecomMissingnessProfileV1>,
     pub class_counts: SecomClassCountsV1,
     pub unique_timestamps: usize,
     pub duplicate_timestamp_rows: usize,
@@ -256,31 +291,73 @@ pub fn audit_secom_raw_v1(
 
     let mut missing_sensor_cells = 0usize;
     let mut rows_with_any_missing = 0usize;
-    for row in &features {
-        let row_missing = row.values.iter().filter(|value| value.is_none()).count();
-        missing_sensor_cells += row_missing;
-        if row_missing > 0 {
-            rows_with_any_missing += 1;
-        }
-    }
+    let mut missing_sensor_cells_by_feature =
+        vec![0usize; expectations.expected_features_per_row];
     let total_sensor_cells = features.len() * expectations.expected_features_per_row;
     let mut pass = 0usize;
     let mut fail = 0usize;
     let mut unique_timestamps = BTreeSet::new();
     let mut timestamps_non_decreasing = true;
     let mut previous = None;
-    for row in &labels {
-        match row.label {
-            -1 => pass += 1,
-            1 => fail += 1,
+    let mut missingness_by_class: BTreeMap<String, MissingnessAccumulator> = BTreeMap::new();
+    let mut missingness_by_month: BTreeMap<String, MissingnessAccumulator> = BTreeMap::new();
+
+    for (feature_row, label_row) in features.iter().zip(&labels) {
+        let class_name = match label_row.label {
+            -1 => {
+                pass += 1;
+                "pass"
+            }
+            1 => {
+                fail += 1;
+                "fail"
+            }
             _ => unreachable!("label parser admits only -1 or +1"),
+        };
+        let row_missing = feature_row.values.iter().filter(|value| value.is_none()).count();
+        missing_sensor_cells += row_missing;
+        if row_missing > 0 {
+            rows_with_any_missing += 1;
         }
-        unique_timestamps.insert(row.observed_at);
-        if previous.is_some_and(|previous| row.observed_at < previous) {
+        for (feature_index, value) in feature_row.values.iter().enumerate() {
+            if value.is_none() {
+                missing_sensor_cells_by_feature[feature_index] += 1;
+            }
+        }
+
+        let class_profile = missingness_by_class.entry(class_name.to_string()).or_default();
+        class_profile.rows += 1;
+        class_profile.missing_cells += row_missing;
+        class_profile.sensor_cells += expectations.expected_features_per_row;
+
+        let month = label_row.observed_at.format("%Y-%m").to_string();
+        let month_profile = missingness_by_month.entry(month).or_default();
+        month_profile.rows += 1;
+        month_profile.missing_cells += row_missing;
+        month_profile.sensor_cells += expectations.expected_features_per_row;
+
+        unique_timestamps.insert(label_row.observed_at);
+        if previous.is_some_and(|previous| label_row.observed_at < previous) {
             timestamps_non_decreasing = false;
         }
-        previous = Some(row.observed_at);
+        previous = Some(label_row.observed_at);
     }
+    let missingness_by_class = missingness_by_class
+        .into_iter()
+        .map(|(key, profile)| (key, profile.report()))
+        .collect();
+    let missingness_by_month = missingness_by_month
+        .into_iter()
+        .map(|(key, profile)| (key, profile.report()))
+        .collect();
+    let features_with_no_missing = missing_sensor_cells_by_feature
+        .iter()
+        .filter(|missing| **missing == 0)
+        .count();
+    let features_over_50_percent_missing = missing_sensor_cells_by_feature
+        .iter()
+        .filter(|missing| **missing * 2 > features.len())
+        .count();
     if !timestamps_non_decreasing {
         return Err(SecomRawDataError(
             "label_file timestamps are not non-decreasing in source row order".to_string(),
@@ -303,6 +380,11 @@ pub fn audit_secom_raw_v1(
         total_sensor_cells,
         missing_fraction: missing_sensor_cells as f64 / total_sensor_cells as f64,
         rows_with_any_missing,
+        missing_sensor_cells_by_feature,
+        features_with_no_missing,
+        features_over_50_percent_missing,
+        missingness_by_class,
+        missingness_by_month,
         class_counts: SecomClassCountsV1 { pass, fail },
         unique_timestamps: unique_timestamps.len(),
         duplicate_timestamp_rows: labels.len() - unique_timestamps.len(),
@@ -353,6 +435,13 @@ mod tests {
         assert_eq!(report.total_sensor_cells, 6);
         assert!((report.missing_fraction - (1.0 / 6.0)).abs() < 1e-12);
         assert_eq!(report.rows_with_any_missing, 1);
+        assert_eq!(report.missing_sensor_cells_by_feature, vec![0, 1, 0]);
+        assert_eq!(report.features_with_no_missing, 2);
+        assert_eq!(report.features_over_50_percent_missing, 0);
+        assert_eq!(report.missingness_by_class["pass"].missing_cells, 1);
+        assert!((report.missingness_by_class["pass"].missing_fraction - (1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(report.missingness_by_class["fail"].missing_cells, 0);
+        assert_eq!(report.missingness_by_month["2008-07"].missing_cells, 1);
         assert_eq!(report.class_counts, SecomClassCountsV1 { pass: 1, fail: 1 });
         assert_eq!(report.unique_timestamps, 2);
         assert_eq!(report.duplicate_timestamp_rows, 0);
