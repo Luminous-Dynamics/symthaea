@@ -75,19 +75,53 @@ impl Action {
     }
 }
 
+/// Use-time freshness assessment derived by the canonical time/evidence
+/// owners (currently #9954/#12401/#13091).
+///
+/// These are durations and deadline slack already computed in one qualified
+/// clock contract. This crate does not read a wall clock, compare raw clock
+/// ticks, choose valid_at/known_at, or infer freshness from retrieval time.
+/// Every required value is optional so an unknown value fails closed.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FreshnessAtUse {
+    /// Age of the evidence actually supporting this decision at consumption.
+    pub evidence_age_at_use_ns: Option<u64>,
+    /// Frozen task-specific maximum evidence age, inclusive.
+    pub max_evidence_age_ns: Option<u64>,
+    /// Remaining time at consumption before the task deadline.
+    /// Zero means consumed exactly at the deadline; None means unknown.
+    pub deadline_slack_at_use_ns: Option<u64>,
+}
+
+impl FreshnessAtUse {
+    /// Freshness is qualified only when age, age budget and deadline slack
+    /// are all known and the evidence is still valid at the actual use point.
+    pub const fn is_qualified(self) -> bool {
+        match (
+            self.evidence_age_at_use_ns,
+            self.max_evidence_age_ns,
+            self.deadline_slack_at_use_ns,
+        ) {
+            (Some(age), Some(max_age), Some(_deadline_slack)) => age <= max_age,
+            _ => false,
+        }
+    }
+}
+
 /// Snapshot of already-computed admission facts from upstream owners.
 ///
 /// This is deliberately not an authorization token or cryptographic receipt.
 /// Integrations must not set these fields from model prose or untrusted
 /// candidate output. A production integration must bind this snapshot to the
-/// exact source, scope, time, consent and policy revisions.
+/// exact source, scope, time, consent and policy revisions. Freshness is
+/// evaluated at consumption, not merely at retrieval.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AdmissionSnapshot {
     pub durable_write_authorized: bool,
     pub session_capture_authorized: bool,
     pub source_qualified: bool,
     pub scope_qualified: bool,
-    pub freshness_qualified: bool,
+    pub freshness_at_use: FreshnessAtUse,
     pub not_revoked_or_erased: bool,
     pub verification_authorized: bool,
     pub verifier_available: bool,
@@ -214,7 +248,7 @@ pub const fn is_admissible(action: Action, gates: AdmissionSnapshot) -> bool {
         Action::Use => {
             gates.source_qualified
                 && gates.scope_qualified
-                && gates.freshness_qualified
+                && gates.freshness_at_use.is_qualified()
                 && gates.not_revoked_or_erased
         }
         Action::Verify => gates.verification_authorized && gates.verifier_available,
@@ -387,7 +421,11 @@ mod tests {
             verifier_available: true,
             source_qualified: true,
             scope_qualified: true,
-            freshness_qualified: false,
+            freshness_at_use: FreshnessAtUse {
+                evidence_age_at_use_ns: Some(101),
+                max_evidence_age_ns: Some(100),
+                deadline_slack_at_use_ns: Some(1_000),
+            },
             not_revoked_or_erased: true,
             ..AdmissionSnapshot::default()
         };
@@ -399,6 +437,63 @@ mod tests {
 
         let decision = select_action(Stage::Query, gates, &options).unwrap();
         assert_eq!(decision.action, Action::Verify);
+    }
+
+    #[test]
+    fn evidence_fresh_at_retrieval_but_stale_at_use_is_rejected() {
+        // A retrieval at age 20ns can become age 120ns before consumption.
+        // Only the use-time age is supplied to the decision gate.
+        let fresh_at_retrieval = FreshnessAtUse {
+            evidence_age_at_use_ns: Some(120),
+            max_evidence_age_ns: Some(100),
+            deadline_slack_at_use_ns: Some(500),
+        };
+        assert!(!fresh_at_retrieval.is_qualified());
+
+        let gates = AdmissionSnapshot {
+            source_qualified: true,
+            scope_qualified: true,
+            not_revoked_or_erased: true,
+            freshness_at_use: fresh_at_retrieval,
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::Use, &LOW_LOSS, 0, 0, 0),
+            option(Action::Abstain, &HIGH_LOSS, 0, 0, 1),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::Abstain);
+    }
+
+    #[test]
+    fn unknown_freshness_fails_closed_for_use() {
+        let gates = AdmissionSnapshot {
+            source_qualified: true,
+            scope_qualified: true,
+            not_revoked_or_erased: true,
+            freshness_at_use: FreshnessAtUse {
+                evidence_age_at_use_ns: Some(10),
+                max_evidence_age_ns: Some(100),
+                deadline_slack_at_use_ns: None,
+            },
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::Use, &LOW_LOSS, 0, 0, 0),
+            option(Action::Abstain, &HIGH_LOSS, 0, 0, 1),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::Abstain);
+    }
+
+    #[test]
+    fn evidence_at_inclusive_age_limit_and_exact_deadline_is_qualified() {
+        let freshness = FreshnessAtUse {
+            evidence_age_at_use_ns: Some(100),
+            max_evidence_age_ns: Some(100),
+            deadline_slack_at_use_ns: Some(0),
+        };
+        assert!(freshness.is_qualified());
     }
 
     #[test]
