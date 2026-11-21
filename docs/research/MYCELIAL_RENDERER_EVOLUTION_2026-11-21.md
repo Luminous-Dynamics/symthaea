@@ -1,7 +1,7 @@
 # Mycelial Presence: Renderer Evolution
 
 **Date:** 2026-11-21  
-**Status:** Spatial model v1 implemented; GPU renderer is a proposed next adapter  
+**Status:** Spatial model v1 and CPU tube mesh implemented; isolated Bevy 0.20.1 native renderer source added; build/device validation pending  
 **Implementation branch:** `research/symthaea-embodiment-contract-v0`
 
 ## Decision
@@ -44,7 +44,7 @@ Implemented in `crates/domains/symthaea-canvas/src/mycelial_model.rs`:
 
 The SVG adapter now projects these same spatial curves into a lightly depth-compressed 2.5D view. It no longer invents an independent 2D branching topology.
 
-The v1 model and CPU tessellator now emit a bounded, indexed 3D tube mesh. They do **not** yet upload that mesh to a GPU, apply a 3D shader/material, or present a real 3D scene. The GPU renderer is therefore planned, not delivered.
+The v1 model and CPU tessellator emit a bounded, indexed 3D tube mesh. An isolated Bevy 0.20.1 adapter now uploads it as a `Mesh3d` and supplies a first native PBR scene with a layered nucleus, membrane, orbital cells, selectable presentation modes, and reduced-motion control. Renderer source is authored but remains **uncompiled and visually unverified** in the current environment. Custom WESL material extensions, GPU-generated geometry, volumetrics, browser WebGPU/WebGL adapters, and live runtime streaming are not implemented.
 
 ## Rendering architecture
 
@@ -62,7 +62,7 @@ CPU tube tessellator (bounded indexed triangle mesh)
         |
         +--> SVG projection (current, portable fallback/debug/export)
         |
-        +--> Bevy / wgpu renderer (next native 3D adapter)
+        +--> Bevy 0.20.1 native PBR adapter (source added; validation pending)
         |
         +--> WebGPU renderer (later browser GPU adapter)
         |
@@ -71,18 +71,24 @@ CPU tube tessellator (bounded indexed triangle mesh)
 
 ### Native renderer
 
-The preferred native experiment is a separate Bevy 0.20 adapter, not a rushed migration of the existing dashboard:
+An isolated Bevy 0.20.1 preview adapter now lives at `crates/bridges/symthaea-mycelial-renderer`. It is explicitly excluded from the root workspace so its dependency graph does not force the existing Bevy 0.15 dashboard or workspace-level `wgpu 27` users to migrate.
 
-1. Upload the existing bounded tube mesh or rebuild it when the model version changes. The CPU tessellator uses parallel-transport frames to avoid the sudden twists common with naïve Frenet frames near low-curvature points. A future GPU compute tessellator can be compared against it, not silently substituted.
-2. Keep topology and mesh identity stable; update per-frame uniforms and a small set of dynamic buffers rather than rebuilding the entire mesh every frame.
-3. Use a restrained emissive core, thin transmissive membrane, grazing-angle rim light, and depth-aware branch materials. Avoid indiscriminate bloom, which destroys branch separation.
-4. Instance terminal spores and orbital cells; apply level-of-detail and a strict particle budget on mobile.
-5. Animate from the shared monotonic frame context. Reduced-motion mode must disable camera drift, branch breathing, orbit animation, and particle motion.
+Implemented in source:
+1. CPU tube geometry is uploaded as one Bevy `Mesh3d` with `StandardMaterial` PBR shading.
+2. The preview assembles an emissive central nucleus, a translucent outer membrane, and orbital cell spheres.
+3. Ambient, Cognitive, and Conversational modes are selectable on the command line.
+4. `--reduced-motion` disables renderer-local core breathing and orbital movement.
+5. The model and tessellation remain in `symthaea-canvas`; the adapter only converts them to renderer assets.
+
+Still required:
+1. Build and run the isolated adapter on a supported native GPU, inspect actual output, and fix any API or visual issues.
+2. Replace the shared filament material with generation/branch-aware material data without duplicating semantic geometry.
+3. Add custom WESL material extensions for a restrained Fresnel rim and bounded glow; do not make mesh shaders a requirement.
+4. Instance terminal spores, apply level-of-detail, and set strict geometry/particle budgets on mobile.
+5. Add camera interaction, runtime event streaming, and renderer telemetry only after the baseline is stable.
 6. Keep camera motion user-controlled or very subtle. The organism should remain legible without motion.
 
-The current `symthaea-bevy-dash` package is on Bevy 0.15 and currently visualizes a separate cognitive dashboard. Bevy 0.20 adds sprite material extensions and WESL shader support. Its release notes also state that mesh shaders are not supported on web platforms. Treat the Bevy adapter as native-first; do not make advanced mesh shaders a requirement for browser parity.
-
-The workspace currently declares `wgpu = 27`, while Bevy 0.20's current render crate manifest uses `wgpu = 30`. Do not casually share GPU resources or force a workspace-wide version bump. Keep renderer integration behind a separate crate boundary until its dependency graph, feature set, platform matrix, and build costs are measured.
+The existing `symthaea-bevy-dash` package remains on Bevy 0.15 and visualizes a separate cognitive dashboard. Bevy 0.20 uses WESL and its current rendering stack has a newer `wgpu` dependency. The new adapter keeps that version boundary separate. Bevy's advanced mesh-shader path is not supported on web platforms; browser parity must use conventional vertex/fragment pipelines.
 
 ### Browser renderer
 
@@ -165,8 +171,8 @@ Targets must be revised only after measuring real supported hardware. Quality/pe
 
 1. **Completed in this increment:** canonical renderer-neutral 3D spatial model; deterministic branching; bounded CPU tube-mesh tessellator; shared SVG projection; three presentation modes; gaze and confirmed-playback layers.
 2. **Next:** render-golden and model-hash fixtures; validate SVG output in Chromium and reduced-motion; compare mode node/geometry budgets.
-3. **Native GPU prototype:** a small, isolated Bevy 0.20 adapter that consumes `MycelialModel`, draws 3D tubular filaments and the nucleus, and reports frame metrics. Keep it out of the core semantic crate.
-4. **Browser GPU adapter:** WebGPU with WebGL 2 fallback and SVG fallback; capability detection and device-loss tests.
+3. **Native GPU prototype (source added; validation pending):** isolated Bevy 0.20.1 adapter consumes the shared CPU tube mesh and draws the 3D canopy, nucleus, membrane, and cells. Next validate compilation, startup, visual output and frame metrics. Keep it out of the core semantic crate.
+4. **Browser GPU adapter:** WebGPU with WebGL 2 fallback and SVG fallback; capability detection, context/device-loss tests, and matched output.
 5. **Cognitive Instrument extension:** only after real producers for retrieval, association, prediction, and planning traces are available.
 6. **Conversational Puppet:** a separate, optional embodiment adapter (e.g. VRM/Live2D) sharing the event contract; never force the mycelial identity into a humanoid rig.
 
