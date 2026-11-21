@@ -365,14 +365,17 @@ pub fn extract_element_features(scene: &SceneNode) -> Vec<ElementFeature> {
             | NodeKind::Filter { .. }
             | NodeKind::UseFilter { .. } => None,
         };
-        if let Some((center, size)) = geometry {
-            if size.is_finite() && size > 0.0 && center.0.is_finite() && center.1.is_finite() {
-                out.push(ElementFeature {
-                    center,
-                    size,
-                    color,
-                });
-            }
+        if let Some((center, size)) = geometry
+            && size.is_finite()
+            && size > 0.0
+            && center.0.is_finite()
+            && center.1.is_finite()
+        {
+            out.push(ElementFeature {
+                center,
+                size,
+                color,
+            });
         }
         for child in &node.children {
             walk_elements(child, affine, out);
