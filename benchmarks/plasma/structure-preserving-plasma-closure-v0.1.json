@@ -1,0 +1,81 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "structure-preserving-plasma-closure-v0.1",
+  "created_at": "2026-11-20",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12958",
+  "status": "mathematical_specification_only",
+  "lanes": [
+    {
+      "id": "collisionless_vlasov_poisson_hamiltonian",
+      "equation_class": "hamiltonian",
+      "source_solver_reference": "PETSc_discrete_gradient_Vlasov_Poisson",
+      "required_structure": [
+        "Poisson_bracket_skew_adjointness",
+        "Hamiltonian_energy",
+        "mass_momentum_charge_and_applicable_Casimirs"
+      ],
+      "entropy_gate": "do_not_impose_collisional_Landau_entropy_monotonicity_as_collisionless_universal_gate",
+      "tasks": ["linear_Landau_damping", "nonlinear_Landau_damping", "phase_mixing_and_recurrence"]
+    },
+    {
+      "id": "collisional_vlasov_poisson_landau_metriplectic",
+      "equation_class": "reversible_plus_dissipative",
+      "source_solver_reference": "PETSc_discrete_gradient_Vlasov_Poisson_Landau",
+      "required_structure": [
+        "mass_momentum_total_energy_conservation",
+        "Landau_entropy_monotonicity",
+        "reversible_dissipative_degeneracy"
+      ],
+      "tasks": ["two_species_thermalisation", "collision_frequency_sweeps", "equilibrium_approach"]
+    }
+  ],
+  "source_references": [
+    {
+      "id": "PETSc_VPL_discrete_gradient_2026",
+      "doi": "10.1016/j.jcp.2026.114749",
+      "journal": "Journal of Computational Physics",
+      "volume": 554,
+      "article": "114749",
+      "published": "2026-06-01",
+      "data_state": "tools_tests_in_PETSc_specific_data_on_request",
+      "exact_revision": "not_pinned"
+    },
+    {
+      "id": "GENERIC_FNO_2026",
+      "arxiv": "2606.08343",
+      "submitted": "2026-06-06",
+      "source_code_state": "anonymous_repository_stated_in_paper",
+      "plasma_validation": false
+    }
+  ],
+  "candidate_methods": [
+    "discrete_gradient_PETSc_reference",
+    "unconstrained_FNO",
+    "conservation_penalty_FNO",
+    "post_step_invariant_projection",
+    "Hamiltonian_Poisson_structure_preserving_operator",
+    "GENERIC_metriplectic_operator",
+    "positive_semidefinite_learned_dissipative_operator"
+  ],
+  "metrics": [
+    "mass_momentum_energy_residual",
+    "charge_Poisson_Gauss_residual",
+    "Poisson_skew_adjointness_residual",
+    "GENERIC_L_deltaS_degeneracy_residual",
+    "GENERIC_M_deltaE_degeneracy_residual",
+    "minimum_eigenvalue_of_M",
+    "collisional_entropy_increment_and_violation_count",
+    "damping_growth_phase_mixing_and_thermalisation",
+    "long_horizon_drift_and_failure_time",
+    "timestep_convergence",
+    "operator_and_solver_runtime",
+    "functional_gradient_and_JVP_cost",
+    "memory_and_end_to_end_wall_time"
+  ],
+  "claim_limits": {
+    "plasma_GENERIC_FNO_implemented": false,
+    "VPL_reproduction": false,
+    "SOTA_superiority": false,
+    "facility_validation": false
+  }
+}
