@@ -318,7 +318,6 @@ jobs:
             sha256sum data/research/precursor_genome_graph_benchmark_v0_1.json
             sha256sum data/schemas/precursor_genome_graph_benchmark_v0_1.schema.json
             sha256sum tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
-            sha256sum "$RUNNER_TEMP/precursor-genome/ledger_precursor_genome.json"
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
@@ -348,7 +347,6 @@ jobs:
             ${{ runner.temp }}/sc-spatial-reaction-diffusion-smoke.json
             ${{ runner.temp }}/sc-onset-prediction-smoke.json
             ${{ runner.temp }}/precursor-genome/graph-audit-receipt.json
-            ${{ runner.temp }}/precursor-genome/ledger_precursor_genome.json
             ${{ runner.temp }}/sc-thermochemical-unbalanced-negative.log
             ${{ runner.temp }}/sc-thermochemical-charge-negative.log
             ${{ runner.temp }}/sc-thermochemical-disconnected-negative.log
