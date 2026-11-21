@@ -5,7 +5,7 @@
 //! This binary does not fit an Ic surface or qualify a magnet/coil.
 
 use jsonschema::validator_for;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::env;
@@ -89,15 +89,9 @@ impl Mat3 {
 
     fn local_to_global(self, local: Vec3) -> Vec3 {
         Vec3 {
-            x: self.rows[0][0] * local.x
-                + self.rows[0][1] * local.y
-                + self.rows[0][2] * local.z,
-            y: self.rows[1][0] * local.x
-                + self.rows[1][1] * local.y
-                + self.rows[1][2] * local.z,
-            z: self.rows[2][0] * local.x
-                + self.rows[2][1] * local.y
-                + self.rows[2][2] * local.z,
+            x: self.rows[0][0] * local.x + self.rows[0][1] * local.y + self.rows[0][2] * local.z,
+            y: self.rows[1][0] * local.x + self.rows[1][1] * local.y + self.rows[1][2] * local.z,
+            z: self.rows[2][0] * local.x + self.rows[2][1] * local.y + self.rows[2][2] * local.z,
         }
     }
 }
@@ -162,7 +156,10 @@ fn matrix3(value: &Value, path: &str) -> Result<Mat3, String> {
             .as_array()
             .ok_or_else(|| fail(path, "each matrix row must contain three numbers"))?;
         if entries.len() != 3 {
-            return Err(fail(path, "each matrix row must contain exactly three numbers"));
+            return Err(fail(
+                path,
+                "each matrix row must contain exactly three numbers",
+            ));
         }
         for (column_index, entry) in entries.iter().enumerate() {
             matrix[row_index][column_index] =
@@ -219,7 +216,10 @@ fn transform_station(station: &Value, index: usize) -> Result<Value, String> {
     }
     .norm();
     if residual > VECTOR_TOLERANCE * global.norm().max(1.0) {
-        return Err(fail(&path, format!("inverse transform residual too large: {residual}")));
+        return Err(fail(
+            &path,
+            format!("inverse transform residual too large: {residual}"),
+        ));
     }
 
     let magnitude_t = global.norm();
@@ -263,8 +263,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema)
-        .map_err(|error| format!("schema compilation failed: {error}"))?;
+    let validator =
+        validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
     if let Some(error) = validator.iter_errors(&fixture).next() {
         return Err(format!(
             "fixture schema validation failed: {} at {}",
@@ -276,7 +276,9 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
         || text_field(&fixture, "evidence_class", "$")? != "synthetic"
         || text_field(&fixture, "claim_ceiling", "$")? != CLAIM_CEILING
     {
-        return Err("fixture version, evidence class, or claim ceiling does not match v0.1".to_owned());
+        return Err(
+            "fixture version, evidence class, or claim ceiling does not match v0.1".to_owned(),
+        );
     }
 
     let convention = field(&fixture, "frame_convention", "$")?;
@@ -321,7 +323,10 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
             &format!("{path}.transform_uncertainty_rad"),
         )?;
         if uncertainty < 0.0 {
-            return Err(fail(&path, "transform_uncertainty_rad must be non-negative"));
+            return Err(fail(
+                &path,
+                "transform_uncertainty_rad must be non-negative",
+            ));
         }
         validate_digest(
             text_field(station, "source_artifact_sha256", &path)?,
@@ -413,7 +418,10 @@ mod tests {
         assert_eq!(station["local_field_vector_t"], json!([5.0, 0.0, 0.0]));
         let theta = station["theta_from_local_normal_rad"].as_f64().unwrap();
         assert!((theta - std::f64::consts::FRAC_PI_2).abs() < 1.0e-12);
-        assert_eq!(station["phi_from_longitudinal_toward_width_rad"], json!(0.0));
+        assert_eq!(
+            station["phi_from_longitudinal_toward_width_rad"],
+            json!(0.0)
+        );
     }
 
     #[test]
@@ -423,7 +431,10 @@ mod tests {
         assert_eq!(station["local_field_vector_t"], json!([0.0, 0.0, 5.0]));
         let theta = station["theta_from_local_normal_rad"].as_f64().unwrap();
         assert!(theta.abs() < 1.0e-12);
-        assert_eq!(station["phi_from_longitudinal_toward_width_rad"], Value::Null);
+        assert_eq!(
+            station["phi_from_longitudinal_toward_width_rad"],
+            Value::Null
+        );
     }
 
     #[test]
@@ -433,14 +444,21 @@ mod tests {
         assert_eq!(station["field_magnitude_t"], 0.0);
         assert_eq!(station["orientation_defined"], false);
         assert_eq!(station["theta_from_local_normal_rad"], Value::Null);
-        assert_eq!(station["phi_from_longitudinal_toward_width_rad"], Value::Null);
+        assert_eq!(
+            station["phi_from_longitudinal_toward_width_rad"],
+            Value::Null
+        );
     }
 
     #[test]
     fn same_global_field_has_different_local_angles_along_curved_tape() {
         let receipt = audit(schema_bytes(), fixture_bytes()).expect("fixture audits");
-        let straight = receipt["stations"][0]["theta_from_local_normal_rad"].as_f64().unwrap();
-        let curved = receipt["stations"][1]["theta_from_local_normal_rad"].as_f64().unwrap();
+        let straight = receipt["stations"][0]["theta_from_local_normal_rad"]
+            .as_f64()
+            .unwrap();
+        let curved = receipt["stations"][1]["theta_from_local_normal_rad"]
+            .as_f64()
+            .unwrap();
         assert_ne!(straight, curved);
     }
 
@@ -449,7 +467,11 @@ mod tests {
         let mut value = fixture();
         value["stations"][0]["local_to_global_rotation_matrix"] =
             json!([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
-        assert!(audit_fixture(&value).unwrap_err().contains("determinant +1"));
+        assert!(
+            audit_fixture(&value)
+                .unwrap_err()
+                .contains("determinant +1")
+        );
     }
 
     #[test]
@@ -457,14 +479,22 @@ mod tests {
         let mut value = fixture();
         value["stations"][0]["local_to_global_rotation_matrix"] =
             json!([[1, 0.1, 0], [0, 1, 0], [0, 0, 1]]);
-        assert!(audit_fixture(&value).unwrap_err().contains("not orthonormal"));
+        assert!(
+            audit_fixture(&value)
+                .unwrap_err()
+                .contains("not orthonormal")
+        );
     }
 
     #[test]
     fn rejects_wrong_matrix_shape() {
         let mut value = fixture();
         value["stations"][0]["local_to_global_rotation_matrix"] = json!([[1, 0], [0, 1]]);
-        assert!(audit_fixture(&value).unwrap_err().contains("exactly three rows"));
+        assert!(
+            audit_fixture(&value)
+                .unwrap_err()
+                .contains("exactly three rows")
+        );
     }
 
     #[test]
@@ -472,21 +502,33 @@ mod tests {
         let mut value = fixture();
         let first_id = value["stations"][0]["station_id"].clone();
         value["stations"][1]["station_id"] = first_id;
-        assert!(audit_fixture(&value).unwrap_err().contains("duplicate station_id"));
+        assert!(
+            audit_fixture(&value)
+                .unwrap_err()
+                .contains("duplicate station_id")
+        );
     }
 
     #[test]
     fn rejects_negative_frame_uncertainty() {
         let mut value = fixture();
         value["stations"][0]["transform_uncertainty_rad"] = json!(-0.1);
-        assert!(audit_fixture(&value).unwrap_err().contains("must be non-negative"));
+        assert!(
+            audit_fixture(&value)
+                .unwrap_err()
+                .contains("must be non-negative")
+        );
     }
 
     #[test]
     fn rejects_malformed_source_digest() {
         let mut value = fixture();
         value["stations"][0]["source_artifact_sha256"] = json!("ABC");
-        assert!(audit_fixture(&value).unwrap_err().contains("lowercase 64-character SHA-256"));
+        assert!(
+            audit_fixture(&value)
+                .unwrap_err()
+                .contains("lowercase 64-character SHA-256")
+        );
     }
 
     #[test]
