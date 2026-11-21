@@ -172,6 +172,8 @@ pub mod research_release_promotion;
 pub mod research_revision_governance;
 pub mod rhythm;
 #[cfg(feature = "theory")]
+pub mod score_transaction;
+#[cfg(feature = "theory")]
 pub mod sonata_intervention;
 #[cfg(all(feature = "clap-fad", feature = "theory"))]
 pub mod steering;
