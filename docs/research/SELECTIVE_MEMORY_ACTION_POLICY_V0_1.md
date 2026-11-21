@@ -146,6 +146,33 @@ FAMA penalizes use of obsolete or invalidated memories. MACE should separately r
 
 [Findings EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.1211/) evaluates 45 hours of egocentric video for retrospective faithfulness and prospective memory-grounded planning. Its architecture maintains typed environment, entity and activity information and consolidates reusable routines. MACE should eventually test whether remembered procedures transfer to unseen goals while retaining exact visual/action evidence, not merely natural-language captions.
 
+## 5.1 External competition targets: attack the weak dimensions, not just the headline score
+
+The official [Agent Memory Challenge Cycle 2 results](https://agentmemoryleaderboard.ai/results/cycle-2/) were released on 2026-11-19. It has separate Textual, Coding and Multimodal boards and separate open-method, closed-source and commercial divisions. Keep each score in its own track; none is directly comparable with internal MACE utility or this action-policy benchmark.
+
+For the next eligible official open-method comparison, use a proposed **+5 absolute-point stretch target** over each current open-method leader and target the weaker submetrics explicitly:
+
+| Track / capability | Cycle 2 open-method leader | Proposed stretch target |
+|---|---:|---:|
+| Textual overall (Resurface) | 61.22 | 66.22 |
+| Textual temporal sequencing | 57.76 | 62.76 |
+| Textual personalization/care | 38.82 | 43.82 |
+| Textual workflow execution | 59.67 | 64.67 |
+| Textual streaming | 49.65 | 54.65 |
+| Coding overall resolved (InsightMem) | 63.33% | 68.33% |
+| Coding new-feature resolution | 74.51% | 79.51% |
+| Coding bug-fix resolution | 57.58% | 62.58% |
+| Multimodal overall (Khipu) | 43.26 | 48.26 |
+| Multimodal retrieval | 50.28 | 55.28 |
+| Multimodal temporal reasoning | 34.23 | 39.23 |
+| Multimodal continual learning | 38.45 | 43.45 |
+| Multimodal personalization | 11.04 | 16.04 |
+| Multimodal evidence governance | 31.29 | 36.29 |
+
+The current textual open-method leader already has 76.55 memory-governance and 68.59 epistemic-safety/privacy scores; those should be preserved rather than improved by sacrificing safety. The commercial/closed-source Cycle 2 references are MemoraX at 69.26 Textual, 68.00% Coding resolved and 53.68 Multimodal. A later Stage-2 ambition is at least one point above those values, but only on the same official board and protocol.
+
+This target ladder is arithmetic-derived, not a forecast. Cycle 2 is a historical baseline; the next eligible competition requires its own submission window, API contract and official evaluation. Do not tune against sealed official test data.
+
 ## 6. Benchmark design
 
 Build a deterministic benchmark with separate ingestion and query-time tracks.
