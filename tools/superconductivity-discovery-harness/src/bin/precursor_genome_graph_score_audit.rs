@@ -482,6 +482,195 @@ fn evaluate_model(graph: &Graph, model: &Value) -> Result<Value, String> {
         "double_node_folds": double_folds.iter().map(|fold| fold.json.clone()).collect::<Vec<_>>()
     }))
 }
+fn valid_sha1(value: &str) -> bool {
+    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+fn graph_from_audit_receipt(receipt: &Value) -> Result<Graph, String> {
+    if required_text(receipt, "status")? != "precursor_genome_graph_audit_pass"
+        || required_text(receipt, "contract")? != "SC-PRECURSOR-GENOME-GRAPH-AUDIT-0.1"
+    {
+        return Err("input is not a passing Precursor Genome graph audit receipt".to_owned());
+    }
+    let source = receipt.get("source").ok_or("graph receipt source is missing")?;
+    if required_text(source, "repository")? != "lauren-walters/precursor-genome" {
+        return Err("graph receipt is not from the pinned Precursor Genome repository".to_owned());
+    }
+    let ledger_commit = required_text(source, "commit")?;
+    if ledger_commit != "78cb026aa6c9b53aa0ec26ea5611d523bc3c320a" {
+        return Err(format!("unexpected Precursor Genome source commit {ledger_commit}"));
+    }
+    if !valid_sha1(required_text(source, "ledger_git_blob_sha1")?) {
+        return Err("graph receipt ledger_git_blob_sha1 is malformed".to_owned());
+    }
+    if !valid_digest(required_text(source, "ledger_sha256")?) {
+        return Err("graph receipt ledger_sha256 is malformed".to_owned());
+    }
+    let pair_graph = receipt.get("pair_graph").ok_or("graph receipt pair_graph is missing")?;
+    if pair_graph.get("complete_undirected_graph").and_then(Value::as_bool) != Some(true) {
+        return Err("source graph receipt does not establish a complete undirected graph".to_owned());
+    }
+    let precursor_rows = pair_graph.get("per_precursor").and_then(Value::as_array)
+        .ok_or("graph receipt pair_graph.per_precursor must be an array")?;
+    let mut nodes = Vec::with_capacity(precursor_rows.len());
+    for row in precursor_rows {
+        nodes.push(required_text(row, "precursor_formula")?.to_owned());
+    }
+    nodes.sort();
+    let expected_edges = nodes.len() * (nodes.len() - 1) / 2;
+    if pair_graph.get("precursor_count").and_then(Value::as_u64) != Some(nodes.len() as u64)
+        || pair_graph.get("unique_unordered_pair_count").and_then(Value::as_u64) != Some(expected_edges as u64)
+        || pair_graph.get("expected_degree").and_then(Value::as_u64) != Some((nodes.len() - 1) as u64)
+    {
+        return Err("graph receipt node, edge or degree counts do not describe a complete graph".to_owned());
+    }
+    let source_rows = receipt.get("sample_records").and_then(Value::as_array)
+        .ok_or("graph receipt sample_records must be an array")?;
+    let mut records = Vec::with_capacity(source_rows.len());
+    for row in source_rows {
+        let sample_id = required_text(row, "sample_id")?.to_owned();
+        let pair = row.get("precursor_pair_canonical").and_then(Value::as_array)
+            .ok_or_else(|| format!("source sample {sample_id} lacks canonical precursor pair"))?;
+        if pair.len() != 2 {
+            return Err(format!("source sample {sample_id} precursor pair must have exactly two values"));
+        }
+        let precursor_a = pair[0].as_str().ok_or("canonical precursor A must be string")?.to_owned();
+        let precursor_b = pair[1].as_str().ok_or("canonical precursor B must be string")?.to_owned();
+        let category = row.get("raw_reaction_category").and_then(Value::as_str)
+            .unwrap_or("unclassified").to_owned();
+        let state = required_text(row, "cohort_status")?;
+        let (cohort_state, label, exclusion_reason) = match state {
+            "analyzable" => {
+                let endpoint = row.get("cross_precursor_product_endpoint").and_then(Value::as_bool)
+                    .ok_or_else(|| format!("analyzable sample {sample_id} lacks binary cross-precursor endpoint"))?;
+                ("included", json!(u8::from(endpoint)), None)
+            }
+            "physical_failure_no_powder" => ("physical_failure_excluded", Value::Null, Some(state)),
+            "poor_xrd_refinement_quality_3" => ("poor_refinement_excluded", Value::Null, Some(state)),
+            other => return Err(format!("source sample {sample_id} has unsupported cohort status {other}")),
+        };
+        let mut item = json!({
+            "record_id": sample_id,
+            "sample_id": sample_id,
+            "precursor_a": precursor_a,
+            "precursor_b": precursor_b,
+            "category": category,
+            "cohort_state": cohort_state,
+            "label": label
+        });
+        if let Some(reason) = exclusion_reason {
+            item["exclusion_reason"] = json!(reason);
+        }
+        records.push(item);
+    }
+    let cohort_value = json!({
+        "nodes": nodes,
+        "records": records,
+        "source_snapshot_sha256": required_text(source, "ledger_sha256")?,
+        "graph_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    });
+    let graph = parse_graph(&cohort_value)?;
+    let summary = receipt.get("cohort").ok_or("graph receipt cohort summary is missing")?;
+    for (field, observed) in [
+        ("source_sample_count", graph.records.len()),
+        ("analyzable_count", graph.included_count),
+        ("cross_precursor_product_positive_count", graph.positive_count),
+        ("cross_precursor_product_negative_count", graph.negative_count),
+    ] {
+        if summary.get(field).and_then(Value::as_u64) != Some(observed as u64) {
+            return Err(format!("graph receipt cohort.{field} conflicts with source sample records"));
+        }
+    }
+    Ok(graph)
+}
+fn training_prevalence_fold(graph: &Graph, kind: &str, heldout: &[String]) -> Result<Value, String> {
+    let heldout_set = heldout.iter().cloned().collect::<BTreeSet<_>>();
+    let training_ids = expected_training_ids(graph, &heldout_set);
+    if training_ids.is_empty() {
+        return Err(format!("fold {} has no eligible training records", fold_id(kind, heldout)));
+    }
+    let training_id_set = training_ids.iter().cloned().collect::<HashSet<_>>();
+    let positives = graph.records.iter()
+        .filter(|record| training_id_set.contains(&record.id) && record.label == Some(1))
+        .count();
+    let probability = positives as f64 / training_ids.len() as f64;
+    let training_nodes = expected_training_nodes(graph, &heldout_set);
+    let predictions = expected_test_records(graph, &heldout_set).iter()
+        .map(|record| json!({"record_id": record.id, "probability": probability}))
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "fold_id": fold_id(kind, heldout),
+        "heldout_precursors": heldout,
+        "training_precursors": training_nodes,
+        "training_record_count": training_ids.len(),
+        "predictions": predictions
+    }))
+}
+fn training_prevalence_model(graph: &Graph, source_identity: &str) -> Result<Value, String> {
+    let mut lopo = Vec::with_capacity(graph.nodes.len());
+    for node in &graph.nodes {
+        lopo.push(training_prevalence_fold(graph, "lopo", std::slice::from_ref(node))?);
+    }
+    let mut double_node = Vec::with_capacity(graph.nodes.len() * (graph.nodes.len() - 1) / 2);
+    for i in 0..graph.nodes.len() {
+        for j in i + 1..graph.nodes.len() {
+            let heldout = vec![graph.nodes[i].clone(), graph.nodes[j].clone()];
+            double_node.push(training_prevalence_fold(graph, "double", &heldout)?);
+        }
+    }
+    let artifact_identity = format!("training-prevalence-baseline-v0.1:{source_identity}");
+    Ok(json!({
+        "model_id": "fold_local_training_prevalence_baseline",
+        "model_artifact_sha256": sha256_hex(artifact_identity.as_bytes()),
+        "decision_threshold": 0.5,
+        "lopo_folds": lopo,
+        "double_node_folds": double_node
+    }))
+}
+fn audit_graph_receipt(receipt_bytes: &[u8]) -> Result<Value, String> {
+    let receipt: Value = serde_json::from_slice(receipt_bytes)
+        .map_err(|error| format!("graph receipt JSON parse failed: {error}"))?;
+    let graph = graph_from_audit_receipt(&receipt)?;
+    let receipt_sha256 = sha256_hex(receipt_bytes);
+    let source = receipt.get("source").ok_or("graph receipt source is missing")?;
+    let model = training_prevalence_model(&graph, &receipt_sha256)?;
+    let evaluation = evaluate_model(&graph, &model)?;
+    let prevalence = graph.positive_count as f64 / graph.included_count as f64;
+    let global_baseline_brier = prevalence * (1.0 - prevalence);
+    let global_baseline_log_loss = -prevalence * prevalence.ln()
+        - (1.0 - prevalence) * (1.0 - prevalence).ln();
+    Ok(json!({
+        "status": "precursor_genome_training_prevalence_baseline_pass",
+        "contract": CONTRACT,
+        "benchmark_id": "precursor_genome_k46_fold_local_training_prevalence_baseline_001",
+        "source": {
+            "repository": required_text(source, "repository")?,
+            "commit": required_text(source, "commit")?,
+            "ledger_git_blob_sha1": required_text(source, "ledger_git_blob_sha1")?,
+            "ledger_sha256": required_text(source, "ledger_sha256")?,
+            "license": required_text(source, "license")?
+        },
+        "graph_receipt_sha256": receipt_sha256,
+        "graph": {
+            "precursor_count": graph.nodes.len(),
+            "complete_undirected_edge_count": graph.records.len(),
+            "included_edge_count": graph.included_count,
+            "excluded_edge_count": graph.records.len() - graph.included_count,
+            "positive_count": graph.positive_count,
+            "negative_count": graph.negative_count,
+            "positive_prevalence": prevalence
+        },
+        "global_constant_prevalence_reference": {
+            "brier_score": global_baseline_brier,
+            "log_loss": global_baseline_log_loss,
+            "roc_auc": 0.5,
+            "average_precision": prevalence,
+            "note": "Uses the full evaluation cohort prevalence and is a descriptive no-skill reference, not a fold-valid prediction."
+        },
+        "fold_local_training_prevalence_baseline": evaluation,
+        "claim_ceiling": "A deterministic, fold-local prevalence baseline replayed on the source-pinned Precursor Genome graph. This is not a learned predictor, does not establish model superiority, and makes no new synthesis or material claim."
+    }))
+}
+
 fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let schema: Value = serde_json::from_slice(schema_bytes)
         .map_err(|error| format!("schema JSON parse failed: {error}"))?;
