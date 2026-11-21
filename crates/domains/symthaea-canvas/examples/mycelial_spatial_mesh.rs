@@ -1,8 +1,8 @@
 //! Inspect the renderer-neutral Mycelial Presence model and tube mesh.
 
 use symthaea_canvas::{
-    EmbodimentSnapshot, PresenceMode, TubeTessellationConfig,
-    build_mycelial_model, tessellate_mycelial_model,
+    EmbodimentSnapshot, PresenceMode, TubeTessellationConfig, build_mycelial_model,
+    tessellate_mycelial_model,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
