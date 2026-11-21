@@ -732,14 +732,17 @@ mod tests {
     #[test]
     fn phase_fractions_cannot_exceed_one_hundred_percent() {
         let (_, mut fixture, _, observations) = committed_inputs();
-        fixture["outcome_records"][0]["realized_phases"].push(json!({
-            "phase_id": "second-phase",
-            "identity_status": "identified",
-            "formula": "synthetic second phase",
-            "structure": null,
-            "phase_fraction_percent": 40.0,
-            "microstructure_notes": null
-        }));
+        fixture["outcome_records"][0]["realized_phases"]
+            .as_array_mut()
+            .expect("realized_phases must be an array")
+            .push(json!({
+                "phase_id": "second-phase",
+                "identity_status": "identified",
+                "formula": "synthetic second phase",
+                "structure": null,
+                "phase_fraction_percent": 40.0,
+                "microstructure_notes": null
+            }));
         fixture["outcome_records"][0]["realized_phases"][0]["phase_fraction_percent"] = json!(70.0);
         assert!(audit_mutated(fixture, observations).is_err());
     }
