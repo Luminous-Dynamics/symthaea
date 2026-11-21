@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -81,11 +81,16 @@ struct Network {
 }
 
 fn text_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value.get(key).and_then(Value::as_str).filter(|x| !x.trim().is_empty())
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|x| !x.trim().is_empty())
         .ok_or_else(|| format!("missing or empty string field {key}"))
 }
 fn number_field(value: &Value, key: &str) -> Result<f64, String> {
-    let number = value.get(key).and_then(Value::as_f64)
+    let number = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("missing numeric field {key}"))?;
     if !number.is_finite() {
         return Err(format!("{key} must be finite"));
@@ -124,8 +129,8 @@ fn element_balance(species: &[Species], reaction: &Reaction, tolerance: f64) -> 
     }
     let mut elements: Vec<(String, f64)> = residuals.into_iter().collect();
     elements.sort_by(|a, b| a.0.cmp(&b.0));
-    let balanced = elements.iter().all(|(_, value)| value.abs() <= tolerance)
-        && charge.abs() <= tolerance;
+    let balanced =
+        elements.iter().all(|(_, value)| value.abs() <= tolerance) && charge.abs() <= tolerance;
     Balance {
         element_residuals: elements,
         charge_residual: charge,
@@ -140,21 +145,27 @@ fn parse_species(rows: &[Value]) -> Result<(Vec<Species>, HashMap<String, usize>
         if index.insert(id.clone(), species.len()).is_some() {
             return Err(format!("duplicate species ID {id}"));
         }
-        let composition_value = row.get("elemental_composition")
+        let composition_value = row
+            .get("elemental_composition")
             .and_then(Value::as_object)
             .ok_or_else(|| format!("species {id} elemental_composition must be an object"))?;
         if composition_value.is_empty() {
-            return Err(format!("species {id} elemental_composition cannot be empty"));
+            return Err(format!(
+                "species {id} elemental_composition cannot be empty"
+            ));
         }
         let mut composition = Vec::with_capacity(composition_value.len());
         for (element, value) in composition_value {
             if element.trim().is_empty() {
                 return Err(format!("species {id} contains empty element symbol"));
             }
-            let count = value.as_f64()
+            let count = value
+                .as_f64()
                 .ok_or_else(|| format!("species {id} element {element} count must be numeric"))?;
             if !count.is_finite() || count <= 0.0 {
-                return Err(format!("species {id} element {element} count must be positive and finite"));
+                return Err(format!(
+                    "species {id} element {element} count must be positive and finite"
+                ));
             }
             composition.push((element.clone(), count));
         }
@@ -191,17 +202,25 @@ fn parse_reactions(
             return Err(format!("duplicate reaction ID {id}"));
         }
         if text_field(row, "conditions_id")? != conditions_id {
-            return Err(format!("reaction {id} condition ID does not match the network"));
+            return Err(format!(
+                "reaction {id} condition ID does not match the network"
+            ));
         }
         if text_field(row, "extent_basis_id")? != basis_id
-            || text_field(row, "extent_unit")? != basis_unit {
-            return Err(format!("reaction {id} extent basis/unit does not match the network"));
+            || text_field(row, "extent_unit")? != basis_unit
+        {
+            return Err(format!(
+                "reaction {id} extent basis/unit does not match the network"
+            ));
         }
         if text_field(row, "standard_state_id")? != standard_state_id {
-            return Err(format!("reaction {id} standard-state ID does not match the network"));
+            return Err(format!(
+                "reaction {id} standard-state ID does not match the network"
+            ));
         }
         let delta_g = interval(
-            row.get("delta_g_interval_eV").ok_or("reaction missing delta_g_interval_eV")?,
+            row.get("delta_g_interval_eV")
+                .ok_or("reaction missing delta_g_interval_eV")?,
             &format!("reaction {id} ΔG"),
         )?;
         let activation_barrier = interval(
@@ -210,24 +229,33 @@ fn parse_reactions(
             &format!("reaction {id} activation barrier"),
         )?;
         if activation_barrier.lower < 0.0 {
-            return Err(format!("reaction {id} activation barrier must be non-negative"));
+            return Err(format!(
+                "reaction {id} activation barrier must be non-negative"
+            ));
         }
         let mut terms = Vec::new();
         let mut seen = HashSet::new();
         let mut has_reactant = false;
         let mut has_product = false;
-        for term in row.get("stoichiometric_terms").and_then(Value::as_array)
-            .ok_or_else(|| format!("reaction {id} stoichiometric_terms must be an array"))? {
+        for term in row
+            .get("stoichiometric_terms")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("reaction {id} stoichiometric_terms must be an array"))?
+        {
             let species_id = text_field(term, "species_id")?;
             let Some(species_position) = species_index.get(species_id) else {
-                return Err(format!("reaction {id} references unknown species {species_id}"));
+                return Err(format!(
+                    "reaction {id} references unknown species {species_id}"
+                ));
             };
             if !seen.insert(*species_position) {
                 return Err(format!("reaction {id} repeats species term {species_id}"));
             }
             let coefficient = number_field(term, "coefficient")?;
             if coefficient.abs() <= 1.0e-15 {
-                return Err(format!("reaction {id} has a zero stoichiometric coefficient"));
+                return Err(format!(
+                    "reaction {id} has a zero stoichiometric coefficient"
+                ));
             }
             has_reactant |= coefficient < 0.0;
             has_product |= coefficient > 0.0;
@@ -237,7 +265,9 @@ fn parse_reactions(
             });
         }
         if !has_reactant || !has_product {
-            return Err(format!("reaction {id} must contain both reactant and product terms"));
+            return Err(format!(
+                "reaction {id} must contain both reactant and product terms"
+            ));
         }
         let reaction = Reaction {
             id,
@@ -250,7 +280,9 @@ fn parse_reactions(
         };
         let balance = element_balance(species, &reaction, balance_tolerance);
         if !balance.balanced {
-            let offending = balance.element_residuals.iter()
+            let offending = balance
+                .element_residuals
+                .iter()
                 .filter(|(_, value)| value.abs() > balance_tolerance)
                 .map(|(element, value)| format!("{element} residual={value}"))
                 .collect::<Vec<_>>()
@@ -280,18 +312,26 @@ fn parse_paths(
             return Err(format!("duplicate path ID {id}"));
         }
         let mut inputs = Vec::new();
-        for species_id in row.get("input_species_ids").and_then(Value::as_array)
-            .ok_or_else(|| format!("path {id} input_species_ids must be an array"))? {
-            let species_id = species_id.as_str()
+        for species_id in row
+            .get("input_species_ids")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("path {id} input_species_ids must be an array"))?
+        {
+            let species_id = species_id
+                .as_str()
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| format!("path {id} has invalid input species ID"))?;
-            inputs.push(*species_index.get(species_id)
-                .ok_or_else(|| format!("path {id} references unknown input species {species_id}"))?);
+            inputs.push(*species_index.get(species_id).ok_or_else(|| {
+                format!("path {id} references unknown input species {species_id}")
+            })?);
         }
         let target_id = text_field(row, "target_species_id")?;
-        let target_species = *species_index.get(target_id)
+        let target_species = *species_index
+            .get(target_id)
             .ok_or_else(|| format!("path {id} references unknown target species {target_id}"))?;
-        let reaction_rows = row.get("reaction_ids").and_then(Value::as_array)
+        let reaction_rows = row
+            .get("reaction_ids")
+            .and_then(Value::as_array)
             .ok_or_else(|| format!("path {id} reaction_ids must be an array"))?;
         if reaction_rows.is_empty() {
             return Err(format!("path {id} needs at least one reaction"));
@@ -299,11 +339,14 @@ fn parse_paths(
         let mut path_reactions = Vec::new();
         let mut seen_reactions = HashSet::new();
         for reaction_id in reaction_rows {
-            let reaction_id = reaction_id.as_str()
+            let reaction_id = reaction_id
+                .as_str()
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| format!("path {id} contains an invalid reaction ID"))?;
             let Some(position) = reaction_index.get(reaction_id) else {
-                return Err(format!("path {id} references unknown reaction {reaction_id}"));
+                return Err(format!(
+                    "path {id} references unknown reaction {reaction_id}"
+                ));
             };
             if !seen_reactions.insert(*position) {
                 return Err(format!("path {id} repeats reaction {reaction_id}"));
@@ -312,8 +355,15 @@ fn parse_paths(
         }
         let first = &reactions[path_reactions[0]];
         for input in &inputs {
-            if !first.terms.iter().any(|term| term.species_index == *input && term.coefficient < 0.0) {
-                return Err(format!("path {id} first reaction does not consume input species {}", species[*input].id));
+            if !first
+                .terms
+                .iter()
+                .any(|term| term.species_index == *input && term.coefficient < 0.0)
+            {
+                return Err(format!(
+                    "path {id} first reaction does not consume input species {}",
+                    species[*input].id
+                ));
             }
         }
         for pair in path_reactions.windows(2) {
@@ -322,7 +372,8 @@ fn parse_paths(
             let connected = previous.terms.iter().any(|produced| {
                 produced.coefficient > 0.0
                     && next.terms.iter().any(|consumed| {
-                        consumed.species_index == produced.species_index && consumed.coefficient < 0.0
+                        consumed.species_index == produced.species_index
+                            && consumed.coefficient < 0.0
                     })
             });
             if !connected {
@@ -333,8 +384,14 @@ fn parse_paths(
             }
         }
         let last = &reactions[*path_reactions.last().expect("non-empty path")];
-        if !last.terms.iter().any(|term| term.species_index == target_species && term.coefficient > 0.0) {
-            return Err(format!("path {id} final reaction does not produce target species {target_id}"));
+        if !last
+            .terms
+            .iter()
+            .any(|term| term.species_index == target_species && term.coefficient > 0.0)
+        {
+            return Err(format!(
+                "path {id} final reaction does not produce target species {target_id}"
+            ));
         }
         paths.push(Path {
             id,
@@ -359,15 +416,21 @@ fn parse_cycles(
         }
         let mut terms = Vec::new();
         let mut seen = HashSet::new();
-        for term in row.get("terms").and_then(Value::as_array)
-            .ok_or_else(|| format!("cycle {id} terms must be an array"))? {
+        for term in row
+            .get("terms")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("cycle {id} terms must be an array"))?
+        {
             let reaction_id = text_field(term, "reaction_id")?;
-            let position = *reaction_index.get(reaction_id)
+            let position = *reaction_index
+                .get(reaction_id)
                 .ok_or_else(|| format!("cycle {id} references unknown reaction {reaction_id}"))?;
             if !seen.insert(position) {
                 return Err(format!("cycle {id} repeats reaction {reaction_id}"));
             }
-            let orientation = term.get("orientation").and_then(Value::as_i64)
+            let orientation = term
+                .get("orientation")
+                .and_then(Value::as_i64)
                 .ok_or_else(|| format!("cycle {id} orientation must be integer +1 or -1"))?;
             if orientation != 1 && orientation != -1 {
                 return Err(format!("cycle {id} orientation must be +1 or -1"));
@@ -391,22 +454,32 @@ impl Network {
         if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
             return Err(format!("schema must declare {DIALECT}"));
         }
-        let validator = validator_for(&schema).map_err(|e| format!("schema compilation failed: {e}"))?;
+        let validator =
+            validator_for(&schema).map_err(|e| format!("schema compilation failed: {e}"))?;
         if let Some(error) = validator.iter_errors(&fixture).next() {
-            return Err(format!("thermochemical network schema validation failed: {error} at {}", error.instance_path()));
+            return Err(format!(
+                "thermochemical network schema validation failed: {error} at {}",
+                error.instance_path()
+            ));
         }
         if fixture.get("fixture_only").and_then(Value::as_bool) != Some(true) {
-            return Err("thermochemical network auditor accepts synthetic fixtures only".to_owned());
+            return Err(
+                "thermochemical network auditor accepts synthetic fixtures only".to_owned(),
+            );
         }
         if text_field(&fixture, "contract")? != "SC-THERMOCHEMICAL-NETWORK-0.1" {
             return Err("unsupported thermochemical network contract".to_owned());
         }
-        let conditions = fixture.get("conditions").ok_or("network missing conditions")?;
+        let conditions = fixture
+            .get("conditions")
+            .ok_or("network missing conditions")?;
         let conditions_id = text_field(conditions, "conditions_id")?.to_owned();
         let temperature_k = number_field(conditions, "temperature_k")?;
         let pressure_gpa = number_field(conditions, "pressure_gpa")?;
         if temperature_k <= 0.0 || pressure_gpa < 0.0 {
-            return Err("network temperature must be positive and pressure non-negative".to_owned());
+            return Err(
+                "network temperature must be positive and pressure non-negative".to_owned(),
+            );
         }
         let extent_basis_id = text_field(&fixture, "reference_extent_basis_id")?.to_owned();
         let extent_unit = text_field(&fixture, "reference_extent_unit")?.to_owned();
@@ -416,21 +489,40 @@ impl Network {
         if balance_tolerance < 0.0 || cycle_tolerance < 0.0 {
             return Err("network tolerances must be non-negative".to_owned());
         }
-        let species_rows = fixture.get("species").and_then(Value::as_array)
+        let species_rows = fixture
+            .get("species")
+            .and_then(Value::as_array)
             .ok_or("network species must be an array")?;
         let (species, species_index) = parse_species(species_rows)?;
-        let reaction_rows = fixture.get("reactions").and_then(Value::as_array)
+        let reaction_rows = fixture
+            .get("reactions")
+            .and_then(Value::as_array)
             .ok_or("network reactions must be an array")?;
         let (reactions, reaction_index, balances) = parse_reactions(
-            reaction_rows, &species, &species_index, &conditions_id,
-            &extent_basis_id, &extent_unit, &standard_state_id, balance_tolerance
+            reaction_rows,
+            &species,
+            &species_index,
+            &conditions_id,
+            &extent_basis_id,
+            &extent_unit,
+            &standard_state_id,
+            balance_tolerance,
         )?;
         let paths = parse_paths(
-            fixture.get("paths").and_then(Value::as_array).ok_or("network paths must be an array")?,
-            &reactions, &reaction_index, &species, &species_index,
+            fixture
+                .get("paths")
+                .and_then(Value::as_array)
+                .ok_or("network paths must be an array")?,
+            &reactions,
+            &reaction_index,
+            &species,
+            &species_index,
         )?;
         let cycles = parse_cycles(
-            fixture.get("cycles").and_then(Value::as_array).ok_or("network cycles must be an array")?,
+            fixture
+                .get("cycles")
+                .and_then(Value::as_array)
+                .ok_or("network cycles must be an array")?,
             &reaction_index,
         )?;
         Ok(Self {
@@ -441,7 +533,8 @@ impl Network {
             temperature_k,
             pressure_gpa,
             atmosphere: text_field(conditions, "atmosphere")?.to_owned(),
-            chemical_potential_context: text_field(conditions, "chemical_potential_context")?.to_owned(),
+            chemical_potential_context: text_field(conditions, "chemical_potential_context")?
+                .to_owned(),
             extent_basis_id,
             extent_unit,
             standard_state_id,
@@ -456,28 +549,35 @@ impl Network {
     }
 
     fn path_receipt(&self, path: &Path) -> Value {
-        let mut delta_g = Interval { lower: 0.0, upper: 0.0 };
+        let mut delta_g = Interval {
+            lower: 0.0,
+            upper: 0.0,
+        };
         let mut barrier_lower: f64 = 0.0;
         let mut barrier_upper: f64 = 0.0;
-        let steps: Vec<Value> = path.reactions.iter().map(|index| {
-            let reaction = &self.reactions[*index];
-            delta_g = add_intervals(delta_g, reaction.delta_g);
-            barrier_lower = barrier_lower.max(reaction.activation_barrier.lower);
-            barrier_upper = barrier_upper.max(reaction.activation_barrier.upper);
-            json!({
-                "reaction_id": reaction.id,
-                "role": reaction.role,
-                "delta_g_interval_eV": {
-                    "lower": reaction.delta_g.lower,
-                    "upper": reaction.delta_g.upper
-                },
-                "activation_barrier_interval_eV": {
-                    "lower": reaction.activation_barrier.lower,
-                    "upper": reaction.activation_barrier.upper
-                },
-                "balance": self.balances[*index].balanced
+        let steps: Vec<Value> = path
+            .reactions
+            .iter()
+            .map(|index| {
+                let reaction = &self.reactions[*index];
+                delta_g = add_intervals(delta_g, reaction.delta_g);
+                barrier_lower = barrier_lower.max(reaction.activation_barrier.lower);
+                barrier_upper = barrier_upper.max(reaction.activation_barrier.upper);
+                json!({
+                    "reaction_id": reaction.id,
+                    "role": reaction.role,
+                    "delta_g_interval_eV": {
+                        "lower": reaction.delta_g.lower,
+                        "upper": reaction.delta_g.upper
+                    },
+                    "activation_barrier_interval_eV": {
+                        "lower": reaction.activation_barrier.lower,
+                        "upper": reaction.activation_barrier.upper
+                    },
+                    "balance": self.balances[*index].balanced
+                })
             })
-        }).collect();
+            .collect();
         json!({
             "path_id": path.id,
             "path_role": path.role,
@@ -497,7 +597,10 @@ impl Network {
     }
 
     fn cycle_receipt(&self, cycle: &Cycle) -> Value {
-        let mut total = Interval { lower: 0.0, upper: 0.0 };
+        let mut total = Interval {
+            lower: 0.0,
+            upper: 0.0,
+        };
         let mut stoichiometric_residuals = vec![0.0; self.species.len()];
         let mut terms = Vec::new();
         for term in &cycle.terms {
@@ -525,13 +628,20 @@ impl Network {
         let stoichiometry_closed = stoichiometric_residuals
             .iter()
             .all(|residual| residual.abs() <= self.balance_tolerance);
-        let residuals: Vec<Value> = self.species.iter().enumerate().filter_map(|(index, species)| {
-            let residual = stoichiometric_residuals[index];
-            (residual.abs() > self.balance_tolerance).then(|| json!({
-                "species_id": species.id,
-                "net_coefficient": residual
-            }))
-        }).collect();
+        let residuals: Vec<Value> = self
+            .species
+            .iter()
+            .enumerate()
+            .filter_map(|(index, species)| {
+                let residual = stoichiometric_residuals[index];
+                (residual.abs() > self.balance_tolerance).then(|| {
+                    json!({
+                        "species_id": species.id,
+                        "net_coefficient": residual
+                    })
+                })
+            })
+            .collect();
         let energy_consistent =
             total.lower <= self.cycle_tolerance && total.upper >= -self.cycle_tolerance;
         let closure_status = if !stoichiometry_closed {
@@ -627,7 +737,9 @@ fn read(path: &PathBuf) -> Vec<u8> {
     })
 }
 fn usage(program: &str) {
-    eprintln!("Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]");
+    eprintln!(
+        "Usage: {program} --schema <schema.json> --fixture <fixture.json> [--out <receipt.json>]"
+    );
 }
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -638,8 +750,11 @@ fn main() {
     while index < args.len() {
         match args[index].as_str() {
             "--schema" | "--fixture" | "--out" => {
-                if index + 1 >= args.len() { usage(&args[0]); process::exit(2); }
-                let path = PathBuf::from(&args[index+1]);
+                if index + 1 >= args.len() {
+                    usage(&args[0]);
+                    process::exit(2);
+                }
+                let path = PathBuf::from(&args[index + 1]);
                 match args[index].as_str() {
                     "--schema" => schema_path = Some(path),
                     "--fixture" => fixture_path = Some(path),
@@ -648,18 +763,27 @@ fn main() {
                 }
                 index += 2;
             }
-            "--help" | "-h" => { usage(&args[0]); return; }
-            other => { eprintln!("unknown argument {other}"); usage(&args[0]); process::exit(2); }
+            "--help" | "-h" => {
+                usage(&args[0]);
+                return;
+            }
+            other => {
+                eprintln!("unknown argument {other}");
+                usage(&args[0]);
+                process::exit(2);
+            }
         }
     }
     let (Some(schema_path), Some(fixture_path)) = (schema_path, fixture_path) else {
-        usage(&args[0]); process::exit(2);
+        usage(&args[0]);
+        process::exit(2);
     };
     let output = audit(&read(&schema_path), &read(&fixture_path)).unwrap_or_else(|error| {
         eprintln!("SC-THERMOCHEMICAL-NETWORK-FAIL: {error}");
         process::exit(1);
     });
-    let rendered = serde_json::to_string_pretty(&output).expect("JSON receipt serialization cannot fail");
+    let rendered =
+        serde_json::to_string_pretty(&output).expect("JSON receipt serialization cannot fail");
     if let Some(path) = output_path {
         if let Err(error) = fs::write(&path, format!("{rendered}\n")) {
             eprintln!("could not write {}: {error}", path.display());
@@ -677,8 +801,15 @@ mod tests {
     fn inputs_for(file: &str) -> (Vec<u8>, Vec<u8>) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         (
-            fs::read(root.join("data/schemas/superconductivity_thermochemical_network_v0_1.schema.json")).unwrap(),
-            fs::read(root.join("tools/superconductivity-discovery-harness/fixtures").join(file)).unwrap(),
+            fs::read(
+                root.join("data/schemas/superconductivity_thermochemical_network_v0_1.schema.json"),
+            )
+            .unwrap(),
+            fs::read(
+                root.join("tools/superconductivity-discovery-harness/fixtures")
+                    .join(file),
+            )
+            .unwrap(),
         )
     }
     fn inputs() -> (Vec<u8>, Vec<u8>) {
@@ -693,8 +824,13 @@ mod tests {
         assert_eq!(reactions.len(), 4);
         for reaction in reactions {
             assert_eq!(reaction["conservation_status"], "balanced_within_tolerance");
-            assert!(reaction["computed_element_residuals"].as_array().unwrap().iter()
-                .all(|x| x["residual"].as_f64().unwrap().abs() <= 1.0e-9));
+            assert!(
+                reaction["computed_element_residuals"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|x| x["residual"].as_f64().unwrap().abs() <= 1.0e-9)
+            );
             assert!(reaction["computed_charge_residual"].as_f64().unwrap().abs() <= 1.0e-9);
         }
     }
@@ -703,12 +839,44 @@ mod tests {
     fn route_delta_g_is_summed_on_the_declared_common_extent_basis() {
         let (schema, fixture) = inputs();
         let receipt = audit(&schema, &fixture).unwrap();
-        let target = receipt["paths"].as_array().unwrap().iter()
-            .find(|x| x["path_id"] == "target_two_step").unwrap();
-        assert!((target["route_delta_g_interval_eV_per_reference_extent"]["lower"].as_f64().unwrap() + 0.90).abs() < 1.0e-12);
-        assert!((target["route_delta_g_interval_eV_per_reference_extent"]["upper"].as_f64().unwrap() + 0.70).abs() < 1.0e-12);
-        assert!((target["maximum_activation_barrier_interval_eV"]["lower"].as_f64().unwrap() - 0.9).abs() < 1.0e-12);
-        assert!((target["maximum_activation_barrier_interval_eV"]["upper"].as_f64().unwrap() - 1.2).abs() < 1.0e-12);
+        let target = receipt["paths"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["path_id"] == "target_two_step")
+            .unwrap();
+        assert!(
+            (target["route_delta_g_interval_eV_per_reference_extent"]["lower"]
+                .as_f64()
+                .unwrap()
+                + 0.90)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (target["route_delta_g_interval_eV_per_reference_extent"]["upper"]
+                .as_f64()
+                .unwrap()
+                + 0.70)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (target["maximum_activation_barrier_interval_eV"]["lower"]
+                .as_f64()
+                .unwrap()
+                - 0.9)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (target["maximum_activation_barrier_interval_eV"]["upper"]
+                .as_f64()
+                .unwrap()
+                - 1.2)
+                .abs()
+                < 1.0e-12
+        );
     }
 
     #[test]
@@ -716,9 +884,22 @@ mod tests {
         let (schema, fixture) = inputs();
         let receipt = audit(&schema, &fixture).unwrap();
         let cycle = &receipt["thermodynamic_cycles"][0];
-        assert_eq!(cycle["closure_status"], "interval_intersects_zero_closure_tolerance");
-        assert!(cycle["cycle_delta_g_interval_eV"]["lower"].as_f64().unwrap() < 0.0);
-        assert!(cycle["cycle_delta_g_interval_eV"]["upper"].as_f64().unwrap() > 0.0);
+        assert_eq!(
+            cycle["closure_status"],
+            "interval_intersects_zero_closure_tolerance"
+        );
+        assert!(
+            cycle["cycle_delta_g_interval_eV"]["lower"]
+                .as_f64()
+                .unwrap()
+                < 0.0
+        );
+        assert!(
+            cycle["cycle_delta_g_interval_eV"]["upper"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
     }
 
     #[test]
@@ -777,7 +958,6 @@ mod tests {
         data["reactions"][1]["extent_basis_id"] = json!("different_basis");
         assert!(Network::from_bytes(&schema, &serde_json::to_vec(&data).unwrap()).is_err());
     }
-
 
     #[test]
     fn standard_state_mismatch_fails_closed() {
