@@ -1,0 +1,9 @@
+{
+  "schema": "luminous.semi-bench.secom-raw-expectations.v1",
+  "dataset_id": "UCI-SECOM-179@Be1an001/semiconductor-pass-fail-prediction-python@0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+  "expected_feature_sha256": "4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf",
+  "expected_label_sha256": "2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef",
+  "expected_rows": 1567,
+  "expected_features_per_row": 590,
+  "clock_domain_id": "uci-secom-mirror-single-source-clock"
+}
