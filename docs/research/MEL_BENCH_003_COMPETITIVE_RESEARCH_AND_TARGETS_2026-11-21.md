@@ -130,6 +130,47 @@ Sources:
 - [ICML 2026 / PMLR paper](https://proceedings.mlr.press/v306/ma26am.html)
 - [Official CMI-RewardBench release and result tables](https://github.com/Haiwen-Xia/CMI-RewardBench)
 
+### 1.8 MIREX 2026 pairwise human-preference results: reward-model rankings are task-specific
+
+The MIREX public results page for CMI-RewardBench evaluates which of two generated clips better matches a text prompt and human pairwise preference. On its 249-sample core set, the reported leaders are CloudEar-overall (73.9%), SongEval Average (72.7%) and first_submission (72.3%); the CMI-RM baseline is 65.9%. Vocal and instrumental extension scores are reported separately (300+ samples each).
+
+| System | Core (249) | Vocal extension | Instrumental extension |
+|---|---:|---:|---:|
+| CloudEar-overall | 73.9% | 60.9% | 72.6% |
+| SongEval Average | 72.7% | 62.0% | 72.0% |
+| first_submission | 72.3% | 63.3% | 75.4% |
+| CloudEar Musicality | 69.9% | 60.6% | 70.7% |
+| CloudEar Alignment | 69.5% | 61.6% | 69.5% |
+| CMI-RM baseline | 65.9% | 57.2% | 69.2% |
+
+The leaderboard includes a “Random guess (always B)” row at 59.0% on the core set; this is a label-prior diagnostic, not a balanced 50% random baseline. Report class balance, majority/label-prior controls and calibration.
+
+This does not negate CMI-RM's selected correlation results on its native benchmark: it is a different held-out preference task, dataset and metric. It shows that no one reward model is established as a universal judge.
+
+Source: [MIREX 2026 CMI-RewardBench results](https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results).
+
+### 1.9 Audio-native relational perception — MUSE Benchmark (PMLR 2026)
+
+Carone, Roman and Ripollés compare audio and MIDI inputs for syncopation scoring, transposition detection and chord-quality identification. Several multimodal LLMs reason near ceiling over MIDI but lose substantial accuracy when the same underlying task is supplied as audio. Prompting/reasoning variations produce much smaller gains than input-modality changes.
+
+Approximate visual estimates from Figure 2:
+
+| Model | Task | Audio | MIDI |
+|---|---|---:|---:|
+| Gemini 2.5 Flash | Syncopation | ≈29% | ≈98% |
+| Gemini 2.5 Pro | Syncopation | ≈41% | ≈100% |
+| Gemini 2.5 Flash | Transposition | ≈71% | ≈98% |
+| Gemini 2.5 Pro | Transposition | ≈95% | ≈100% |
+| Gemini 2.5 Flash | Chord quality | ≈20% | ≈87% |
+| Gemini 2.5 Pro | Chord quality | ≈35% | ≈99% |
+| Qwen2.5-Omni | Chord quality | ≈24% | ≈51% |
+
+These are approximate chart estimates—not exact raw counts or a new leaderboard. Gemini Pro approaches audio/MIDI parity for transposition, while syncopation and chord recognition remain much harder from audio.
+
+**Strategic implication:** a symbolic score engine can be correct while the system's hearing is wrong. Melothaea must test the same semantic case in audio and MIDI modalities and report the gap explicitly. MIDI-only results must never be described as audio-native listening competence.
+
+Source: [PMLR 303 (2026): LLMs can read music, but struggle to hear it](https://proceedings.mlr.press/v303/carone26a.html).
+
 ## 2. Paradigm shifts for Melothaea
 
 ### A. From audio-first generation to score-authoritative collaboration
@@ -187,6 +228,12 @@ The snapshot-isolated RMI Track A work addresses the synthetic state-confound sl
 
 Separate the score authority, cognitive planner, deterministic transformation kernels, external audio generators, real-time performer models and renderers. Use capability declarations and adapters rather than making one provider the entire architecture. This allows the artist to choose a local symbolic engine, a commercial audio generator, a human collaborator or no model at all.
 
+### G. From symbolic competence to audio-native perception parity
+
+Treat audio understanding and symbolic reasoning as separate measured capabilities. For every perceptual task, create paired audio/MIDI inputs from the same source score and renderer recipe. Record immutable model, preprocessing and prompt/policy identities. Report audio and MIDI accuracy, paired agreement, coverage, explicit abstentions, missing predictions, confidence calibration and ordinal error where appropriate.
+
+A model that succeeds on MIDI but fails the audio rendering has not passed the listening task. Conversely, audio-only success with no symbolic consistency is not enough for a score-authoritative editor. The two channels should cross-check each other while preserving independent uncertainty.
+
 ## 3. Benchmark programme and prospective targets
 
 These are proposed targets, not achieved results. Freeze the exact cohort, sample size, scorer and statistical plan before confirmatory evaluation.
@@ -202,6 +249,7 @@ These are proposed targets, not achieved results. Freeze the exact cohort, sampl
 | Causal reciprocity | RMI-Bench | 100% synthetic known-answer control discrimination; zero negative-control false positives | Real-policy randomized human study beats one-way/yoked controls on preregistered musical-relevance outcomes |
 | Live improvisation | JAM_BOT, Lyria RealTime | Same device/clock/MIDI path; report system, transport and output latency separately | p95 decision latency ≤100 ms for a bounded local symbolic response; p95 beat-relative onset error ≤20 ms after calibrated output compensation |
 | Temporal event control | TimingBench | Reproduce its 250 prompts, 399 events and detector taxonomy; report instruction success, event timing by tolerance, tempo and fidelity separately | 100% score-time event placement in symbolic state; ≥90% rendered events within ±100 ms for event families whose independently measured detector floor supports that tolerance; no timing credit when event identity is ambiguous |
+| Audio-native relational perception | MUSE Benchmark | Same-source audio/MIDI pairs for syncopation, transposition and chord quality; frozen stimuli and renderer identity | Transposition audio ≥95% with ≤5 percentage-point modality gap; syncopation and chord-quality audio ≥70% with ≤15 pp gap; report confidence, abstention and subgroup results |
 | Recovery | MEL-TRG-Music | Recover from context reset, clock drift, dropped chunks and device reconnect without state corruption | 100% deterministic state reconciliation; no duplicated, backdated or silently lost committed events |
 | Agency and rights | MEL-CREATIVE-001 | 100% commits have an explicit authority receipt; 100% exact undo | Zero unauthorized commits; zero export/publication without the required permission and provenance receipt |
 | Cost and efficiency | Per-track/per-edit matched budget | Report cost, latency, failure rate and quality separately | Pareto improvement: lower cost/latency without degradation in target correctness, preservation or agency |
@@ -221,6 +269,7 @@ These are proposed targets, not achieved results. Freeze the exact cohort, sampl
 1. **Complete hierarchical Sonata action control.** Formal obligations remain hard constraints; only supported cognitive subintents select among independently verified candidates. Add a same-source counterfactual with different valid score selections.
 2. **Add score-diff receipts.** Stable event IDs, source score digest, target set, changed-event list, protected-complement digest, obligation receipts and exact rollback.
 3. **Add SMEBench-compatible edit adapters.** Start with operations that can be represented exactly in the existing score model. Keep audio-only operations explicitly unsupported by the symbolic adapter.
+4. **Qualify paired audio/MIDI perception.** Extend the new PerceptionParity evaluator from contract fixtures to rights-cleared rendered stimuli; audit transcription/onset/chroma uncertainty before the symbolic solver sees them.
 4. **Bind immutable production model identity.** Checkpoint/weights, adapter, configuration, tokenizer/grammar, runtime and backend identity must be separate from mutable episode state.
 5. **Add live performance clock calibration.** Record capture, inference, scheduling, MIDI transport, instrument and acoustic onset separately.
 6. **Build a blinded musician cohort.** Test whether responses are contextually relevant and creatively helpful, not only statistically sensitive to a changed feature.
