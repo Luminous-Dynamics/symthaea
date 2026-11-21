@@ -12,12 +12,9 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Write as _;
 
-use crate::cognitive_layout::{
-    CognitiveSpatialProjection, CognitiveSpatialLink,
-};
+use crate::cognitive_layout::{CognitiveSpatialLink, CognitiveSpatialProjection};
 use crate::cognitive_topology::{
-    CognitiveNodeKind, CognitiveProvenance, CognitiveRelation,
-    EpistemicStatus,
+    CognitiveNodeKind, CognitiveProvenance, CognitiveRelation, EpistemicStatus,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -49,7 +46,9 @@ impl fmt::Display for CognitiveSvgError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidOptions => write!(f, "cognitive SVG dimensions or padding are invalid"),
-            Self::InvalidProjection => write!(f, "cognitive SVG requires a valid spatial projection"),
+            Self::InvalidProjection => {
+                write!(f, "cognitive SVG requires a valid spatial projection")
+            }
         }
     }
 }
@@ -181,13 +180,7 @@ pub fn render_cognitive_projection_svg(
         let Some(&(x, y)) = positions.get(anchor.node_id.as_str()) else {
             continue;
         };
-        render_anchor(
-            &mut output,
-            anchor,
-            x,
-            y,
-            options.show_labels,
-        );
+        render_anchor(&mut output, anchor, x, y, options.show_labels);
     }
 
     render_legend(&mut output, options.width, options.height, has_synthetic);
@@ -211,7 +204,11 @@ fn render_link(
     let dy = ty - sy;
     let length = (dx * dx + dy * dy).sqrt().max(1.0);
     let bend = (length * 0.12).clamp(10.0, 42.0);
-    let direction = if stable_sign(&link.edge_id) { 1.0 } else { -1.0 };
+    let direction = if stable_sign(&link.edge_id) {
+        1.0
+    } else {
+        -1.0
+    };
     let control_x = (sx + tx) * 0.5 - (dy / length) * bend * direction;
     let control_y = (sy + ty) * 0.5 + (dx / length) * bend * direction;
     let (color, width) = match link.relation {
@@ -474,8 +471,8 @@ fn stable_sign(id: &str) -> bool {
 fn polygon_points(x: f32, y: f32, radius: f32, sides: usize) -> String {
     let mut points = String::with_capacity(sides * 18);
     for index in 0..sides {
-        let angle = -std::f32::consts::FRAC_PI_2
-            + index as f32 * std::f32::consts::TAU / sides as f32;
+        let angle =
+            -std::f32::consts::FRAC_PI_2 + index as f32 * std::f32::consts::TAU / sides as f32;
         let px = x + radius * angle.cos();
         let py = y + radius * angle.sin();
         let _ = write!(&mut points, "{px:.2},{py:.2} ");
@@ -512,21 +509,15 @@ mod tests {
         let topology: CognitiveTopology =
             serde_json::from_str(include_str!("../tests/fixtures/cognitive_topology_v1.json"))
                 .expect("checked-in cognitive topology fixture");
-        layout_cognitive_topology(
-            &topology,
-            None,
-            CognitiveLayoutConfig::default(),
-        )
-        .expect("valid topology layout")
+        layout_cognitive_topology(&topology, None, CognitiveLayoutConfig::default())
+            .expect("valid topology layout")
     }
 
     #[test]
     fn static_svg_distinguishes_candidate_links_and_marks_synthetic_fixture() {
-        let svg = render_cognitive_projection_svg(
-            &fixture_projection(),
-            CognitiveSvgOptions::default(),
-        )
-        .expect("valid SVG");
+        let svg =
+            render_cognitive_projection_svg(&fixture_projection(), CognitiveSvgOptions::default())
+                .expect("valid SVG");
         assert!(svg.contains(r#"role="img""#));
         assert!(svg.contains("SYNTHETIC FIXTURE"));
         assert!(svg.contains(r#"data-provenance="synthetic_fixture""#));
@@ -540,11 +531,8 @@ mod tests {
     fn labels_are_xml_escaped_and_full_text_remains_in_title() {
         let mut projection = fixture_projection();
         projection.anchors[0].label = "<script>& unsafe".to_string();
-        let svg = render_cognitive_projection_svg(
-            &projection,
-            CognitiveSvgOptions::default(),
-        )
-        .expect("valid escaped SVG");
+        let svg = render_cognitive_projection_svg(&projection, CognitiveSvgOptions::default())
+            .expect("valid escaped SVG");
         assert!(svg.contains("&lt;script&gt;&amp; unsafe"));
         assert!(!svg.contains("<script>"));
     }
