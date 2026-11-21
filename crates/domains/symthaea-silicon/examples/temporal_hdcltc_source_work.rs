@@ -169,8 +169,11 @@ impl SourceDerivedWork {
             }
             EvolutionMethod::IterativeClosedForm => {
                 let max_substep = tau_base / 10.0;
+                if !max_substep.is_finite() || max_substep <= 0.0 {
+                    return Err("iterative max-substep is not finite and positive");
+                }
                 let raw_steps = (dt / max_substep).ceil();
-                if !raw_steps.is_finite() || raw_steps < 1.0 || raw_steps > u64::MAX as f32 {
+                if !raw_steps.is_finite() || raw_steps < 1.0 || raw_steps >= u64::MAX as f32 {
                     return Err("iterative substep count is outside the auditable range");
                 }
                 let steps = raw_steps as u64;
