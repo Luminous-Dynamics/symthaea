@@ -18,6 +18,8 @@ This differs from a single confidence threshold. The costs of false persistence,
 
 This protocol defines a policy contract only. It does not create a second memory store, evidence verifier, consolidation engine, retrieval index, tool authority or benchmark oracle.
 
+The machine-readable candidate/evaluator record contract is [`data/schemas/selective_memory_action_policy_v0_1.schema.json`](https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/selective_memory_action_policy_v0_1.schema.json). Candidate action records and evaluator scores are separate record types and separate trust domains.
+
 ## 2. Two separate decision moments
 
 Do not conflate the decision to retain information with the decision to act on it later.
