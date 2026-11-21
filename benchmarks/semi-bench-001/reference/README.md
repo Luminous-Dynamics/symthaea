@@ -67,3 +67,12 @@ The synthetic 10-validation / 10-test known-answer case is frozen in `fixtures/v
 The independent helper `python/semi_split_manifest_reference.py` validates a frozen split assignment without reading or distributing raw dataset rows. It supports three explicitly distinct policies: `group_disjoint`, `forward_time`, and `stratified_sample`. It rejects duplicate sample identities, empty splits, cross-split group reuse, non-chronological/overlapping time windows, timezone-free timestamps and malformed dataset digests. It emits a deterministic SHA-256 identity for the sorted assignment set and states which independence claims are—and are not—established.
 
 The synthetic group-disjoint known-answer input/output are `fixtures/split-manifest-known-answer-v1.json` and `fixtures/split-manifest-known-answer-v1.expected.json`. Seven tests cover known-answer stability and adversarial leakage controls. Combined with the binary-metrics and threshold-policy suites, the full reference suite contains 21 tests. Hosted GitHub Actions run [#44881540564](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44881540564) completed successfully, including the unit-test and byte-for-byte report steps. This is a hosted CI result; no local test execution is claimed.
+
+
+## Budget-aware inspection decision reference
+
+The independent helper `python/semi_inspection_decision_reference.py` scores a finite set of inspection candidates using a declared expected-net-value model. It accounts for defect-risk probability, test sensitivity/specificity, actionability, exposed population, avoidable loss, false-hold cost, direct inspection cost and delay penalty. It selects the exact best subset under inspection-time, cash-cost and per-group capacity constraints by exhaustive enumeration, capped at 18 candidates.
+
+A matched-budget risk-only greedy policy is emitted as a comparator. The synthetic fixture is in `fixtures/inspection-decision-known-answer-v1.json` with frozen output in `fixtures/inspection-decision-known-answer-v1.expected.json`. Ten tests cover known answers, budget/group constraints, input-order invariance, invalid probabilities/costs, duplicate identities, excessive candidate count and empty-positive-value behavior.
+
+This is an exact finite-set reference oracle, not a production scheduling algorithm. All expected values are model-based; uninspected wafers remain unknown, and the fixture is not evidence of physical savings or fab yield.
