@@ -750,6 +750,62 @@
         "preregistered-controlled-outcome-study"
       ],
       "claim_ceiling": "simulation and replay improvements are not measured fab or yield improvements; no process authority"
+    },
+    {
+      "id": "cross-dataset-wafer-label-alignment-and-pseudo-label-integrity",
+      "source": "https://doi.org/10.1109/ACCESS.2026.3744016",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
+      "reference_paper": {
+        "title": "Comparative Study of AI Models for Wafer Map Defect Pattern Classification Using a Novel Pseudo-Labeling-Based Integrated Dataset",
+        "publisher": "IEEE Access",
+        "publication_date": "2026-10-16",
+        "reported_method": "pseudo-label integration of labeled WM-811K and unlabeled Mixed38 using cluster distributions and inter-label boundaries",
+        "reported_results": {
+          "silhouette_relative_improvement_percent": 207.75,
+          "ratkowsky_lance_relative_improvement_percent": 16.19
+        },
+        "claim_status": "paper-abstract-reported-cluster-structure-metrics; not independently reproduced; not equivalent to pseudo-label correctness or fab transfer"
+      },
+      "tasks": [
+        "partial-cross-dataset-label-alignment",
+        "label-boundary-aware-pseudo-labels",
+        "confidence-vs-cluster-distribution-vs-boundary-filtering",
+        "unknown-and-unmapped-class-preservation",
+        "leave-component-and-combination-out",
+        "source-group-heldout"
+      ],
+      "baselines": [
+        "no-integration",
+        "forced-label-map",
+        "nearest-centroid",
+        "kmeans",
+        "label-propagation",
+        "confidence-filtered-self-training",
+        "cluster-distribution-pseudo-labels",
+        "boundary-aware-pseudo-labels",
+        "HDC-prototype-alignment",
+        "manual-reviewed-audit-subset"
+      ],
+      "metrics": [
+        "silhouette",
+        "ratkowsky-lance",
+        "ARI",
+        "NMI",
+        "pseudo-label-precision-recall",
+        "pseudo-label-ECE",
+        "boundary-error",
+        "unknown-false-acceptance",
+        "seen-unseen-harmonic-mean",
+        "source-transfer-degradation"
+      ],
+      "integrity_gates": [
+        "heldout-labels-never-used-to-generate-pseudo-labels",
+        "preserve-source-and-original-label",
+        "unmapped-patterns-remain-unknown",
+        "duplicate-and-source-identity-leakage-zero",
+        "synthetic-real-provenance-not-inferred"
+      ],
+      "claim_ceiling": "cluster separability is not pseudo-label accuracy; no causal, yield or cross-fab claim"
     }
   ],
   "cross_cutting_protocol": {
@@ -873,6 +929,17 @@
       "publication_date": "2026-11-06",
       "core_finding": "human-supervised closed-loop AIS across state sensing, planning, scheduling, dispatching, execution and feedback; hard constraints, bounded authority, safe fallback and auditability remain central",
       "claim_status": "review-derived-architecture-reference-not-performance-benchmark"
+    },
+    "cross_dataset_wafer_pseudolabel_2026": {
+      "title": "Comparative Study of AI Models for Wafer Map Defect Pattern Classification Using a Novel Pseudo-Labeling-Based Integrated Dataset",
+      "url": "https://doi.org/10.1109/ACCESS.2026.3744016",
+      "publication_date": "2026-10-16",
+      "reported_results": {
+        "silhouette_relative_improvement_percent": 207.75,
+        "ratkowsky_lance_relative_improvement_percent": 16.19
+      },
+      "method": "integrates labeled WM-811K and unlabeled Mixed38 using pseudo-labels informed by cluster distributions and inter-label boundaries",
+      "caveat": "The abstract's cluster-separation metrics do not establish pseudo-label correctness or production transfer; full split and source identity protocol require reproduction."
     }
   },
   "reference_evaluator": {
@@ -1079,6 +1146,29 @@
         "cargo test: 18 passed",
         "binary metrics CLI byte-for-byte parity"
       ]
+    },
+    "secom_raw_integrity_audit": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-secom-audit.rs",
+      "expectations": "docs/research/semi-bench-001/secom-raw-expectations-v1.json",
+      "synthetic_input_fixtures": [
+        "benchmarks/semi-bench-001/reference/fixtures/secom-mini-features-v1.data",
+        "benchmarks/semi-bench-001/reference/fixtures/secom-mini-labels-v1.data"
+      ],
+      "synthetic_expectations": "benchmarks/semi-bench-001/reference/fixtures/secom-mini-expectations-v1.json",
+      "synthetic_expected_report": "benchmarks/semi-bench-001/reference/fixtures/secom-mini-integrity-report-v1.expected.json",
+      "semantics": [
+        "raw-file-sha256-check",
+        "expected-row-and-feature-count",
+        "NaN-preserved-as-missing",
+        "label-domain-(-1,+1)",
+        "strict-row-alignment",
+        "source-local-naive-timestamp-preservation",
+        "monotonic-source-order",
+        "missingness-and-class-support-report"
+      ],
+      "hosted_ci_status": "pending",
+      "claim_ceiling": "raw-source integrity only; no predictive model or physical process claim"
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
@@ -1102,7 +1192,8 @@
     "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
     "rust_semiconductor_metrics": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
     "frozen_lmm_rule_ordered_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
-    "fab_closed_loop_decision_support": "https://github.com/Luminous-Dynamics/symthaea/issues/13147"
+    "fab_closed_loop_decision_support": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
+    "cross_dataset_wafer_pseudolabel_alignment": "https://github.com/Luminous-Dynamics/symthaea/issues/13148"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
@@ -1125,7 +1216,9 @@
     "frozen_lmm_rule_ordered_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
     "semiconductor_closed_loop_decision_support_review": "https://doi.org/10.1007/s43684-026-00146-z",
     "fab_closed_loop_decision_review": "https://doi.org/10.1007/s43684-026-00146-z",
-    "fab_closed_loop_decision_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147"
+    "fab_closed_loop_decision_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
+    "cross_dataset_wafer_pseudolabel_paper": "https://doi.org/10.1109/ACCESS.2026.3744016",
+    "cross_dataset_wafer_pseudolabel_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13148"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
