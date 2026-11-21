@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod transition;
+pub mod velocity_frame;
 
 use std::error::Error;
 use std::f64::consts::TAU;
