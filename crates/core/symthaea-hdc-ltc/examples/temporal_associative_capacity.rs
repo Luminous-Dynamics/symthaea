@@ -316,48 +316,75 @@ fn evolve_state(
     event_count: usize,
     gap_profile: &'static str,
     condition: &'static str,
-) -> (ContinuousHV, u64, f64, u128) {
-    if condition == "static_hdc_bundle" || horizon_seconds == 0.0 {
-        return (memory.clone(), 0, 0.0, 0);
+) -> EvolutionOutcome {
+    if condition == "static_hdc_bundle"
+        || condition == "static_mismatched_pairing_control"
+        || horizon_seconds == 0.0
+    {
+        return EvolutionOutcome {
+            state: memory.clone(),
+            api_update_count: 0,
+            reported_logical_seconds: 0.0,
+            model_setup_wall_ns: 0,
+            input_preparation_wall_ns: 0,
+            evolution_wall_ns: 0,
+        };
     }
 
+    let setup_start = Instant::now();
     let config = NeuronConfig {
         dim,
         ..NeuronConfig::default()
     };
     let mut neuron = HdcLtcUnifiedNeuron::new(config, derive_seed(seed, 4, 0));
     neuron.set_state(memory.clone());
+    let model_setup_wall_ns = setup_start.elapsed().as_nanos();
 
+    // Input generation is a distinct measured phase. This prevents random
+    // distractor construction from being reported as neuron evolution cost.
+    let input_prep_start = Instant::now();
     let zero_input = ContinuousHV::new(dim);
     let gaps = make_gaps(horizon_seconds, event_count, gap_profile, seed);
-    let start = Instant::now();
+    let distractors: Vec<ContinuousHV> = if condition == "hdc_ltc_distractor" {
+        (0..event_count)
+            .map(|index| bipolar_random(dim, derive_seed(seed, 5, index as u64)))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let input_preparation_wall_ns = input_prep_start.elapsed().as_nanos();
 
+    let start = Instant::now();
     for (index, dt) in gaps.iter().enumerate() {
         if !dt.is_finite() || *dt <= 0.0 {
-            // Invalid schedules must not be passed to the neuron.
-            return (
-                neuron.state().clone(),
-                neuron.update_count(),
-                neuron.total_time(),
-                start.elapsed().as_nanos(),
-            );
+            // Invalid schedules must not be passed to the neuron. The summary
+            // retains the incomplete work count and cannot imply completion.
+            return EvolutionOutcome {
+                state: neuron.state().clone(),
+                api_update_count: neuron.update_count(),
+                reported_logical_seconds: neuron.total_time(),
+                model_setup_wall_ns,
+                input_preparation_wall_ns,
+                evolution_wall_ns: start.elapsed().as_nanos(),
+            };
         }
 
-        if condition == "hdc_ltc_zero_input" {
-            neuron.evolve_closed_form(*dt, &zero_input);
+        let input = if condition == "hdc_ltc_zero_input" {
+            &zero_input
         } else {
-            let distractor = bipolar_random(dim, derive_seed(seed, 5, index as u64));
-            neuron.evolve_closed_form(*dt, &distractor);
-        }
+            &distractors[index]
+        };
+        neuron.evolve_closed_form(*dt, input);
     }
 
-    let elapsed = start.elapsed().as_nanos();
-    (
-        neuron.state().clone(),
-        neuron.update_count(),
-        neuron.total_time(),
-        elapsed,
-    )
+    EvolutionOutcome {
+        state: neuron.state().clone(),
+        api_update_count: neuron.update_count(),
+        reported_logical_seconds: neuron.total_time(),
+        model_setup_wall_ns,
+        input_preparation_wall_ns,
+        evolution_wall_ns: start.elapsed().as_nanos(),
+    }
 }
 
 fn decode(memory: &PreparedMemory, state: &ContinuousHV, query_index: usize) -> Scores {
