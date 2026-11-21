@@ -1,0 +1,12 @@
+[package]
+name = "plasma-phase-space-mmd"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Characteristic-kernel MMD reference oracle for weighted kinetic phase-space measures"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
