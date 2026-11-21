@@ -20,11 +20,11 @@ Unknown calibration/configuration/provenance and unresolved frames remain Unknow
 
 ## Exact real-dependency adapter test
 
-The dedicated workflow pins Mycelix commit dc28de1165eeb04b27d23011b6f9681fa740d66d, the exact API head whose current mirrored Position workflow passed 94 tests in each workspace.
+The production SOMA manifest now pins Mycelix commit 9bd90984e57cee2a6c239f3809d68024db648928 through the uniquely named Git package `mycelix-positioning-v2`. Its library name remains `positioning`, so the adapter retains its existing import paths. The facade manifest points directly to the canonical `mycelix-position/lib/positioning/src/lib.rs`; it does not duplicate or fork the implementation. This avoids ambiguous package discovery caused by mirrored `positioning` manifests in the Mycelix repository.
 
-CI copies the actual Mycelix pure positioning package into a temporary path, renames it to avoid colliding with Symthaea's offline stub, and creates a tiny standalone Cargo harness with an optional dependency named `positioning`. The harness imports the exact committed SOMA adapter source under the `positioning` feature and runs three checks: feature-disabled `cargo check` (the optional dependency/module is absent), feature-enabled Clippy, and feature-enabled all-target tests against the real Mycelix source.
+The dedicated workflow extracts the immutable revision from the production SOMA manifest and builds a temporary adapter harness against that exact Git dependency. It runs feature-disabled `cargo check`, then feature-enabled Clippy and all-target tests. Cargo fetches the package from the same public Git URL and immutable revision used by production.
 
-This intentionally does not resolve Symthaea's full root workspace: that workspace currently references a missing `crates/core/symthaea/Cargo.toml` member. The harness mirrors the intended optional-feature behavior and proves the adapter source compiles/tests against the real Mycelix API, but it is **not** a full `symthaea-soma` package or application build and does not yet prove the production `symthaea-soma/Cargo.toml` dependency wiring. That remains an explicit integration gate.
+This intentionally does not resolve Symthaea's full root workspace: that workspace currently references a missing `crates/core/symthaea/Cargo.toml` member. The harness now verifies the production dependency's package identity, Git source, revision and Rust library import, plus the exact adapter code. It is still not a full `symthaea-soma` package/application build or Android/iOS provider integration.
 
 ## Claim ceiling
 
