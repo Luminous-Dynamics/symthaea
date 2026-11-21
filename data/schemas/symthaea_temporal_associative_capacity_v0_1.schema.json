@@ -163,6 +163,7 @@
         "final_state_norm",
         "api_update_count",
         "reported_logical_seconds",
+        "logical_horizon_error_seconds",
         "memory_preparation_wall_ns",
         "model_setup_wall_ns",
         "input_preparation_wall_ns",
@@ -331,13 +332,18 @@
         "input_seeds": {
           "type": "array",
           "maxItems": 4096,
+          "description": "Lowercase 16-digit hexadecimal u64 seeds, preserving all bits across JSON consumers.",
           "items": {
-            "type": "integer",
-            "minimum": 0
+            "type": "string",
+            "pattern": "^[0-9a-f]{16}$"
           }
         },
         "memory_preparation_wall_ns": {
           "type": "integer",
+          "minimum": 0
+        },
+        "logical_horizon_error_seconds": {
+          "type": "number",
           "minimum": 0
         }
       }
