@@ -156,6 +156,8 @@
         "mean_best_distractor_similarity",
         "mean_target_margin",
         "plug_in_fano_information_lower_bound_bits",
+        "initial_state_norm",
+        "final_state_norm",
         "api_update_count",
         "reported_logical_seconds",
         "model_setup_wall_ns",
@@ -269,6 +271,14 @@
           "maximum": 2
         },
         "plug_in_fano_information_lower_bound_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "initial_state_norm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "final_state_norm": {
           "type": "number",
           "minimum": 0
         },
