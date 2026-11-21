@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/mel-perception-parity-v1.schema.json",
   "title": "Melothaea Paired Audio-Symbolic Perception Parity v1",
-  "description": "Strict case and run schemas for evaluating the same musical task through audio and symbolic MIDI modalities.",
+  "description": "Strict suite, immutable run, and scored report schemas for evaluating the same musical task through audio and symbolic MIDI modalities.",
   "$defs": {
     "sha256": {
       "type": "string",
@@ -203,6 +203,230 @@
         }
       },
       "additionalProperties": false
+    },
+    "calibration_bin": {
+      "type": "object",
+      "required": [
+        "bin_index",
+        "lower_bound",
+        "upper_bound",
+        "sample_count",
+        "mean_confidence",
+        "empirical_accuracy"
+      ],
+      "properties": {
+        "bin_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "lower_bound": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper_bound": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mean_confidence": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "empirical_accuracy": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "confidence_calibration": {
+      "type": "object",
+      "required": [
+        "evaluated_count",
+        "brier_score",
+        "expected_calibration_error",
+        "bins"
+      ],
+      "properties": {
+        "evaluated_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "brier_score": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_calibration_error": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bins": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/calibration_bin"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "modality_metrics": {
+      "type": "object",
+      "required": [
+        "case_count",
+        "answered_count",
+        "abstained_count",
+        "missing_count",
+        "correct_count",
+        "accuracy_all_cases",
+        "accuracy_answered_only",
+        "coverage",
+        "mean_absolute_error_answered",
+        "confidence_calibration"
+      ],
+      "properties": {
+        "case_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "answered_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "abstained_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correct_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accuracy_all_cases": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "accuracy_answered_only": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_absolute_error_answered": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 4
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence_calibration": {
+          "$ref": "#/$defs/confidence_calibration"
+        }
+      },
+      "additionalProperties": false
+    },
+    "task_parity_metrics": {
+      "type": "object",
+      "required": [
+        "task",
+        "audio",
+        "symbolic_midi",
+        "audio_minus_symbolic_accuracy",
+        "paired_answer_agreement",
+        "paired_answer_count"
+      ],
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/task"
+        },
+        "audio": {
+          "$ref": "#/$defs/modality_metrics"
+        },
+        "symbolic_midi": {
+          "$ref": "#/$defs/modality_metrics"
+        },
+        "audio_minus_symbolic_accuracy": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "paired_answer_agreement": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paired_answer_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
     }
   },
   "oneOf": [
@@ -266,6 +490,47 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/prediction"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Scored paired modality report",
+      "type": "object",
+      "required": [
+        "schema",
+        "suite_id",
+        "run_id",
+        "model",
+        "total_cases",
+        "task_metrics"
+      ],
+      "properties": {
+        "schema": {
+          "const": "mel-perception-parity-v1"
+        },
+        "suite_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "$ref": "#/$defs/model_identity"
+        },
+        "total_cases": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "task_metrics": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/task_parity_metrics"
           }
         }
       },
