@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-selective-memory-actions"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Research-only cost-sensitive selector for memory commitment and query-time information actions"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
