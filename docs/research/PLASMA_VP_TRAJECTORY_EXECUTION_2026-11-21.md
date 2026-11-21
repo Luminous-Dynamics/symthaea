@@ -153,6 +153,17 @@ The paper also identifies important failure surfaces: looser rank truncation red
 
 Tracking: [#13104 — adaptive phase-space representation tournament](https://github.com/Luminous-Dynamics/symthaea/issues/13104). A representation transition (dense↔TT↔particle↔Hermite) is itself a numerical operation and requires its own discrepancy, invariant, positivity and cost receipt. No universal representation winner is assumed.
 
+### Representation and spectral-resolution frontiers added 21 November 2026
+
+Two additional 2026 Vlasov methods should now be in the first comparator set:
+
+- Cho & Russo, [adaptive Fourier spectral Vlasov–Poisson](https://arxiv.org/abs/2607.12368): reports high-order splitting and spectral-tail-triggered wavenumber-domain expansion by zero-padding when filamentation develops. This makes fixed-grid versus dynamically expanded Fourier support a separate benchmark axis. The paper's mass/(L^2) claims are not reproduced here.
+- Kormann, Nazarov & Wen, [positivity-preserving dynamical low-rank Vlasov](https://arxiv.org/abs/2606.31662): studies a constrained minimal low-rank correction, with one scheme additionally preserving mass and momentum. Compare only on a nonnegative (f) cohort; positivity must not be imposed on signed (delta f) without a distinct contract.
+
+Tracking: [#13106 — spectral-tail-triggered adaptive resolution](https://github.com/Luminous-Dynamics/symthaea/issues/13106), under [#13104 — adaptive phase-space representation tournament](https://github.com/Luminous-Dynamics/symthaea/issues/13104).
+
+The Rust reference prototype now has an initial diagnostic-only spectral-tail monitor that measures high-frequency and Nyquist energy independently along (x) and (v). It does not yet expand either grid and is not a truncation-error certificate. The next implementation must first qualify tail indicators on complete trajectories, then implement zero-padding transitions with their own mass, momentum, energy, (L^2), distribution-discrepancy and full compute-cost receipts.
+
 ## 8. Prospective targets and statistics
 
 These are targets, not measurements:
