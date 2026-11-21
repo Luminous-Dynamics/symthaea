@@ -329,13 +329,20 @@ fn add_edge(graph: &mut [Vec<FlowEdge>], from: usize, to: usize, capacity: f64, 
     });
 }
 
+#[derive(Debug)]
+struct ResidualShortestPath {
+    distances: Vec<f64>,
+    predecessors: Vec<Option<(usize, usize)>>,
+    relaxations: u128,
+}
+
 /// Bellman-Ford shortest path over the residual network. Reverse arcs have
 /// negative costs, so Dijkstra without valid potentials is not sufficient.
 fn shortest_residual_path(
     graph: &[Vec<FlowEdge>],
     source: usize,
     sink: usize,
-) -> Result<(Vec<f64>, Vec<Option<(usize, usize)>>, u128), TransportError> {
+) -> Result<ResidualShortestPath, TransportError> {
     let node_count = graph.len();
     let mut distance = vec![f64::INFINITY; node_count];
     let mut predecessor = vec![None; node_count];
@@ -369,7 +376,11 @@ fn shortest_residual_path(
     if !distance[sink].is_finite() {
         return Err(TransportError::NoAugmentingPath);
     }
-    Ok((distance, predecessor, relaxations))
+    Ok(ResidualShortestPath {
+        distances: distance,
+        predecessors: predecessor,
+        relaxations,
+    })
 }
 
 fn min_cost_transport(
@@ -422,10 +433,12 @@ fn min_cost_transport(
         if augmenting_paths >= MAX_AUGMENTATIONS {
             return Err(TransportError::IterationLimitExceeded);
         }
-        let (distance, predecessor, relaxations) = shortest_residual_path(&graph, source, sink)?;
+        let shortest_path = shortest_residual_path(&graph, source, sink)?;
         shortest_path_relaxations = shortest_path_relaxations
-            .checked_add(relaxations)
+            .checked_add(shortest_path.relaxations)
             .ok_or(TransportError::NonFiniteOutput)?;
+        let distance = shortest_path.distances;
+        let predecessor = shortest_path.predecessors;
 
         let mut amount = TARGET_FLOW - total_flow;
         let mut node = sink;
