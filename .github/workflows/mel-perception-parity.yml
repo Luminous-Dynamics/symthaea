@@ -53,9 +53,13 @@ jobs:
         run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
 
       - name: Check perception evaluator formatting
+        shell: bash
         run: |
+          set -euo pipefail
           rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/perception_parity.rs
-          rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/audio_frontend_evidence.rs
+          if [[ -f crates/domains/symthaea-muse/src/audio_frontend_evidence.rs ]]; then
+            rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/audio_frontend_evidence.rs
+          fi
 
       - name: Compile actual Muse library
         run: cargo check --locked -p symthaea-muse --lib
@@ -63,8 +67,15 @@ jobs:
       - name: Run paired modality evaluator tests
         run: cargo test --locked -p symthaea-muse --lib perception_parity::tests
 
-      - name: Run audio front-end evidence contract tests
-        run: cargo test --locked -p symthaea-muse --lib audio_frontend_evidence::tests
+      - name: Run audio front-end evidence contract tests when present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f crates/domains/symthaea-muse/src/audio_frontend_evidence.rs ]]; then
+            cargo test --locked -p symthaea-muse --lib audio_frontend_evidence::tests
+          else
+            echo "audio front-end evidence module is not part of this PR; child PR owns that contract"
+          fi
 
       - name: Test-compile all Muse library tests
         run: cargo test --locked -p symthaea-muse --lib --no-run
@@ -81,12 +92,16 @@ jobs:
           ' "$schema" > /dev/null
           echo "perception parity schema parsed and contract anchors verified"
           audio_schema="benchmarks/mel/schemas/audio-frontend-evidence-v1.schema.json"
-          jq -e '
-            .["$schema"] == "https://json-schema.org/draft/2020-12/schema"
-            and .properties.schema.const == "mel-audio-frontend-evidence-v1"
-            and (.properties.estimates.items.properties.stage.enum | length) == 4
-          ' "$audio_schema" > /dev/null
-          echo "audio front-end evidence schema parsed and stage contract verified"
+          if [[ -f "$audio_schema" ]]; then
+            jq -e '
+              .["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+              and .properties.schema.const == "mel-audio-frontend-evidence-v1"
+              and (.properties.estimates.items.properties.stage.enum | length) == 4
+            ' "$audio_schema" > /dev/null
+            echo "audio front-end evidence schema parsed and stage contract verified"
+          else
+            echo "audio front-end schema not present in this PR; child PR owns that contract"
+          fi
 
       - name: Record exact merge-head evidence
         shell: bash
@@ -97,15 +112,19 @@ jobs:
           cp Cargo.toml "$evidence/Cargo.toml"
           cp Cargo.lock "$evidence/Cargo.lock"
           cp crates/domains/symthaea-muse/src/perception_parity.rs "$evidence/perception_parity.rs"
-          cp crates/domains/symthaea-muse/src/audio_frontend_evidence.rs "$evidence/audio_frontend_evidence.rs"
           cp benchmarks/mel/schemas/perception-parity-v1.schema.json "$evidence/perception-parity-v1.schema.json"
-          cp benchmarks/mel/schemas/audio-frontend-evidence-v1.schema.json "$evidence/audio-frontend-evidence-v1.schema.json"
-          cp docs/research/MEL_AUDIO_FRONTEND_UNCERTAINTY_V1_2026-11-21.md "$evidence/audio-frontend-uncertainty.md"
           cp "$RUNNER_TEMP/workspace-metadata.json" "$evidence/workspace-metadata.json"
           cp "$RUNNER_TEMP/source-identities.txt" "$evidence/source-identities.txt"
+          files=(Cargo.toml Cargo.lock perception_parity.rs perception-parity-v1.schema.json workspace-metadata.json source-identities.txt)
+          if [[ -f crates/domains/symthaea-muse/src/audio_frontend_evidence.rs ]]; then
+            cp crates/domains/symthaea-muse/src/audio_frontend_evidence.rs "$evidence/audio_frontend_evidence.rs"
+            cp benchmarks/mel/schemas/audio-frontend-evidence-v1.schema.json "$evidence/audio-frontend-evidence-v1.schema.json"
+            cp docs/research/MEL_AUDIO_FRONTEND_UNCERTAINTY_V1_2026-11-21.md "$evidence/audio-frontend-uncertainty.md"
+            files+=(audio_frontend_evidence.rs audio-frontend-evidence-v1.schema.json audio-frontend-uncertainty.md)
+          fi
           (
             cd "$evidence"
-            sha256sum Cargo.toml Cargo.lock perception_parity.rs audio_frontend_evidence.rs perception-parity-v1.schema.json audio-frontend-evidence-v1.schema.json audio-frontend-uncertainty.md workspace-metadata.json source-identities.txt > SHA256SUMS
+            sha256sum "${files[@]}" > SHA256SUMS
           )
 
       - name: Upload exact merge-head perception parity evidence
