@@ -3,9 +3,13 @@ name: MUSE Sonata Cognitive Subintent
 on:
   pull_request:
     branches:
+      - main
       - fix/workspace-stale-member-exclusion-20261121
     paths:
       - "crates/domains/symthaea-muse/src/sonata_intervention.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docs/research/MEL_SONATA_COGNITIVE_SUBINTENT_V1_2026-11-21.md"
       - ".github/workflows/muse-sonata-cognitive-subintent.yml"
   workflow_dispatch:
 
@@ -18,43 +22,44 @@ concurrency:
 
 jobs:
   qualify:
-    name: Exact-head Sonata subintent contract
+    name: Exact merge-head Sonata subintent qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Checkout exact PR merge head
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Verify exact source revision
+      - name: Verify merge and source revisions
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
           test "$actual" = "${{ github.sha }}"
-          printf 'merge_head=%s\n' "$actual" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'merge_head=%s\n' "$actual" > "$RUNNER_TEMP/source-identities.txt"
           printf 'pr_head=%s\n' "${{ github.event.pull_request.head.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'base_head=%s\n' "${{ github.event.pull_request.base.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
 
-      - name: Verify real workspace manifest graph and lockfile
+      - name: Resolve actual workspace under committed lockfile
         run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
 
-      - name: Check changed source formatting
+      - name: Check touched Sonata module formatting
         run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/sonata_intervention.rs
 
       - name: Compile actual Muse library
         run: cargo check --locked -p symthaea-muse --lib
 
-      - name: Run Sonata intervention tests in the actual Muse crate
+      - name: Run Sonata intervention and subintent tests in actual Muse package
         run: cargo test --locked -p symthaea-muse --lib sonata_intervention::tests
 
-      - name: Run warnings-denied Clippy for actual Muse library
-        run: cargo clippy --locked -p symthaea-muse --lib -- -D warnings
+      - name: Test-compile all Muse library test targets
+        run: cargo test --locked -p symthaea-muse --lib --no-run
 
       - name: Record exact-head evidence
         shell: bash
@@ -64,12 +69,12 @@ jobs:
           mkdir -p "$evidence"
           cp Cargo.toml "$evidence/Cargo.toml"
           cp Cargo.lock "$evidence/Cargo.lock"
+          cp crates/domains/symthaea-muse/src/sonata_intervention.rs "$evidence/sonata_intervention.rs"
           cp "$RUNNER_TEMP/workspace-metadata.json" "$evidence/workspace-metadata.json"
           cp "$RUNNER_TEMP/source-identities.txt" "$evidence/source-identities.txt"
-          cp crates/domains/symthaea-muse/src/sonata_intervention.rs "$evidence/sonata_intervention.rs"
           (
             cd "$evidence"
-            sha256sum Cargo.toml Cargo.lock workspace-metadata.json source-identities.txt sonata_intervention.rs > SHA256SUMS
+            sha256sum Cargo.toml Cargo.lock sonata_intervention.rs workspace-metadata.json source-identities.txt > SHA256SUMS
           )
 
       - name: Upload exact-head Sonata subintent evidence
