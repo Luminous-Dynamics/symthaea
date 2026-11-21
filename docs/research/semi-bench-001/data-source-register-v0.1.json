@@ -437,6 +437,45 @@
         "source_identity_or_group_split": "not-established-from-public-abstract"
       },
       "evidence_class": "paper-reported-ranges; reproduction lead; not directly rankable until per-dataset protocols and source identity are verified"
+    },
+    {
+      "id": "Rule-Ordered-LMM-WaferMap-2026",
+      "title": "Zero-Shot Multi-Class Wafer Map Classification with Rule-Ordered Prompts for Large Multimodal Models",
+      "source": "https://arxiv.org/abs/2610.35080",
+      "publication_date": "2026-10-26",
+      "evidence_class": "arxiv-preprint",
+      "model": "gpt-4o-2024-08-06",
+      "results": {
+        "MixedWM38": {
+          "samples": 6866,
+          "classes": 6,
+          "macro_accuracy": 0.929,
+          "overall_accuracy": 0.938
+        },
+        "WM811K": {
+          "samples": 9000,
+          "classes": 6,
+          "macro_accuracy": 0.791,
+          "overall_accuracy": 0.813
+        },
+        "alternate_order_overall_accuracy": [
+          0.901,
+          0.919
+        ],
+        "reported_latency_seconds": [
+          0.5,
+          1
+        ]
+      },
+      "data_and_protocol": {
+        "training": "none",
+        "prompt_tuning_on_test": "not reported; prompts fixed before evaluation",
+        "random_sample_or_lot_split": "six-class sample evaluation; unseen-lot not established",
+        "full_38_category_mixed_defect_evaluation": false,
+        "repeated_query_variance": "not characterized; one query per wafer map"
+      },
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
+      "claim_status": "preprint-reported-not-independently-reproduced"
     }
   ],
   "benchmark_reference_artifacts": {
