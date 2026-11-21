@@ -200,9 +200,7 @@ fn dominates_resource_plan(left: &Resources, right: &Resources) -> bool {
     no_more && strictly_less
 }
 
-fn select_best_action(
-    audits: &[ActionAudit],
-) -> (Option<String>, Option<f64>, &'static str) {
+fn select_best_action(audits: &[ActionAudit]) -> (Option<String>, Option<f64>, &'static str) {
     let candidates: Vec<&ActionAudit> = audits
         .iter()
         .filter(|audit| {
@@ -1002,8 +1000,7 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         && if scenario.expected.abstain {
             abstain_correct
         } else {
-            expected_action_eligible
-                && expected_action_value.is_some_and(|value| value > EPSILON)
+            expected_action_eligible && expected_action_value.is_some_and(|value| value > EPSILON)
         };
     Ok(ScenarioAudit {
         scenario_id: scenario.scenario_id.clone(),
@@ -1405,7 +1402,10 @@ mod tests {
             .iter()
             .find(|case| case.scenario_id == "JEV-001")
             .unwrap();
-        assert_eq!(first_choice.selected_action_id, second_choice.selected_action_id);
+        assert_eq!(
+            first_choice.selected_action_id,
+            second_choice.selected_action_id
+        );
     }
 
     #[test]
