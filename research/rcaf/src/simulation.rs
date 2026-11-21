@@ -1385,7 +1385,7 @@ mod tests {
             );
         }
         let json = sweep.to_json_pretty();
-        assert!(json.contains("rcaf.common-mode-nuisance-sweep/0.1.0"));
+        assert!(json.contains("rcaf.common-mode-nuisance-sweep/0.2.0"));
         assert!(json.contains("\"nuisance_only_rejection_rate\""));
     }
 
@@ -1568,7 +1568,7 @@ mod tests {
             );
         }
         let output = tournament.to_json_pretty();
-        assert!(output.contains("rcaf.estimator-dose-response-tournament/0.3.0"));
+        assert!(output.contains("rcaf.estimator-dose-response-tournament/0.4.0"));
         assert!(output.contains("signed_shift_weighted_jaccard"));
     }
 
