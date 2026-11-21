@@ -22,7 +22,7 @@ cargo fmt --manifest-path research/selective-memory-actions-v0-1/Cargo.toml -- -
 
 ## Tests and current validation
 
-Sixteen focused unit tests are authored, including use-time staleness after queue delay, unknown freshness, overdue decisions, inclusive age boundary and exact-deadline behavior. They have not been run because the current environment has no Cargo/Rust toolchain.
+Seventeen focused unit tests are authored, including use-time staleness after queue delay, unknown freshness, overdue decisions, inclusive age boundary and exact-deadline behavior. They have not been run because the current environment has no Cargo/Rust toolchain.
 
 ## Deliberate limitations
 
