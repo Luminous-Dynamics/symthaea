@@ -1,7 +1,7 @@
 use jsonschema::validator_for;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -286,10 +286,10 @@ fn metric_values(predictions: &[Prediction], threshold: f64) -> Result<Metrics, 
     }
     let mut brier = 0.0;
     let mut log_loss = 0.0;
-    let mut tp = 0.0;
-    let mut fp = 0.0;
-    let mut tn = 0.0;
-    let mut fn_count = 0.0;
+    let mut tp: f64 = 0.0;
+    let mut fp: f64 = 0.0;
+    let mut tn: f64 = 0.0;
+    let mut fn_count: f64 = 0.0;
     let epsilon = 1.0e-15;
     for row in predictions {
         let p = row.probability.clamp(epsilon, 1.0 - epsilon);
