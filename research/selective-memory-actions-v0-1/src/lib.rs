@@ -141,6 +141,10 @@ pub struct AdmissionSnapshot {
 pub struct ActionOption<'a> {
     pub action: Action,
     pub outcomes: &'a [OutcomeLoss],
+    /// Result of the upstream component-wise hard resource-budget check
+    /// (e.g. #9666). This is not a scalarized resource price.
+    pub resource_feasible: bool,
+    /// Explicit priced cost only; hard resource caps must be enforced above.
     pub operational_cost_micros: u64,
     pub delay_cost_micros: u64,
     pub tie_break_rank: u16,
@@ -203,7 +207,9 @@ pub fn select_action(
 
         let expected_loss = expected_loss_micros(option)?;
 
-        if !is_admissible(option.action, admission) {
+        // Hard resource feasibility is checked independently of expected loss.
+        // A low scalar cost can never compensate for exceeding a resource cap.
+        if !option.resource_feasible || !is_admissible(option.action, admission) {
             continue;
         }
 
@@ -354,6 +360,7 @@ mod tests {
         ActionOption {
             action,
             outcomes,
+            resource_feasible: true,
             operational_cost_micros,
             delay_cost_micros,
             tie_break_rank,
@@ -414,6 +421,24 @@ mod tests {
 
         let decision = select_action(Stage::Ingestion, gates, &options).unwrap();
         assert_eq!(decision.action, Action::SessionOnly);
+    }
+
+    #[test]
+    fn hard_resource_infeasibility_overrides_the_lowest_expected_loss() {
+        let options = [
+            ActionOption {
+                action: Action::Use,
+                outcomes: &LOW_LOSS,
+                resource_feasible: false,
+                operational_cost_micros: 0,
+                delay_cost_micros: 0,
+                tie_break_rank: 0,
+            },
+            option(Action::Abstain, &HIGH_LOSS, 0, 0, 1),
+        ];
+        let decision = select_action(Stage::Query, AdmissionSnapshot::default(), &options)
+            .unwrap();
+        assert_eq!(decision.action, Action::Abstain);
     }
 
     #[test]
