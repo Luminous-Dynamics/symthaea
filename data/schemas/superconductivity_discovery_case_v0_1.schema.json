@@ -69,7 +69,10 @@
             "type": "string"
           },
           "arxiv_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "minLength": 1
           },
           "repository_url": {
