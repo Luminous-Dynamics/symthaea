@@ -35,5 +35,5 @@
   "schema": "luminous.semi-bench.contrastive-pair-validation.v1",
   "split_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "time_basis": "source_local_naive",
-  "time_embargo_minutes": 60
+  "time_embargo_minutes": 60.0
 }
