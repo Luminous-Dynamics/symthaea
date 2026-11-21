@@ -29,6 +29,10 @@ pub struct MemoryDoseTrialV1 {
     pub cluster_id: u64,
     pub task_family_id: u32,
     pub source_root: SourceRootDigest,
+    /// Exact task/episode identity shared by all budget arms in a cluster.
+    pub episode_sha256: String,
+    pub environment_sha256: String,
+    pub evaluation_protocol_sha256: String,
     /// Digest of the target agent model whose performance is measured.
     pub target_model_sha256: String,
     /// Digest of the frozen memory/consolidation pipeline under test.
@@ -36,6 +40,73 @@ pub struct MemoryDoseTrialV1 {
     pub context_budget_tokens: u32,
     /// Realized episode utility after declared token, latency and execution costs.
     pub net_utility_micros: i64,
+}
+
+impl MemoryDoseTrialV1 {
+    pub fn canonical_digest(&self) -> String {
+        let fields = [
+            self.event_id.to_string(),
+            self.cluster_id.to_string(),
+            self.task_family_id.to_string(),
+            sha256_hex(self.source_root.as_bytes()),
+            self.episode_sha256.clone(),
+            self.environment_sha256.clone(),
+            self.evaluation_protocol_sha256.clone(),
+            self.target_model_sha256.clone(),
+            self.memory_pipeline_sha256.clone(),
+            self.context_budget_tokens.to_string(),
+            self.net_utility_micros.to_string(),
+        ];
+        digest_fields(b"mace:memory-dose-trial:v1\\0", &fields)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MemoryDoseTrialReceiptV1 {
+    pub trial_sha256: String,
+    pub episode_sha256: String,
+    pub environment_sha256: String,
+    pub evaluation_protocol_sha256: String,
+    pub target_model_sha256: String,
+    pub memory_pipeline_sha256: String,
+    pub verified_at_ms: i64,
+    pub valid_until_ms: i64,
+    pub verifier_id: String,
+    pub receipt_sha256: String,
+}
+
+impl MemoryDoseTrialReceiptV1 {
+    pub fn canonical_digest(&self) -> String {
+        let fields = [
+            self.trial_sha256.clone(),
+            self.episode_sha256.clone(),
+            self.environment_sha256.clone(),
+            self.evaluation_protocol_sha256.clone(),
+            self.target_model_sha256.clone(),
+            self.memory_pipeline_sha256.clone(),
+            self.verified_at_ms.to_string(),
+            self.valid_until_ms.to_string(),
+            self.verifier_id.clone(),
+        ];
+        digest_fields(b"mycelix:mace:memory-dose-trial-receipt:v1\\0", &fields)
+    }
+}
+
+/// Production implementations authenticate an independent run receipt and
+/// independently validate the measured outcome and utility-cost calculation.
+pub trait MemoryDoseTrialVerifierV1 {
+    fn verify_trial(
+        &self,
+        trial: &MemoryDoseTrialV1,
+        as_known_at_ms: i64,
+    ) -> Option<MemoryDoseTrialReceiptV1>;
+}
+
+/// Opaque record admitted only after the injected verifier accepts its receipt.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedMemoryDoseTrialV1 {
+    trial: MemoryDoseTrialV1,
+    receipt: MemoryDoseTrialReceiptV1,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,6 +124,8 @@ pub struct MemoryBudgetCalibrationV1 {
     pub calibration_dataset_sha256: String,
     pub calibration_task_family_split_sha256: String,
     pub calibration_source_root_split_sha256: String,
+    pub environment_sha256: String,
+    pub evaluation_protocol_sha256: String,
     pub calibration_cluster_count: u32,
     pub budget_means: Vec<MemoryBudgetMeanV1>,
     pub calibration_sha256: String,
@@ -64,6 +137,11 @@ pub enum MemoryBudgetReject {
     InvalidDigest,
     MixedTargetModel,
     MixedMemoryPipeline,
+    MixedEnvironment,
+    MixedEvaluationProtocol,
+    MissingTrialReceipt,
+    InvalidTrialReceipt,
+    TrialReceiptNotValidAtSnapshot,
     InvalidBudgetSet,
     UnknownSourceRoot,
     DuplicateEvent,
@@ -85,12 +163,14 @@ struct Identity {
     families: BTreeSet<u32>,
     roots: BTreeSet<SourceRootDigest>,
     events: BTreeSet<u32>,
+    episodes: BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ClusterCurve {
     task_family_id: u32,
     source_root: SourceRootDigest,
+    episode_sha256: String,
     utilities: BTreeMap<u32, i64>,
 }
 
@@ -100,6 +180,8 @@ struct ValidatedDoseResponse {
     cluster_curves: BTreeMap<u64, ClusterCurve>,
     target_model_sha256: String,
     memory_pipeline_sha256: String,
+    environment_sha256: String,
+    evaluation_protocol_sha256: String,
     dataset_sha256: String,
 }
 
@@ -191,6 +273,57 @@ impl ModelBudgetSurfacingPlanV1 {
     }
 }
 
+/// Admit raw dose-response rows only after a verifier attests each exact
+/// task/outcome record at the requested knowledge time.
+pub fn verify_memory_dose_trials(
+    trials: &[MemoryDoseTrialV1],
+    as_known_at_ms: i64,
+    verifier: &impl MemoryDoseTrialVerifierV1,
+) -> Result<Vec<VerifiedMemoryDoseTrialV1>, MemoryBudgetReject> {
+    if as_known_at_ms < 0 || trials.is_empty() {
+        return Err(MemoryBudgetReject::Empty);
+    }
+    let mut verified = Vec::with_capacity(trials.len());
+    for trial in trials {
+        let digests = [
+            &trial.episode_sha256,
+            &trial.environment_sha256,
+            &trial.evaluation_protocol_sha256,
+            &trial.target_model_sha256,
+            &trial.memory_pipeline_sha256,
+        ];
+        if digests.iter().any(|value| !is_lower_sha256(value)) {
+            return Err(MemoryBudgetReject::InvalidDigest);
+        }
+        let receipt = verifier
+            .verify_trial(trial, as_known_at_ms)
+            .ok_or(MemoryBudgetReject::MissingTrialReceipt)?;
+        if receipt.trial_sha256 != trial.canonical_digest()
+            || receipt.episode_sha256 != trial.episode_sha256
+            || receipt.environment_sha256 != trial.environment_sha256
+            || receipt.evaluation_protocol_sha256 != trial.evaluation_protocol_sha256
+            || receipt.target_model_sha256 != trial.target_model_sha256
+            || receipt.memory_pipeline_sha256 != trial.memory_pipeline_sha256
+            || !is_lower_sha256(&receipt.trial_sha256)
+            || !is_lower_sha256(&receipt.receipt_sha256)
+            || receipt.verifier_id.trim().is_empty()
+            || receipt.receipt_sha256 != receipt.canonical_digest()
+        {
+            return Err(MemoryBudgetReject::InvalidTrialReceipt);
+        }
+        if receipt.verified_at_ms > as_known_at_ms
+            || receipt.valid_until_ms <= as_known_at_ms
+        {
+            return Err(MemoryBudgetReject::TrialReceiptNotValidAtSnapshot);
+        }
+        verified.push(VerifiedMemoryDoseTrialV1 {
+            trial: trial.clone(),
+            receipt,
+        });
+    }
+    Ok(verified)
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -231,20 +364,17 @@ fn validate_budget_set(budgets: &[u32]) -> Result<(), MemoryBudgetReject> {
     Ok(())
 }
 
-fn dataset_digest(rows: &[MemoryDoseTrialV1]) -> String {
+fn dataset_digest(rows: &[VerifiedMemoryDoseTrialV1]) -> String {
     let mut ordered: Vec<_> = rows.iter().collect();
-    ordered.sort_by_key(|row| row.event_id);
+    ordered.sort_by_key(|row| row.trial.event_id);
     let mut hasher = Sha256::new();
-    hasher.update(b"mace:model-memory-dose-response:v1\0");
-    for row in ordered {
-        hasher.update(row.event_id.to_be_bytes());
-        hasher.update(row.cluster_id.to_be_bytes());
-        hasher.update(row.task_family_id.to_be_bytes());
-        hasher.update(row.source_root.as_bytes());
-        field(&mut hasher, row.target_model_sha256.as_bytes());
-        field(&mut hasher, row.memory_pipeline_sha256.as_bytes());
-        hasher.update(row.context_budget_tokens.to_be_bytes());
-        hasher.update(row.net_utility_micros.to_be_bytes());
+    hasher.update(b"mace:model-memory-dose-response:v2\0");
+    for verified in ordered {
+        field(
+            &mut hasher,
+            verified.trial.canonical_digest().as_bytes(),
+        );
+        field(&mut hasher, verified.receipt.receipt_sha256.as_bytes());
     }
     sha256_hex(&hasher.finalize())
 }
@@ -264,11 +394,14 @@ fn identity_digest(identity: &Identity, domain: &[u8]) -> String {
     for event in &identity.events {
         hasher.update(event.to_be_bytes());
     }
+    for episode in &identity.episodes {
+        field(&mut hasher, episode.as_bytes());
+    }
     sha256_hex(&hasher.finalize())
 }
 
 fn validate_trials(
-    rows: &[MemoryDoseTrialV1],
+    rows: &[VerifiedMemoryDoseTrialV1],
     budgets: &[u32],
 ) -> Result<ValidatedDoseResponse, MemoryBudgetReject> {
     validate_budget_set(budgets)?;
@@ -276,9 +409,16 @@ fn validate_trials(
         return Err(MemoryBudgetReject::Empty);
     }
 
-    let target_model = rows[0].target_model_sha256.clone();
-    let pipeline = rows[0].memory_pipeline_sha256.clone();
-    if !is_lower_sha256(&target_model) || !is_lower_sha256(&pipeline) {
+    let first_trial = &rows[0].trial;
+    let target_model = first_trial.target_model_sha256.clone();
+    let pipeline = first_trial.memory_pipeline_sha256.clone();
+    let environment = first_trial.environment_sha256.clone();
+    let protocol = first_trial.evaluation_protocol_sha256.clone();
+    if !is_lower_sha256(&target_model)
+        || !is_lower_sha256(&pipeline)
+        || !is_lower_sha256(&environment)
+        || !is_lower_sha256(&protocol)
+    {
         return Err(MemoryBudgetReject::InvalidDigest);
     }
 
@@ -286,20 +426,31 @@ fn validate_trials(
     let mut clusters = BTreeSet::new();
     let mut families = BTreeSet::new();
     let mut roots = BTreeSet::new();
+    let mut episodes = BTreeSet::new();
     let mut curves = BTreeMap::<u64, ClusterCurve>::new();
 
-    for row in rows {
+    for verified in rows {
+        let row = &verified.trial;
         if row.target_model_sha256 != target_model {
             return Err(MemoryBudgetReject::MixedTargetModel);
         }
         if row.memory_pipeline_sha256 != pipeline {
             return Err(MemoryBudgetReject::MixedMemoryPipeline);
         }
+        if row.environment_sha256 != environment {
+            return Err(MemoryBudgetReject::MixedEnvironment);
+        }
+        if row.evaluation_protocol_sha256 != protocol {
+            return Err(MemoryBudgetReject::MixedEvaluationProtocol);
+        }
         if row.event_id == 0 || row.cluster_id == 0 || row.task_family_id == 0 {
             return Err(MemoryBudgetReject::InvalidDigest);
         }
         if !row.source_root.is_known() {
             return Err(MemoryBudgetReject::UnknownSourceRoot);
+        }
+        if !is_lower_sha256(&row.episode_sha256) {
+            return Err(MemoryBudgetReject::InvalidDigest);
         }
         if !budgets.contains(&row.context_budget_tokens) {
             return Err(MemoryBudgetReject::InvalidBudgetSet);
@@ -314,14 +465,17 @@ fn validate_trials(
         clusters.insert(row.cluster_id);
         families.insert(row.task_family_id);
         roots.insert(row.source_root);
+        episodes.insert(row.episode_sha256.clone());
 
         let curve = curves.entry(row.cluster_id).or_insert_with(|| ClusterCurve {
             task_family_id: row.task_family_id,
             source_root: row.source_root,
+            episode_sha256: row.episode_sha256.clone(),
             utilities: BTreeMap::new(),
         });
         if curve.task_family_id != row.task_family_id
             || curve.source_root != row.source_root
+            || curve.episode_sha256 != row.episode_sha256
         {
             return Err(MemoryBudgetReject::ClusterIdentityMismatch);
         }
@@ -358,12 +512,15 @@ fn validate_trials(
         families,
         roots,
         events,
+        episodes,
     };
     Ok(ValidatedDoseResponse {
         identity,
         cluster_curves: curves,
         target_model_sha256: target_model,
         memory_pipeline_sha256: pipeline,
+        environment_sha256: environment,
+        evaluation_protocol_sha256: protocol,
         dataset_sha256: dataset_digest(rows),
     })
 }
@@ -373,6 +530,7 @@ fn ensure_disjoint(left: &Identity, right: &Identity) -> Result<(), MemoryBudget
         || !left.families.is_disjoint(&right.families)
         || !left.roots.is_disjoint(&right.roots)
         || !left.events.is_disjoint(&right.events)
+        || !left.episodes.is_disjoint(&right.episodes)
     {
         return Err(MemoryBudgetReject::SplitOverlap);
     }
@@ -395,6 +553,8 @@ fn calibration_digest(profile: &MemoryBudgetCalibrationV1) -> String {
         profile.calibration_dataset_sha256.clone(),
         profile.calibration_task_family_split_sha256.clone(),
         profile.calibration_source_root_split_sha256.clone(),
+        profile.environment_sha256.clone(),
+        profile.evaluation_protocol_sha256.clone(),
         profile.calibration_cluster_count.to_string(),
     ];
     fields.extend(
@@ -416,8 +576,12 @@ fn calibration_digest(profile: &MemoryBudgetCalibrationV1) -> String {
 pub fn fit_model_memory_budget(
     calibration_rows: &[MemoryDoseTrialV1],
     candidate_budgets_tokens: &[u32],
+    as_known_at_ms: i64,
+    verifier: &impl MemoryDoseTrialVerifierV1,
 ) -> Result<MemoryBudgetCalibrationV1, MemoryBudgetReject> {
-    let validated = validate_trials(calibration_rows, candidate_budgets_tokens)?;
+    let verified_rows =
+        verify_memory_dose_trials(calibration_rows, as_known_at_ms, verifier)?;
+    let validated = validate_trials(&verified_rows, candidate_budgets_tokens)?;
     let budget_means: Vec<_> = candidate_budgets_tokens
         .iter()
         .map(|budget| MemoryBudgetMeanV1 {
@@ -452,6 +616,8 @@ pub fn fit_model_memory_budget(
             &validated.identity,
             b"mace:memory-budget-source-roots:v1\0",
         ),
+        environment_sha256: validated.environment_sha256,
+        evaluation_protocol_sha256: validated.evaluation_protocol_sha256,
         calibration_cluster_count: validated.identity.clusters.len() as u32,
         budget_means,
         calibration_sha256: String::new(),
@@ -528,6 +694,8 @@ pub fn qualify_model_memory_budget(
     calibration: &MemoryBudgetCalibrationV1,
     calibration_rows: &[MemoryDoseTrialV1],
     heldout_rows: &[MemoryDoseTrialV1],
+    as_known_at_ms: i64,
+    verifier: &impl MemoryDoseTrialVerifierV1,
 ) -> Result<QualifiedModelMemoryBudgetV1, MemoryBudgetReject> {
     if calibration.calibration_sha256 != calibration_digest(calibration) {
         return Err(MemoryBudgetReject::CalibrationProfileMismatch);
@@ -535,19 +703,30 @@ pub fn qualify_model_memory_budget(
     let reproduced = fit_model_memory_budget(
         calibration_rows,
         &calibration.candidate_budgets_tokens,
+        as_known_at_ms,
+        verifier,
     )?;
     if &reproduced != calibration {
         return Err(MemoryBudgetReject::CalibrationProfileMismatch);
     }
 
-    let heldout = validate_trials(heldout_rows, &calibration.candidate_budgets_tokens)?;
+    let verified_heldout =
+        verify_memory_dose_trials(heldout_rows, as_known_at_ms, verifier)?;
+    let heldout = validate_trials(
+        &verified_heldout,
+        &calibration.candidate_budgets_tokens,
+    )?;
     if heldout.target_model_sha256 != calibration.target_model_sha256
         || heldout.memory_pipeline_sha256 != calibration.memory_pipeline_sha256
+        || heldout.environment_sha256 != calibration.environment_sha256
+        || heldout.evaluation_protocol_sha256 != calibration.evaluation_protocol_sha256
     {
         return Err(MemoryBudgetReject::CalibrationProfileMismatch);
     }
+    let verified_calibration =
+        verify_memory_dose_trials(calibration_rows, as_known_at_ms, verifier)?;
     let calibration_identity = validate_trials(
-        calibration_rows,
+        &verified_calibration,
         &calibration.candidate_budgets_tokens,
     )?
     .identity;
@@ -664,8 +843,62 @@ mod tests {
 
     const BUDGETS: [u32; 4] = [0, 128, 512, 1_024];
 
+    struct FixtureMemoryDoseTrialVerifier;
+
+    impl MemoryDoseTrialVerifierV1 for FixtureMemoryDoseTrialVerifier {
+        fn verify_trial(
+            &self,
+            trial: &MemoryDoseTrialV1,
+            as_known_at_ms: i64,
+        ) -> Option<MemoryDoseTrialReceiptV1> {
+            let mut receipt = MemoryDoseTrialReceiptV1 {
+                trial_sha256: trial.canonical_digest(),
+                episode_sha256: trial.episode_sha256.clone(),
+                environment_sha256: trial.environment_sha256.clone(),
+                evaluation_protocol_sha256: trial.evaluation_protocol_sha256.clone(),
+                target_model_sha256: trial.target_model_sha256.clone(),
+                memory_pipeline_sha256: trial.memory_pipeline_sha256.clone(),
+                verified_at_ms: as_known_at_ms.saturating_sub(1),
+                valid_until_ms: as_known_at_ms.saturating_add(10_000),
+                verifier_id: "fixture-dose-trial-verifier".into(),
+                receipt_sha256: String::new(),
+            };
+            receipt.receipt_sha256 = receipt.canonical_digest();
+            Some(receipt)
+        }
+    }
+
+    const AS_KNOWN_AT_MS: i64 = 100;
+
     fn digest(label: &str) -> String {
         sha256_hex(label.as_bytes())
+    }
+
+
+    fn fit(
+        rows: &[MemoryDoseTrialV1],
+        budgets: &[u32],
+    ) -> Result<MemoryBudgetCalibrationV1, MemoryBudgetReject> {
+        fit_model_memory_budget(
+            rows,
+            budgets,
+            AS_KNOWN_AT_MS,
+            &FixtureMemoryDoseTrialVerifier,
+        )
+    }
+
+    fn qualify(
+        profile: &MemoryBudgetCalibrationV1,
+        calibration: &[MemoryDoseTrialV1],
+        heldout: &[MemoryDoseTrialV1],
+    ) -> Result<QualifiedModelMemoryBudgetV1, MemoryBudgetReject> {
+        qualify_model_memory_budget(
+            profile,
+            calibration,
+            heldout,
+            AS_KNOWN_AT_MS,
+            &FixtureMemoryDoseTrialVerifier,
+        )
     }
 
     fn rows(
@@ -694,6 +927,9 @@ mod tests {
                     cluster_id: cluster,
                     task_family_id: family,
                     source_root: root,
+                    episode_sha256: digest(&format!("episode-{cluster}")),
+                    environment_sha256: digest("fixed-appworld-environment-v1"),
+                    evaluation_protocol_sha256: digest("memory-dose-protocol-v1"),
                     target_model_sha256: model.to_owned(),
                     memory_pipeline_sha256: pipeline.to_owned(),
                     context_budget_tokens: budget,
@@ -702,6 +938,86 @@ mod tests {
             }
         }
         result
+    }
+
+    #[test]
+    fn forged_or_snapshot_expired_trial_receipts_are_rejected() {
+        struct WrongDigestVerifier;
+        impl MemoryDoseTrialVerifierV1 for WrongDigestVerifier {
+            fn verify_trial(
+                &self,
+                trial: &MemoryDoseTrialV1,
+                as_known_at_ms: i64,
+            ) -> Option<MemoryDoseTrialReceiptV1> {
+                let fixture = FixtureMemoryDoseTrialVerifier;
+                let mut receipt = fixture.verify_trial(trial, as_known_at_ms)?;
+                receipt.trial_sha256 = digest("not-the-trial-digest");
+                receipt.receipt_sha256 = receipt.canonical_digest();
+                Some(receipt)
+            }
+        }
+        struct ExpiredVerifier;
+        impl MemoryDoseTrialVerifierV1 for ExpiredVerifier {
+            fn verify_trial(
+                &self,
+                trial: &MemoryDoseTrialV1,
+                as_known_at_ms: i64,
+            ) -> Option<MemoryDoseTrialReceiptV1> {
+                let fixture = FixtureMemoryDoseTrialVerifier;
+                let mut receipt = fixture.verify_trial(trial, as_known_at_ms)?;
+                receipt.valid_until_ms = as_known_at_ms;
+                receipt.receipt_sha256 = receipt.canonical_digest();
+                Some(receipt)
+            }
+        }
+
+        let model = digest("receipt-test-model");
+        let pipeline = digest("receipt-test-pipeline");
+        let trials = rows(
+            &model,
+            &pipeline,
+            1,
+            1,
+            10,
+            100,
+            [0, 10_000, 20_000, 30_000],
+        );
+        assert_eq!(
+            verify_memory_dose_trials(
+                &trials,
+                AS_KNOWN_AT_MS,
+                &WrongDigestVerifier,
+            ),
+            Err(MemoryBudgetReject::InvalidTrialReceipt)
+        );
+        assert_eq!(
+            verify_memory_dose_trials(
+                &trials,
+                AS_KNOWN_AT_MS,
+                &ExpiredVerifier,
+            ),
+            Err(MemoryBudgetReject::TrialReceiptNotValidAtSnapshot)
+        );
+    }
+
+    #[test]
+    fn every_budget_arm_in_a_cluster_must_measure_the_same_episode() {
+        let model = digest("paired-episode-model");
+        let pipeline = digest("paired-episode-pipeline");
+        let mut trials = rows(
+            &model,
+            &pipeline,
+            1,
+            1,
+            10,
+            100,
+            [0, 10_000, 20_000, 30_000],
+        );
+        trials[0].episode_sha256 = digest("substituted-episode");
+        assert_eq!(
+            fit(&trials, &BUDGETS),
+            Err(MemoryBudgetReject::ClusterIdentityMismatch)
+        );
     }
 
     #[test]
@@ -747,19 +1063,19 @@ mod tests {
         );
 
         let weak_profile =
-            fit_model_memory_budget(&weak_calibration, &BUDGETS).unwrap();
+            fit(&weak_calibration, &BUDGETS).unwrap();
         let strong_profile =
-            fit_model_memory_budget(&strong_calibration, &BUDGETS).unwrap();
+            fit(&strong_calibration, &BUDGETS).unwrap();
         assert_eq!(weak_profile.selected_context_budget_tokens, 128);
         assert_eq!(strong_profile.selected_context_budget_tokens, 1_024);
 
-        let weak = qualify_model_memory_budget(
+        let weak = qualify(
             &weak_profile,
             &weak_calibration,
             &weak_heldout,
         )
         .unwrap();
-        let strong = qualify_model_memory_budget(
+        let strong = qualify(
             &strong_profile,
             &strong_calibration,
             &strong_heldout,
@@ -780,14 +1096,14 @@ mod tests {
             rows(&model, &pipeline, 1, 1, 10, 100, [0, 10_000, 20_000, 30_000]);
         calibration[0].target_model_sha256 = digest("other-model");
         assert_eq!(
-            fit_model_memory_budget(&calibration, &BUDGETS),
+            fit(&calibration, &BUDGETS),
             Err(MemoryBudgetReject::MixedTargetModel)
         );
         let mut wrong_pipeline =
             rows(&model, &pipeline, 1, 1, 10, 100, [0, 10_000, 20_000, 30_000]);
         wrong_pipeline[0].memory_pipeline_sha256 = digest("other-pipeline");
         assert_eq!(
-            fit_model_memory_budget(&wrong_pipeline, &BUDGETS),
+            fit(&wrong_pipeline, &BUDGETS),
             Err(MemoryBudgetReject::MixedMemoryPipeline)
         );
     }
@@ -798,12 +1114,12 @@ mod tests {
         let pipeline = digest("memory-pipeline");
         let calibration =
             rows(&model, &pipeline, 1, 1, 10, 100, [0, 10_000, 20_000, 30_000]);
-        let profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let profile = fit(&calibration, &BUDGETS).unwrap();
         let mut heldout =
             rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [0, 10_000, 20_000, 30_000]);
         heldout[0].source_root = calibration[0].source_root;
         assert_eq!(
-            qualify_model_memory_budget(&profile, &calibration, &heldout),
+            qualify(&profile, &calibration, &heldout),
             Err(MemoryBudgetReject::SplitOverlap)
         );
     }
@@ -814,11 +1130,11 @@ mod tests {
         let pipeline = digest("memory-pipeline");
         let calibration =
             rows(&model, &pipeline, 1, 1, 10, 100, [0, 15_000, 40_000, 70_000]);
-        let profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let profile = fit(&calibration, &BUDGETS).unwrap();
         let heldout =
             rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [0, -15_000, -40_000, -70_000]);
         assert_eq!(
-            qualify_model_memory_budget(&profile, &calibration, &heldout),
+            qualify(&profile, &calibration, &heldout),
             Err(MemoryBudgetReject::HeldoutLiftNotEstablished)
         );
     }
@@ -831,10 +1147,10 @@ mod tests {
             rows(&model, &pipeline, 1, 1, 10, 100, [20_000, 10_000, -10_000, -20_000]);
         let heldout =
             rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [18_000, 8_000, -12_000, -22_000]);
-        let profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let profile = fit(&calibration, &BUDGETS).unwrap();
         assert_eq!(profile.selected_context_budget_tokens, 0);
         let qualified =
-            qualify_model_memory_budget(&profile, &calibration, &heldout).unwrap();
+            qualify(&profile, &calibration, &heldout).unwrap();
         assert_eq!(qualified.context_budget_tokens(), 0);
         assert_eq!(qualified.heldout_mean_lift_micros(), 0);
     }
@@ -847,9 +1163,9 @@ mod tests {
             rows(&model, &pipeline, 1, 1, 10, 100, [0, 10_000, 20_000, 30_000]);
         let heldout =
             rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [0, 10_000, 20_000, 30_000]);
-        let profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let profile = fit(&calibration, &BUDGETS).unwrap();
         let qualified =
-            qualify_model_memory_budget(&profile, &calibration, &heldout).unwrap();
+            qualify(&profile, &calibration, &heldout).unwrap();
         let wrong_runtime_model = digest("different-runtime-model");
         let result = select_for_qualified_model_budget(
             &[],
@@ -879,9 +1195,9 @@ mod tests {
             rows(&model, &pipeline, 1, 1, 10, 100, [20_000, 10_000, -10_000, -20_000]);
         let heldout =
             rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [18_000, 8_000, -12_000, -22_000]);
-        let profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let profile = fit(&calibration, &BUDGETS).unwrap();
         let qualified =
-            qualify_model_memory_budget(&profile, &calibration, &heldout).unwrap();
+            qualify(&profile, &calibration, &heldout).unwrap();
         assert_eq!(qualified.context_budget_tokens(), 0);
 
         let scope = Scope {
@@ -918,12 +1234,12 @@ mod tests {
         let pipeline = digest("memory-pipeline");
         let calibration =
             rows(&model, &pipeline, 1, 1, 10, 100, [0, 10_000, 20_000, 30_000]);
-        let mut profile = fit_model_memory_budget(&calibration, &BUDGETS).unwrap();
+        let mut profile = fit(&calibration, &BUDGETS).unwrap();
         profile.selected_context_budget_tokens = 0;
         let heldout =
             rows(&model, &pipeline, 1_000, 10_000, 100, 10_000, [0, 10_000, 20_000, 30_000]);
         assert_eq!(
-            qualify_model_memory_budget(&profile, &calibration, &heldout),
+            qualify(&profile, &calibration, &heldout),
             Err(MemoryBudgetReject::CalibrationProfileMismatch)
         );
     }
