@@ -24,7 +24,7 @@ Report schema versions were advanced to 0.4.0 for the injection report and conta
 
 The two directional counts partition the two-sided detection count. Wrong-direction rejections are never counted as successful recovery. The sign direction is currently tied to the positive module-loading injection; future negative or polarity-changing injections must declare and test their own expected direction.
 
-## 4. Signal-plus-nuisance interaction extension
+## 3. Signal-plus-nuisance interaction extension
 
 The report contract now separately records:
 - `signal_plus_nuisance_detection_power`: two-sided difference detection when the intended injection and common-mode observation nuisance are both present;
@@ -33,7 +33,7 @@ The report contract now separately records:
 - `median_signal_plus_nuisance_paired_gap`: median paired-gap summary for the combined condition.
 
 At nuisance dose zero, these outputs must match the clean injection outputs exactly. At positive nuisance doses, the nuisance-only and combined signal+nuisance conditions use the same deterministic innovation stream, while only the planted module loading differs. This makes sensitivity loss or direction reversal under nuisance measurable without changing the clean signal baseline. The output schemas are now version 0.4.0 for injection and containing sweep/tournament reports and 0.2.0 for the common-mode sweep.
-## 3. Implementation
+## 4. Implementation
 
 The standalone Rust kernel now classifies each injected replicate into the two-sided detection, expected-direction or wrong-direction outcomes. The JSON serializer includes both new binomial rates with Wilson intervals. The injection, sweep, estimator-tournament and estimator-by-dose schemas all carry the fields and were advanced to 0.3.0.
 
@@ -46,18 +46,18 @@ Focused Rust tests cover:
 
 The RCAF CI workflow now requires expected-direction power in its strong-injection smoke test and checks the directional count partition.
 
-## 4. First nuisance-only challenge
+## 5. First nuisance-only challenge
 
 The same report now contains `common_mode_nuisance_loading`, `nuisance_only_rejection_rate` and `median_nuisance_only_paired_gap`. This challenge keeps participant-level latent global/module loadings fixed and adds an independent shared AR(1) observation factor to one repeat before correlation estimation. It measures the rate at which a common-mode artifact produces an apparent between-repeat network difference. It is not the conventional Type-I error rate because the observed data distribution changes, even though the declared latent neural loadings do not.
 
 When nuisance strength is zero, the implementation reuses the exact same null sample. The nuisance rejection rate and median gap must therefore equal the exact null outputs exactly. This is a deterministic known-answer test. Motion, site/scanner shift, censoring, missingness and nonstationarity remain future nuisance families.
 
-## 5. Historical result boundary
+## 6. Historical result boundary
 
 The 2026-11-21 synthetic calibration report predates this correction. Its 45%, 85% and 92.5% values at delta=0.30 are two-sided difference-detection rates. The saved aggregate report does not provide the per-replicate sign direction needed to decompose those historical values into expected-direction and wrong-direction detections. They must not be relabelled retroactively as directional power.
 
 The updated generator must be rerun on a new exact-head workflow to obtain directional and nuisance-only results. The 0.3.0 report also introduces a common-mode observation nuisance challenge with unchanged latent loadings, recorded as `nuisance_only_rejection_rate`; this is separate from the exact same-observation Type-I null. No new numerical result is claimed by this addendum.
 
-## 6. Claim limits
+## 7. Claim limits
 
 This correction fixes the interpretation of a known-direction synthetic injection. It does not add a new biological measurement, validate preprocessing, establish construct validity or transportability, or demonstrate consciousness detection, causal inference, clinical utility or SOTA superiority.
