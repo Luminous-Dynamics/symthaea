@@ -122,7 +122,7 @@ required-features = ["studio"]
 name = "ab_listening_pack"
 
 [[bin]]
-name = "rmi_bench_track_a"
+name = "rmi_track_a"
 
 [[bin]]
 name = "cognitive_study"
