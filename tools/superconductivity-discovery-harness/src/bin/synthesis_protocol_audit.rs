@@ -20,21 +20,6 @@ fn has_actual_value(value: &Value) -> bool {
         .is_some_and(|object| object.values().any(|item| !item.is_null()))
 }
 
-fn has_locator(value: &Value) -> bool {
-    let Some(locator) = value.as_object() else {
-        return false;
-    };
-    ["page", "section", "table", "figure", "row_or_record_id"]
-        .iter()
-        .any(|field| {
-            locator.get(*field).is_some_and(|item| match item {
-                Value::String(text) => !text.trim().is_empty(),
-                Value::Number(number) => number.as_u64().is_some_and(|n| n > 0),
-                _ => false,
-            })
-        })
-}
-
 fn load_observation_events(
     observation_schema_bytes: &[u8],
     observation_fixture_bytes: &[u8],
