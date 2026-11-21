@@ -642,6 +642,8 @@ mod tests {
         fixture["blocks"][0]["arms"][3]["arm_id"] = json!("control");
         fixture["blocks"][0]["arms"][3]["factor_a_on"] = json!(false);
         fixture["blocks"][0]["arms"][3]["factor_b_on"] = json!(false);
+        fixture["blocks"][0]["arms"][3]["delivery_readback"]["factor_a_value"] = json!(0.0);
+        fixture["blocks"][0]["arms"][3]["delivery_readback"]["factor_b_value"] = json!(0.0);
         assert!(
             audit_fixture(&fixture)
                 .unwrap_err()
