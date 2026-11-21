@@ -122,12 +122,22 @@
     }
   },
   "implementation": {
-    "test_functions_authored": 18,
+    "test_functions_authored": 19,
     "tests_executed": false,
     "real_sensor_adapter": false,
     "calibrated_energy": false,
     "OS_level_evaluator_isolation": false,
     "security_dependency_issue": 9437,
-    "risk_adjusted_voi_arm": true
+    "risk_adjusted_voi_arm": true,
+    "auditable_diagnostic_helper": "risk_adjusted_voi_diagnostics",
+    "diagnostic_components": [
+      "expected_ted_reduction_us",
+      "risk_premium_us",
+      "ignorance_exposure_us",
+      "ignorance_penalty_us",
+      "adjusted_benefit_us",
+      "estimated_observation_energy_nj",
+      "adjusted_value_per_nj_ppm"
+    ]
   }
 }
