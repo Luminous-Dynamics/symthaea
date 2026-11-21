@@ -377,6 +377,7 @@ mod tests {
         receipt.work.input_bytes_read = 400;
         assert_eq!(receipt.work.total_bytes_touched(), Some(1000));
         assert_eq!(receipt.bytes_touched_per_logical_second(), Some(1000.0));
+        assert_eq!(receipt.events_per_logical_second(), Some(100.0));
     }
 
     #[test]
@@ -439,6 +440,7 @@ mod tests {
     #[test]
     fn direct_energy_requires_boundary_identity_and_same_run() {
         let mut receipt = observation();
+        receipt.system.wall_elapsed_ns = Some(1_000_000_000);
         receipt.system.direct_energy = Some(DirectEnergyMeasurement {
             joules: 0.25,
             method: "external power meter".to_owned(),
@@ -451,9 +453,24 @@ mod tests {
             Err("energy and performance must come from the same run")
         );
 
-        receipt.system.wall_elapsed_ns = Some(1_000_000_000);
         receipt.system.direct_energy.as_mut().unwrap().same_run_as_performance = true;
         receipt.validate().unwrap();
+    }
+
+    #[test]
+    fn direct_energy_requires_a_wall_clock_performance_observation() {
+        let mut receipt = observation();
+        receipt.system.direct_energy = Some(DirectEnergyMeasurement {
+            joules: 0.25,
+            method: "external power meter".to_owned(),
+            system_boundary: "host plus accelerator and memory".to_owned(),
+            meter_or_device_id: "meter-A".to_owned(),
+            same_run_as_performance: true,
+        });
+        assert_eq!(
+            receipt.validate(),
+            Err("direct energy requires same-run wall-clock performance observation")
+        );
     }
 
     #[test]
