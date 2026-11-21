@@ -19,6 +19,9 @@ use crate::cognitive_bridge::{
 };
 use crate::intervention::{InterventionDescriptor, InterventionStrategy, ObligationClass};
 use crate::musical_inference::MusicAction;
+use crate::score_transaction::{
+    ScorePatchErrorV1, ScorePatchReceiptV1, create_score_patch_receipt,
+};
 use crate::musical_policy::{
     MusicalPolicyPreference, MusicalPolicySelection, PolicyCandidateEvidence,
     select_by_musical_policy,
@@ -110,6 +113,8 @@ pub struct SonataInterventionCandidate {
     pub preserved_invariants: bool,
     pub measurement: SymbolicMeasurementEvidence,
     pub prediction: InterventionCalibrationEvidence,
+    /// Source-bound, independently verifiable note-level edit transaction.
+    pub patch_receipt: ScorePatchReceiptV1,
 }
 
 impl SonataInterventionCandidate {
@@ -138,6 +143,7 @@ pub enum SonataInterventionError {
     MissingSourceMelody,
     MissingTargetMelody,
     InvalidMeasurementRegion,
+    ScorePatchRejected(ScorePatchErrorV1),
 }
 
 impl From<ClosedLoopError> for SonataInterventionError {
@@ -241,6 +247,9 @@ pub fn generate_and_rank_sonata_return_with_model(
     let mut candidates = Vec::with_capacity(generated.len());
     let mut policy_evidence = Vec::with_capacity(generated.len());
     for (alternative_id, strategy, score) in generated {
+        let patch_receipt =
+            create_score_patch_receipt(&realization.score, &score, &target_indices)
+                .map_err(SonataInterventionError::ScorePatchRejected)?;
         let motif_return = compare_melodic_regions(
             &score,
             source.start,
@@ -303,6 +312,7 @@ pub fn generate_and_rank_sonata_return_with_model(
             preserved_invariants,
             measurement,
             prediction,
+            patch_receipt,
         });
     }
 
