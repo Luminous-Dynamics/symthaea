@@ -719,3 +719,78 @@ fn main() -> Result<(), Box<dyn Error>> {
     writer.flush()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seeded_codebooks_and_bundles_are_reproducible() {
+        let first = prepare_memory(1_024, 8, 42);
+        let second = prepare_memory(1_024, 8, 42);
+
+        assert_eq!(first.keys, second.keys);
+        assert_eq!(first.values, second.values);
+        assert_eq!(first.bundle, second.bundle);
+        assert_eq!(first.mismatched_bundle, second.mismatched_bundle);
+        assert_eq!(first.random_query_keys, second.random_query_keys);
+    }
+
+    #[test]
+    fn negative_controls_are_separate_from_the_incumbent_bundle() {
+        let memory = prepare_memory(1_024, 8, 7);
+
+        assert_ne!(memory.bundle, memory.mismatched_bundle);
+        assert!(memory
+            .keys
+            .iter()
+            .zip(memory.random_query_keys.iter())
+            .all(|(key, random)| key != random));
+    }
+
+    #[test]
+    fn regular_and_irregular_gaps_are_positive_and_cover_the_horizon() {
+        for profile in ["regular", "irregular"] {
+            let gaps = make_gaps(12.75, 17, profile, 91);
+            assert_eq!(gaps.len(), 17);
+            assert!(gaps.iter().all(|dt| dt.is_finite() && *dt > 0.0));
+
+            let elapsed: f64 = gaps.iter().map(|&dt| dt as f64).sum();
+            assert!((elapsed - 12.75).abs() < 1.0e-5);
+        }
+    }
+
+    #[test]
+    fn zero_horizon_is_an_exact_identity_without_solver_updates() {
+        let memory = prepare_memory(1_024, 4, 13);
+        let outcome = evolve_state(
+            1_024,
+            &memory.bundle,
+            13,
+            0.0,
+            0,
+            "not_applicable",
+            "hdc_ltc_zero_input",
+        )
+        .expect("zero-horizon identity path should be accepted");
+
+        assert_eq!(outcome.state, memory.bundle);
+        assert_eq!(outcome.api_update_count, 0);
+        assert_eq!(outcome.reported_logical_seconds, 0.0);
+        assert_eq!(outcome.evolution_wall_ns, 0);
+    }
+
+    #[test]
+    fn fano_diagnostic_is_finite_and_within_label_entropy() {
+        for classes in [2, 4, 8, 16] {
+            let maximum = (classes as f64).log2();
+            for error_rate in [0.0, 0.1, 0.25, 0.5, 1.0] {
+                let bound = plug_in_fano_lower_bound_bits(error_rate, classes);
+                assert!(bound.is_finite());
+                assert!((0.0..=maximum).contains(&bound));
+            }
+            assert_eq!(plug_in_fano_lower_bound_bits(0.0, classes), maximum);
+            assert_eq!(plug_in_fano_lower_bound_bits(1.0, classes), 0.0);
+        }
+    }
+}
