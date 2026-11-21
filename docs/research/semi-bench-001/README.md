@@ -492,3 +492,10 @@ See [2026-wafer-lot-and-multiview-frontier.md](2026-wafer-lot-and-multiview-fron
 The 2026 GNN wafer-map paper reports 98.6% accuracy and 89.3% LOCO OOD detection, but its reported split is sample-level stratified rather than lot-disjoint. A review of the released OOD script also found an apparent calibration mismatch: the paper describes a validation-derived threshold, while the public script appears to derive the 5th-percentile threshold from test in-distribution scores. This is a paper/repository reproduction discrepancy to resolve, not evidence that the published result itself is invalid.
 
 The PPAPlace-5000 data release provides 5,000 complete placements with post-GRT timing/power/area labels across ten ChiPBench circuits. Its Hugging Face license metadata is “other”; exact terms must be reviewed before downloading, caching or redistributing the 8.47 GiB release.
+
+
+## Contrastive-pair lineage gate
+
+The fourth-class? reference layer has been extended with a split-local contrastive-pair validator at `benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py`. It prevents positive/negative pairs from crossing train/validation/test boundaries, prohibits pair identity duplication and requires evidence for same-lot or near-time production-proximity pair labels. This is important for reproducing the 2026 wafer-map GNN that uses lot/time context in contrastive pair construction.
+
+See [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122).
