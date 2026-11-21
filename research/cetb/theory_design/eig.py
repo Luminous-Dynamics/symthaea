@@ -33,6 +33,8 @@ def _validate_distribution(values: Mapping[str, float], name: str, tolerance: fl
 
 def theory_entropy_bits(prior: Mapping[str, float], tolerance: float = 1e-10) -> float:
     """Shannon entropy of the theory prior in bits."""
+    if isinstance(tolerance, bool) or not math.isfinite(tolerance) or tolerance < 0.0:
+        raise DesignValidationError("tolerance must be finite and non-negative")
     _validate_distribution(prior, "prior", tolerance)
     return -math.fsum(
         float(probability) * math.log2(float(probability))
@@ -98,16 +100,20 @@ def weighted_lower_quantile(values_and_weights: Sequence[tuple[float, float]], q
         raise DesignValidationError("at least one nuisance scenario is required")
     if isinstance(q, bool) or not isinstance(q, (int, float)) or not math.isfinite(q) or not 0.0 <= q <= 1.0:
         raise DesignValidationError("q must be finite and in [0, 1]")
-    total_weight = math.fsum(weight for _, weight in values_and_weights)
+    normalized = []
+    for index, item in enumerate(values_and_weights):
+        if not isinstance(item, (tuple, list)) or len(item) != 2:
+            raise DesignValidationError(f"scenario item {index} must be a (value, weight) pair")
+        value, weight = item
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise DesignValidationError("scenario EIG must be finite and numeric")
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not math.isfinite(weight) or weight < 0.0:
+            raise DesignValidationError("scenario weights must be finite, numeric and non-negative")
+        normalized.append((float(value), float(weight)))
+    total_weight = math.fsum(weight for _, weight in normalized)
     if not math.isfinite(total_weight) or total_weight <= 0.0:
         raise DesignValidationError("scenario weights must have positive finite mass")
-    normalized = []
-    for value, weight in values_and_weights:
-        if not math.isfinite(value):
-            raise DesignValidationError("scenario EIG must be finite")
-        if not math.isfinite(weight) or weight < 0.0:
-            raise DesignValidationError("scenario weights must be finite and non-negative")
-        normalized.append((value, weight / total_weight))
+    normalized = [(value, weight / total_weight) for value, weight in normalized]
     normalized.sort(key=lambda item: item[0])
     if q == 0.0:
         return normalized[0][0]
