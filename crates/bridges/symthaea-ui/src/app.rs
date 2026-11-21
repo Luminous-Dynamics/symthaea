@@ -94,24 +94,32 @@ impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
         use base64::Engine as _;
         let m = v.get("mental_movie")?;
-        let width = m["width"].as_u64()? as u32;
-        let height = m["height"].as_u64()? as u32;
-        let channels = m["channels"].as_u64()? as usize;
+        // The gateway is an external trust boundary. Reject narrowing casts
+        // and unsupported wire layouts before calculating frame sizes or
+        // indexing the decoded payload.
+        let width = u32::try_from(m["width"].as_u64()?).ok()?;
+        let height = u32::try_from(m["height"].as_u64()?).ok()?;
+        let channels = usize::try_from(m["channels"].as_u64()?).ok()?;
+        if channels != 1 && channels != 3 {
+            return None;
+        }
+
         let engine = base64::engine::general_purpose::STANDARD;
         let px = (width as usize).checked_mul(height as usize)?;
         if px == 0 || px > MAX_MOVIE_PIXELS {
             return None;
         }
+        let frame_bytes = px.checked_mul(channels)?;
         let rgba_capacity = px.checked_mul(4)?;
         let frames_rgba: Vec<Vec<u8>> = m["frames_b64"]
             .as_array()?
             .iter()
             .filter_map(|f| engine.decode(f.as_str()?).ok())
-            .filter(|raw| raw.len() >= px * channels.max(1))
+            .filter(|raw| raw.len() >= frame_bytes)
             .map(|raw| {
                 let mut rgba = Vec::with_capacity(rgba_capacity);
                 for i in 0..px {
-                    let (r, g, b) = if channels >= 3 {
+                    let (r, g, b) = if channels == 3 {
                         (
                             raw[i * channels],
                             raw[i * channels + 1],
@@ -412,5 +420,79 @@ pub fn App() -> impl IntoView {
                 </form>
             </section>
         </div>
+    }
+}
+
+#[cfg(test)]
+mod movie_payload_tests {
+    use super::Movie;
+    use base64::Engine as _;
+    use serde_json::{Value, json};
+
+    fn payload(width: u64, height: u64, channels: u64, frame: &[u8]) -> Value {
+        json!({
+            "mental_movie": {
+                "width": width,
+                "height": height,
+                "channels": channels,
+                "frames_b64": [
+                    base64::engine::general_purpose::STANDARD.encode(frame)
+                ],
+                "semantic_coherence": 0.75
+            }
+        })
+    }
+
+    #[test]
+    fn decodes_grayscale_frames_to_opaque_rgba() {
+        let value = payload(2, 1, 1, &[10, 30]);
+        let movie = Movie::from_json(&value).expect("valid grayscale frame");
+
+        assert_eq!(movie.width, 2);
+        assert_eq!(movie.height, 1);
+        assert_eq!(movie.frames_rgba, vec![vec![
+            10, 10, 10, 255,
+            30, 30, 30, 255,
+        ]]);
+    }
+
+    #[test]
+    fn decodes_rgb_frames_to_opaque_rgba() {
+        let value = payload(2, 1, 3, &[1, 2, 3, 4, 5, 6]);
+        let movie = Movie::from_json(&value).expect("valid RGB frame");
+
+        assert_eq!(movie.frames_rgba, vec![vec![
+            1, 2, 3, 255,
+            4, 5, 6, 255,
+        ]]);
+    }
+
+    #[test]
+    fn rejects_unsupported_channel_counts() {
+        for channels in [0, 2, 4, u64::MAX] {
+            let value = payload(1, 1, channels, &[1, 2, 3, 4]);
+            assert!(
+                Movie::from_json(&value).is_none(),
+                "channels={channels} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_dimensions_that_would_narrow_to_u32() {
+        let value = payload(u32::MAX as u64 + 2, 1, 1, &[7]);
+        assert!(Movie::from_json(&value).is_none());
+    }
+
+    #[test]
+    fn rejects_frames_shorter_than_the_declared_layout() {
+        let value = payload(2, 1, 3, &[1, 2, 3, 4, 5]);
+        assert!(Movie::from_json(&value).is_none());
+    }
+
+    #[test]
+    fn rejects_frames_over_the_pixel_limit() {
+        let value = payload(4097, 4097, 1, &[]);
+        assert!(Movie::from_json(&value).is_none());
     }
 }
