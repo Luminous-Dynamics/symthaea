@@ -140,10 +140,41 @@ def audit_scenario(scenario):
         raise ValueError("baseline score differs from known-answer oracle")
 
     by_id = {}
+    actual_totals = {
+        "engineering_hours": 0.0,
+        "compute_core_hours": 0.0,
+        "facility_hours": 0.0,
+        "specimen_count": 0,
+        "review_hours": 0.0,
+        "external_cost_units": 0.0,
+    }
+    actual_over_plan_count = 0
+    actual_record_count = 0
     for action in scenario["actions"]:
         if action["action_id"] in by_id:
             raise ValueError("duplicate action id")
         by_id[action["action_id"]] = action
+        observed_state = action.get("observed_execution_state")
+        actual = action.get("actual_resources")
+        if observed_state is not None and actual is None:
+            raise ValueError("execution state has no actual resource record")
+        if actual is not None and observed_state is None:
+            raise ValueError("actual resources have no execution state")
+        if actual is not None:
+            numeric = ("engineering_hours", "compute_core_hours", "facility_hours",
+                       "review_hours", "external_cost_units")
+            if any(not math.isfinite(actual[key]) or actual[key] < 0 for key in numeric):
+                raise ValueError("actual resource record is invalid")
+            if not isinstance(actual["specimen_count"], int) or actual["specimen_count"] < 0:
+                raise ValueError("actual specimen count is invalid")
+            actual_record_count += 1
+            if not resource_fits(action, actual):
+                actual_over_plan_count += 1
+            for key in actual_totals:
+                actual_totals[key] += actual[key]
+    actual_over_budget = not all(
+        actual_totals[key] <= scenario["budget"][key] + TOL for key in actual_totals
+    )
     audits = {action_id: evaluate_action(scenario, action, baseline)
               for action_id, action in by_id.items()}
 
@@ -191,6 +222,10 @@ def audit_scenario(scenario):
         "expected_action_value": chosen,
         "eligible_action_count": sum(1 for result in audits.values() if result["eligible"]),
         "must_not_select_count": len(scenario["expected"]["must_not_select"]),
+        "actual_resources_consumed": actual_totals,
+        "actual_resources_over_scenario_budget": actual_over_budget,
+        "actual_over_plan_action_count": actual_over_plan_count,
+        "actions_with_actual_resource_records": actual_record_count,
         "oracle_matched": True,
     }
 
@@ -223,7 +258,7 @@ def main():
         "scenarios": results,
     }
     print(json.dumps(report, sort_keys=True, indent=2))
-    if len(results) != 11 or matches != 11:
+    if len(results) != 13 or matches != 13:
         raise SystemExit(1)
 
 
