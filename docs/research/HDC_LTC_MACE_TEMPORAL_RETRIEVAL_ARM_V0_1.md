@@ -39,6 +39,21 @@ Unknown ID, duplicate/ambiguous ID, stale snapshot, unresolved source, or retrie
 
 The evaluator and hidden labels remain outside candidate memory. #11816 owns benchmark oracle independence and qualification.
 
+### Decision-time canonical revalidation
+
+Candidate retrieval and decision consumption are separated by time. A candidate ID may have been valid when indexed or retrieved and become superseded, corrected, retracted or privacy-erased before the decision uses it.
+
+Therefore, after candidate-ID resolution and immediately before the decision:
+- re-resolve the exact source/revision against the canonical bitemporal ledger (#9075), using the requested `valid_at` and `known_at` coordinates;
+- verify current trust, scope, supersession, retraction and privacy-erasure state with the source-bound receipt contract (#12846);
+- bind the revalidation receipt and source-revision digest to the decision record;
+- measure evidence age at actual use and task deadline slack under #13091/#9954/#12401, not only age at retrieval;
+- fail closed when the canonical receipt, lifecycle state, time semantics or freshness is unknown.
+
+A similarity score or cached index tombstone is not an authoritative lifecycle check. A historical as-known query must still reproduce the earlier `known_at` view; a later correction must block current use without rewriting that historical view.
+
+The research-only action selector in [#13154](https://github.com/Luminous-Dynamics/symthaea/pull/13154) prototypes the action-side gate. It does not authenticate the receipt or replace the ledger/verifier owners.
+
 ## 3. Adapter data flow
 
 The research adapter has four stages:
