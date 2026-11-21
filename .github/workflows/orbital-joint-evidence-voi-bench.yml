@@ -91,3 +91,40 @@ jobs:
             ([.scenarios[] | select(.scenario_id == "JEV-016" and .selection_disposition == "ABSTAIN_NO_DECISION_VALUE" and .selected_action_id == null and .eligible_action_count == 0)] | length == 1) and
             ([.scenarios[] | select(.scenario_id == "JEV-017" and .selected_action_id == "A-TARGETED-STRUCTURAL-REQUALIFICATION" and .selection_matches_oracle == true)] | length == 1)' \
             /tmp/evidence-voi-oracle.json
+      - name: Sequential campaign CLI and exact-policy assertions
+        run: |
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin sequential-campaign -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
+            --source-commit "$GITHUB_SHA" > /tmp/sequential-campaign-a.json
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --bin sequential-campaign -- \
+            fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
+            --source-commit "$GITHUB_SHA" > /tmp/sequential-campaign-b.json
+          cmp /tmp/sequential-campaign-a.json /tmp/sequential-campaign-b.json
+          jq -e '
+            .scenario_count == 1 and .oracle_matches == 1 and
+            .oracle_mismatches == 0 and .authority_granted == false and
+            .scenarios[0].baseline_worst_case_regret == 5 and
+            .scenarios[0].myopic.worst_case_regret == 5 and
+            .scenarios[0].myopic.stops_without_action == true and
+            .scenarios[0].fixed_campaign.worst_case_regret == 0 and
+            .scenarios[0].adaptive_campaign.worst_case_regret == 0 and
+            .scenarios[0].adaptive_campaign.first_action_id == "A-COMBINED-LOAD-SCREEN" and
+            .scenarios[0].adaptive_campaign.policy.branches.FAIL.decision == "REJECT" and
+            .scenarios[0].adaptive_campaign.policy.branches.PASS.action_id == "B-THERMAL-INSPECTION" and
+            .scenarios[0].adaptive_campaign.expected_resources.engineering_hours == 1.2 and
+            .scenarios[0].adaptive_campaign.expected_resources.facility_hours == 1.55
+          ' /tmp/sequential-campaign-a.json
+      - name: Independent stdlib sequential campaign oracle
+        run: |
+          python3 tools/orbital-joint-evidence-voi-bench/tests/sequential_reference_oracle.py \
+            fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
+            "$GITHUB_SHA" > /tmp/sequential-campaign-oracle.json
+          jq -e '
+            .scenario_count == 1 and .oracle_matches == 1 and .oracle_mismatches == 0 and
+            .scenarios[0].adaptive_first_action == "A-COMBINED-LOAD-SCREEN" and
+            .scenarios[0].adaptive_worst_case_regret == 0 and
+            .scenarios[0].myopic_worst_case_regret == 5 and
+            .scenarios[0].fixed_campaign_worst_case_regret == 0 and
+            .scenarios[0].adaptive_expected_resources.engineering_hours == 1.2 and
+            .scenarios[0].adaptive_expected_resources.facility_hours == 1.55
+          ' /tmp/sequential-campaign-oracle.json
