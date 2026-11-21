@@ -80,7 +80,7 @@ class AdversarialPlanTests(unittest.TestCase):
 
     def test_common_mode_nuisance_requires_zero_and_positive_doses(self):
         plan = deepcopy(FIXTURE)
-        plan["nuisance_scenarios"][0]["dose_points"] = [0.0]
+        plan["nuisance_scenarios"][0]["dose_points"] = [0.1, 0.2]
         with self.assertRaisesRegex(PlanValidationError, "zero and positive nuisance doses"):
             validate_plan(plan, SCHEMA)
 
