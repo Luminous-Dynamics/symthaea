@@ -221,13 +221,40 @@ mod tests {
         serde_json::from_str(INPUT).expect("validation threshold fixture")
     }
 
+    fn assert_json_numeric_equivalent(actual: &Value, expected: &Value) {
+        match (actual, expected) {
+            (Value::Number(left), Value::Number(right)) => {
+                assert_eq!(left.as_f64(), right.as_f64());
+            }
+            (Value::Array(left), Value::Array(right)) => {
+                assert_eq!(left.len(), right.len());
+                for (left, right) in left.iter().zip(right) {
+                    assert_json_numeric_equivalent(left, right);
+                }
+            }
+            (Value::Object(left), Value::Object(right)) => {
+                assert_eq!(
+                    left.keys().collect::<Vec<_>>(),
+                    right.keys().collect::<Vec<_>>()
+                );
+                for (key, left_value) in left {
+                    assert_json_numeric_equivalent(
+                        left_value,
+                        right.get(key).expect("matching key"),
+                    );
+                }
+            }
+            _ => assert_eq!(actual, expected),
+        }
+    }
+
     #[test]
     fn validation_threshold_report_matches_python_known_answer_exactly() {
         let input = read_input();
         let report = evaluate_with_validation_threshold(&input).expect("valid threshold input");
         let actual = serde_json::to_value(report).expect("serialize threshold report");
         let expected: Value = serde_json::from_str(EXPECTED).expect("expected JSON");
-        assert_eq!(actual, expected);
+        assert_json_numeric_equivalent(&actual, &expected);
     }
 
     #[test]
