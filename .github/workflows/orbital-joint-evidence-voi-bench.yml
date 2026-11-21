@@ -65,7 +65,7 @@ jobs:
           cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml -- \
             fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
             --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-a.json
-          cargo run --quiet --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml -- \
+          cargo run --quiet --locked --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml -- \
             fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
             --source-commit "$GITHUB_SHA" > /tmp/evidence-voi-b.json
           cmp /tmp/evidence-voi-a.json /tmp/evidence-voi-b.json
