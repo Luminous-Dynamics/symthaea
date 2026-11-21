@@ -201,3 +201,17 @@ The current COGITATE release documentation states CC BY 4.0 and provides raw/BID
 The 2026 COGITATE MEG comparison of 246 pairwise statistics is a reason to treat estimator choice as part of the learning procedure, not as a preprocessing constant. The full candidate set, all exclusions, all region/condition/window combinations and all model fits must be logged. The inner grouped folds select the statistic family and model; outer grouped folds evaluate the selection policy on participants not used for that selection. A separate untouched dataset or cohort is required for independent confirmation.
 
 A high peak among many candidate models is an exploratory observation until this nested and independent evaluation is complete. Cross-task transfer on the same participants is useful but is not the same as participant-held-out transfer. The corrected supplement and article correction must be pinned in any replay.
+
+
+## 14. Claim-specific qualification ladder
+
+CETB uses a proposed internal Q0–Q5 evidence ladder. It qualifies each empirical claim, endpoint, modality and deployment context separately; no model or repository receives one global grade.
+
+- Q0: synthetic implementation evidence.
+- Q1: exact published-method reproduction.
+- Q2: held-out participant evaluation with nested selection and no participant leakage.
+- Q3: independent cohort/site/device replication.
+- Q4: prospective preregistered multi-site evaluation.
+- Q5: clinical utility and intended-use qualification, including applicable ethics and regulatory requirements.
+
+A second publication on the same participants, a different derivative of the same raw data, or a new split of the same participants cannot satisfy Q3. A protocol does not earn the tier of the future experiment it describes. See `CETB_CLAIM_QUALIFICATION_LADDER_V0.md` and its machine-readable JSON companion.
