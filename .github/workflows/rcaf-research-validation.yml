@@ -7,6 +7,7 @@ on:
       - "research/rcaf/**"
       - "research/cetb/theory_design/**"
       - "research/cetb/multiverse/**"
+      - "research/cetb/measurement_qualification/**"
       - ".github/workflows/rcaf-research-validation.yml"
   workflow_dispatch:
 
@@ -51,6 +52,23 @@ jobs:
           python research/cetb/multiverse/validate_manifest.py \
             research/cetb/multiverse/fixtures/synthetic-multiverse.json \
             research/cetb/multiverse/multiverse.schema.json
+
+      - name: Validate multidimensional measurement qualification receipt
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/cetb/measurement_qualification/measurement-qualification.schema.json").read_text())
+          receipt = json.loads(Path("research/cetb/measurement_qualification/fixtures/synthetic-qualification.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(receipt, schema)
+          assert receipt["no_composite_score"] is True
+          assert receipt["repeatability"]["inferential_unit"] == "participant"
+          assert receipt["transportability"]["independent_cohort"]["status"] == "not_assessed"
+          print("PASS: multidimensional measurement qualification receipt")
+          PY
 
       - name: Validate theory-design manifest and execute synthetic ranking
         run: |
