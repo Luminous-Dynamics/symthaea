@@ -63,7 +63,7 @@ jobs:
             .benchmark_id == "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001" and
             (.scenarios | length == 1) and
             .scenarios[0].resource_frequency_model.used_for == "EXPECTED_RESOURCE_USE_ONLY" and
-            (.scenarios[0].actions | all(.decision_context == .[0].decision_context))
+            (.scenarios[0].actions | map(.decision_context) | unique | length == 1)
           ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json
       - name: Format
         run: cargo fmt --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --check
