@@ -165,7 +165,7 @@ pub fn render_cognitive_projection_svg(
     if has_synthetic {
         writeln!(
             &mut output,
-            r#"<g class="fixture-warning"><text x="{}" y="34" text-anchor="middle" fill="#ffd18a" font-family="sans-serif" font-size="15" letter-spacing="1.8">SYNTHETIC FIXTURE — NOT LIVE COGNITIVE TELEMETRY</text></g>"#,
+            r##"<g class="fixture-warning"><text x="{}" y="34" text-anchor="middle" fill="#ffd18a" font-family="sans-serif" font-size="15" letter-spacing="1.8">SYNTHETIC FIXTURE — NOT LIVE COGNITIVE TELEMETRY</text></g>"##,
             options.width / 2
         )
         .expect("writing to String cannot fail");
@@ -393,7 +393,7 @@ fn render_anchor(
     };
     let _ = writeln!(
         output,
-        r#"<text x="{x:.2}" y="{:.2}" text-anchor="middle" dominant-baseline="central" fill="#edf7ff" font-size="10" font-family="sans-serif">{}</text>"#,
+        r##"<text x="{x:.2}" y="{:.2}" text-anchor="middle" dominant-baseline="central" fill="#edf7ff" font-size="10" font-family="sans-serif">{}</text>"##,
         y + 3.5,
         status_marker
     );
@@ -402,7 +402,7 @@ fn render_anchor(
         let short_label = truncate_label(&label, 36);
         let _ = writeln!(
             output,
-            r#"<text x="{x:.2}" y="{:.2}" text-anchor="middle" fill="#d4e2f1" font-size="12" font-family="sans-serif">{short_label}</text>"#,
+            r##"<text x="{x:.2}" y="{:.2}" text-anchor="middle" fill="#d4e2f1" font-size="12" font-family="sans-serif">{short_label}</text>"##,
             y + radius + 18.0
         );
     }
@@ -418,7 +418,7 @@ fn render_legend(output: &mut String, width: u32, height: u32, has_synthetic: bo
     };
     let _ = writeln!(
         output,
-        r#"<g class="legend"><text x="24" y="{legend_y:.1}" fill="#91a9c1" font-family="sans-serif" font-size="11">{}</text><text x="{}" y="{legend_y:.1}" text-anchor="end" fill="#91a9c1" font-family="sans-serif" font-size="11">Outline: observed / derived / candidate / resolved / rejected / stale</text></g>"#,
+        r##"<g class="legend"><text x="24" y="{legend_y:.1}" fill="#91a9c1" font-family="sans-serif" font-size="11">{}</text><text x="{}" y="{legend_y:.1}" text-anchor="end" fill="#91a9c1" font-family="sans-serif" font-size="11">Outline: observed / derived / candidate / resolved / rejected / stale</text></g>"##,
         escape_xml(warning),
         width - 24
     );
