@@ -440,6 +440,7 @@ mod tests {
         receipt.work.output_decisions = 10;
         receipt.work.late_decisions = 1;
         receipt.work.abstained_decisions = 1;
+        receipt.work.unserved_decisions = 1;
         receipt.work.independently_verified_correct_decisions = 8;
         receipt.work.independently_verified_incorrect_decisions = 1;
         receipt.quality.decision_contract_id = Some("decision-contract-v1".to_owned());
@@ -525,7 +526,7 @@ mod tests {
     #[test]
     fn abstentions_and_unserved_opportunities_cannot_disappear_from_the_denominator() {
         let mut receipt = observation();
-        receipt.work.unserved_decisions = 1;
+        receipt.work.unserved_decisions = 2;
         assert_eq!(
             receipt.validate(),
             Err("decision dispositions must equal declared opportunities")
