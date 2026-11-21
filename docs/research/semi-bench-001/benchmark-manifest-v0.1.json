@@ -523,7 +523,22 @@
           "inference_latency_ms": 8.3,
           "memory_mb": 387
         },
-        "claim_status": "paper-reported-not-independently-reproduced"
+        "claim_status": "paper-reported-not-independently-reproduced",
+        "mixedwm38_transfer": {
+          "held_out_test_samples": 7603,
+          "bitwise_accuracy": 0.9086,
+          "bitwise_macro_f1": 0.815,
+          "comparison_context": {
+            "wscn_accuracy": 0.982,
+            "pienet_accuracy": 0.989
+          },
+          "author_reported_limitations": [
+            "36x36 downsampling discards spatial detail for four-pattern mixtures",
+            "GIN encoder was not tuned specifically on MixedWM38",
+            "shorter supervised schedule than some compared methods"
+          ],
+          "claim_status": "paper-reported-cross-dataset-transfer-not-independent-reproduction"
+        }
       },
       "implementation_audit": {
         "repo": "https://github.com/irjawais/wafer-gnn-contrastive",
@@ -673,6 +688,48 @@
       "latency_hardware": "NVIDIA RTX 3060 Ti",
       "training_hardware": "NVIDIA H100",
       "note": "Single dataset; authors identify cross-dataset/process-condition generalization and batch latency as future validation."
+    },
+    "fad_net_2026": {
+      "title": "FAD-Net: An Efficient Architecture for Defect Recognition in Semiconductor Wafers",
+      "url": "https://doi.org/10.1002/qre.70321",
+      "publication_date": "2026-07-05",
+      "reported_ranges": {
+        "accuracy": [
+          0.9535,
+          0.9863
+        ],
+        "f1": [
+          0.9255,
+          0.9858
+        ],
+        "auc": [
+          0.9971,
+          0.9997
+        ]
+      },
+      "datasets": [
+        "WM-811K",
+        "MixedWM38"
+      ],
+      "method": [
+        "Dendritic-Neuron-Module",
+        "Feature-Pyramid-Module",
+        "attention"
+      ],
+      "data_availability": "The public statement directs interested readers to the manuscript/corresponding author for further details.",
+      "protocol_status": "exact per-dataset split, source identity and evaluation protocol not established from public abstract; reproduction required before direct comparison"
+    },
+    "wm811k_graph_contrastive_2026": {
+      "mixedwm38_transfer": {
+        "test_samples": 7603,
+        "bitwise_accuracy": 0.9086,
+        "bitwise_macro_f1": 0.815,
+        "comparison_baselines_cited": {
+          "WSCN_accuracy": 0.982,
+          "PIENet_accuracy": 0.989
+        },
+        "caveat": "bit-wise evaluation only; exact 38-way whole-composition accuracy and cross-data protocol are separate"
+      }
     }
   },
   "reference_evaluator": {
@@ -792,6 +849,28 @@
       },
       "hosted_ci_status": "success",
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489"
+    },
+    "rust_binary_metrics": {
+      "package": "symthaea-semiconductor",
+      "crate_path": "crates/domains/symthaea-semiconductor",
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs",
+      "tests": "inline-unit-tests",
+      "reference_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+      "semantics": [
+        "fixed-threshold-confusion-metrics",
+        "tie-grouped-average-precision",
+        "pairwise-auroc-half-credit-ties",
+        "brier-score",
+        "fixed-width-ece",
+        "fpr-at-recall",
+        "tie-grouped-risk-coverage"
+      ],
+      "implementation_class": "production-Rust-scorer-with-independent-test-only-Python-reference",
+      "hosted_ci_status": "pending",
+      "claim_ceiling": "known-answer metric semantic agreement only; not a model-quality or physical manufacturing result",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129"
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
@@ -812,7 +891,8 @@
     "mixed_defect_compositional_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13113",
     "open_world_wafer_defects": "https://github.com/Luminous-Dynamics/symthaea/issues/13121",
     "secom_missingness_drift": "https://github.com/Luminous-Dynamics/symthaea/issues/13115",
-    "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114"
+    "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
+    "rust_semiconductor_metrics": "https://github.com/Luminous-Dynamics/symthaea/issues/13129"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
@@ -827,7 +907,10 @@
     "cp_dfc_multiview_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13123",
     "ppaplace_5000_dataset": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000",
     "ppaplace_dataset_license_note": "Hugging Face dataset card metadata is 'other'; verify exact use/redistribution terms; no raw archive checked in.",
-    "ppaplace_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13069"
+    "ppaplace_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+    "fad_net_2026": "https://doi.org/10.1002/qre.70321",
+    "semi_rust_core_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
+    "semi_rust_core_path": "crates/domains/symthaea-semiconductor"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
