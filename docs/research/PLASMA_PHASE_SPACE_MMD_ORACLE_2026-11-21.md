@@ -398,3 +398,10 @@ The direct mixture oracle is mathematically the weighted sum of the component ex
 
 This is still a diagnostic ensemble, not a learned solver and not proof of SOTA. The aggregate must be reported with its component MMD values; do not let a low aggregate hide a subgroup failure. Freeze scales and weights on training/calibration fixtures, and compare single-scale and multi-scale methods at equal feature counts and compute.
 
+
+
+### Per-component diagnostics and interpretation
+
+The exact mixture result now returns both aggregate normalized MMD² and a vector of exact per-component normalized MMD² values in frozen component order. The spectral mixture result returns the aggregate estimate and mixture-wide fixed-D Hoeffding interval, plus per-component feature counts, conditional estimates, sample variance and standard error.
+
+The component-conditional estimates are descriptive diagnostics: the mixture-wide Hoeffding interval does not automatically confer separate simultaneous coverage to every component. A future component-wise acceptance rule needs its own preregistered multiplicity/error budget. The aggregate mixture must always be accompanied by the component results.
