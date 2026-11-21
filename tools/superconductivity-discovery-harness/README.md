@@ -196,3 +196,6 @@ The auditor compares model probability-per-cost, a chemistry heuristic, determin
 Training and evaluation pools are disjoint by family, prototype, reduced formula and source paper. The target track is fixed to conventional electron-phonon superconductor classification in v0.1. Other mechanism and label tracks require separate cohorts; in particular, this audit does not turn BEE-NET's DFT/Allen–Dynes regression error into measured-Tc accuracy. Out-of-domain candidates must abstain with no probability and cannot be selected by the model policy.
 
 The fixture is fully synthetic. The oracle is a scoring ceiling over the hidden synthetic truth, not a deployable model. The audit validates evaluator arithmetic and semantics only; it does not reproduce BEE-NET or demonstrate a real discovery advantage.
+
+
+The discovery registry schema treats `arxiv_id` as optional nullable metadata: a source may be identified by its required DOI/URL and source ID without an arXiv identifier. This preserves source identity without inventing an arXiv record. The synthetic discovery fixture must also distinguish `manual_curated` from `database_import`; only actual external-catalog imports may claim catalog record/snapshot provenance.
