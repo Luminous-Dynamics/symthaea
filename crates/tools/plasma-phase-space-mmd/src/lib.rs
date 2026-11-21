@@ -107,7 +107,9 @@ impl fmt::Display for MmdError {
                 write!(f, "velocity length scale must be finite and positive")
             }
             Self::InvalidFeatureCount => write!(f, "spectral feature count must be positive"),
-            Self::InvalidAdaptiveConfig => write!(f, "adaptive spectral MMD configuration is invalid"),
+            Self::InvalidAdaptiveConfig => {
+                write!(f, "adaptive spectral MMD configuration is invalid")
+            }
             Self::UnsupportedSpatialConcentrationForSampling => write!(
                 f,
                 "spatial concentration exceeds the deterministic spectral sampler range"
@@ -603,9 +605,7 @@ fn spectral_squared_signature_difference(
     let imaginary_difference = candidate_imaginary.total() - reference_imaginary.total();
     let squared_difference =
         real_difference * real_difference + imaginary_difference * imaginary_difference;
-    if !squared_difference.is_finite()
-        || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference)
-    {
+    if !squared_difference.is_finite() || !(0.0..=4.0 + 1.0e-10).contains(&squared_difference) {
         return Err(MmdError::NonFiniteOutput);
     }
     Ok(squared_difference)
@@ -721,7 +721,6 @@ pub fn compare_phase_space_measures_spectral(
         particle_feature_evaluations,
     })
 }
-
 
 /// Configuration for checkpointed, anytime-valid spectral MMD evaluation.
 ///
@@ -859,8 +858,8 @@ pub fn compare_phase_space_measures_spectral_adaptive(
         let look = look_index as f64;
         let alpha_for_checkpoint = alpha_budget / (look * (look + 1.0));
         cumulative_alpha_spent += alpha_for_checkpoint;
-        let interval_radius = 4.0
-            * ((2.0 / alpha_for_checkpoint).ln() / (2.0 * feature_count as f64)).sqrt();
+        let interval_radius =
+            4.0 * ((2.0 / alpha_for_checkpoint).ln() / (2.0 * feature_count as f64)).sqrt();
         final_lower = (mean - interval_radius).max(0.0);
         final_upper = (mean + interval_radius).min(4.0);
 
@@ -1492,7 +1491,8 @@ mod tests {
             AdaptiveMmdDecision::UnresolvedBudgetExhausted
         );
         assert_eq!(
-            result.checkpoints
+            result
+                .checkpoints
                 .iter()
                 .map(|checkpoint| checkpoint.feature_count)
                 .collect::<Vec<_>>(),
@@ -1500,9 +1500,12 @@ mod tests {
         );
         assert!((result.alpha_spent - 0.0375).abs() <= 1.0e-12);
         assert!(result.alpha_spent <= result.alpha_budget);
-        assert!(result.checkpoints.windows(2).all(|pair| {
-            pair[0].cumulative_alpha_spent < pair[1].cumulative_alpha_spent
-        }));
+        assert!(
+            result
+                .checkpoints
+                .windows(2)
+                .all(|pair| { pair[0].cumulative_alpha_spent < pair[1].cumulative_alpha_spent })
+        );
     }
 
     #[test]
@@ -1584,6 +1587,4 @@ mod tests {
             );
         }
     }
-
-
 }
