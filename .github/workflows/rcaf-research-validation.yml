@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "research/rcaf/**"
+      - "research/cetb/theory_design/**"
       - ".github/workflows/rcaf-research-validation.yml"
   workflow_dispatch:
 
@@ -39,6 +40,9 @@ jobs:
 
       - name: Run report-validator unit tests
         run: python -m unittest discover -s research/rcaf/tools -p 'test_*.py' -v
+
+      - name: Run theory-design EIG reference tests
+        run: python -m unittest discover -s research/cetb/theory_design -p 'test_*.py' -v
 
       - name: Validate synthetic fixture against schema and semantic invariants
         run: |
