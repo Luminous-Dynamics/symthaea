@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/precursor_genome_source_manifest_v0_1.schema.json",
+  "title": "Frozen Precursor Genome source and profile manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "source_repository",
+    "source_commit",
+    "ledger_path",
+    "ledger_git_blob_sha1",
+    "license",
+    "zenodo_raw_artifacts_doi",
+    "expected_profile",
+    "publication_comparison",
+    "claim_ceiling",
+    "measurement_units"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-PRECURSOR-GENOME-SOURCE-0.1"
+    },
+    "source_repository": {
+      "const": "lauren-walters/precursor-genome"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{40}$"
+    },
+    "ledger_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ledger_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{40}$"
+    },
+    "license": {
+      "const": "CC-BY-4.0"
+    },
+    "zenodo_raw_artifacts_doi": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "samples",
+        "unique_sample_ids",
+        "unique_precursor_formulas",
+        "unique_precursor_pairs",
+        "synthesis_objects",
+        "physical_failures",
+        "samples_with_recorded_heating_temperature",
+        "category_counts",
+        "scans",
+        "scans_by_status",
+        "refinement_cases",
+        "samples_with_active_refinement",
+        "active_refinement_quality",
+        "active_refinement_acceptance",
+        "classified_with_temperature_and_no_physical_failure",
+        "cohort_temperature_and_accepted_quality_1_or_2"
+      ],
+      "properties": {
+        "samples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_sample_ids": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_precursor_formulas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_precursor_pairs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "synthesis_objects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "physical_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "samples_with_recorded_heating_temperature": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "category_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "scans": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scans_by_status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "refinement_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "samples_with_active_refinement": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "active_refinement_quality": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "active_refinement_acceptance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "classified_with_temperature_and_no_physical_failure": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cohort_temperature_and_accepted_quality_1_or_2": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "publication_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "paper_analyzable_outcomes",
+        "paper_category_counts",
+        "reconciliation_status"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paper_analyzable_outcomes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "paper_category_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "reconciliation_status": {
+          "const": "unresolved; preserve snapshot differences and do not silently select/drop records"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Frozen identity and profile for the public Precursor Genome ledger. Counts are source-snapshot bookkeeping, not the paper's model-training cohort or raw in-situ onset measurements."
+    },
+    "measurement_units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heating_temperature",
+        "heating_time",
+        "provenance_url"
+      ],
+      "properties": {
+        "heating_temperature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_field",
+            "unit",
+            "provenance"
+          ],
+          "properties": {
+            "source_field": {
+              "const": "synthesis.heating_temperature"
+            },
+            "unit": {
+              "const": "degree_Celsius"
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "heating_time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_field",
+            "unit",
+            "provenance"
+          ],
+          "properties": {
+            "source_field": {
+              "const": "synthesis.heating_time"
+            },
+            "unit": {
+              "const": "minute"
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "provenance_url": {
+          "const": "https://arxiv.org/abs/2607.09903"
+        }
+      }
+    }
+  }
+}

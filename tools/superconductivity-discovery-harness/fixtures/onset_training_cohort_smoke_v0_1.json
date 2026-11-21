@@ -1,0 +1,22 @@
+{
+  "contract": "SC-ONSET-TRAINING-COHORT-0.1",
+  "cohort_id": "synthetic_clean_training_cohort_001",
+  "dataset_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rows": [
+    {
+      "row_id": "synthetic_pg_0001",
+      "source_kind": "precursor_genome",
+      "precursor_a": "Li2CO3",
+      "precursor_b": "Al2O3",
+      "sample_id": "PG_SYN_0001"
+    },
+    {
+      "row_id": "synthetic_lit_0001",
+      "source_kind": "pg_lit_literature",
+      "precursor_a": "Na2CO3",
+      "precursor_b": "ZrO2",
+      "sample_id": null
+    }
+  ],
+  "claim_ceiling": "Candidate-cohort leakage audit only; no original PG-LIT completeness, model training, onset prediction or laboratory outcome is established."
+}

@@ -1,0 +1,20 @@
+{
+  "contract": "SC-ONSET-HOLDOUT-LEAKAGE-SUITE-0.1",
+  "suite_id": "onset_pair_holdout_leakage_suite_001",
+  "holdout_manifest_path": "data/research/sc_onset_pair_holdout_manifest_v0_1.json",
+  "training_cohort_schema_path": "data/schemas/sc_onset_training_cohort_v0_1.schema.json",
+  "fixtures": [
+    {
+      "path": "tools/superconductivity-discovery-harness/fixtures/onset_training_cohort_smoke_v0_1.json",
+      "expected": "pass_clean_training_cohort"
+    }
+  ],
+  "negative_controls": [
+    "pg_sample_id_leak",
+    "pg_lit_same_pair_leak",
+    "reversed_pair_order_leak",
+    "duplicate_row_id",
+    "missing_pair_identity"
+  ],
+  "claim_ceiling": "Synthetic leakage-control plumbing only; completeness of PG-LIT source data and reproduction of the published split remain unverified."
+}

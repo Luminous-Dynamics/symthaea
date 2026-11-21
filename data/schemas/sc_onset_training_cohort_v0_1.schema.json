@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/sc_onset_training_cohort_v0_1.schema.json",
+  "title": "Candidate onset-model training cohort manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "cohort_id",
+    "dataset_snapshot_sha256",
+    "rows",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-ONSET-TRAINING-COHORT-0.1"
+    },
+    "cohort_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_snapshot_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "row_id",
+          "source_kind",
+          "precursor_a",
+          "precursor_b",
+          "sample_id"
+        ],
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_kind": {
+            "enum": [
+              "precursor_genome",
+              "pg_lit_literature"
+            ]
+          },
+          "precursor_a": {
+            "type": "string",
+            "minLength": 1
+          },
+          "precursor_b": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sample_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "source_kind": {
+                  "const": "precursor_genome"
+                }
+              },
+              "required": [
+                "source_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "sample_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "source_kind": {
+                  "const": "pg_lit_literature"
+                }
+              },
+              "required": [
+                "source_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "sample_id": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "claim_ceiling": {
+      "const": "Candidate-cohort leakage audit only; no original PG-LIT completeness, model training, onset prediction or laboratory outcome is established."
+    }
+  }
+}
