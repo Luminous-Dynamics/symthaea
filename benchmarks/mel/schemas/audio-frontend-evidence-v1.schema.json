@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-audio-frontend-evidence-v1.schema.json",
+  "title": "Melothaea Audio Front-End Evidence v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "case_id",
+    "audio_input_sha256",
+    "sample_rate_hz",
+    "channels",
+    "sample_count",
+    "front_end_id",
+    "front_end_version",
+    "front_end_identity_sha256",
+    "estimates"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-audio-frontend-evidence-v1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audio_input_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sample_rate_hz": {
+      "type": "integer",
+      "minimum": 8000,
+      "maximum": 192000
+    },
+    "channels": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "front_end_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "front_end_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "front_end_identity_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "estimates": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "stage",
+          "status",
+          "estimate_sha256",
+          "confidence",
+          "uncertainty",
+          "calibration_identity_sha256",
+          "reason"
+        ],
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "PitchSalience",
+              "OnsetDetection",
+              "ChromaExtraction",
+              "BeatGridTracking"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Extracted",
+              "Abstained",
+              "NotRun"
+            ]
+          },
+          "estimate_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Fa-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uncertainty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "calibration_identity_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Fa-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
