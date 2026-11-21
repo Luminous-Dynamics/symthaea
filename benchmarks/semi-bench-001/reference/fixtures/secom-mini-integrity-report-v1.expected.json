@@ -1,0 +1,32 @@
+{
+  "schema": "luminous.semi-bench.secom-raw-integrity-report.v1",
+  "dataset_id": "synthetic-secom-raw-fixture-v1",
+  "feature_sha256": "06324b50b87e6ae9b97347907a42c928cca9716fd67a4a444c9c25d03872ae59",
+  "label_sha256": "1b6643872e828998aac2fdcca7bd6fc87cb90bc9f8ce41bb95e93cea9e655572",
+  "rows": 2,
+  "features_per_row": 3,
+  "missing_sensor_cells": 1,
+  "total_sensor_cells": 6,
+  "missing_fraction": 0.16666666666666666,
+  "rows_with_any_missing": 1,
+  "class_counts": {
+    "pass": 1,
+    "fail": 1
+  },
+  "unique_timestamps": 2,
+  "duplicate_timestamp_rows": 0,
+  "timestamps_non_decreasing": true,
+  "first_timestamp_source_local": "2008-07-19T11:55:00",
+  "last_timestamp_source_local": "2008-07-19T12:00:00",
+  "clock_domain_id": "synthetic-secom-fixture-clock",
+  "timezone_interpretation": "source_local_naive; no timezone or UTC conversion",
+  "claim_limits": {
+    "validates_source_file_identity": true,
+    "preserves_missing_measurements": true,
+    "preserves_source_local_clock_only": true,
+    "does_not_establish_feature_semantics_or_units": true,
+    "does_not_establish_group_or_tool_independence": true,
+    "does_not_establish_predictive_performance": true,
+    "does_not_establish_causality_or_yield_improvement": true
+  }
+}
