@@ -84,7 +84,8 @@
             "fail": 17,
             "pass": 297
           }
-        }
+        },
+        "missingness_profile": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json#integrity_results.missingness_distribution"
       }
     },
     {
@@ -412,6 +413,26 @@
       },
       "claim_limit": "temporal ordering within one source clock only; no timezone, lot/tool/site identity, or temporal model result",
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316"
+    },
+    {
+      "id": "external-UCI-SECOM-missingness-observation-drift-audit",
+      "status": "source-profile-computed; classifier baselines not yet run",
+      "source_snapshot": "Be1an001/semiconductor-pass-fail-prediction-python@0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+      "audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+      "key_findings": {
+        "overall_missing_fraction": 0.04537548808583821,
+        "rows_with_any_missing": 1567,
+        "train_missing_fraction": 0.05142084385142445,
+        "validation_missing_fraction": 0.034185303514377,
+        "test_missing_fraction": 0.038432473280794556,
+        "august_missing_fraction": 0.053260039700717667,
+        "october_missing_fraction": 0.037651668948585994,
+        "zero_missing_features": 52,
+        "over50pct_missing_features": 28,
+        "mean_missing_fail": 25.46153846153846,
+        "mean_missing_pass": 26.86466165413534
+      },
+      "caveat": "descriptive drift only; missingness-only shortcut classifier and matched ablations remain to be run"
     }
   ]
 }
