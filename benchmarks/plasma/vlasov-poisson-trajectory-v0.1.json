@@ -183,6 +183,13 @@
       "pr": 13065,
       "head_sha": "f6e947173787e6ce3435d4ce7659890cf634ec5d",
       "state_at_profile_creation": "open"
+    },
+    {
+      "component": "dense_distribution_space_vlasov_poisson_reference_prototype",
+      "pr": 13103,
+      "head_sha": "cec768a09cbcf32e064f0555a9815a4b33f7184d",
+      "state_at_profile_creation": "open",
+      "claim_ceiling": "Spectral-Strang reference prototype with focused tests pending exact-head execution; not yet L3-admitted."
     }
   ],
   "initial_condition_suite": [
@@ -408,6 +415,48 @@
       "source": "https://arxiv.org/abs/2603.25832",
       "source_claim_status": "paper_reported_not_reproduced",
       "admission_rule": "Separate collisional cohort only; never pool its entropy or performance metrics into collisionless Vlasov-Poisson."
+    },
+    {
+      "name": "VlasovTT.jl tensor-train / MPS fully spectral Vlasov-Poisson",
+      "paper": "https://arxiv.org/abs/2602.13092",
+      "repository": "https://github.com/erikasgrim/VlasovTT.jl",
+      "pinned_repository_head": "99aa077b6f5e4ae4dfc8330590e502267caf298b",
+      "repository_license": "MIT (repository README/license)",
+      "source_claim_status": "paper_reported_and_open_source_code_inspected_not_reproduced",
+      "paper_reported_setup": {
+        "quantics_bits_per_dimension": 10,
+        "grid_points_per_dimension": 1024,
+        "phase_space_grid_points": 1048576,
+        "timestep": 0.1,
+        "tci_tolerance": 1e-8,
+        "electric_field_maximum_bond_dimension": 32,
+        "landau_initial_amplitude": 0.01,
+        "landau_thermal_speed": 1,
+        "landau_velocity_interval": [
+          -6,
+          6
+        ],
+        "tt_truncation_thresholds": [
+          1e-7,
+          1e-8,
+          1e-9,
+          1e-10
+        ]
+      },
+      "paper_reported_observations": {
+        "linear_landau_field_amplitude_damping_rate": -0.151,
+        "landau_maximum_bond_dimension_range": [
+          15,
+          45
+        ],
+        "two_stream_maximum_bond_dimension_range": [
+          120,
+          150
+        ],
+        "landau_relative_energy_deviation_order": 0.001,
+        "tcifit_acceleration_step_runtime_relative_to_all_tt_mpo_contractions": "approximately one order of magnitude"
+      },
+      "admission_rule": "Reproduce both the paper's TT/MPS and dense-reference paths on identical initial conditions, grids, dt, precision and final time. Retain truncation-induced damping bias, negative distribution mass, rank history, TCI reconstruction cost and full runtime. Paper observations are not independently reproduced here."
     }
   ],
   "execution_receipt": {
@@ -448,6 +497,32 @@
     "https://arxiv.org/abs/2603.25832",
     "https://smileipic.github.io/Smilei/Understand/vectorization.html",
     "https://warpx.readthedocs.io/en/26.11/usage/parameters.html",
-    "https://doi.org/10.1017/S002237781700040X"
-  ]
+    "https://doi.org/10.1017/S002237781700040X",
+    "https://github.com/erikasgrim/VlasovTT.jl/tree/99aa077b6f5e4ae4dfc8330590e502267caf298b",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13104"
+  ],
+  "representation_tournament": {
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
+    "purpose": "Compare dense spectral, TT/MPS, Fourier-Hermite, particle-measure and learned particle-field representations on one admitted 1D1V Vlasov-Poisson cohort.",
+    "key_rule": "A representation transition is a numerical operation with its own error, conservation, positivity and compute cost; it must be qualified before use.",
+    "methods": [
+      "dense_spectral_distribution",
+      "tensor_train_mps_quantics",
+      "fourier_hermite_velocity",
+      "weighted_particle_measure",
+      "learned_particle_measure_field"
+    ],
+    "mandatory_metrics": [
+      "phase_space_distribution_error",
+      "mass_momentum_energy",
+      "minimum_distribution_and_negative_mass",
+      "velocity_tail_truncation",
+      "compression_rank_and_truncation_residual",
+      "representation_transition_error",
+      "representation_transition_runtime",
+      "p50_p95_runtime_peak_memory_energy",
+      "risk_coverage_fallback_and_abstention"
+    ],
+    "claim_ceiling": "No universal winner or adaptive representation claim before matched-source reproduction and independent trajectory qualification."
+  }
 }
