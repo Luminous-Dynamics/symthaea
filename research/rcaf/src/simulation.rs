@@ -1147,7 +1147,8 @@ mod tests {
         let n = 23usize;
         let positive_test = exact_sign_test(&vec![1.0; n]).unwrap();
         let negative_test = exact_sign_test(&vec![-1.0; n]).unwrap();
-        let non_significant_test = exact_sign_test(&[1.0; 12][..]).unwrap();
+        let non_significant_differences = [vec![1.0; 13], vec![-1.0; 10]].concat();
+        let non_significant_test = exact_sign_test(&non_significant_differences).unwrap();
 
         let (correct, wrong) = classify_expected_positive_injection(
             positive_test.positive_count,
