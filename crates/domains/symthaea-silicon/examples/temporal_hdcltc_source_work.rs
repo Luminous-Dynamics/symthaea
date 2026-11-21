@@ -430,6 +430,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn p99_is_withheld_until_the_minimum_tail_sample_count() {
+        let small = summarize_latency((0..32).map(|value| value as u64).collect()).unwrap();
+        assert_eq!(small.sample_count, 32);
+        assert_eq!(small.p99_ns, None);
+        assert_eq!(small.p99_minimum_sample_gate, 1_000);
+
+        let large = summarize_latency((0..1_000).map(|value| value as u64).collect()).unwrap();
+        assert_eq!(large.sample_count, 1_000);
+        assert!(large.p99_ns.is_some());
+    }
+
+    #[test]
     fn every_public_method_is_accounted_as_one_api_invocation() {
         for method in EvolutionMethod::ALL {
             let work = SourceDerivedWork::for_invocation(method, 0.1, 0.1).unwrap();
