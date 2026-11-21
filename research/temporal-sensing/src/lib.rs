@@ -32,6 +32,10 @@ pub struct SensingFeatures {
     /// Candidate-estimated predictive-model confidence after posterior feedback,
     /// in PPM. Age/horizon decay should be incorporated by the candidate estimator.
     pub model_confidence_ppm: u32,
+    /// Candidate-estimated share of the current ignorance exposure that this
+    /// specific observation can resolve, in PPM. Zero means the sensor is
+    /// uninformative about the uncertainty being penalized.
+    pub predicted_ignorance_resolution_ppm: u32,
     /// Candidate-visible horizon over which model ignorance could expose future
     /// decisions to wrong-belief loss, in microseconds.
     pub prediction_horizon_us: u64,
@@ -371,6 +375,8 @@ pub struct RiskAdjustedVoIDiagnostics {
     pub risk_aversion_ppm: u32,
     pub risk_premium_us: u128,
     pub ignorance_exposure_us: u128,
+    pub predicted_ignorance_resolution_ppm: u32,
+    pub resolvable_ignorance_exposure_us: u128,
     pub ignorance_weight_ppm: u32,
     pub ignorance_penalty_us: u128,
     pub adjusted_benefit_us: u128,
@@ -413,7 +419,11 @@ pub fn risk_adjusted_voi_diagnostics(
         .checked_mul(confidence_shortfall)
         .ok_or(SensingError::ArithmeticOverflow)?
         / PPM;
-    let ignorance_penalty_us = ignorance_exposure_us
+    let resolvable_ignorance_exposure_us = ignorance_exposure_us
+        .checked_mul(u128::from(features.predicted_ignorance_resolution_ppm))
+        .ok_or(SensingError::ArithmeticOverflow)?
+        / PPM;
+    let ignorance_penalty_us = resolvable_ignorance_exposure_us
         .checked_mul(u128::from(ignorance_weight_ppm))
         .ok_or(SensingError::ArithmeticOverflow)?
         / PPM;
@@ -434,6 +444,8 @@ pub fn risk_adjusted_voi_diagnostics(
         risk_aversion_ppm,
         risk_premium_us,
         ignorance_exposure_us,
+        predicted_ignorance_resolution_ppm: features.predicted_ignorance_resolution_ppm,
+        resolvable_ignorance_exposure_us,
         ignorance_weight_ppm,
         ignorance_penalty_us,
         adjusted_benefit_us,
@@ -449,6 +461,7 @@ fn validate_features(features: SensingFeatures) -> Result<(), SensingError> {
         ("novelty_ppm", features.novelty_ppm),
         ("past_residual_ppm", features.past_residual_ppm),
         ("model_confidence_ppm", features.model_confidence_ppm),
+        ("predicted_ignorance_resolution_ppm", features.predicted_ignorance_resolution_ppm),
     ] {
         if u128::from(value) > PPM {
             return Err(SensingError::InvalidProbability { field, value });
@@ -548,6 +561,7 @@ mod tests {
             predicted_ted_reduction_us: 100,
             opportunity_loss_stddev_us: 0,
             model_confidence_ppm: 1_000_000,
+            predicted_ignorance_resolution_ppm: 1_000_000,
             prediction_horizon_us: 0,
         }
     }
@@ -766,6 +780,70 @@ mod tests {
         assert_eq!(
             risk_adjusted_voi_diagnostics(current, 0, 0, 0),
             Err(SensingError::ZeroObservationEnergy)
+        );
+    }
+
+    #[test]
+    fn low_confidence_does_not_reward_an_uninformative_observation() {
+        let mut current = features();
+        current.predicted_ted_reduction_us = 0;
+        current.opportunity_loss_stddev_us = 0;
+        current.model_confidence_ppm = 0;
+        current.predicted_ignorance_resolution_ppm = 0;
+        current.prediction_horizon_us = 10_000;
+
+        let diagnostics =
+            risk_adjusted_voi_diagnostics(current, 50, 0, 1_000_000).unwrap();
+        assert_eq!(diagnostics.ignorance_exposure_us, 10_000);
+        assert_eq!(diagnostics.resolvable_ignorance_exposure_us, 0);
+        assert_eq!(diagnostics.ignorance_penalty_us, 0);
+        assert_eq!(diagnostics.adjusted_benefit_us, 0);
+
+        assert!(matches!(
+            decide_next_observation(
+                SensingPolicy::RiskAdjustedValueOfInformation {
+                    minimum_adjusted_us_per_nj_ppm: 1,
+                    risk_aversion_ppm: 0,
+                    ignorance_weight_ppm: 1_000_000,
+                },
+                context(20),
+                current,
+            )
+            .unwrap(),
+            SensingDecision::Wait {
+                reason: TriggerReason::MaximumGap,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn ignorance_surcharge_scales_with_candidate_estimated_resolvability() {
+        let mut current = features();
+        current.predicted_ted_reduction_us = 0;
+        current.opportunity_loss_stddev_us = 0;
+        current.model_confidence_ppm = 0;
+        current.predicted_ignorance_resolution_ppm = 500_000;
+        current.prediction_horizon_us = 10_000;
+
+        let diagnostics =
+            risk_adjusted_voi_diagnostics(current, 50, 0, 1_000_000).unwrap();
+        assert_eq!(diagnostics.ignorance_exposure_us, 10_000);
+        assert_eq!(diagnostics.predicted_ignorance_resolution_ppm, 500_000);
+        assert_eq!(diagnostics.resolvable_ignorance_exposure_us, 5_000);
+        assert_eq!(diagnostics.ignorance_penalty_us, 5_000);
+    }
+
+    #[test]
+    fn predicted_ignorance_resolvability_must_be_bounded() {
+        let mut current = features();
+        current.predicted_ignorance_resolution_ppm = 1_000_001;
+        assert_eq!(
+            risk_adjusted_voi_diagnostics(current, 50, 0, 0),
+            Err(SensingError::InvalidProbability {
+                field: "predicted_ignorance_resolution_ppm",
+                value: 1_000_001,
+            })
         );
     }
 
