@@ -98,7 +98,7 @@ struct SummaryRecord {
     event_count: usize,
     gap_schedule_seconds: Vec<f64>,
     gap_coefficient_of_variation: Option<f64>,
-    input_seeds: Vec<u64>,
+    input_seeds: Vec<String>,
     query_count: usize,
     valid_query_count: usize,
     correct_count: usize,
@@ -114,6 +114,7 @@ struct SummaryRecord {
     final_state_norm: f64,
     api_update_count: u64,
     reported_logical_seconds: f64,
+    logical_horizon_error_seconds: f64,
     memory_preparation_wall_ns: u128,
     model_setup_wall_ns: u128,
     input_preparation_wall_ns: u128,
@@ -134,7 +135,7 @@ struct EvolutionOutcome {
     state: ContinuousHV,
     gap_schedule_seconds: Vec<f64>,
     gap_coefficient_of_variation: Option<f64>,
-    input_seeds: Vec<u64>,
+    input_seeds: Vec<String>,
     api_update_count: u64,
     reported_logical_seconds: f64,
     model_setup_wall_ns: u128,
@@ -410,14 +411,20 @@ fn evolve_state(
     let zero_input = (condition == "hdc_ltc_zero_input")
         .then(|| ContinuousHV::new(dim));
     let gaps = make_gaps(horizon_seconds, event_count, gap_profile, seed);
-    let input_seeds: Vec<u64> = if condition == "hdc_ltc_distractor" {
+    let input_seed_values: Vec<u64> = if condition == "hdc_ltc_distractor" {
         (0..event_count)
             .map(|index| derive_seed(seed, 5, index as u64))
             .collect()
     } else {
         Vec::new()
     };
-    let distractors: Vec<ContinuousHV> = input_seeds
+    // Hex strings preserve all 64 seed bits in JSON consumers that use
+    // IEEE-754 numbers (and therefore cannot exactly represent all u64s).
+    let input_seeds: Vec<String> = input_seed_values
+        .iter()
+        .map(|seed| format!("{seed:016x}"))
+        .collect();
+    let distractors: Vec<ContinuousHV> = input_seed_values
         .iter()
         .map(|&input_seed| bipolar_random(dim, input_seed))
         .collect();
@@ -550,7 +557,8 @@ fn cohort_id(
     event_count: usize,
 ) -> String {
     format!(
-        "s{seed}-d{dimension}-l{fan_in}-{condition}-{gap_profile}-t{horizon_seconds:.6}-e{event_count}"
+        "s{seed}-d{dimension}-l{fan_in}-{condition}-{gap_profile}-t{:016x}-e{event_count}",
+        horizon_seconds.to_bits()
     )
 }
 
@@ -700,6 +708,7 @@ fn run_cohort(
             final_state_norm: state.norm() as f64,
             api_update_count: evolution.api_update_count,
             reported_logical_seconds: evolution.reported_logical_seconds,
+            logical_horizon_error_seconds: (evolution.reported_logical_seconds - horizon_seconds).abs(),
             memory_preparation_wall_ns,
             model_setup_wall_ns: evolution.model_setup_wall_ns,
             input_preparation_wall_ns: evolution.input_preparation_wall_ns,
@@ -771,7 +780,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 for &horizon_seconds in args.horizons.iter().filter(|&&h| h > 0.0) {
                     for &events in &args.events {
-                        for gap_profile in ["regular", "irregular"] {
+                        for gap_profile in ["regular", "irregular"].into_iter().take(
+                            if events > 1 { 2 } else { 1 },
+                        ) {
                             for condition in [
                                 "hdc_ltc_zero_input",
                                 "hdc_ltc_distractor",
@@ -838,6 +849,13 @@ mod tests {
             let elapsed: f64 = gaps.iter().map(|&dt| dt as f64).sum();
             assert!((elapsed - 12.75).abs() < 1.0e-5);
         }
+    }
+
+    #[test]
+    fn cohort_ids_preserve_exact_horizon_identity() {
+        let first = cohort_id(1, 1024, 8, "hdc_ltc_zero_input", "regular", 1.000_000_1, 4);
+        let second = cohort_id(1, 1024, 8, "hdc_ltc_zero_input", "regular", 1.000_000_2, 4);
+        assert_ne!(first, second);
     }
 
     #[test]
