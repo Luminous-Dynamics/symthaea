@@ -900,4 +900,82 @@ mod tests {
         }).unwrap_err();
         assert!(error.contains("training_record_count"));
     }
+
+    fn synthetic_graph_receipt() -> Value {
+        let (_, fixture) = inputs();
+        let value: Value = serde_json::from_slice(&fixture).unwrap();
+        let cohort = &value["cohort"];
+        let nodes = cohort["nodes"].as_array().unwrap().clone();
+        let records = cohort["records"].as_array().unwrap();
+        let sample_records = records.iter().map(|row| json!({
+            "sample_id": row["sample_id"],
+            "precursor_pair_canonical": [row["precursor_a"], row["precursor_b"]],
+            "cohort_status": "analyzable",
+            "raw_reaction_category": row["category"],
+            "cross_precursor_product_endpoint": row["label"] == 1
+        })).collect::<Vec<_>>();
+        json!({
+            "status": "precursor_genome_graph_audit_pass",
+            "contract": "SC-PRECURSOR-GENOME-GRAPH-AUDIT-0.1",
+            "source": {
+                "repository": "lauren-walters/precursor-genome",
+                "commit": "78cb026aa6c9b53aa0ec26ea5611d523bc3c320a",
+                "ledger_git_blob_sha1": "a".repeat(40),
+                "ledger_sha256": "b".repeat(64),
+                "license": "CC-BY-4.0"
+            },
+            "cohort": {
+                "source_sample_count": records.len(),
+                "analyzable_count": records.len(),
+                "cross_precursor_product_positive_count": 3,
+                "cross_precursor_product_negative_count": 3
+            },
+            "pair_graph": {
+                "complete_undirected_graph": true,
+                "precursor_count": nodes.len(),
+                "unique_unordered_pair_count": records.len(),
+                "expected_degree": nodes.len() - 1,
+                "per_precursor": nodes.iter().map(|node| json!({
+                    "precursor_formula": node
+                })).collect::<Vec<_>>()
+            },
+            "sample_records": sample_records
+        })
+    }
+
+    #[test]
+    fn real_receipt_mode_parses_pinned_graph_and_scores_fold_local_prevalence() {
+        let graph_receipt = synthetic_graph_receipt();
+        let bytes = serde_json::to_vec(&graph_receipt).unwrap();
+        let receipt = audit_graph_receipt(&bytes).unwrap();
+        assert_eq!(receipt["graph"]["precursor_count"], 4);
+        assert_eq!(receipt["graph"]["complete_undirected_edge_count"], 6);
+        assert_eq!(receipt["fold_local_training_prevalence_baseline"]["lopo"]["fold_count"], 4);
+        assert_eq!(receipt["fold_local_training_prevalence_baseline"]["double_node_holdout"]["fold_count"], 6);
+        assert_eq!(receipt["fold_local_training_prevalence_baseline"]["lopo"]["mean_fold_roc_auc"], 0.5);
+    }
+
+    #[test]
+    fn real_receipt_mode_rejects_wrong_pinned_source_revision() {
+        let mut receipt = synthetic_graph_receipt();
+        receipt["source"]["commit"] = json!("0000000000000000000000000000000000000000");
+        let error = audit_graph_receipt(&serde_json::to_vec(&receipt).unwrap()).unwrap_err();
+        assert!(error.contains("unexpected Precursor Genome source commit"));
+    }
+
+    #[test]
+    fn fold_local_prevalence_is_computed_from_training_edges_only() {
+        let (schema, fixture) = inputs();
+        let data: Value = serde_json::from_slice(&fixture).unwrap();
+        let graph = parse_graph(&data["cohort"]).unwrap();
+        let model = training_prevalence_model(&graph, "synthetic-source").unwrap();
+        let fold = model["lopo_folds"].as_array().unwrap().iter()
+            .find(|fold| fold["fold_id"] == "lopo:A").unwrap();
+        assert_eq!(fold["training_record_count"], 3);
+        for prediction in fold["predictions"].as_array().unwrap() {
+            assert_eq!(prediction["probability"], 1.0 / 3.0);
+        }
+        let _ = schema;
+    }
+
 }
