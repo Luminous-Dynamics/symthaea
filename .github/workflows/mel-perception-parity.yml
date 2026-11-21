@@ -66,15 +66,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          schema = json.loads(Path("benchmarks/mel/schemas/perception-parity-v1.schema.json").read_text())
-          assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
-          assert schema["$defs"]["sha256"]["pattern"] == "^[A-Fa-f0-9]{64}$"
-          assert len(schema["oneOf"]) == 2
-          print("perception parity schema parsed and contract anchors verified")
-          PY
+          schema="benchmarks/mel/schemas/perception-parity-v1.schema.json"
+          jq -e '
+            .["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+            and .["$defs"].sha256.pattern == "^[A-Fa-f0-9]{64}$"
+            and (.oneOf | length) == 2
+          ' "$schema" > /dev/null
+          echo "perception parity schema parsed and contract anchors verified"
 
       - name: Record exact merge-head evidence
         shell: bash
