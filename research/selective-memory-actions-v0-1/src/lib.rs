@@ -124,7 +124,10 @@ pub struct AdmissionSnapshot {
     pub source_qualified: bool,
     pub scope_qualified: bool,
     pub freshness_at_use: FreshnessAtUse,
+    /// Lifecycle state as revalidated against the canonical source at use.
     pub not_revoked_or_erased: bool,
+    /// True only when a current source/revision receipt was checked at consumption.
+    pub canonical_revalidation_at_use: bool,
     pub verification_authorized: bool,
     pub verifier_available: bool,
     pub clarification_authorized: bool,
@@ -258,6 +261,7 @@ pub const fn is_admissible(action: Action, gates: AdmissionSnapshot) -> bool {
                 && gates.scope_qualified
                 && gates.freshness_at_use.is_qualified()
                 && gates.not_revoked_or_erased
+                && gates.canonical_revalidation_at_use
         }
         Action::Verify => gates.verification_authorized && gates.verifier_available,
         Action::Clarify => gates.clarification_authorized,
@@ -465,6 +469,55 @@ mod tests {
 
         let decision = select_action(Stage::Query, gates, &options).unwrap();
         assert_eq!(decision.action, Action::Verify);
+    }
+
+    #[test]
+    fn use_requires_current_canonical_revalidation_after_retrieval() {
+        let freshness = FreshnessAtUse {
+            evidence_age_at_retrieval_ns: Some(10),
+            evidence_age_at_use_ns: Some(20),
+            max_evidence_age_ns: Some(100),
+            deadline_slack_at_use_ns: Some(500),
+        };
+        let gates = AdmissionSnapshot {
+            source_qualified: true,
+            scope_qualified: true,
+            freshness_at_use: freshness,
+            not_revoked_or_erased: true,
+            // A cached retrieval-time "not retracted" value is not enough.
+            canonical_revalidation_at_use: false,
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::Use, &LOW_LOSS, 0, 0, 0),
+            option(Action::Verify, &HIGH_LOSS, 0, 0, 1),
+            option(Action::Abstain, &HIGH_LOSS, 0, 0, 2),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::Verify);
+    }
+
+    #[test]
+    fn use_is_available_after_current_source_receipt_revalidation() {
+        let gates = AdmissionSnapshot {
+            source_qualified: true,
+            scope_qualified: true,
+            freshness_at_use: FreshnessAtUse {
+                evidence_age_at_retrieval_ns: Some(10),
+                evidence_age_at_use_ns: Some(20),
+                max_evidence_age_ns: Some(100),
+                deadline_slack_at_use_ns: Some(500),
+            },
+            not_revoked_or_erased: true,
+            canonical_revalidation_at_use: true,
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::Use, &LOW_LOSS, 0, 0, 0),
+            option(Action::Abstain, &HIGH_LOSS, 0, 0, 1),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::Use);
     }
 
     #[test]
