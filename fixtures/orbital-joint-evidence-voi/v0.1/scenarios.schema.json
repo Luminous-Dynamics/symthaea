@@ -115,7 +115,9 @@
         "current_evidence_refs",
         "budget",
         "actions",
-        "expected"
+        "expected",
+        "current_evidence_dependency_groups",
+        "required_obligations"
       ],
       "properties": {
         "scenario_id": {
@@ -188,6 +190,25 @@
         },
         "expected": {
           "$ref": "#/$defs/expected"
+        },
+        "current_evidence_dependency_groups": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "allOf": [
