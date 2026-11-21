@@ -2233,7 +2233,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn multi_scale_kernel_detects_thin_velocity_structure_lost_by_broad_scale() {
         let candidate = [particle(1.0, 0.0, 1.0)];
@@ -2288,5 +2287,4 @@ mod tests {
                 <= 1.0e-12
         );
     }
-
 }
