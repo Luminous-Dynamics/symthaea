@@ -665,7 +665,9 @@ pub fn validate_action_pair(proposal_bytes: &[u8], outcome_bytes: &[u8]) -> Resu
         || outcome.proposal_ref.revision.as_deref() != Some(proposal.record_revision.as_str())
         || outcome.proposal_ref.sha256.as_deref() != Some(expected_digest.as_str())
     {
-        return Err("outcome does not reference the exact proposal identity, revision and bytes".to_owned());
+        return Err(
+            "outcome does not reference the exact proposal identity, revision and bytes".to_owned(),
+        );
     }
     if outcome.decision_context != proposal.decision_context {
         return Err("outcome decision context differs from the exact proposal".to_owned());
@@ -682,7 +684,11 @@ pub fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), 
         || !valid_contract_reference(&outcome.proposal_ref)
         || outcome.proposal_ref.kind != "evidence_action_proposal"
         || outcome.proposal_ref.revision.as_deref() != Some("v1")
-        || outcome.proposal_ref.sha256.as_deref().is_none_or(|digest| !valid_sha256(digest))
+        || outcome
+            .proposal_ref
+            .sha256
+            .as_deref()
+            .is_none_or(|digest| !valid_sha256(digest))
     {
         return Err(
             "outcome schema, identity, claim ceiling or authority boundary is invalid".to_owned(),
@@ -1978,8 +1984,9 @@ mod tests {
     #[test]
     fn outcome_cannot_reference_a_different_proposal_digest() {
         let mut outcome: Value = serde_json::from_slice(OUTCOME_FIXTURE).unwrap();
-        outcome["proposal_ref"]["sha256"] =
-            Value::String("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned());
+        outcome["proposal_ref"]["sha256"] = Value::String(
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned(),
+        );
         let bytes = serde_json::to_vec(&outcome).unwrap();
         assert!(validate_action_pair(PROPOSAL_FIXTURE, &bytes).is_err());
     }
