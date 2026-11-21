@@ -1249,6 +1249,107 @@
         ],
         "notes": "The aborted coupon trial exceeded the planned estimate and the total scenario budget. Preserve actual consumption; report over-plan and over-budget rather than dropping or rejecting the cost record."
       }
+    },
+    {
+      "scenario_id": "JEV-014",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-LOW-ENGINEERING-HIGH-FACILITY",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 1.5,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        },
+        {
+          "action_id": "A-HIGH-ENGINEERING-LOW-FACILITY",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://A-COUPON-INTERACTION",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 1.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.5,
+            "external_cost_units": 1
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "PASS",
+            "CRITICAL_CAPACITY_FAILURE": "FAIL"
+          },
+          "dependencies": []
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "REPLAN-RESOURCE-PARETO-TIE",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [],
+        "notes": "The two admissible actions yield equal minimax-regret improvement but incomparable resource vectors: one consumes fewer engineering hours and more facility hours, the other the reverse. Do not invent a conversion rate between these dimensions; request human review."
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "required_obligations": [],
+      "current_evidence_dependency_groups": {}
     }
   ]
 }
