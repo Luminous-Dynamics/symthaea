@@ -5,9 +5,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::poisson_certificate::{
-    PERIODIC_1D_FD_POISSON_OPERATOR_ID, PeriodicPoissonCertificate,
-};
+use crate::poisson_certificate::{PERIODIC_1D_FD_POISSON_OPERATOR_ID, PeriodicPoissonCertificate};
 
 /// Action selected for the proposed field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,8 +148,7 @@ fn certificate_is_valid(value: &PeriodicPoissonCertificate) -> bool {
     let expected_field_bound = value.residual_l2 / expected_lambda.sqrt();
     let potential_tolerance =
         64.0 * f64::EPSILON * expected_potential_bound.abs().max(f64::MIN_POSITIVE);
-    let field_tolerance =
-        64.0 * f64::EPSILON * expected_field_bound.abs().max(f64::MIN_POSITIVE);
+    let field_tolerance = 64.0 * f64::EPSILON * expected_field_bound.abs().max(f64::MIN_POSITIVE);
 
     (value.potential_error_l2_bound - expected_potential_bound).abs() <= potential_tolerance
         && (value.electric_field_error_l2_bound - expected_field_bound).abs() <= field_tolerance
@@ -163,7 +160,10 @@ mod tests {
     use crate::poisson_certificate::certify_periodic_1d_poisson;
     use std::f64::consts::PI;
 
-    fn certificate_with_bound(target_mode: usize, estimate_mode: usize) -> PeriodicPoissonCertificate {
+    fn certificate_with_bound(
+        target_mode: usize,
+        estimate_mode: usize,
+    ) -> PeriodicPoissonCertificate {
         let count = 16;
         let dx = 0.5;
         let truth: Vec<f64> = (0..count)
@@ -224,7 +224,10 @@ mod tests {
             false,
         );
         assert_eq!(unresolved.action, CorrectionAction::Unresolved);
-        assert_eq!(unresolved.reason, CorrectionReason::CorrectionBudgetExhausted);
+        assert_eq!(
+            unresolved.reason,
+            CorrectionReason::CorrectionBudgetExhausted
+        );
     }
 
     #[test]
