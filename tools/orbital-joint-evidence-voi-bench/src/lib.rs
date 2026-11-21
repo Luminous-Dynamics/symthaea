@@ -462,7 +462,7 @@ fn valid_contract_reference(reference: &ContractReference) -> bool {
         && reference
             .sha256
             .as_deref()
-            .is_none_or(|digest| valid_sha256(digest))
+            .is_none_or(valid_sha256)
 }
 
 fn validate_change_impact_receipt(impact: &ChangeImpact) -> Result<(), String> {
@@ -497,7 +497,7 @@ fn validate_change_impact_receipt(impact: &ChangeImpact) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), String> {
+pub fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), String> {
     if proposal.schema != "EvidenceActionProposalOutcomeV1"
         || proposal.record_kind != "PROPOSAL"
         || proposal.claim_ceiling != "proposal_only_no_qualification_authority"
@@ -653,7 +653,7 @@ fn validate_action_proposal(proposal: &EvidenceActionProposalV1) -> Result<(), S
     Ok(())
 }
 
-fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), String> {
+pub fn validate_action_outcome(outcome: &EvidenceActionOutcomeV1) -> Result<(), String> {
     if outcome.schema != "EvidenceActionProposalOutcomeV1"
         || outcome.record_kind != "OUTCOME"
         || outcome.outcome_id.trim().is_empty()
