@@ -187,9 +187,9 @@
     {
       "component": "dense_distribution_space_vlasov_poisson_reference_prototype",
       "pr": 13103,
-      "head_sha": "f39ab296b531ddfa9ec4f71ced2fbe23c00fe2ca",
+      "head_sha": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
       "state_at_profile_creation": "open",
-      "claim_ceiling": "Spectral-Strang distribution-space prototype with phase-resolved Fourier modes, x/v spectral-tail diagnostics and a periodic Fourier zero-padding interpolation oracle. The 19-test exact-head workflow is rerunning after strict-Clippy iterator fixes; not yet L3-admitted."
+      "claim_ceiling": "Spectral-Strang distribution-space prototype with complex electric-mode diagnostics, x/v spectral-tail monitoring and a periodic Fourier zero-padding interpolation oracle. Nineteen tests passed on a preceding exact head; latest iterator/format fixes and t=10 trace are queued for exact-head validation. Not yet L3-admitted."
     },
     {
       "component": "phase_space_spectral_tail_monitor",
@@ -201,7 +201,7 @@
     {
       "component": "periodic_fourier_zero_padding_interpolation_oracle",
       "pr": 13103,
-      "head_sha": "f39ab296b531ddfa9ec4f71ced2fbe23c00fe2ca",
+      "head_sha": "7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b",
       "state_at_profile_creation": "implemented_validation_pending",
       "claim_ceiling": "Standalone trigonometric interpolation transfer oracle only. Does not mutate Vlasov state, choose an adaptive trigger or certify physical validity of grid expansion."
     }
