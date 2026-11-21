@@ -89,6 +89,10 @@ pub enum TransportError {
     NoAugmentingPath,
     NoProgress,
     IterationLimitExceeded,
+    ResidualMassUnresolved {
+        remaining_supply: f64,
+        remaining_demand: f64,
+    },
     NonFiniteOutput,
     MateriallyNegativeTransportCost {
         value: f64,
@@ -138,6 +142,13 @@ impl fmt::Display for TransportError {
             Self::IterationLimitExceeded => {
                 write!(f, "transport solver exceeded its augmenting-path limit")
             }
+            Self::ResidualMassUnresolved {
+                remaining_supply,
+                remaining_demand,
+            } => write!(
+                f,
+                "transport solver left unresolved mass (supply {remaining_supply:e}, demand {remaining_demand:e})"
+            ),
             Self::NonFiniteOutput => write!(f, "transport solver produced a non-finite output"),
             Self::MateriallyNegativeTransportCost { value, tolerance } => {
                 write!(
@@ -383,6 +394,21 @@ fn shortest_residual_path(
     })
 }
 
+fn residual_capacity_sum(edges: &[FlowEdge]) -> Result<f64, TransportError> {
+    let mut residual = CompensatedSum::default();
+    for edge in edges {
+        if !edge.residual_capacity.is_finite() || edge.residual_capacity < 0.0 {
+            return Err(TransportError::NonFiniteOutput);
+        }
+        residual.add(edge.residual_capacity);
+    }
+    let total = residual.total();
+    if !total.is_finite() || total < 0.0 {
+        return Err(TransportError::NonFiniteOutput);
+    }
+    Ok(total)
+}
+
 fn min_cost_transport(
     supplies: &[f64],
     demands: &[f64],
@@ -404,10 +430,16 @@ fn min_cost_transport(
     let mut graph = vec![Vec::<FlowEdge>::new(); sink + 1];
 
     for (index, supply) in supplies.iter().enumerate() {
+        if !supply.is_finite() || *supply <= 0.0 {
+            return Err(TransportError::NonFiniteOutput);
+        }
         add_edge(&mut graph, source, left_start + index, *supply, 0.0);
     }
     for (i, cost_row) in costs.iter().enumerate() {
         for (j, cost) in cost_row.iter().enumerate() {
+            if !cost.is_finite() || *cost < 0.0 {
+                return Err(TransportError::NonFiniteGroundCost);
+            }
             add_edge(
                 &mut graph,
                 left_start + i,
@@ -417,22 +449,33 @@ fn min_cost_transport(
             );
         }
     }
+    let mut demand_edge_indices = Vec::with_capacity(demand_count);
     for (index, demand) in demands.iter().enumerate() {
+        if !demand.is_finite() || *demand <= 0.0 {
+            return Err(TransportError::NonFiniteOutput);
+        }
+        let edge_index = graph[right_start + index].len();
+        demand_edge_indices.push(edge_index);
         add_edge(&mut graph, right_start + index, sink, *demand, 0.0);
     }
 
-    let mut total_flow = 0.0;
     let mut total_cost = CompensatedSum::default();
     let mut augmenting_paths = 0_usize;
     let mut shortest_path_relaxations = 0_u128;
-    const TARGET_FLOW: f64 = 1.0;
-    const FLOW_TOLERANCE: f64 = 1.0e-12;
     const MAX_AUGMENTATIONS: usize = 1_000_000;
 
-    while TARGET_FLOW - total_flow > FLOW_TOLERANCE {
+    // Stop only when every source-capacity residual is exactly exhausted.
+    // A fixed total-flow epsilon can silently discard tiny normalized atoms
+    // whose contribution becomes material at large phase-space separation.
+    loop {
+        let remaining_supply = residual_capacity_sum(&graph[source])?;
+        if remaining_supply == 0.0 {
+            break;
+        }
         if augmenting_paths >= MAX_AUGMENTATIONS {
             return Err(TransportError::IterationLimitExceeded);
         }
+
         let shortest_path = shortest_residual_path(&graph, source, sink)?;
         shortest_path_relaxations = shortest_path_relaxations
             .checked_add(shortest_path.relaxations)
@@ -440,7 +483,7 @@ fn min_cost_transport(
         let distance = shortest_path.distances;
         let predecessor = shortest_path.predecessors;
 
-        let mut amount = TARGET_FLOW - total_flow;
+        let mut amount = f64::INFINITY;
         let mut node = sink;
         while node != source {
             let (previous, edge_index) =
@@ -460,24 +503,40 @@ fn min_cost_transport(
                 let edge = &graph[previous][edge_index];
                 (edge.to, edge.reverse_index, edge.unit_cost)
             };
-            graph[previous][edge_index].residual_capacity =
-                (graph[previous][edge_index].residual_capacity - amount).max(0.0);
-            graph[to][reverse_index].residual_capacity += amount;
-            if !unit_cost.is_finite() {
+            let old_capacity = graph[previous][edge_index].residual_capacity;
+            let next_capacity = (old_capacity - amount).max(0.0);
+            if next_capacity == old_capacity {
+                return Err(TransportError::NoProgress);
+            }
+            graph[previous][edge_index].residual_capacity = next_capacity;
+            let reverse_capacity = graph[to][reverse_index].residual_capacity + amount;
+            if !reverse_capacity.is_finite() || !unit_cost.is_finite() {
                 return Err(TransportError::NonFiniteOutput);
             }
+            graph[to][reverse_index].residual_capacity = reverse_capacity;
             node = previous;
         }
 
-        total_flow += amount;
         total_cost.add(amount * distance[sink]);
         augmenting_paths += 1;
     }
 
-    if !total_flow.is_finite()
-        || (TARGET_FLOW - total_flow).abs() > 1.0e-10
-        || !total_cost.total().is_finite()
-    {
+    let remaining_supply = residual_capacity_sum(&graph[source])?;
+    let mut remaining_demand_sum = CompensatedSum::default();
+    for (index, edge_index) in demand_edge_indices.iter().enumerate() {
+        remaining_demand_sum.add(graph[right_start + index][*edge_index].residual_capacity);
+    }
+    let remaining_demand = remaining_demand_sum.total();
+    if !remaining_demand.is_finite() {
+        return Err(TransportError::NonFiniteOutput);
+    }
+    if remaining_supply > 0.0 || remaining_demand > 0.0 {
+        return Err(TransportError::ResidualMassUnresolved {
+            remaining_supply,
+            remaining_demand,
+        });
+    }
+    if !total_cost.total().is_finite() {
         return Err(TransportError::NonFiniteOutput);
     }
 
@@ -554,14 +613,37 @@ pub fn compare_phase_space_measures_w1(
         });
     }
 
-    let supplies = candidate_atoms
-        .iter()
-        .map(|atom| atom.weight / candidate_total_mass)
-        .collect::<Vec<_>>();
-    let demands = reference_atoms
-        .iter()
-        .map(|atom| atom.weight / reference_total_mass)
-        .collect::<Vec<_>>();
+    let normalize_weights = |atoms: &[WeightedAtom], total_mass: f64| {
+        let mut normalized = atoms
+            .iter()
+            .map(|atom| atom.weight / total_mass)
+            .collect::<Vec<_>>();
+        let mut sum = CompensatedSum::default();
+        for weight in &normalized {
+            sum.add(*weight);
+        }
+        let correction = 1.0 - sum.total();
+        let largest_index = normalized
+            .iter()
+            .enumerate()
+            .max_by(|left, right| left.1.total_cmp(right.1))
+            .map(|(index, _)| index)
+            .ok_or(TransportError::NonFiniteOutput)?;
+        normalized[largest_index] += correction;
+        if normalized.iter().any(|weight| !weight.is_finite() || *weight <= 0.0) {
+            return Err(TransportError::NonFiniteOutput);
+        }
+        let mut verified_sum = CompensatedSum::default();
+        for weight in &normalized {
+            verified_sum.add(*weight);
+        }
+        if (verified_sum.total() - 1.0).abs() > 16.0 * f64::EPSILON {
+            return Err(TransportError::NonFiniteOutput);
+        }
+        Ok::<Vec<f64>, TransportError>(normalized)
+    };
+    let supplies = normalize_weights(&candidate_atoms, candidate_total_mass)?;
+    let demands = normalize_weights(&reference_atoms, reference_total_mass)?;
 
     let mut costs = vec![vec![0.0; reference_atoms.len()]; candidate_atoms.len()];
     for (i, left) in candidate_atoms.iter().enumerate() {
