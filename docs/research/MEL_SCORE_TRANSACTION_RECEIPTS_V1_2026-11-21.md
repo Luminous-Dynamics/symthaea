@@ -89,3 +89,8 @@ This revision is rebased on the qualified Sonata universal-theory gate. Candidat
 
 
 **Build identity note:** the exact-head workflow explicitly checks out the event SHA; the score-receipt branch and Sonata base both carry the same canonical import for the shared universal-theory gate. The receipt's standalone compilation is therefore tested against the source revision named in the evidence manifest.
+
+
+## Exact-head test intent
+
+The receipt and Sonata integration gates must run together against the same event SHA and committed lockfile. A standalone receipt unit-test pass is not sufficient: each candidate receipt is independently recomputed inside the Sonata intervention tests before the selected candidate can be accepted.
