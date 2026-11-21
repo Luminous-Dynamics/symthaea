@@ -557,6 +557,7 @@ mod tests {
         assert_eq!(result["observation_count"], 8);
         assert_eq!(result["task_count"], 8);
         assert_eq!(result["unique_specimen_count"], 5);
+        assert_eq!(result["unique_material_state_count"], 4);
         assert_eq!(result["unique_batch_count"], 4);
         assert_eq!(result["unique_campaign_count"], 3);
         assert_eq!(result["unique_laboratory_count"], 3);
@@ -684,7 +685,27 @@ mod tests {
         assert!(
             audit_fixture_value(&fixture)
                 .unwrap_err()
-                .contains("does not match material_state")
+                .contains("paired material state")
+        );
+    }
+
+    #[test]
+    fn between_batch_holdout_can_test_distinct_realized_states_of_same_material() {
+        let result = run_fixture();
+        let task = &result["tasks"][3];
+        assert_eq!(task["train_material_state_count"], 1);
+        assert_eq!(task["test_material_state_count"], 1);
+        assert_eq!(result["unique_material_state_count"], 4);
+    }
+
+    #[test]
+    fn paired_repeatability_rejects_a_changed_realized_state() {
+        let mut fixture = fixture_value();
+        fixture["observations"][1]["material_state_id"] = json!("SYNTH-STATE-OTHER");
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("paired material state")
         );
     }
 
