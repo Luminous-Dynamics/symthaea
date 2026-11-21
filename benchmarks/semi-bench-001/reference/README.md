@@ -95,3 +95,8 @@ The second mode proves only ordered, non-overlapping chronology within that one 
 
 
 Implementation compatibility note: non-temporal v1 split manifests retain their original canonical payload and known-answer digest. The `time_basis` and `clock_domain_id` fields are included only for `forward_time` manifests, preserving compatibility for existing group-disjoint and stratified fixtures.
+
+
+## Frozen real-source split manifest
+
+A source-level chronological SECOM manifest now accompanies the synthetic split fixtures at `docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json`. It binds sample row IDs, labels, source-local naive timestamps, source commit and a canonical file-manifest digest. A dedicated test validates the actual manifest and asserts the 940/313/314 partition counts and 76/11/17 failure support. The 11 split-manifest tests bring the full reference suite to **35 tests**.
