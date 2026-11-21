@@ -27,10 +27,10 @@ pub mod color;
 pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
+pub mod mycelial_junction_graph;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
-pub mod mycelial_junction_graph;
 pub mod mycelial_presence;
 pub mod scene_features;
 pub mod scene_graph;
@@ -81,6 +81,13 @@ pub use embodiment_trace::{
     MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
 };
 pub use geometry::build_scene;
+pub use mycelial_junction_graph::{
+    GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit, MAX_JUNCTION_GRAPH_JUNCTIONS,
+    MAX_JUNCTION_GRAPH_SEGMENTS, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
+    MycelialJunction, MycelialJunctionGraphConfig, MycelialJunctionGraphError,
+    MycelialJunctionGraphMetrics, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
+    build_mycelial_junction_hypha_graph,
+};
 pub use mycelial_mesh::{
     FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
     TubeTessellationConfig, TubeTessellationError, tessellate_mycelial_model,
@@ -94,13 +101,6 @@ pub use mycelial_network::{
     MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialConnectionKind,
     MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
     MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
-};
-pub use mycelial_junction_graph::{
-    GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit,
-    MAX_JUNCTION_GRAPH_JUNCTIONS, MAX_JUNCTION_GRAPH_SEGMENTS,
-    MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment, MycelialJunction,
-    MycelialJunctionGraphConfig, MycelialJunctionGraphError, MycelialJunctionGraphMetrics,
-    MycelialJunctionHyphaGraph, PARAMETER_SCALE, build_mycelial_junction_hypha_graph,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
