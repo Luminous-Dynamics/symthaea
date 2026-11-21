@@ -17,7 +17,7 @@ The crate is intentionally excluded from the root workspace. This avoids couplin
 ## Current scope
 
 - Uploads bounded CPU-generated tube geometry as a Bevy `Mesh3d`.
-- Shows a generation-tinted filament canopy, terminal spores, emissive nucleus, translucent membrane, and orbital cells.
+- Shows a generation-tinted filament canopy, smooth junction bulbs, terminal spores, emissive nucleus, translucent membrane, and orbital cells.
 - Uses Bevy's natural HDR bloom preset with filmic tonemapping for restrained light scattering.
 - Offers the three shared Mycelial Presence presentation modes.
 - `--reduced-motion` disables renderer-local nucleus breathing and orbital movement.
