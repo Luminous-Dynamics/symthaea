@@ -450,60 +450,81 @@ pub fn evaluate_mixed_strategy_decision_observability(
 
     let action_count = action_ids.len();
     let world_count = prepared.len();
-    let mut log_action_weights = vec![0.0_f64; action_count];
-    let mut log_world_weights = vec![0.0_f64; world_count];
-    let mut average_action = vec![0.0_f64; action_count];
-    let mut average_world = vec![0.0_f64; world_count];
-    let learning_rate = f64::from(solver.learning_rate_ppm) / f64::from(DECISION_OBSERVABILITY_PPM);
-    let iterations = f64::from(solver.iterations);
+    // If a single action is optimal in every observationally equivalent
+    // world, the mixed minimax-regret value is exactly zero. Use that action
+    // directly rather than reporting the finite-iteration optimizer's small
+    // residual probability on dominated actions as an approximate bound.
+    let common_optimal_action_index = (0..action_count).find(|action_index| {
+        prepared
+            .iter()
+            .all(|world| world.regrets_ppm[*action_index] == 0)
+    });
 
-    for _ in 0..solver.iterations {
-        let action_distribution = softmax(&log_action_weights)?;
-        let world_distribution = softmax(&log_world_weights)?;
+    let (minimax_probabilities, adversarial_probabilities, solver_iterations_used) =
+        if let Some(common_index) = common_optimal_action_index {
+            let mut minimax_probabilities = vec![0_u32; action_count];
+            minimax_probabilities[common_index] = DECISION_OBSERVABILITY_PPM;
+            let mut adversarial_probabilities = vec![0_u32; world_count];
+            adversarial_probabilities[0] = DECISION_OBSERVABILITY_PPM;
+            (minimax_probabilities, adversarial_probabilities, 0)
+        } else {
+            let mut log_action_weights = vec![0.0_f64; action_count];
+            let mut log_world_weights = vec![0.0_f64; world_count];
+            let mut average_action = vec![0.0_f64; action_count];
+            let mut average_world = vec![0.0_f64; world_count];
+            let learning_rate =
+                f64::from(solver.learning_rate_ppm) / f64::from(DECISION_OBSERVABILITY_PPM);
+            let iterations = f64::from(solver.iterations);
 
-        for (average, probability) in average_action.iter_mut().zip(&action_distribution) {
-            *average += *probability;
-        }
-        for (average, probability) in average_world.iter_mut().zip(&world_distribution) {
-            *average += *probability;
-        }
+            for _ in 0..solver.iterations {
+                let action_distribution = softmax(&log_action_weights)?;
+                let world_distribution = softmax(&log_world_weights)?;
 
-        let mut expected_loss_by_action = vec![0.0_f64; action_count];
-        let mut expected_loss_by_world = vec![0.0_f64; world_count];
-        for (world_index, world) in prepared.iter().enumerate() {
-            let adversarial_probability = world_distribution[world_index];
-            for action_index in 0..action_count {
-                let regret = f64::from(world.regrets_ppm[action_index])
-                    / f64::from(DECISION_OBSERVABILITY_PPM);
-                expected_loss_by_action[action_index] += adversarial_probability * regret;
-                expected_loss_by_world[world_index] +=
-                    action_distribution[action_index] * regret;
+                for (average, probability) in average_action.iter_mut().zip(&action_distribution) {
+                    *average += *probability;
+                }
+                for (average, probability) in average_world.iter_mut().zip(&world_distribution) {
+                    *average += *probability;
+                }
+
+                let mut expected_loss_by_action = vec![0.0_f64; action_count];
+                let mut expected_loss_by_world = vec![0.0_f64; world_count];
+                for (world_index, world) in prepared.iter().enumerate() {
+                    let adversarial_probability = world_distribution[world_index];
+                    for action_index in 0..action_count {
+                        let regret = f64::from(world.regrets_ppm[action_index])
+                            / f64::from(DECISION_OBSERVABILITY_PPM);
+                        expected_loss_by_action[action_index] += adversarial_probability * regret;
+                        expected_loss_by_world[world_index] +=
+                            action_distribution[action_index] * regret;
+                    }
+                }
+
+                for (weight, expected_loss) in
+                    log_action_weights.iter_mut().zip(expected_loss_by_action)
+                {
+                    *weight -= learning_rate * expected_loss;
+                }
+                for (weight, expected_loss) in
+                    log_world_weights.iter_mut().zip(expected_loss_by_world)
+                {
+                    *weight += learning_rate * expected_loss;
+                }
             }
-        }
 
-        for (weight, expected_loss) in log_action_weights
-            .iter_mut()
-            .zip(expected_loss_by_action)
-        {
-            *weight -= learning_rate * expected_loss;
-        }
-        for (weight, expected_loss) in log_world_weights
-            .iter_mut()
-            .zip(expected_loss_by_world)
-        {
-            *weight += learning_rate * expected_loss;
-        }
-    }
+            for value in &mut average_action {
+                *value /= iterations;
+            }
+            for value in &mut average_world {
+                *value /= iterations;
+            }
 
-    for value in &mut average_action {
-        *value /= iterations;
-    }
-    for value in &mut average_world {
-        *value /= iterations;
-    }
-
-    let minimax_probabilities = quantize_probabilities(&average_action)?;
-    let adversarial_probabilities = quantize_probabilities(&average_world)?;
+            (
+                quantize_probabilities(&average_action)?,
+                quantize_probabilities(&average_world)?,
+                solver.iterations,
+            )
+        };
 
     let mut mixed_upper_bound = 0_u32;
     for world in &prepared {
@@ -566,7 +587,7 @@ pub fn evaluate_mixed_strategy_decision_observability(
         mixed_minimax_strategy,
         avoidable_regret_lower_bound_ppm: avoidable_lower,
         avoidable_regret_upper_bound_ppm: avoidable_upper,
-        solver_iterations: solver.iterations,
+        solver_iterations: solver_iterations_used,
         solver_learning_rate_ppm: solver.learning_rate_ppm,
         solver_tolerance_ppm: solver.tolerance_ppm,
         solver_tolerance_met: duality_gap <= solver.tolerance_ppm,
@@ -674,8 +695,8 @@ mod tests {
         let class = MixedStrategyEquivalenceClass {
             equivalence_class_id: 8,
             alternatives: vec![
-                world(1, 10, distribution(500_000, 500_000), &[("left", 0), ("right", 100_000)]),
-                world(2, 11, distribution(500_000, 500_000), &[("left", 0), ("right", 200_000)]),
+                world(1, 10, distribution(1_000_000, 0), &[("left", 0), ("right", 100_000)]),
+                world(2, 11, distribution(1_000_000, 0), &[("left", 0), ("right", 200_000)]),
             ],
         };
         let result = evaluate_mixed_strategy_decision_observability(
@@ -687,6 +708,8 @@ mod tests {
         assert_eq!(result.mixed_minimax_upper_bound_ppm, 0);
         assert_eq!(result.candidate_worst_case_expected_regret_lower_bound_ppm, 0);
         assert_eq!(result.candidate_worst_case_expected_regret_upper_bound_ppm, 0);
+        assert_eq!(result.mixed_minimax_strategy, distribution(1_000_000, 0));
+        assert_eq!(result.solver_iterations, 0);
     }
 
     #[test]
