@@ -41,7 +41,8 @@
     "approximate_not_exact": true
   },
   "metrics": [
-    "candidate_worst_case_expected_regret_ppm",
+    "candidate_worst_case_expected_regret_lower_bound_ppm",
+    "candidate_worst_case_expected_regret_upper_bound_ppm",
     "deterministic_minimax_regret_ppm",
     "mixed_minimax_lower_bound_ppm",
     "mixed_minimax_upper_bound_ppm",
@@ -51,7 +52,7 @@
     "avoidable_regret_upper_bound_ppm",
     "solver_tolerance_met"
   ],
-  "tests_authored": 10,
+  "tests_authored": 11,
   "tests_executed": false,
   "benchmark_runs": false,
   "security_qualified": false,
