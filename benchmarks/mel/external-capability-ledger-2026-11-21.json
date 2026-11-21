@@ -148,6 +148,23 @@
         "The benchmark uses a ±500 ms timed-event criterion; this is not equivalent to MIDI beat-phase precision, sub-100-ms timing, or live system latency.",
         "FAD measures distribution similarity under a fixed VGGish/GTZAN procedure, not listener preference or reciprocal collaboration."
       ]
+    },
+    {
+      "source_id": "cmi-rewardbench-icml-2026",
+      "title": "CMI-RewardBench: Evaluating Music Reward Models with Compositional Multimodal Instruction — official results and toolkit",
+      "url": "https://github.com/Haiwen-Xia/CMI-RewardBench",
+      "source_class": "benchmark_leaderboard",
+      "published_or_observed_at": "ICML 2026; official repository snapshot observed 21 November 2026",
+      "retrieved_at": "2026-11-21",
+      "scope": "Reward-model evaluation for generated music conditioned on text, lyrics and reference audio. Public result tables report musicality correlations/accuracy and compositional alignment accuracy for CMI-RM, SongEval-RM, Gemini 3 Pro and CLAP.",
+      "version_snapshot": "CMI-RewardBench ICML 2026 official release repository snapshot",
+      "limitations": [
+        "This evaluates reward models/judges, not music generators; scores are not generation quality or a direct comparison to audio Elo.",
+        "The 110k CMIPref-Pseudo items are pseudo-labelled, not 110k human preference labels.",
+        "The CMI-Pref corpus is human annotated; the author and institutional materials report roughly 4,027 human preference labels, but do not assume that is the sample size for every displayed metric.",
+        "The README gives selected competitive metrics; use the paper and official evaluation script for full reproduction, split definitions, confidence intervals and subgroup analysis.",
+        "Reward-model outputs can be biased or miscalibrated and must not authorize edits or substitute for artist preference."
+      ]
     }
   ],
   "observations": [
@@ -732,6 +749,243 @@
       "comparability_group": "timingbench-2026-v1",
       "directly_comparable_to_audio_elo": false,
       "claim_ceiling": "Published temporal-control comparator only; not general musical quality or human preference."
+    },
+    {
+      "observation_id": "cmi-rm-musicality-icml2026",
+      "system": "CMI-RM",
+      "system_version": "ICML 2026 official release",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Reward-model scoring of generated music for musicality on PAM-Music, MusicEval, Music Arena and CMI-Pref.",
+      "comparability_group": "cmi-rewardbench-2026-musicality",
+      "metrics": [
+        {
+          "name": "pam_music_spearman_rho",
+          "value": 0.6606,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "musiceval_spearman_rho",
+          "value": 0.8266,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "music_arena_preference_accuracy",
+          "value": 73.43,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on Music Arena."
+        },
+        {
+          "name": "cmi_pref_preference_accuracy",
+          "value": 78.2,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on CMI-Pref."
+        }
+      ],
+      "capabilities": [
+        "Specialized reward model supports musicality scoring and inference-time top-k candidate filtering."
+      ],
+      "limitations": [
+        "Reward-model evaluation only; not a generation model result.",
+        "No single score establishes human preference, edit correctness or agency."
+      ],
+      "claim_ceiling": "A reported reward-model agreement/correlation result on its native benchmark only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "songeval-rm-musicality-icml2026",
+      "system": "SongEval-RM",
+      "system_version": "CMI-RewardBench comparison baseline",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Reward-model scoring of generated music for musicality on PAM-Music, MusicEval, Music Arena and CMI-Pref.",
+      "comparability_group": "cmi-rewardbench-2026-musicality",
+      "metrics": [
+        {
+          "name": "pam_music_spearman_rho",
+          "value": 0.6977,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "musiceval_spearman_rho",
+          "value": 0.6949,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "music_arena_preference_accuracy",
+          "value": 73.88,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on Music Arena."
+        },
+        {
+          "name": "cmi_pref_preference_accuracy",
+          "value": 72.4,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on CMI-Pref."
+        }
+      ],
+      "capabilities": [
+        "Specialized reward model baseline for musicality evaluation."
+      ],
+      "limitations": [
+        "Reward-model evaluation only; not a generation model result.",
+        "It leads CMI-RM on PAM-Music correlation and Music Arena accuracy, showing that model rankings differ by metric."
+      ],
+      "claim_ceiling": "A reported reward-model baseline on its native benchmark only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "gemini3-pro-musicality-icml2026",
+      "system": "Gemini 3 Pro",
+      "system_version": "CMI-RewardBench comparison baseline",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "General multimodal-model scoring of generated music for musicality on PAM-Music, MusicEval, Music Arena and CMI-Pref.",
+      "comparability_group": "cmi-rewardbench-2026-musicality",
+      "metrics": [
+        {
+          "name": "pam_music_spearman_rho",
+          "value": 0.5967,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "musiceval_spearman_rho",
+          "value": 0.6018,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human musicality ratings."
+        },
+        {
+          "name": "music_arena_preference_accuracy",
+          "value": 68.85,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on Music Arena."
+        },
+        {
+          "name": "cmi_pref_preference_accuracy",
+          "value": 65.8,
+          "unit": "percent_accuracy",
+          "scope": "Pairwise preference agreement on CMI-Pref."
+        }
+      ],
+      "capabilities": [
+        "General multimodal-model baseline for musicality scoring."
+      ],
+      "limitations": [
+        "Reward-model/judge evaluation only; not a generation model result.",
+        "Does not establish that general multimodal models are uniformly weak across music tasks."
+      ],
+      "claim_ceiling": "A reported general-model judge baseline on its native benchmark only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "cmi-rm-compositional-alignment-icml2026",
+      "system": "CMI-RM",
+      "system_version": "ICML 2026 official release",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Compositional instruction alignment on CMI-Pref, separately evaluated for text-only, text+lyrics, text+audio and text+lyrics+audio conditions.",
+      "comparability_group": "cmi-rewardbench-2026-compositional-alignment",
+      "metrics": [
+        {
+          "name": "pam_alignment_spearman_rho",
+          "value": 0.4321,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human text/music alignment judgments."
+        },
+        {
+          "name": "text_only_preference_accuracy",
+          "value": 67.6,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text-only condition."
+        },
+        {
+          "name": "text_plus_lyrics_preference_accuracy",
+          "value": 72.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+lyrics condition."
+        },
+        {
+          "name": "text_plus_audio_preference_accuracy",
+          "value": 76.4,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+reference-audio condition."
+        },
+        {
+          "name": "text_lyrics_audio_preference_accuracy",
+          "value": 79.2,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref compositional text+lyrics+audio condition."
+        }
+      ],
+      "capabilities": [
+        "Fine-grained alignment scoring across compositional multimodal instruction inputs."
+      ],
+      "limitations": [
+        "Reward-model evaluation only; not a generator result.",
+        "The PAM alignment correlation is not the same scale as CMI-Pref pairwise accuracy."
+      ],
+      "claim_ceiling": "A reported reward-model alignment result on its native CMI-Pref conditions only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
+    },
+    {
+      "observation_id": "gemini3-pro-compositional-alignment-icml2026",
+      "system": "Gemini 3 Pro",
+      "system_version": "CMI-RewardBench comparison baseline",
+      "capability_area": "music_understanding",
+      "evidence_kind": "human_rating_study",
+      "task_scope": "Compositional instruction alignment on CMI-Pref, separately evaluated for text-only, text+lyrics, text+audio and text+lyrics+audio conditions.",
+      "comparability_group": "cmi-rewardbench-2026-compositional-alignment",
+      "metrics": [
+        {
+          "name": "pam_alignment_spearman_rho",
+          "value": 0.5373,
+          "unit": "spearman_rho",
+          "scope": "Correlation with human text/music alignment judgments."
+        },
+        {
+          "name": "text_only_preference_accuracy",
+          "value": 67.2,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text-only condition."
+        },
+        {
+          "name": "text_plus_lyrics_preference_accuracy",
+          "value": 60.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+lyrics condition."
+        },
+        {
+          "name": "text_plus_audio_preference_accuracy",
+          "value": 68.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref text+reference-audio condition."
+        },
+        {
+          "name": "text_lyrics_audio_preference_accuracy",
+          "value": 64.8,
+          "unit": "percent_accuracy",
+          "scope": "CMI-Pref compositional text+lyrics+audio condition."
+        }
+      ],
+      "capabilities": [
+        "General multimodal-model baseline for compositional music alignment scoring."
+      ],
+      "limitations": [
+        "Reward-model/judge evaluation only; not a generation model result.",
+        "It has a higher PAM alignment correlation than CMI-RM while CMI-RM wins on the three-way compositional accuracy metric."
+      ],
+      "claim_ceiling": "A reported general-model judge baseline on its native CMI-Pref conditions only.",
+      "source_id": "cmi-rewardbench-icml-2026",
+      "directly_comparable_to_audio_elo": false
     }
   ],
   "comparison_rules": [
