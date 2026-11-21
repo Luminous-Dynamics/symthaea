@@ -105,7 +105,7 @@ pub struct MycelialJunctionHyphaGraph {
     pub schema_version: u16,
     pub source_model_version: u16,
     pub length_unit: JunctionLengthUnit,
-    pub source_model_digest: String,
+    pub source_geometry_digest: String,
     /// Complete, sorted identity set of source filaments represented by segments.
     /// This allows deserialized graph validation to detect a wholly omitted curve.
     pub source_filament_ids: Vec<u32>,
@@ -355,7 +355,7 @@ pub fn build_mycelial_junction_hypha_graph(
         }
     }
 
-    let source_model_digest = source_model_digest(model);
+    let source_geometry_digest = source_geometry_digest(model);
     let mut nodes = BTreeMap::<String, MycelialJunction>::new();
     let mut contact_to_node = BTreeMap::<(u32, u32), String>::new();
 
@@ -561,7 +561,7 @@ pub fn build_mycelial_junction_hypha_graph(
         schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
         source_model_version: model.schema_version,
         length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
-        source_model_digest,
+        source_geometry_digest,
         source_filament_ids: filaments.keys().copied().collect(),
         maximum_junction_gap_model_units: maximum_gap,
         junctions: nodes.into_values().collect(),
@@ -697,9 +697,9 @@ impl MycelialJunctionHyphaGraph {
     pub fn validate(&self) -> Result<(), MycelialJunctionGraphError> {
         if self.schema_version != MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION
             || self.source_model_version != MYCELIAL_MODEL_VERSION
-            || self.source_model_digest.len() != 64
+            || self.source_geometry_digest.len() != 64
             || !self
-                .source_model_digest
+                .source_geometry_digest
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
             || !self.maximum_junction_gap_model_units.is_finite()
@@ -1035,7 +1035,7 @@ impl MycelialJunctionHyphaGraph {
         hasher.update(&self.schema_version.to_le_bytes());
         hasher.update(&self.source_model_version.to_le_bytes());
         hasher.update(&[0]); // organism_local_model_unit
-        hasher.update(self.source_model_digest.as_bytes());
+        hasher.update(self.source_geometry_digest.as_bytes());
         hasher.update(&(self.source_filament_ids.len() as u64).to_le_bytes());
         for filament_id in &self.source_filament_ids {
             hasher.update(&filament_id.to_le_bytes());
@@ -1204,7 +1204,7 @@ fn count_components(adjacency: &[Vec<(usize, f64)>]) -> usize {
     components
 }
 
-fn source_model_digest(model: &MycelialModel) -> String {
+fn source_geometry_digest(model: &MycelialModel) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-mycelial-source-curves-v1");
     hasher.update(&model.schema_version.to_le_bytes());
@@ -1419,7 +1419,7 @@ mod tests {
     #[test]
     fn accepted_tip_to_side_fusion_splits_target_curve_and_closes_a_loop() {
         let model = fixture_model();
-        let before = source_model_digest(&model);
+        let before = source_geometry_digest(&model);
         let graph = build_mycelial_junction_hypha_graph(
             &model,
             &[accepted_tip_to_side()],
@@ -1448,7 +1448,7 @@ mod tests {
         assert_eq!(target_segments[0].t_end_micros, 500_000);
         assert_eq!(target_segments[1].t_start_micros, 500_000);
         assert_eq!(target_segments[1].t_end_micros, PARAMETER_SCALE);
-        assert_eq!(source_model_digest(&model), before);
+        assert_eq!(source_geometry_digest(&model), before);
     }
 
     #[test]
@@ -1606,7 +1606,7 @@ mod tests {
             MycelialJunctionGraphConfig::default(),
         )
         .unwrap();
-        assert_ne!(first.source_model_digest, third.source_model_digest);
+        assert_ne!(first.source_geometry_digest, third.source_geometry_digest);
     }
 
     #[test]
