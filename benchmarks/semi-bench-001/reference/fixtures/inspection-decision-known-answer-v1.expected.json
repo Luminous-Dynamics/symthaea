@@ -1,0 +1,136 @@
+{
+  "budget": {
+    "max_cash_cost": 20.0,
+    "max_minutes": 45.0,
+    "max_per_group": 1
+  },
+  "candidate_ledger": [
+    {
+      "candidate_id": "A",
+      "delay_penalty": 1.0,
+      "expected_false_hold_cost": 8.0,
+      "expected_net_value": 329.0,
+      "expected_prevented_loss": 342.0,
+      "group_id": "LOT-1",
+      "inspection_cost": 4.0,
+      "inspection_minutes": 10.0,
+      "net_value_per_minute": 32.9,
+      "residual_missed_defect_loss": 58.0,
+      "risk_probability": 0.2,
+      "selected": true
+    },
+    {
+      "candidate_id": "B",
+      "delay_penalty": 0.5,
+      "expected_false_hold_cost": 3.75,
+      "expected_net_value": 72.75,
+      "expected_prevented_loss": 80.0,
+      "group_id": "LOT-2",
+      "inspection_cost": 3.0,
+      "inspection_minutes": 5.0,
+      "net_value_per_minute": 14.55,
+      "residual_missed_defect_loss": 45.0,
+      "risk_probability": 0.5,
+      "selected": false
+    },
+    {
+      "candidate_id": "C",
+      "delay_penalty": 1.0,
+      "expected_false_hold_cost": 7.2,
+      "expected_net_value": 760.96,
+      "expected_prevented_loss": 776.16,
+      "group_id": "LOT-3",
+      "inspection_cost": 7.0,
+      "inspection_minutes": 20.0,
+      "net_value_per_minute": 38.048,
+      "residual_missed_defect_loss": 23.84,
+      "risk_probability": 0.1,
+      "selected": true
+    },
+    {
+      "candidate_id": "D",
+      "delay_penalty": 1.0,
+      "expected_false_hold_cost": 3.6,
+      "expected_net_value": 9.1,
+      "expected_prevented_loss": 14.7,
+      "group_id": "LOT-4",
+      "inspection_cost": 1.0,
+      "inspection_minutes": 4.0,
+      "net_value_per_minute": 2.275,
+      "residual_missed_defect_loss": 20.3,
+      "risk_probability": 0.7,
+      "selected": false
+    },
+    {
+      "candidate_id": "E",
+      "delay_penalty": 2.0,
+      "expected_false_hold_cost": 4.75,
+      "expected_net_value": 106.75,
+      "expected_prevented_loss": 121.5,
+      "group_id": "LOT-1",
+      "inspection_cost": 8.0,
+      "inspection_minutes": 15.0,
+      "net_value_per_minute": 7.116666666667,
+      "residual_missed_defect_loss": 28.5,
+      "risk_probability": 0.05,
+      "selected": false
+    },
+    {
+      "candidate_id": "F",
+      "delay_penalty": 0.5,
+      "expected_false_hold_cost": 3.5,
+      "expected_net_value": 196.2,
+      "expected_prevented_loss": 205.2,
+      "group_id": "LOT-5",
+      "inspection_cost": 5.0,
+      "inspection_minutes": 15.0,
+      "net_value_per_minute": 13.08,
+      "residual_missed_defect_loss": 34.8,
+      "risk_probability": 0.3,
+      "selected": true
+    }
+  ],
+  "case_id": "SEMI-INSPECT-KA-001",
+  "claim_limits": {
+    "expected_values_are_model_based_not_observed": true,
+    "policy_optimum_is_exact_only_for_this_finite_candidate_set": true,
+    "uninspected_units_remain_unknown": true
+  },
+  "expected_value_ranking": [
+    "C",
+    "A",
+    "F",
+    "E",
+    "B",
+    "D"
+  ],
+  "risk_only_comparator": {
+    "expected_net_value": 607.05,
+    "inspection_cost": 13.0,
+    "inspection_minutes": 34.0,
+    "selected_candidate_ids": [
+      "A",
+      "B",
+      "D",
+      "F"
+    ]
+  },
+  "risk_only_ranking": [
+    "D",
+    "B",
+    "F",
+    "A",
+    "C",
+    "E"
+  ],
+  "schema": "luminous.semi-bench.inspection-decision-report.v1",
+  "selected_candidate_ids": [
+    "A",
+    "C",
+    "F"
+  ],
+  "selected_expected_net_value": 1286.16,
+  "selected_inspection_cost": 16.0,
+  "selected_inspection_minutes": 45.0,
+  "selection_policy": "exact-exhaustive-net-value-maximization"
+}
