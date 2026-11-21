@@ -371,8 +371,8 @@ mod tests {
     fn checked_in_ledger_has_valid_references_and_comparison_groups() {
         let ledger = current_ledger();
         validate_ledger(&ledger).expect("ledger must satisfy semantic validator");
-        assert_eq!(ledger.sources.len(), 10);
-        assert_eq!(ledger.observations.len(), 16);
+        assert_eq!(ledger.sources.len(), 11);
+        assert_eq!(ledger.observations.len(), 21);
     }
 
     #[test]
