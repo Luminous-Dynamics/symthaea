@@ -511,3 +511,8 @@ The new validator's 11 tests passed locally, and its CLI reproduced the frozen J
 ## Latest clean-base verification
 
 The clean-base successor PR [#13126](https://github.com/Luminous-Dynamics/symthaea/pull/13126) has a verified hosted GitHub Actions pass: [run #44917273962](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962), commit `5f8ffa91bac2cb8cee923d0f1968d2f57fd01149`. The full reference suite passed **46/46**, and binary-metric, inspection-decision and contrastive-pair JSON reports all reproduced byte-for-byte. This is hosted CI evidence; no full local run of all 46 tests is claimed.
+
+
+## Latest verification on the current clean-base PR head
+
+Hosted GitHub Actions run [#44917385489](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489) completed successfully on commit `010faa4a517d4dc46a57a9b0f6b07015a188bf35`. All **46/46** reference tests passed, and the binary-metric, inspection-decision and contrastive-pair reports each matched their frozen expected JSON byte-for-byte. No full local run of all 46 tests is claimed.
