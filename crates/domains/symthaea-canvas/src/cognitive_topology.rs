@@ -178,14 +178,20 @@ impl fmt::Display for CognitiveTopologyError {
             Self::InvalidLabel => write!(f, "invalid node label"),
             Self::InvalidProducer => write!(f, "invalid evidence producer"),
             Self::InvalidTraceDigest => {
-                write!(f, "trace digest must be 64 lowercase hexadecimal characters")
+                write!(
+                    f,
+                    "trace digest must be 64 lowercase hexadecimal characters"
+                )
             }
             Self::InvalidSequence => write!(
                 f,
                 "evidence sequence is zero, exceeds last_sequence, or has non-monotonic time"
             ),
             Self::ConflictingEventMetadata => {
-                write!(f, "one event identity or sequence has conflicting evidence metadata")
+                write!(
+                    f,
+                    "one event identity or sequence has conflicting evidence metadata"
+                )
             }
             Self::DuplicateNode(id) => write!(f, "duplicate cognitive node {id}"),
             Self::DuplicateEdge(id) => write!(f, "duplicate cognitive edge {id}"),
@@ -216,7 +222,9 @@ impl CognitiveTopology {
     /// resource bounds before this object is consumed by a layout or renderer.
     pub fn validate(&self) -> Result<(), CognitiveTopologyError> {
         if self.schema_version != COGNITIVE_TOPOLOGY_SCHEMA_VERSION {
-            return Err(CognitiveTopologyError::UnsupportedVersion(self.schema_version));
+            return Err(CognitiveTopologyError::UnsupportedVersion(
+                self.schema_version,
+            ));
         }
         validate_identifier(&self.session_id, "session")?;
         if self.nodes.len() > MAX_COGNITIVE_NODES {
@@ -226,16 +234,16 @@ impl CognitiveTopology {
             return Err(CognitiveTopologyError::EdgeLimitExceeded(self.edges.len()));
         }
         if self.episodes.len() > MAX_COGNITIVE_EPISODES {
-            return Err(CognitiveTopologyError::EpisodeLimitExceeded(self.episodes.len()));
+            return Err(CognitiveTopologyError::EpisodeLimitExceeded(
+                self.episodes.len(),
+            ));
         }
 
         let mut node_ids = HashSet::with_capacity(self.nodes.len());
         let mut edge_ids = HashSet::with_capacity(self.edges.len());
         let mut episode_ids = HashSet::with_capacity(self.episodes.len());
-        let mut event_metadata = HashMap::<
-            String,
-            (String, u64, u64, CognitiveProvenance, Option<String>),
-        >::new();
+        let mut event_metadata =
+            HashMap::<String, (String, u64, u64, CognitiveProvenance, Option<String>)>::new();
         let mut sequence_events = BTreeMap::<u64, String>::new();
         let mut sequence_times = BTreeMap::<u64, u64>::new();
 
@@ -268,10 +276,14 @@ impl CognitiveTopology {
             validate_identifier(&edge.source, "edge source")?;
             validate_identifier(&edge.target, "edge target")?;
             if !node_ids.contains(edge.source.as_str()) {
-                return Err(CognitiveTopologyError::DanglingEdgeEndpoint(edge.source.clone()));
+                return Err(CognitiveTopologyError::DanglingEdgeEndpoint(
+                    edge.source.clone(),
+                ));
             }
             if !node_ids.contains(edge.target.as_str()) {
-                return Err(CognitiveTopologyError::DanglingEdgeEndpoint(edge.target.clone()));
+                return Err(CognitiveTopologyError::DanglingEdgeEndpoint(
+                    edge.target.clone(),
+                ));
             }
             validate_activation(&edge.id, edge.activation)?;
             validate_evidence(
@@ -713,12 +725,13 @@ mod tests {
 
     #[test]
     fn checked_in_fixture_matches_the_reference_topology() {
-        let checked_in: CognitiveTopology = serde_json::from_str(include_str!(
-            "../tests/fixtures/cognitive_topology_v1.json"
-        ))
-        .expect("checked-in cognitive topology fixture must deserialize");
+        let checked_in: CognitiveTopology =
+            serde_json::from_str(include_str!("../tests/fixtures/cognitive_topology_v1.json"))
+                .expect("checked-in cognitive topology fixture must deserialize");
         assert_eq!(checked_in, fixture());
-        checked_in.validate().expect("checked-in fixture must validate");
+        checked_in
+            .validate()
+            .expect("checked-in fixture must validate");
     }
 
     #[test]
@@ -738,13 +751,13 @@ mod tests {
             episode.kind == CognitiveEpisodeKind::Prediction
                 && episode.state == CognitiveEpisodeState::Unresolved
         }));
-        assert!(topology
-            .nodes
-            .iter()
-            .filter(|node| node.status == EpistemicStatus::Candidate)
-            .any(|node| {
-            node.kind == CognitiveNodeKind::Prediction
-        }));
+        assert!(
+            topology
+                .nodes
+                .iter()
+                .filter(|node| node.status == EpistemicStatus::Candidate)
+                .any(|node| { node.kind == CognitiveNodeKind::Prediction })
+        );
     }
 
     #[test]
@@ -759,7 +772,12 @@ mod tests {
             episode.node_ids.reverse();
             episode.edge_ids.reverse();
         }
-        assert_eq!(expected, reordered.canonical_digest().expect("valid reordered fixture"));
+        assert_eq!(
+            expected,
+            reordered
+                .canonical_digest()
+                .expect("valid reordered fixture")
+        );
     }
 
     #[test]
@@ -768,7 +786,10 @@ mod tests {
         let original = topology.canonical_digest().expect("valid fixture");
         let mut changed = topology;
         changed.nodes[0].label.push_str(" updated");
-        assert_ne!(original, changed.canonical_digest().expect("valid changed fixture"));
+        assert_ne!(
+            original,
+            changed.canonical_digest().expect("valid changed fixture")
+        );
     }
 
     #[test]
@@ -777,16 +798,17 @@ mod tests {
         topology.edges[0].target = "missing-node".to_string();
         assert_eq!(
             topology.validate(),
-            Err(CognitiveTopologyError::DanglingEdgeEndpoint("missing-node".to_string()))
+            Err(CognitiveTopologyError::DanglingEdgeEndpoint(
+                "missing-node".to_string()
+            ))
         );
     }
 
     #[test]
     fn renderer_local_provenance_cannot_be_admitted_as_cognitive_evidence() {
-        let mut value: serde_json::Value = serde_json::from_str(include_str!(
-            "../tests/fixtures/cognitive_topology_v1.json"
-        ))
-        .expect("fixture JSON");
+        let mut value: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/cognitive_topology_v1.json"))
+                .expect("fixture JSON");
         value["nodes"][0]["evidence"]["provenance"] =
             serde_json::Value::String("renderer_local".to_string());
         assert!(serde_json::from_value::<CognitiveTopology>(value).is_err());
@@ -810,25 +832,37 @@ mod tests {
                 episode.evidence.monotonic_ns = 4_000;
             }
         }
-        assert_eq!(topology.validate(), Err(CognitiveTopologyError::InvalidSequence));
+        assert_eq!(
+            topology.validate(),
+            Err(CognitiveTopologyError::InvalidSequence)
+        );
     }
 
     #[test]
     fn conflicting_metadata_for_one_event_is_rejected() {
         let mut topology = fixture();
         topology.edges[0].evidence.monotonic_ns += 1;
-        assert_eq!(topology.validate(), Err(CognitiveTopologyError::ConflictingEventMetadata));
+        assert_eq!(
+            topology.validate(),
+            Err(CognitiveTopologyError::ConflictingEventMetadata)
+        );
     }
 
     #[test]
     fn invalid_activation_and_out_of_range_sequence_are_rejected() {
         let mut topology = fixture();
         topology.nodes[0].activation = Some(f32::NAN);
-        assert!(matches!(topology.validate(), Err(CognitiveTopologyError::InvalidActivation(_))));
+        assert!(matches!(
+            topology.validate(),
+            Err(CognitiveTopologyError::InvalidActivation(_))
+        ));
 
         let mut topology = fixture();
         topology.nodes[0].evidence.sequence = topology.last_sequence + 1;
-        assert_eq!(topology.validate(), Err(CognitiveTopologyError::InvalidSequence));
+        assert_eq!(
+            topology.validate(),
+            Err(CognitiveTopologyError::InvalidSequence)
+        );
     }
 
     #[test]
@@ -847,7 +881,9 @@ mod tests {
         }
         assert_eq!(
             topology.validate(),
-            Err(CognitiveTopologyError::NodeLimitExceeded(MAX_COGNITIVE_NODES + 1))
+            Err(CognitiveTopologyError::NodeLimitExceeded(
+                MAX_COGNITIVE_NODES + 1
+            ))
         );
     }
 }
