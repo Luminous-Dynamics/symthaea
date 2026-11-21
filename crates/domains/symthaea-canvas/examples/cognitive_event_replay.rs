@@ -103,6 +103,49 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !replay_trace_agreement || !replay_projection_agreement {
         return Err("independent projection replay diverged".into());
     }
+
+    let replay_assurance_receipt = serde_json::json!({
+        "schema_version": 1,
+        "claim_scope": "same_binary_same_process_projection_replay",
+        "input": {
+            "session_id": session_id,
+            "accepted_event_count": reducer.events().len(),
+            "event_log_digest": event_log_digest,
+            "semantic_snapshot_digest": semantic_digest,
+        },
+        "assertions": {
+            "byte_identity": {
+                "status": "not_assessed",
+                "reason": "source artifact bytes are not compared by this CLI"
+            },
+            "trace_identity": {
+                "status": if replay_trace_agreement { "established" } else { "failed" },
+                "scope": "accepted event log digest agreement",
+                "verifier": "independent reducer replay in same process"
+            },
+            "projection_equivalence": {
+                "status": if replay_projection_agreement { "established" } else { "failed" },
+                "scope": "canonical semantic snapshot digest agreement",
+                "verifier": "independent reducer replay in same process"
+            },
+            "path_identity": {
+                "status": "not_assessed",
+                "reason": "model and tool path receipts are not part of the graph event fixture"
+            },
+            "decision_equivalence": {
+                "status": "not_assessed",
+                "reason": "no task-specific decision equivalence oracle is supplied"
+            },
+            "execution_replay": {
+                "status": "not_assessed",
+                "reason": "no recorded model/tool execution receipts or live-call guard are supplied"
+            },
+            "environment_equivalence": {
+                "status": "not_assessed",
+                "reason": "graph projection forks do not model or reconcile external effects"
+            }
+        }
+    });
     let geometry_digest = morphology.geometry_digest_hex()?;
 
     if let Some(path) = &svg_path {
@@ -126,6 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("last_sequence: {}", snapshot.last_sequence);
     println!("semantic_snapshot_digest: {semantic_digest}");
     println!("event_log_digest: {event_log_digest}");
+    println!("replay_assurance_json: {}", serde_json::to_string(&replay_assurance_receipt)?);
     println!("replay_assurance_schema_version: 1");
     println!("replay_assurance_scope: same-binary same-process projection replay");
     println!("replay_assertion.byte_identity: not_assessed");
