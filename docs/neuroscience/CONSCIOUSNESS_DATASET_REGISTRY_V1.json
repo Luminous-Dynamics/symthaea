@@ -153,11 +153,6 @@
       "paper_doi": "10.1038/s41586-025-08888-1",
       "data_url": "https://cogitate-consortium.github.io/cogitate-data/03_cogdataset/",
       "participants_total": 256,
-      "release_documentation_counts": {
-        "fmri": 118,
-        "meg_eeg": 100,
-        "ieeg": 38
-      },
       "denominator_status": "modality_level_counts_reconciled; endpoint_specific_iEEG_and_release_manifest_reconciliation_required",
       "modalities": [
         "fMRI",
@@ -178,7 +173,7 @@
         "optimization and replication phase membership must be frozen from participant-level metadata or the exact supplementary mapping, never inferred by random repartition",
         "published outcomes have been inspected; subsequent analysis is reproduction or secondary analysis, not a blind holdout"
       ],
-      "acquisition_status": "public_release_documentation_reviewed; data_access_terms_to_be_checked",
+      "acquisition_status": "public_catalogue_and_release_documentation_audited; exact modality bundle intake_not_started",
       "paper_cohort_counts": {
         "fmri": 120,
         "meg": 102,
@@ -205,6 +200,36 @@
         ],
         "access_note": "Data are openly licensed but download portal access requires a user account; verify exact bundle DOI/version and terms at intake",
         "current_documentation": "COGITATE Data Release wiki V1.3"
+      },
+      "catalogue_cohort_counts": {
+        "fmri": 118,
+        "meg_eeg": 100,
+        "ieeg": 38
+      },
+      "modality_release_status": {
+        "fmri_experiment_1": {
+          "status": "raw_and_bids_formats_reported_released_in_data_release_v1.3",
+          "documentation_version": "V1.3",
+          "note": "Official introduction states raw/unprocessed and BIDS fMRI Experiment 1 are released."
+        },
+        "meeg_experiment_1": {
+          "status": "release_documentation_exists_but_current_v1.3_overview_lists_raw_all_batches_as_future",
+          "documentation_versions": [
+            "V1.0 batch 1",
+            "V1.2 batch 2",
+            "V1.3 overview"
+          ],
+          "note": "The introduction lists raw/unprocessed M-EEG batch 1 and batch 2 among future releases. Verify exact content and format of each versioned bundle before declaring a file-level release complete."
+        },
+        "ieeg": {
+          "status": "versioned_release_documentation_exists",
+          "documentation_version": "V1.1",
+          "note": "The cohort is 38 in the current catalogue; inspect exact release bundle and terms before intake."
+        },
+        "experiment_2": {
+          "status": "not_yet_released_in_v1.3_overview",
+          "note": "Raw/BIDS fMRI and M-EEG formats are listed as future releases."
+        }
       }
     },
     {
