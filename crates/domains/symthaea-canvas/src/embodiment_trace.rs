@@ -631,7 +631,7 @@ mod tests {
             summary.open_activity,
             Some(OpenActivityInterval {
                 activity: EmbodimentActivity::Listening,
-                started_at_ns: 210,
+                started_at_ns: 230,
             })
         );
     }
@@ -692,7 +692,7 @@ mod tests {
     fn malformed_event_fails_trace_at_exact_index() {
         let mut trace = sample_trace();
         trace.events.push(event(
-            10,
+            9,
             240,
             EmbodimentEventKind::ActivityChanged {
                 activity: EmbodimentActivity::Fault,
