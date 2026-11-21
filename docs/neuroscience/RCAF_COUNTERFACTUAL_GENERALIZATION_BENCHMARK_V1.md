@@ -132,6 +132,21 @@ The benchmark should compare against the right public baselines, not manufacture
 4. **Network Similarity Index.** Buchanan et al. (2026) provide an expert-anchored precision-fMRI map-quality assessment with nested-CV usability prediction. RCAF/CETB should reuse NSI when input compatibility and its intended PFM use case match, rather than clone or relabel it.
 5. **External validation.** Rosenblatt et al. (2026) emphasize independent-dataset validation as stricter evidence than unseen-sample validation within one dataset. CETB's tiers must preserve that distinction.
 
+### Operational comparator stack: qualify the ecosystem, do not rebuild it
+
+The competitive baseline is not just papers and leaderboards. The current research-software ecosystem already separates acquisition preprocessing, postprocessing/denoising, connectivity construction and individualized quality assessment. CETB/RCAF should be an independent qualification layer over those outputs.
+
+| Tool or deployment | Existing role | Fair CETB comparison |
+|---|---|---|
+| fMRIPrep | BIDS-oriented minimal preprocessing; motion correction, susceptibility unwarping, normalization, bias correction, brain extraction and per-subject visual reports | Pin exact version and configuration; consume its derivatives and reports rather than claiming to replace preprocessing |
+| XCP-D | Continues from fMRIPrep/HCP/ABCD/UK Biobank-like derivatives into denoising, QC and connectivity outputs | Run on the same derivative set; compare QC/denoising and connectivity outputs under identical input conditions |
+| CONN 25b | Established SPM-based connectivity toolbox for resting/task fMRI, with transparent methods reporting and combined denoising/QC workflows | Treat as an alternative analysis implementation; compare exact denoising choices, FC matrices, QC decisions and participant-level outputs |
+| ABCD Coordinating Center 4.1.0 (18 Nov 2026) | Operational pipeline deployment combining fMRIPrep 25.1.4, XCP-D 26.1.1 and ReproTM individualized network maps | Use as a pinned real-world pipeline-stack reference, not as an independent accuracy score |
+| Network Similarity Index (NSI) | Precision-fMRI map-quality / usable-network assessment | Reuse only where its CIFTI/precision-fMRI input assumptions and intended endpoint match; do not substitute it for RCAF inference |
+
+These tools are mature and complementary. The differentiator is to attach a stronger claim-scoped evidence package to their outputs: known-truth injection recovery, artifact-only false alarms, signal × artifact interaction, transformation-contract checks, calibration intervals, selection/leakage audits, transportability and content-addressed replay evidence.
+
+An implementable industry-facing comparison should freeze the same BIDS input release, atlas, censoring rules, denoising strategy and FC estimator. Run fMRIPrep → XCP-D and an agreed CONN configuration, then evaluate each output with the same RCAF matrix-comparison and participant-level qualification harness. Also preserve each native tool's intended outputs and QC, rather than forcing all packages into one artificial API. Report runtime, memory, hardware, failed subjects, QC attrition and all exclusions.
 ### The actual route to outperformance
 
 A credible advantage is not "beat 90% accuracy" on a different task. It is to deliver a benchmark where the **same frozen input, target, split, and preprocessing** pass through all four layers; where signal and nuisance interventions are independently controlled; where failure modes are localized; and where external confirmation is untouched.
