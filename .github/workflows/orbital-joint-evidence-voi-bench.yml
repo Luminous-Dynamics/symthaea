@@ -31,6 +31,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate standalone action contract and example fixtures
+        run: |
+          jq -e '
+            .title == "EvidenceActionProposalOutcomeV1" and
+            (.oneOf | length == 2) and
+            ."\u0024defs".proposal.properties.no_actuation.const == true and
+            ."\u0024defs".outcome.properties.authority_granted.const == false
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-proposal-outcome.schema.json
+          jq -e '
+            .schema == "EvidenceActionProposalOutcomeV1" and
+            .record_kind == "PROPOSAL" and
+            .no_actuation == true and .authority_granted == false and
+            .change_impact.completeness == "COMPLETE" and
+            (.requalification_claims_covered | index("STRUCTURAL-INTERFACE-CAPABILITY-001") != null)
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json
+          jq -e '
+            .schema == "EvidenceActionProposalOutcomeV1" and
+            .record_kind == "OUTCOME" and
+            .execution_attempted == true and .execution_state == "ABORTED" and
+            .actual_resources != null and .verification.state == "INDETERMINATE" and
+            .authority_granted == false
+          ' fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json
       - name: Format
         run: cargo fmt --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --check
       - name: Rust tests
