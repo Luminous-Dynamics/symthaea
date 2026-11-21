@@ -56,8 +56,8 @@ jobs:
           jq -e '
             .title == "OrbitalJointSequentialPlanningCorpusV0_1" and
             ."$defs".scenario.properties.max_actions.maximum == 8 and
-            (. "$defs".scenario.required | index("decision_obligations") != null) and
-            (. "$defs".action.required | index("obligations_covered") != null) and
+            (."$defs".scenario.required | index("decision_obligations") != null) and
+            (."$defs".action.required | index("obligations_covered") != null) and
             ."$defs".action.properties.admissibility.enum == ["ADMISSIBLE","INADMISSIBLE"]
           ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.schema.json
           jq -e '
