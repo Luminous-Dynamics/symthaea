@@ -388,14 +388,18 @@
       },
       "license": {
         "dataset_card_field": "other",
-        "exact_terms": "must be reviewed before downloading, caching or redistribution",
-        "status": "not-yet-cleared-for-redistribution"
+        "reason": "The generated placement DEFs derive from ChiPBench benchmark inputs; PPAPlace does not assert a new blanket license over third-party design material.",
+        "included_notice": "ChiPBench top-level BSD-3-Clause notice is reproduced in THIRD_PARTY_NOTICES.md.",
+        "residual_rights": "Individual benchmark designs may retain additional upstream notices.",
+        "required_review": "Review PPAPlace THIRD_PARTY_NOTICES.md and each relevant upstream design notice before downloading, caching, modifying or redistributing placement archives.",
+        "status": "metadata-and-rights-explanation-reviewed; redistribution-not-cleared"
       },
       "acquisition": {
         "raw_data_in_repository": false,
         "exact_dataset_revision": null,
         "exact_archive_sha256": null,
-        "split_manifest_status": "not-yet-frozen"
+        "split_manifest_status": "not-yet-frozen",
+        "rights_review_reference": "https://huggingface.co/datasets/ValleyC/PPAPlace-5000#provenance-and-license"
       }
     },
     {
