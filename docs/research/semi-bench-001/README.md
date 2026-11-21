@@ -449,3 +449,12 @@ New workstreams:
 - [SEMI-SUBSTRATE-001 #13114](https://github.com/Luminous-Dynamics/symthaea/issues/13114): crystal growth, ingot slicing, wafer machining, material utilization and substrate metrology.
 
 The key change is to treat random-split performance on GAN-augmented MixedWM38 as a data/pipeline check, not a claim of factory generalization. For SECOM, the public external baseline uses a stratified random split and must remain separate from a forward-time evaluation.
+
+
+## SECOM source integrity and chronology audit
+
+A public UCI-attributed SECOM mirror was audited without importing its raw data into the repository. The audit confirms 1,567 aligned feature/label rows, 590 numeric sensor columns, 41,951 missing values (all rows contain at least one), 104 failures, non-decreasing source timestamp order and 33 repeated timestamp rows. The mirror's Git blob identities are recorded; byte identity to the official UCI download remains unverified.
+
+A contiguous chronological 60/20/20 proposal contains 76/11/17 failures in train/validation/test. This is a source-clock chronology stress split, not an evaluated model result. Validation/test positive counts are small; no lot/tool IDs are present, and timestamps have no timezone. Full audit: [secom-source-integrity-audit-v0.1.json](secom-source-integrity-audit-v0.1.json).
+
+The split validator now supports either offset-aware timestamps or source-local naive timestamps with an explicit clock-domain ID. The latter establishes ordering only within that declared source clock; it does not create UTC or cross-site time comparability.
