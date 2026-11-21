@@ -71,6 +71,104 @@ pub struct InjectionRecoveryReport {
     pub median_injected_positive_gap_fraction: f64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct InjectionRecoverySweepReport {
+    pub schema_version: &'static str,
+    pub effect_size_points: usize,
+    pub endpoint_median_gap_difference: f64,
+    pub monotonic_adjacent_pair_fraction: f64,
+    pub reports: Vec<InjectionRecoveryReport>,
+}
+
+impl InjectionRecoverySweepReport {
+    /// Render the complete dose-response curve as stable JSON.
+    pub fn to_json_pretty(&self) -> String {
+        let rendered_reports = self
+            .reports
+            .iter()
+            .map(|report| {
+                report
+                    .to_json_pretty()
+                    .lines()
+                    .map(|line| format!("  {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .collect::<Vec<_>>()
+            .join(",\n");
+        format!(
+            concat!(
+                "{{\n",
+                "  \"schema_version\": \"{}\",\n",
+                "  \"effect_size_points\": {},\n",
+                "  \"endpoint_median_gap_difference\": {:.12},\n",
+                "  \"monotonic_adjacent_pair_fraction\": {:.12},\n",
+                "  \"reports\": [\n{}\n  ],\n",
+                "  \"claim_limits\": [\"synthetic_factor_model_only\", \"not_a_biological_dose_response\", \"not_clinically_validated\"]\n",
+                "}}\n"
+            ),
+            self.schema_version,
+            self.effect_size_points,
+            self.endpoint_median_gap_difference,
+            self.monotonic_adjacent_pair_fraction,
+            rendered_reports,
+        )
+    }
+}
+
+/// Evaluate an increasing grid of factor-loading perturbations with common random numbers.
+///
+/// The same seed and same draw order are used at every effect size. Thus the baseline
+/// participant loadings and sampled segments are held constant while only the declared
+/// injected loading delta changes. The first point may be zero and is the null-dose control.
+pub fn run_injection_recovery_sweep(
+    config: &InjectionRecoveryConfig,
+    effect_sizes: &[f64],
+) -> Result<InjectionRecoverySweepReport, MetricError> {
+    if effect_sizes.len() < 2 {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "at least two effect sizes are required for a sweep",
+        });
+    }
+    let mut previous = -1.0;
+    for effect in effect_sizes {
+        if !effect.is_finite() || *effect < 0.0 || *effect <= previous {
+            return Err(MetricError::InvalidSimulationConfig {
+                reason: "effect sizes must be finite, non-negative and strictly increasing",
+            });
+        }
+        previous = *effect;
+    }
+
+    let mut reports = Vec::with_capacity(effect_sizes.len());
+    for effect in effect_sizes {
+        let mut point_config = config.clone();
+        point_config.injection_loading_delta = *effect;
+        reports.push(run_injection_recovery(&point_config)?);
+    }
+
+    let first_gap = reports
+        .first()
+        .expect("validated effect-size grid is non-empty")
+        .median_injected_paired_gap;
+    let last_gap = reports
+        .last()
+        .expect("validated effect-size grid is non-empty")
+        .median_injected_paired_gap;
+    let adjacent_increases = reports
+        .windows(2)
+        .filter(|pair| pair[1].median_injected_paired_gap > pair[0].median_injected_paired_gap)
+        .count();
+
+    Ok(InjectionRecoverySweepReport {
+        schema_version: "rcaf.injection-recovery-sweep/0.1.0",
+        effect_size_points: reports.len(),
+        endpoint_median_gap_difference: last_gap - first_gap,
+        monotonic_adjacent_pair_fraction: adjacent_increases as f64 / (reports.len() - 1) as f64,
+        reports,
+    })
+}
+
 impl InjectionRecoveryReport {
     /// Render a stable JSON representation without a serialization dependency.
     pub fn to_json_pretty(&self) -> String {
@@ -300,9 +398,9 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "alpha must be finite and in (0, 0.5)",
         });
     }
-    if !config.injection_loading_delta.is_finite() || config.injection_loading_delta <= 0.0 {
+    if !config.injection_loading_delta.is_finite() || config.injection_loading_delta < 0.0 {
         return Err(MetricError::InvalidSimulationConfig {
-            reason: "injection_loading_delta must be finite and positive",
+            reason: "injection_loading_delta must be finite and non-negative",
         });
     }
     if !config.loading_jitter.is_finite() || config.loading_jitter < 0.0 {
@@ -530,6 +628,33 @@ mod tests {
         config.injection_loading_delta = 1.2;
         assert!(matches!(
             run_injection_recovery(&config),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+    }
+
+    #[test]
+    fn dose_response_sweep_uses_sorted_effect_sizes_and_increases_at_strong_endpoint() {
+        let mut config = test_config();
+        config.monte_carlo_replicates = 30;
+        let sweep = run_injection_recovery_sweep(&config, &[0.0, 0.2, 0.4]).unwrap();
+        assert_eq!(sweep.effect_size_points, 3);
+        assert!(sweep.endpoint_median_gap_difference > 0.04);
+        assert!(
+            sweep.reports[2].median_injected_paired_gap
+                > sweep.reports[0].median_injected_paired_gap
+        );
+        assert!(sweep.monotonic_adjacent_pair_fraction >= 0.5);
+    }
+
+    #[test]
+    fn dose_response_rejects_unsorted_or_repeated_effect_sizes() {
+        let config = test_config();
+        assert!(matches!(
+            run_injection_recovery_sweep(&config, &[0.2, 0.1]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        assert!(matches!(
+            run_injection_recovery_sweep(&config, &[0.1, 0.1]),
             Err(MetricError::InvalidSimulationConfig { .. })
         ));
     }
