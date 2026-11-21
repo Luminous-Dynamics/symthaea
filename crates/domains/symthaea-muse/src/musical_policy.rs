@@ -13,7 +13,7 @@ use crate::cognitive_bridge::{
 };
 use serde::{Deserialize, Serialize};
 use symthaea_music_theory::{
-    TheoryValidationReport, ValidationSeverity, is_universal_invariant,
+    TheoryValidationReport, ValidationSeverity, score_validation::is_universal_invariant,
 };
 
 pub const MUSICAL_POLICY_VERSION: &str = "musical-policy-v1";
