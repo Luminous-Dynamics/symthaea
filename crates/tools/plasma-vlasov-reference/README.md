@@ -141,7 +141,7 @@ This is an **offline qualification gate**, not a transfer operator, adaptive
 controller, rigorous continuum error bound, or permission to change a live
 solver state. Thresholds must be calibrated and preregistered for the relevant
 equation cohort. Persist the complete evidence and budget next to each receipt;
-the returned Rust value is not itself a JSON serializer.
+the returned Rust value is not itself a JSON serializer. Persist missing measurements as explicit JSON null values when recording an inconclusive attempt; the schema allows these nulls, while an accepted record requires complete numeric measurements and valid SHA-256 identities.
 
 The portable evidence shape is described in
 `benchmarks/plasma/schemas/representation-transition-v0.1.schema.json`.
