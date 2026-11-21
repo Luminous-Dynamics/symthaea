@@ -183,10 +183,12 @@ impl MetricObservation {
         validate_time_interval(self.time_start, self.time_end)?;
         self.provenance.validate()?;
 
-        if let Some(reason) = &self.applicability_reason {
-            if reason.trim().is_empty() {
-                return Err(LedgerError::EmptyReason);
-            }
+        if self
+            .applicability_reason
+            .as_ref()
+            .is_some_and(|reason| reason.trim().is_empty())
+        {
+            return Err(LedgerError::EmptyReason);
         }
 
         match self.applicability {
