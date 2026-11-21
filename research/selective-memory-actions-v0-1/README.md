@@ -14,6 +14,7 @@ cargo fmt --manifest-path research/selective-memory-actions-v0-1/Cargo.toml -- -
 - Separates ingestion actions from query-time information actions.
 - Ranks precomputed probability-weighted loss distributions using integer fixed-point arithmetic.
 - Applies hard admission gates before cost ranking.
+- Requires a separate per-action hard-resource-feasibility result from the #9666 budget owner; infeasible actions cannot win through a low scalar cost.
 - Enforces an upstream-derived evidence freshness assessment at actual use time (age budget plus signed deadline slack); unknown or late use is blocked. Retrieval age is recorded separately for diagnostics.
 - Uses deterministic tie-breaking from a frozen policy rank.
 - Binds every run to canonical time semantics, freshness metric definitions and task-specific age/deadline budgets via manifest digests.
