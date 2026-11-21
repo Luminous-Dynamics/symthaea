@@ -7,21 +7,18 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    env,
-    fs,
+    env, fs,
     path::Path,
     process::{Command, ExitCode},
 };
 
 use symthaea_muse::rmi_benchmark::{
-    evaluate_rmi_pair, evaluate_rmi_reciprocal_pair, FixedPartnerResponsePolicyV1,
-    FixedResponsePolicyV1, ImitationOnlyPolicyV1, OneWayPromptPolicyV1,
-    RmiAgentActionV1, RmiEvaluationEnvelopeV1, RmiInterventionPairV1,
-    RmiMusicalFeaturesV1, RmiPartnerPolicyV1, RmiPartnerResponseV1,
-    RmiPolicyV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1,
-    RmiTargetFeatureV1, RmiHistoryActorV1, RmiHistoryEventV1,
-    SyntheticContingentPolicyV1, SyntheticResponsivePartnerPolicyV1,
-    YokedReplayPolicyV1,
+    FixedPartnerResponsePolicyV1, FixedResponsePolicyV1, ImitationOnlyPolicyV1,
+    OneWayPromptPolicyV1, RmiAgentActionV1, RmiEvaluationEnvelopeV1, RmiHistoryActorV1,
+    RmiHistoryEventV1, RmiInterventionPairV1, RmiMusicalFeaturesV1, RmiPartnerPolicyV1,
+    RmiPartnerResponseV1, RmiPolicyV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1,
+    RmiTargetFeatureV1, SyntheticContingentPolicyV1, SyntheticResponsivePartnerPolicyV1,
+    YokedReplayPolicyV1, evaluate_rmi_pair, evaluate_rmi_reciprocal_pair,
 };
 
 const RUNNER_SCHEMA_V1: &str = "melothaea-rmi-track-a-report-v1";
@@ -294,13 +291,15 @@ fn partner_policy_descriptors() -> Vec<PolicyDescriptorV1> {
             policy_id: "fixed-partner".into(),
             version: "1".into(),
             role: "negative_control".into(),
-            interpretation: "Returns a constant partner response independent of the agent action.".into(),
+            interpretation: "Returns a constant partner response independent of the agent action."
+                .into(),
         },
         PolicyDescriptorV1 {
             policy_id: "synthetic-responsive-partner".into(),
             version: "1".into(),
             role: "positive_control".into(),
-            interpretation: "Applies a known target-specific transformation to the agent action.".into(),
+            interpretation: "Applies a known target-specific transformation to the agent action."
+                .into(),
         },
     ]
 }
@@ -320,7 +319,9 @@ where
     let reciprocal = evaluate_rmi_reciprocal_pair(agent_policy, partner_policy, pair)
         .map_err(|error| format!("reciprocal evaluation failed: {error:?}"))?;
     if reciprocal.payload.agent_evaluation_sha256 != agent_evaluation.payload_sha256 {
-        return Err("agent evaluation digest differs between unidirectional and reciprocal paths".into());
+        return Err(
+            "agent evaluation digest differs between unidirectional and reciprocal paths".into(),
+        );
     }
     let target = pair.target;
     let key = format!(
@@ -346,10 +347,7 @@ where
         intervention: pair.clone(),
         agent_policy_id: agent_policy.policy_id().to_string(),
         partner_policy_id: partner_policy.policy_id().to_string(),
-        intervention_pair_sha256: agent_evaluation
-            .payload
-            .intervention_pair_sha256
-            .clone(),
+        intervention_pair_sha256: agent_evaluation.payload.intervention_pair_sha256.clone(),
         agent_evaluation: agent_evaluation.clone(),
         reciprocal_evaluation: reciprocal,
     });
@@ -572,15 +570,10 @@ fn parse_args() -> Result<Args, String> {
                     .map_err(|_| "--seed-count must be an unsigned integer")?;
             }
             "--source-commit" => {
-                args.source_commit = iter
-                    .next()
-                    .ok_or("--source-commit requires a commit SHA")?;
+                args.source_commit = iter.next().ok_or("--source-commit requires a commit SHA")?;
             }
             "--output" => {
-                args.output = Some(
-                    iter.next()
-                        .ok_or("--output requires a file path")?,
-                );
+                args.output = Some(iter.next().ok_or("--output requires a file path")?);
             }
             "--self-check" => args.self_check = true,
             "--internal-replay" => args.internal_replay = true,
@@ -648,11 +641,7 @@ fn run() -> Result<(), String> {
     }
 
     if args.self_check {
-        fresh_process_replay(
-            args.seed_count,
-            &args.source_commit,
-            &report.report_sha256,
-        )?;
+        fresh_process_replay(args.seed_count, &args.source_commit, &report.report_sha256)?;
         eprintln!(
             "fresh-process replay: PASS (report SHA-256 {})",
             report.report_sha256
@@ -724,20 +713,20 @@ mod tests {
         }));
         assert_eq!(result.payload.agent_to_input_sensitivity.len(), 4 * 5);
         assert_eq!(result.payload.agent_to_partner_sensitivity.len(), 4 * 5 * 2);
-        assert!(result
-            .payload
-            .receipts
-            .iter()
-            .all(|receipt| receipt.intervention_pair_sha256 == receipt.agent_evaluation.payload.intervention_pair_sha256));
+        assert!(
+            result
+                .payload
+                .receipts
+                .iter()
+                .all(|receipt| receipt.intervention_pair_sha256
+                    == receipt.agent_evaluation.payload.intervention_pair_sha256)
+        );
     }
 
     #[test]
     fn synthetic_agent_positive_control_is_target_specific() {
         for target in targets() {
-            let key = format!(
-                "target={}|policy=synthetic-contingent",
-                target_name(target)
-            );
+            let key = format!("target={}|policy=synthetic-contingent", target_name(target));
             let counts = report(4).payload.agent_to_input_sensitivity[&key].clone();
             assert_eq!(counts.trials, 4);
             assert_eq!(counts.targeted_sensitivity_count, 4);
@@ -762,10 +751,7 @@ mod tests {
     fn imitation_is_sensitive_but_is_not_labelled_as_collaboration() {
         let result = report(3);
         for target in targets() {
-            let key = format!(
-                "target={}|policy=imitation-only",
-                target_name(target)
-            );
+            let key = format!("target={}|policy=imitation-only", target_name(target));
             let counts = &result.payload.agent_to_input_sensitivity[&key];
             assert_eq!(counts.targeted_sensitivity_count, 3);
             assert_eq!(counts.collateral_changed_feature_total, 0);
@@ -777,7 +763,10 @@ mod tests {
             .iter()
             .find(|policy| policy.policy_id == "imitation-only")
             .unwrap();
-        assert_eq!(descriptor.role, "input_sensitivity_control_not_collaboration");
+        assert_eq!(
+            descriptor.role,
+            "input_sensitivity_control_not_collaboration"
+        );
     }
 
     #[test]
