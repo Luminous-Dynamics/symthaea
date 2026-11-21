@@ -1180,5 +1180,4 @@ mod tests {
         assert_eq!(result.normalized_mmd, 0.0);
         assert_eq!(result.particle_feature_evaluations, 0);
     }
-
 }
