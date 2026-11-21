@@ -2,8 +2,8 @@
 
 pub mod binary_metrics;
 pub mod pair_manifest;
-pub mod split_manifest;
 pub mod secom_raw;
+pub mod split_manifest;
 
 pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
