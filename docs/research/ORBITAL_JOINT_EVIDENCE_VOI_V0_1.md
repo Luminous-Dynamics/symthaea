@@ -301,9 +301,9 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 
 P0: this contract and owner map.  
 P1: machine-readable action and outcome schema plus 13 frozen synthetic scenarios.  
-P2: executable dry-run preflight that audits admissibility, resource budgets, claim identity, common-cause labels, mandatory obligations, minimax regret, the one explicit calibrated-EVSI case, and actual resource consumption including aborted-test overruns; a separately implemented standard-library Python oracle independently checks the known answers. No solver or physical execution is invoked.  
+P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 13 known-answer scenarios. No solver or physical execution is invoked.  
 P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
 P5: only after review, authorized human-supervised physical evidence handoff.
 
-**Current milestone:** P0 specification, P1 schema/scenario catalogue and P2 dry-run admissibility/value audit are implemented on a public research branch. The selector-policy tournament remains future work. No selector-performance win, physical test or certification claim is made.
+**Current milestone:** P0 specification, P1 schema/scenario catalogue and P2 dry-run admissibility/value audit with a deterministic one-step selector are implemented on a public research branch. P3 multi-step/matched-budget policy tournament and external adapter evidence remain future work. No selector-performance win over SOTA, physical test or certification claim is made.
