@@ -8,6 +8,7 @@
 //! absent from this module. Rejected events and rejected batches never mutate
 //! the current snapshot or its accepted event log.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -33,6 +34,28 @@ pub struct CognitiveTopologyEvent {
     pub caused_by_event_id: Option<String>,
     pub evidence: CognitiveEvidence,
     pub change: CognitiveTopologyChange,
+}
+
+/// One directional difference between two materialized topology snapshots.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CognitiveItemDelta<T> {
+    pub id: String,
+    pub before: Option<T>,
+    pub after: Option<T>,
+}
+
+/// Structural diff between two branches from the same topology session.
+/// These are graph-state differences, not truth or confidence differences.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CognitiveTopologyDiff {
+    pub session_id: String,
+    pub from_revision: u64,
+    pub to_revision: u64,
+    pub from_snapshot_digest: String,
+    pub to_snapshot_digest: String,
+    pub node_changes: Vec<CognitiveItemDelta<CognitiveNode>>,
+    pub edge_changes: Vec<CognitiveItemDelta<CognitiveEdge>>,
+    pub episode_changes: Vec<CognitiveItemDelta<CognitiveEpisode>>,
 }
 
 /// Supported semantic mutations. Additions and explicit state transitions are
@@ -205,6 +228,63 @@ pub struct CognitiveTopologyReducer {
     base_snapshot: CognitiveTopology,
     topology: CognitiveTopology,
     events: Vec<CognitiveTopologyEvent>,
+}
+
+/// Compare two valid snapshots from the same session. IDs are sorted in
+/// the resulting change sets so the diff is deterministic and reviewable.
+pub fn diff_cognitive_topologies(
+    from: &CognitiveTopology,
+    to: &CognitiveTopology,
+) -> Result<CognitiveTopologyDiff, CognitiveEventError> {
+    from.validate()?;
+    to.validate()?;
+    if from.session_id != to.session_id {
+        return Err(CognitiveEventError::SessionMismatch {
+            expected: from.session_id.clone(),
+            received: to.session_id.clone(),
+        });
+    }
+
+    Ok(CognitiveTopologyDiff {
+        session_id: from.session_id.clone(),
+        from_revision: from.revision,
+        to_revision: to.revision,
+        from_snapshot_digest: from.canonical_digest_hex()?,
+        to_snapshot_digest: to.canonical_digest_hex()?,
+        node_changes: item_changes(&from.nodes, &to.nodes, |node| node.id.clone()),
+        edge_changes: item_changes(&from.edges, &to.edges, |edge| edge.id.clone()),
+        episode_changes: item_changes(&from.episodes, &to.episodes, |episode| {
+            episode.id.clone()
+        }),
+    })
+}
+
+fn item_changes<T: Clone + PartialEq>(
+    before: &[T],
+    after: &[T],
+    id_of: impl Fn(&T) -> String,
+) -> Vec<CognitiveItemDelta<T>> {
+    let before_by_id: BTreeMap<String, &T> = before
+        .iter()
+        .map(|item| (id_of(item), item))
+        .collect();
+    let after_by_id: BTreeMap<String, &T> = after
+        .iter()
+        .map(|item| (id_of(item), item))
+        .collect();
+    let ids: BTreeSet<String> = before_by_id
+        .keys()
+        .chain(after_by_id.keys())
+        .cloned()
+        .collect();
+
+    ids.into_iter()
+        .filter_map(|id| {
+            let before = before_by_id.get(&id).map(|item| (*item).clone());
+            let after = after_by_id.get(&id).map(|item| (*item).clone());
+            (before != after).then_some(CognitiveItemDelta { id, before, after })
+        })
+        .collect()
 }
 
 impl CognitiveTopologyReducer {
@@ -1145,6 +1225,28 @@ mod tests {
         assert_ne!(left.event_log_digest_hex().unwrap(), right.event_log_digest_hex().unwrap());
         assert_eq!(base_snapshot.nodes.len(), 0);
         assert_eq!(complete_log.len(), 2);
+    }
+
+    #[test]
+    fn structural_diff_identifies_branch_exclusive_nodes_and_preserves_provenance() {
+        let base_snapshot = base();
+        let events = vec![add_node(1, "memory:shared")];
+        let mut left = CognitiveTopologyReducer::replay(base_snapshot.clone(), &events).unwrap();
+        let mut right = CognitiveTopologyReducer::replay(base_snapshot, &events).unwrap();
+        left.apply_event(add_node(2, "concept:left")).unwrap();
+        right.apply_event(add_node(2, "concept:right")).unwrap();
+
+        let diff = diff_cognitive_topologies(left.snapshot(), right.snapshot()).unwrap();
+        assert_eq!(diff.node_changes.len(), 2);
+        assert_eq!(diff.edge_changes.len(), 0);
+        assert_eq!(diff.episode_changes.len(), 0);
+        assert!(diff.node_changes.iter().any(|change| {
+            change.id == "concept:left" && change.before.is_some() && change.after.is_none()
+        }));
+        assert!(diff.node_changes.iter().any(|change| {
+            change.id == "concept:right" && change.before.is_none() && change.after.is_some()
+        }));
+        assert_ne!(diff.from_snapshot_digest, diff.to_snapshot_digest);
     }
 
     #[test]
