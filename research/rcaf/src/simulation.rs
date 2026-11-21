@@ -285,8 +285,12 @@ pub struct InjectionRecoveryReport {
     pub alpha: f64,
     /// Type-I error estimate under exchangeable no-change matrices.
     pub null_false_positive_rate: BinomialRate,
-    /// Detection rate under the declared factor-loading injection.
+    /// Two-sided difference detection, regardless of observed direction (legacy metric).
     pub injection_detection_power: BinomialRate,
+    /// Significant recovery in the preregistered positive paired-gap direction.
+    pub injection_directional_detection_power: BinomialRate,
+    /// Significant two-sided rejection in the direction opposite to the positive injection.
+    pub injection_wrong_direction_rejection_rate: BinomialRate,
     /// Median across Monte Carlo replicates of participant-level median paired gaps.
     pub median_null_paired_gap: f64,
     pub median_injected_paired_gap: f64,
@@ -393,6 +397,24 @@ pub fn run_injection_recovery_sweep(
     })
 }
 
+/// Classify a significant two-sided injection result against its known positive direction.
+///
+/// A significant result is only a correct recovery when positive paired gaps outnumber
+/// negative paired gaps. Opposite-direction significance is tracked separately and is never
+/// counted as successful directional recovery.
+fn classify_expected_positive_injection(
+    positive_count: usize,
+    negative_count: usize,
+    p_two_sided_exact: f64,
+    alpha: f64,
+) -> (bool, bool) {
+    let significant = p_two_sided_exact < alpha;
+    (
+        significant && positive_count > negative_count,
+        significant && negative_count > positive_count,
+    )
+}
+
 impl InjectionRecoveryReport {
     /// Render a stable JSON representation without a serialization dependency.
     pub fn to_json_pretty(&self) -> String {
@@ -416,6 +438,8 @@ impl InjectionRecoveryReport {
                 "  \"alpha\": {:.12},\n",
                 "  \"null_false_positive_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"injection_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"injection_directional_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"injection_wrong_direction_rejection_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"median_null_paired_gap\": {:.12},\n",
                 "  \"median_injected_paired_gap\": {:.12},\n",
                 "  \"median_null_positive_gap_fraction\": {:.12},\n",
@@ -453,6 +477,16 @@ impl InjectionRecoveryReport {
             self.injection_detection_power.estimate,
             self.injection_detection_power.ci95_lower,
             self.injection_detection_power.ci95_upper,
+            self.injection_directional_detection_power.successes,
+            self.injection_directional_detection_power.trials,
+            self.injection_directional_detection_power.estimate,
+            self.injection_directional_detection_power.ci95_lower,
+            self.injection_directional_detection_power.ci95_upper,
+            self.injection_wrong_direction_rejection_rate.successes,
+            self.injection_wrong_direction_rejection_rate.trials,
+            self.injection_wrong_direction_rejection_rate.estimate,
+            self.injection_wrong_direction_rejection_rate.ci95_lower,
+            self.injection_wrong_direction_rejection_rate.ci95_upper,
             self.median_null_paired_gap,
             self.median_injected_paired_gap,
             self.median_null_positive_gap_fraction,
@@ -478,6 +512,8 @@ pub fn run_injection_recovery(
     let mut rng = GaussianRng::new(config.seed);
     let mut null_rejections = 0usize;
     let mut injection_rejections = 0usize;
+    let mut directional_injection_rejections = 0usize;
+    let mut wrong_direction_rejections = 0usize;
     let mut null_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
     let mut injected_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
     let mut null_positive_fractions = Vec::with_capacity(config.monte_carlo_replicates);
@@ -557,6 +593,19 @@ pub fn run_injection_recovery(
         if injected_test.p_two_sided_exact < config.alpha {
             injection_rejections += 1;
         }
+        let (directionally_detected, wrong_direction_detected) =
+            classify_expected_positive_injection(
+                injected_test.positive_count,
+                injected_test.negative_count,
+                injected_test.p_two_sided_exact,
+                config.alpha,
+            );
+        if directionally_detected {
+            directional_injection_rejections += 1;
+        }
+        if wrong_direction_detected {
+            wrong_direction_rejections += 1;
+        }
         null_positive_fractions.push(null_test.positive_count as f64 / config.participants as f64);
         injected_positive_fractions
             .push(injected_test.positive_count as f64 / config.participants as f64);
@@ -565,7 +614,7 @@ pub fn run_injection_recovery(
     }
 
     Ok(InjectionRecoveryReport {
-        schema_version: "rcaf.injection-recovery/0.1.0",
+        schema_version: "rcaf.injection-recovery/0.2.0",
         seed: config.seed,
         participants_per_replicate: config.participants,
         regions: config.regions,
@@ -582,6 +631,14 @@ pub fn run_injection_recovery(
         alpha: config.alpha,
         null_false_positive_rate: wilson_rate(null_rejections, config.monte_carlo_replicates),
         injection_detection_power: wilson_rate(injection_rejections, config.monte_carlo_replicates),
+        injection_directional_detection_power: wilson_rate(
+            directional_injection_rejections,
+            config.monte_carlo_replicates,
+        ),
+        injection_wrong_direction_rejection_rate: wilson_rate(
+            wrong_direction_rejections,
+            config.monte_carlo_replicates,
+        ),
         median_null_paired_gap: median(&null_median_gaps),
         median_injected_paired_gap: median(&injected_median_gaps),
         median_null_positive_gap_fraction: median(&null_positive_fractions),
@@ -842,19 +899,48 @@ mod tests {
     }
 
     #[test]
-    fn known_network_injection_is_recovered() {
+    fn known_network_injection_is_recovered_in_the_expected_direction() {
         let result = run_injection_recovery(&test_config()).unwrap();
         assert!(
             result.injection_detection_power.estimate >= 0.80,
-            "observed injection recovery {}",
+            "observed two-sided difference detection {}",
             result.injection_detection_power.estimate
         );
+        assert!(
+            result.injection_directional_detection_power.estimate >= 0.80,
+            "observed expected-direction recovery {}",
+            result.injection_directional_detection_power.estimate
+        );
+        assert_eq!(result.injection_wrong_direction_rejection_rate.successes, 0,
+            "strong positive loading injection produced wrong-direction rejection");
         assert!(
             result.median_injected_paired_gap > result.median_null_paired_gap + 0.035,
             "null gap {} vs injected gap {}",
             result.median_null_paired_gap,
             result.median_injected_paired_gap
         );
+    }
+
+    #[test]
+    fn opposite_direction_significance_is_never_counted_as_successful_recovery() {
+        let alpha = 0.05;
+        let n = 23usize;
+        let two_sided_extreme_p = 2.0 / 2_f64.powi(n as i32);
+
+        let (correct, wrong) =
+            classify_expected_positive_injection(n, 0, two_sided_extreme_p, alpha);
+        assert!(correct);
+        assert!(!wrong);
+
+        let (correct, wrong) =
+            classify_expected_positive_injection(0, n, two_sided_extreme_p, alpha);
+        assert!(!correct, "opposite-direction rejection must not count as recovery");
+        assert!(wrong, "opposite-direction rejection must be recorded separately");
+
+        let (correct, wrong) =
+            classify_expected_positive_injection(12, 11, 1.0, alpha);
+        assert!(!correct, "non-significant positive imbalance is not recovery");
+        assert!(!wrong);
     }
 
     #[test]
