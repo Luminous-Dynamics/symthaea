@@ -177,6 +177,16 @@ pub enum SolverError {
         maximum_exclusive: usize,
     },
     InvalidSpectralTailFraction,
+    InvalidInterpolationGrid {
+        source_len: usize,
+        target_len: usize,
+    },
+    AllocationFailed {
+        elements: usize,
+    },
+    NonFiniteInterpolationInput {
+        index: usize,
+    },
     NonFiniteState,
 }
 
@@ -231,6 +241,19 @@ impl fmt::Display for SolverError {
                 f,
                 "spectral tail start fraction must be finite and in (0, 1]"
             ),
+            Self::InvalidInterpolationGrid {
+                source_len,
+                target_len,
+            } => write!(
+                f,
+                "zero-padding requires power-of-two source length >= 4 and power-of-two target length >= source length (got {source_len} -> {target_len})"
+            ),
+            Self::AllocationFailed { elements } => {
+                write!(f, "could not allocate {elements} interpolation elements")
+            }
+            Self::NonFiniteInterpolationInput { index } => {
+                write!(f, "interpolation input {index} is non-finite")
+            }
             Self::NonFiniteState => write!(f, "solver produced a non-finite state"),
         }
     }
@@ -744,6 +767,96 @@ fn spectral_axis_result(
     })
 }
 
+/// Interpolate a real periodic line onto a finer power-of-two grid by exact
+/// trigonometric zero-padding of its discrete Fourier coefficients.
+///
+/// The source samples are assumed to cover one period uniformly. This function
+/// does not change the physical period or apply a filter. The old Nyquist
+/// coefficient is split equally between the positive and negative Nyquist
+/// harmonics so the refined interpolant remains real-valued.
+///
+/// This is a transfer oracle only: callers must separately qualify the
+/// physical effect and cost of changing a simulation grid.
+pub fn zero_pad_periodic_line(
+    samples: &[f64],
+    target_len: usize,
+) -> Result<Vec<f64>, SolverError> {
+    let source_len = samples.len();
+    if source_len < 4
+        || !source_len.is_power_of_two()
+        || target_len < source_len
+        || !target_len.is_power_of_two()
+    {
+        return Err(SolverError::InvalidInterpolationGrid {
+            source_len,
+            target_len,
+        });
+    }
+    for (index, sample) in samples.iter().enumerate() {
+        if !sample.is_finite() {
+            return Err(SolverError::NonFiniteInterpolationInput { index });
+        }
+    }
+    if target_len == source_len {
+        return Ok(samples.to_vec());
+    }
+
+    let mut source_spectrum = Vec::new();
+    source_spectrum
+        .try_reserve_exact(source_len)
+        .map_err(|_| SolverError::AllocationFailed {
+            elements: source_len,
+        })?;
+    source_spectrum.extend(samples.iter().map(|sample| Complex::new(*sample, 0.0)));
+    fft(&mut source_spectrum, false);
+
+    let scale = target_len as f64 / source_len as f64;
+    if !scale.is_finite() {
+        return Err(SolverError::NonFiniteState);
+    }
+
+    let mut target_spectrum = Vec::new();
+    target_spectrum
+        .try_reserve_exact(target_len)
+        .map_err(|_| SolverError::AllocationFailed {
+            elements: target_len,
+        })?;
+    target_spectrum.resize(target_len, Complex::ZERO);
+
+    // DC and all strictly positive modes below the source Nyquist.
+    for mode in 0..(source_len / 2) {
+        target_spectrum[mode] = source_spectrum[mode].scale(scale);
+    }
+
+    // Negative modes retain their signed frequency index on the larger grid.
+    for source_index in (source_len / 2 + 1)..source_len {
+        let negative_mode = source_len - source_index;
+        let target_index = target_len - negative_mode;
+        target_spectrum[target_index] = source_spectrum[source_index].scale(scale);
+    }
+
+    // The source Nyquist mode aliases +N/2 and -N/2 on the coarse grid.
+    // Split its real coefficient between both target frequencies.
+    let nyquist = source_spectrum[source_len / 2].re * (0.5 * scale);
+    target_spectrum[source_len / 2] = Complex::new(nyquist, 0.0);
+    target_spectrum[target_len - source_len / 2] = Complex::new(nyquist, 0.0);
+
+    fft(&mut target_spectrum, true);
+    let mut refined = Vec::new();
+    refined
+        .try_reserve_exact(target_len)
+        .map_err(|_| SolverError::AllocationFailed {
+            elements: target_len,
+        })?;
+    for (index, value) in target_spectrum.iter().enumerate() {
+        if !value.re.is_finite() || !value.im.is_finite() {
+            return Err(SolverError::NonFiniteState);
+        }
+        refined.push(value.re);
+    }
+    Ok(refined)
+}
+
 fn validate_dt(dt: f64) -> Result<(), SolverError> {
     if !dt.is_finite() || dt <= 0.0 {
         return Err(SolverError::InvalidTimeStep);
@@ -1053,6 +1166,97 @@ mod tests {
                 Err(SolverError::InvalidSpectralTailFraction)
             ));
         }
+    }
+
+    #[test]
+    fn zero_padding_preserves_band_limited_trigonometric_interpolant() {
+        let source_len = 16;
+        let target_len = 64;
+        let samples: Vec<f64> = (0..source_len)
+            .map(|index| {
+                let x = index as f64 / source_len as f64;
+                0.7 + 0.4 * (TAU * 3.0 * x).cos() - 0.2 * (TAU * 5.0 * x).sin()
+            })
+            .collect();
+        let refined = zero_pad_periodic_line(&samples, target_len).unwrap();
+
+        for (index, expected) in samples.iter().enumerate() {
+            let actual = refined[index * (target_len / source_len)];
+            assert!(
+                (actual - expected).abs() < 2.0e-12,
+                "old node {index}: {actual} != {expected}"
+            );
+        }
+        for (index, actual) in refined.iter().enumerate() {
+            let x = index as f64 / target_len as f64;
+            let expected =
+                0.7 + 0.4 * (TAU * 3.0 * x).cos() - 0.2 * (TAU * 5.0 * x).sin();
+            assert!((actual - expected).abs() < 2.0e-12);
+        }
+    }
+
+    #[test]
+    fn zero_padding_splits_source_nyquist_mode_symmetrically() {
+        let source_len = 16;
+        let target_len = 64;
+        let samples: Vec<f64> = (0..source_len)
+            .map(|index| if index % 2 == 0 { 1.0 } else { -1.0 })
+            .collect();
+        let refined = zero_pad_periodic_line(&samples, target_len).unwrap();
+
+        for (index, actual) in refined.iter().enumerate() {
+            let x = index as f64 / target_len as f64;
+            let expected = (TAU * (source_len / 2) as f64 * x).cos();
+            assert!(
+                (actual - expected).abs() < 2.0e-12,
+                "refined node {index}: {actual} != {expected}"
+            );
+        }
+        for index in 0..source_len {
+            assert!((refined[index * 4] - samples[index]).abs() < 2.0e-12);
+        }
+    }
+
+    #[test]
+    fn zero_padding_preserves_constant_lines_and_equal_grid_is_identity() {
+        let samples = vec![2.5; 8];
+        let same = zero_pad_periodic_line(&samples, 8).unwrap();
+        let refined = zero_pad_periodic_line(&samples, 32).unwrap();
+        assert_eq!(same, samples);
+        for value in refined {
+            assert!((value - 2.5).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn zero_padding_rejects_invalid_grids_and_non_finite_samples() {
+        for (source_len, target_len) in [(3, 8), (12, 32), (16, 8), (16, 48)] {
+            let samples = vec![0.0; source_len];
+            assert!(matches!(
+                zero_pad_periodic_line(&samples, target_len),
+                Err(SolverError::InvalidInterpolationGrid { .. })
+            ));
+        }
+        let mut samples = vec![0.0; 8];
+        samples[3] = f64::NAN;
+        assert!(matches!(
+            zero_pad_periodic_line(&samples, 32),
+            Err(SolverError::NonFiniteInterpolationInput { index: 3 })
+        ));
+    }
+
+    #[test]
+    fn low_spectral_tail_does_not_hide_truncated_velocity_domain() {
+        let mut config = test_config(64, 128);
+        config.velocity_min = -4.0;
+        config.velocity_max = 4.0;
+        let initial = maxwellian_perturbation(config, 1.0e-3, 1, 1.0).unwrap();
+        let solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        let physical = solver.diagnostics().unwrap();
+        let tail = solver.spectral_tail_diagnostics(0.75).unwrap();
+
+        assert!(physical.velocity_boundary_ratio > 1.0e-4);
+        assert!(tail.velocity.high_frequency_fraction < 1.0e-8);
     }
 
     #[test]
