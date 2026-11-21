@@ -122,6 +122,8 @@ pub enum CognitiveEventError {
     SequenceGap { expected: u64, received: u64 },
     SequenceConflict { sequence: u64 },
     ForkBeforeBase { base_sequence: u64, requested_sequence: u64 },
+    ForkBeyondLog { last_available: u64, requested_sequence: u64 },
+    MissingCausationParent(String),
     TimestampRegression { previous: u64, received: u64 },
     ConflictingDuplicate(String),
     BatchLimitExceeded(usize),
@@ -176,6 +178,12 @@ impl fmt::Display for CognitiveEventError {
             }
             Self::ForkBeforeBase { base_sequence, requested_sequence } => {
                 write!(f, "cannot fork at sequence {requested_sequence} before base sequence {base_sequence}")
+            }
+            Self::ForkBeyondLog { last_available, requested_sequence } => {
+                write!(f, "cannot fork at sequence {requested_sequence}; log ends at {last_available}")
+            }
+            Self::MissingCausationParent(id) => {
+                write!(f, "causation parent event {id} is not present in the base snapshot or accepted log")
             }
             Self::TimestampRegression { previous, received } => {
                 write!(f, "event timestamp {received} regresses behind {previous}")
@@ -380,6 +388,14 @@ impl CognitiveTopologyReducer {
                 received: event.evidence.sequence,
             });
         }
+        if let Some(parent_id) = &event.caused_by_event_id
+            && !self.events.iter().any(|accepted| accepted.evidence.event_id == *parent_id)
+            && !topology_contains_event(&self.base_snapshot, parent_id)
+        {
+            return Err(CognitiveEventError::MissingCausationParent(
+                parent_id.clone(),
+            ));
+        }
 
         ensure_session_provenance(&self.topology, event.evidence.provenance)?;
         let previous_time = latest_evidence_time(&self.topology);
@@ -445,6 +461,18 @@ impl CognitiveTopologyReducer {
         if sequence < base_snapshot.last_sequence {
             return Err(CognitiveEventError::ForkBeforeBase {
                 base_sequence: base_snapshot.last_sequence,
+                requested_sequence: sequence,
+            });
+        }
+        let last_available = events
+            .iter()
+            .map(|event| event.evidence.sequence)
+            .max()
+            .unwrap_or(base_snapshot.last_sequence)
+            .max(base_snapshot.last_sequence);
+        if sequence > last_available {
+            return Err(CognitiveEventError::ForkBeyondLog {
+                last_available,
                 requested_sequence: sequence,
             });
         }
@@ -794,6 +822,21 @@ fn valid_episode_transition(from: CognitiveEpisodeState, to: CognitiveEpisodeSta
                 | CognitiveEpisodeState::Failed
         )
     )
+}
+
+fn topology_contains_event(topology: &CognitiveTopology, event_id: &str) -> bool {
+    topology
+        .nodes
+        .iter()
+        .any(|node| node.evidence.event_id == event_id)
+        || topology
+            .edges
+            .iter()
+            .any(|edge| edge.evidence.event_id == event_id)
+        || topology
+            .episodes
+            .iter()
+            .any(|episode| episode.evidence.event_id == event_id)
 }
 
 fn latest_evidence_time(topology: &CognitiveTopology) -> u64 {
@@ -1259,6 +1302,32 @@ mod tests {
             Err(CognitiveEventError::ForkBeforeBase {
                 base_sequence: 1,
                 requested_sequence: 0
+            })
+        ));
+    }
+
+    #[test]
+    fn dangling_causation_parent_is_rejected_without_mutation() {
+        let mut reducer = CognitiveTopologyReducer::new(base()).unwrap();
+        let mut event = add_node(1, "memory:a");
+        event.caused_by_event_id = Some("event:not-yet-accepted".to_string());
+        assert!(matches!(
+            reducer.apply_event(event),
+            Err(CognitiveEventError::MissingCausationParent(_))
+        ));
+        assert!(reducer.snapshot().nodes.is_empty());
+        assert!(reducer.events().is_empty());
+    }
+
+    #[test]
+    fn fork_beyond_available_event_log_is_rejected() {
+        let base_snapshot = base();
+        let events = vec![add_node(1, "memory:a")];
+        assert!(matches!(
+            CognitiveTopologyReducer::fork_at_sequence(base_snapshot, &events, 2),
+            Err(CognitiveEventError::ForkBeyondLog {
+                last_available: 1,
+                requested_sequence: 2
             })
         ));
     }
