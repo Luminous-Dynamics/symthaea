@@ -85,6 +85,9 @@ These are programme targets for future matched evaluations, not current measured
 | Duplicate event-ID acceptance as independent evidence | **0** |
 | Use of retracted, unreconciled, untrusted, confounded, or incomplete-horizon evidence in a qualified decision | **0** in known-control suites |
 | Transfer across a different optimization objective | **0** |
+| Transport across a different estimand (population, treatment contrast, outcome, or horizon) | **0** on held-out mismatch controls |
+| False rejection of the same estimand across different valid randomized designs | **≤20%** on held-out positive controls |
+| Canonical estimand descriptor coverage (once semantic descriptor is integrated) | **100%** of transported evidence binds population, treatment versions, outcome/unit, follow-up, censoring and target weighting |
 | Known Session-C retraction reused by the next decision | **0** |
 | False acceptance of a deliberately changed mechanism | **≤0.1%** across at least **10,000** held-out negative trials; report a binomial confidence bound |
 | Acceptance of genuinely invariant, independently witnessed few-shot transfers | **≥80%** on held-out positive cases |
@@ -94,6 +97,8 @@ These are programme targets for future matched evaluations, not current measured
 | Decision-time overhead | Report p50/p95/p99 latency and CPU/energy per decision; target p95 deterministic policy overhead **<100 ms** on the declared reference host |
 
 Do not report an internal metric as a leaderboard win. Synthetic controls qualify implementation properties; external benchmarks qualify external validity.
+**Estimand claim boundary:** v0.14 compares receipt-bound estimand digests for identity consistency. It does not yet parse or independently validate the semantic descriptor behind the digest. The production verifier must bind a versioned canonical specification (population, treatment versions/contrast, outcome and unit, follow-up horizon, censoring/intercurrent-event strategy and target weighting) into the receipt and digest. A digest match alone is not proof of a correct estimand.
+
 
 ### Harness and provider portability qualification
 
