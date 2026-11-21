@@ -674,6 +674,52 @@ pub fn summarize_edge_sign_transitions(
 mod tests {
     use super::*;
 
+    fn metamorphic_matrix_fixtures() -> (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>) {
+        let labels = ["ROI-A", "ROI-B", "ROI-C", "ROI-D"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let a = vec![
+            vec![1.0, 0.5, -0.4, 0.1],
+            vec![0.5, 1.0, 0.3, -0.2],
+            vec![-0.4, 0.3, 1.0, 0.6],
+            vec![0.1, -0.2, 0.6, 1.0],
+        ];
+        let b = vec![
+            vec![1.0, 0.4, -0.2, -0.1],
+            vec![0.4, 1.0, 0.2, -0.3],
+            vec![-0.2, 0.2, 1.0, 0.5],
+            vec![-0.1, -0.3, 0.5, 1.0],
+        ];
+        (labels, a, b)
+    }
+
+    fn permute_square_matrix(matrix: &[Vec<f64>], order: &[usize]) -> Vec<Vec<f64>> {
+        order
+            .iter()
+            .map(|&row| order.iter().map(|&col| matrix[row][col]).collect())
+            .collect()
+    }
+
+    fn invert_off_diagonal_polarity(matrix: &[Vec<f64>]) -> Vec<Vec<f64>> {
+        matrix
+            .iter()
+            .enumerate()
+            .map(|(row_index, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(|(col_index, value)| {
+                        if row_index == col_index {
+                            *value
+                        } else {
+                            -*value
+                        }
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
     #[test]
     fn weighted_jaccard_matches_hand_fixture() {
         let score = weighted_jaccard(&[0.2, 0.5], &[0.1, 0.4]).unwrap();
@@ -884,6 +930,110 @@ mod tests {
                 regions: 2
             })
         );
+    }
+
+    #[test]
+    fn labeled_matrix_comparison_is_invariant_to_joint_roi_permutation_and_argument_order() {
+        let (labels, a, b) = metamorphic_matrix_fixtures();
+        let permutation = [2, 0, 3, 1];
+        let permuted_labels: Vec<String> = permutation
+            .iter()
+            .map(|&index| labels[index].clone())
+            .collect();
+        let permuted_a = permute_square_matrix(&a, &permutation);
+        let permuted_b = permute_square_matrix(&b, &permutation);
+
+        for mode in [
+            CorrelationWjMode::Absolute,
+            CorrelationWjMode::PositiveEdgesInBoth,
+            CorrelationWjMode::NegativeEdgesInBoth,
+            CorrelationWjMode::SignedShift,
+        ] {
+            let baseline = weighted_jaccard_labeled_correlation_matrices(
+                &labels, &a, &labels, &b, mode, 1,
+            )
+            .unwrap();
+            let permuted = weighted_jaccard_labeled_correlation_matrices(
+                &permuted_labels,
+                &permuted_a,
+                &permuted_labels,
+                &permuted_b,
+                mode,
+                1,
+            )
+            .unwrap();
+            let swapped = weighted_jaccard_labeled_correlation_matrices(
+                &labels, &b, &labels, &a, mode, 1,
+            )
+            .unwrap();
+            let identity = weighted_jaccard_labeled_correlation_matrices(
+                &labels, &a, &labels, &a, mode, 1,
+            )
+            .unwrap();
+
+            assert!((baseline - permuted).abs() < 1e-12, "{mode:?}");
+            assert!((baseline - swapped).abs() < 1e-12, "{mode:?}");
+            assert!((identity - 1.0).abs() < 1e-12, "{mode:?}");
+        }
+    }
+
+    #[test]
+    fn absolute_comparison_is_global_polarity_invariant_but_signed_shift_is_not() {
+        let (_, a, b) = metamorphic_matrix_fixtures();
+        let inverted_a = invert_off_diagonal_polarity(&a);
+        let inverted_b = invert_off_diagonal_polarity(&b);
+
+        let absolute = weighted_jaccard_correlation_matrices(
+            &a,
+            &b,
+            CorrelationWjMode::Absolute,
+            1,
+        )
+        .unwrap();
+        let inverted_absolute = weighted_jaccard_correlation_matrices(
+            &inverted_a,
+            &inverted_b,
+            CorrelationWjMode::Absolute,
+            1,
+        )
+        .unwrap();
+        let signed_shift = weighted_jaccard_correlation_matrices(
+            &a,
+            &b,
+            CorrelationWjMode::SignedShift,
+            1,
+        )
+        .unwrap();
+        let inverted_signed_shift = weighted_jaccard_correlation_matrices(
+            &inverted_a,
+            &inverted_b,
+            CorrelationWjMode::SignedShift,
+            1,
+        )
+        .unwrap();
+
+        assert!((absolute - inverted_absolute).abs() < 1e-12);
+        assert!(
+            (signed_shift - inverted_signed_shift).abs() > 1e-3,
+            "signed-shift mode should expose the global polarity transformation"
+        );
+    }
+
+    #[test]
+    fn edge_transition_reversal_counts_are_invariant_and_directional_counts_swap() {
+        let (_, a, b) = metamorphic_matrix_fixtures();
+        let forward = summarize_edge_sign_transitions(&a, &b, 0.05).unwrap();
+        let reverse = summarize_edge_sign_transitions(&b, &a, 0.05).unwrap();
+
+        assert_eq!(forward.polarity_reversal_count, reverse.polarity_reversal_count);
+        assert_eq!(forward.sign_state_change_count, reverse.sign_state_change_count);
+        assert_eq!(forward.total_edges, reverse.total_edges);
+        assert_eq!(forward.positive_to_negative, reverse.negative_to_positive);
+        assert_eq!(forward.negative_to_positive, reverse.positive_to_negative);
+        assert_eq!(forward.positive_to_neutral, reverse.neutral_to_positive);
+        assert_eq!(forward.neutral_to_positive, reverse.positive_to_neutral);
+        assert_eq!(forward.negative_to_neutral, reverse.neutral_to_negative);
+        assert_eq!(forward.neutral_to_negative, reverse.negative_to_neutral);
     }
 
     #[test]
