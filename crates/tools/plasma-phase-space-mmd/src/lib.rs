@@ -1426,4 +1426,164 @@ mod tests {
         assert_eq!(result.normalized_mmd, 0.0);
         assert_eq!(result.particle_feature_evaluations, 0);
     }
+
+    #[test]
+    fn adaptive_mmd_stops_early_when_distribution_is_within_tolerance() {
+        let measure = [particle(0.5, -0.25, 0.4), particle(5.0, 1.5, 0.6)];
+        let result = compare_phase_space_measures_spectral_adaptive(
+            &measure,
+            &measure,
+            config(),
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 4096,
+                confidence_level: 0.95,
+                tolerance: 1.0,
+                seed: 51,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.decision, AdaptiveMmdDecision::WithinTolerance);
+        assert_eq!(result.feature_count, 64);
+        assert_eq!(result.checkpoints.len(), 1);
+        assert_eq!(result.normalized_mmd_squared, 0.0);
+    }
+
+    #[test]
+    fn adaptive_mmd_stops_early_when_distribution_exceeds_tolerance() {
+        let reference = [particle(2.0, -1.0, 1.0)];
+        let result = compare_phase_space_measures_spectral_adaptive(
+            &[],
+            &reference,
+            config(),
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 4096,
+                confidence_level: 0.95,
+                tolerance: 0.1,
+                seed: 52,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.decision, AdaptiveMmdDecision::AboveTolerance);
+        assert_eq!(result.feature_count, 64);
+        assert_eq!(result.normalized_mmd_squared, 1.0);
+    }
+
+    #[test]
+    fn adaptive_mmd_uses_alpha_spending_and_abstains_at_budget() {
+        let reference = [particle(2.0, -1.0, 1.0)];
+        let adaptive_config = AdaptiveSpectralMmdConfig {
+            initial_feature_count: 64,
+            max_feature_count: 256,
+            confidence_level: 0.95,
+            tolerance: 1.0,
+            seed: 53,
+        };
+        let result = compare_phase_space_measures_spectral_adaptive(
+            &[],
+            &reference,
+            config(),
+            adaptive_config,
+        )
+        .unwrap();
+        assert_eq!(
+            result.decision,
+            AdaptiveMmdDecision::UnresolvedBudgetExhausted
+        );
+        assert_eq!(
+            result.checkpoints
+                .iter()
+                .map(|checkpoint| checkpoint.feature_count)
+                .collect::<Vec<_>>(),
+            vec![64, 128, 256]
+        );
+        assert!((result.alpha_spent - 0.0375).abs() <= 1.0e-12);
+        assert!(result.alpha_spent <= result.alpha_budget);
+        assert!(result.checkpoints.windows(2).all(|pair| {
+            pair[0].cumulative_alpha_spent < pair[1].cumulative_alpha_spent
+        }));
+    }
+
+    #[test]
+    fn adaptive_mmd_matches_the_same_frozen_feature_prefix() {
+        let reference = [particle(2.0, -1.0, 1.0)];
+        let seed = 0x2026_1121;
+        let adaptive = compare_phase_space_measures_spectral_adaptive(
+            &[],
+            &reference,
+            config(),
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 256,
+                confidence_level: 0.95,
+                tolerance: 1.0,
+                seed,
+            },
+        )
+        .unwrap();
+        let fixed = compare_phase_space_measures_spectral(
+            &[],
+            &reference,
+            config(),
+            SpectralMmdConfig {
+                feature_count: 256,
+                seed,
+            },
+        )
+        .unwrap();
+        assert_eq!(adaptive.feature_count, 256);
+        assert_eq!(
+            adaptive.normalized_mmd_squared,
+            fixed.normalized_mmd_squared
+        );
+    }
+
+    #[test]
+    fn adaptive_mmd_rejects_invalid_alpha_threshold_and_budget() {
+        let measure = [particle(0.0, 0.0, 1.0)];
+        let invalid = [
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 0,
+                max_feature_count: 64,
+                confidence_level: 0.95,
+                tolerance: 0.1,
+                seed: 1,
+            },
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 128,
+                max_feature_count: 64,
+                confidence_level: 0.95,
+                tolerance: 0.1,
+                seed: 1,
+            },
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 128,
+                confidence_level: 1.0,
+                tolerance: 0.1,
+                seed: 1,
+            },
+            AdaptiveSpectralMmdConfig {
+                initial_feature_count: 64,
+                max_feature_count: 128,
+                confidence_level: 0.95,
+                tolerance: 4.1,
+                seed: 1,
+            },
+        ];
+        for adaptive_config in invalid {
+            assert_eq!(
+                compare_phase_space_measures_spectral_adaptive(
+                    &measure,
+                    &measure,
+                    config(),
+                    adaptive_config
+                ),
+                Err(MmdError::InvalidAdaptiveConfig)
+            );
+        }
+    }
+
+
 }
