@@ -1,0 +1,526 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/symthaea_hdc_ltc_mace_arm_v0_1.schema.json",
+  "title": "HDC-LTC MACE Temporal Retrieval Arm v0.1",
+  "description": "JSONL record contract for candidate-side retrieval receipts and evaluator-side scoring. Evaluator-only labels must never be exposed to candidate memory.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/run_manifest"
+    },
+    {
+      "$ref": "#/$defs/candidate_retrieval"
+    },
+    {
+      "$ref": "#/$defs/evaluator_score"
+    },
+    {
+      "$ref": "#/$defs/summary"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "nonempty_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regime",
+        "objective"
+      ],
+      "properties": {
+        "regime": {
+          "type": "string",
+          "enum": [
+            "baseline",
+            "shifted",
+            "other"
+          ]
+        },
+        "objective": {
+          "type": "string",
+          "enum": [
+            "quality",
+            "cost",
+            "speed",
+            "other"
+          ]
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "dimension",
+        "fan_in",
+        "event_count",
+        "gap_profile",
+        "seed",
+        "config_sha256"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "exact_scan",
+            "static_continuous_hv",
+            "hdc_ltc_zero_input",
+            "hdc_ltc_distractor",
+            "hdc_ltc_confusable_distractor",
+            "hdc_ltc_irregular_correction"
+          ]
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 262144
+        },
+        "fan_in": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000
+        },
+        "gap_profile": {
+          "type": "string",
+          "enum": [
+            "regular",
+            "irregular",
+            "burst",
+            "mixed",
+            "not_applicable"
+          ]
+        },
+        "seed": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "tau_base_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tau_min_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tau_max_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "retrieved_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "similarity"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "similarity": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_record_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "run_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "source_revision",
+        "mace_revision",
+        "split_manifest_sha256",
+        "scenario_manifest_sha256",
+        "profile",
+        "index_bytes",
+        "evidence_sidecar_bytes",
+        "query_count"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "symthaea_hdc_ltc_mace_arm_v0_1"
+        },
+        "record_type": {
+          "const": "run_manifest"
+        },
+        "run_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "mace_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scenario_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "profile": {
+          "$ref": "#/$defs/profile"
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_sidecar_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hidden_evaluator_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_model_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "candidate_retrieval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "world_cluster_id",
+        "query_id",
+        "query_scope",
+        "action",
+        "profile",
+        "selected_event_ids",
+        "ranked_candidates",
+        "abstained",
+        "latency_ns",
+        "index_bytes",
+        "evidence_sidecar_bytes"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "symthaea_hdc_ltc_mace_arm_v0_1"
+        },
+        "record_type": {
+          "const": "candidate_retrieval"
+        },
+        "run_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "world_cluster_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "query_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "query_scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "profile": {
+          "$ref": "#/$defs/profile"
+        },
+        "selected_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "uniqueItems": true
+        },
+        "ranked_candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/retrieved_candidate"
+          }
+        },
+        "abstained": {
+          "type": "boolean"
+        },
+        "abstention_reason": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "best_similarity": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "best_margin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "acceptance_threshold": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_sidecar_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_schedule_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evaluator_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "world_cluster_id",
+        "query_id",
+        "relevant_event_ids",
+        "exact_scan_event_ids",
+        "decision_agreement",
+        "invalid_evidence_use_count",
+        "stale_evidence_use_count",
+        "net_utility_micros",
+        "regret_micros",
+        "evaluation_validity"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "symthaea_hdc_ltc_mace_arm_v0_1"
+        },
+        "record_type": {
+          "const": "evaluator_score"
+        },
+        "run_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "world_cluster_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "query_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "relevant_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "uniqueItems": true
+        },
+        "exact_scan_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "uniqueItems": true
+        },
+        "decision_agreement": {
+          "type": "boolean"
+        },
+        "invalid_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "net_utility_micros": {
+          "type": "integer"
+        },
+        "regret_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evaluation_validity": {
+          "type": "string",
+          "enum": [
+            "qualified",
+            "provisional",
+            "not_qualified"
+          ]
+        },
+        "oracle_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "excluded_from_primary_score": {
+          "type": "boolean"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "source_revision",
+        "profile",
+        "world_cluster_count",
+        "query_count",
+        "recall_at_1",
+        "recall_at_k",
+        "decision_agreement_rate",
+        "invalid_evidence_use_count",
+        "stale_evidence_use_count",
+        "mean_net_utility_micros",
+        "mean_regret_micros",
+        "p50_latency_ns",
+        "p95_latency_ns",
+        "p99_latency_ns",
+        "index_bytes",
+        "evidence_sidecar_bytes",
+        "evaluation_validity"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "symthaea_hdc_ltc_mace_arm_v0_1"
+        },
+        "record_type": {
+          "const": "summary"
+        },
+        "run_id": {
+          "$ref": "#/$defs/nonempty_id"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "profile": {
+          "$ref": "#/$defs/profile"
+        },
+        "world_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "query_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "recall_at_1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "recall_at_k": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "decision_agreement_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "invalid_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mean_net_utility_micros": {
+          "type": "number"
+        },
+        "mean_regret_micros": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p50_latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p95_latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p99_latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_sidecar_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paired_ci95_lower_micros": {
+          "type": "number"
+        },
+        "paired_ci95_upper_micros": {
+          "type": "number"
+        },
+        "evaluation_validity": {
+          "type": "string",
+          "enum": [
+            "qualified",
+            "provisional",
+            "not_qualified"
+          ]
+        }
+      }
+    }
+  }
+}
