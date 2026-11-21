@@ -121,6 +121,7 @@ fn setup_presence(
     )
     .expect("bounded canonical model must tessellate");
     spawn_filament_canopy(&mut commands, &mut meshes, &mut materials, cpu_mesh);
+    spawn_branch_junctions(&mut commands, &mut meshes, &mut materials, &model.filaments);
     spawn_terminal_spores(&mut commands, &mut meshes, &mut materials, &model.filaments);
 
     spawn_core(&mut commands, &mut meshes, &mut materials, config.reduced_motion);
@@ -152,6 +153,37 @@ fn spawn_filament_canopy(
         MeshMaterial3d(material),
         Transform::from_scale(Vec3::splat(0.035)),
     ));
+}
+
+fn spawn_branch_junctions(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    filaments: &[MycelialFilament],
+) {
+    let junction_mesh = meshes.add(Sphere::new(1.0).mesh().ico(2).expect("valid junction mesh"));
+    let junction_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.22, 0.76, 0.84),
+        emissive: LinearRgba::rgb(0.028, 0.22, 0.30),
+        metallic: 0.18,
+        perceptual_roughness: 0.28,
+        ..default()
+    });
+
+    for filament in filaments.iter().filter(|filament| !filament.terminal) {
+        let position = filament.end;
+        let radius = filament.radius_end * 0.035 * 1.55;
+        commands.spawn((
+            Mesh3d(junction_mesh.clone()),
+            MeshMaterial3d(junction_material.clone()),
+            Transform::from_xyz(
+                position.x * 0.035,
+                position.z * 0.035,
+                position.y * 0.035,
+            )
+            .with_scale(Vec3::splat(radius)),
+        ));
+    }
 }
 
 fn spawn_terminal_spores(
