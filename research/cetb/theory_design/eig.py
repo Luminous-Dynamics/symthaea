@@ -163,3 +163,101 @@ def evaluate_design_scenarios(
         "cost": cost,
         "lower_quantile": lower_quantile,
     }
+
+
+def evaluate_design_manifest(manifest: Mapping[str, object], tolerance: float = 1e-10) -> dict[str, object]:
+    """Evaluate a versioned manifest containing multiple candidate designs."""
+    if manifest.get("schema_version") != "cetb.theory-design-run/0.1.0":
+        raise DesignValidationError("unsupported theory-design manifest schema_version")
+    status = manifest.get("status")
+    if status not in {"synthetic_fixture", "preregistered_design_input"}:
+        raise DesignValidationError("manifest status must identify synthetic or preregistered input")
+    prior = manifest.get("theory_prior")
+    designs = manifest.get("designs")
+    if not isinstance(prior, dict) or not isinstance(designs, list) or not designs:
+        raise DesignValidationError("manifest requires theory_prior and at least one design")
+    results = []
+    seen_ids: set[str] = set()
+    for index, design in enumerate(designs):
+        if not isinstance(design, dict):
+            raise DesignValidationError(f"designs[{index}] must be an object")
+        design_id = design.get("design_id")
+        if not isinstance(design_id, str) or not design_id.strip():
+            raise DesignValidationError(f"designs[{index}].design_id must be non-empty")
+        if design_id in seen_ids:
+            raise DesignValidationError(f"duplicate design_id {design_id!r}")
+        seen_ids.add(design_id)
+        scenarios = design.get("nuisance_scenarios")
+        if not isinstance(scenarios, list) or not scenarios:
+            raise DesignValidationError(f"design {design_id!r} requires nuisance_scenarios")
+        scenario_values = []
+        for scenario_index, scenario in enumerate(scenarios):
+            if not isinstance(scenario, dict):
+                raise DesignValidationError(
+                    f"design {design_id!r} scenario {scenario_index} must be an object"
+                )
+            scenario_values.append((
+                scenario.get("weight"),
+                scenario.get("likelihoods"),
+            ))
+        cost = design.get("cost")
+        q = design.get("lower_quantile", 0.10)
+        summary = evaluate_design_scenarios(
+            prior,
+            scenario_values,
+            cost=cost,
+            lower_quantile=q,
+            tolerance=tolerance,
+        )
+        results.append({"design_id": design_id, **summary})
+
+    results.sort(
+        key=lambda item: (
+            float(item["lower_quantile_eig_bits_per_cost"]),
+            float(item["expected_eig_bits_per_cost"]),
+        ),
+        reverse=True,
+    )
+    for rank, result in enumerate(results, start=1):
+        result["rank"] = rank
+    return {
+        "schema_version": "cetb.theory-design-result/0.1.0",
+        "source_status": status,
+        "selection_basis": "lower_quantile_eig_bits_per_cost_then_expected_eig_per_cost",
+        "theory_entropy_bits": theory_entropy_bits(prior, tolerance),
+        "results": results,
+        "claim_limits": [
+            "design ranking depends on supplied priors and likelihoods",
+            "no empirical experiment result is implied",
+            "EIG does not establish that a theory is true",
+        ],
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    import json
+    import sys
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("manifest", type=Path, help="versioned theory-design input JSON")
+    parser.add_argument("--output", type=Path, help="optional JSON output path")
+    parser.add_argument("--tolerance", type=float, default=1e-10)
+    args = parser.parse_args(argv)
+    try:
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        result = evaluate_design_manifest(manifest, tolerance=args.tolerance)
+        rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            args.output.write_text(rendered, encoding="utf-8")
+        else:
+            print(rendered, end="")
+    except (OSError, json.JSONDecodeError, DesignValidationError, ArithmeticError) as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
