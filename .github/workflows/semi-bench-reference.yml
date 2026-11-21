@@ -110,3 +110,13 @@ jobs:
           diff -u \
             /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json \
             /tmp/semi-rust-rust-metrics.json
+      - name: Reproduce Rust SECOM raw audit report byte-for-byte
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-audit -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-mini-features-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-mini-labels-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-mini-expectations-v1.json \
+            > /tmp/semi-rust-secom-report.json
+          diff -u \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-mini-integrity-report-v1.expected.json \
+            /tmp/semi-rust-secom-report.json
