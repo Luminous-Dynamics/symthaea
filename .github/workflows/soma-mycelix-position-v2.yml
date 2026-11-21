@@ -18,13 +18,6 @@ jobs:
       - name: Checkout Symthaea
         uses: actions/checkout@v4
 
-      - name: Checkout exact Mycelix Position v2 contract
-        uses: actions/checkout@v4
-        with:
-          repository: Luminous-Dynamics/mycelix
-          ref: dc28de1165eeb04b27d23011b6f9681fa740d66d
-          path: mycelix
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
