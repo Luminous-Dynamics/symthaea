@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "profile_version": "0.1.0",
   "benchmark_id": "plasma.vlasov_poisson.1d1v.periodic.trajectory",
   "profile_date": "2026-11-21",
@@ -361,7 +360,7 @@
     "status": "prospective_targets_not_results",
     "linear_growth_or_damping_rate_relative_error": 0.01,
     "observed_false_safe_count_on_curated_adversarial_suite": 0,
-    "end_to_end_speedup_at_matched_physical_fidelity": 2.0,
+    "end_to_end_speedup_at_matched_physical_fidelity": 2,
     "required_cost_metrics": [
       "preprocessing_and_plan_creation",
       "training_amortisation",
