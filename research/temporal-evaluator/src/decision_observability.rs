@@ -298,7 +298,6 @@ pub fn evaluate_decision_observability(
     for action in &actions {
         let mut worst_loss = 0_u32;
         let mut worst_regret = 0_u32;
-        let mut regret_sum = 0_u64;
         for world in &prepared {
             let loss = *world.losses.get(action).ok_or(
                 DecisionObservabilityError::ActionSetMismatch {
@@ -312,9 +311,6 @@ pub fn evaluate_decision_observability(
             )?;
             worst_loss = worst_loss.max(loss);
             worst_regret = worst_regret.max(regret);
-            regret_sum = regret_sum
-                .checked_add(u64::from(regret))
-                .ok_or(DecisionObservabilityError::ArithmeticOverflow)?;
         }
 
         let loss_candidate = (worst_loss, action.clone());
