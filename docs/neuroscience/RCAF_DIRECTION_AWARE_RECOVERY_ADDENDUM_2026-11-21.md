@@ -1,7 +1,7 @@
 # RCAF Direction-Aware and Nuisance Calibration Addendum
 
 **Date:** 2026-11-21  
-**Status:** Implemented in the research branch; execution validation pending  
+**Status:** Implemented and focused-workflow validated on exact head 42582270476f110576f754de60c6a779d2fc7d6c; broad repository CI and biological validation remain outstanding  
 **Parent:** RCAF Adversarial Instrument Calibration Protocol V1
 
 ## 1. Why this correction matters
@@ -16,7 +16,7 @@ A statistically significant negative paired gap is therefore evidence of an effe
 
 ## 2. Updated report semantics
 
-Report schema versions were advanced to 0.3.0 for the injection report and containing sweep/tournament outputs, adding the nuisance-only fields as well as the direction-aware recovery fields.
+Report schema versions were advanced to 0.4.0 for the injection report and containing sweep/tournament outputs, adding the nuisance-only fields as well as the direction-aware recovery fields.
 
 - `injection_detection_power`: retained for compatibility within the research package; it means the two-sided significant-difference rate, regardless of direction.
 - `injection_directional_detection_power`: significant two-sided rejections whose observed participant sign balance is in the preregistered positive paired-gap direction.
@@ -24,6 +24,15 @@ Report schema versions were advanced to 0.3.0 for the injection report and conta
 
 The two directional counts partition the two-sided detection count. Wrong-direction rejections are never counted as successful recovery. The sign direction is currently tied to the positive module-loading injection; future negative or polarity-changing injections must declare and test their own expected direction.
 
+## 4. Signal-plus-nuisance interaction extension
+
+The report contract now separately records:
+- `signal_plus_nuisance_detection_power`: two-sided difference detection when the intended injection and common-mode observation nuisance are both present;
+- `signal_plus_nuisance_directional_detection_power`: significant recovery in the expected direction under that combined condition;
+- `signal_plus_nuisance_wrong_direction_rejection_rate`: significant rejection in the opposite direction under that combined condition;
+- `median_signal_plus_nuisance_paired_gap`: median paired-gap summary for the combined condition.
+
+At nuisance dose zero, these outputs must match the clean injection outputs exactly. At positive nuisance doses, the nuisance-only and combined signal+nuisance conditions use the same deterministic innovation stream, while only the planted module loading differs. This makes sensitivity loss or direction reversal under nuisance measurable without changing the clean signal baseline. The output schemas are now version 0.4.0 for injection and containing sweep/tournament reports and 0.2.0 for the common-mode sweep.
 ## 3. Implementation
 
 The standalone Rust kernel now classifies each injected replicate into the two-sided detection, expected-direction or wrong-direction outcomes. The JSON serializer includes both new binomial rates with Wilson intervals. The injection, sweep, estimator-tournament and estimator-by-dose schemas all carry the fields and were advanced to 0.3.0.
