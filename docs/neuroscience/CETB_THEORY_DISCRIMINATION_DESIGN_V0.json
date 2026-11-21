@@ -1,0 +1,42 @@
+{
+  "schema_version": "cetb.theory-design/0.1.0",
+  "status": "protocol_template_synthetic_no_empirical_predictions",
+  "design_id": "synthetic-theory-discrimination-template",
+  "theory_predictions": [],
+  "candidate_designs": [],
+  "outcome_semantics": {
+    "missingness_is_explicit": true,
+    "required_outcomes": [
+      "valid_outcome",
+      "ambiguous_low_quality",
+      "technical_failure",
+      "withdrawal_or_noncompletion"
+    ],
+    "outcome_probabilities_must_sum_to_one": true
+  },
+  "objective": {
+    "primary": "expected_information_gain_about_theory_identity_bits",
+    "robustness": "predeclared_lower_quantile_over_nuisance_scenarios",
+    "cost_adjustment": "report_eig_and_cost_separately; optional robust_eig_per_positive_cost",
+    "decision_constraints": [
+      "ethics",
+      "participant_safety",
+      "measurement_validity",
+      "rights_privacy",
+      "operational_feasibility"
+    ]
+  },
+  "gates": {
+    "freeze_theory_cards_before_design_selection": true,
+    "preserve_all_prediction_versions": true,
+    "publish_prior_sensitivity": true,
+    "publish_nuisance_sensitivity": true,
+    "use_proper_scores_on_held_out_outcomes": true,
+    "report_null_and_failed_experiments": true
+  },
+  "claim_limits": [
+    "design_utility_is_not_evidence_that_a_theory_is_true",
+    "EIG_depends_on_prediction_likelihood_calibration",
+    "not_a_consciousness_score"
+  ]
+}
