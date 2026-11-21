@@ -479,6 +479,9 @@ mod tests {
     const EXPECTED: &str = include_str!(
         "../../../../../benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json"
     );
+    const SECOM_MANIFEST: &str = include_str!(
+        "../../../../../docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json"
+    );
 
     fn known_answer() -> SplitManifestV1 {
         serde_json::from_str(INPUT).expect("split fixture must parse")
@@ -490,6 +493,50 @@ mod tests {
         let actual = serde_json::to_value(report).expect("report serializes");
         let expected: Value = serde_json::from_str(EXPECTED).expect("expected parses");
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn frozen_secom_source_clock_manifest_has_expected_support() {
+        let manifest: SplitManifestV1 =
+            serde_json::from_str(SECOM_MANIFEST).expect("SECOM chronology manifest parses");
+        let report = validate_split_manifest_v1(&manifest).expect("SECOM chronology validates");
+        assert_eq!(
+            manifest.dataset_snapshot_sha256,
+            "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281"
+        );
+        assert_eq!(report.time_basis.as_deref(), Some("source_local_naive"));
+        assert_eq!(
+            report.clock_domain_id.as_deref(),
+            Some("uci-secom-mirror-single-source-clock")
+        );
+        assert_eq!(
+            report.split_counts["train"],
+            SplitCountsV1 {
+                samples: 940,
+                positive: 76,
+                negative: 864,
+            }
+        );
+        assert_eq!(
+            report.split_counts["validation"],
+            SplitCountsV1 {
+                samples: 313,
+                positive: 11,
+                negative: 302,
+            }
+        );
+        assert_eq!(
+            report.split_counts["test"],
+            SplitCountsV1 {
+                samples: 314,
+                positive: 17,
+                negative: 297,
+            }
+        );
+        assert_eq!(
+            report.claim_limits.temporal_independence,
+            "established-within-declared-source-clock-domain-only"
+        );
     }
 
     #[test]
