@@ -114,3 +114,9 @@ The independent helper `python/semi_pair_manifest_reference.py` validates pair p
 The known-answer input/output are `fixtures/contrastive-pair-manifest-known-answer-v1.json` and `fixtures/contrastive-pair-manifest-known-answer-v1.expected.json`. Eleven tests cover cross-split pairs, scope mismatch, duplicate identities/edges, orphan references, self-pairs, same-lot evidence and time-embargo violations.
 
 This establishes pair-manifest integrity only. It does not establish that a positive or negative pair is semantically correct, or that a trained embedding/model performs well.
+
+
+Reproduce the pair-manifest validation report:
+
+    python benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py \
+      benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json
