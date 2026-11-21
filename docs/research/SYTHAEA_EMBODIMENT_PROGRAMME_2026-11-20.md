@@ -234,9 +234,9 @@ Repository source inspection found that `src/cognitive_loop/voice_channel.rs` re
 
 ## Renderer evolution — 2026-11-21
 
-The Mycelial Presence no longer treats SVG as its source of truth. A deterministic renderer-neutral spatial model and bounded CPU tube-mesh tessellator are now in the branch. SVG is retained as the inspectable, portable 2D projection and fallback; future Bevy/WGPU or browser GPU adapters will consume the same model/mesh.
+The Mycelial Presence no longer treats SVG as its source of truth. A deterministic renderer-neutral spatial model and bounded CPU tube-mesh tessellator are now in the branch. SVG is retained as the inspectable, portable 2D projection and fallback. An isolated Bevy 0.20.1 native PBR preview adapter now consumes the same mesh, but has not yet been compiled or visually verified. Custom WESL materials, GPU-generated geometry and browser WebGPU/WebGL adapters remain future work.
 
-This avoids a renderer-specific rewrite and keeps cognitive event semantics independent from geometry, materials, and camera motion. The native GPU renderer is a separate next adapter, not a completed result.
+This avoids a renderer-specific rewrite and keeps cognitive event semantics independent from geometry, materials, and camera motion. The new Bevy adapter is excluded from the root workspace to preserve the existing Bevy 0.15 dashboard and workspace `wgpu 27` boundary.
 
 Detailed decision, browser/native compatibility considerations, resource limits, visual direction, and matched benchmark targets:
 [MYCELIAL_RENDERER_EVOLUTION_2026-11-21.md](MYCELIAL_RENDERER_EVOLUTION_2026-11-21.md)
