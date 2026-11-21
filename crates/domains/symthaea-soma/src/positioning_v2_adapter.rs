@@ -244,6 +244,7 @@ impl SomaPositioningV2Adapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use positioning::navigation_v2::TimeBasisRef;
 
     #[test]
     fn missing_source_time_is_not_filled_with_receipt_tick() {
