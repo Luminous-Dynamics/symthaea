@@ -94,7 +94,10 @@
             "AXIAL_CAPACITY_DEFECT": "FAIL",
             "THERMAL_WEAR_DEFECT": "PASS",
             "JOINT_RETENTION_DEFECT": "FAIL"
-          }
+          },
+          "obligations_covered": [
+            "COMBINED-LOAD-CAPABILITY-001"
+          ]
         },
         {
           "action_id": "B-THERMAL-INSPECTION",
@@ -120,7 +123,10 @@
             "AXIAL_CAPACITY_DEFECT": "CLEAR",
             "THERMAL_WEAR_DEFECT": "INDICATION",
             "JOINT_RETENTION_DEFECT": "CLEAR"
-          }
+          },
+          "obligations_covered": [
+            "THERMAL-WEAR-INSPECTABILITY-001"
+          ]
         }
       ],
       "expected": {
@@ -148,6 +154,13 @@
         },
         "require_adaptive_resource_pareto_dominates_fixed": true,
         "notes": "Neither test alone improves distribution-free minimax regret. A two-step contingent policy screens combined load first; FAIL means every remaining state is defective and terminates at REJECT. PASS leaves healthy/thermal-wear states, so the thermal inspection is then selected and determines ACCEPT versus REJECT. The state-frequency weights are an explicitly synthetic calibrated fixture model used only for expected resource-use accounting; they never enter the minimax-regret/acceptance decision."
+      },
+      "decision_obligations": {
+        "ACCEPT": [
+          "COMBINED-LOAD-CAPABILITY-001",
+          "THERMAL-WEAR-INSPECTABILITY-001"
+        ],
+        "REJECT": []
       }
     },
     {
@@ -233,7 +246,10 @@
             "AXIAL_CAPACITY_DEFECT": "FAIL",
             "THERMAL_WEAR_DEFECT": "PASS",
             "JOINT_RETENTION_DEFECT": "FAIL"
-          }
+          },
+          "obligations_covered": [
+            "COMBINED-LOAD-CAPABILITY-001"
+          ]
         },
         {
           "action_id": "B-THERMAL-INSPECTION",
@@ -259,7 +275,10 @@
             "AXIAL_CAPACITY_DEFECT": "CLEAR",
             "THERMAL_WEAR_DEFECT": "INDICATION",
             "JOINT_RETENTION_DEFECT": "CLEAR"
-          }
+          },
+          "obligations_covered": [
+            "THERMAL-WEAR-INSPECTABILITY-001"
+          ]
         }
       ],
       "expected": {
@@ -287,6 +306,13 @@
         },
         "require_adaptive_resource_pareto_dominates_fixed": true,
         "notes": "Same physical decision states, tests, loss matrix and non-compensatory robust terminal criterion as SEQ-001, but with a different explicit synthetic state-frequency model. The exact finite-horizon planner chooses thermal inspection first because the declared frequency profile makes B-first followed by A only on CLEAR use fewer expected resources in every dimension. The frequency model changes expected cost/order only; the worst-case minimax regret remains zero."
+      },
+      "decision_obligations": {
+        "ACCEPT": [
+          "COMBINED-LOAD-CAPABILITY-001",
+          "THERMAL-WEAR-INSPECTABILITY-001"
+        ],
+        "REJECT": []
       }
     }
   ]
