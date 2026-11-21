@@ -580,12 +580,19 @@
         "stratified_sample"
       ],
       "semantics": "unique-identity; all-splits-non-empty; group-disjoint-check; strict-forward-time-check; timezone-required; deterministic-assignment-digest; source-local-naive chronology permitted only with explicit clock_domain_id and no UTC/cross-domain claim",
-      "test_count": 10,
+      "test_count": 11,
       "empirical_dataset_result": false,
       "supported_time_basis": [
         "offset_aware",
         "source_local_naive-with-explicit-clock_domain_id"
-      ]
+      ],
+      "actual_source_manifest": {
+        "path": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+        "source_snapshot_id": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+        "clock_domain_id": "uci-secom-mirror-single-source-clock",
+        "test": "frozen source-level chronology and support assertions",
+        "status": "frozen; hosted validation pending"
+      }
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
@@ -615,7 +622,7 @@
       "test_count": 10,
       "claim_ceiling": "synthetic model-based expected value only; no physical savings or inspection authorization"
     },
-    "total_test_count": 34,
+    "total_test_count": 35,
     "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler"
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
@@ -643,5 +650,6 @@
   ],
   "source_integrity_audits": [
     "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
-  ]
+  ],
+  "secom_integrity_audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
 }
