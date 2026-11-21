@@ -33,7 +33,7 @@ struct SourceV1 {
     limitations: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum SourceClassV1 {
     OfficialProductDocumentation,
@@ -62,7 +62,7 @@ struct ObservationV1 {
     claim_ceiling: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum CapabilityAreaV1 {
     AudioGeneration,
@@ -73,7 +73,7 @@ enum CapabilityAreaV1 {
     DatasetOrBenchmark,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum EvidenceKindV1 {
     BlindPreferenceLeaderboard,
@@ -93,13 +93,6 @@ struct MetricV1 {
     plus_minus: Option<f64>,
     sample_size: Option<u64>,
     scope: String,
-}
-
-fn valid_identifier(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    bytes.len() >= 3
-        && bytes.len() <= 101
-        && bytes[0].is_ascii_lowercase() || false
 }
 
 fn valid_id(value: &str) -> bool {
