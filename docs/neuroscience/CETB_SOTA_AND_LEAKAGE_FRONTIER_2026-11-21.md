@@ -97,3 +97,10 @@ Do not set a universal minimum accuracy. The correct target depends on endpoint,
 - RCAF's synthetic injection/recovery only demonstrates behaviour under a declared Gaussian factor model.
 - CETB has not yet reproduced the published COGITATE or ds006623 analyses using biological signals.
 - No consciousness detection, causal mechanism, clinical readiness or better-than-SOTA claim is established.
+
+
+### Temporal dependence added to the synthetic world
+
+The RCAF generator now supports stationary AR(1) autocorrelation in the shared factors and region-level residual processes. The default is rho=0.30; the report and JSON schemas carry the selected value. This creates autocorrelated finite time series while preserving the declared cross-sectional factor model.
+
+It is still not a realistic BOLD/EEG/MEG pipeline simulator: no hemodynamic response, motion, physiology, source leakage, sensor noise, nonstationarity or preprocessing artifacts are represented yet. The next surface should vary rho and include nuisance mechanisms separately rather than calling this model "brain-like".
