@@ -437,9 +437,10 @@ impl VlasovPoisson1d1v {
         let period = config.velocity_max - config.velocity_min;
         let mut line = vec![Complex::ZERO; config.nv];
         for (ix, electric_value) in self.electric_field.iter().enumerate() {
-            let acceleration = config.charge_to_mass * electric_value;
-            for (iv, value) in line.iter_mut().enumerate() {
-                *value = Complex::new(self.distribution[ix * config.nv + iv], 0.0);
+            let acceleration = config.charge_to_mass * *electric_value;
+            let row = &self.distribution[ix * config.nv..(ix + 1) * config.nv];
+            for (value, density) in line.iter_mut().zip(row) {
+                *value = Complex::new(*density, 0.0);
             }
             fft(&mut line, false);
             for (mode, coefficient) in line.iter_mut().enumerate() {
