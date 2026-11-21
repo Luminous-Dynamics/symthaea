@@ -1,0 +1,164 @@
+{
+  "authority": "representation_only_no_execution_authority",
+  "cases": [
+    {
+      "attempt_ref": null,
+      "equipment_capability_ref": null,
+      "expected_disposition": "CapabilityUnresolved",
+      "id": "plan_without_equipment_capability",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "metrology_ref": null,
+      "observed_output_state_ref": null,
+      "process_family_ref": "mfg-proc:synthetic-surface-transform-v1"
+    },
+    {
+      "attempt_ref": null,
+      "equipment_capability_ref": "semi-eqp:synthetic-tool-capability-v1",
+      "expected_disposition": "PlannedOnly",
+      "id": "capability_without_attempt",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "metrology_ref": null,
+      "observed_output_state_ref": null,
+      "process_family_ref": "mfg-proc:synthetic-surface-transform-v1"
+    },
+    {
+      "attempt_ref": "attempt:synthetic-001",
+      "equipment_capability_ref": "semi-eqp:synthetic-tool-capability-v1",
+      "expected_disposition": "AttemptedObservationIncomplete",
+      "id": "attempt_without_metrology",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "metrology_ref": null,
+      "observed_output_state_ref": null,
+      "process_family_ref": "mfg-proc:synthetic-surface-transform-v1"
+    },
+    {
+      "acceptance_profile_ref": null,
+      "attempt_ref": "attempt:synthetic-002",
+      "equipment_capability_ref": "semi-eqp:synthetic-tool-capability-v1",
+      "expected_disposition": "ObservedCandidateState",
+      "id": "observed_candidate_not_yet_accepted",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "metrology_ref": "semi-met:synthetic-current-observation-v1",
+      "observed_output_state_ref": "wafer-state:synthetic-a1",
+      "process_family_ref": "mfg-proc:synthetic-surface-transform-v1"
+    },
+    {
+      "acceptance_profile_ref": "acceptance:synthetic-profile-v1",
+      "attempt_ref": "attempt:synthetic-003",
+      "equipment_capability_ref": "semi-eqp:synthetic-tool-capability-v1",
+      "expected_disposition": "AcceptedUnderProfile",
+      "id": "accepted_under_exact_profile",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "metrology_ref": "semi-met:synthetic-current-observation-v1",
+      "observed_output_state_ref": "wafer-state:synthetic-a1",
+      "process_family_ref": "mfg-proc:synthetic-surface-transform-v1",
+      "profile_evaluation": "within_profile"
+    },
+    {
+      "acceptance_profile_ref": "acceptance:synthetic-profile-v1",
+      "attempt_ref": "attempt:synthetic-004",
+      "equipment_capability_ref": "semi-eqp:synthetic-tool-capability-v1",
+      "expected_disposition": "RejectedUnderProfile",
+      "id": "rejected_under_exact_profile",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "metrology_ref": "semi-met:synthetic-current-observation-v1",
+      "observed_output_state_ref": "wafer-state:synthetic-a2",
+      "process_family_ref": "mfg-proc:synthetic-surface-transform-v1",
+      "profile_evaluation": "outside_profile"
+    },
+    {
+      "attempt_input_state_ref": "wafer-state:synthetic-b0",
+      "attempt_ref": "attempt:synthetic-005",
+      "declared_input_state_ref": "wafer-state:synthetic-a0",
+      "expected_error": "InputStateLineageMismatch",
+      "id": "wrong_input_state_lineage",
+      "process_family_ref": "mfg-proc:synthetic-surface-transform-v1"
+    },
+    {
+      "downstream_input_state_ref": "wafer-state:intended-a1",
+      "expected_error": "UnobservedStateCannotSatisfyDownstreamInput",
+      "id": "downstream_consumes_intended_not_observed",
+      "upstream_intended_output_state_ref": "wafer-state:intended-a1",
+      "upstream_observed_output_state_ref": null
+    },
+    {
+      "expected_disposition": "ReworkRequired",
+      "history_rule": "rejected_state_preserved",
+      "id": "rework_creates_new_branch",
+      "rejected_state_ref": "wafer-state:synthetic-r1-rejected",
+      "rework_attempt_ref": "attempt:synthetic-rework-001",
+      "reworked_state_ref": "wafer-state:synthetic-r2",
+      "source_state_ref": "wafer-state:synthetic-r0"
+    },
+    {
+      "expected_error": "RequiredInputReferenceMissing",
+      "id": "missing_material_input_ref",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "present_material_refs": [],
+      "process_family_ref": "mfg-proc:synthetic-add-material-v1",
+      "required_material_refs": [
+        "material:synthetic-film-source-v1"
+      ]
+    },
+    {
+      "acceptance_profile_ref": "acceptance:synthetic-profile-v1",
+      "attempt_ref": "attempt:synthetic-006",
+      "expected_disposition": "AttemptedObservationIncomplete",
+      "id": "stale_metrology_blocks_acceptance",
+      "input_state_ref": "wafer-state:synthetic-a0",
+      "metrology_currentness": "stale",
+      "metrology_ref": "semi-met:synthetic-stale-observation-v1"
+    },
+    {
+      "base_process_family_ref": "mfg-proc:synthetic-transform-v1",
+      "changed_process_family_ref": "mfg-proc:synthetic-transform-v2",
+      "expected_identity_relation": "distinct",
+      "id": "process_profile_change_changes_identity"
+    },
+    {
+      "base_equipment_ref": "semi-eqp:synthetic-tool-config-a",
+      "changed_equipment_ref": "semi-eqp:synthetic-tool-config-b",
+      "expected_identity_relation": "distinct",
+      "id": "equipment_configuration_change_changes_execution_subject"
+    },
+    {
+      "declared_order_semantics": "set",
+      "expected_identity_relation": "same",
+      "id": "nonsemantic_reference_order_is_canonical",
+      "material_refs_a": [
+        "material:alpha",
+        "material:beta"
+      ],
+      "material_refs_b": [
+        "material:beta",
+        "material:alpha"
+      ]
+    },
+    {
+      "expected_error": "DuplicateReference",
+      "id": "duplicate_reference_rejected",
+      "material_refs": [
+        "material:alpha",
+        "material:alpha"
+      ]
+    },
+    {
+      "execution_authority": false,
+      "expected_authority": "none",
+      "expected_history": "both_preserved",
+      "historical_attempts": [
+        {
+          "attempt_ref": "attempt:synthetic-fail",
+          "disposition": "RejectedUnderProfile"
+        },
+        {
+          "attempt_ref": "attempt:synthetic-pass",
+          "disposition": "AcceptedUnderProfile"
+        }
+      ],
+      "id": "later_success_does_not_erase_failure_or_mint_authority"
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for semiconductor wafer-state/process-step evidence semantics. Contains no physical process recipe parameters.",
+  "schema": "semi-proc-001a-synthetic-corpus-v1"
+}
