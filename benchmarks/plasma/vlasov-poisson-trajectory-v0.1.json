@@ -187,9 +187,9 @@
     {
       "component": "dense_distribution_space_vlasov_poisson_reference_prototype",
       "pr": 13103,
-      "head_sha": "cec768a09cbcf32e064f0555a9815a4b33f7184d",
+      "head_sha": "49a82ef6b50e8b026235a77a1bfa3c45a171fc13",
       "state_at_profile_creation": "open",
-      "claim_ceiling": "Spectral-Strang reference prototype with focused tests pending exact-head execution; not yet L3-admitted."
+      "claim_ceiling": "Spectral-Strang reference prototype with exact-head tests not yet confirmed; not yet L3-admitted."
     }
   ],
   "initial_condition_suite": [
