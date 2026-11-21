@@ -100,3 +100,8 @@ Implementation compatibility note: non-temporal v1 split manifests retain their 
 ## Frozen real-source split manifest
 
 A source-level chronological SECOM manifest now accompanies the synthetic split fixtures at `docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json`. It binds sample row IDs, labels, source-local naive timestamps, source commit and a canonical file-manifest digest. A dedicated test validates the actual manifest and asserts the 940/313/314 partition counts and 76/11/17 failure support. The 11 split-manifest tests bring the full reference suite to **35 tests**.
+
+
+## Latest hosted verification
+
+The updated reference suite contains **35 tests** and passed in hosted GitHub Actions run [#44899113316](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316). This run includes the frozen row-level SECOM source-clock manifest test. It also reproduced the binary-metric and inspection-decision reports byte-for-byte. No local test execution is claimed.
