@@ -50,6 +50,9 @@ jobs:
       - name: Run focused runner tests
         run: cargo test --locked -p symthaea-muse --bin rmi_bench_track_a
 
+      - name: Run focused Clippy
+        run: cargo clippy --locked -p symthaea-muse --bin rmi_bench_track_a -- -D warnings
+
       - name: Execute frozen fixture suite and fresh-process replay
         run: |
           source_commit="$(git rev-parse HEAD)"
