@@ -521,7 +521,8 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "loading_jitter must be finite and non-negative",
         });
     }
-    if !config.temporal_autocorrelation.is_finite() || config.temporal_autocorrelation.abs() >= 1.0 {
+    if !config.temporal_autocorrelation.is_finite() || config.temporal_autocorrelation.abs() >= 1.0
+    {
         return Err(MetricError::InvalidSimulationConfig {
             reason: "temporal_autocorrelation must be finite and strictly between -1 and 1",
         });
