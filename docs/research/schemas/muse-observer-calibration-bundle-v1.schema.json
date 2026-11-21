@@ -1,0 +1,486 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-observer-calibration-bundle-v1.schema.json",
+  "title": "MUSE Observer Calibration Bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dataset_sha256",
+    "contract_sha256",
+    "model",
+    "threshold_selection",
+    "held_out",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-observer-calibration-bundle-v1"
+    },
+    "dataset_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "contract_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model": {
+      "$ref": "#/$defs/model"
+    },
+    "threshold_selection": {
+      "$ref": "#/$defs/threshold"
+    },
+    "held_out": {
+      "$ref": "#/$defs/heldOut"
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "calibrator_id",
+        "calibrator_version",
+        "feature_id",
+        "fit_dataset_sha256",
+        "fit_example_count",
+        "fit_unmeasured_count",
+        "fit_positive_count",
+        "blocks",
+        "model_sha256"
+      ],
+      "properties": {
+        "schema": {
+          "const": "muse-isotonic-calibration-model-v1"
+        },
+        "calibrator_id": {
+          "const": "muse-isotonic-salience-calibrator"
+        },
+        "calibrator_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "feature_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "fit_dataset_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fit_example_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fit_unmeasured_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fit_positive_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower_score_db",
+        "upper_score_db",
+        "positive_count",
+        "total_count",
+        "probability"
+      ],
+      "properties": {
+        "lower_score_db": {
+          "type": "number",
+          "minimum": -300,
+          "maximum": 120
+        },
+        "upper_score_db": {
+          "type": "number",
+          "minimum": -300,
+          "maximum": 120
+        },
+        "positive_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "threshold_dataset_sha256",
+        "target_maximum_false_support_rate",
+        "selected_support_threshold",
+        "threshold_examples",
+        "threshold_positive_count",
+        "threshold_negative_count",
+        "supported_count",
+        "false_support_count",
+        "false_support_rate",
+        "true_support_rate",
+        "selection_status"
+      ],
+      "properties": {
+        "threshold_dataset_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_maximum_false_support_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        "selected_support_threshold": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "threshold_examples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "threshold_positive_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "threshold_negative_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "supported_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_support_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_support_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "true_support_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "selection_status": {
+          "enum": [
+            "threshold_selected",
+            "no_safe_threshold_all_abstain"
+          ]
+        }
+      }
+    },
+    "heldOut": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "held_out_dataset_sha256",
+        "total_examples",
+        "measured_examples",
+        "unmeasured_examples",
+        "positive_examples",
+        "negative_examples",
+        "brier_score",
+        "expected_calibration_error",
+        "roc_auc",
+        "average_precision",
+        "supported_examples",
+        "abstained_examples",
+        "true_support_count",
+        "false_support_count",
+        "support_coverage",
+        "measurement_coverage",
+        "abstention_rate",
+        "support_precision",
+        "false_support_rate_all_negatives",
+        "false_support_rate_measured_negatives",
+        "event_recall",
+        "cluster_bootstrap",
+        "negative_family_metrics"
+      ],
+      "properties": {
+        "held_out_dataset_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "total_examples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "measured_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmeasured_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "positive_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "negative_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "brier_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "expected_calibration_error": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "roc_auc": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "average_precision": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "supported_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "abstained_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "true_support_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_support_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "support_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "measurement_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "abstention_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "support_precision": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_support_rate_all_negatives": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_support_rate_measured_negatives": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "event_recall": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cluster_bootstrap": {
+          "$ref": "#/$defs/clusterBootstrap"
+        },
+        "negative_family_metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/negativeFamily"
+          }
+        }
+      }
+    },
+    "bootstrapInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower_95",
+        "upper_95",
+        "valid_replicates"
+      ],
+      "properties": {
+        "lower_95": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper_95": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "valid_replicates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "clusterBootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "support_precision",
+        "false_support_rate_all_negatives",
+        "event_recall",
+        "support_coverage",
+        "brier_score",
+        "false_support_rate_measured_negatives"
+      ],
+      "properties": {
+        "support_precision": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "false_support_rate_all_negatives": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "event_recall": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "support_coverage": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "brier_score": {
+          "$ref": "#/$defs/bootstrapInterval"
+        },
+        "false_support_rate_measured_negatives": {
+          "$ref": "#/$defs/bootstrapInterval"
+        }
+      }
+    },
+    "negativeFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "negative_family",
+        "total_negative_examples",
+        "measured_negative_examples",
+        "false_support_count",
+        "false_support_rate_all_negatives",
+        "false_support_rate_measured_negatives"
+      ],
+      "properties": {
+        "negative_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "total_negative_examples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "measured_negative_examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_support_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_support_rate_all_negatives": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_support_rate_measured_negatives": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
