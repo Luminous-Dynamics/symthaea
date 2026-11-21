@@ -55,20 +55,10 @@ jobs:
 
       - name: Validate multidimensional measurement qualification receipt
         run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          import jsonschema
-
-          schema = json.loads(Path("research/cetb/measurement_qualification/measurement-qualification.schema.json").read_text())
-          receipt = json.loads(Path("research/cetb/measurement_qualification/fixtures/synthetic-qualification.json").read_text())
-          jsonschema.Draft202012Validator.check_schema(schema)
-          jsonschema.validate(receipt, schema)
-          assert receipt["no_composite_score"] is True
-          assert receipt["repeatability"]["inferential_unit"] == "participant"
-          assert receipt["transportability"]["independent_cohort"]["status"] == "not_assessed"
-          print("PASS: multidimensional measurement qualification receipt")
-          PY
+          python -m unittest discover -s research/cetb/measurement_qualification -p 'test_*.py' -v
+          python research/cetb/measurement_qualification/validate_receipt.py \
+            research/cetb/measurement_qualification/fixtures/synthetic-qualification.json \
+            research/cetb/measurement_qualification/measurement-qualification.schema.json
 
       - name: Validate theory-design manifest and execute synthetic ranking
         run: |
