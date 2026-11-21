@@ -250,10 +250,12 @@ fn validate_summary(row: &SummaryInput, line_number: usize) -> Result<(), Box<dy
     if (reproduced_accuracy - row.accuracy).abs() > 1.0e-12 {
         return Err(format!("line {line_number}: accuracy does not reproduce from counts").into());
     }
-    if let Some(revision) = row.source_revision.as_deref() {
-        if !valid_git_revision(revision) {
-            return Err(format!("line {line_number}: invalid source revision").into());
-        }
+    let revision = row
+        .source_revision
+        .as_deref()
+        .ok_or_else(|| format!("line {line_number}: source revision is required for frontier analysis"))?;
+    if !valid_git_revision(revision) {
+        return Err(format!("line {line_number}: invalid source revision").into());
     }
     if !matches!(
         row.condition.as_str(),
@@ -692,6 +694,60 @@ mod tests {
         let c: BTreeSet<u64> = [0, 1, 2, 4].into_iter().collect();
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn analysis_qualifies_only_paired_59_seed_capacity_points() {
+        let revision = "a".repeat(40);
+        let mut cohorts = BTreeMap::new();
+
+        for fan_in in [4usize, 8] {
+            for horizon in [1.0f64, 2.0] {
+                let key = CohortKey {
+                    source_revision: Some(revision.clone()),
+                    dimension: 1_024,
+                    memory_fan_in: fan_in,
+                    condition: "hdc_ltc_zero_input".to_owned(),
+                    gap_profile: "irregular".to_owned(),
+                    horizon_bits: horizon.to_bits(),
+                    event_count: 4,
+                };
+                let mut data = CohortData {
+                    chance_accuracy: Some(1.0 / fan_in as f64),
+                    ..CohortData::default()
+                };
+                for seed in 0..59u64 {
+                    data.seed_accuracy.insert(seed, 1.0);
+                    data.cohort_ids.insert(format!("seed-{seed}"));
+                }
+                cohorts.insert(key, data);
+            }
+        }
+
+        let records = analyze(&cohorts, 59).expect("paired 59-seed frontier should analyze");
+        let k95 = records.iter().find_map(|record| match record {
+            OutputRecord::K95(row)
+                if row.dimension == 1_024
+                    && row.horizon_seconds == 1.0
+                    && row.condition == "hdc_ltc_zero_input" =>
+            {
+                row.qualified_k95
+            }
+            _ => None,
+        });
+        let t90 = records.iter().find_map(|record| match record {
+            OutputRecord::T90(row)
+                if row.dimension == 1_024
+                    && row.memory_fan_in == 4
+                    && row.condition == "hdc_ltc_zero_input" =>
+            {
+                row.qualified_t90_seconds
+            }
+            _ => None,
+        });
+
+        assert_eq!(k95, Some(8));
+        assert_eq!(t90, Some(2.0));
     }
 
     #[test]
