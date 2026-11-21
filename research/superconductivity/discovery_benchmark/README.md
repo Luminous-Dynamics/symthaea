@@ -165,3 +165,8 @@ Each run binds a unique convergence profile, the same functional and pseudopoten
 ### Claim ceiling
 
 The source-reported LuRu3B2 positive control is not numerically reproduced here. All mode values and evaluation truths in the fixture are synthetic. The auditor verifies screening disposition semantics and a synthetic hard-filter false-negative control only; it does not set a universal imaginary-mode tolerance, validate SSCHA/TDEP, establish the real material's 0 K/finite-temperature stability, prove general recall improvement or claim a new superconducting result.
+
+
+## Current SOTA / industry comparator (21 Nov 2026)
+
+See [2026_SOTA_AND_INDUSTRY_COMPARISON.md](2026_SOTA_AND_INDUSTRY_COMPARISON.md) for source-pinned comparisons against AutoSuperCon, BEE-NET, the active ORNL physics-enhanced AI discovery programme, and commercial REBCO manufacturing / cross-lab benchmarks. It distinguishes paper-reported results from active project plans and from Luminous synthetic-software validation.
