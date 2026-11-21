@@ -123,3 +123,45 @@ The auditor separates four dispositions: harmonic stable for the declared 0 K me
 The test fixture includes an intentionally false-negative case for the simple any-imaginary-mode hard gate, plus stable, robustly unstable, underconverged and sign-sensitive controls. The receipt compares the hard-gate false negative with the triage queue's ability to preserve a positive case, while ensuring no unsupported harmonic-stability claim is emitted.
 
 This proves only software disposition semantics on synthetic inputs and a source-linked positive-control citation. It does not reproduce material phonons, validate a universal imaginary-frequency threshold, establish anharmonic stabilization or prove an improved physical discovery rate.
+
+
+## Soft-mode false-negative / recovery benchmark
+
+This child benchmark is tracked by [SC-SOFT-MODE-RECALL-001 #13134](https://github.com/Luminous-Dynamics/symthaea/issues/13134) and composes the BEE-NET funnel/compute-allocation owner (#12644) with the sealed harmonic dynamic-stability evidence owner (#5016).
+
+Schema: `data/schemas/sc_soft_mode_triage_v0_1.schema.json`.
+
+Synthetic fixture: `data/research/sc_soft_mode_triage_fixture_v0_1.json`.
+
+Auditor: `tools/superconductivity-discovery-benchmark-auditor/src/bin/soft_mode_triage_audit.rs`.
+
+Run:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-benchmark-auditor/Cargo.toml --bin sc_soft_mode_triage_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-benchmark-auditor/Cargo.toml --bin sc_soft_mode_triage_audit -- \
+  --schema data/schemas/sc_soft_mode_triage_v0_1.schema.json \
+  --fixture data/research/sc_soft_mode_triage_fixture_v0_1.json
+```
+
+### Source-linked case vs synthetic mode values
+
+The source reference is LuRu3B2 from Mustaf et al. (Phys. Rev. Research 8, 023308, 17 June 2026, DOI 10.1103/lpqj-7hyg). The paper reports that weakly imaginary calculated phonon modes caused LuRu3B2 to be initially overlooked in its ML-guided high-throughput predictions, while bulk superconductivity was later observed at Tc=0.95 K through magnetization, specific heat and electrical transport. The source-reference row records that qualitative source statement and explicitly says that no numeric phonon frequency or raw dispersion artifact is admitted. Numeric frequency values in the fixture belong only to synthetic controls and are not LuRu3B2 data.
+
+### Disposition semantics
+
+The auditor distinguishes:
+- harmonic stable for the declared converged 0 K harmonic method;
+- marginal / soft-mode unresolved;
+- robust harmonic instability for the stated high-symmetry structure;
+- underconverged / unknown.
+
+A disposition is not the same as candidate disposition. Marginal cases are retained for re-evaluation. Robustly unstable high-symmetry structures are routed to lower-symmetry distortion search; they are not globally rejected as impossible materials. Underconverged evidence remains unknown. Only the declared harmonic proposition can be asserted by this v0.1 auditor; no finite-temperature or anharmonic stability is inferred.
+
+### Convergence requirements
+
+Each run binds a unique convergence profile, the same functional and pseudopotential set, q-mesh, supercell, electronic cutoff, displacement amplitude, force residual, frequency uncertainty and declared method scope. A stable or robust-instability disposition requires at least two converged runs that differ in both convergence-profile identity and q-mesh/supercell settings. One calculation, repeated rows with identical settings, failed convergence, excessive force residual or a method-scope mismatch cannot establish a robust disposition.
+
+### Claim ceiling
+
+The source-reported LuRu3B2 positive control is not numerically reproduced here. All mode values and evaluation truths in the fixture are synthetic. The auditor verifies screening disposition semantics and a synthetic hard-filter false-negative control only; it does not set a universal imaginary-mode tolerance, validate SSCHA/TDEP, establish the real material's 0 K/finite-temperature stability, prove general recall improvement or claim a new superconducting result.
