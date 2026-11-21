@@ -361,6 +361,62 @@
         "dataset release, EDF files, annotation version and file checksums must be pinned before a new analysis"
       ],
       "acquisition_status": "historical_local_use_reported; new_version_not_pinned"
+    },
+    {
+      "id": "openneuro-ds003171",
+      "name": "Modeling an auditory stimulated brain under altered states of consciousness using the generalized Ising model",
+      "provider": "OpenNeuro",
+      "version": "2.0.1",
+      "doi": "10.18112/openneuro.ds003171.v2.0.1",
+      "data_url": "https://openneuro.org/datasets/ds003171/versions/2.0.1",
+      "repository_url": "https://github.com/OpenNeuroDatasets/ds003171",
+      "paper_doi": "10.1016/j.neuroimage.2020.117367",
+      "license": "CC0",
+      "license_status": "reported_in_current_dataset_description",
+      "participants": 17,
+      "population": "healthy adult volunteers; published cohort summary reports mean age approximately 24 years",
+      "modalities": [
+        "MRI",
+        "fMRI",
+        "behavioural"
+      ],
+      "tasks": [
+        "naturalistic auditory listening (film excerpt)",
+        "rest"
+      ],
+      "context": "propofol sedation with awake, light sedation, deep sedation and recovery acquisitions",
+      "available_metadata": [
+        "participant metadata",
+        "task/rest acquisition structure",
+        "BIDS dataset description",
+        "auditory stimulus timing metadata"
+      ],
+      "published_preprocessing": {
+        "bids": "1.0.1"
+      },
+      "best_use": "locked independent-cohort/site transportability test after the ds006623 reproduction pipeline, using resting-state awake-versus-deep-sedation as the primary comparable contrast and auditory listening as a separate task-specific analysis",
+      "limitations": [
+        "17 participants is a small external cohort; participant-level uncertainty must be emphasized and flexible machine-learning models are not justified by this sample size",
+        "published analyses have excluded participants for motion in some condition-specific comparisons; actual retained denominators must be recomputed from the frozen QC protocol before inference",
+        "rest and auditory-listening acquisitions must be analysed separately and must not be pooled as if they were exchangeable",
+        "task content differs from ds006623 mental-imagery and hand-squeeze tasks, so task-specific results are not direct replications of those paradigms",
+        "sedation state, behavioural responsiveness, task processing and subjective experience are separate variables; this dataset does not provide a universal consciousness label",
+        "external confirmation must be performed with a frozen pipeline and no tuning on ds003171 outcomes"
+      ],
+      "acquisition_status": "metadata_audited; data_files_not_downloaded",
+      "file_manifest_status": "pending_frozen_manifest_and_checksums",
+      "external_validation_plan": {
+        "source_dataset_id": "openneuro-ds006623",
+        "role": "independent_cohort_and_site_external_validation",
+        "primary_contrast": "rest_awake_vs_rest_deep_sedation",
+        "secondary_contrasts": [
+          "rest_awake_vs_rest_recovery",
+          "naturalistic_listening_awake_vs_naturalistic_listening_deep_sedation"
+        ],
+        "analysis_rule": "Keep rest and auditory-listening analyses separate; lock ROI/edge mapping, preprocessing, estimator, comparator, exclusions and thresholds on ds006623 before opening ds003171 outcomes.",
+        "tuning_on_external_outcomes": false,
+        "evidence_status": "planned_not_run"
+      }
     }
   ]
 }
