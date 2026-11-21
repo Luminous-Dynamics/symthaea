@@ -72,6 +72,7 @@ pub enum MmdError {
     InvalidVelocityLengthScale,
     InvalidFeatureCount,
     InvalidAdaptiveConfig,
+    InvalidMixtureConfig,
     UnsupportedSpatialConcentrationForSampling,
     NonFinitePosition {
         measure: &'static str,
@@ -109,6 +110,9 @@ impl fmt::Display for MmdError {
             Self::InvalidFeatureCount => write!(f, "spectral feature count must be positive"),
             Self::InvalidAdaptiveConfig => {
                 write!(f, "adaptive spectral MMD configuration is invalid")
+            }
+            Self::InvalidMixtureConfig => {
+                write!(f, "multi-scale MMD mixture configuration is invalid")
             }
             Self::UnsupportedSpatialConcentrationForSampling => write!(
                 f,
@@ -951,6 +955,413 @@ pub fn compare_phase_space_measures_spectral_adaptive(
     })
 }
 
+/// One positive component in a frozen characteristic-kernel mixture.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MmdKernelComponent {
+    /// Positive mixture mass. Component masses are normalized after a
+    /// strict unit-sum validation (absolute tolerance 1e-12).
+    pub weight: f64,
+    /// Positive von Mises spatial concentration.
+    pub spatial_concentration: f64,
+    /// Positive Gaussian velocity length scale.
+    pub velocity_length_scale: f64,
+}
+
+/// A finite positive mixture of characteristic kernels on S^1_L x R.
+///
+/// Every component is unit diagonal and characteristic when its scales are
+/// positive. A positive mixture of such kernels remains characteristic.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MmdMixtureConfig {
+    pub domain_length: f64,
+    pub components: Vec<MmdKernelComponent>,
+}
+
+/// Exact mixture reference with aggregate and per-component diagnostics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MmdMixtureResult {
+    pub aggregate: MmdResult,
+    /// Exact normalized MMD^2 for every configured kernel component, in the
+    /// same order as MmdMixtureConfig.components.
+    pub component_normalized_mmd_squared: Vec<f64>,
+}
+
+/// Per-component summary from a spectral mixture draw. These are descriptive
+/// conditional estimates; the mixture-wide Hoeffding bound does not apply to
+/// each component estimate independently.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpectralMmdMixtureComponentEstimate {
+    pub feature_count: usize,
+    pub normalized_mmd_squared_estimate: Option<f64>,
+    pub feature_sample_variance: Option<f64>,
+    pub feature_standard_error: Option<f64>,
+}
+
+/// Spectral mixture estimate together with component allocation provenance.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpectralMmdMixtureResult {
+    pub estimate: SpectralMmdResult,
+    /// Number of spectral features sampled from each configured component.
+    pub component_feature_counts: Vec<usize>,
+    /// Conditional estimates for each component; None when the component
+    /// received no sampled features in this finite draw.
+    pub component_estimates: Vec<SpectralMmdMixtureComponentEstimate>,
+}
+
+fn validate_mixture_config(config: &MmdMixtureConfig) -> Result<f64, MmdError> {
+    if !config.domain_length.is_finite()
+        || config.domain_length <= 0.0
+        || config.components.is_empty()
+        || config.components.len() > 32
+    {
+        return Err(MmdError::InvalidMixtureConfig);
+    }
+
+    let mut total_weight = CompensatedSum::default();
+    for (index, component) in config.components.iter().enumerate() {
+        if !component.weight.is_finite()
+            || component.weight <= 0.0
+            || !component.spatial_concentration.is_finite()
+            || component.spatial_concentration <= 0.0
+            || !component.velocity_length_scale.is_finite()
+            || component.velocity_length_scale <= 0.0
+        {
+            return Err(MmdError::InvalidMixtureConfig);
+        }
+        if config.components[..index].iter().any(|previous| {
+            previous.spatial_concentration == component.spatial_concentration
+                && previous.velocity_length_scale == component.velocity_length_scale
+        }) {
+            return Err(MmdError::InvalidMixtureConfig);
+        }
+        total_weight.add(component.weight);
+    }
+
+    let total_weight = total_weight.total();
+    if !total_weight.is_finite() || (total_weight - 1.0).abs() > 1.0e-12 {
+        return Err(MmdError::InvalidMixtureConfig);
+    }
+    Ok(total_weight)
+}
+
+fn component_config(domain_length: f64, component: MmdKernelComponent) -> MmdConfig {
+    MmdConfig {
+        domain_length,
+        spatial_concentration: component.spatial_concentration,
+        velocity_length_scale: component.velocity_length_scale,
+    }
+}
+
+fn mixture_kernel(
+    left: WeightedAtom,
+    right: WeightedAtom,
+    config: &MmdMixtureConfig,
+    total_weight: f64,
+) -> f64 {
+    let mut sum = CompensatedSum::default();
+    for component in &config.components {
+        let weight = component.weight / total_weight;
+        sum.add(
+            weight
+                * kernel(
+                    left,
+                    right,
+                    component_config(config.domain_length, *component),
+                ),
+        );
+    }
+    sum.total()
+}
+
+fn quadratic_sum_mixture(
+    left: &[WeightedAtom],
+    right: &[WeightedAtom],
+    normalization: f64,
+    config: &MmdMixtureConfig,
+    total_weight: f64,
+) -> (f64, f64) {
+    let mut sum = CompensatedSum::default();
+    let mut absolute_sum = CompensatedSum::default();
+    for left_atom in left {
+        let left_weight = left_atom.weight / normalization;
+        for right_atom in right {
+            let right_weight = right_atom.weight / normalization;
+            let term = left_weight
+                * right_weight
+                * mixture_kernel(*left_atom, *right_atom, config, total_weight);
+            sum.add(term);
+            absolute_sum.add(term.abs());
+        }
+    }
+    (sum.total(), absolute_sum.total())
+}
+
+/// Exact small-N MMD reference for a frozen positive mixture of characteristic
+/// periodic × Gaussian kernels. Co-located signed atoms are canonicalized by
+/// the same function and total-variation convention as the single-scale oracle.
+pub fn compare_phase_space_measures_mmd_mixture(
+    candidate: &[PhaseSpaceParticle1d],
+    reference: &[PhaseSpaceParticle1d],
+    config: &MmdMixtureConfig,
+) -> Result<MmdMixtureResult, MmdError> {
+    let total_weight = validate_mixture_config(config)?;
+    let (candidate_atoms, candidate_tv) =
+        aggregate_measure(candidate, "candidate", config.domain_length)?;
+    let (reference_atoms, reference_tv) =
+        aggregate_measure(reference, "reference", config.domain_length)?;
+    let total_variation_scale = candidate_tv.max(reference_tv);
+    let normalization = if total_variation_scale == 0.0 {
+        1.0
+    } else {
+        total_variation_scale
+    };
+    let pair_evaluations = pair_count(candidate_atoms.len(), reference_atoms.len())?
+        .checked_mul(config.components.len() as u128)
+        .ok_or(MmdError::PairCountOverflow)?;
+
+    let (candidate_self, candidate_abs) = quadratic_sum_mixture(
+        &candidate_atoms,
+        &candidate_atoms,
+        normalization,
+        config,
+        total_weight,
+    );
+    let (reference_self, reference_abs) = quadratic_sum_mixture(
+        &reference_atoms,
+        &reference_atoms,
+        normalization,
+        config,
+        total_weight,
+    );
+    let (cross, cross_abs) = quadratic_sum_mixture(
+        &candidate_atoms,
+        &reference_atoms,
+        normalization,
+        config,
+        total_weight,
+    );
+
+    let mut normalized_mmd_squared = candidate_self + reference_self - 2.0 * cross;
+    let absolute_term_sum = candidate_abs + reference_abs + 2.0 * cross_abs;
+    let roundoff_tolerance = 128.0 * f64::EPSILON * absolute_term_sum.max(1.0);
+    if !normalized_mmd_squared.is_finite()
+        || !absolute_term_sum.is_finite()
+        || !roundoff_tolerance.is_finite()
+    {
+        return Err(MmdError::NonFiniteOutput);
+    }
+    let mut negative_roundoff_clamped = false;
+    if normalized_mmd_squared < -roundoff_tolerance {
+        return Err(MmdError::MateriallyNegativeMmdSquared {
+            value: normalized_mmd_squared,
+            tolerance: roundoff_tolerance,
+        });
+    }
+    if normalized_mmd_squared < 0.0 {
+        normalized_mmd_squared = 0.0;
+        negative_roundoff_clamped = true;
+    }
+    let normalized_mmd = normalized_mmd_squared.sqrt();
+    if !normalized_mmd.is_finite() {
+        return Err(MmdError::NonFiniteOutput);
+    }
+
+    let component_normalized_mmd_squared = config
+        .components
+        .iter()
+        .map(|component| {
+            compare_phase_space_measures_mmd(
+                candidate,
+                reference,
+                component_config(config.domain_length, *component),
+            )
+            .map(|result| result.normalized_mmd_squared)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(MmdMixtureResult {
+        aggregate: MmdResult {
+            normalized_mmd_squared,
+            normalized_mmd,
+            total_variation_scale,
+            candidate_particle_count: candidate.len(),
+            reference_particle_count: reference.len(),
+            candidate_atom_count: candidate_atoms.len(),
+            reference_atom_count: reference_atoms.len(),
+            pair_evaluations,
+            roundoff_tolerance,
+            negative_roundoff_clamped,
+        },
+        component_normalized_mmd_squared,
+    })
+}
+
+fn sample_mixture_component(
+    config: &MmdMixtureConfig,
+    total_weight: f64,
+    rng: &mut SplitMix64,
+) -> usize {
+    let target = rng.uniform_open();
+    let mut cumulative = 0.0;
+    for (index, component) in config.components.iter().enumerate() {
+        cumulative += component.weight / total_weight;
+        if target < cumulative {
+            return index;
+        }
+    }
+    // The last branch absorbs only floating-point CDF roundoff; all component
+    // weights were validated positive and the sum normalized above.
+    config.components.len() - 1
+}
+
+/// Common-random-feature approximation for a frozen positive kernel mixture.
+///
+/// First sample component r with probability beta_r, then sample a frequency
+/// from that component's exact Skellam × Gaussian spectrum. This samples the
+/// complete spectral measure of the mixture without truncating any component.
+/// The returned [0,4] Hoeffding interval concerns random-feature integration
+/// error in normalized squared MMD only.
+pub fn compare_phase_space_measures_spectral_mixture(
+    candidate: &[PhaseSpaceParticle1d],
+    reference: &[PhaseSpaceParticle1d],
+    mixture: &MmdMixtureConfig,
+    feature_config: SpectralMmdConfig,
+) -> Result<SpectralMmdMixtureResult, MmdError> {
+    let total_weight = validate_mixture_config(mixture)?;
+    if feature_config.feature_count == 0 || feature_config.feature_count > 10_000_000 {
+        return Err(MmdError::InvalidFeatureCount);
+    }
+
+    let (candidate_atoms, candidate_tv) =
+        aggregate_measure(candidate, "candidate", mixture.domain_length)?;
+    let (reference_atoms, reference_tv) =
+        aggregate_measure(reference, "reference", mixture.domain_length)?;
+    let total_variation_scale = candidate_tv.max(reference_tv);
+    let normalization = if total_variation_scale == 0.0 {
+        1.0
+    } else {
+        total_variation_scale
+    };
+
+    let mut rng = SplitMix64::new(feature_config.seed);
+    let mut component_feature_counts = vec![0_usize; mixture.components.len()];
+    let mut component_means = vec![0.0_f64; mixture.components.len()];
+    let mut component_sum_squared_deviations = vec![0.0_f64; mixture.components.len()];
+    let mut mean = 0.0;
+    let mut sum_squared_deviation = 0.0;
+
+    for sample_index in 0..feature_config.feature_count {
+        let component_index = sample_mixture_component(mixture, total_weight, &mut rng);
+        component_feature_counts[component_index] += 1;
+        let kernel_config =
+            component_config(mixture.domain_length, mixture.components[component_index]);
+        let feature = sample_spectral_feature(kernel_config, &mut rng)?;
+        let squared_difference = spectral_squared_signature_difference(
+            &candidate_atoms,
+            &reference_atoms,
+            normalization,
+            feature,
+            kernel_config,
+        )?;
+
+        let count = (sample_index + 1) as f64;
+        let delta = squared_difference - mean;
+        mean += delta / count;
+        let delta_after_update = squared_difference - mean;
+        sum_squared_deviation += delta * delta_after_update;
+
+        let component_count = component_feature_counts[component_index] as f64;
+        let component_delta = squared_difference - component_means[component_index];
+        component_means[component_index] += component_delta / component_count;
+        let component_delta_after_update = squared_difference - component_means[component_index];
+        component_sum_squared_deviations[component_index] +=
+            component_delta * component_delta_after_update;
+    }
+
+    if !mean.is_finite()
+        || !sum_squared_deviation.is_finite()
+        || component_means.iter().any(|value| !value.is_finite())
+        || component_sum_squared_deviations
+            .iter()
+            .any(|value| !value.is_finite())
+    {
+        return Err(MmdError::NonFiniteOutput);
+    }
+    let feature_sample_variance = if feature_config.feature_count > 1 {
+        (sum_squared_deviation / (feature_config.feature_count - 1) as f64).max(0.0)
+    } else {
+        0.0
+    };
+    let feature_standard_error =
+        (feature_sample_variance / feature_config.feature_count as f64).sqrt();
+    let hoeffding_95_half_width =
+        4.0 * ((2.0 / 0.05_f64).ln() / (2.0 * feature_config.feature_count as f64)).sqrt();
+    let feature_bound_lower = (mean - hoeffding_95_half_width).max(0.0);
+    let feature_bound_upper = (mean + hoeffding_95_half_width).min(4.0);
+    let normalized_mmd = mean.sqrt();
+
+    let particle_feature_evaluations = (candidate_atoms.len() as u128)
+        .checked_add(reference_atoms.len() as u128)
+        .and_then(|count| count.checked_mul(feature_config.feature_count as u128))
+        .ok_or(MmdError::PairCountOverflow)?;
+
+    if !normalized_mmd.is_finite()
+        || !feature_sample_variance.is_finite()
+        || !feature_standard_error.is_finite()
+        || !hoeffding_95_half_width.is_finite()
+    {
+        return Err(MmdError::NonFiniteOutput);
+    }
+
+    let component_estimates = component_feature_counts
+        .iter()
+        .enumerate()
+        .map(|(index, count)| {
+            if *count == 0 {
+                SpectralMmdMixtureComponentEstimate {
+                    feature_count: 0,
+                    normalized_mmd_squared_estimate: None,
+                    feature_sample_variance: None,
+                    feature_standard_error: None,
+                }
+            } else {
+                let variance = if *count > 1 {
+                    (component_sum_squared_deviations[index] / (*count - 1) as f64).max(0.0)
+                } else {
+                    0.0
+                };
+                SpectralMmdMixtureComponentEstimate {
+                    feature_count: *count,
+                    normalized_mmd_squared_estimate: Some(component_means[index]),
+                    feature_sample_variance: Some(variance),
+                    feature_standard_error: Some((variance / *count as f64).sqrt()),
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    Ok(SpectralMmdMixtureResult {
+        estimate: SpectralMmdResult {
+            normalized_mmd_squared: mean,
+            normalized_mmd,
+            feature_sample_variance,
+            feature_standard_error,
+            hoeffding_95_half_width,
+            feature_bound_lower,
+            feature_bound_upper,
+            feature_count: feature_config.feature_count,
+            seed: feature_config.seed,
+            candidate_particle_count: candidate.len(),
+            reference_particle_count: reference.len(),
+            candidate_atom_count: candidate_atoms.len(),
+            reference_atom_count: reference_atoms.len(),
+            particle_feature_evaluations,
+        },
+        component_feature_counts,
+        component_estimates,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1591,5 +2002,303 @@ mod tests {
                 Err(MmdError::InvalidAdaptiveConfig)
             );
         }
+    }
+
+    fn mixture_config() -> MmdMixtureConfig {
+        MmdMixtureConfig {
+            domain_length: 8.0,
+            components: vec![
+                MmdKernelComponent {
+                    weight: 0.2,
+                    spatial_concentration: 0.5,
+                    velocity_length_scale: 2.0,
+                },
+                MmdKernelComponent {
+                    weight: 0.5,
+                    spatial_concentration: 2.0,
+                    velocity_length_scale: 1.0,
+                },
+                MmdKernelComponent {
+                    weight: 0.3,
+                    spatial_concentration: 20.0,
+                    velocity_length_scale: 0.25,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn exact_mixture_mmd_squared_is_weighted_sum_of_component_oracles() {
+        let candidate = [
+            particle(0.0, -0.5, 0.2),
+            particle(1.5, 0.25, 0.3),
+            particle(5.0, 1.25, 0.5),
+        ];
+        let reference = [
+            particle(0.25, -0.4, 0.2),
+            particle(2.0, 0.5, 0.3),
+            particle(5.5, 1.0, 0.5),
+        ];
+        let mixture = mixture_config();
+        let mixed =
+            compare_phase_space_measures_mmd_mixture(&candidate, &reference, &mixture).unwrap();
+        let weighted_sum = mixture
+            .components
+            .iter()
+            .zip(&mixed.component_normalized_mmd_squared)
+            .map(|(component, component_mmd_squared)| component.weight * component_mmd_squared)
+            .sum::<f64>();
+        assert_eq!(
+            mixed.component_normalized_mmd_squared.len(),
+            mixture.components.len()
+        );
+        assert!(
+            (mixed.aggregate.normalized_mmd_squared - weighted_sum).abs() <= 1.0e-12,
+            "mixture MMD^2 {} differed from weighted component sum {weighted_sum}",
+            mixed.aggregate.normalized_mmd_squared
+        );
+    }
+
+    #[test]
+    fn exact_mixture_preserves_permutation_and_signed_split_invariance() {
+        let candidate = [particle(1.0, 0.25, 0.5), particle(6.0, -0.5, 0.5)];
+        let permutation = [particle(6.0, -0.5, 0.5), particle(1.0, 0.25, 0.5)];
+        let signed_split = [
+            particle(1.0, 0.25, 0.75),
+            particle(1.0, 0.25, -0.25),
+            particle(6.0, -0.5, 0.2),
+            particle(6.0, -0.5, 0.3),
+        ];
+        let permuted =
+            compare_phase_space_measures_mmd_mixture(&candidate, &permutation, &mixture_config())
+                .unwrap();
+        let split =
+            compare_phase_space_measures_mmd_mixture(&candidate, &signed_split, &mixture_config())
+                .unwrap();
+        assert_mmd_zero(permuted.aggregate);
+        assert_mmd_zero(split.aggregate);
+        assert_eq!(split.aggregate.reference_atom_count, 2);
+    }
+
+    #[test]
+    fn exact_mixture_is_invariant_to_component_order() {
+        let candidate = [particle(0.0, 0.0, 0.5), particle(4.0, 1.0, 0.5)];
+        let reference = [particle(0.25, 0.0, 0.5), particle(4.25, 1.0, 0.5)];
+        let forward = mixture_config();
+        let mut reversed = forward.clone();
+        reversed.components.reverse();
+        let left =
+            compare_phase_space_measures_mmd_mixture(&candidate, &reference, &forward).unwrap();
+        let right =
+            compare_phase_space_measures_mmd_mixture(&candidate, &reference, &reversed).unwrap();
+        assert!(
+            (left.aggregate.normalized_mmd_squared - right.aggregate.normalized_mmd_squared).abs()
+                <= 1.0e-12
+        );
+    }
+
+    #[test]
+    fn spectral_mixture_is_reproducible_and_accounts_component_draws() {
+        let candidate = [particle(0.0, 0.0, 0.5), particle(4.0, 1.0, 0.5)];
+        let reference = [particle(0.25, 0.0, 0.5), particle(4.25, 1.0, 0.5)];
+        let feature_config = SpectralMmdConfig {
+            feature_count: 2048,
+            seed: 0x0051_ca1e,
+        };
+        let first = compare_phase_space_measures_spectral_mixture(
+            &candidate,
+            &reference,
+            &mixture_config(),
+            feature_config,
+        )
+        .unwrap();
+        let second = compare_phase_space_measures_spectral_mixture(
+            &candidate,
+            &reference,
+            &mixture_config(),
+            feature_config,
+        )
+        .unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            first.component_feature_counts.iter().sum::<usize>(),
+            feature_config.feature_count
+        );
+        assert_eq!(
+            first.component_estimates.len(),
+            first.component_feature_counts.len()
+        );
+        assert!(
+            first
+                .component_estimates
+                .iter()
+                .zip(&first.component_feature_counts)
+                .all(|(estimate, count)| {
+                    estimate.feature_count == *count
+                        && estimate.normalized_mmd_squared_estimate.is_some() == (*count > 0)
+                })
+        );
+        assert_eq!(first.estimate.particle_feature_evaluations, 8192);
+    }
+
+    #[test]
+    fn spectral_mixture_tracks_exact_mixture_inside_feature_bound() {
+        let candidate = [
+            particle(0.0, -0.5, 0.2),
+            particle(1.5, 0.25, 0.3),
+            particle(5.0, 1.25, 0.5),
+        ];
+        let reference = [
+            particle(0.25, -0.4, 0.2),
+            particle(2.0, 0.5, 0.3),
+            particle(5.5, 1.0, 0.5),
+        ];
+        let exact =
+            compare_phase_space_measures_mmd_mixture(&candidate, &reference, &mixture_config())
+                .unwrap();
+        let approximate = compare_phase_space_measures_spectral_mixture(
+            &candidate,
+            &reference,
+            &mixture_config(),
+            SpectralMmdConfig {
+                feature_count: 16_384,
+                seed: 0x2026_1130,
+            },
+        )
+        .unwrap();
+        let error = (approximate.estimate.normalized_mmd_squared
+            - exact.aggregate.normalized_mmd_squared)
+            .abs();
+        assert!(
+            error <= approximate.estimate.hoeffding_95_half_width,
+            "mixture spectral error {error:e} exceeds feature bound {:e}",
+            approximate.estimate.hoeffding_95_half_width
+        );
+    }
+
+    #[test]
+    fn spectral_mixture_is_zero_for_equivalent_signed_measures() {
+        let candidate = [particle(1.0, 0.25, 0.5), particle(6.0, -0.5, 0.5)];
+        let reference = [
+            particle(6.0, -0.5, 0.5),
+            particle(1.0, 0.25, 0.75),
+            particle(1.0, 0.25, -0.25),
+        ];
+        let result = compare_phase_space_measures_spectral_mixture(
+            &candidate,
+            &reference,
+            &mixture_config(),
+            SpectralMmdConfig {
+                feature_count: 256,
+                seed: 88,
+            },
+        )
+        .unwrap();
+        assert!(result.estimate.normalized_mmd <= 1.0e-12);
+    }
+
+    #[test]
+    fn malformed_kernel_mixtures_are_rejected() {
+        let mut invalid = mixture_config();
+        invalid.components.clear();
+        assert_eq!(
+            compare_phase_space_measures_mmd_mixture(&[], &[], &invalid),
+            Err(MmdError::InvalidMixtureConfig)
+        );
+
+        invalid = mixture_config();
+        invalid.components[0].weight = 0.0;
+        assert_eq!(
+            compare_phase_space_measures_mmd_mixture(&[], &[], &invalid),
+            Err(MmdError::InvalidMixtureConfig)
+        );
+
+        invalid = mixture_config();
+        invalid.components[0].spatial_concentration = f64::NAN;
+        assert_eq!(
+            compare_phase_space_measures_mmd_mixture(&[], &[], &invalid),
+            Err(MmdError::InvalidMixtureConfig)
+        );
+
+        invalid = mixture_config();
+        invalid.components[2] = invalid.components[1];
+        assert_eq!(
+            compare_phase_space_measures_mmd_mixture(&[], &[], &invalid),
+            Err(MmdError::InvalidMixtureConfig)
+        );
+
+        invalid = mixture_config();
+        invalid.components[0].weight += 0.1;
+        assert_eq!(
+            compare_phase_space_measures_mmd_mixture(&[], &[], &invalid),
+            Err(MmdError::InvalidMixtureConfig)
+        );
+    }
+
+    #[test]
+    fn multi_scale_kernel_detects_thin_velocity_structure_lost_by_broad_scale() {
+        let candidate = [particle(1.0, 0.0, 1.0)];
+        let reference = [particle(1.0, 0.1, 1.0)];
+        let broad = compare_phase_space_measures_mmd(
+            &candidate,
+            &reference,
+            MmdConfig {
+                domain_length: 8.0,
+                spatial_concentration: 2.0,
+                velocity_length_scale: 2.0,
+            },
+        )
+        .unwrap();
+        let narrow = compare_phase_space_measures_mmd(
+            &candidate,
+            &reference,
+            MmdConfig {
+                domain_length: 8.0,
+                spatial_concentration: 2.0,
+                velocity_length_scale: 0.1,
+            },
+        )
+        .unwrap();
+        let mixture = compare_phase_space_measures_mmd_mixture(
+            &candidate,
+            &reference,
+            &MmdMixtureConfig {
+                domain_length: 8.0,
+                components: vec![
+                    MmdKernelComponent {
+                        weight: 0.2,
+                        spatial_concentration: 2.0,
+                        velocity_length_scale: 2.0,
+                    },
+                    MmdKernelComponent {
+                        weight: 0.8,
+                        spatial_concentration: 2.0,
+                        velocity_length_scale: 0.1,
+                    },
+                ],
+            },
+        )
+        .unwrap();
+
+        assert!(narrow.normalized_mmd_squared > broad.normalized_mmd_squared);
+        assert!(mixture.aggregate.normalized_mmd_squared > broad.normalized_mmd_squared);
+        assert!(
+            (mixture.aggregate.normalized_mmd_squared
+                - (0.2 * broad.normalized_mmd_squared + 0.8 * narrow.normalized_mmd_squared))
+                .abs()
+                <= 1.0e-12
+        );
+    }
+
+    #[test]
+    fn exact_mixture_reports_component_weighted_kernel_pair_evaluations() {
+        let candidate = [particle(0.0, 0.0, 0.5), particle(4.0, 1.0, 0.5)];
+        let reference = [particle(0.25, 0.0, 0.5), particle(4.25, 1.0, 0.5)];
+        let result =
+            compare_phase_space_measures_mmd_mixture(&candidate, &reference, &mixture_config())
+                .unwrap();
+        // Two candidate atoms and two reference atoms: 2² + 2² + 2×2 = 12
+        // base pairs, evaluated once for each of the three mixture components.
+        assert_eq!(result.aggregate.pair_evaluations, 36);
     }
 }

@@ -375,3 +375,33 @@ Relevant baselines:
 The next comparison matrix should include: fixed-D standard RFF; RFF with the Yao-style bootstrap error estimator adapted and validated for this functional; current alpha-spending geometric checkpoint controller; and a proven empirical-Bernstein / mixture confidence sequence. Hold physics cases, kernel scales, seeds, error target and hardware constant. Report achieved coverage across all looks, false-safe rate, mean and p95 feature count, absolute and relative MMD² error versus exact oracle, wall time and memory.
 
 Our credible claim ceiling is narrower and stronger: the implementation provides a measure-aware, full-spectrum sampler for this specific periodic × Gaussian kernel, an exact small-N reference, and a checkpointed optional-stopping-safe budget controller. Competitive superiority remains an empirical question.
+
+
+## 15. Frozen multi-scale characteristic-kernel mixture
+
+[Issue #13050](https://github.com/Luminous-Dynamics/symthaea/issues/13050) tracks the next diagnostic extension. A positive mixture is
+
+\[
+k_{\rm mix}=\sum_{r=1}^{R}\beta_r k_r,\qquad
+\beta_r>0,\quad\sum_r\beta_r=1,
+\]
+
+where each \(k_r\) is a von Mises periodic-position × Gaussian-velocity characteristic kernel with its own frozen \(\kappa_r\) and \(\ell_{v,r}\). Since each component is characteristic, their positive mixture retains injective mean embeddings on the declared domain.
+
+The implementation now adds:
+- strict mixture validation (positive finite weights/scales, bounded component count, unit-sum tolerance, duplicate scale-pair rejection);
+- an exact small-N direct mixture MMD oracle using the same periodic canonicalization and signed-measure total variation;
+- a common-random spectral mixture estimator that first samples a component by its normalized mixture weight, then samples that component's exact Skellam × Gaussian spectrum;
+- per-component feature-count reporting for provenance and diagnostics.
+
+The direct mixture oracle is mathematically the weighted sum of the component exact MMD² values. A regression test enforces this identity. Additional tests cover component-order invariance, signed split/merge, spectral replay and error bounds, invalid mixture definitions, and a thin velocity-feature control where a narrow component resolves a discrepancy smoothed by a broad component.
+
+This is still a diagnostic ensemble, not a learned solver and not proof of SOTA. The aggregate must be reported with its component MMD values; do not let a low aggregate hide a subgroup failure. Freeze scales and weights on training/calibration fixtures, and compare single-scale and multi-scale methods at equal feature counts and compute.
+
+
+
+### Per-component diagnostics and interpretation
+
+The exact mixture result now returns both aggregate normalized MMD² and a vector of exact per-component normalized MMD² values in frozen component order. The spectral mixture result returns the aggregate estimate and mixture-wide fixed-D Hoeffding interval, plus per-component feature counts, conditional estimates, sample variance and standard error.
+
+The component-conditional estimates are descriptive diagnostics: the mixture-wide Hoeffding interval does not automatically confer separate simultaneous coverage to every component. A future component-wise acceptance rule needs its own preregistered multiplicity/error budget. The aggregate mixture must always be accompanied by the component results.
