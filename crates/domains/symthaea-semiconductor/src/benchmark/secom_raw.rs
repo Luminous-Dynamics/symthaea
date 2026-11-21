@@ -153,10 +153,7 @@ fn parse_labels(bytes: &[u8]) -> Result<Vec<SecomLabelRowV1>, SecomRawDataError>
             )));
         }
         let label_value = parts[0].trim().parse::<i8>().map_err(|_| {
-            SecomRawDataError(format!(
-                "label_file line {}: invalid label",
-                row_index + 1
-            ))
+            SecomRawDataError(format!("label_file line {}: invalid label", row_index + 1))
         })?;
         if label_value != -1 && label_value != 1 {
             return Err(SecomRawDataError(format!(
@@ -164,8 +161,8 @@ fn parse_labels(bytes: &[u8]) -> Result<Vec<SecomLabelRowV1>, SecomRawDataError>
                 row_index + 1
             )));
         }
-        let observed_at = NaiveDateTime::parse_from_str(parts[1], "%d/%m/%Y %H:%M:%S")
-            .map_err(|_| {
+        let observed_at =
+            NaiveDateTime::parse_from_str(parts[1], "%d/%m/%Y %H:%M:%S").map_err(|_| {
                 SecomRawDataError(format!(
                     "label_file line {}: timestamp must match DD/MM/YYYY HH:MM:SS without timezone",
                     row_index + 1
@@ -207,13 +204,11 @@ pub fn audit_secom_raw_v1(
         &expectations.expected_feature_sha256,
         "expected_feature_sha256",
     )?;
-    validate_sha256(
-        &expectations.expected_label_sha256,
-        "expected_label_sha256",
-    )?;
+    validate_sha256(&expectations.expected_label_sha256, "expected_label_sha256")?;
     if expectations.expected_rows == 0 || expectations.expected_features_per_row == 0 {
         return Err(SecomRawDataError(
-            "expectations: expected_rows and expected_features_per_row must be positive".to_string(),
+            "expectations: expected_rows and expected_features_per_row must be positive"
+                .to_string(),
         ));
     }
 
@@ -333,8 +328,7 @@ mod tests {
     use super::*;
 
     const FEATURES: &[u8] = b"1.0 NaN -2.5\n4.0 5.5 6.0\n";
-    const LABELS: &[u8] =
-        b"-1 \"19/07/2008 11:55:00\"\n1 \"19/07/2008 12:00:00\"\n";
+    const LABELS: &[u8] = b"-1 \"19/07/2008 11:55:00\"\n1 \"19/07/2008 12:00:00\"\n";
 
     fn expectations() -> SecomRawExpectationsV1 {
         SecomRawExpectationsV1 {
@@ -397,8 +391,7 @@ mod tests {
     fn rejects_non_monotonic_source_clock() {
         let labels = b"-1 \"19/07/2008 12:00:00\"\n1 \"19/07/2008 11:55:00\"\n";
         let mut expected = expectations();
-        expected.expected_label_sha256 =
-            format!("{:x}", Sha256::digest(labels));
+        expected.expected_label_sha256 = format!("{:x}", Sha256::digest(labels));
         assert!(
             audit_secom_raw_v1(FEATURES, labels, &expected)
                 .unwrap_err()
