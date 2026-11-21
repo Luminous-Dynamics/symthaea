@@ -49,11 +49,11 @@ jobs:
           cmp /tmp/evidence-voi-a.json /tmp/evidence-voi-b.json
           jq -e '
             .schema == "luminous.orbital-joint-evidence-voi.receipt.v0.1" and
-            .scenario_count == 13 and .oracle_matches == 13 and
+            .scenario_count == 14 and .oracle_matches == 14 and
             .oracle_mismatches == 0 and .authority_granted == false and
             .claim_ceiling == "synthetic_decision_value_semantics_only" and
             (.scenarios | all(.selection_matches_oracle == true)) and
-            (.scenarios | all(.selection_disposition != "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE")) and
+            ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1) and
             (.input_sha256 | test("^[0-9a-f]{64}$"))
           ' /tmp/evidence-voi-a.json
       - name: Independent stdlib action-value oracle
@@ -61,5 +61,5 @@ jobs:
           python3 tools/orbital-joint-evidence-voi-bench/tests/reference_oracle.py \
             fixtures/orbital-joint-evidence-voi/v0.1/scenarios.json \
             "$GITHUB_SHA" > /tmp/evidence-voi-oracle.json
-          jq -e '.scenario_count == 13 and .oracle_matches == 13 and .oracle_mismatches == 0 and (.scenarios | all(.selection_matches_oracle == true))' \
+          jq -e '.scenario_count == 14 and .oracle_matches == 14 and .oracle_mismatches == 0 and (.scenarios | all(.selection_matches_oracle == true)) and ([.scenarios[] | select(.scenario_id == "JEV-014" and .selection_disposition == "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE" and .selected_action_id == null)] | length == 1)' \
             /tmp/evidence-voi-oracle.json
