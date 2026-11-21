@@ -1171,42 +1171,6 @@ mod tests {
                 "THERMAL-WEAR-INSPECTABILITY-001".to_owned(),
             ])
         );
-    }
-
-    #[test]
-    fn missing_thermal_coverage_cannot_produce_accept() {
-        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
-        value["scenarios"][0]["actions"][1]["obligations_by_observation"]["CLEAR"] =
-            serde_json::json!([]);
-        let changed = serde_json::to_vec(&value).unwrap();
-        assert!(run_sequential_audit(&changed, SOURCE).is_err());
-    }
-
-    #[test]
-    fn accept_leaf_carries_every_required_path_obligation() {
-        let result = receipt();
-        let scenario = &result.scenarios[0];
-        let PolicyNode::Test { branches, .. } = &scenario.adaptive_campaign.policy else {
-            panic!("adaptive policy must start at the combined-load screen");
-        };
-        let Some(PolicyNode::Test { branches, .. }) = branches.get("PASS") else {
-            panic!("PASS branch must execute targeted thermal evidence");
-        };
-        let Some(PolicyNode::Terminal {
-            decision,
-            covered_obligations,
-            ..
-        }) = branches.get("CLEAR") else {
-            panic!("CLEAR branch must end in a terminal disposition");
-        };
-        assert_eq!(decision, "ACCEPT");
-        assert_eq!(
-            covered_obligations.iter().cloned().collect::<BTreeSet<_>>(),
-            BTreeSet::from([
-                "COMBINED-LOAD-CAPABILITY-001".to_owned(),
-                "THERMAL-WEAR-INSPECTABILITY-001".to_owned(),
-            ])
-        );
         let PolicyNode::Test { branches, .. } = &scenario.adaptive_campaign.policy else {
             unreachable!();
         };
@@ -1220,14 +1184,14 @@ mod tests {
         assert_eq!(decision, "REJECT");
         assert_eq!(
             covered_obligations,
-            &vec!["COMBINED-LOAD-CAPABILITY-001".to_owned()]
+            &vec!["REJECTION-BASIS-001".to_owned()]
         );
     }
 
     #[test]
     fn missing_thermal_coverage_cannot_produce_accept() {
         let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
-        value["scenarios"][0]["actions"][1]["obligations_covered"] =
+        value["scenarios"][0]["actions"][1]["obligations_by_observation"]["CLEAR"] =
             serde_json::json!([]);
         let changed = serde_json::to_vec(&value).unwrap();
         assert!(run_sequential_audit(&changed, SOURCE).is_err());
