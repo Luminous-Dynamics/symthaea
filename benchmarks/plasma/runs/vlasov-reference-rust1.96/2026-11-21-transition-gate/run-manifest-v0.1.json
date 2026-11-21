@@ -1,0 +1,78 @@
+{
+  "schema": "luminous.plasma.transition-qualification-run",
+  "schema_version": "0.1.0",
+  "purpose": "Exact-head focused validation of the fail-closed representation transition qualification module, plus byte-for-byte regression check of the existing Vlasov reference trajectory artifacts.",
+  "run": {
+    "workflow": "Plasma Vlasov reference solver",
+    "workflow_run_id": 44917841441,
+    "workflow_run_number": 97,
+    "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917841441",
+    "source_branch": "research/plasma-transition-receipts-v0-1",
+    "source_commit": "1f8b2323168bff45c10a96934150027e4d6595c0",
+    "tested_merge_candidate": "9f538e51ccfedd218ba92bee5f9c78c743ba348f",
+    "tested_merge_message": "Merge 1f8b2323168bff45c10a96934150027e4d6595c0 into 73484cb7448a7a208af3dbefc29f95891e41e91f",
+    "base_source_commit": "73484cb7448a7a208af3dbefc29f95891e41e91f",
+    "toolchain": "Rust 1.96.0 (ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96)",
+    "runner": "ubuntu-26.04 x86_64-unknown-linux-gnu",
+    "conclusion": "success",
+    "gates": {
+      "strict_format": true,
+      "unit_tests_passed": 29,
+      "unit_tests_failed": 0,
+      "strict_clippy": true,
+      "landau_reference_to_t10": true,
+      "space_velocity_domain_timestep_probe": true,
+      "matched_amplitude_sweep_to_t10": true,
+      "artifact_upload": true
+    }
+  },
+  "artifact": {
+    "artifact_id": 14712675249,
+    "artifact_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917841441/artifacts/14712675249",
+    "artifact_name": "plasma-vlasov-reference-9f538e51ccfedd218ba92bee5f9c78c743ba348f",
+    "zip_bytes": 24897,
+    "zip_sha256": "d38dbf5626f7424b619e00f9f08ca8fec22ba18916939f8a9de45d4f74de2ad5",
+    "downloaded_csv_uncompressed_bytes": 79128,
+    "expires_at": "2026-12-21T15:11:44Z",
+    "files": {
+      "landau-amplitude-sweep.csv": {
+        "sha256": "0abda0447119e98bf2456b954d08d42ed9d2e4c54568fdcd74834e711ab934a8",
+        "rows_including_header": 203,
+        "data_rows": 202
+      },
+      "landau-reference.csv": {
+        "sha256": "d27a590d0f1b32f41b742c827017a74ce91f1518b80e9971af1f5041f8e47a69",
+        "rows_including_header": 102,
+        "data_rows": 101
+      },
+      "refinement-probe.csv": {
+        "sha256": "b9567426d2e382817a7bad112d1071f3d312dd475f9b302d5e13fd04bdbb0202",
+        "rows_including_header": 14,
+        "data_rows": 13
+      }
+    }
+  },
+  "regression_comparison": {
+    "compared_artifact_id": 14707567884,
+    "comparison": "SHA-256 of all three downloaded CSV files",
+    "all_files_byte_identical": true,
+    "interpretation": "The transition API adds tests and qualification logic without changing the existing numerical traces in the tested build."
+  },
+  "transition_gate": {
+    "module": "crates/tools/plasma-vlasov-reference/src/transition.rs",
+    "test_count": 10,
+    "behaviors_covered": [
+      "complete in-budget evidence accepted",
+      "measured distribution discrepancy violation rejected",
+      "missing mandatory evidence inconclusive",
+      "signed delta-f bypasses positivity checks",
+      "nonnegative distribution positivity and negative-mass violations rejected",
+      "memory and wall-time budget exhaustion rejected",
+      "malformed digest and non-finite measurement inconclusive",
+      "invalid budget inconclusive",
+      "empty identifier and zero resource measurements inconclusive",
+      "negative-mass fraction outside [0,1] treated as malformed"
+    ],
+    "claim_boundary": "Offline evidence evaluator only; it does not perform a representation transfer, alter a live solver state, implement a controller, or establish a rigorous continuum error bound."
+  }
+}
