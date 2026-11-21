@@ -156,6 +156,13 @@
               "additionalProperties": false,
               "required": [
                 "run_id",
+                "convergence_profile_id",
+                "functional_id",
+                "pseudopotential_set_id",
+                "q_mesh",
+                "supercell",
+                "electronic_cutoff_ev",
+                "displacement_amplitude_angstrom",
                 "method_scope",
                 "converged",
                 "minimum_frequency_cm1",
@@ -183,6 +190,44 @@
                 "max_force_residual_mev_per_angstrom": {
                   "type": "number",
                   "minimum": 0
+                },
+                "convergence_profile_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "functional_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "pseudopotential_set_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "q_mesh": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "supercell": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "electronic_cutoff_ev": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "displacement_amplitude_angstrom": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
                 }
               }
             }
