@@ -37,6 +37,7 @@ jobs:
       - name: Checkout exact workflow source revision
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify exact source revision
