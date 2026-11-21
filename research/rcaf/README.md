@@ -129,3 +129,8 @@ Injection-recovery reports use schema version `rcaf.injection-recovery/0.3.0`. T
 - `injection_wrong_direction_rejection_rate`: significant paired gaps in the opposite direction.
 
 The two directional rates partition the two-sided detections under the exact sign test. A wrong-direction rejection is never counted as successful recovery. The same fields are carried through the sweep and both estimator tournament reports. The report also records `common_mode_nuisance_loading` and `median_nuisance_only_paired_gap`. At zero nuisance strength, the nuisance control reuses the exact null sample and must match the null rejection rate and median gap exactly. A nonzero nuisance-only rejection rate is evidence of artifact sensitivity, not proof that the latent network changed.
+
+
+### Shared observation-only nuisance challenge
+
+The current generator adds an independent AR(1) common-mode factor to one observed repeat while leaving the participant's latent global/module loadings unchanged. Its rejection rate and median paired gap are reported separately from the exact same-observation null and the known latent module injection. This is the first nuisance family only; it does not model all physiology, motion, scanner drift, censoring or missingness. The output field `nuisance_only_rejection_rate` measures artifact-only rejection relative to latent truth, not conventional Type-I error under identical observed-data distributions.
