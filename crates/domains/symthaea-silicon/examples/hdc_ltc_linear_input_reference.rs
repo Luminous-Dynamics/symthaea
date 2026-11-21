@@ -271,8 +271,10 @@ fn oracle_target_at(knots: &[OracleKnot], time: u64) -> Result<f64, &'static str
     Err("oracle interval not found")
 }
 
-/// Exact reference state for the isolated leaky scalar system, integrated
-/// across every hidden oracle knot up to the requested logical time.
+/// Independent fine-step RK4 evaluator reference for the isolated leaky
+/// scalar system, integrated across every hidden oracle knot up to time.
+/// Candidate analytic-update methods do not call this solver, avoiding a
+/// same-formula candidate/oracle comparison.
 fn oracle_state_at(
     knots: &[OracleKnot],
     initial_state: f64,
@@ -297,8 +299,10 @@ fn oracle_state_at(
         let g0 = oracle_target_at(knots, left.time)?;
         let g1 = oracle_target_at(knots, end)?;
         let h = (end - left.time) as f64;
-        state = linear_target_update(state, g0, g1, tau, h)
-            .map_err(|_| "analytic oracle integration failed")?;
+        state = rk4_linear_target(state, g0, g1, tau, h, 4_096);
+        if !state.is_finite() {
+            return Err("fine-step RK4 oracle produced non-finite state");
+        }
         if end == time {
             break;
         }
@@ -735,6 +739,30 @@ mod tests {
                 method.max_abs_state_error.is_finite()
                     && method.terminal_abs_state_error.is_finite()
             }));
+        }
+    }
+
+    #[test]
+    fn linear_interpolation_improves_error_over_zoh_at_equal_interval_update_count() {
+        for profile in [
+            SamplingProfile::Regular,
+            SamplingProfile::Jittered,
+            SamplingProfile::Bursty,
+        ] {
+            let result = run_trace(profile).unwrap();
+            let zoh = &result.methods[0];
+            let linear = &result.methods[1];
+            assert_eq!(
+                zoh.analytic_interval_updates,
+                linear.analytic_interval_updates
+            );
+            assert_eq!(zoh.analytic_interval_updates, result.delivered_events - 1);
+            assert!(
+                linear.max_abs_state_error < zoh.max_abs_state_error,
+                "profile {profile:?}: linear {} vs ZOH {}",
+                linear.max_abs_state_error,
+                zoh.max_abs_state_error
+            );
         }
     }
 
