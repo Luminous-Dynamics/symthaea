@@ -98,11 +98,16 @@ struct SourceDerivedWork {
     equilibrium_recomputations: u64,
     tau_recomputations: u64,
     gating_evaluations: u64,
+    logical_hdc_bind_ops: u64,
+    bundle_ops: u64,
+    activation_ops: u64,
+    input_similarity_evaluations: u64,
+    gating_vector_passes: u64,
+    fused_vector_passes: u64,
     /// Direct calls to f32::exp in the pinned source; excludes tanh/libm internals.
     explicit_exp_calls: u64,
     state_norm_scans: u64,
     iterative_substeps: u64,
-    fused_equilibrium_passes: u64,
 }
 
 impl SourceDerivedWork {
@@ -125,10 +130,15 @@ impl SourceDerivedWork {
             equilibrium_recomputations: 0,
             tau_recomputations: 0,
             gating_evaluations: 0,
+            logical_hdc_bind_ops: 0,
+            bundle_ops: 0,
+            activation_ops: 0,
+            input_similarity_evaluations: 0,
+            gating_vector_passes: 0,
+            fused_vector_passes: 0,
             explicit_exp_calls: 0,
             state_norm_scans: 0,
             iterative_substeps: 0,
-            fused_equilibrium_passes: 0,
         };
 
         match method {
@@ -136,6 +146,10 @@ impl SourceDerivedWork {
                 work.derivative_rhs_evaluations = 1;
                 work.equilibrium_recomputations = 1;
                 work.tau_recomputations = 1;
+                work.logical_hdc_bind_ops = 2;
+                work.bundle_ops = 1;
+                work.activation_ops = 1;
+                work.input_similarity_evaluations = 1;
                 // compute_tau + apply_state_bounds + update_stats.
                 work.state_norm_scans = 3;
             }
@@ -143,6 +157,10 @@ impl SourceDerivedWork {
                 work.derivative_rhs_evaluations = 4;
                 work.equilibrium_recomputations = 4;
                 work.tau_recomputations = 4;
+                work.logical_hdc_bind_ops = 8;
+                work.bundle_ops = 4;
+                work.activation_ops = 4;
+                work.input_similarity_evaluations = 4;
                 // One state norm in each derivative stage, then bounds + stats.
                 work.state_norm_scans = 6;
             }
@@ -150,6 +168,11 @@ impl SourceDerivedWork {
                 work.equilibrium_recomputations = 1;
                 work.tau_recomputations = 1; // compute_gating calls compute_tau.
                 work.gating_evaluations = 1;
+                work.logical_hdc_bind_ops = 2;
+                work.bundle_ops = 1;
+                work.activation_ops = 1;
+                work.input_similarity_evaluations = 1;
+                work.gating_vector_passes = 1;
                 // compute_tau + apply_state_bounds + update_stats.
                 work.state_norm_scans = 3;
                 // One sigmoid exponential and one time-decay exponential.
@@ -158,13 +181,24 @@ impl SourceDerivedWork {
             EvolutionMethod::FusedClosedForm => {
                 work.tau_recomputations = 1;
                 work.gating_evaluations = 1;
-                work.fused_equilibrium_passes = 1;
+                // The fused dimension pass still implements two logical binds,
+                // one bundle and one activation without materializing intermediates.
+                work.logical_hdc_bind_ops = 2;
+                work.bundle_ops = 1;
+                work.activation_ops = 1;
+                work.input_similarity_evaluations = 1;
+                work.gating_vector_passes = 1;
+                work.fused_vector_passes = 1;
                 work.state_norm_scans = 3;
                 work.explicit_exp_calls = 2;
             }
             EvolutionMethod::AnalyticalClosedForm => {
                 work.equilibrium_recomputations = 1;
                 work.tau_recomputations = 1;
+                work.logical_hdc_bind_ops = 2;
+                work.bundle_ops = 1;
+                work.activation_ops = 1;
+                work.input_similarity_evaluations = 1;
                 work.state_norm_scans = 3;
                 work.explicit_exp_calls = 1;
             }
@@ -181,6 +215,11 @@ impl SourceDerivedWork {
                 work.iterative_substeps = steps;
                 work.equilibrium_recomputations = steps;
                 work.tau_recomputations = steps;
+                work.logical_hdc_bind_ops = steps.checked_mul(2)
+                    .ok_or("logical HDC bind counter overflow")?;
+                work.bundle_ops = steps;
+                work.activation_ops = steps;
+                work.input_similarity_evaluations = steps;
                 work.explicit_exp_calls = steps;
                 // One state norm per compute_tau substep, then bounds + stats.
                 work.state_norm_scans = steps
@@ -458,6 +497,10 @@ mod tests {
         assert_eq!(work.equilibrium_recomputations, 4);
         assert_eq!(work.tau_recomputations, 4);
         assert_eq!(work.state_norm_scans, 6);
+        assert_eq!(work.logical_hdc_bind_ops, 8);
+        assert_eq!(work.bundle_ops, 4);
+        assert_eq!(work.activation_ops, 4);
+        assert_eq!(work.input_similarity_evaluations, 4);
     }
 
     #[test]
@@ -485,11 +528,23 @@ mod tests {
 
         assert_eq!(ordinary.equilibrium_recomputations, 1);
         assert_eq!(ordinary.gating_evaluations, 1);
+        assert_eq!(ordinary.logical_hdc_bind_ops, 2);
+        assert_eq!(ordinary.bundle_ops, 1);
+        assert_eq!(ordinary.activation_ops, 1);
+        assert_eq!(ordinary.input_similarity_evaluations, 1);
+        assert_eq!(ordinary.gating_vector_passes, 1);
         assert_eq!(ordinary.explicit_exp_calls, 2);
         assert_eq!(fused.equilibrium_recomputations, 0);
-        assert_eq!(fused.fused_equilibrium_passes, 1);
+        assert_eq!(fused.fused_vector_passes, 1);
+        assert_eq!(fused.logical_hdc_bind_ops, ordinary.logical_hdc_bind_ops);
+        assert_eq!(fused.bundle_ops, ordinary.bundle_ops);
+        assert_eq!(fused.activation_ops, ordinary.activation_ops);
         assert_eq!(fused.gating_evaluations, 1);
         assert_eq!(analytical.gating_evaluations, 0);
+        assert_eq!(analytical.logical_hdc_bind_ops, 2);
+        assert_eq!(analytical.bundle_ops, 1);
+        assert_eq!(analytical.activation_ops, 1);
+        assert_eq!(analytical.input_similarity_evaluations, 1);
         assert_eq!(analytical.explicit_exp_calls, 1);
     }
 
