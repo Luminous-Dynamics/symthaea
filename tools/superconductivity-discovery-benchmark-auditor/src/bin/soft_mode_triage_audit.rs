@@ -503,13 +503,13 @@ fn audit(value: &Value) -> Result<Value, String> {
         if !candidate_ids.insert(candidate.candidate_id.clone()) {
             return Err(fail("$.synthetic_candidates", "duplicate candidate_id"));
         }
-        if let Some(reference_id) = &candidate.reference_case_id {
-            if !source_ids.contains(reference_id) {
-                return Err(fail(
-                    "$.synthetic_candidates",
-                    "candidate references an unknown source reference case",
-                ));
-            }
+        if let Some(reference_id) = &candidate.reference_case_id
+            && !source_ids.contains(reference_id)
+        {
+            return Err(fail(
+                "$.synthetic_candidates",
+                "candidate references an unknown source reference case",
+            ));
         }
         candidates.push(candidate);
     }
