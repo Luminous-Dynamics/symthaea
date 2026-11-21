@@ -98,9 +98,7 @@ impl PairTime {
         match basis {
             "offset_aware" => DateTime::parse_from_rfc3339(raw)
                 .map(Self::Offset)
-                .map_err(|_| {
-                    PairManifestError(format!("{field}: timezone offset required"))
-                }),
+                .map_err(|_| PairManifestError(format!("{field}: timezone offset required"))),
             "source_local_naive" => {
                 if raw.ends_with('Z') || has_explicit_offset(raw) {
                     return Err(PairManifestError(format!(
@@ -123,9 +121,14 @@ impl PairTime {
             }
             (Self::Naive(left), Self::Naive(right)) => {
                 (left.and_utc().timestamp_millis() - right.and_utc().timestamp_millis())
-                    .unsigned_abs() as f64 / 1000.0
+                    .unsigned_abs() as f64
+                    / 1000.0
             }
-            _ => return Err(PairManifestError("timestamp clock basis mismatch".to_string())),
+            _ => {
+                return Err(PairManifestError(
+                    "timestamp clock basis mismatch".to_string(),
+                ));
+            }
         };
         Ok(seconds / 60.0)
     }
@@ -193,7 +196,10 @@ pub fn validate_pair_manifest_v1(
 
     let mut assignments = BTreeMap::new();
     for (index, row) in manifest.sample_assignments.iter().enumerate() {
-        require_text(&row.sample_id, &format!("sample_assignments[{index}].sample_id"))?;
+        require_text(
+            &row.sample_id,
+            &format!("sample_assignments[{index}].sample_id"),
+        )?;
         if !SPLITS.contains(&row.split.as_str()) {
             return Err(PairManifestError(format!(
                 "sample_assignments[{index}]: invalid split"
@@ -248,12 +254,12 @@ pub fn validate_pair_manifest_v1(
         if pair.left_sample_id == pair.right_sample_id {
             return Err(PairManifestError(format!("pairs[{index}]: self-pair")));
         }
-        let left = assignments.get(pair.left_sample_id.as_str()).ok_or_else(|| {
-            PairManifestError(format!("pairs[{index}]: orphan sample reference"))
-        })?;
-        let right = assignments.get(pair.right_sample_id.as_str()).ok_or_else(|| {
-            PairManifestError(format!("pairs[{index}]: orphan sample reference"))
-        })?;
+        let left = assignments
+            .get(pair.left_sample_id.as_str())
+            .ok_or_else(|| PairManifestError(format!("pairs[{index}]: orphan sample reference")))?;
+        let right = assignments
+            .get(pair.right_sample_id.as_str())
+            .ok_or_else(|| PairManifestError(format!("pairs[{index}]: orphan sample reference")))?;
 
         let edge = if pair.left_sample_id < pair.right_sample_id {
             (pair.left_sample_id.as_str(), pair.right_sample_id.as_str())
@@ -290,7 +296,10 @@ pub fn validate_pair_manifest_v1(
             }
         }
 
-        let has_proximity = pair.basis.iter().any(|basis| basis == "production_proximity");
+        let has_proximity = pair
+            .basis
+            .iter()
+            .any(|basis| basis == "production_proximity");
         match (has_proximity, pair.proximity_reason.as_deref()) {
             (true, Some("same_lot")) => {
                 if left.group_id.as_deref().unwrap_or_default().is_empty()
@@ -337,7 +346,9 @@ pub fn validate_pair_manifest_v1(
             (false, None) => {}
         }
 
-        *pair_counts.get_mut(&pair.pair_scope).expect("validated scope") += 1;
+        *pair_counts
+            .get_mut(&pair.pair_scope)
+            .expect("validated scope") += 1;
         *relation_counts
             .get_mut(&pair.relation)
             .expect("validated relation") += 1;
@@ -380,8 +391,12 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    const INPUT: &str = include_str!("../../../../../benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json");
-    const EXPECTED: &str = include_str!("../../../../../benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json");
+    const INPUT: &str = include_str!(
+        "../../../../../benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json"
+    );
+    const EXPECTED: &str = include_str!(
+        "../../../../../benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json"
+    );
 
     fn known_answer() -> ContrastivePairManifestV1 {
         serde_json::from_str(INPUT).expect("pair fixture must parse")
@@ -412,7 +427,10 @@ mod tests {
         let mut manifest = known_answer();
         let mut duplicate = manifest.pairs[0].clone();
         duplicate.pair_id = "P-TRAIN-02".to_string();
-        std::mem::swap(&mut duplicate.left_sample_id, &mut duplicate.right_sample_id);
+        std::mem::swap(
+            &mut duplicate.left_sample_id,
+            &mut duplicate.right_sample_id,
+        );
         manifest.pairs.push(duplicate);
         assert!(
             validate_pair_manifest_v1(&manifest)
