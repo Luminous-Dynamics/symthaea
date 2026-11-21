@@ -129,7 +129,8 @@
         "max_actions",
         "fixed_campaign_sequence",
         "actions",
-        "expected"
+        "expected",
+        "decision_obligations"
       ],
       "properties": {
         "scenario_id": {
@@ -223,6 +224,17 @@
         },
         "expected": {
           "type": "object"
+        },
+        "decision_obligations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
@@ -236,7 +248,8 @@
         "method_ref",
         "admissibility",
         "resource_plan",
-        "observation_by_state"
+        "observation_by_state",
+        "obligations_covered"
       ],
       "properties": {
         "action_id": {
@@ -267,6 +280,14 @@
           "type": "object",
           "minProperties": 2,
           "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "obligations_covered": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
             "type": "string",
             "minLength": 1
           }
