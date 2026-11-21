@@ -708,7 +708,7 @@
         "detection_status": "detected",
         "measurement_scope": "bulk",
         "measurement_scope_description": "synthetic bulk stiffness measurement example",
-        "tc_criterion": null,
+        "tc_criterion": "not_applicable",
         "measurement_method": "synthetic bulk superfluid stiffness probe",
         "model_id": null,
         "model_revision": null,
