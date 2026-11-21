@@ -10,6 +10,8 @@ struct ProbeResult {
     poisson_residual: f64,
     velocity_boundary_ratio: f64,
     minimum_distribution: f64,
+    x_high_tail_fraction: f64,
+    velocity_high_tail_fraction: f64,
 }
 
 fn run(
@@ -39,6 +41,7 @@ fn run(
         solver.step(dt)?;
     }
     let diagnostics = solver.diagnostics()?;
+    let tails = solver.spectral_tail_diagnostics(0.75)?;
     Ok(ProbeResult {
         electric_mode_1: solver.electric_mode_amplitude(1)?,
         mass: diagnostics.total_mass,
@@ -46,6 +49,8 @@ fn run(
         poisson_residual: diagnostics.max_poisson_residual,
         velocity_boundary_ratio: diagnostics.velocity_boundary_ratio,
         minimum_distribution: diagnostics.minimum_distribution,
+        x_high_tail_fraction: tails.x.high_frequency_fraction,
+        velocity_high_tail_fraction: tails.velocity.high_frequency_fraction,
     })
 }
 
@@ -59,20 +64,22 @@ fn print_row(
     result: ProbeResult,
 ) {
     println!(
-        "{axis},{nx},{nv},{velocity_max:.8},{dt:.8},{final_time:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+        "{axis},{nx},{nv},{velocity_max:.8},{dt:.8},{final_time:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
         result.electric_mode_1,
         result.mass,
         result.total_energy,
         result.poisson_residual,
         result.velocity_boundary_ratio,
-        result.minimum_distribution
+        result.minimum_distribution,
+        result.x_high_tail_fraction,
+        result.velocity_high_tail_fraction
     );
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let final_time = 1.0;
     println!(
-        "sweep,nx,nv,velocity_max,dt,final_time,electric_mode_1,mass,total_energy,poisson_residual,velocity_boundary_ratio,minimum_distribution"
+        "sweep,nx,nv,velocity_max,dt,final_time,electric_mode_1,mass,total_energy,poisson_residual,velocity_boundary_ratio,minimum_distribution,x_high_tail_fraction,v_high_tail_fraction"
     );
 
     // Spatial grid refinement with velocity resolution, domain and timestep fixed.
