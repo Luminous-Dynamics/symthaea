@@ -83,3 +83,12 @@ This is an exact finite-set reference oracle, not a production scheduling algori
 The independent helper `python/semi_inspection_decision_reference.py` evaluates a finite candidate set using an explicit expected-net-value formula. It includes risk probability, test sensitivity/specificity, actionability, exposed volume, avoidable loss, false-hold cost, inspection cost and delay penalty. It selects the exact best subset subject to cash, time and per-group capacity limits, using exhaustive enumeration capped at 18 candidates. The matched-budget risk-only comparator is emitted separately.
 
 The synthetic fixture selects A/C/F under the 45-minute / 20-cost-unit budget for modeled net value 1,286.16. The risk-only greedy comparator selects A/B/D/F with modeled net value 607.05. These are fixture outputs, not observed factory savings. Ten tests cover known answers, budget/group constraints, deterministic ordering and malformed/empty cases.
+
+
+## Source-local naive chronology
+
+The split-manifest validator supports two explicit time bases for forward-time manifests:
+- offset_aware: timestamps must include an explicit timezone offset;
+- source_local_naive: timestamps must be timezone-free and the manifest must declare a non-empty clock_domain_id.
+
+The second mode proves only ordered, non-overlapping chronology within that one source clock. It does not convert timestamps to UTC or permit comparisons across sites/clock domains. This is needed for sources such as SECOM whose timestamps provide a date/time string but no timezone offset. Tests reject silent timezone assumptions and require the clock-domain declaration.
