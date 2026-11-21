@@ -375,9 +375,9 @@ fn terminal_plan(
     })
 }
 
-fn eligible_action<'a>(
+fn eligible_action(
     scenario: &SequentialScenario,
-    action: &'a SequentialAction,
+    action: &SequentialAction,
     budget: &Resources,
     used: &BTreeSet<String>,
 ) -> bool {
