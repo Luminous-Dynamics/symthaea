@@ -1,0 +1,82 @@
+{
+  "run_id": 44894949853,
+  "artifact_id": 14703438168,
+  "artifact_sha256": "02a620b3123416a6c245f76ffdf29fd2a9524c414a9a6199c9b12120a4fedc66",
+  "source_commit": "2c2b91ce43890b3d9175b4949b1354fd09fdc2c4",
+  "source_branch": "research/plasma-vp-spectral-reference-v0-1",
+  "workflow": "Plasma Vlasov reference solver",
+  "toolchain": "Rust 1.96.0 (ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96)",
+  "runner": "ubuntu-latest",
+  "target": "x86_64-unknown-linux-gnu",
+  "workflow_conclusion": "success",
+  "gates": {
+    "strict_format": true,
+    "unit_tests": {
+      "passed": 14,
+      "failed": 0
+    },
+    "strict_clippy": true,
+    "phase_resolved_landau_trace": true,
+    "refinement_and_spectral_tail_probe": true,
+    "artifact_upload": true
+  },
+  "measurement_limits": {
+    "wall_time_recorded": false,
+    "peak_memory_recorded": false,
+    "energy_to_solution_recorded": false,
+    "independent_physical_validation": false,
+    "external_baseline_comparison": false,
+    "landau_damping_rate_fit": false
+  },
+  "landau_configuration": {
+    "nx": 64,
+    "nv": 128,
+    "domain_length": 12.566370614359172,
+    "velocity_interval": [
+      -6,
+      6
+    ],
+    "perturbation_amplitude": 0.001,
+    "spatial_mode": 1,
+    "thermal_speed": 1,
+    "dt": 0.01,
+    "steps": 200,
+    "sampled_every_steps": 10,
+    "final_time": 2,
+    "spectral_tail_start_fraction": 0.75
+  },
+  "refinement_configuration": {
+    "common_final_time": 1,
+    "space_nx": [
+      32,
+      64,
+      128
+    ],
+    "velocity_nv": [
+      64,
+      128,
+      256
+    ],
+    "velocity_max": [
+      4,
+      6,
+      8
+    ],
+    "timestep": [
+      0.04,
+      0.02,
+      0.01,
+      0.005
+    ],
+    "spectral_tail_start_fraction": 0.75
+  },
+  "caveats": [
+    "The trace is a short-horizon reference-prototype diagnostic, not a continuum accuracy certification.",
+    "The signed imaginary Fourier coefficient crosses zero between t=1.4 and t=1.5 and changes sign; magnitude-only logs obscure this phase reversal.",
+    "No Landau damping rate is fitted or claimed.",
+    "The finite numerical velocity interval is periodic and truncated.",
+    "The x/v spectral-tail fractions and Nyquist fractions are observed occupancy diagnostics, not rigorous truncation-error bounds.",
+    "The velocity-endpoint occupancy diagnostic remains necessary; low spectral-tail energy does not certify an adequate velocity-domain extent.",
+    "No production solver speed, memory or energy comparison was measured."
+  ]
+}
