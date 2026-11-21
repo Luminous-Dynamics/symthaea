@@ -267,6 +267,53 @@
         "local-field-observation-not-whole-wafer-evidence"
       ],
       "evidence_class": "synthetic-until-traceable-physical-reference-campaign"
+    },
+    {
+      "id": "chip-placement-end-to-end-routed-ppa",
+      "source": "https://proceedings.neurips.cc/paper_files/paper/2025/hash/1cba8502063fab9df252a63968691768-Abstract-Datasets_and_Benchmarks_Track.html",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+      "latest_method_reference": {
+        "name": "PPAPlace",
+        "source": "https://arxiv.org/abs/2608.13790",
+        "doi": "10.1145/3831252.3834172",
+        "reported_test_circuits": 5,
+        "reported_average_wns_improvement_percent": 22,
+        "reported_average_tns_improvement_percent": 51,
+        "reported_preserves_power_and_routability": true,
+        "claim_status": "paper-reported-not-independently-reproduced"
+      },
+      "tasks": [
+        "reproduce-hierarchical-baseline",
+        "compare-ai-placement-algorithms",
+        "validate-surrogate-to-final-timing-fidelity",
+        "optimize-final-routed-wns-tns-ppa"
+      ],
+      "split_policy": "hold-out-entire-circuits; freeze-design-pdk-library-corner-constraints-flow-tools-and-seeds",
+      "final_metrics": [
+        "routed-wns",
+        "routed-tns",
+        "area",
+        "power-under-declared-activity-and-extraction",
+        "congestion",
+        "wirelength",
+        "drc-routability",
+        "full-flow-completion",
+        "runtime",
+        "memory"
+      ],
+      "intermediate_metrics": [
+        "hpwl",
+        "pre-route-timing",
+        "global-route-timing",
+        "surrogate-predictions"
+      ],
+      "negative_controls": [
+        "proxy-ranking-disagrees-with-final-wns",
+        "placement-looks-better-but-route-fails",
+        "held-out-design-leakage",
+        "mismatched-pdk-or-constraints"
+      ],
+      "claim_ceiling": "end-to-end software-flow result for exact design/PDK/constraints only; no fabricated-silicon or foundry-yield claim"
     }
   ],
   "cross_cutting_protocol": {
@@ -361,5 +408,12 @@
       "empirical_dataset_result": false
     }
   },
-  "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067"
+  "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
+  "eda_end_to_end_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
+  "industry_frontier_review": "docs/research/semi-bench-001/2026-industry-frontier.md",
+  "industry_architecture_references": {
+    "nist_tidal": "https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing",
+    "semi_semiconductor_digital_twin_activity": "https://downloads.semi.org/web/wstdsbal.nsf/0e0afa4c4969bea688256efd0062a27c/61c2bf6034c0eed988258dcd00669238%21OpenDocument",
+    "note": "TIDAL is a NIST programme architecture reference; SEMI document 7465 is a standards activity proposal, not a final published standard or conformance claim."
+  }
 }
