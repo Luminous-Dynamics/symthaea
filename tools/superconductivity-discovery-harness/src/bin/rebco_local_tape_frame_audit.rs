@@ -451,6 +451,29 @@ mod tests {
     }
 
     #[test]
+    fn width_aligned_field_has_positive_quarter_turn_azimuth() {
+        let receipt = audit(schema_bytes(), fixture_bytes()).expect("fixture audits");
+        let station = &receipt["stations"][3];
+        assert_eq!(station["local_field_vector_t"], json!([0.0, 5.0, 0.0]));
+        let theta = station["theta_from_local_normal_rad"].as_f64().unwrap();
+        let phi = station["phi_from_longitudinal_toward_width_rad"]
+            .as_f64()
+            .unwrap();
+        assert!((theta - std::f64::consts::FRAC_PI_2).abs() < 1.0e-12);
+        assert!((phi - std::f64::consts::FRAC_PI_2).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn reverse_normal_field_maps_to_theta_pi() {
+        let receipt = audit(schema_bytes(), fixture_bytes()).expect("fixture audits");
+        let station = &receipt["stations"][4];
+        assert_eq!(station["local_field_vector_t"], json!([0.0, 0.0, -5.0]));
+        let theta = station["theta_from_local_normal_rad"].as_f64().unwrap();
+        assert!((theta - std::f64::consts::PI).abs() < 1.0e-12);
+        assert_eq!(station["phi_from_longitudinal_toward_width_rad"], Value::Null);
+    }
+
+    #[test]
     fn same_global_field_has_different_local_angles_along_curved_tape() {
         let receipt = audit(schema_bytes(), fixture_bytes()).expect("fixture audits");
         let straight = receipt["stations"][0]["theta_from_local_normal_rad"]
