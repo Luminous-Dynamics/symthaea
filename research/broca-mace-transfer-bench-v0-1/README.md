@@ -474,7 +474,7 @@ The `aml-adapter::submission` module now checks declared division, track, partic
 
 ## Learned future-use forecasting experiment
 
-The consolidation crate now contains `salience_learning`, a deterministic logistic-regression baseline using seven observable features. It fits on training data, calibrates with a separate partition, and evaluates on held-out data. Split qualification requires disjoint cluster IDs, task-family IDs, upstream source-root digests, and event IDs. The evaluator fixture uses 64 training, 32 calibration, and 32 held-out clusters; the evaluator owns the hidden reuse response function and future-reuse labels.
+The consolidation crate now contains `salience_learning`, a deterministic logistic-regression baseline using seven observable features. It fits on training data, calibrates with a separate partition, and evaluates on held-out data. Split qualification requires disjoint cluster IDs, task-family IDs, upstream source-root digests and event IDs, plus one identical target-agent SHA-256 fingerprint across train, calibration and held-out partitions. The evaluator fixture uses 64 training, 32 calibration, and 32 held-out clusters; the evaluator owns the hidden reuse response function and future-reuse labels.
 
 The report includes Brier score versus a **training-only** base-rate comparator, expected calibration error, worst task-family ECE, and split cardinalities. The split manifest carries separate dataset, task-family and source-root digests, and rejects overlap across clusters, families, roots or events. The trained model and calibrator can now emit a raw `FutureUsePredictionV1` bound to a combined model-and-calibrator pipeline digest. It remains untrusted: the existing `SaliencePredictionVerifierV1` must issue the independent calibration receipt before any prediction becomes eligible for surfacing. This is a learned synthetic baseline, not demonstrated utility lift, production forecasting, or a SOTA result.
 
@@ -498,7 +498,7 @@ MACE v0.14 additionally requires the receipt-bound estimand digest to remain con
 **Semantic-estimand limitation:** the current v0.14 policy compares verified estimand digests; it does not independently decode or validate the semantic specification represented by those digests. The production Mycelix verifier must bind canonical population, treatment versions/contrast, outcome/unit, follow-up horizon, censoring/intercurrent-event strategy and target weighting into the signed assessment before transport is eligible.
 
 
-### Model-conditioned memory dose response (MACE v0.15.1)
+### Model-conditioned memory dose response (MACE v0.16)
 
 The new `memory_budget` module treats context size as a target-model-specific policy parameter rather than a global constant. A frozen candidate set of token budgets (including zero memory) is evaluated on paired calibration episodes from the same task clusters. The best mean net-utility budget is selected using calibration data only, with ties resolved toward the smaller budget. The selected budget is then qualified on a disjoint held-out set; a nonzero recommendation is rejected unless its paired cluster-bootstrap 95% lower bound is above zero.
 
@@ -507,7 +507,7 @@ Every trial binds the target-agent model digest, memory-pipeline digest, episode
 This directly operationalises the November 19, 2026 IBM Research paper *How Much Should an Agent Remember?*: its AppWorld results report that useful memory quantity varies with target-model capability, and that a smaller selected subset can outperform a full guideline set for a weaker model. MACE's implementation is a deterministic calibration protocol, not a replication of the paper or evidence of an external benchmark gain.
 
 
-### Receipt-qualified model-memory dose response (MACE v0.15.1)
+### Receipt-qualified model-memory dose response (MACE v0.16)
 
 The dose-response calibration does not accept plain utility rows as sufficient evidence. Each trial binds target-model and memory-pipeline digests, frozen environment and evaluation-protocol digests, task-family, upstream source root, cluster and exact episode identity, token budget, and net utility after declared costs.
 
@@ -515,4 +515,11 @@ Before fitting, `verify_memory_dose_trials` requires an injected `MemoryDoseTria
 
 The current verifier is a deterministic test fixture, **not** a cryptographic verifier. A production adapter must authenticate an independently signed evaluator/run receipt and independently validate task outcome and utility-cost accounting, including token counts, latency and execution costs. Digest self-consistency alone is not authenticity.
 
-The runtime selector rejects a budget for a different model fingerprint and binds the held-out dataset digest into the surfacing plan. A qualified zero-memory result produces a valid empty surfacing plan. This calibrates token budget per model; the future-use salience predictor itself is still shared across models and remains a separate research gap.
+The runtime selector rejects a budget for a different model fingerprint and binds the held-out dataset digest into the surfacing plan. A qualified zero-memory result produces a valid empty surfacing plan. The v0.16 future-use salience predictor is also target-model-conditioned: examples, training/calibration/held-out partitions, model, calibrator and raw prediction requests bind the target-agent fingerprint.
+
+
+### Target-model-conditioned predictive salience (MACE v0.16)
+
+The learned future-use model is trained, calibrated and evaluated against one explicit target-agent model digest. Every example carries that digest; mixed fingerprints are rejected within a split and across the train/calibration/held-out partitions. The split manifest, trained model, calibrator and raw-prediction pipeline bind the same target identity. A forecast names the agent it is intended for, and a model/input mismatch fails closed.
+
+This is a qualification-boundary improvement, not a measured performance gain. The next experiment compares pooled, model-conditioned and hierarchical predictors under leave-one-model-family-out evaluation, using measured no-memory baselines and complete memory dose-response curves. Parameter count alone is not a capability metric.
