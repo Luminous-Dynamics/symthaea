@@ -247,6 +247,74 @@
               "minLength": 1
             }
           }
+        },
+        "change_impact": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_owner",
+                "receipt_ref",
+                "event_frontier_ref",
+                "completeness",
+                "required_requalification_claims",
+                "unaffected_claims"
+              ],
+              "properties": {
+                "source_owner": {
+                  "const": "mycelix:6219"
+                },
+                "receipt_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "event_frontier_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "completeness": {
+                  "enum": [
+                    "COMPLETE",
+                    "INCOMPLETE"
+                  ]
+                },
+                "required_requalification_claims": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "unaffected_claims": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "not": {
+                    "properties": {
+                      "required_requalification_claims": {
+                        "contains": {
+                          "type": "string",
+                          "const": "__never__"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
         }
       },
       "allOf": [
@@ -431,6 +499,14 @@
           "type": "string"
         },
         "obligations_covered": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requalification_claims_covered": {
           "type": "array",
           "uniqueItems": true,
           "items": {
