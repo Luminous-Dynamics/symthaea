@@ -210,7 +210,7 @@ impl VlasovPoisson1d1v {
     /// characteristic-solution tests; this deliberately omits self-fields.
     pub fn advance_free_streaming(&mut self, dt: f64) -> Result<(), SolverError> {
         validate_dt(dt)?;
-        self.advect_x(dt)?;
+        self.advect_x(dt);
         self.time += dt;
         if !self.time.is_finite() { return Err(SolverError::NonFiniteState); }
         self.refresh_electric_field()?;
@@ -219,9 +219,9 @@ impl VlasovPoisson1d1v {
 
     pub fn step(&mut self, dt: f64) -> Result<(), SolverError> {
         validate_dt(dt)?;
-        self.advect_x(0.5 * dt)?;
+        self.advect_x(0.5 * dt);
         self.refresh_electric_field()?;
-        self.advect_velocity(dt)?;
+        self.advect_velocity(dt);
         self.advect_x(0.5 * dt)?;
         self.time += dt;
         if !self.time.is_finite() { return Err(SolverError::NonFiniteState); }
@@ -271,7 +271,7 @@ impl VlasovPoisson1d1v {
             .map(|value| value * value * dx).sum::<f64>();
         let rho = self.charge_density()?;
         let net_charge = rho.iter().sum::<f64>() * dx;
-        let max_poisson_residual = self.max_poisson_residual(&rho)?;
+        let max_poisson_residual = self.max_poisson_residual(&rho);
         let velocity_boundary_ratio = if maximum_abs_distribution > 0.0 {
             boundary_abs / maximum_abs_distribution
         } else { 0.0 };
@@ -306,7 +306,7 @@ impl VlasovPoisson1d1v {
         Ok(())
     }
 
-    fn advect_x(&mut self, dt: f64) -> Result<(), SolverError> {
+    fn advect_x(&mut self, dt: f64) {
         let config = self.config;
         let mut line = vec![Complex::ZERO; config.nx];
         for iv in 0..config.nv {
@@ -327,10 +327,9 @@ impl VlasovPoisson1d1v {
                 self.distribution[ix * config.nv + iv] = value.re;
             }
         }
-        Ok(())
     }
 
-    fn advect_velocity(&mut self, dt: f64) -> Result<(), SolverError> {
+    fn advect_velocity(&mut self, dt: f64) {
         let config = self.config;
         let period = config.velocity_max - config.velocity_min;
         let mut line = vec![Complex::ZERO; config.nv];
@@ -353,7 +352,6 @@ impl VlasovPoisson1d1v {
                 self.distribution[ix * config.nv + iv] = value.re;
             }
         }
-        Ok(())
     }
 
     fn charge_density(&self) -> Result<Vec<f64>, SolverError> {
@@ -376,7 +374,7 @@ impl VlasovPoisson1d1v {
         Ok(())
     }
 
-    fn max_poisson_residual(&self, rho: &[f64]) -> Result<f64, SolverError> {
+    fn max_poisson_residual(&self, rho: &[f64]) -> f64 {
         let mut spectrum: Vec<Complex> = self.electric_field.iter()
             .map(|value| Complex::new(*value, 0.0)).collect();
         fft(&mut spectrum, false);
@@ -393,7 +391,7 @@ impl VlasovPoisson1d1v {
         for ix in 0..self.config.nx {
             maximum = maximum.max((spectrum[ix].re - rho[ix] / self.config.permittivity).abs());
         }
-        Ok(maximum)
+        maximum
     }
 }
 
