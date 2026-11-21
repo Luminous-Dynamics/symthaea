@@ -11,6 +11,9 @@ on:
   push:
     paths:
       - "benchmarks/semi-bench-001/**"
+      - "crates/domains/symthaea-semiconductor/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/semi-bench-reference.yml"
   workflow_dispatch:
 
