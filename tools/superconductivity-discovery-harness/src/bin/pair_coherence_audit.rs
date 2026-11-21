@@ -29,7 +29,7 @@ fn validate_document(
     }
     let validator = validator_for(&schema)
         .map_err(|error| format!("{label} schema compile failed: {error}"))?;
-    for error in validator.iter_errors(&document) {
+    if let Some(error) = validator.iter_errors(&document).next() {
         return Err(format!(
             "{label} schema validation failed: {} at {}",
             error,
@@ -85,7 +85,7 @@ fn validate_comparison(
         .ok_or_else(|| "observation fixture must contain observations".to_owned())?;
     let mut event_map = HashMap::with_capacity(events.len());
     for (index, event) in events.iter().enumerate() {
-        for error in observation_validator.iter_errors(event) {
+        if let Some(error) = observation_validator.iter_errors(event).next() {
             return Err(format!(
                 "observation[{index}] schema validation failed: {} at {}",
                 error,
