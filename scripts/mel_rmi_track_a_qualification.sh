@@ -65,7 +65,25 @@ CARGO_TOML
 echo "staged_manifest=$MANIFEST"
 echo "exact_source_head=$SOURCE_COMMIT"
 
+# Preserve original repository source bytes before formatting the isolated
+# staging copy. The formatted staging copy is what is compiled and tested.
+cp "$STAGE_CRATE/src/rmi_benchmark.rs" "$EVIDENCE_DIR/rmi_benchmark.source.rs"
+cp "$STAGE_CRATE/src/rmi_track_a_runner.rs" "$EVIDENCE_DIR/rmi_track_a_runner.source.rs"
+cp "$STAGE_CRATE/src/bin/rmi_track_a.rs" "$EVIDENCE_DIR/rmi_track_a.source.rs"
+cp "$STAGE_CRATE/tests/rmi_track_a_replay.rs" "$EVIDENCE_DIR/rmi_track_a_replay.source.rs"
+SOURCE_RMI_BENCHMARK_SHA256="$(sha256sum "$STAGE_CRATE/src/rmi_benchmark.rs" | awk '{print $1}')"
+SOURCE_RMI_RUNNER_SHA256="$(sha256sum "$STAGE_CRATE/src/rmi_track_a_runner.rs" | awk '{print $1}')"
+SOURCE_RMI_CLI_SHA256="$(sha256sum "$STAGE_CRATE/src/bin/rmi_track_a.rs" | awk '{print $1}')"
+SOURCE_RMI_REPLAY_TEST_SHA256="$(sha256sum "$STAGE_CRATE/tests/rmi_track_a_replay.rs" | awk '{print $1}')"
+
+# Rustfmt normalization is performed only in the temporary isolated crate.
+# Both original and normalized source digests are retained in the evidence.
+cargo fmt --manifest-path "$MANIFEST"
 cargo fmt --manifest-path "$MANIFEST" --check
+FORMATTED_RMI_BENCHMARK_SHA256="$(sha256sum "$STAGE_CRATE/src/rmi_benchmark.rs" | awk '{print $1}')"
+FORMATTED_RMI_RUNNER_SHA256="$(sha256sum "$STAGE_CRATE/src/rmi_track_a_runner.rs" | awk '{print $1}')"
+FORMATTED_RMI_CLI_SHA256="$(sha256sum "$STAGE_CRATE/src/bin/rmi_track_a.rs" | awk '{print $1}')"
+FORMATTED_RMI_REPLAY_TEST_SHA256="$(sha256sum "$STAGE_CRATE/tests/rmi_track_a_replay.rs" | awk '{print $1}')"
 cargo generate-lockfile --manifest-path "$MANIFEST"
 
 LOCK_SHA256="$(sha256sum "$STAGE_CRATE/Cargo.lock" | awk '{print $1}')"
@@ -85,21 +103,27 @@ cargo run --locked --manifest-path "$MANIFEST" --bin rmi_track_a -- "$TRIALS_PER
 cp "$MANIFEST" "$EVIDENCE_DIR/Cargo.toml"
 cp "$STAGE_CRATE/Cargo.lock" "$EVIDENCE_DIR/Cargo.lock"
 cp "$STAGE_CRATE/src/lib.rs" "$EVIDENCE_DIR/lib.rs"
-cp "$STAGE_CRATE/src/rmi_benchmark.rs" "$EVIDENCE_DIR/rmi_benchmark.rs"
-cp "$STAGE_CRATE/src/rmi_track_a_runner.rs" "$EVIDENCE_DIR/rmi_track_a_runner.rs"
-cp "$STAGE_CRATE/src/bin/rmi_track_a.rs" "$EVIDENCE_DIR/rmi_track_a.rs"
-cp "$STAGE_CRATE/tests/rmi_track_a_replay.rs" "$EVIDENCE_DIR/rmi_track_a_replay.rs"
+cp "$STAGE_CRATE/src/rmi_benchmark.rs" "$EVIDENCE_DIR/rmi_benchmark.formatted.rs"
+cp "$STAGE_CRATE/src/rmi_track_a_runner.rs" "$EVIDENCE_DIR/rmi_track_a_runner.formatted.rs"
+cp "$STAGE_CRATE/src/bin/rmi_track_a.rs" "$EVIDENCE_DIR/rmi_track_a.formatted.rs"
+cp "$STAGE_CRATE/tests/rmi_track_a_replay.rs" "$EVIDENCE_DIR/rmi_track_a_replay.formatted.rs"
 sha256sum \
   "$EVIDENCE_DIR/Cargo.toml" \
   "$EVIDENCE_DIR/Cargo.lock" \
   "$EVIDENCE_DIR/lib.rs" \
-  "$EVIDENCE_DIR/rmi_benchmark.rs" \
-  "$EVIDENCE_DIR/rmi_track_a_runner.rs" \
-  "$EVIDENCE_DIR/rmi_track_a.rs" \
-  "$EVIDENCE_DIR/rmi_track_a_replay.rs" \
+  "$EVIDENCE_DIR/rmi_benchmark.source.rs" \
+  "$EVIDENCE_DIR/rmi_track_a_runner.source.rs" \
+  "$EVIDENCE_DIR/rmi_track_a.source.rs" \
+  "$EVIDENCE_DIR/rmi_track_a_replay.source.rs" \
+  "$EVIDENCE_DIR/rmi_benchmark.formatted.rs" \
+  "$EVIDENCE_DIR/rmi_track_a_runner.formatted.rs" \
+  "$EVIDENCE_DIR/rmi_track_a.formatted.rs" \
+  "$EVIDENCE_DIR/rmi_track_a_replay.formatted.rs" \
   "$REPORT" > "$EVIDENCE_DIR/SHA256SUMS"
-printf 'exact_head=%s\ntrials_per_target=%s\nseed_root=%s\nrustc=%s\ncargo_lock_sha256=%s\n' \
+printf 'exact_head=%s\ntrials_per_target=%s\nseed_root=%s\nrustc=%s\ncargo_lock_sha256=%s\nsource_rmi_benchmark_sha256=%s\nsource_runner_sha256=%s\nsource_cli_sha256=%s\nsource_replay_test_sha256=%s\nformatted_rmi_benchmark_sha256=%s\nformatted_runner_sha256=%s\nformatted_cli_sha256=%s\nformatted_replay_test_sha256=%s\n' \
   "$SOURCE_COMMIT" "$TRIALS_PER_TARGET" "$SEED_ROOT" "$RUSTC_VERSION" "$LOCK_SHA256" \
+  "$SOURCE_RMI_BENCHMARK_SHA256" "$SOURCE_RMI_RUNNER_SHA256" "$SOURCE_RMI_CLI_SHA256" "$SOURCE_RMI_REPLAY_TEST_SHA256" \
+  "$FORMATTED_RMI_BENCHMARK_SHA256" "$FORMATTED_RMI_RUNNER_SHA256" "$FORMATTED_RMI_CLI_SHA256" "$FORMATTED_RMI_REPLAY_TEST_SHA256" \
   > "$EVIDENCE_DIR/source-identities.txt"
 
 echo "RMI Track A qualification completed."
