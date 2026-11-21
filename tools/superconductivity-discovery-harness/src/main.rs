@@ -184,12 +184,12 @@ fn audit_registry(schema_bytes: &[u8], registry_bytes: &[u8]) -> Result<Value, S
                     ));
                 }
             }
+            "experimental_report" if observations.is_empty() => {
+                return Err(format!(
+                    "{candidate_id}: experimental report requires at least one observed transition"
+                ));
+            }
             "experimental_report" => {
-                if observations.is_empty() {
-                    return Err(format!(
-                        "{candidate_id}: experimental report requires at least one observed transition"
-                    ));
-                }
                 // Experimental materials may also have separate, explicitly
                 // calculated or predicted Tc estimates; these stay in their
                 // own fields and never overwrite measured observations.
