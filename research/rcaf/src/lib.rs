@@ -37,37 +37,54 @@ impl fmt::Display for MetricError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyInput => write!(f, "edge-weight input is empty"),
-            Self::LengthMismatch { left, right } =>
-                write!(f, "edge-vector lengths differ: {left} != {right}"),
-            Self::NonFiniteValue { index } =>
-                write!(f, "non-finite value at edge index {index}"),
-            Self::NegativeWeight { index } =>
-                write!(f, "negative edge weight at index {index}"),
+            Self::LengthMismatch { left, right } => {
+                write!(f, "edge-vector lengths differ: {left} != {right}")
+            }
+            Self::NonFiniteValue { index } => write!(f, "non-finite value at edge index {index}"),
+            Self::NegativeWeight { index } => write!(f, "negative edge weight at index {index}"),
             Self::ZeroTotalMass => write!(f, "weighted Jaccard is undefined for zero total mass"),
             Self::TooFewRegions => write!(f, "at least two regions are required"),
             Self::NonSquareMatrix => write!(f, "correlation matrix must be square"),
-            Self::MatrixSizeMismatch { left, right } =>
-                write!(f, "correlation matrix dimensions differ: {left} != {right}"),
-            Self::AsymmetricMatrix { row, col } =>
-                write!(f, "matrix is not symmetric at ({row}, {col})"),
-            Self::CorrelationOutOfRange { row, col } =>
-                write!(f, "correlation outside [-1, 1] at ({row}, {col})"),
-            Self::InsufficientSelectedEdges { selected, minimum } =>
-                write!(f, "only {selected} edges selected; minimum required is {minimum}"),
-            Self::TooFewParticipants { n } =>
-                write!(f, "at least two participants are required, got {n}"),
-            Self::InvalidSimilarity { index } =>
-                write!(f, "similarity at participant index {index} is outside [0, 1] or non-finite"),
-            Self::InvalidBootstrapDraws { draws } =>
-                write!(f, "at least 100 bootstrap draws are required, got {draws}"),
+            Self::MatrixSizeMismatch { left, right } => {
+                write!(f, "correlation matrix dimensions differ: {left} != {right}")
+            }
+            Self::AsymmetricMatrix { row, col } => {
+                write!(f, "matrix is not symmetric at ({row}, {col})")
+            }
+            Self::CorrelationOutOfRange { row, col } => {
+                write!(f, "correlation outside [-1, 1] at ({row}, {col})")
+            }
+            Self::InsufficientSelectedEdges { selected, minimum } => write!(
+                f,
+                "only {selected} edges selected; minimum required is {minimum}"
+            ),
+            Self::TooFewParticipants { n } => {
+                write!(f, "at least two participants are required, got {n}")
+            }
+            Self::InvalidSimilarity { index } => write!(
+                f,
+                "similarity at participant index {index} is outside [0, 1] or non-finite"
+            ),
+            Self::InvalidBootstrapDraws { draws } => {
+                write!(f, "at least 100 bootstrap draws are required, got {draws}")
+            }
             Self::InvalidAlpha => write!(f, "alpha must be finite and in (0, 0.5)"),
             Self::InvalidSignThreshold => write!(f, "sign threshold must be finite and in [0, 1]"),
-            Self::RoiLabelCountMismatch { labels, regions } => write!(f, "ROI label count {labels} does not match matrix dimension {regions}"),
-            Self::RoiOrderMismatch => write!(f, "ROI label order differs between compared matrices"),
+            Self::RoiLabelCountMismatch { labels, regions } => write!(
+                f,
+                "ROI label count {labels} does not match matrix dimension {regions}"
+            ),
+            Self::RoiOrderMismatch => {
+                write!(f, "ROI label order differs between compared matrices")
+            }
             Self::EmptyRoiLabel { index } => write!(f, "ROI label at index {index} is empty"),
             Self::DuplicateRoiLabel { index } => write!(f, "duplicate ROI label at index {index}"),
-            Self::EmptyParticipantId { index } => write!(f, "participant ID at index {index} is empty"),
-            Self::DuplicateParticipantId { index } => write!(f, "duplicate participant ID at index {index}"),
+            Self::EmptyParticipantId { index } => {
+                write!(f, "participant ID at index {index} is empty")
+            }
+            Self::DuplicateParticipantId { index } => {
+                write!(f, "duplicate participant ID at index {index}")
+            }
         }
     }
 }
@@ -114,10 +131,12 @@ fn validate_correlation_matrix(matrix: &[Vec<f64>]) -> Result<usize, MetricError
     Ok(n)
 }
 
-
 fn validate_roi_labels(labels: &[String], regions: usize) -> Result<(), MetricError> {
     if labels.len() != regions {
-        return Err(MetricError::RoiLabelCountMismatch { labels: labels.len(), regions });
+        return Err(MetricError::RoiLabelCountMismatch {
+            labels: labels.len(),
+            regions,
+        });
     }
     let mut seen = std::collections::HashSet::with_capacity(labels.len());
     for (index, label) in labels.iter().enumerate() {
@@ -169,7 +188,10 @@ pub fn weighted_jaccard_correlation_matrices(
     let n_a = validate_correlation_matrix(a)?;
     let n_b = validate_correlation_matrix(b)?;
     if n_a != n_b {
-        return Err(MetricError::MatrixSizeMismatch { left: n_a, right: n_b });
+        return Err(MetricError::MatrixSizeMismatch {
+            left: n_a,
+            right: n_b,
+        });
     }
 
     let mut weights_a = Vec::with_capacity(n_a * (n_a - 1) / 2);
@@ -211,7 +233,10 @@ pub fn weighted_jaccard(a: &[f64], b: &[f64]) -> Result<f64, MetricError> {
         return Err(MetricError::EmptyInput);
     }
     if a.len() != b.len() {
-        return Err(MetricError::LengthMismatch { left: a.len(), right: b.len() });
+        return Err(MetricError::LengthMismatch {
+            left: a.len(),
+            right: b.len(),
+        });
     }
 
     let mut min_sum = 0.0;
@@ -255,7 +280,6 @@ pub struct RcafSummary {
     pub sign_test: SignTestSummary,
 }
 
-
 /// A within/between pair attached to one pseudonymous participant key.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParticipantSimilarity {
@@ -283,8 +307,14 @@ pub fn summarize_rcaf_by_participant(
             return Err(MetricError::DuplicateParticipantId { index });
         }
     }
-    let within: Vec<f64> = observations.iter().map(|item| item.within_similarity).collect();
-    let between: Vec<f64> = observations.iter().map(|item| item.between_similarity).collect();
+    let within: Vec<f64> = observations
+        .iter()
+        .map(|item| item.within_similarity)
+        .collect();
+    let between: Vec<f64> = observations
+        .iter()
+        .map(|item| item.between_similarity)
+        .collect();
     summarize_rcaf(&within, &between, bootstrap_draws, alpha, seed)
 }
 
@@ -301,14 +331,19 @@ pub fn summarize_rcaf(
     seed: u64,
 ) -> Result<RcafSummary, MetricError> {
     if within.len() != between.len() {
-        return Err(MetricError::LengthMismatch { left: within.len(), right: between.len() });
+        return Err(MetricError::LengthMismatch {
+            left: within.len(),
+            right: between.len(),
+        });
     }
     let n = within.len();
     if n < 2 {
         return Err(MetricError::TooFewParticipants { n });
     }
     if bootstrap_draws < 100 {
-        return Err(MetricError::InvalidBootstrapDraws { draws: bootstrap_draws });
+        return Err(MetricError::InvalidBootstrapDraws {
+            draws: bootstrap_draws,
+        });
     }
     if !alpha.is_finite() || alpha <= 0.0 || alpha >= 0.5 {
         return Err(MetricError::InvalidAlpha);
@@ -323,9 +358,15 @@ pub fn summarize_rcaf(
         }
     }
 
-    let gaps: Vec<f64> = within.iter().zip(between.iter()).map(|(w, b)| w - b).collect();
+    let gaps: Vec<f64> = within
+        .iter()
+        .zip(between.iter())
+        .map(|(w, b)| w - b)
+        .collect();
     let sign_test = exact_sign_test(&gaps)?;
-    let excess: Vec<f64> = within.iter().zip(between.iter())
+    let excess: Vec<f64> = within
+        .iter()
+        .zip(between.iter())
         .filter_map(|(w, b)| {
             let denominator = 1.0 - b;
             if denominator > f64::EPSILON {
@@ -355,7 +396,11 @@ pub fn summarize_rcaf(
         median_between_similarity: median(between),
         median_paired_gap: median(&gaps),
         positive_gap_fraction: gaps.iter().filter(|&&gap| gap > 0.0).count() as f64 / n as f64,
-        median_excess_distance_fraction: if excess.is_empty() { None } else { Some(median(&excess)) },
+        median_excess_distance_fraction: if excess.is_empty() {
+            None
+        } else {
+            Some(median(&excess))
+        },
         excess_distance_participant_count: excess.len(),
         gap_ci_lower: quantile_sorted(&boot, alpha / 2.0),
         gap_ci_upper: quantile_sorted(&boot, 1.0 - alpha / 2.0),
@@ -394,7 +439,13 @@ struct XorShift64 {
 
 impl XorShift64 {
     fn new(seed: u64) -> Self {
-        Self { state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed } }
+        Self {
+            state: if seed == 0 {
+                0x9E37_79B9_7F4A_7C15
+            } else {
+                seed
+            },
+        }
     }
 
     fn next(&mut self) -> u64 {
@@ -415,7 +466,6 @@ impl XorShift64 {
         }
     }
 }
-
 
 /// Participant-level exact sign test for the median paired gap.
 ///
@@ -455,10 +505,8 @@ pub fn exact_sign_test(differences: &[f64]) -> Result<SignTestSummary, MetricErr
     let p_two_sided_exact = if non_tied_count == 0 {
         1.0
     } else {
-        let lower_tail = binomial_symmetric_lower_tail(
-            non_tied_count,
-            positive_count.min(negative_count),
-        );
+        let lower_tail =
+            binomial_symmetric_lower_tail(non_tied_count, positive_count.min(negative_count));
         (2.0 * lower_tail).min(1.0)
     };
     Ok(SignTestSummary {
@@ -524,7 +572,6 @@ fn classify_sign(value: f64, neutral_threshold: f64) -> SignState {
     }
 }
 
-
 /// Sign-transition analysis that verifies exact ROI labels and order before comparison.
 pub fn summarize_edge_sign_transitions_labeled(
     a_roi_labels: &[String],
@@ -559,7 +606,10 @@ pub fn summarize_edge_sign_transitions(
     let n_a = validate_correlation_matrix(a)?;
     let n_b = validate_correlation_matrix(b)?;
     if n_a != n_b {
-        return Err(MetricError::MatrixSizeMismatch { left: n_a, right: n_b });
+        return Err(MetricError::MatrixSizeMismatch {
+            left: n_a,
+            right: n_b,
+        });
     }
 
     let mut summary = EdgeSignTransitionSummary {
@@ -597,8 +647,7 @@ pub fn summarize_edge_sign_transitions(
         }
     }
 
-    summary.polarity_reversal_count =
-        summary.positive_to_negative + summary.negative_to_positive;
+    summary.polarity_reversal_count = summary.positive_to_negative + summary.negative_to_positive;
     summary.sign_state_change_count = summary.total_edges
         - summary.stable_positive
         - summary.stable_negative
@@ -627,32 +676,88 @@ mod tests {
 
     #[test]
     fn zero_mass_fails_closed() {
-        assert_eq!(weighted_jaccard(&[0.0, 0.0], &[0.0, 0.0]), Err(MetricError::ZeroTotalMass));
+        assert_eq!(
+            weighted_jaccard(&[0.0, 0.0], &[0.0, 0.0]),
+            Err(MetricError::ZeroTotalMass)
+        );
     }
 
     #[test]
     fn invalid_edge_vectors_are_rejected() {
-        assert!(matches!(weighted_jaccard(&[0.2], &[0.2, 0.3]), Err(MetricError::LengthMismatch { .. })));
-        assert_eq!(weighted_jaccard(&[f64::NAN], &[0.2]), Err(MetricError::NonFiniteValue { index: 0 }));
-        assert_eq!(weighted_jaccard(&[-0.1], &[0.2]), Err(MetricError::NegativeWeight { index: 0 }));
+        assert!(matches!(
+            weighted_jaccard(&[0.2], &[0.2, 0.3]),
+            Err(MetricError::LengthMismatch { .. })
+        ));
+        assert_eq!(
+            weighted_jaccard(&[f64::NAN], &[0.2]),
+            Err(MetricError::NonFiniteValue { index: 0 })
+        );
+        assert_eq!(
+            weighted_jaccard(&[-0.1], &[0.2]),
+            Err(MetricError::NegativeWeight { index: 0 })
+        );
     }
 
     #[test]
     fn pair_aware_sign_masks_match_the_published_definition() {
-        let a = vec![vec![1.0, 0.5, -0.4], vec![0.5, 1.0, 0.6], vec![-0.4, 0.6, 1.0]];
-        let b = vec![vec![1.0, -0.5, -0.2], vec![-0.5, 1.0, 0.6], vec![-0.2, 0.6, 1.0]];
+        let a = vec![
+            vec![1.0, 0.5, -0.4],
+            vec![0.5, 1.0, 0.6],
+            vec![-0.4, 0.6, 1.0],
+        ];
+        let b = vec![
+            vec![1.0, -0.5, -0.2],
+            vec![-0.5, 1.0, 0.6],
+            vec![-0.2, 0.6, 1.0],
+        ];
         // Only the shared positive edge (1,2) is compared: 0.6 vs 0.6.
-        assert_eq!(weighted_jaccard_correlation_matrices(&a, &b, CorrelationWjMode::PositiveEdgesInBoth, 1).unwrap(), 1.0);
+        assert_eq!(
+            weighted_jaccard_correlation_matrices(
+                &a,
+                &b,
+                CorrelationWjMode::PositiveEdgesInBoth,
+                1
+            )
+            .unwrap(),
+            1.0
+        );
         // Shared negative edge (0,2): |-.4| vs |-.2| = 0.5 WJ.
-        assert!((weighted_jaccard_correlation_matrices(&a, &b, CorrelationWjMode::NegativeEdgesInBoth, 1).unwrap() - 0.5).abs() < 1e-12);
+        assert!(
+            (weighted_jaccard_correlation_matrices(
+                &a,
+                &b,
+                CorrelationWjMode::NegativeEdgesInBoth,
+                1
+            )
+            .unwrap()
+                - 0.5)
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]
     fn invalid_matrices_and_empty_sign_masks_fail_closed() {
         let asymmetric = vec![vec![1.0, 0.4], vec![0.3, 1.0]];
-        assert!(matches!(weighted_jaccard_correlation_matrices(&asymmetric, &asymmetric, CorrelationWjMode::Absolute, 1), Err(MetricError::AsymmetricMatrix { .. })));
+        assert!(matches!(
+            weighted_jaccard_correlation_matrices(
+                &asymmetric,
+                &asymmetric,
+                CorrelationWjMode::Absolute,
+                1
+            ),
+            Err(MetricError::AsymmetricMatrix { .. })
+        ));
         let no_shared_positive = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
-        assert!(matches!(weighted_jaccard_correlation_matrices(&no_shared_positive, &no_shared_positive, CorrelationWjMode::PositiveEdgesInBoth, 1), Err(MetricError::InsufficientSelectedEdges { .. })));
+        assert!(matches!(
+            weighted_jaccard_correlation_matrices(
+                &no_shared_positive,
+                &no_shared_positive,
+                CorrelationWjMode::PositiveEdgesInBoth,
+                1
+            ),
+            Err(MetricError::InsufficientSelectedEdges { .. })
+        ));
     }
 
     #[test]
@@ -672,9 +777,18 @@ mod tests {
 
     #[test]
     fn rcaf_rejects_unpaired_or_invalid_similarity() {
-        assert!(matches!(summarize_rcaf(&[0.5], &[0.4, 0.3], 100, 0.05, 1), Err(MetricError::LengthMismatch { .. })));
-        assert_eq!(summarize_rcaf(&[f64::NAN, 0.5], &[0.4, 0.3], 100, 0.05, 1), Err(MetricError::InvalidSimilarity { index: 0 }));
-        assert!(matches!(summarize_rcaf(&[0.5, 0.6], &[0.4, 0.3], 99, 0.05, 1), Err(MetricError::InvalidBootstrapDraws { .. })));
+        assert!(matches!(
+            summarize_rcaf(&[0.5], &[0.4, 0.3], 100, 0.05, 1),
+            Err(MetricError::LengthMismatch { .. })
+        ));
+        assert_eq!(
+            summarize_rcaf(&[f64::NAN, 0.5], &[0.4, 0.3], 100, 0.05, 1),
+            Err(MetricError::InvalidSimilarity { index: 0 })
+        );
+        assert!(matches!(
+            summarize_rcaf(&[0.5, 0.6], &[0.4, 0.3], 99, 0.05, 1),
+            Err(MetricError::InvalidBootstrapDraws { .. })
+        ));
     }
 
     #[test]
@@ -695,7 +809,10 @@ mod tests {
         let all_tied = exact_sign_test(&[0.0, 0.0]).unwrap();
         assert_eq!(all_tied.non_tied_count, 0);
         assert_eq!(all_tied.p_two_sided_exact, 1.0);
-        assert_eq!(exact_sign_test(&[f64::NAN]), Err(MetricError::NonFiniteValue { index: 0 }));
+        assert_eq!(
+            exact_sign_test(&[f64::NAN]),
+            Err(MetricError::NonFiniteValue { index: 0 })
+        );
     }
 
     #[test]
@@ -725,7 +842,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn labeled_matrix_comparison_rejects_roi_order_mismatch() {
         let a = vec![vec![1.0, 0.2], vec![0.2, 1.0]];
@@ -734,23 +850,44 @@ mod tests {
         let labels_b = vec!["ROI-2".to_string(), "ROI-1".to_string()];
         assert_eq!(
             weighted_jaccard_labeled_correlation_matrices(
-                &labels_a, &a, &labels_b, &b, CorrelationWjMode::Absolute, 1
+                &labels_a,
+                &a,
+                &labels_b,
+                &b,
+                CorrelationWjMode::Absolute,
+                1
             ),
             Err(MetricError::RoiOrderMismatch)
         );
         assert_eq!(
             weighted_jaccard_labeled_correlation_matrices(
-                &["ROI-1".to_string()], &a, &labels_a, &b, CorrelationWjMode::Absolute, 1
+                &["ROI-1".to_string()],
+                &a,
+                &labels_a,
+                &b,
+                CorrelationWjMode::Absolute,
+                1
             ),
-            Err(MetricError::RoiLabelCountMismatch { labels: 1, regions: 2 })
+            Err(MetricError::RoiLabelCountMismatch {
+                labels: 1,
+                regions: 2
+            })
         );
     }
 
     #[test]
     fn participant_keyed_summary_rejects_duplicate_or_empty_ids() {
         let valid = vec![
-            ParticipantSimilarity { participant_id: "p1".into(), within_similarity: 0.6, between_similarity: 0.5 },
-            ParticipantSimilarity { participant_id: "p2".into(), within_similarity: 0.7, between_similarity: 0.6 },
+            ParticipantSimilarity {
+                participant_id: "p1".into(),
+                within_similarity: 0.6,
+                between_similarity: 0.5,
+            },
+            ParticipantSimilarity {
+                participant_id: "p2".into(),
+                within_similarity: 0.7,
+                between_similarity: 0.6,
+            },
         ];
         let summary = summarize_rcaf_by_participant(&valid, 100, 0.05, 7).unwrap();
         assert_eq!(summary.participant_count, 2);
@@ -762,7 +899,11 @@ mod tests {
             Err(MetricError::DuplicateParticipantId { index: 1 })
         );
         let empty = vec![
-            ParticipantSimilarity { participant_id: " ".into(), within_similarity: 0.6, between_similarity: 0.5 },
+            ParticipantSimilarity {
+                participant_id: " ".into(),
+                within_similarity: 0.6,
+                between_similarity: 0.5,
+            },
             valid[1].clone(),
         ];
         assert_eq!(
