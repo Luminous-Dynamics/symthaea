@@ -638,7 +638,10 @@ mod tests {
     #[test]
     fn rejects_more_than_eighteen_candidates() {
         let mut subject = read_subject();
-        subject.candidates = subject.candidates.repeat(4);
+        let original = subject.candidates.clone();
+        for _ in 1..4 {
+            subject.candidates.extend(original.clone());
+        }
         assert_eq!(
             evaluate_inspection_decision(&subject),
             Err(InspectionDecisionError::TooManyCandidates)
