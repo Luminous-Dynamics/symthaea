@@ -1,0 +1,95 @@
+name: MUSE Observer Calibration
+
+on:
+  pull_request:
+    paths:
+      - "tools/muse-observer-calibration/**"
+      - "docs/research/MUSE_OBSERVER_CALIBRATION_V1.md"
+      - "docs/research/schemas/muse-observer-calibration-*.schema.json"
+      - "docs/research/fixtures/muse-observer-calibration-*.synthetic.json"
+      - ".github/workflows/muse-observer-calibration.yml"
+  push:
+    branches:
+      - "research/muse-observer-calibration-v1-20261120"
+    paths:
+      - "tools/muse-observer-calibration/**"
+      - "docs/research/schemas/muse-observer-calibration-*.schema.json"
+      - "docs/research/fixtures/muse-observer-calibration-*.synthetic.json"
+      - ".github/workflows/muse-observer-calibration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-observer-calibration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standalone:
+    name: exact-head-observer-calibration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Check formatting
+        run: |
+          rustfmt --check --edition 2024 --config skip_children=true \
+            tools/muse-observer-calibration/src/lib.rs \
+            tools/muse-observer-calibration/src/main.rs
+
+      - name: Run library, CLI and adversarial tests
+        run: cargo test --manifest-path tools/muse-observer-calibration/Cargo.toml --all-targets
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/muse-observer-calibration/Cargo.toml --all-targets -- -D warnings
+
+      - name: CLI help smoke
+        run: cargo run --manifest-path tools/muse-observer-calibration/Cargo.toml -- --help
+
+      - name: Validate Draft 2020-12 schemas and synthetic fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'jsonschema==4.26.0'
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("docs/research")
+          pairs = [
+              ("schemas/muse-observer-calibration-dataset-v1.schema.json",
+               "fixtures/muse-observer-calibration-dataset-v1.synthetic.json"),
+              ("schemas/muse-observer-calibration-contract-v1.schema.json",
+               "fixtures/muse-observer-calibration-contract-v1.synthetic.json"),
+          ]
+          for schema_rel, fixture_rel in pairs:
+              schema = json.loads((root / schema_rel).read_text())
+              fixture = json.loads((root / fixture_rel).read_text())
+              Draft202012Validator.check_schema(schema)
+              Draft202012Validator(schema).validate(fixture)
+              print(f"{fixture_rel}=PASS")
+          bundle_schema = json.loads((root / "schemas/muse-observer-calibration-bundle-v1.schema.json").read_text())
+          Draft202012Validator.check_schema(bundle_schema)
+          print("bundle_schema_meta_validation=PASS")
+          PY
