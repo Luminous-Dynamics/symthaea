@@ -1014,6 +1014,39 @@ mod tests {
     }
 
     #[test]
+    fn frequency_profile_can_reverse_first_test_without_changing_robust_decision_risk() {
+        let result = receipt();
+        let seq_one = result
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "SEQ-001")
+            .unwrap();
+        let seq_two = result
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "SEQ-002")
+            .unwrap();
+        assert_eq!(
+            seq_one.adaptive_campaign.first_action_id.as_deref(),
+            Some("A-COMBINED-LOAD-SCREEN")
+        );
+        assert_eq!(
+            seq_two.adaptive_campaign.first_action_id.as_deref(),
+            Some("B-THERMAL-INSPECTION")
+        );
+        assert_eq!(seq_one.adaptive_campaign.worst_case_regret, 0.0);
+        assert_eq!(seq_two.adaptive_campaign.worst_case_regret, 0.0);
+        assert!(expected_dominates(
+            seq_one.adaptive_campaign.expected_resources.as_ref().unwrap(),
+            &seq_one.fixed_campaign.expected_resources
+        ));
+        assert!(expected_dominates(
+            seq_two.adaptive_campaign.expected_resources.as_ref().unwrap(),
+            &seq_two.fixed_campaign.expected_resources
+        ));
+    }
+
+    #[test]
     fn wrong_article_or_configuration_context_is_not_selectable() {
         let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
         value["scenarios"][0]["actions"][0]["decision_context"]["article_subject_ref"] =
