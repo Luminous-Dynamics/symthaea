@@ -18,8 +18,8 @@
 pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
-pub mod cognitive_layout;
 pub mod cognitive_events;
+pub mod cognitive_layout;
 pub mod cognitive_svg;
 pub mod cognitive_topology;
 pub mod color;
@@ -41,16 +41,16 @@ use serde::{Deserialize, Serialize};
 pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
+pub use cognitive_events::{
+    COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION, CognitiveEventApplyOutcome, CognitiveEventError,
+    CognitiveItemDelta, CognitiveTopologyChange, CognitiveTopologyDiff, CognitiveTopologyEvent,
+    CognitiveTopologyReducer, MAX_COGNITIVE_EVENT_LOG, MAX_COGNITIVE_EVENTS_PER_BATCH,
+    diff_cognitive_topologies,
+};
 pub use cognitive_layout::{
     COGNITIVE_PROJECTION_SCHEMA_VERSION, CognitiveAnchor, CognitiveLayoutConfig,
     CognitiveLayoutError, CognitiveSpatialLink, CognitiveSpatialProjection,
     layout_cognitive_topology, project_cognitive_topology,
-};
-pub use cognitive_events::{
-    COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION, MAX_COGNITIVE_EVENT_LOG,
-    MAX_COGNITIVE_EVENTS_PER_BATCH, CognitiveEventApplyOutcome, CognitiveEventError,
-    CognitiveItemDelta, CognitiveTopologyChange, CognitiveTopologyDiff, CognitiveTopologyEvent,
-    CognitiveTopologyReducer, diff_cognitive_topologies,
 };
 pub use cognitive_svg::{CognitiveSvgError, CognitiveSvgOptions, render_cognitive_projection_svg};
 pub use cognitive_topology::{
@@ -80,11 +80,10 @@ pub use mycelial_model::{
     SpatialPoint3, build_mycelial_model,
 };
 pub use mycelial_network::{
-    AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MycelialAnastomosis,
-    MycelialAnastomosisCandidate, MycelialConnectionKind, MycelialNetworkConfig,
-    MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
-    MycelialNetworkMetrics, MYCELIAL_NETWORK_SCHEMA_VERSION,
-    build_mycelial_network_graph, detect_anastomosis_candidates,
+    AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MYCELIAL_NETWORK_SCHEMA_VERSION,
+    MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialConnectionKind,
+    MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError, MycelialNetworkGraph,
+    MycelialNetworkMetrics, build_mycelial_network_graph, detect_anastomosis_candidates,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
