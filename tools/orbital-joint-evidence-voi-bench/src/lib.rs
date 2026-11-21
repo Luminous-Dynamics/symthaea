@@ -68,7 +68,7 @@ pub struct Admissibility {
     pub reason_codes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Resources {
     pub engineering_hours: f64,
@@ -97,6 +97,11 @@ pub struct Expected {
 pub struct ActionAudit {
     pub action_id: String,
     pub admissibility_state: String,
+    pub planned_resources: Resources,
+    pub actual_resources: Option<Resources>,
+    pub execution_state: Option<String>,
+    pub actual_exceeds_plan: bool,
+    pub actual_exceeds_scenario_budget: bool,
     pub budget_fits: bool,
     pub target_claim_matches: bool,
     pub common_cause_conflict: bool,
@@ -121,6 +126,10 @@ pub struct ScenarioAudit {
     pub action_count: usize,
     pub eligible_action_count: usize,
     pub budget_blocked_count: usize,
+    pub actual_resources_consumed: Resources,
+    pub actual_resources_over_scenario_budget: bool,
+    pub actual_over_plan_action_count: usize,
+    pub actions_with_actual_resource_records: usize,
     pub oracle_matched: bool,
     pub actions: Vec<ActionAudit>,
 }
@@ -172,18 +181,58 @@ fn fits_budget(cost: &Resources, budget: &Resources) -> bool {
 }
 
 fn actual_resources(action: &Action) -> Result<Option<Resources>, String> {
+    let observed_state = metadata_string(action, "observed_execution_state");
     let Some(value) = action.metadata.get("actual_resources") else {
+        if observed_state.is_some() {
+            return Err(format!(
+                "{} has an execution state without an actual resource record",
+                action.action_id
+            ));
+        }
         return Ok(None);
     };
+    if observed_state.is_none() {
+        return Err(format!(
+            "{} has actual resources without an execution state",
+            action.action_id
+        ));
+    }
     let parsed: Resources = serde_json::from_value(value.clone())
         .map_err(|error| format!("{} actual_resources invalid: {error}", action.action_id))?;
-    if !valid_resources(&parsed) || !fits_budget(&parsed, &action.resources) {
+    if !valid_resources(&parsed) {
         return Err(format!(
-            "{} actual resource record is invalid or exceeds planned resource envelope",
+            "{} actual resource record is invalid",
             action.action_id
         ));
     }
     Ok(Some(parsed))
+}
+
+fn zero_resources() -> Resources {
+    Resources {
+        engineering_hours: 0.0,
+        compute_core_hours: 0.0,
+        facility_hours: 0.0,
+        specimen_count: 0,
+        review_hours: 0.0,
+        external_cost_units: 0.0,
+    }
+}
+
+fn accumulate_resources(total: &mut Resources, actual: &Resources) -> Result<(), String> {
+    total.engineering_hours += actual.engineering_hours;
+    total.compute_core_hours += actual.compute_core_hours;
+    total.facility_hours += actual.facility_hours;
+    total.specimen_count = total
+        .specimen_count
+        .checked_add(actual.specimen_count)
+        .ok_or_else(|| "actual specimen count overflow".to_owned())?;
+    total.review_hours += actual.review_hours;
+    total.external_cost_units += actual.external_cost_units;
+    if !valid_resources(total) {
+        return Err("accumulated actual resource total is non-finite".to_owned());
+    }
+    Ok(())
 }
 
 fn metadata_string<'a>(action: &'a Action, key: &str) -> Option<&'a str> {
@@ -566,6 +615,9 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     let mut action_value_by_id = BTreeMap::<String, Option<f64>>::new();
     let mut eligible_by_id = BTreeMap::<String, bool>::new();
     let mut budget_blocked_count = 0usize;
+    let mut actual_resources_consumed = zero_resources();
+    let mut actual_over_plan_action_count = 0usize;
+    let mut actions_with_actual_resource_records = 0usize;
 
     for action in &scenario.actions {
         if action.action_id.trim().is_empty() || !action_ids.insert(action.action_id.as_str()) {
@@ -645,6 +697,21 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         let mandatory_obligations_covered = obligations_covered(scenario, action);
         let terminal_nonresult = is_terminal_nonresult(action);
         let actual = actual_resources(action)?;
+        let execution_state = metadata_string(action, "observed_execution_state")
+            .map(str::to_owned);
+        let actual_exceeds_plan = actual
+            .as_ref()
+            .is_some_and(|resources| !fits_budget(resources, &action.resources));
+        let actual_exceeds_scenario_budget = actual
+            .as_ref()
+            .is_some_and(|resources| !fits_budget(resources, &scenario.budget));
+        if let Some(actual) = &actual {
+            accumulate_resources(&mut actual_resources_consumed, actual)?;
+            actions_with_actual_resource_records += 1;
+            if actual_exceeds_plan {
+                actual_over_plan_action_count += 1;
+            }
+        }
         let mut reasons = action.admissibility.reason_codes.clone();
         if !budget_fits {
             reasons.push("BUDGET_EXCEEDED".to_owned());
@@ -728,6 +795,11 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         audits.push(ActionAudit {
             action_id: action.action_id.clone(),
             admissibility_state: action.admissibility.state.clone(),
+            planned_resources: action.resources.clone(),
+            actual_resources: actual.clone(),
+            execution_state,
+            actual_exceeds_plan,
+            actual_exceeds_scenario_budget,
             budget_fits,
             target_claim_matches,
             common_cause_conflict,
@@ -739,7 +811,6 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             post_action_regret_or_loss: post_action_score,
             reasons,
         });
-        let _ = actual;
     }
 
     audits.sort_by(|left, right| left.action_id.cmp(&right.action_id));
@@ -863,6 +934,13 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         action_count,
         eligible_action_count,
         budget_blocked_count,
+        actual_resources_over_scenario_budget: !fits_budget(
+            &actual_resources_consumed,
+            &scenario.budget,
+        ),
+        actual_resources_consumed,
+        actual_over_plan_action_count,
+        actions_with_actual_resource_records,
         oracle_matched,
         actions: audits,
     })
