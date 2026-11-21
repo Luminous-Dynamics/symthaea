@@ -1,0 +1,100 @@
+name: MEL Audio-Symbolic Perception Parity
+
+on:
+  pull_request:
+    branches:
+      - main
+      - fix/workspace-stale-member-exclusion-20261121
+    paths:
+      - "crates/domains/symthaea-muse/src/perception_parity.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "benchmarks/mel/schemas/perception-parity-v1.schema.json"
+      - ".github/workflows/mel-perception-parity.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-perception-parity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact merge-head perception parity qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact PR merge head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify exact merge and source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "${{ github.sha }}"
+          printf 'merge_head=%s\n' "$actual" > "$RUNNER_TEMP/source-identities.txt"
+          printf 'pr_head=%s\n' "${{ github.event.pull_request.head.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+          printf 'base_head=%s\n' "${{ github.event.pull_request.base.sha }}" >> "$RUNNER_TEMP/source-identities.txt"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Resolve actual workspace under committed lockfile
+        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
+
+      - name: Check perception evaluator formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/perception_parity.rs
+
+      - name: Compile actual Muse library
+        run: cargo check --locked -p symthaea-muse --lib
+
+      - name: Run paired modality evaluator tests
+        run: cargo test --locked -p symthaea-muse --lib perception_parity::tests
+
+      - name: Test-compile all Muse library tests
+        run: cargo test --locked -p symthaea-muse --lib --no-run
+
+      - name: Validate perception parity schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema="benchmarks/mel/schemas/perception-parity-v1.schema.json"
+          jq -e '
+            .["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+            and .["$defs"].sha256.pattern == "^[A-Fa-f0-9]{64}$"
+            and (.oneOf | length) == 2
+          ' "$schema" > /dev/null
+          echo "perception parity schema parsed and contract anchors verified"
+
+      - name: Record exact merge-head evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-perception-parity-evidence"
+          mkdir -p "$evidence"
+          cp Cargo.toml "$evidence/Cargo.toml"
+          cp Cargo.lock "$evidence/Cargo.lock"
+          cp crates/domains/symthaea-muse/src/perception_parity.rs "$evidence/perception_parity.rs"
+          cp benchmarks/mel/schemas/perception-parity-v1.schema.json "$evidence/perception-parity-v1.schema.json"
+          cp "$RUNNER_TEMP/workspace-metadata.json" "$evidence/workspace-metadata.json"
+          cp "$RUNNER_TEMP/source-identities.txt" "$evidence/source-identities.txt"
+          (
+            cd "$evidence"
+            sha256sum Cargo.toml Cargo.lock perception_parity.rs perception-parity-v1.schema.json workspace-metadata.json source-identities.txt > SHA256SUMS
+          )
+
+      - name: Upload exact merge-head perception parity evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-perception-parity-${{ github.sha }}
+          path: ${{ runner.temp }}/mel-perception-parity-evidence/
+          if-no-files-found: error
+          retention-days: 90
