@@ -197,6 +197,8 @@ Execution/result is a separate record:
 
 The adapter never starts the action or issues a qualification release.
 
+The machine-readable contract is [action-proposal-outcome.schema.json](../../fixtures/orbital-joint-evidence-voi/v0.1/action-proposal-outcome.schema.json). Rust typed fixtures are [a non-actuating proposal](../../fixtures/orbital-joint-evidence-voi/v0.1/action-proposal.synthetic.json) and [an aborted outcome with actual costs](../../fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json). A proposal is always `authority_granted=false` and `no_actuation=true`. An attempted outcome must carry actual resource consumption and an external executing-owner/authority reference; an aborted/failed/indeterminate result cannot be promoted to qualification.
+
 ## 7. Bounded benchmark v0.1
 
 The first synthetic benchmark should use the 44-case structural-interface compatibility corpus as an immutable decision input. Do not duplicate its evaluator or revise expected compatibility dispositions. Add a separate action-selection layer and independent action-value oracle.
@@ -347,7 +349,7 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 ## 11. Deliverables
 
 P0: this contract and owner map.  
-P1: machine-readable action and outcome schema plus 17 frozen synthetic scenarios.  
+P1: machine-readable scenario and proposal/outcome schemas, typed synthetic proposal/aborted-outcome examples, and 17 frozen synthetic scenarios.  
 P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 17 known-answer scenarios, including incomplete change-frontier abstention and complete-frontier targeted requalification. No solver or physical execution is invoked.  
 P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
