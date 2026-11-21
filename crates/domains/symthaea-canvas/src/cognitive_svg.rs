@@ -212,23 +212,24 @@ pub fn render_cognitive_morphology_svg(
     let mut points = Vec::with_capacity(projection.nodes.len() + projection.hyphae.len() * 4);
     points.extend(projection.nodes.iter().map(|node| node.position));
     for hypha in &projection.hyphae {
-        points.extend([
-            hypha.start,
-            hypha.control_a,
-            hypha.control_b,
-            hypha.end,
-        ]);
+        points.extend([hypha.start, hypha.control_a, hypha.control_b, hypha.end]);
     }
     let (min_x, max_x, min_y, max_y) = if points.is_empty() {
         (-1.0f32, 1.0f32, -1.0f32, 1.0f32)
     } else {
         (
-            points.iter().map(|point| point.x).fold(f32::INFINITY, f32::min),
+            points
+                .iter()
+                .map(|point| point.x)
+                .fold(f32::INFINITY, f32::min),
             points
                 .iter()
                 .map(|point| point.x)
                 .fold(f32::NEG_INFINITY, f32::max),
-            points.iter().map(|point| point.y).fold(f32::INFINITY, f32::min),
+            points
+                .iter()
+                .map(|point| point.y)
+                .fold(f32::INFINITY, f32::min),
             points
                 .iter()
                 .map(|point| point.y)
@@ -251,15 +252,17 @@ pub fn render_cognitive_morphology_svg(
         )
     };
 
-    let has_synthetic = projection.nodes.iter().any(|node| {
-        node.evidence.provenance == CognitiveProvenance::SyntheticFixture
-    }) || projection.hyphae.iter().any(|hypha| {
-        hypha.evidence.provenance == CognitiveProvenance::SyntheticFixture
-    });
+    let has_synthetic = projection
+        .nodes
+        .iter()
+        .any(|node| node.evidence.provenance == CognitiveProvenance::SyntheticFixture)
+        || projection
+            .hyphae
+            .iter()
+            .any(|hypha| hypha.evidence.provenance == CognitiveProvenance::SyntheticFixture);
 
-    let mut output = String::with_capacity(
-        projection.nodes.len() * 320 + projection.hyphae.len() * 520 + 1_400,
-    );
+    let mut output =
+        String::with_capacity(projection.nodes.len() * 320 + projection.hyphae.len() * 520 + 1_400);
     writeln!(
         &mut output,
         r#"<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mycelial evidence morphology" width="{}" height="{}" viewBox="0 0 {} {}">"#,
@@ -737,11 +740,8 @@ mod tests {
             crate::cognitive_morphology::CognitiveMorphologyConfig::default(),
         )
         .expect("valid morphology");
-        let svg = render_cognitive_morphology_svg(
-            &morphology,
-            CognitiveSvgOptions::default(),
-        )
-        .expect("morphology SVG");
+        let svg = render_cognitive_morphology_svg(&morphology, CognitiveSvgOptions::default())
+            .expect("morphology SVG");
         assert!(svg.contains(" C "));
         assert!(svg.contains(r#"class="cognitive-hypha""#));
         assert!(svg.contains(r#"data-provenance="synthetic_fixture""#));
