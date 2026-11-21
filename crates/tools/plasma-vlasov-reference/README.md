@@ -35,7 +35,7 @@ The in-house radix-2 FFT has no external dependencies. The time integrator is se
 
 ## Diagnostics
 
-The solver reports mass, momentum, kinetic energy, field energy, total energy, integrated net charge, maximum collocation spectral Poisson residual, minimum distribution value and velocity-endpoint occupancy ratio.
+The solver reports mass, momentum, kinetic energy, field energy, total energy, integrated net charge, maximum collocation spectral Poisson residual, minimum distribution value and velocity-endpoint occupancy ratio. For a requested spatial mode it also exposes the complex Fourier coefficient (real part, imaginary part, magnitude and principal phase), so oscillatory field modes are not reduced to a magnitude-only time trace.
 
 These are raw observations. In particular:
 
@@ -47,7 +47,7 @@ These are raw observations. In particular:
 
 ## Verification tests
 
-The unit suite contains 11 tests:
+The unit suite contains 12 tests:
 - radix-2 FFT forward/inverse round-trip;
 - homogeneous Maxwellian equilibrium;
 - manufactured free-streaming characteristic solution;
@@ -57,7 +57,7 @@ The unit suite contains 11 tests:
 - observed second-order timestep-convergence ratio on a coupled trajectory;
 - phase-space grid-size overflow rejection;
 - invalid grid, non-finite input and invalid timestep rejection;
-- electric-mode diagnostic validation.
+- complex electric-mode coefficient, phase and amplitude consistency.
 
 Run with Rust 1.96:
 
@@ -69,7 +69,7 @@ cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo
 
 ## Reproducible probes
 
-Landau-damping diagnostic trace:
+Phase-resolved Landau-damping diagnostic trace (complex Fourier coefficient, magnitude and phase):
 
 ```sh
 cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_reference
