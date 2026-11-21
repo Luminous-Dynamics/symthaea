@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          scratch=/tmp/mycelial-renderer-validation
+          scratch="$GITHUB_WORKSPACE/.mycelial-renderer-validation"
           rm -rf "$scratch"
           mkdir -p "$scratch/crates/domains" "$scratch/crates/bridges"
           cp -a crates/domains/symthaea-canvas "$scratch/crates/domains/"
@@ -80,10 +80,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            /tmp/mycelial-renderer-validation -> target
+            .mycelial-renderer-validation -> target
 
       - name: Check formatting
-        run: cargo fmt --manifest-path /tmp/mycelial-renderer-validation/Cargo.toml --all -- --check
+        run: cargo fmt --manifest-path .mycelial-renderer-validation/Cargo.toml --all -- --check
 
       - name: Test renderer-neutral canvas contract
         run: cargo test --locked --manifest-path /tmp/mycelial-renderer-validation/Cargo.toml -p symthaea-canvas --all-targets
