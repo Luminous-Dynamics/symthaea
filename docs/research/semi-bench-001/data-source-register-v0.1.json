@@ -192,6 +192,84 @@
         "dataset_snapshot_status": "not-yet-frozen"
       },
       "evidence_class": "public simulated SEM images and reported AI detection-limit visualizations; no independent physical instrument measurement"
+    },
+    {
+      "id": "MixedWM38",
+      "title": "Mixed-type Wafer Map Dataset",
+      "official_source": "https://github.com/Junliangwangdhu/WaferMap",
+      "primary_citation": "Wang et al. (2020), Deformable Convolutional Networks for Efficient Mixed-type Wafer Defect Pattern Recognition, IEEE Transactions on Semiconductor Manufacturing, DOI 10.1109/TSM.2020.3020985",
+      "metadata": {
+        "maps": 38015,
+        "resolution": [
+          52,
+          52
+        ],
+        "base_defect_components": 8,
+        "observed_combination_classes": 38,
+        "label_semantics": "8-dimensional multi-hot over basic defect components; all-zero vector is normal",
+        "pixel_semantics": {
+          "0": "outside-or-blank",
+          "1": "passing-die",
+          "2": "failing-die"
+        },
+        "upstream_synthetic_augmentation": "upstream README states GAN-generated wafer maps were added to balance mixed-pattern classes",
+        "third_party_audit": {
+          "repository": "https://github.com/ALEX8642/wafer-mixed",
+          "undocumented_pixel_value_3": 214,
+          "maps_containing_value_3": 105,
+          "near_full_single_support": 149,
+          "random_single_support": 866,
+          "note": "Third-party audit reports label ordering was visually established because upstream ordering is undocumented. Verify on an exact dataset snapshot before adopting these values."
+        }
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_distributor_snapshot": null,
+        "exact_file_sha256": null,
+        "license_status": "not-explicitly-established-by-original-upstream-repository; verify original data permissions before copying or redistribution",
+        "sample_level_real_vs_gan_provenance": "not-established-from-public-upstream-interface",
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "benchmark_rules": [
+        "Do not describe whole dataset as real-origin when GAN-augmented examples are included",
+        "Do not claim synthetic-to-real transfer without per-sample provenance or an independently identified real-origin test set",
+        "Use leave-combination-out splits for compositional generalization",
+        "Treat third-party repository code license as distinct from source dataset rights"
+      ]
+    },
+    {
+      "id": "MixedWM38-VQA",
+      "title": "Derived multimodal wafer-map VQA annotation set",
+      "source": "https://huggingface.co/datasets/wafervqaanon/MixedWM38-VQA",
+      "derived_from": "MixedWM38",
+      "metadata": {
+        "images": 38015,
+        "annotation_styles": [
+          "tuple_generation",
+          "stepwise_reasoning"
+        ],
+        "questions_per_image": 5,
+        "image_resolution": [
+          416,
+          416
+        ],
+        "train_val_test_counts": {
+          "train": 7602,
+          "validation": 3800,
+          "test": 26613
+        },
+        "dataset_card_says": "synthetic-or-semi-synthetic/benchmark-structured supervision; derived visual style is cleaner than real manufacturing environments"
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_dataset_revision": null,
+        "exact_artifact_sha256": null,
+        "declared_dataset_card_license": "MIT",
+        "source_image_rights": "must be checked independently against MixedWM38 original source",
+        "data_snapshot_status": "not-yet-frozen"
+      },
+      "evaluation_rule": "Treat as a derived reasoning/annotation benchmark sharing MixedWM38 image lineage, not an independent physical wafer corpus. Audit image-ID leakage and answer/reference contamination."
     }
   ],
   "benchmark_reference_artifacts": {
@@ -223,5 +301,39 @@
       "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550",
       "claim_ceiling": "synthetic expected-net-value only; not measured inspection savings or authorization"
     }
-  }
+  },
+  "reproducibility_artifacts": [
+    {
+      "id": "external-UCI-SECOM-random-split-baseline",
+      "repository": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+      "status": "source-and-metrics-reviewed; not independently executed by Luminous",
+      "split": "stratified-random-60-20-20-two-stage-train_test_split-random_state-42",
+      "preprocessing": "training-only-missingness-selection-and-median-imputation",
+      "threshold_selection": "validation-only-F2-selection",
+      "reported_test_metrics": {
+        "threshold": 0.11,
+        "tp": 11,
+        "fp": 56,
+        "fn": 10,
+        "tn": 237,
+        "recall": 0.5238,
+        "precision": 0.1642,
+        "balanced_accuracy": 0.6663,
+        "pr_auc": 0.2192,
+        "review_rate": 0.2134
+      },
+      "caveat": "not time-held-out; exact UCI data/split hashes are not frozen in Symthaea; external model-card labels this a screening prototype, not production"
+    },
+    {
+      "id": "external-MixedWM38-multilabel-baseline",
+      "repository": "https://github.com/ALEX8642/wafer-mixed",
+      "status": "source/report reviewed; not independently executed by Luminous",
+      "split": "stratified-by-full-combination-70-10-20-sample-level",
+      "reported_test_metrics": {
+        "macro_f1": 0.9846,
+        "exact_match": 0.9696
+      },
+      "caveat": "project explicitly reports dataset is largely GAN-synthesized and saturates quickly; not fab generalization"
+    }
+  ]
 }
