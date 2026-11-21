@@ -1,0 +1,662 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/selective_memory_action_policy_v0_1.schema.json",
+  "title": "Selective Memory Action Policy v0.1",
+  "description": "Candidate-side memory action proposals and evaluator-side scores. Candidate records must never contain hidden labels, target costs or evaluator outputs.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/run_manifest"
+    },
+    {
+      "$ref": "#/$defs/candidate_action"
+    },
+    {
+      "$ref": "#/$defs/evaluator_score"
+    },
+    {
+      "$ref": "#/$defs/summary"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "ingestion",
+        "query"
+      ]
+    },
+    "ingestion_action": {
+      "type": "string",
+      "enum": [
+        "persist",
+        "session_only",
+        "discard_candidate",
+        "request_confirmation"
+      ]
+    },
+    "query_action": {
+      "type": "string",
+      "enum": [
+        "use",
+        "verify",
+        "clarify",
+        "abstain",
+        "probe"
+      ]
+    },
+    "actual_tool_action": {
+      "type": "string",
+      "enum": [
+        "none",
+        "source_verify",
+        "user_clarify",
+        "authorized_probe",
+        "other"
+      ]
+    },
+    "run_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "source_revision",
+        "policy_revision",
+        "evaluator_revision",
+        "scenario_manifest_sha256",
+        "split_manifest_sha256",
+        "cost_model_sha256",
+        "calibration_profile_sha256",
+        "hidden_label_manifest_sha256",
+        "model_family",
+        "track",
+        "independent_cluster_count",
+        "case_count",
+        "randomization"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "selective_memory_action_policy_v0_1"
+        },
+        "record_type": {
+          "const": "run_manifest"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "policy_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "evaluator_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "scenario_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cost_model_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "hidden_label_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "model_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "track": {
+          "type": "string",
+          "enum": [
+            "canonical_pool",
+            "raw_native",
+            "embodied_procedure"
+          ]
+        },
+        "independent_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "case_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "randomization": {
+          "type": "string",
+          "enum": [
+            "within_cluster_order",
+            "cluster_assignment",
+            "deterministic_replay"
+          ]
+        },
+        "hardware_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "candidate_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "cluster_id",
+        "case_id",
+        "stage",
+        "candidate_input_sha256",
+        "policy_revision",
+        "calibration_profile_sha256",
+        "declared_action",
+        "actual_tool_action",
+        "decision_state_sha256",
+        "latency_ns",
+        "input_tokens",
+        "tool_calls"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "selective_memory_action_policy_v0_1"
+        },
+        "record_type": {
+          "const": "candidate_action"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "case_id": {
+          "$ref": "#/$defs/id"
+        },
+        "stage": {
+          "$ref": "#/$defs/stage"
+        },
+        "candidate_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policy_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "calibration_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "declared_action": {
+          "type": "string",
+          "enum": [
+            "persist",
+            "session_only",
+            "discard_candidate",
+            "request_confirmation",
+            "use",
+            "verify",
+            "clarify",
+            "abstain",
+            "probe"
+          ]
+        },
+        "actual_tool_action": {
+          "$ref": "#/$defs/actual_tool_action"
+        },
+        "decision_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "uniqueItems": true
+        },
+        "action_reason_code": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "clarification_variable": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "verification_request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "probe_request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "abstention_reason": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "memory_bytes_read": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "memory_bytes_written": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "ingestion"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "declared_action": {
+                "enum": [
+                  "persist",
+                  "session_only",
+                  "discard_candidate",
+                  "request_confirmation"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "query"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "declared_action": {
+                "enum": [
+                  "use",
+                  "verify",
+                  "clarify",
+                  "abstain",
+                  "probe"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_action": {
+                "const": "verify"
+              }
+            },
+            "required": [
+              "declared_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "verification_request_sha256"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_action": {
+                "const": "clarify"
+              }
+            },
+            "required": [
+              "declared_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "clarification_variable"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_action": {
+                "const": "abstain"
+              }
+            },
+            "required": [
+              "declared_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "abstention_reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_action": {
+                "const": "probe"
+              }
+            },
+            "required": [
+              "declared_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "probe_request_sha256"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_action": {
+                "const": "persist"
+              }
+            },
+            "required": [
+              "declared_action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "memory_bytes_written": {
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evaluator_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "cluster_id",
+        "case_id",
+        "stage",
+        "expected_action",
+        "actual_action_match",
+        "decision_cost_micros",
+        "oracle_regret_micros",
+        "unauthorized_persistence_count",
+        "scope_violation_count",
+        "stale_use_count",
+        "privacy_erasure_miss_count",
+        "unauthorized_probe_count",
+        "verification_receipt_valid",
+        "tool_call_matches_action",
+        "timely_abstention",
+        "evaluation_validity"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "selective_memory_action_policy_v0_1"
+        },
+        "record_type": {
+          "const": "evaluator_score"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "case_id": {
+          "$ref": "#/$defs/id"
+        },
+        "stage": {
+          "$ref": "#/$defs/stage"
+        },
+        "expected_action": {
+          "type": "string",
+          "enum": [
+            "persist",
+            "session_only",
+            "discard_candidate",
+            "request_confirmation",
+            "use",
+            "verify",
+            "clarify",
+            "abstain",
+            "probe"
+          ]
+        },
+        "actual_action_match": {
+          "type": "boolean"
+        },
+        "decision_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oracle_regret_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unauthorized_persistence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "privacy_erasure_miss_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unauthorized_probe_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verification_receipt_valid": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "tool_call_matches_action": {
+          "type": "boolean"
+        },
+        "timely_abstention": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "time_to_correct_action_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "over_abstention": {
+          "type": "boolean"
+        },
+        "false_durable_commit": {
+          "type": "boolean"
+        },
+        "missed_valid_commit": {
+          "type": "boolean"
+        },
+        "clarification_resolved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "evaluation_validity": {
+          "type": "string",
+          "enum": [
+            "qualified",
+            "provisional",
+            "not_qualified"
+          ]
+        },
+        "invalidity_reason": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "label_provenance_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "source_revision",
+        "split_manifest_sha256",
+        "track",
+        "independent_cluster_count",
+        "case_count",
+        "metrics",
+        "hard_gate_failures",
+        "evaluation_validity"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "selective_memory_action_policy_v0_1"
+        },
+        "record_type": {
+          "const": "summary"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "track": {
+          "type": "string",
+          "enum": [
+            "canonical_pool",
+            "raw_native",
+            "embodied_procedure"
+          ]
+        },
+        "independent_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "case_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metric"
+          },
+          "minItems": 1
+        },
+        "hard_gate_failures": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evaluation_validity": {
+          "type": "string",
+          "enum": [
+            "qualified",
+            "provisional",
+            "not_qualified"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    }
+  }
+}
