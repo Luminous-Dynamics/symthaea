@@ -777,10 +777,7 @@ fn spectral_axis_result(
 ///
 /// This is a transfer oracle only: callers must separately qualify the
 /// physical effect and cost of changing a simulation grid.
-pub fn zero_pad_periodic_line(
-    samples: &[f64],
-    target_len: usize,
-) -> Result<Vec<f64>, SolverError> {
+pub fn zero_pad_periodic_line(samples: &[f64], target_len: usize) -> Result<Vec<f64>, SolverError> {
     let source_len = samples.len();
     if source_len < 4
         || !source_len.is_power_of_two()
@@ -1189,8 +1186,7 @@ mod tests {
         }
         for (index, actual) in refined.iter().enumerate() {
             let x = index as f64 / target_len as f64;
-            let expected =
-                0.7 + 0.4 * (TAU * 3.0 * x).cos() - 0.2 * (TAU * 5.0 * x).sin();
+            let expected = 0.7 + 0.4 * (TAU * 3.0 * x).cos() - 0.2 * (TAU * 5.0 * x).sin();
             assert!((actual - expected).abs() < 2.0e-12);
         }
     }
