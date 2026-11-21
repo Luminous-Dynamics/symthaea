@@ -76,8 +76,10 @@ jobs:
         run: |
           mkdir -p /tmp/semi-rust-work/crates/domains
           mkdir -p /tmp/semi-rust-work/benchmarks
+          mkdir -p /tmp/semi-rust-work/docs/research
           cp -R crates/domains/symthaea-semiconductor /tmp/semi-rust-work/crates/domains/
           cp -R benchmarks/semi-bench-001 /tmp/semi-rust-work/benchmarks/
+          cp -R docs/research/semi-bench-001 /tmp/semi-rust-work/docs/research/
           cat > /tmp/semi-rust-work/Cargo.toml <<'EOF'
           [workspace]
           members = ["crates/domains/symthaea-semiconductor"]
