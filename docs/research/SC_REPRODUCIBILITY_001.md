@@ -32,7 +32,11 @@ A future statistical model may use a hierarchical representation such as:
 
 The terms are not automatically identifiable. Campaign may be nested in batch, instrument may be nested in lab, and specimens may be nested in batches. If the experiment never crosses laboratories or instruments, the corresponding variance components may be confounded. The design must determine what can be estimated before a model is selected.
 
-Do not use a small synthetic fixture to claim variance-component recovery. The first executable slice only verifies whether split definitions preserve the intended specimen / batch / campaign / lab / instrument grouping.
+Do not use a small synthetic fixture to claim variance-component recovery. The first executable slice only verifies whether split definitions preserve the intended specimen / realized-state / batch / campaign / lab / instrument grouping.
+
+## Realized state identity
+
+Keep nominal material family and realized state separate. Independent specimens or batches of the same intended material can have different oxygen content, phase fraction, strain, texture, defect population or metastable history. Each observation therefore binds the target `material_id` plus a realized `material_state_id`. Same-specimen repeatability and paired instrument / inter-lab transfer require matching state IDs; between-batch and between-campaign generalization explicitly permit different realized states.
 
 ## Current executable contract
 
