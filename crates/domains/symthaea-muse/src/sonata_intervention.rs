@@ -900,7 +900,15 @@ mod tests {
                 .unwrap();
             assert!(selected.theory_validation.valid);
             assert!(selected.preserved_invariants);
-            assert!(selected.verification.iter().any(|evidence| evidence.obligation_id == batch.driving_obligation_id.unwrap() && evidence.verified));
+            assert!(
+                selected
+                    .verification
+                    .iter()
+                    .any(
+                        |evidence| evidence.obligation_id == batch.driving_obligation_id.unwrap()
+                            && evidence.verified
+                    )
+            );
         }
     }
 
@@ -955,8 +963,7 @@ mod tests {
             bars: 4,
             ..MusicalIntent::default()
         };
-        let realization =
-            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
 
         let mut supported_trace = return_trace(&realization);
         supported_trace.proposal.driving_obligation_id = None;
