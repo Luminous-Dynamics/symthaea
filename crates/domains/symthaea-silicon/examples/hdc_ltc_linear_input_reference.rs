@@ -231,6 +231,9 @@ struct MethodResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TraceResult {
+    workload_version: String,
+    time_unit: String,
+    trace_fingerprint: String,
     profile: SamplingProfile,
     scheduled_events: u64,
     dropped_events: u64,
@@ -395,6 +398,39 @@ fn euler_linear_target(
     state
 }
 
+fn trace_fingerprint(
+    profile: SamplingProfile,
+    knots: &[OracleKnot],
+    observations: &[CandidateObservation],
+) -> String {
+    // FNV-1a is used only as a stable fixture fingerprint, not a cryptographic
+    // integrity digest or an evidence-authentication mechanism.
+    let mut hash = 0xcbf29ce484222325_u64;
+    let profile_tag = match profile {
+        SamplingProfile::Regular => 0_u8,
+        SamplingProfile::Jittered => 1_u8,
+        SamplingProfile::Bursty => 2_u8,
+    };
+    let mut absorb = |bytes: &[u8]| {
+        for byte in bytes {
+            hash ^= *byte as u64;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+    };
+    absorb(&[profile_tag]);
+    for knot in knots {
+        absorb(&knot.time.to_le_bytes());
+        absorb(&knot.target.to_bits().to_le_bytes());
+    }
+    for event in observations {
+        absorb(&event.event_id.to_le_bytes());
+        absorb(&event.source_time.to_le_bytes());
+        absorb(&event.available_at.to_le_bytes());
+        absorb(&event.target.to_bits().to_le_bytes());
+    }
+    format!("fnv1a64:{hash:016x}")
+}
+
 fn run_trace(profile: SamplingProfile) -> Result<TraceResult, &'static str> {
     const INITIAL_STATE: f64 = -0.25;
     const TAU: f64 = 140.0;
@@ -412,7 +448,6 @@ fn run_trace(profile: SamplingProfile) -> Result<TraceResult, &'static str> {
     let mut z_euler = INITIAL_STATE;
     let mut z_rk4 = INITIAL_STATE;
     let mut errors = [0.0_f64; 4];
-    let mut analytic_updates = 0_u64;
     let mut euler_evaluations = 0_u64;
     let mut rk4_evaluations = 0_u64;
 
@@ -469,10 +504,6 @@ fn run_trace(profile: SamplingProfile) -> Result<TraceResult, &'static str> {
             .checked_add((4 * RK4_STEPS_PER_INTERVAL) as u64)
             .ok_or("RK4 work counter overflow")?;
 
-        analytic_updates = analytic_updates
-            .checked_add(2)
-            .ok_or("analytic update counter overflow")?;
-
         let reference = oracle_state_at(&knots, INITIAL_STATE, TAU, current.source_time)?;
         errors[0] = errors[0].max((z_zoh - reference).abs());
         errors[1] = errors[1].max((z_linear_exact - reference).abs());
@@ -491,6 +522,9 @@ fn run_trace(profile: SamplingProfile) -> Result<TraceResult, &'static str> {
     let scheduled = scheduled_times(profile).len() as u64;
 
     Ok(TraceResult {
+        workload_version: "piecewise-linear-leaky-reference-v0.1".to_owned(),
+        time_unit: "synthetic logical ticks".to_owned(),
+        trace_fingerprint: trace_fingerprint(profile, &knots, &observations),
         profile,
         scheduled_events: scheduled,
         dropped_events: dropped_indices(profile).len() as u64,
@@ -549,7 +583,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         SamplingProfile::Jittered,
         SamplingProfile::Bursty,
     ] {
-        let result = run_trace(profile)?;
+        let result = run_trace(profile)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
         println!("{}", serde_json::to_string_pretty(&result)?);
     }
     println!("scope: scalar analytic reference and synthetic input fixture only; not HDC-LTC qualification");
@@ -710,9 +745,12 @@ mod tests {
             SamplingProfile::Jittered,
             SamplingProfile::Bursty,
         ] {
-            let first = serde_json::to_string(&run_trace(profile).unwrap()).unwrap();
+            let result = run_trace(profile).unwrap();
+            let first = serde_json::to_string(&result).unwrap();
             let second = serde_json::to_string(&run_trace(profile).unwrap()).unwrap();
             assert_eq!(first, second);
+            assert!(result.trace_fingerprint.starts_with("fnv1a64:"));
+            assert_eq!(result.time_unit, "synthetic logical ticks");
         }
     }
 
