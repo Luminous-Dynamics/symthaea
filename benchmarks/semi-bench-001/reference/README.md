@@ -53,3 +53,10 @@ These conventions are part of the versioned contract. A future Rust implementati
 ## Claim ceiling
 
 Passing these tests establishes only that this reference implementation reproduces the checked-in synthetic known answers and rejects the tested malformed inputs. It does not establish predictive performance, SECOM generalization, fab yield improvement, process causality, metrology capability, physical semiconductor fabrication or production readiness.
+
+
+## Validation-selected threshold policy
+
+The separate helper `python/semi_threshold_policy_reference.py` selects the highest validation recall subject to a declared precision floor, with equal-score thresholds grouped. It then applies the chosen threshold once to a disjoint test subject. Validation/test identity overlap is rejected. If no threshold satisfies the floor, the specified fallback is reported rather than silently choosing one.
+
+The synthetic 10-validation / 10-test known-answer case is frozen in `fixtures/validation-threshold-known-answer-v1.json` and `fixtures/validation-threshold-known-answer-v1.expected.json`. Its 3 tests bring this reference suite to 14 tests in total. The tiny fixture demonstrates semantics only; it says nothing about real threshold reliability on rare-failure datasets.
