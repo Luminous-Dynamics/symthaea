@@ -166,6 +166,16 @@ pub enum SolverError {
         index: usize,
     },
     InvalidTimeStep,
+    VelocityImpulseLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteVelocityImpulse {
+        index: usize,
+    },
+    NonFiniteVelocityImpulsePhase {
+        index: usize,
+    },
     InvalidThermalSpeed,
     InvalidPerturbationAmplitude,
     InvalidSpatialMode {
@@ -218,6 +228,17 @@ impl fmt::Display for SolverError {
                 write!(f, "distribution value {index} is non-finite")
             }
             Self::InvalidTimeStep => write!(f, "time step must be finite and positive"),
+            Self::VelocityImpulseLengthMismatch { expected, actual } => write!(
+                f,
+                "velocity impulse has {actual} values; expected {expected} (nx)"
+            ),
+            Self::NonFiniteVelocityImpulse { index } => {
+                write!(f, "velocity impulse at spatial index {index} is non-finite")
+            }
+            Self::NonFiniteVelocityImpulsePhase { index } => write!(
+                f,
+                "velocity impulse at spatial index {index} produces a non-finite Fourier phase"
+            ),
             Self::InvalidThermalSpeed => write!(f, "thermal speed must be finite and positive"),
             Self::InvalidPerturbationAmplitude => write!(
                 f,
@@ -372,6 +393,105 @@ impl VlasovPoisson1d1v {
         }
         self.refresh_electric_field()?;
         self.ensure_finite_state()
+    }
+
+    /// Apply an instantaneous, spatially varying velocity translation.
+    ///
+    /// For each spatial cell this applies the exact periodic Fourier
+    /// characteristic map f_plus(x, v) = f_minus(x, v - delta_v(x)).
+    /// This is an externally prescribed impulse, not a time-integrated
+    /// self-consistent field step, and the simulation clock is unchanged.
+    ///
+    /// The finite periodic velocity interval and its Nyquist-mode projection
+    /// are the same as the existing velocity-advection subflow. Inputs and
+    /// transformed candidate rows are validated before the state is committed.
+    pub fn apply_velocity_impulse(&mut self, velocity_impulses: &[f64]) -> Result<(), SolverError> {
+        let config = self.config;
+        if velocity_impulses.len() != config.nx {
+            return Err(SolverError::VelocityImpulseLengthMismatch {
+                expected: config.nx,
+                actual: velocity_impulses.len(),
+            });
+        }
+        for (index, impulse) in velocity_impulses.iter().copied().enumerate() {
+            if !impulse.is_finite() {
+                return Err(SolverError::NonFiniteVelocityImpulse { index });
+            }
+        }
+
+        let period = config.velocity_max - config.velocity_min;
+        let expected = config
+            .nx
+            .checked_mul(config.nv)
+            .ok_or(SolverError::GridSizeOverflow)?;
+
+        let mut candidate = Vec::new();
+        candidate
+            .try_reserve_exact(expected)
+            .map_err(|_| SolverError::AllocationFailed { elements: expected })?;
+
+        let mut line = Vec::new();
+        line.try_reserve_exact(config.nv)
+            .map_err(|_| SolverError::AllocationFailed {
+                elements: config.nv,
+            })?;
+
+        for (ix, impulse) in velocity_impulses.iter().copied().enumerate() {
+            line.clear();
+            let row_start = ix * config.nv;
+            let row_end = row_start + config.nv;
+            for density in &self.distribution[row_start..row_end] {
+                line.push(Complex::new(*density, 0.0));
+            }
+
+            fft(&mut line, false);
+            for (mode, coefficient) in line.iter_mut().enumerate() {
+                let eta = signed_mode(mode, config.nv) as f64 * TAU / period;
+                let phase = -eta * impulse;
+                if !phase.is_finite() {
+                    return Err(SolverError::NonFiniteVelocityImpulsePhase { index: ix });
+                }
+
+                // Match the existing finite-periodic-velocity pusher's real
+                // Nyquist projection; all other modes retain their full phase.
+                let multiplier = if mode == config.nv / 2 {
+                    Complex::new(phase.cos(), 0.0)
+                } else {
+                    Complex::cis(phase)
+                };
+                *coefficient = coefficient.mul(multiplier);
+            }
+
+            fft(&mut line, true);
+            for value in &line {
+                if !value.re.is_finite() || !value.im.is_finite() {
+                    return Err(SolverError::NonFiniteState);
+                }
+                candidate.push(value.re);
+            }
+        }
+
+        // Prepare a rollback copy before mutating the solver. If field refresh
+        // or the final state check fails, restore both state and field exactly.
+        let mut previous_electric_field = Vec::new();
+        previous_electric_field
+            .try_reserve_exact(self.electric_field.len())
+            .map_err(|_| SolverError::AllocationFailed {
+                elements: self.electric_field.len(),
+            })?;
+        previous_electric_field.extend_from_slice(&self.electric_field);
+
+        let previous_distribution = std::mem::replace(&mut self.distribution, candidate);
+        if let Err(error) = self
+            .refresh_electric_field()
+            .and_then(|_| self.ensure_finite_state())
+        {
+            self.distribution = previous_distribution;
+            self.electric_field = previous_electric_field;
+            return Err(error);
+        }
+
+        Ok(())
     }
 
     pub fn step(&mut self, dt: f64) -> Result<(), SolverError> {
@@ -1035,6 +1155,142 @@ mod tests {
             maximum_error < 2.0e-11,
             "free-streaming max error {maximum_error:e}"
         );
+    }
+
+    fn periodic_velocity_mode_initial_state(config: VlasovPoissonConfig, mode: usize) -> Vec<f64> {
+        let period = config.velocity_max - config.velocity_min;
+        let eta = TAU * mode as f64 / period;
+        let base = 1.0 / period;
+        let amplitude = 0.1 / period;
+        (0..config.nx)
+            .flat_map(|_| {
+                (0..config.nv).map(move |iv| {
+                    base + amplitude * (eta * (config.velocity(iv) - config.velocity_min)).cos()
+                })
+            })
+            .collect()
+    }
+
+    fn discrete_mass(config: VlasovPoissonConfig, distribution: &[f64]) -> f64 {
+        distribution.iter().sum::<f64>() * config.dx() * config.dv()
+    }
+
+    #[test]
+    fn constant_velocity_impulse_matches_manufactured_periodic_characteristic() {
+        let config = test_config(16, 64);
+        let velocity_mode = 4usize;
+        let initial = periodic_velocity_mode_initial_state(config, velocity_mode);
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        let period = config.velocity_max - config.velocity_min;
+        let eta = TAU * velocity_mode as f64 / period;
+        let impulse = 0.23;
+        let impulses = vec![impulse; config.nx];
+
+        solver.apply_velocity_impulse(&impulses).unwrap();
+
+        let base = 1.0 / period;
+        let amplitude = 0.1 / period;
+        let mut maximum_error: f64 = 0.0;
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let shifted_velocity = config.velocity(iv) - config.velocity_min - impulse;
+                let expected = base + amplitude * (eta * shifted_velocity).cos();
+                let actual = solver.distribution()[ix * config.nv + iv];
+                maximum_error = maximum_error.max((actual - expected).abs());
+            }
+        }
+        assert!(
+            maximum_error < 2.0e-12,
+            "constant impulse max error {maximum_error:e}"
+        );
+    }
+
+    #[test]
+    fn spatially_varying_velocity_impulse_matches_characteristics_and_preserves_mass() {
+        let config = test_config(32, 64);
+        let velocity_mode = 3usize;
+        let initial = periodic_velocity_mode_initial_state(config, velocity_mode);
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        let before_mass = discrete_mass(config, solver.distribution());
+        let before_time = solver.time();
+        let period = config.velocity_max - config.velocity_min;
+        let eta = TAU * velocity_mode as f64 / period;
+        let impulses: Vec<f64> = (0..config.nx)
+            .map(|ix| 0.14 * (TAU * ix as f64 / config.nx as f64 + 0.3).cos())
+            .collect();
+
+        solver.apply_velocity_impulse(&impulses).unwrap();
+
+        let base = 1.0 / period;
+        let amplitude = 0.1 / period;
+        let mut maximum_error: f64 = 0.0;
+        for (ix, impulse) in impulses.iter().copied().enumerate() {
+            for iv in 0..config.nv {
+                let shifted_velocity = config.velocity(iv) - config.velocity_min - impulse;
+                let expected = base + amplitude * (eta * shifted_velocity).cos();
+                let actual = solver.distribution()[ix * config.nv + iv];
+                maximum_error = maximum_error.max((actual - expected).abs());
+            }
+        }
+
+        assert!(
+            maximum_error < 2.0e-12,
+            "instantaneous impulse max error {maximum_error:e}"
+        );
+        assert!((discrete_mass(config, solver.distribution()) - before_mass).abs() < 2.0e-13);
+        assert_eq!(solver.time(), before_time);
+    }
+
+    #[test]
+    fn zero_velocity_impulse_is_identity_to_roundoff_and_does_not_advance_time() {
+        let config = test_config(16, 32);
+        let initial = periodic_velocity_mode_initial_state(config, 2);
+        let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
+        let before_time = solver.time();
+        let zero_impulses = vec![0.0; config.nx];
+        solver.apply_velocity_impulse(&zero_impulses).unwrap();
+
+        let maximum_error = solver
+            .distribution()
+            .iter()
+            .zip(initial.iter())
+            .map(|(actual, expected)| (actual - expected).abs())
+            .fold(0.0_f64, f64::max);
+        assert!(maximum_error < 2.0e-13, "identity error {maximum_error:e}");
+        assert_eq!(solver.time(), before_time);
+    }
+
+    #[test]
+    fn invalid_velocity_impulses_fail_before_state_mutation() {
+        let config = test_config(16, 32);
+        let initial = periodic_velocity_mode_initial_state(config, 2);
+        let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
+        let before_field = solver.electric_field().to_vec();
+        let before_time = solver.time();
+
+        assert_eq!(
+            solver.apply_velocity_impulse(&[0.0; 3]),
+            Err(SolverError::VelocityImpulseLengthMismatch {
+                expected: config.nx,
+                actual: 3,
+            })
+        );
+        let mut non_finite = vec![0.0; config.nx];
+        non_finite[5] = f64::NAN;
+        assert_eq!(
+            solver.apply_velocity_impulse(&non_finite),
+            Err(SolverError::NonFiniteVelocityImpulse { index: 5 })
+        );
+        let mut overflowing_phase = vec![0.0; config.nx];
+        overflowing_phase[7] = f64::MAX;
+        assert_eq!(
+            solver.apply_velocity_impulse(&overflowing_phase),
+            Err(SolverError::NonFiniteVelocityImpulsePhase { index: 7 })
+        );
+
+        assert_eq!(solver.distribution(), initial.as_slice());
+        assert_eq!(solver.electric_field(), before_field.as_slice());
+        assert_eq!(solver.time(), before_time);
     }
 
     #[test]
