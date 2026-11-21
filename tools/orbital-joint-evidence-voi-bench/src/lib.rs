@@ -297,6 +297,13 @@ pub struct Receipt {
     pub scenarios: Vec<ScenarioAudit>,
 }
 
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
 fn valid_commit(value: &str) -> bool {
     value.len() == 40
         && value
