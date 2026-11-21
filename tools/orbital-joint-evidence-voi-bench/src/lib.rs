@@ -900,8 +900,7 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         selected_action_id.is_none()
             && matches!(
                 selection_disposition,
-                "ABSTAIN_NO_DECISION_VALUE"
-                    | "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE"
+                "ABSTAIN_NO_DECISION_VALUE" | "HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE"
             )
     } else {
         expected_action_eligible && expected_action_value.is_some_and(|value| value > EPSILON)
