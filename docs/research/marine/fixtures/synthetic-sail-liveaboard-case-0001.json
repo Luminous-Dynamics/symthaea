@@ -1,0 +1,317 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "SYNTHETIC-SAIL-LIVEABOARD-CASE-0001",
+  "record_status": "synthetic",
+  "comparison": {
+    "comparison_group_id": "SYNTHETIC-MISSION-GROUP-0001",
+    "candidate_id": "SYNTHETIC-INTEGRATED-ADVISORY-01",
+    "service_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "paired_baseline_ids": [
+      "SYNTHETIC-POLAR-VMG-01",
+      "SYNTHETIC-RESERVE-AWARE-01"
+    ],
+    "matching_deviations": []
+  },
+  "craft": {
+    "craft_identity": {
+      "id": "SYNTHETIC-LIVEABOARD-18M",
+      "revision": "0.0.1-synthetic",
+      "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "architecture": "catamaran",
+    "length_overall_m": 18,
+    "loading_condition_id": "SYNTHETIC-4-PERSON-LOAD",
+    "configuration_refs": [
+      {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-COMPOSITE-CONFIG",
+        "revision": "0.0.1",
+        "artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic fixture only; not a vessel design or configuration.",
+        "rights_status": "not_applicable"
+      }
+    ]
+  },
+  "mission": {
+    "mission_identity": {
+      "id": "SYNTHETIC-72H-COASTAL-PASSAGE",
+      "revision": "0.0.1"
+    },
+    "mission_profile_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "occupants": 4,
+    "target_duration_h": 72,
+    "arrival_window": {
+      "start": "2026-11-20T06:00:00Z",
+      "end": "2026-11-21T18:00:00Z",
+      "clock_id": "SYNTHETIC-UTC"
+    },
+    "route_or_waypoint_ref": {
+      "owner_repo": "external",
+      "artifact_id": "SYNTHETIC-ROUTE",
+      "revision": "0.0.1",
+      "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "disposition": "synthetic_only",
+      "evidence_class": "synthetic",
+      "claim_limit": "Synthetic waypoints, not navigational data."
+    },
+    "service_level_ref": {
+      "owner_repo": "external",
+      "artifact_id": "SYNTHETIC-SERVICE-LEVEL",
+      "revision": "0.0.1",
+      "artifact_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "disposition": "synthetic_only",
+      "evidence_class": "synthetic",
+      "claim_limit": "Synthetic service roster, not a habitability claim."
+    },
+    "reserve_policy_ref": {
+      "owner_repo": "external",
+      "artifact_id": "SYNTHETIC-RESERVE-POLICY",
+      "revision": "0.0.1",
+      "artifact_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "disposition": "synthetic_only",
+      "evidence_class": "synthetic",
+      "claim_limit": "Synthetic reserve policy; not an operating limit."
+    },
+    "comfort_requirement": "hard"
+  },
+  "environment": {
+    "decision_snapshots": [
+      {
+        "decision_time": "2026-11-19T08:00:00Z",
+        "forecast_ref": {
+          "owner_repo": "external",
+          "artifact_id": "SYNTHETIC-FORECAST-ISSUE-0001",
+          "revision": "0.0.1",
+          "artifact_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "disposition": "synthetic_only",
+          "evidence_class": "synthetic",
+          "claim_limit": "Synthetic forecast only."
+        },
+        "source_issue_time": "2026-11-19T06:00:00Z",
+        "available_at": "2026-11-19T06:05:00Z",
+        "valid_window": {
+          "start": "2026-11-19T08:00:00Z",
+          "end": "2026-11-22T08:00:00Z",
+          "clock_id": "SYNTHETIC-UTC"
+        }
+      }
+    ],
+    "realized_environment_ref": {
+      "owner_repo": "external",
+      "artifact_id": "SYNTHETIC-REALIZED-WEATHER",
+      "revision": "0.0.1",
+      "artifact_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "disposition": "synthetic_only",
+      "evidence_class": "synthetic",
+      "claim_limit": "Evaluator-only synthetic truth; never available to a decision policy.",
+      "rights_status": "not_applicable"
+    }
+  },
+  "policy_arm": {
+    "policy_id": "SYNTHETIC-S5-INTEGRATED",
+    "family": "integrated_advisory",
+    "information_policy": "as_of_decision_time",
+    "compute_budget_ms": 1000,
+    "policy_revision": "0.0.1",
+    "comfort_fallback_status": "none"
+  },
+  "owner_receipts": [
+    {
+      "role": "sailing_route_candidate",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-ROUTE-CANDIDATE",
+        "revision": "0.0.1",
+        "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "tack_gybe_transition",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-MANOEUVRE-ENVELOPE",
+        "revision": "0.0.1",
+        "artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "sail_capability_graph",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-SAIL-CAPABILITY-GRAPH",
+        "revision": "0.0.1",
+        "artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "operational_design_domain",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-ODD",
+        "revision": "0.0.1",
+        "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "mission_energy_budget",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-ENERGY-BUDGET",
+        "revision": "0.0.1",
+        "artifact_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "resource_service_schedule",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-RESOURCE-SCHEDULE",
+        "revision": "0.0.1",
+        "artifact_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "resource_autonomy_vector",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-AUTONOMY-VECTOR",
+        "revision": "0.0.1",
+        "artifact_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "service_continuity",
+      "reference": {
+        "owner_repo": "external",
+        "artifact_id": "SYNTHETIC-SERVICE-CONTINUITY",
+        "revision": "0.0.1",
+        "artifact_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic owner receipt placeholder; no physical result."
+      }
+    },
+    {
+      "role": "spatial_metocean_context",
+      "reference": {
+        "owner_repo": "Luminous-Dynamics/sol-atlas-leptos",
+        "artifact_id": "SYNTHETIC-SOLATLAS-METOCEAN-CONTEXT",
+        "revision": "0.0.1",
+        "artifact_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic spatial context placeholder; not a forecast, chart or navigation source."
+      }
+    },
+    {
+      "role": "component_product_lifecycle",
+      "reference": {
+        "owner_repo": "Luminous-Dynamics/mycelix",
+        "artifact_id": "SYNTHETIC-MYCELIX-COMPONENT-LIFECYCLE",
+        "revision": "0.0.1",
+        "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic product-lifecycle placeholder; not an as-built or inspected vessel."
+      }
+    },
+    {
+      "role": "maritime_cross_stack_golden_trace",
+      "reference": {
+        "owner_repo": "Luminous-Dynamics/mycelix",
+        "artifact_id": "SYNTHETIC-MARITIME-CROSS-STACK-TRACE",
+        "revision": "0.0.1",
+        "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "disposition": "synthetic_only",
+        "evidence_class": "synthetic",
+        "claim_limit": "Synthetic four-owner integration placeholder; not independently verified evidence."
+      }
+    }
+  ],
+  "required_resource_dimensions": [
+    "propulsion_energy",
+    "hotel_auxiliary_energy",
+    "fuel_inventory",
+    "battery_usable_energy",
+    "potable_water",
+    "food_nutrient_groups",
+    "grey_black_water_capacity",
+    "consumables",
+    "critical_spares",
+    "emergency_reserve"
+  ],
+  "hard_gate_ids": [
+    "SYNTHETIC-ODD-GATE",
+    "SYNTHETIC-SERVICE-FLOOR-GATE",
+    "SYNTHETIC-ENERGY-RESERVE-GATE"
+  ],
+  "evaluator_boundary": {
+    "decision_inputs_as_of_cutoff_only": true,
+    "realized_environment_evaluator_only": true,
+    "missing_values_are_unknown": true,
+    "no_actuation": true,
+    "no_authority_grant": true,
+    "perfect_foresight_is_non_deployable": true
+  },
+  "claim_ceiling": "cross_owner_composition_only",
+  "hard_gate_evaluations": [
+    {
+      "gate_id": "SYNTHETIC-ODD-GATE",
+      "status": "unknown",
+      "owner_receipt_roles": [
+        "operational_design_domain"
+      ],
+      "evidence_ids": [
+        "SYNTHETIC-ODD-RECEIPT"
+      ],
+      "rationale": "Synthetic fixture contains no operational-domain qualification."
+    },
+    {
+      "gate_id": "SYNTHETIC-SERVICE-FLOOR-GATE",
+      "status": "unknown",
+      "owner_receipt_roles": [
+        "service_continuity",
+        "resource_service_schedule"
+      ],
+      "evidence_ids": [
+        "SYNTHETIC-SERVICE-RECEIPT"
+      ],
+      "rationale": "Synthetic fixture contains no measured service-continuity evidence."
+    },
+    {
+      "gate_id": "SYNTHETIC-ENERGY-RESERVE-GATE",
+      "status": "unknown",
+      "owner_receipt_roles": [
+        "mission_energy_budget",
+        "resource_autonomy_vector"
+      ],
+      "evidence_ids": [
+        "SYNTHETIC-ENERGY-RECEIPT"
+      ],
+      "rationale": "Synthetic fixture contains no measured mission energy or resource reserve evidence."
+    }
+  ]
+}

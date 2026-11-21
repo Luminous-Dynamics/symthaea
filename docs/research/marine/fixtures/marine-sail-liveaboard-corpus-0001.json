@@ -1,0 +1,205 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "MARINE-SAIL-LIVEABOARD-PAIRED-ADVERSARIAL-CORPUS-001",
+  "status": "declarative_synthetic_only",
+  "frozen_at": "2026-11-19",
+  "source_fixture": "docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json",
+  "claim_ceiling": "test-vector-contract_only",
+  "execution_note": "These are declarative mutation vectors and expected outcomes. The corpus validator checks their shape and coverage; it does not yet execute each vector against the audit CLI. Existing Rust unit tests execute the individual semantic falsifiers.",
+  "policy_arms": [
+    {"arm_id":"S0","family":"fixed_conservative","deployable":true,"information_policy":"as_of_decision_time","budget_profile_id":"P0-ADVISORY-500MS"},
+    {"arm_id":"S1","family":"polar_vmg","deployable":true,"information_policy":"as_of_decision_time","budget_profile_id":"P0-ADVISORY-500MS"},
+    {"arm_id":"S2","family":"transition_aware_vmg","deployable":true,"information_policy":"as_of_decision_time","budget_profile_id":"P0-ADVISORY-500MS"},
+    {"arm_id":"S3","family":"weather_routing","deployable":true,"information_policy":"as_of_decision_time","budget_profile_id":"P0-ADVISORY-500MS"},
+    {"arm_id":"S4","family":"reserve_aware_weather_routing","deployable":true,"information_policy":"as_of_decision_time","budget_profile_id":"P0-ADVISORY-500MS"},
+    {"arm_id":"S5","family":"integrated_advisory","deployable":true,"information_policy":"as_of_decision_time","budget_profile_id":"P0-ADVISORY-500MS"},
+    {"arm_id":"S6","family":"perfect_foresight_oracle","deployable":false,"information_policy":"realized_environment_evaluator_only","budget_profile_id":"P0-ADVISORY-500MS"}
+  ],
+  "required_threat_classes": [
+    "forecast_temporal_leakage",
+    "realized_truth_leakage",
+    "hard_gate_failure",
+    "hard_gate_omission",
+    "resource_dimension_omission",
+    "resource_dimension_duplication",
+    "comfort_constraint_bypass",
+    "comfort_fallback_without_provenance",
+    "identity_corruption",
+    "matched_occupancy_mismatch",
+    "matched_configuration_mismatch",
+    "perfect_foresight_comparison",
+    "matched_service_mismatch"
+  ],
+  "scenario_cases": [
+    {
+      "scenario_id":"MSL-CORPUS-000",
+      "threat_class":"baseline_synthetic_fixture",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[],
+      "expected_disposition":"SYNTHETIC_ONLY",
+      "expected_finding_codes":["SYNTHETIC_GATE_UNRESOLVED"],
+      "purpose":"Prove the pristine reference remains synthetic and cannot be promoted to operational evidence."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-001",
+      "threat_class":"forecast_temporal_leakage",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"set","path":"/environment/decision_snapshots/0/available_at","value":"2026-11-19T08:05:00Z"}],
+      "expected_disposition":"BLOCKED",
+      "expected_finding_codes":["FUTURE_INFORMATION_LEAKAGE"],
+      "purpose":"A forecast arriving after its decision cutoff must not be admitted."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-002",
+      "threat_class":"forecast_issue_availability_order",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"set","path":"/environment/decision_snapshots/0/source_issue_time","value":"2026-11-19T06:10:00Z"}],
+      "expected_disposition":"INVALID",
+      "expected_finding_codes":["FORECAST_AVAILABLE_BEFORE_ISSUE"],
+      "purpose":"Reject impossible issue/availability chronology."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-003",
+      "threat_class":"realized_truth_leakage",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"copy","path":"/environment/decision_snapshots/0/forecast_ref/artifact_sha256","from_path":"/environment/realized_environment_ref/artifact_sha256"}],
+      "expected_disposition":"BLOCKED",
+      "expected_finding_codes":["REALIZED_ENVIRONMENT_LEAKAGE"],
+      "purpose":"Prevent realized weather truth from entering a deployable policy's information set."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-004",
+      "threat_class":"hard_gate_failure",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"set","path":"/hard_gate_evaluations/0/status","value":"fail"}],
+      "expected_disposition":"BLOCKED",
+      "expected_finding_codes":["HARD_GATE_FAILED"],
+      "purpose":"A route or energy gain cannot compensate for a failed safety or essential-service gate."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-005",
+      "threat_class":"hard_gate_omission",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"remove","path":"/hard_gate_evaluations/2"}],
+      "expected_disposition":"BLOCKED",
+      "expected_finding_codes":["HARD_GATE_EVALUATION_MISSING"],
+      "purpose":"An absent gate evaluation is unresolved, never an implicit pass."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-006",
+      "threat_class":"resource_dimension_omission",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"remove","path":"/required_resource_dimensions/4"}],
+      "expected_disposition":"INCOMPLETE",
+      "expected_finding_codes":["RESOURCE_DIMENSION_OMITTED"],
+      "purpose":"Potable-water autonomy cannot disappear from a liveaboard comparison."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-007",
+      "threat_class":"resource_dimension_duplication",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"append","path":"/required_resource_dimensions","value":"potable_water"}],
+      "expected_disposition":"INVALID",
+      "expected_finding_codes":["DUPLICATE_RESOURCE_DIMENSION"],
+      "purpose":"Reject a malformed autonomy vector with duplicated dimensions."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-008",
+      "threat_class":"comfort_constraint_bypass",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"set","path":"/policy_arm/comfort_fallback_status","value":"automatically_relaxed"},{"operation":"set","path":"/policy_arm/comfort_fallback_evidence_id","value":"SYNTHETIC-COMFORT-RELAXATION-RECEIPT"}],
+      "expected_disposition":"BLOCKED",
+      "expected_finding_codes":["HARD_COMFORT_CONSTRAINT_NOT_MET"],
+      "purpose":"A router's automatic comfort fallback cannot satisfy a hard comfort requirement."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-009",
+      "threat_class":"comfort_fallback_without_provenance",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"set","path":"/policy_arm/comfort_fallback_status","value":"automatically_relaxed"}],
+      "expected_disposition":"INVALID",
+      "expected_finding_codes":["MISSING_COMFORT_FALLBACK_EVIDENCE"],
+      "purpose":"Fallback and no-route outcomes require a source receipt."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-010",
+      "threat_class":"identity_corruption",
+      "command":"audit_case",
+      "mutation_target":"case",
+      "mutations":[{"operation":"set","path":"/craft/craft_identity/configuration_sha256","value":"not-a-digest"}],
+      "expected_disposition":"INVALID",
+      "expected_finding_codes":["INVALID_DIGEST"],
+      "purpose":"Reject malformed configuration identity rather than inferring a match."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-011",
+      "threat_class":"matched_baseline_candidate",
+      "command":"compare_pair",
+      "mutation_target":"candidate",
+      "mutations":[{"operation":"set","path":"/case_id","value":"SYNTHETIC-BASELINE-CASE-0002"},{"operation":"set","path":"/comparison/candidate_id","value":"SYNTHETIC-POLAR-VMG-01"},{"operation":"set","path":"/policy_arm/policy_id","value":"SYNTHETIC-S1-POLAR"},{"operation":"set","path":"/policy_arm/family","value":"polar_vmg"}],
+      "expected_disposition":"MATCHED_SYNTHETIC_CASES_ONLY",
+      "expected_mismatched_fields":[],
+      "purpose":"The matching oracle must permit a truly matched synthetic pair while retaining a synthetic-only claim ceiling."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-012",
+      "threat_class":"matched_occupancy_mismatch",
+      "command":"compare_pair",
+      "mutation_target":"candidate",
+      "mutations":[{"operation":"set","path":"/mission/occupants","value":3}],
+      "expected_disposition":"INCOMPARABLE",
+      "expected_mismatched_fields":["mission.occupants"],
+      "purpose":"Different occupancy changes the service demand and invalidates a paired result."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-013",
+      "threat_class":"matched_configuration_mismatch",
+      "command":"compare_pair",
+      "mutation_target":"candidate",
+      "mutations":[{"operation":"set","path":"/craft/craft_identity/configuration_sha256","value":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}],
+      "expected_disposition":"INCOMPARABLE",
+      "expected_mismatched_fields":["craft.craft_identity.configuration_sha256"],
+      "purpose":"Changed craft configuration is not an apples-to-apples policy comparison."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-014",
+      "threat_class":"perfect_foresight_comparison",
+      "command":"compare_pair",
+      "mutation_target":"candidate",
+      "mutations":[{"operation":"set","path":"/policy_arm/family","value":"perfect_foresight_oracle"},{"operation":"set","path":"/policy_arm/information_policy","value":"realized_environment_evaluator_only"}],
+      "expected_disposition":"INCOMPARABLE",
+      "expected_mismatched_fields":["policy_arm.information_policy"],
+      "purpose":"A perfect-foresight upper bound must not be reported as a deployable competitor."
+    },
+    {
+      "scenario_id":"MSL-CORPUS-015",
+      "threat_class":"matched_service_mismatch",
+      "command":"compare_pair",
+      "mutation_target":"candidate",
+      "mutations":[{"operation":"set","path":"/comparison/service_fingerprint_sha256","value":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}],
+      "expected_disposition":"INCOMPARABLE",
+      "expected_mismatched_fields":["comparison.service_fingerprint_sha256"],
+      "purpose":"A policy cannot claim an energy win by quietly reducing delivered services."
+    }
+  ],
+  "metric_contract": {
+    "hard_constraints": ["zero_false_feasible","zero_accepted_hard_gate_failures","zero_future_information_leakage","zero_unauthorized_commands","zero_unreported_service_floor_breaches"],
+    "report_separately": ["propulsion_electric_kwh","fuel_mass_kg","fuel_lhv_kwh","hotel_auxiliary_kwh","shore_energy_kwh","generator_runtime_h","battery_throughput_kwh","renewable_energy_used_kwh","renewable_energy_curtailed_kwh","potable_water_l","food_nutrient_coverage_by_group","grey_black_water_margin_l","critical_spares_margin","crew_workload_hours","comfort_constraint_status","arrival_window_error_h","plan_churn_count","runtime_p50_p95_p99_ms"],
+    "primary_efficiency_metric": "purchased_energy_kwh_equivalent_per_delivered_occupied_berth_day",
+    "robustness_metric": "conditional_value_at_risk_95_percent_of_mission_regret",
+    "target_improvement_fraction": 0.10,
+    "minimum_environment_strata": 3,
+    "statistical_protocol": "Pre-register the route, occupancy, service and hardware configuration; stratify by wind/sea-state, solar/load and forecast-error regimes; use paired trajectories and block bootstrap by voyage or independent weather episode; set sample size by a prospective power analysis; hold out entire voyages/episodes and never split adjacent time samples across train/test.",
+    "claim_rule": "No aggregate efficiency improvement is reportable unless every hard constraint is satisfied and the complete resource/service vector is published. If the conservative paired interval crosses zero, dominance is unresolved."
+  }
+}

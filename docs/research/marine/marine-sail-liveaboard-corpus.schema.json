@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:luminous-dynamics:marine-sail-liveaboard-corpus:0.1.0",
+  "title":"Marine Sail-Liveaboard Declarative Adversarial Corpus",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","corpus_id","status","frozen_at","source_fixture","claim_ceiling","execution_note","policy_arms","required_threat_classes","scenario_cases","metric_contract"],
+  "properties":{
+    "schema_version":{"const":"0.1.0"},
+    "corpus_id":{"type":"string","minLength":1},
+    "status":{"const":"declarative_synthetic_only"},
+    "frozen_at":{"type":"string","format":"date"},
+    "source_fixture":{"type":"string","minLength":1},
+    "claim_ceiling":{"const":"test-vector-contract_only"},
+    "execution_note":{"type":"string","minLength":1},
+    "policy_arms":{"type":"array","minItems":7,"items":{"type":"object","additionalProperties":false,"required":["arm_id","family","deployable","information_policy","budget_profile_id"],"properties":{"arm_id":{"type":"string"},"family":{"type":"string"},"deployable":{"type":"boolean"},"information_policy":{"enum":["as_of_decision_time","realized_environment_evaluator_only"]},"budget_profile_id":{"type":"string"}}}},
+    "required_threat_classes":{"type":"array","minItems":10,"uniqueItems":true,"items":{"type":"string"}},
+    "scenario_cases":{"type":"array","minItems":13,"items":{"type":"object","additionalProperties":false,"required":["scenario_id","threat_class","command","mutation_target","mutations","expected_disposition","purpose"],"properties":{"scenario_id":{"type":"string"},"threat_class":{"type":"string"},"command":{"enum":["audit_case","compare_pair"]},"mutation_target":{"enum":["case","candidate"]},"mutations":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["operation","path"],"properties":{"operation":{"enum":["set","remove","append","copy"]},"path":{"type":"string","pattern":"^/"},"value":{},"from_path":{"type":"string","pattern":"^/"}}}},"expected_disposition":{"type":"string"},"expected_finding_codes":{"type":"array","items":{"type":"string"}},"expected_mismatched_fields":{"type":"array","items":{"type":"string"}},"purpose":{"type":"string","minLength":1}}}},
+    "metric_contract":{"type":"object","required":["hard_constraints","report_separately","primary_efficiency_metric","robustness_metric","target_improvement_fraction","minimum_environment_strata","statistical_protocol","claim_rule"],"properties":{"hard_constraints":{"type":"array","items":{"type":"string"}},"report_separately":{"type":"array","items":{"type":"string"}},"primary_efficiency_metric":{"type":"string"},"robustness_metric":{"type":"string"},"target_improvement_fraction":{"type":"number","exclusiveMinimum":0,"maximum":1},"minimum_environment_strata":{"type":"integer","minimum":3},"statistical_protocol":{"type":"string"},"claim_rule":{"type":"string"}}}
+  }
+}

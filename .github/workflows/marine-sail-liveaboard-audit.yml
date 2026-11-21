@@ -1,0 +1,63 @@
+name: Marine Sail-Liveaboard P0 Audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/marine/**"
+      - "tools/marine-sail-liveaboard-audit/**"
+      - ".github/workflows/marine-sail-liveaboard-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marine-sail-liveaboard-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  p0-audit:
+    name: P0 manifest and matched-case audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- --check
+
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run independent semantic tests
+        run: cargo test --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml
+
+      - name: Check schema and synthetic fixture structure
+        run: |
+          jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema" and (.required | index("hard_gate_evaluations") != null) and (.properties.mission.required | index("comfort_requirement") != null) and (."$defs".policy.required | index("comfort_fallback_status") != null)' docs/research/marine/marine-sail-liveaboard-case.schema.json
+          jq -e '(.hard_gate_ids | sort) == ([.hard_gate_evaluations[].gate_id] | sort) and (.required_resource_dimensions | length == 10) and (.required_resource_dimensions | unique | length == 10) and (.record_status == "synthetic") and (.mission.comfort_requirement == "hard") and (.policy_arm.comfort_fallback_status == "none")' docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json
+
+      - name: Validate frozen paired-mission adversarial corpus
+        run: |
+          cargo run --quiet --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml --bin validate_corpus -- docs/research/marine/fixtures/marine-sail-liveaboard-corpus-0001.json > /tmp/marine-corpus.json
+          jq -e '.status == "CORPUS_EXECUTED" and .scenario_count == 16 and .executed_scenario_count == 16 and .policy_arm_count == 7 and .required_threat_classes_covered == 13 and ([.scenario_results[].passed] | all)' /tmp/marine-corpus.json
+
+      - name: Check forecast replay source-class boundary
+        run: |
+          jq -e '."$schema" == "https://json-schema.org/draft/2020-12/schema" and (.properties.source_records.minItems == 6) and (.properties.information_classes.required | length == 4)' docs/research/marine/sources/marine-forecast-replay-source-register.schema.json
+          jq -e '.register_id == "MARINE-FORECAST-REPLAY-SOURCE-REGISTER-001" and .status == "candidate_sources_not_yet_retrieved_or_qualified" and (.source_records | length == 6) and ([.source_records[].source_id] | unique | length == 6) and ([.source_records[] | select(.information_class == "deployable_forecast")] | length == 2) and ([.source_records[] | select(.information_class == "realized_evaluator_context")] | length == 2) and ([.source_records[] | select(.information_class == "in_situ_validation")] | length == 1) and ([.source_records[] | select(.information_class == "commercial_route_reference")] | length == 1) and ([.source_records[] | select(.information_class == "deployable_forecast") | (.required_capture | index("availability_evidence") != null and index("availability_evidence_ref") != null and index("availability_evidence_sha256") != null)] | all)' docs/research/marine/sources/marine-forecast-replay-source-register-0001.json
+
+      - name: Audit synthetic fixture (must remain non-operational)
+        run: |
+          cargo run --quiet --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- audit-case docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json > /tmp/marine-audit.json
+          jq -e '.disposition == "SYNTHETIC_ONLY"' /tmp/marine-audit.json
+
+      - name: Check synthetic matched-case oracle
+        run: |
+          cargo run --quiet --manifest-path tools/marine-sail-liveaboard-audit/Cargo.toml -- compare-pair docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json docs/research/marine/fixtures/synthetic-sail-liveaboard-case-0001.json > /tmp/marine-pair.json
+          jq -e '.disposition == "MATCHED_SYNTHETIC_CASES_ONLY"' /tmp/marine-pair.json

@@ -1,0 +1,228 @@
+{
+  "register_version": "0.1.0",
+  "register_id": "MARINE-FORECAST-REPLAY-SOURCE-REGISTER-001",
+  "status": "candidate_sources_not_yet_retrieved_or_qualified",
+  "frozen_on": "2026-11-19",
+  "claim_ceiling": "source_inventory_only",
+  "information_classes": {
+    "deployable_forecast": "A source cycle with a preserved issue time and a defensible first-available/publication time; only usable after both are no later than the decision cutoff.",
+    "realized_evaluator_context": "Retrospective reanalysis or post-event reconstruction; never an input to a deployable policy.",
+    "in_situ_validation": "Instrument observations with station, sensor, timestamp, quality flags and uncertainty; spatially sparse and not a continuous route-wide field.",
+    "commercial_route_reference": "A route result from a licensed commercial system; route geometry alone does not reproduce the forecast, polar, settings or computation."
+  },
+  "source_records": [
+    {
+      "source_id": "NOAA-GFS-025-UCAR-ARCHIVE",
+      "provider": "NOAA/NCEP via NSF NCAR GDEX",
+      "information_class": "deployable_forecast",
+      "dataset_name": "NCEP GFS 0.25 Degree Global Forecast Grids Historical Archive",
+      "dataset_id": "d084001",
+      "doi": "10.5065/D65D8PWK",
+      "url": "https://gdex.ucar.edu/datasets/d084001/",
+      "mirror_url": "https://noaa-gfs-bdp-pds.s3.amazonaws.com/index.html",
+      "temporal_coverage": "2015-01-15 onward; exact object availability and retained periods must be checked per cycle",
+      "grid": "0.25 degree global lat/lon",
+      "cadence": "Forecast cycles at 00, 06, 12 and 18 UTC; 3-hourly leads through +240 h, then 12-hourly through +384 h",
+      "role": "Primary candidate historical forecast archive for forecast-blind replay",
+      "required_capture": [
+        "model_name",
+        "model_version_or_cycle_metadata",
+        "cycle_issue_time",
+        "forecast_lead_hours",
+        "valid_time",
+        "object_first_seen_at",
+        "retrieval_time",
+        "object_uri",
+        "object_sha256",
+        "parameter_set",
+        "grid_definition",
+        "units",
+        "regridding_method",
+        "availability_evidence",
+        "availability_evidence_ref",
+        "availability_evidence_sha256"
+      ],
+      "admissibility": "A cycle can enter a deployable decision snapshot only where issue time, object first-seen/publication time and data validity are independently recorded and the object was available by the decision cutoff. Do not substitute ERA5 or later analyses for missing forecast cycles. First-availability claims require an immutable evidence-artifact reference and digest, not only a typed evidence class.",
+      "known_limits": [
+        "GFS model configuration evolves; preserve cycle and parameter metadata",
+        "The GDEX page states the archive copy is moving to an AWS mirror and RDA updates stop in early 2026",
+        "The catalogue's 0.25-degree forecast grid is not equivalent to higher-resolution coastal forecasts",
+        "Do not interpret archive ingest time as original operational availability without source evidence"
+      ],
+      "rights_review": "Record NOAA/UCAR attribution and dataset access terms from the current metadata before redistribution; do not re-host raw data without reviewing terms"
+    },
+    {
+      "source_id": "NOAA-GFS-NODD-RECENT",
+      "provider": "NOAA Open Data Dissemination",
+      "information_class": "deployable_forecast",
+      "dataset_name": "Recent high-resolution GFS analysis and forecast",
+      "url": "https://www.ncei.noaa.gov/products/weather-climate-models/global-forecast",
+      "temporal_coverage": "Trailing 30-day window",
+      "grid": "0.25 and 0.5 degree",
+      "cadence": "00, 06, 12 and 18 UTC cycles; forecast fields at 3-hourly steps through +384 h",
+      "role": "Recent-cycle operational cross-check and current capture source",
+      "required_capture": [
+        "model_name",
+        "cycle_issue_time",
+        "forecast_lead_hours",
+        "valid_time",
+        "object_first_seen_at",
+        "retrieval_time",
+        "object_uri",
+        "object_sha256",
+        "parameter_set",
+        "grid_definition",
+        "units",
+        "availability_evidence",
+        "availability_evidence_ref",
+        "availability_evidence_sha256"
+      ],
+      "admissibility": "Use only as-of captured forecast objects with first-seen timestamps; the trailing window is not a substitute for a long historical forecast archive. First-availability claims require an immutable evidence-artifact reference and digest, not only a typed evidence class.",
+      "known_limits": [
+        "Only trailing 30 days at this high resolution according to NCEI",
+        "NCEI currently warns cloud migration may delay archival and update cycles"
+      ],
+      "rights_review": "Review current NOAA/NODD metadata and attribution terms"
+    },
+    {
+      "source_id": "ERA5-SINGLE-LEVELS",
+      "provider": "ECMWF Copernicus Climate Change Service",
+      "information_class": "realized_evaluator_context",
+      "dataset_name": "ERA5 hourly data on single levels",
+      "url": "https://cds.climate.copernicus.eu/stac-browser/collections/reanalysis-era5-single-levels",
+      "temporal_coverage": "1940 to present (rolling)",
+      "cadence": "Hourly",
+      "license": "CC-BY-4.0",
+      "role": "Retrospective atmosphere and surface-field evaluator context; not a forecast",
+      "required_capture": [
+        "dataset_revision",
+        "valid_time",
+        "retrieval_time",
+        "object_uri",
+        "object_sha256",
+        "grid_definition",
+        "variable_names",
+        "units",
+        "quality_or_uncertainty_fields"
+      ],
+      "admissibility": "Evaluator-only. ERA5 is a reanalysis that assimilates observations and is not constrained to have been available at a historical decision time; it is not direct in-situ truth.",
+      "known_limits": [
+        "Reanalysis uses later observations and retrospective processing",
+        "Spatial and temporal resolution differ from operational forecast products",
+        "Do not leak reanalysis values into deployable policy inputs"
+      ],
+      "rights_review": "Preserve CC-BY-4.0 attribution and citation"
+    },
+    {
+      "source_id": "COPERNICUS-GLOBAL-WAVES-REANALYSIS",
+      "provider": "Copernicus Marine Service",
+      "information_class": "realized_evaluator_context",
+      "dataset_name": "Global Ocean Waves Reanalysis",
+      "dataset_id": "cmems_mod_glo_wav_my_0.2deg_PT3H-i",
+      "doi": "10.48670/moi-00022",
+      "url": "https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_WAV_001_032/services",
+      "temporal_coverage": "1980-01-01 through 2026-08-31 in the current catalogue snapshot",
+      "grid": "0.2 degree global ocean grid",
+      "cadence": "3-hourly",
+      "role": "Retrospective wave-state evaluator context and cross-check",
+      "required_capture": [
+        "product_version",
+        "valid_time",
+        "retrieval_time",
+        "object_uri",
+        "object_sha256",
+        "grid_definition",
+        "variable_names",
+        "units",
+        "quality_information_document_revision"
+      ],
+      "admissibility": "Evaluator-only reanalysis. Never treat it as the wave forecast that a historical routing policy saw.",
+      "known_limits": [
+        "Retrospective reanalysis is not the forecast stream",
+        "Product versions can change; preserve product version and quality-document revision"
+      ],
+      "rights_review": "Copernicus Marine describes its data as free/open; retain product-specific license and required attribution"
+    },
+    {
+      "source_id": "NOAA-NDBC-HISTORICAL-OBSERVATIONS",
+      "provider": "NOAA National Data Buoy Center",
+      "information_class": "in_situ_validation",
+      "dataset_name": "Station-specific historical buoy and C-MAN observations",
+      "url": "https://www.ndbc.noaa.gov/faq/archive.shtml",
+      "temporal_coverage": "Station-specific period of record",
+      "cadence": "Sensor/product-specific; retain native sampling and aggregation",
+      "role": "Independent point-observation checks for wind, waves and meteorology",
+      "required_capture": [
+        "station_id",
+        "station_metadata_revision",
+        "sensor_type",
+        "sensor_height_or_depth",
+        "observation_time",
+        "received_at_if_available",
+        "quality_flags",
+        "units",
+        "raw_value",
+        "calibration_or_sensor_status",
+        "object_uri",
+        "object_sha256"
+      ],
+      "admissibility": "Use only with station metadata, sensor/quality flags and spatial representativeness limits. A buoy observation is not a continuous field across an offshore route.",
+      "known_limits": [
+        "Sparse point coverage",
+        "Station record periods and observed variables differ",
+        "Historical archive documentation identifies station-specific annual/monthly files"
+      ],
+      "rights_review": "Retain NOAA source attribution and relevant data metadata"
+    },
+    {
+      "source_id": "PREDICTWIND-EXPORTED-ROUTE",
+      "provider": "PredictWind",
+      "information_class": "commercial_route_reference",
+      "dataset_name": "Exported weather-router route",
+      "url": "https://help.predictwind.com/en/articles/2884527-how-to-export-and-import-weather-routes-in-predictwind",
+      "role": "Licensed commercial route-output baseline where export and reproducibility conditions are met",
+      "export_formats": [
+        "GPX",
+        "KML",
+        "CSV"
+      ],
+      "required_capture": [
+        "subscription_or_permission_receipt",
+        "route_export_sha256",
+        "export_format",
+        "vessel_polar_revision",
+        "forecast_model_and_cycle_if_disclosed",
+        "route_constraints",
+        "comfort_settings_and_fallback_status",
+        "calculation_time",
+        "route_output_time",
+        "operator_waypoints"
+      ],
+      "admissibility": "A route export alone is a route geometry reference, not a full reproducible benchmark arm. Mark the comparison incomplete when the exact forecast snapshot, vessel polar and settings are not available under license.",
+      "known_limits": [
+        "Commercial rights and access are required",
+        "The provider's help says route accuracy depends on forecast and boat polars and that routes require skipper safety review",
+        "Do not infer missing forecast or polar inputs from the route geometry",
+        "PredictWind states its DataHub AI Polars are proprietary and cannot be downloaded/exported for use in other systems; do not infer them from GPX/KML/CSV route geometry."
+      ],
+      "rights_review": "No redistribution or public hosting without applicable license/permission"
+    }
+  ],
+  "frozen_replay_rules": [
+    "Never substitute retrospective reanalysis for a missing historical forecast cycle.",
+    "Every decision snapshot requires source issue time, source first-available time, valid time, retrieval time, immutable object digest and exact parameter/grid metadata.",
+    "A deployable policy may consume a forecast only after it was demonstrably available and no later than the decision cutoff.",
+    "Reanalysis and post-event observations remain evaluator-only; evaluator truth must never be supplied back to a deployable policy.",
+    "Point buoy observations validate local cells/time windows but do not authorize global spatial interpolation.",
+    "No commercial route result is a reproducible baseline unless forecast, polar, route constraints, comfort/fallback settings and output are licensed and sufficiently captured.",
+    "No data is downloaded, redistributed or called rights-cleared by this register; this is an inventory and qualification plan."
+  ],
+  "next_deliverables": [
+    "Rights and terms review for each chosen dataset/version",
+    "Frozen source manifest with immutable object digests and metadata",
+    "Forecast availability/issue-time replay receipt",
+    "Independent realized-environment evaluator dataset",
+    "Station-to-grid observation cross-checks and uncertainty report",
+    "Held-out voyage/weather-episode split manifest"
+  ]
+}
