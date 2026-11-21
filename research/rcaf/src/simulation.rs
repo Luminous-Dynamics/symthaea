@@ -442,8 +442,7 @@ fn sample_correlation_matrix(
             .zip(sums.iter_mut())
         {
             let residual = (1.0 - global * global - module * module).sqrt();
-            let value =
-                global * global_factor + module * module_factor + residual * rng.normal();
+            let value = global * global_factor + module * module_factor + residual * rng.normal();
             observation.push(value);
             *sum += value;
         }
@@ -457,8 +456,7 @@ fn sample_correlation_matrix(
     let sample_count = samples as f64;
     let mut variances = vec![0.0; regions];
     for (region, (variance, &sum)) in variances.iter_mut().zip(sums.iter()).enumerate() {
-        let centered =
-            cross_products[region * regions + region] - sum * sum / sample_count;
+        let centered = cross_products[region * regions + region] - sum * sum / sample_count;
         *variance = centered / (sample_count - 1.0);
     }
 
