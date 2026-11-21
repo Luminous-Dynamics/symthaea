@@ -47,7 +47,10 @@ class BinaryMetricsReferenceTests(unittest.TestCase):
 
     def test_equal_score_and_equal_confidence_ties_are_grouped(self) -> None:
         result = scorer.score_subject(self.subject)
-        self.assertAlmostEqual(result["ranking_metrics"]["average_precision"], 0.830357142857)
+        # Equal probability scores are admitted together in AP; equal confidence
+        # scores are admitted together in the risk-coverage curve.
+        ap_points = result["ranking_metrics"]["average_precision"]
+        self.assertAlmostEqual(ap_points, 0.830357142857)
         curve = result["risk_coverage"]
         self.assertEqual([point["accepted"] for point in curve], [2, 5, 7, 8])
         self.assertEqual([point["errors"] for point in curve], [0, 1, 2, 3])
