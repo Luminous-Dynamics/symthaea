@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Luminous-Dynamics/mycelix
-          ref: b0da71ac505890d7c2f9f13c6ff870ef6853faff
+          ref: dc28de1165eeb04b27d23011b6f9681fa740d66d
           path: mycelix
 
       - name: Install Rust
