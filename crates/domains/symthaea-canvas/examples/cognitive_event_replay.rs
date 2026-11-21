@@ -96,10 +96,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let event_log_digest = reducer.event_log_digest_hex()?;
     let replay_verifier =
         CognitiveTopologyReducer::replay(black_box(base.clone()), black_box(&events))?;
-    let replay_trace_agreement =
-        replay_verifier.event_log_digest_hex()? == event_log_digest;
-    let replay_projection_agreement =
-        replay_verifier.snapshot_digest_hex()? == semantic_digest;
+    let replay_trace_agreement = replay_verifier.event_log_digest_hex()? == event_log_digest;
+    let replay_projection_agreement = replay_verifier.snapshot_digest_hex()? == semantic_digest;
     if !replay_trace_agreement || !replay_projection_agreement {
         return Err("independent projection replay diverged".into());
     }
@@ -178,11 +176,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("replay_assertion.byte_identity: not_assessed");
     println!(
         "replay_assertion.trace_identity: {}",
-        if replay_trace_agreement { "established_for_accepted_log" } else { "failed" }
+        if replay_trace_agreement {
+            "established_for_accepted_log"
+        } else {
+            "failed"
+        }
     );
     println!(
         "replay_assertion.projection: {}",
-        if replay_projection_agreement { "established_in_process" } else { "failed" }
+        if replay_projection_agreement {
+            "established_in_process"
+        } else {
+            "failed"
+        }
     );
     println!("replay_assertion.path_identity: not_assessed");
     println!("replay_assertion.decision_equivalence: not_assessed");
