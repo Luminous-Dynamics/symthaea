@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use plasma_vlasov_reference::{maxwellian_perturbation, VlasovPoisson1d1v, VlasovPoissonConfig};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let config = VlasovPoissonConfig {
@@ -19,7 +19,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dt = 0.01;
     let steps = 200;
 
-    println!("step,time,electric_mode_1,mass,momentum,total_energy,poisson_residual,velocity_boundary_ratio");
+    println!(
+        "step,time,electric_mode_1,mass,momentum,total_energy,poisson_residual,velocity_boundary_ratio"
+    );
     for step in 0..=steps {
         if step % 10 == 0 {
             let d = solver.diagnostics()?;
