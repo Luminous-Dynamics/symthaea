@@ -656,6 +656,22 @@ mod tests {
         assert_eq!(receipt["evaluation_family_count"], 4);
         assert_eq!(receipt["evaluation_positive_count"], 4);
         assert_eq!(
+            receipt["budgeted_selection"]["model_probability_per_cost"]["selected_true_positives"],
+            2
+        );
+        assert_eq!(
+            receipt["budgeted_selection"]["synthetic_truth_oracle"]["selected_true_positives"],
+            3
+        );
+        assert_eq!(
+            receipt["budgeted_selection"]["model_oracle_regret_fraction"],
+            1.0 / 3.0
+        );
+        assert_eq!(
+            receipt["budgeted_selection"]["model_enrichment_vs_random"],
+            2.0
+        );
+        assert_eq!(
             receipt["claim_ceiling"],
             "synthetic-budgeted-selection-and-calibration-semantics-only"
         );
