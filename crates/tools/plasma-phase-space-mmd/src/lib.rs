@@ -2301,6 +2301,4 @@ mod tests {
         // base pairs, evaluated once for each of the three mixture components.
         assert_eq!(result.aggregate.pair_evaluations, 36);
     }
-
-
 }
