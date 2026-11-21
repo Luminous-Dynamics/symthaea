@@ -245,3 +245,18 @@ The v1.2 kernel adds preferred entry points for empirical comparisons:
 - Neutral-band thresholds must be finite and in [0,1], matching the correlation domain.
 
 The lower-level vector and unlabeled-matrix functions remain available for fixtures and controlled callers, but empirical pipelines should use the identity- and label-aware APIs. A report validator must independently recompute every participant gap and summary; a schema-valid JSON document is not sufficient evidence that the arithmetic or identity mapping is correct.
+
+
+## 14. Participant-level sample-size planning
+
+The exact sign test is a consistency diagnostic, not a complete power model for RCAF. A separate exact binomial calculation is recorded in `RCAF_SIGN_TEST_POWER_V0.md` and its JSON companion.
+
+At 23 non-tied independent participants, the exact two-sided sign test has approximately 12.5% power when 60% of participant gaps are positive, 44% power at 70%, and 65% at 75%. It reaches about 84% power only when 80% of non-tied participant gaps are positive. Under the stated assumptions, approximate n_eff values for 80% power are 199 at q=0.60, 90 at q=0.65, 49 at q=0.70, 30 at q=0.75 and 20 at q=0.80.
+
+These calculations:
+- assume independent participant-level paired differences;
+- exclude exact-zero ties from n_eff;
+- do not account for effect magnitude, median-gap CI precision, hierarchical variance or informative missingness;
+- do not imply that a small study is useless or that a non-significant result shows no state effect.
+
+Future data collection must predeclare an effect/consistency target and simulate the full participant/session/run/segment and QC design. Never increase sample size by counting repeated windows as new participants.
