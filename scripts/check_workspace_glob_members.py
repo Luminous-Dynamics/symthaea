@@ -39,6 +39,7 @@ def main() -> int:
 
     errors: list[str] = []
     checked: set[str] = set()
+    excluded_matches: set[str] = set()
     for pattern in members:
         if not isinstance(pattern, str):
             errors.append(f"non-string workspace member pattern: {pattern!r}")
@@ -53,6 +54,7 @@ def main() -> int:
                 continue
             relative = match.relative_to(root).as_posix()
             if is_excluded(relative, excludes):
+                excluded_matches.add(relative)
                 continue
             checked.add(relative)
             if not (match / "Cargo.toml").is_file():
@@ -66,7 +68,14 @@ def main() -> int:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
-    print(f"workspace glob integrity: {len(checked)} member directories have Cargo.toml")
+    print(
+        "workspace glob integrity: "
+        f"{len(checked)} buildable member directories; "
+        f"{len(excluded_matches)} explicitly excluded paths"
+    )
+    for relative in sorted(excluded_matches):
+        if not (root / relative / "Cargo.toml").is_file():
+            print(f"excluded non-crate path (not built): {relative}")
     return 0
 
 
