@@ -31,7 +31,8 @@
       "required": [
         "name",
         "run_id",
-        "run_attempt"
+        "run_attempt",
+        "event_sha"
       ],
       "properties": {
         "name": {
@@ -51,6 +52,13 @@
             "string",
             "null"
           ]
+        },
+        "event_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{40}$"
         }
       }
     },
