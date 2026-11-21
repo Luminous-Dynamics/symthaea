@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Run-level binding for temporal workload, work-ledger and freshness receipts.
 //!
-//! This example does not reimplement either receipt schema. It validates the
+//! This example does not reimplement or replace either receipt schema validator.
+//! Each receipt must first pass its owning contract validator. This checks the
 //! identity seam between the existing temporal-work-ledger 0.2 receipt and
 //! decision-freshness 0.1 receipt, and binds both to exact candidate-visible
 //! input bytes. The evaluator's hidden oracle identity remains separate.
@@ -58,6 +59,9 @@ impl CandidateTraceIdentity {
                 return Err("candidate trace identity fields cannot be empty");
             }
         }
+        if !is_git_commit_id(&self.source_revision) {
+            return Err("source_revision must be a 40-character Git SHA-1 or 64-character Git SHA-256 commit ID");
+        }
         if !is_sha256(&self.trace_sha256) {
             return Err("candidate-visible trace identity must be a SHA-256 digest");
         }
@@ -98,6 +102,7 @@ struct JoinedRunBinding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum BindingError {
     InvalidCandidateIdentity(&'static str),
+    InvalidSourceRevision,
     EmptyRunId,
     InvalidJson(&'static str),
     MissingField(&'static str),
@@ -125,6 +130,11 @@ impl Error for BindingError {}
 
 fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn is_git_commit_id(value: &str) -> bool {
+    (value.len() == 40 || value.len() == 64)
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -179,7 +189,13 @@ fn join_receipts(
 ) -> Result<JoinedRunBinding, BindingError> {
     identity
         .validate()
-        .map_err(BindingError::InvalidCandidateIdentity)?;
+        .map_err(|message| {
+            if message.starts_with("source_revision") {
+                BindingError::InvalidSourceRevision
+            } else {
+                BindingError::InvalidCandidateIdentity(message)
+            }
+        })?;
     if run_id.trim().is_empty() {
         return Err(BindingError::EmptyRunId);
     }
@@ -463,7 +479,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         workload_family: "leaky-irregular-reference".to_owned(),
         workload_version: "v0.1".to_owned(),
         profile_id: "jittered".to_owned(),
-        source_revision: "40c3b0e75845a20b3ef2dbbe0ea3a0af0068f4b7".to_owned(),
+        source_revision: "36eb3adc1dc2d5ad1ae643863fee828d594472d4".to_owned(),
         configuration_id: "scalar-leaky-tau-140-seed-17".to_owned(),
         trace_sha256: sha256_hex(candidate_trace_bytes),
     };
@@ -491,10 +507,20 @@ mod tests {
             workload_family: "scalar-reference".to_owned(),
             workload_version: "v0.1".to_owned(),
             profile_id: "jittered".to_owned(),
-            source_revision: "abc123".to_owned(),
+            source_revision: "a".repeat(40),
             configuration_id: "cfg-17".to_owned(),
             trace_sha256: sha256_hex(trace),
         }
+    }
+
+    #[test]
+    fn rejects_non_commit_source_revision() {
+        let mut id = identity();
+        id.source_revision = "main".to_owned();
+        assert_eq!(
+            id.validate(),
+            Err("source_revision must be a 40-character Git SHA-1 or 64-character Git SHA-256 commit ID")
+        );
     }
 
     #[test]
