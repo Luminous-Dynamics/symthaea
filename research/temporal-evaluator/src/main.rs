@@ -9,6 +9,7 @@
 //! No function here supplies evaluator outcomes to candidate-side policies.
 
 pub mod sensing;
+pub mod decision_observability;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
