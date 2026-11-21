@@ -911,8 +911,20 @@ mod tests {
             "observed expected-direction recovery {}",
             result.injection_directional_detection_power.estimate
         );
-        assert_eq!(result.injection_wrong_direction_rejection_rate.successes, 0,
-            "strong positive loading injection produced wrong-direction rejection");
+        assert_eq!(
+            result.injection_detection_power.successes,
+            result.injection_directional_detection_power.successes
+                + result.injection_wrong_direction_rejection_rate.successes,
+            "two-sided detections must partition into expected- and wrong-direction results"
+        );
+        assert_eq!(
+            result.injection_wrong_direction_rejection_rate.successes,
+            0,
+            "strong positive loading injection produced wrong-direction rejection"
+        );
+        let json = result.to_json_pretty();
+        assert!(json.contains("\"injection_directional_detection_power\""));
+        assert!(json.contains("\"injection_wrong_direction_rejection_rate\""));
         assert!(
             result.median_injected_paired_gap > result.median_null_paired_gap + 0.035,
             "null gap {} vs injected gap {}",
@@ -925,20 +937,34 @@ mod tests {
     fn opposite_direction_significance_is_never_counted_as_successful_recovery() {
         let alpha = 0.05;
         let n = 23usize;
-        let two_sided_extreme_p = 2.0 / 2_f64.powi(n as i32);
+        let positive_test = exact_sign_test(&vec![1.0; n]).unwrap();
+        let negative_test = exact_sign_test(&vec![-1.0; n]).unwrap();
+        let non_significant_test = exact_sign_test(&[1.0; 12][..]).unwrap();
 
-        let (correct, wrong) =
-            classify_expected_positive_injection(n, 0, two_sided_extreme_p, alpha);
+        let (correct, wrong) = classify_expected_positive_injection(
+            positive_test.positive_count,
+            positive_test.negative_count,
+            positive_test.p_two_sided_exact,
+            alpha,
+        );
         assert!(correct);
         assert!(!wrong);
 
-        let (correct, wrong) =
-            classify_expected_positive_injection(0, n, two_sided_extreme_p, alpha);
+        let (correct, wrong) = classify_expected_positive_injection(
+            negative_test.positive_count,
+            negative_test.negative_count,
+            negative_test.p_two_sided_exact,
+            alpha,
+        );
         assert!(!correct, "opposite-direction rejection must not count as recovery");
         assert!(wrong, "opposite-direction rejection must be recorded separately");
 
-        let (correct, wrong) =
-            classify_expected_positive_injection(12, 11, 1.0, alpha);
+        let (correct, wrong) = classify_expected_positive_injection(
+            non_significant_test.positive_count,
+            non_significant_test.negative_count,
+            non_significant_test.p_two_sided_exact,
+            alpha,
+        );
         assert!(!correct, "non-significant positive imbalance is not recovery");
         assert!(!wrong);
     }
