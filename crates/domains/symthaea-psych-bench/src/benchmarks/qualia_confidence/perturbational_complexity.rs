@@ -1,11 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Perturbational Complexity Index (PCI) Benchmark — Digital Analog
+//! Synthetic perturbation-propagation architecture diagnostic (legacy digital-PCI name).
 //!
-//! Massimini et al. (2013) showed that PCI — the spatiotemporal complexity of
-//! cortical response to TMS perturbation — reliably distinguishes conscious from
-//! unconscious brain states. High PCI = conscious; low PCI = unconscious.
+//! This is not clinical PCI and does not process TMS-EEG or biological recordings.
+//! Its four-state network is constructed so that cross-dimensional coupling is
+//! introduced by the broadcast-enabled condition. Higher post-perturbation LZ
+//! complexity therefore checks the intended synthetic mechanism; it does not
+//! independently validate consciousness theory or a biological consciousness state.
+//!
+//! Clinical PCI is a defined measure computed from TMS-evoked EEG using a
+//! specified acquisition and analysis pipeline. Do not compare this synthetic
+//! ratio to clinical PCI cutoffs or use it for diagnosis.
 //!
 //! ## Principle
 //!

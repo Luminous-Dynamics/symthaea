@@ -1,0 +1,81 @@
+{
+  "schema_version": "cetb.claim-qualification/0.1.0",
+  "status": "proposed_internal_qualification_framework",
+  "no_global_model_grade": true,
+  "tiers": [
+    {
+      "tier": "Q0",
+      "name": "synthetic_implementation_evidence",
+      "scope": "known-answer, adversarial and invalid-input tests",
+      "not_established": [
+        "biological validity",
+        "empirical benchmark performance",
+        "clinical readiness"
+      ]
+    },
+    {
+      "tier": "Q1",
+      "name": "published_method_reproduction",
+      "scope": "exact source data and published method replay",
+      "not_established": [
+        "independent replication",
+        "new generalization",
+        "clinical validity"
+      ]
+    },
+    {
+      "tier": "Q2",
+      "name": "held_out_participant_evaluation",
+      "scope": "frozen model evaluated on participants not used for selection or tuning",
+      "not_established": [
+        "cross-site transport",
+        "cross-device transport",
+        "independent cohort replication"
+      ]
+    },
+    {
+      "tier": "Q3",
+      "name": "independent_cohort_site_device_replication",
+      "scope": "genuinely independent participants/acquisition with frozen procedure",
+      "not_established": [
+        "unrestricted population transport",
+        "clinical intended-use validity"
+      ]
+    },
+    {
+      "tier": "Q4",
+      "name": "prospective_preregistered_multisite_evaluation",
+      "scope": "future outcomes collected after protocol/model lock",
+      "not_established": [
+        "clinical utility",
+        "regulatory authorization"
+      ]
+    },
+    {
+      "tier": "Q5",
+      "name": "clinical_utility_intended_use_qualification",
+      "scope": "prospective target-population decision utility and intended-use evaluation",
+      "not_established": [
+        "claims beyond the defined endpoint and authorization"
+      ]
+    }
+  ],
+  "cross_cutting_gates": [
+    "construct_integrity",
+    "data_integrity",
+    "statistical_unit_integrity",
+    "selection_integrity",
+    "measurement_integrity",
+    "negative_controls",
+    "claim_ceilings",
+    "replay_integrity"
+  ],
+  "current_branch": {
+    "rcaf_kernel": "Q0_proposed_synthetic_tests_authored_not_yet_confirmed_by_focused_CI",
+    "ds006623_published_reproduction": "Q1_target_not_reproduced",
+    "cogitate_fmri_meg": "Q1_replay_protocols_authored_no_signal_analysis",
+    "independent_validation": "not_started",
+    "prospective_multisite": "not_started",
+    "clinical_utility": "not_started"
+  }
+}

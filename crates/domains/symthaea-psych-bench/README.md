@@ -4,8 +4,9 @@ Psychological benchmark suite for evaluating consciousness-relevant properties
 of cognitive architectures. 33 benchmark domain directories with ~170 benchmark
 structs (the older "84 benchmarks across 17 domains" figure predates later
 growth — recount before citing exact numbers), including the
-**Qualia Confidence Matrix** — 7 benchmarks testing architectural prerequisites
-for consciousness.
+**Qualia Confidence Matrix** — 7 synthetic architecture probes motivated by
+consciousness theories. These tests assess model behaviours and implementation
+properties; they do not establish necessary or sufficient conditions for consciousness.
 
 > **Scope honesty:** most benchmarks operate on synthetic HDC stimuli and
 > validate architectural mechanics, not human-normed task performance. In
@@ -30,14 +31,15 @@ cargo test -p symthaea-psych-bench
 
 ## Qualia Confidence Matrix
 
-7 benchmarks testing necessary conditions for consciousness, derived from
-GWT, IIT, HOT, and FEP:
+7 mostly synthetic architecture diagnostics motivated by GWT, IIT, HOT and
+FEP. They test named model behaviours, not necessary or sufficient conditions
+for consciousness:
 
 | Benchmark | Theory | What it tests | Key metric |
 |-----------|--------|---------------|------------|
 | GWT Asphyxiation | GWT | Domain collapse order under workspace restriction | Spearman rho |
 | Phase Transition | IIT | Sigmoidal vs. linear fidelity collapse | Sigmoid advantage |
-| Perturbational Complexity | IIT/Clinical | Complex vs. simple response to perturbation (digital PCI) | PCI ratio |
+| Perturbational Complexity | IIT-motivated synthetic diagnostic | Broadcast-on vs. broadcast-off response complexity in a toy network | Synthetic LZ ratio |
 | Somatic Interference | Damasio | Emergent cascade degradation under neuromod distress | Cascade ratio |
 | Bistable Perception | Psychophysics | Heavy-tailed switching in ambiguous perception | CV of switch interval |
 | Unconscious Priming | GWT | Sub/supra-threshold processing dissociation | Priming dissociation |
@@ -46,6 +48,13 @@ GWT, IIT, HOT, and FEP:
 **Epistemic honesty**: 6 of 7 benchmarks validate properties the architecture
 was designed to exhibit. MetacognitiveIgnition tests emergent cross-module
 alignment that was NOT explicitly programmed — it is the strongest benchmark.
+
+**Digital PCI boundary:** PerturbationalComplexity is a synthetic four-state
+network test. Its broadcast-enabled condition adds the cross-dimensional
+feedback that increases post-perturbation complexity. Passing it verifies that
+synthetic mechanism, not that the architecture has clinical PCI, human-like
+consciousness, or a validated biological consciousness indicator. Do not compare
+its ratio with TMS–EEG PCI cutoffs.
 
 ### Published Results
 

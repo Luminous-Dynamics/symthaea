@@ -1,0 +1,246 @@
+name: RCAF Research Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/rcaf/**"
+      - "research/cetb/theory_design/**"
+      - "research/cetb/multiverse/**"
+      - "research/cetb/measurement_qualification/**"
+      - ".github/workflows/rcaf-research-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rcaf-research-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-report-and-kernel:
+    name: Report contract and standalone Rust kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/rcaf/requirements-validation.txt
+
+      - name: Install schema validator
+        run: python -m pip install -r research/rcaf/requirements-validation.txt
+
+      - name: Run report-validator unit tests
+        run: python -m unittest discover -s research/rcaf/tools -p 'test_*.py' -v
+
+      - name: Run theory-design EIG reference tests
+        run: python -m unittest discover -s research/cetb/theory_design -p 'test_*.py' -v
+
+      - name: Validate defensible multiverse manifest
+        run: |
+          python -m unittest discover -s research/cetb/multiverse -p 'test_*.py' -v
+          python research/cetb/multiverse/validate_manifest.py \
+            research/cetb/multiverse/fixtures/synthetic-multiverse.json \
+            research/cetb/multiverse/multiverse.schema.json
+
+      - name: Validate multidimensional measurement qualification receipt
+        run: |
+          python -m unittest discover -s research/cetb/measurement_qualification -p 'test_*.py' -v
+          python research/cetb/measurement_qualification/validate_receipt.py \
+            research/cetb/measurement_qualification/fixtures/synthetic-qualification.json \
+            research/cetb/measurement_qualification/measurement-qualification.schema.json
+
+      - name: Validate theory-design manifest and execute synthetic ranking
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/cetb/theory_design/design-run.schema.json").read_text())
+          manifest = json.loads(Path("research/cetb/theory_design/fixtures/synthetic-design-run.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(manifest, schema)
+          PY
+          python research/cetb/theory_design/eig.py \
+            research/cetb/theory_design/fixtures/synthetic-design-run.json \
+            --output "$RUNNER_TEMP/cetb-eig-result.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          result = json.loads(Path(os.environ["RUNNER_TEMP"] + "/cetb-eig-result.json").read_text())
+          assert result["source_status"] == "synthetic_fixture"
+          assert len(result["results"]) == 2
+          assert [row["rank"] for row in result["results"]] == [1, 2]
+          assert all(row["lower_quantile_eig_bits"] >= 0.0 for row in result["results"])
+          print("PASS: synthetic theory-design manifest and EIG ranking")
+          PY
+
+      - name: Validate synthetic fixture against schema and semantic invariants
+        run: |
+          python research/rcaf/tools/validate_report.py \
+            research/rcaf/fixtures/synthetic-rcaf-report.json \
+            --schema research/rcaf/rcaf-report.schema.json
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Format standalone kernel
+        run: cargo fmt --manifest-path research/rcaf/Cargo.toml -- --check
+
+      - name: Test standalone kernel
+        run: cargo test --manifest-path research/rcaf/Cargo.toml
+
+      - name: Lint standalone kernel
+        run: cargo clippy --manifest-path research/rcaf/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run RCAF synthetic injection-recovery calibration
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery -- "$RUNNER_TEMP/rcaf-injection-report.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/injection-recovery.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-injection-report.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["null_false_positive_rate"]["estimate"] <= 0.15
+          assert report["injection_detection_power"]["estimate"] >= 0.80
+          assert report["median_injected_paired_gap"] > report["median_null_paired_gap"] + 0.035
+          print("PASS: RCAF synthetic null calibration and injection recovery")
+          PY
+
+      - name: Run RCAF injection-recovery dose-response sweep
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery_sweep -- "$RUNNER_TEMP/rcaf-injection-sweep.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/injection-recovery-sweep.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-injection-sweep.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          points = report["reports"]
+          deltas = [point["injection_loading_delta"] for point in points]
+          assert deltas == [0.0, 0.10, 0.20, 0.30, 0.40]
+          assert report["effect_size_points"] == 5
+          assert report["endpoint_median_gap_difference"] > 0.04
+          assert report["monotonic_adjacent_pair_fraction"] >= 0.5
+          print("PASS: RCAF synthetic injection-recovery dose-response sweep")
+          PY
+
+      - name: Run matched-input RCAF estimator tournament
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament -- "$RUNNER_TEMP/rcaf-estimator-tournament.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/estimator-tournament.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-estimator-tournament.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          results = report["results"]
+          assert report["estimators_compared"] == 3
+          assert [item["estimator"] for item in results] == [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          assert len({item["seed"] for item in results}) == 1
+          assert all(0.0 <= item["null_false_positive_rate"]["estimate"] <= 1.0 for item in results)
+          assert all(0.0 <= item["injection_detection_power"]["estimate"] <= 1.0 for item in results)
+          print("PASS: matched-input RCAF estimator tournament")
+          PY
+
+      - name: Run matched-input estimator dose-response surface
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose_response_tournament -- "$RUNNER_TEMP/rcaf-estimator-dose-surface.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/estimator-dose-response-tournament.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-estimator-dose-surface.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["estimators_compared"] == 3
+          assert report["effect_sizes"] == [0.0, 0.10, 0.20, 0.30, 0.40]
+          assert [curve["estimator"] for curve in report["curves"]] == [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          for curve in report["curves"]:
+              rows = curve["sweep"]["reports"]
+              assert [row["injection_loading_delta"] for row in rows] == report["effect_sizes"]
+              assert len({row["seed"] for row in rows}) == 1
+          print("PASS: matched-input estimator-by-effect-size surface")
+          PY
+
+      - name: Build content-addressed simulation execution receipt
+        run: |
+          python research/rcaf/tools/build_execution_receipt.py \
+            --root . \
+            --output "$RUNNER_TEMP/rcaf-execution-receipt.json" \
+            --reports \
+              "$RUNNER_TEMP/rcaf-injection-report.json" \
+              "$RUNNER_TEMP/rcaf-injection-sweep.json" \
+              "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
+              "$RUNNER_TEMP/rcaf-estimator-dose-surface.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/execution-receipt.schema.json").read_text())
+          receipt = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-execution-receipt.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(receipt, schema)
+          import subprocess
+          checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          assert receipt["source_commit"] == checked_out_head
+          assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
+          assert len(receipt["simulation_reports"]) == 4
+          assert len(receipt["source_files"]) > 0
+          print("PASS: content-addressed RCAF execution receipt")
+          PY
+
+      - name: Archive simulation reports and execution receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: rcaf-simulation-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/rcaf-injection-report.json
+            ${{ runner.temp }}/rcaf-injection-sweep.json
+            ${{ runner.temp }}/rcaf-estimator-tournament.json
+            ${{ runner.temp }}/rcaf-estimator-dose-surface.json
+            ${{ runner.temp }}/rcaf-execution-receipt.json
+          if-no-files-found: error
+          retention-days: 30

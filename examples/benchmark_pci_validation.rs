@@ -1,134 +1,70 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # PCI (Perturbational Complexity Index) Validation
+//! Synthetic HDC representation diagnostic (legacy path: benchmark_pci_validation.rs).
 //!
-//! Validates Symthaea's Φ computation as a proxy for PCI, the gold-standard
-//! clinical measure of consciousness level.
+//! This example does NOT implement clinical PCI, TMS–EEG, or an intervention-based
+//! perturbational-complexity algorithm. It constructs hand-parameterized synthetic
+//! HDC networks, computes Symthaea's internal PhiEngine output, and measures the
+//! entropy of the pairwise similarity distribution around selected reference nodes.
+//! No perturbation is applied to the network in this example.
 //!
-//! ## Background
-//! PCI (Casali et al. 2013) measures the "algorithmic complexity of the brain's
-//! deterministic response to a perturbation" (TMS-EEG). It reliably distinguishes:
-//! - Wakefulness: PCI > 0.31
-//! - REM sleep: PCI ~ 0.30-0.40
-//! - NREM sleep: PCI < 0.31
-//! - Anesthesia: PCI < 0.31
-//! - Vegetative state: PCI < 0.31
-//! - Minimally conscious: PCI > 0.31
+//! The profile parameters are arbitrary synthetic controls, not encodings of
+//! wakefulness, sleep, anesthesia, vegetative state, or minimally conscious state.
+//! These values cannot be compared with clinical PCI values or cutoffs. The
+//! PhiEngine output is an internal architecture metric, not a measurement of
+//! phenomenal consciousness or biologically measured integrated information.
 //!
-//! ## Method
-//! Since we can't do TMS-EEG in software, we simulate the PCI paradigm:
-//! 1. Create networks representing different consciousness states
-//! 2. Apply perturbation (inject signal into one node)
-//! 3. Measure spread complexity (Lempel-Ziv complexity of response pattern)
-//! 4. Verify that Φ correlates with simulated PCI
-//!
-//! ## Validation Criteria
-//! - Φ should be higher for "awake" networks than "anesthetized" networks
-//! - Φ should correlate with perturbation spread complexity
-//! - Networks with more recurrent connections should show higher Φ
+//! This executable is retained as a smoke-test / exploratory synthetic fixture.
+//! It reports no biological, clinical, or theory-validation result.
 //!
 //! ## Run
-//! ```bash
+//!
+//! \`\`\`bash
 //! cargo run --example benchmark_pci_validation --release
-//! ```
+//! \`\`\`
 
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::phi_engine::PhiEngine;
 
 const DIM: usize = 4096;
+const NODE_COUNT: usize = 16;
+const TRIAL_COUNT: usize = 5;
 
-/// Simulated consciousness state
-struct ConsciousnessState {
+#[derive(Clone, Copy)]
+struct SyntheticNetworkRegime {
     name: &'static str,
-    /// How strongly nodes are interconnected (0.0 = disconnected, 1.0 = fully coupled)
     coupling_strength: f32,
-    /// Fraction of connections that are recurrent
     recurrence: f32,
-    /// Background noise level
     noise_level: f32,
-    /// Expected PCI range
-    expected_pci_range: (f64, f64),
 }
 
-fn consciousness_states() -> Vec<ConsciousnessState> {
+fn synthetic_network_regimes() -> Vec<SyntheticNetworkRegime> {
+    // These are arbitrary coverage points in parameter space, not human/clinical states.
     vec![
-        ConsciousnessState {
-            name: "Wakefulness",
-            coupling_strength: 0.6,
-            recurrence: 0.7,
-            noise_level: 0.1,
-            expected_pci_range: (0.31, 0.70),
-        },
-        ConsciousnessState {
-            name: "REM Sleep",
-            coupling_strength: 0.5,
-            recurrence: 0.5,
-            noise_level: 0.15,
-            expected_pci_range: (0.30, 0.45),
-        },
-        ConsciousnessState {
-            name: "Light NREM",
-            coupling_strength: 0.3,
-            recurrence: 0.3,
-            noise_level: 0.2,
-            expected_pci_range: (0.20, 0.35),
-        },
-        ConsciousnessState {
-            name: "Deep NREM",
-            coupling_strength: 0.15,
-            recurrence: 0.15,
-            noise_level: 0.25,
-            expected_pci_range: (0.10, 0.25),
-        },
-        ConsciousnessState {
-            name: "Propofol Anesthesia",
-            coupling_strength: 0.1,
-            recurrence: 0.1,
-            noise_level: 0.3,
-            expected_pci_range: (0.05, 0.20),
-        },
-        ConsciousnessState {
-            name: "Ketamine Anesthesia",
-            coupling_strength: 0.35,
-            recurrence: 0.2,
-            noise_level: 0.4,
-            expected_pci_range: (0.25, 0.40),
-        },
-        ConsciousnessState {
-            name: "Vegetative State",
-            coupling_strength: 0.08,
-            recurrence: 0.05,
-            noise_level: 0.3,
-            expected_pci_range: (0.02, 0.15),
-        },
-        ConsciousnessState {
-            name: "Minimally Conscious",
-            coupling_strength: 0.25,
-            recurrence: 0.25,
-            noise_level: 0.2,
-            expected_pci_range: (0.20, 0.40),
-        },
+        SyntheticNetworkRegime { name: "profile-01", coupling_strength: 0.60, recurrence: 0.70, noise_level: 0.10 },
+        SyntheticNetworkRegime { name: "profile-02", coupling_strength: 0.50, recurrence: 0.50, noise_level: 0.15 },
+        SyntheticNetworkRegime { name: "profile-03", coupling_strength: 0.30, recurrence: 0.30, noise_level: 0.20 },
+        SyntheticNetworkRegime { name: "profile-04", coupling_strength: 0.15, recurrence: 0.15, noise_level: 0.25 },
+        SyntheticNetworkRegime { name: "profile-05", coupling_strength: 0.10, recurrence: 0.10, noise_level: 0.30 },
+        SyntheticNetworkRegime { name: "profile-06", coupling_strength: 0.35, recurrence: 0.20, noise_level: 0.40 },
+        SyntheticNetworkRegime { name: "profile-07", coupling_strength: 0.08, recurrence: 0.05, noise_level: 0.30 },
+        SyntheticNetworkRegime { name: "profile-08", coupling_strength: 0.25, recurrence: 0.25, noise_level: 0.20 },
     ]
 }
 
-/// Create a network representing a consciousness state
-fn create_state_network(
-    state: &ConsciousnessState,
+fn create_synthetic_network(
+    regime: &SyntheticNetworkRegime,
     n_nodes: usize,
     dim: usize,
     seed: u64,
 ) -> Vec<ContinuousHV> {
-    // Base random vectors
     let base_hvs: Vec<ContinuousHV> = (0..n_nodes)
         .map(|i| ContinuousHV::random(dim, seed + i as u64))
         .collect();
 
-    // Shared signal (global workspace)
-    let global_signal = ContinuousHV::random(dim, seed + 10000);
-
-    // Recurrent template
-    let recurrent_template = ContinuousHV::random(dim, seed + 20000);
+    let shared_signal = ContinuousHV::random(dim, seed + 10_000);
+    let recurrent_template = ContinuousHV::random(dim, seed + 20_000);
 
     base_hvs
         .iter()
@@ -136,36 +72,31 @@ fn create_state_network(
         .map(|(i, base)| {
             let mut values = vec![0.0f32; dim];
 
-            // Base node identity
-            let identity_weight = 1.0 - state.coupling_strength;
-            for (v, &b) in values.iter_mut().zip(base.values.iter()) {
-                *v += identity_weight * b;
+            let identity_weight = 1.0 - regime.coupling_strength;
+            for (value, &base_value) in values.iter_mut().zip(base.values.iter()) {
+                *value += identity_weight * base_value;
             }
 
-            // Global coupling (shared signal represents thalamocortical integration)
-            for (v, &g) in values.iter_mut().zip(global_signal.values.iter()) {
-                *v += state.coupling_strength * g;
+            for (value, &shared_value) in values.iter_mut().zip(shared_signal.values.iter()) {
+                *value += regime.coupling_strength * shared_value;
             }
 
-            // Recurrent connections (self-referential processing)
-            if i < (n_nodes as f32 * state.recurrence) as usize {
+            if i < (n_nodes as f32 * regime.recurrence) as usize {
                 let recurrent_hv = base.bind(&recurrent_template);
-                for (v, &r) in values.iter_mut().zip(recurrent_hv.values.iter()) {
-                    *v += state.recurrence * 0.3 * r;
+                for (value, &recurrent_value) in values.iter_mut().zip(recurrent_hv.values.iter()) {
+                    *value += regime.recurrence * 0.3 * recurrent_value;
                 }
             }
 
-            // Noise
-            let noise = ContinuousHV::random(dim, seed + 30000 + i as u64);
-            for (v, &n) in values.iter_mut().zip(noise.values.iter()) {
-                *v += state.noise_level * n;
+            let noise = ContinuousHV::random(dim, seed + 30_000 + i as u64);
+            for (value, &noise_value) in values.iter_mut().zip(noise.values.iter()) {
+                *value += regime.noise_level * noise_value;
             }
 
-            // Normalize
-            let norm: f32 = values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let norm: f32 = values.iter().map(|value| value * value).sum::<f32>().sqrt();
             if norm > 0.0 {
-                for v in &mut values {
-                    *v /= norm;
+                for value in &mut values {
+                    *value /= norm;
                 }
             }
 
@@ -174,291 +105,171 @@ fn create_state_network(
         .collect()
 }
 
-/// Simulate perturbation spread (simplified PCI-like measure)
-fn perturbation_complexity(hvs: &[ContinuousHV], perturb_idx: usize) -> f64 {
-    let n = hvs.len();
-    if n == 0 || perturb_idx >= n {
+/// Shannon entropy of pairwise cosine-similarity bins around one reference node.
+///
+/// This is a descriptive statistic of a synthetic HDC representation. It is not
+/// Lempel–Ziv complexity, PCI, causal perturbation propagation, or a consciousness
+/// measure. The selected node is observed, not physically or computationally perturbed.
+fn reference_node_similarity_entropy(network: &[ContinuousHV], reference_idx: usize) -> f64 {
+    if network.len() < 2 || reference_idx >= network.len() {
         return 0.0;
     }
 
-    // Measure how the perturbation signal spreads through the network
-    // by computing similarity of each node to the perturbed node
-    let perturbed = &hvs[perturb_idx];
-
-    let mut similarities: Vec<f32> = hvs
+    let reference = &network[reference_idx];
+    let similarities: Vec<f32> = network
         .iter()
         .enumerate()
-        .filter(|(i, _)| *i != perturb_idx)
-        .map(|(_, hv)| perturbed.similarity(hv))
+        .filter(|(index, _)| *index != reference_idx)
+        .map(|(_, vector)| reference.similarity(vector))
         .collect();
 
-    similarities.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    if similarities.is_empty() {
+        return 0.0;
+    }
 
-    // Compute complexity of similarity distribution
-    // High PCI = diverse, non-trivial spread pattern
-    // Low PCI = uniform (all similar) or no spread (all dissimilar)
-    let mean: f32 = similarities.iter().sum::<f32>() / similarities.len() as f32;
-    let _variance: f32 =
-        similarities.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / similarities.len() as f32;
+    const BIN_COUNT: usize = 10;
+    let mut bins = [0usize; BIN_COUNT];
 
-    // Entropy of binned similarity distribution (proxy for Lempel-Ziv)
-    let n_bins = 10;
-    let mut bins = vec![0usize; n_bins];
-    for &sim in &similarities {
-        let bin = ((sim.clamp(-1.0, 1.0) + 1.0) / 2.0 * (n_bins - 1) as f32) as usize;
-        bins[bin.min(n_bins - 1)] += 1;
+    for similarity in similarities.iter().copied() {
+        let bin = (((similarity.clamp(-1.0, 1.0) + 1.0) * 0.5)
+            * (BIN_COUNT - 1) as f32) as usize;
+        bins[bin.min(BIN_COUNT - 1)] += 1;
     }
 
     let total = similarities.len() as f64;
-    let entropy: f64 = bins
+    let entropy = bins
         .iter()
-        .filter(|&&b| b > 0)
-        .map(|&b| {
-            let p = b as f64 / total;
-            -p * p.ln()
+        .filter(|&&count| count > 0)
+        .map(|&count| {
+            let probability = count as f64 / total;
+            -probability * probability.ln()
         })
-        .sum();
+        .sum::<f64>();
 
-    // Normalize to [0, 1] range
-    let max_entropy = (n_bins as f64).ln();
+    entropy / (BIN_COUNT as f64).ln()
+}
 
-    entropy / max_entropy
+fn mean_and_sample_std(values: &[f64]) -> (f64, f64) {
+    if values.is_empty() {
+        return (0.0, 0.0);
+    }
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    if values.len() < 2 {
+        return (mean, 0.0);
+    }
+    let variance = values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / (values.len() - 1) as f64;
+    (mean, variance.sqrt())
+}
+
+struct RegimeResult {
+    profile: &'static str,
+    phi_engine_output_mean: f64,
+    phi_engine_output_sample_std: f64,
+    reference_node_similarity_entropy_mean: f64,
+    reference_node_similarity_entropy_sample_std: f64,
 }
 
 fn main() {
-    println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║     PCI (Perturbational Complexity Index) Validation       ║");
-    println!("║     Consciousness Level Discrimination via Φ              ║");
-    println!("╚══════════════════════════════════════════════════════════════╝\n");
+    println!("Synthetic HDC representation diagnostic");
+    println!("No TMS–EEG, clinical PCI, human data, or intervention is used.\n");
 
     let phi_engine = PhiEngine::auto();
-    let states = consciousness_states();
-    let n_nodes = 16;
-    let n_trials = 5;
+    let regimes = synthetic_network_regimes();
+    let mut results = Vec::with_capacity(regimes.len());
 
     println!(
-        "Configuration: {} nodes, {} trials per state, dim={}\n",
-        n_nodes, n_trials, DIM
+        "{:14} │ {:>16} │ {:>21}",
+        "Profile", "PhiEngine output", "Similarity entropy"
     );
+    println!("───────────────┼──────────────────┼───────────────────────");
 
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!(
-        "  {:25} │ {:>10} │ {:>10} │ {:>12}",
-        "State", "Φ (mean)", "PCI (sim)", "Expected PCI"
-    );
-    println!("  ─────────────────────────┼────────────┼────────────┼──────────────");
+    for (regime_index, regime) in regimes.iter().enumerate() {
+        let mut phi_values = Vec::with_capacity(TRIAL_COUNT);
+        let mut entropy_values = Vec::with_capacity(TRIAL_COUNT);
 
-    let mut state_results: Vec<(&str, f64, f64, f64, f64)> = Vec::new();
+        for trial in 0..TRIAL_COUNT {
+            let seed = 42 + (regime_index as u64) * 100_000 + (trial as u64) * 1_000;
+            let network = create_synthetic_network(regime, NODE_COUNT, DIM, seed);
+            let phi_result = phi_engine.compute(&network);
+            phi_values.push(phi_result.phi);
 
-    for state in &states {
-        let mut phis = Vec::new();
-        let mut pcis = Vec::new();
-
-        for trial in 0..n_trials {
-            let seed = 42 + trial as u64 * 1000;
-            let hvs = create_state_network(state, n_nodes, DIM, seed);
-
-            let phi_result = phi_engine.compute(&hvs);
-            phis.push(phi_result.phi);
-
-            // Compute PCI for multiple perturbation sites
-            let mut trial_pcis = Vec::new();
-            for perturb_site in [0, n_nodes / 4, n_nodes / 2] {
-                trial_pcis.push(perturbation_complexity(&hvs, perturb_site));
-            }
-            let trial_pci = trial_pcis.iter().sum::<f64>() / trial_pcis.len() as f64;
-            pcis.push(trial_pci);
+            // Several reference nodes are summarized; no node is perturbed.
+            let reference_nodes = [0, NODE_COUNT / 4, NODE_COUNT / 2];
+            let trial_entropy = reference_nodes
+                .iter()
+                .map(|&index| reference_node_similarity_entropy(&network, index))
+                .sum::<f64>()
+                / reference_nodes.len() as f64;
+            entropy_values.push(trial_entropy);
         }
 
-        let phi_mean = phis.iter().sum::<f64>() / phis.len() as f64;
-        let phi_std = (phis.iter().map(|x| (x - phi_mean).powi(2)).sum::<f64>()
-            / (phis.len() - 1).max(1) as f64)
-            .sqrt();
-
-        let pci_mean = pcis.iter().sum::<f64>() / pcis.len() as f64;
-        let pci_std = (pcis.iter().map(|x| (x - pci_mean).powi(2)).sum::<f64>()
-            / (pcis.len() - 1).max(1) as f64)
-            .sqrt();
+        let (phi_mean, phi_std) = mean_and_sample_std(&phi_values);
+        let (entropy_mean, entropy_std) = mean_and_sample_std(&entropy_values);
 
         println!(
-            "  {:25} │ {:.4}±{:.3} │ {:.4}±{:.3} │ {:.2}-{:.2}",
-            state.name,
-            phi_mean,
-            phi_std,
-            pci_mean,
-            pci_std,
-            state.expected_pci_range.0,
-            state.expected_pci_range.1
+            "{:14} │ {:>8.4} ± {:>5.3} │ {:>10.4} ± {:>5.3}",
+            regime.name, phi_mean, phi_std, entropy_mean, entropy_std
         );
 
-        state_results.push((state.name, phi_mean, phi_std, pci_mean, pci_std));
+        results.push(RegimeResult {
+            profile: regime.name,
+            phi_engine_output_mean: phi_mean,
+            phi_engine_output_sample_std: phi_std,
+            reference_node_similarity_entropy_mean: entropy_mean,
+            reference_node_similarity_entropy_sample_std: entropy_std,
+        });
     }
 
-    // Compute Φ-PCI correlation
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Φ-PCI Correlation Analysis");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    let phis: Vec<f64> = state_results.iter().map(|(_, p, _, _, _)| *p).collect();
-    let pcis: Vec<f64> = state_results.iter().map(|(_, _, _, p, _)| *p).collect();
-
-    let n = phis.len() as f64;
-    let mean_phi = phis.iter().sum::<f64>() / n;
-    let mean_pci = pcis.iter().sum::<f64>() / n;
-
-    let mut cov = 0.0;
-    let mut var_phi = 0.0;
-    let mut var_pci = 0.0;
-
-    for i in 0..phis.len() {
-        let dp = phis[i] - mean_phi;
-        let dc = pcis[i] - mean_pci;
-        cov += dp * dc;
-        var_phi += dp * dp;
-        var_pci += dc * dc;
-    }
-
-    let correlation = if var_phi > 0.0 && var_pci > 0.0 {
-        cov / (var_phi.sqrt() * var_pci.sqrt())
-    } else {
-        0.0
-    };
-
-    println!("  Pearson correlation (Φ vs PCI): {:.4}", correlation);
-
-    // Check consciousness discrimination
-    let awake_phi = state_results
-        .iter()
-        .find(|(n, _, _, _, _)| *n == "Wakefulness")
-        .map(|(_, p, _, _, _)| *p)
-        .unwrap_or(0.0);
-
-    let propofol_phi = state_results
-        .iter()
-        .find(|(n, _, _, _, _)| *n == "Propofol Anesthesia")
-        .map(|(_, p, _, _, _)| *p)
-        .unwrap_or(0.0);
-
-    let vegetative_phi = state_results
-        .iter()
-        .find(|(n, _, _, _, _)| *n == "Vegetative State")
-        .map(|(_, p, _, _, _)| *p)
-        .unwrap_or(0.0);
-
-    let mcs_phi = state_results
-        .iter()
-        .find(|(n, _, _, _, _)| *n == "Minimally Conscious")
-        .map(|(_, p, _, _, _)| *p)
-        .unwrap_or(0.0);
-
-    let awake_pci = state_results
-        .iter()
-        .find(|(n, _, _, _, _)| *n == "Wakefulness")
-        .map(|(_, _, _, p, _)| *p)
-        .unwrap_or(0.0);
-
-    let vegetative_pci = state_results
-        .iter()
-        .find(|(n, _, _, _, _)| *n == "Vegetative State")
-        .map(|(_, _, _, p, _)| *p)
-        .unwrap_or(0.0);
-
-    // Validation
-    println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║                  VALIDATION SUMMARY                        ║");
-    println!("╠══════════════════════════════════════════════════════════════╣");
-
-    let tests = vec![
-        (
-            "Φ(Wake) > Φ(Propofol)",
-            awake_phi > propofol_phi,
-            format!("{:.4} > {:.4}", awake_phi, propofol_phi),
-        ),
-        (
-            "Φ(Wake) > Φ(Vegetative)",
-            awake_phi > vegetative_phi,
-            format!("{:.4} > {:.4}", awake_phi, vegetative_phi),
-        ),
-        (
-            "Φ(MCS) > Φ(Vegetative)",
-            mcs_phi > vegetative_phi,
-            format!("{:.4} > {:.4}", mcs_phi, vegetative_phi),
-        ),
-        // Φ and PCI measure fundamentally different properties:
-        // Φ = intrinsic causal integration (Tononi 2004), computed from TPM without intervention
-        // PCI = perturbational complexity (Casali 2013), computed from TMS-evoked EEG
-        // Low correlation is theoretically expected — they capture orthogonal aspects of consciousness.
-        // We assert weak correlation (|r| < 0.8) rather than strong positive correlation.
-        (
-            "Φ-PCI weak correlation (expected: |r| < 0.8)",
-            correlation.abs() < 0.8,
-            format!(
-                "r = {:.4} (Φ=intrinsic integration, PCI=perturbational complexity)",
-                correlation
-            ),
-        ),
-        // Both measures should independently order conscious states correctly:
-        // awake > vegetative for both Φ and PCI
-        (
-            "Both Φ and PCI order: awake > vegetative",
-            (awake_phi > vegetative_phi) && (awake_pci > vegetative_pci),
-            format!(
-                "Φ: {:.4} > {:.4}, PCI: {:.4} > {:.4}",
-                awake_phi, vegetative_phi, awake_pci, vegetative_pci
-            ),
-        ),
-    ];
-
-    let mut passed = 0;
-    for (name, pass, detail) in &tests {
-        println!(
-            "║  {} {:35} ({})  ║",
-            if *pass { "PASS" } else { "FAIL" },
-            name,
-            detail
-        );
-        if *pass {
-            passed += 1;
-        }
-    }
-
-    println!("╟──────────────────────────────────────────────────────────────╢");
-    println!(
-        "║  Result: {}/{} tests passed                                 ║",
-        passed,
-        tests.len()
-    );
-    println!("╚══════════════════════════════════════════════════════════════╝\n");
-
-    if passed == tests.len() {
-        println!("All PCI validation tests passed.");
-        println!("Φ successfully discriminates consciousness states.");
-    }
-
-    // Save results
-    let result_json = serde_json::json!({
-        "benchmark": "PCI Validation",
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-        "n_nodes": n_nodes,
-        "n_trials": n_trials,
-        "dim": DIM,
-        "states": state_results.iter().map(|(name, phi, phi_std, pci, pci_std)| {
-            serde_json::json!({
-                "state": name,
-                "phi_mean": phi,
-                "phi_std": phi_std,
-                "pci_mean": pci,
-                "pci_std": pci_std,
-            })
-        }).collect::<Vec<_>>(),
-        "phi_pci_correlation": correlation,
-        "tests_passed": passed,
-        "tests_total": tests.len(),
+    let all_finite = results.iter().all(|result| {
+        result.phi_engine_output_mean.is_finite()
+            && result.phi_engine_output_sample_std.is_finite()
+            && result.reference_node_similarity_entropy_mean.is_finite()
+            && result.reference_node_similarity_entropy_sample_std.is_finite()
+    });
+    let entropy_in_range = results.iter().all(|result| {
+        (0.0..=1.0).contains(&result.reference_node_similarity_entropy_mean)
     });
 
-    let result_path = "data/benchmarks/pyphi/pci_results.json";
-    if let Ok(f) = std::fs::File::create(result_path) {
-        serde_json::to_writer_pretty(f, &result_json).ok();
-        println!("Results saved to {}", result_path);
+    println!("\nSynthetic fixture checks:");
+    println!("  All reported values finite: {}", all_finite);
+    println!("  Similarity entropy lies in [0, 1]: {}", entropy_in_range);
+    println!("\nInterpretation: synthetic representation diagnostics only; not clinical PCI, biological consciousness evidence, or a clinical classifier.");
+
+    let output = serde_json::json!({
+        "benchmark": "Synthetic HDC representation diagnostic",
+        "legacy_source_path": "examples/benchmark_pci_validation.rs",
+        "scope": "synthetic_only_not_clinical_pci",
+        "no_intervention_applied": true,
+        "timestamp_utc": chrono::Utc::now().to_rfc3339(),
+        "node_count": NODE_COUNT,
+        "trial_count_per_profile": TRIAL_COUNT,
+        "hypervector_dimension": DIM,
+        "profiles": results.iter().map(|result| serde_json::json!({
+            "profile": result.profile,
+            "phi_engine_output_mean": result.phi_engine_output_mean,
+            "phi_engine_output_sample_std": result.phi_engine_output_sample_std,
+            "reference_node_similarity_entropy_mean": result.reference_node_similarity_entropy_mean,
+            "reference_node_similarity_entropy_sample_std": result.reference_node_similarity_entropy_sample_std
+        })).collect::<Vec<_>>(),
+        "fixture_checks": {
+            "all_values_finite": all_finite,
+            "similarity_entropy_in_unit_interval": entropy_in_range
+        }
+    });
+
+    let output_path = "synthetic_hdc_representation_diagnostic.json";
+    match std::fs::File::create(output_path) {
+        Ok(file) => {
+            if let Err(error) = serde_json::to_writer_pretty(file, &output) {
+                eprintln!("Could not serialize result JSON: {error}");
+            } else {
+                println!("Result manifest written to {output_path}");
+            }
+        }
+        Err(error) => eprintln!("Could not create result JSON at {output_path}: {error}"),
     }
 }

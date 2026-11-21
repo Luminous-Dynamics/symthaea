@@ -1,0 +1,455 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/rcaf-report.schema.json",
+  "title": "RCAF participant-level report",
+  "description": "Evidence report for a repeatability-calibrated neural-state comparison. This schema does not define consciousness ground truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "evidence_status",
+    "dataset",
+    "analysis",
+    "participants",
+    "summary",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.report/1.0.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_status": {
+      "enum": [
+        "synthetic_fixture",
+        "metadata_only",
+        "signal_analysis",
+        "independent_replay"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "dataset_id",
+        "version",
+        "access_state",
+        "participant_flow"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "doi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "access_state": {
+          "enum": [
+            "not_downloaded",
+            "metadata_only",
+            "downloaded_verified",
+            "downloaded_unverified"
+          ]
+        },
+        "file_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "participant_flow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "acquired_or_recruited",
+            "released",
+            "qc_eligible",
+            "analysis_included",
+            "excluded"
+          ],
+          "properties": {
+            "acquired_or_recruited": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "released": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "qc_eligible": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "analysis_included": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "excluded": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "flow_note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "metric",
+        "estimator",
+        "preprocessing_revision",
+        "roi_order_sha256",
+        "segment_volumes",
+        "neutral_sign_threshold"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string"
+        },
+        "metric": {
+          "enum": [
+            "weighted_jaccard",
+            "pearson",
+            "spearman",
+            "covariance",
+            "precision",
+            "other"
+          ]
+        },
+        "estimator": {
+          "type": "string"
+        },
+        "preprocessing_revision": {
+          "type": "string"
+        },
+        "roi_order_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "segment_volumes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repeat_placements_per_participant": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_common_edges": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "neutral_sign_threshold": {
+          "type": "number",
+          "minimum": 0
+        },
+        "quality_metrics": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
+          }
+        },
+        "code_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "configuration_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "environment_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "participant_key",
+          "site",
+          "phase",
+          "within_similarity",
+          "between_similarity",
+          "paired_gap",
+          "within_repeat_count",
+          "between_repeat_count"
+        ],
+        "properties": {
+          "participant_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pseudonymous local key; never a direct identifier."
+          },
+          "site": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "optimization",
+              "replication",
+              "external_holdout",
+              "unknown"
+            ]
+          },
+          "within_similarity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "between_similarity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "paired_gap": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "within_repeat_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "between_repeat_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "mean_framewise_displacement_mm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "censor_fraction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "network_similarity_index": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Optional; only include if the NSI implementation and applicability are documented."
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "participant_count",
+        "median_within_similarity",
+        "median_between_similarity",
+        "median_paired_gap",
+        "positive_gap_fraction",
+        "sign_test",
+        "participant_bootstrap_ci"
+      ],
+      "properties": {
+        "participant_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "median_within_similarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "median_between_similarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "median_paired_gap": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "positive_gap_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sign_test": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "positive_count",
+            "negative_count",
+            "tie_count",
+            "non_tied_count",
+            "p_two_sided_exact"
+          ],
+          "properties": {
+            "positive_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "negative_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tie_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "non_tied_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "p_two_sided_exact": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "participant_bootstrap_ci": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "upper",
+            "confidence_level",
+            "draws",
+            "seed"
+          ],
+          "properties": {
+            "lower": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "upper": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "confidence_level": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "draws": {
+              "type": "integer",
+              "minimum": 100
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "edge_sign_transitions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total_edges",
+            "polarity_reversal_count",
+            "sign_state_change_count",
+            "neutral_threshold"
+          ],
+          "properties": {
+            "total_edges": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "polarity_reversal_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sign_state_change_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "neutral_threshold": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phenomenal_experience_inference",
+        "causal_interpretation",
+        "clinical_use"
+      ],
+      "properties": {
+        "phenomenal_experience_inference": {
+          "const": "not_established_by_rcaf"
+        },
+        "causal_interpretation": {
+          "const": "not_established_by_observational_similarity"
+        },
+        "clinical_use": {
+          "const": "not_validated_for_clinical_use"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "result_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the exact serialized result bundle; required by semantic validation for independent_replay evidence."
+    }
+  }
+}

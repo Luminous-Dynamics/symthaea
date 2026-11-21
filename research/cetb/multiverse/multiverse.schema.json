@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/cetb/multiverse/multiverse.schema.json",
+  "title": "CETB defensible analysis multiverse manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "status",
+    "claim",
+    "freeze",
+    "generation",
+    "decision_nodes",
+    "compatibility_rules",
+    "equivalence_assessments",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cetb.defensible-multiverse/0.1.0"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "synthetic_fixture",
+        "preregistered_confirmatory",
+        "exploratory"
+      ]
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "endpoint",
+        "modality",
+        "population",
+        "primary_estimand"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modality": {
+          "type": "string",
+          "minLength": 1
+        },
+        "population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_estimand": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "freeze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_sha256",
+        "registered_at",
+        "confirmatory_outcomes_accessed"
+      ],
+      "properties": {
+        "protocol_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "registered_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "confirmatory_outcomes_accessed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "seed",
+        "max_pipelines"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "enumerate_all_compatible",
+            "deterministic_sample"
+          ]
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_pipelines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sampling_method": {
+          "type": "string"
+        }
+      }
+    },
+    "decision_nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "stage",
+          "purpose",
+          "applicability",
+          "options"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stage": {
+            "enum": [
+              "measurement_construct",
+              "preprocessing",
+              "estimation",
+              "model_inference",
+              "decision_reporting"
+            ]
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          },
+          "applicability": {
+            "enum": [
+              "applicable",
+              "not_applicable_with_rationale"
+            ]
+          },
+          "not_applicable_rationale": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "option_id",
+                "implementation",
+                "defensibility_rationale",
+                "evidence_basis",
+                "expected_construct",
+                "limitations",
+                "lane"
+              ],
+              "properties": {
+                "option_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "implementation": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "defensibility_rationale": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "evidence_basis": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expected_construct": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "lane": {
+                  "enum": [
+                    "primary",
+                    "sensitivity",
+                    "exploratory"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compatibility_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "effect",
+          "option_ids",
+          "rationale"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "effect": {
+            "enum": [
+              "allow",
+              "forbid",
+              "separate_estimand"
+            ]
+          },
+          "option_ids": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string"
+            }
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "equivalence_assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assessment_id",
+          "option_ids",
+          "criterion",
+          "status",
+          "rationale"
+        ],
+        "properties": {
+          "assessment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "option_ids": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string"
+            }
+          },
+          "criterion": {
+            "enum": [
+              "construct",
+              "scale",
+              "estimand",
+              "reliability",
+              "power_precision",
+              "decision_consequence"
+            ]
+          },
+          "status": {
+            "enum": [
+              "equivalent",
+              "non_equivalent",
+              "uncertain"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

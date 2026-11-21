@@ -1,0 +1,83 @@
+{
+  "schema_version": "cetb.measurement-qualification/0.1.0",
+  "receipt_id": "synthetic-measurement-qualification-example",
+  "evidence_status": "synthetic_fixture",
+  "claim": {
+    "claim_id": "synthetic-network-change",
+    "endpoint": "recovery of a known correlation-network perturbation",
+    "modality": "synthetic",
+    "population": "independently generated synthetic participants",
+    "intended_use": "method_research"
+  },
+  "data_receipt": {
+    "dataset_id": "rcaf-gaussian-factor-simulation",
+    "dataset_version": "0.1.0",
+    "access_state": "not_downloaded",
+    "participant_count": 24,
+    "file_manifest_sha256": null
+  },
+  "measurement_sufficiency": {
+    "status": "not_assessed",
+    "method_id": "synthetic_samples_per_segment",
+    "modality_scope": "Gaussian factor model only",
+    "metric_value": 160,
+    "threshold": null,
+    "rationale": "Number of synthetic observations per generated segment; this is not an NSI or biological data-quality measure.",
+    "provenance": [
+      "research/rcaf/src/simulation.rs"
+    ]
+  },
+  "repeatability": {
+    "status": "not_assessed",
+    "estimator_id": "absolute_weighted_jaccard",
+    "inferential_unit": "participant",
+    "within_state_estimate": null,
+    "confidence_interval": null,
+    "participant_count": 24,
+    "surface_dimensions": [
+      "temporal_autocorrelation",
+      "samples_per_segment",
+      "injected_module_loading"
+    ],
+    "rationale": "A synthetic calibration contract; no empirical test-retest data supplied."
+  },
+  "construct_validity": {
+    "status": "not_assessed",
+    "operational_construct": "known module-loading injection in a Gaussian two-factor network model",
+    "positive_controls": [
+      "declared non-zero module loading increment"
+    ],
+    "negative_controls": [
+      "zero-dose same-state null"
+    ],
+    "reporting_scope": "other",
+    "rationale": "Synthetic network change is not phenomenal experience, consciousness, clinical state or biological mechanism."
+  },
+  "transportability": {
+    "participant_holdout": {
+      "status": "not_assessed",
+      "sample_size": 0,
+      "source_independence": "not_applicable",
+      "details": "No empirical participant cohort."
+    },
+    "site_holdout": {
+      "status": "not_assessed",
+      "sample_size": 0,
+      "source_independence": "not_applicable",
+      "details": "No acquisition sites in this synthetic simulation."
+    },
+    "independent_cohort": {
+      "status": "not_assessed",
+      "sample_size": 0,
+      "source_independence": "not_applicable",
+      "details": "No external cohort."
+    }
+  },
+  "no_composite_score": true,
+  "claim_limits": [
+    "synthetic software calibration only",
+    "measurement sufficiency, repeatability, construct validity and transportability are independent axes",
+    "NSI is a precision-fMRI-specific measure and must not be transplanted to EEG or MEG without validation",
+    "no biological or consciousness inference"
+  ]
+}
