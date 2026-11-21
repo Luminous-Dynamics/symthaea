@@ -319,6 +319,7 @@ fn evolve_state(
 ) -> EvolutionOutcome {
     if condition == "static_hdc_bundle"
         || condition == "static_mismatched_pairing_control"
+        || condition == "static_random_query_control"
         || horizon_seconds == 0.0
     {
         return EvolutionOutcome {
@@ -387,8 +388,13 @@ fn evolve_state(
     }
 }
 
-fn decode(memory: &PreparedMemory, state: &ContinuousHV, query_index: usize) -> Scores {
-    let query = memory.keys[query_index].bind(state);
+fn decode(
+    memory: &PreparedMemory,
+    state: &ContinuousHV,
+    query_index: usize,
+    query_key: &ContinuousHV,
+) -> Scores {
+    let query = query_key.bind(state);
     let mut best_index = None;
     let mut best_score = f32::NEG_INFINITY;
     let mut second_best = f32::NEG_INFINITY;
@@ -485,6 +491,7 @@ fn run_cohort(
     let event_count = if horizon_seconds == 0.0
         || condition == "static_hdc_bundle"
         || condition == "static_mismatched_pairing_control"
+        || condition == "static_random_query_control"
     {
         0
     } else {
@@ -520,7 +527,17 @@ fn run_cohort(
     let mut accumulator = Accumulator::default();
 
     for query_index in 0..fan_in {
-        let scores = decode(memory, state, query_index);
+        let random_query_key;
+        let query_key = if condition == "static_random_query_control" {
+            random_query_key = bipolar_random(
+                dim,
+                derive_seed(seed, 6, query_index as u64),
+            );
+            &random_query_key
+        } else {
+            &memory.keys[query_index]
+        };
+        let scores = decode(memory, state, query_index, query_key);
         if scores.valid {
             accumulator.valid_queries += 1;
             accumulator.target_similarity_sum +=
@@ -629,14 +646,32 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let seed = seed_index as u64;
                 let memory = prepare_memory(dim, fan_in, seed);
 
-                for &horizon_seconds in &args.horizons {
+                // Static controls are emitted once per corpus, not duplicated
+                // for each horizon or event schedule.
+                for condition in [
+                    "static_hdc_bundle",
+                    "static_mismatched_pairing_control",
+                    "static_random_query_control",
+                ] {
+                    run_cohort(
+                        &mut writer,
+                        &memory,
+                        seed,
+                        dim,
+                        fan_in,
+                        0.0,
+                        0,
+                        "not_applicable",
+                        condition,
+                    )?;
+                }
+
+                for &horizon_seconds in args.horizons.iter().filter(|&&h| h > 0.0) {
                     for &events in &args.events {
                         for gap_profile in ["regular", "irregular"] {
                             for condition in [
-                                "static_hdc_bundle",
                                 "hdc_ltc_zero_input",
                                 "hdc_ltc_distractor",
-                                "static_mismatched_pairing_control",
                             ] {
                                 run_cohort(
                                     &mut writer,
