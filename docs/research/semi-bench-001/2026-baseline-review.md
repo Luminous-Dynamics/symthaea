@@ -85,3 +85,18 @@ A later Symthaea HDC/CfC model should be evaluated as a challenger against PSS-H
 ## Claim ceiling
 
 This review establishes current literature anchors and their reported protocols. It does not reproduce either paper, establish a new SOTA result, validate transfer to a live fab or demonstrate physical manufacturing improvement.
+
+
+## EDA placement: proxy objectives versus final routed design
+
+ChiPBench (NeurIPS 2025 Datasets & Benchmarks Track) evaluates six AI placers on 20 CPU/GPU/NPU circuits through the full OpenROAD flow and reports degradation versus hierarchical baseline for the evaluated AI methods: https://proceedings.neurips.cc/paper_files/paper/2025/hash/1cba8502063fab9df252a63968691768-Abstract-Datasets_and_Benchmarks_Track.html.
+
+PPAPlace (ICCAD 2026) reports approximately -0.08 Pearson correlation between macro HPWL and WNS, finds post-global-routing labels more faithful to final timing than HPWL/pre-route timing, and reports 22% WNS / 51% TNS improvement on five held-out ChiPBench circuits versus the hierarchical baseline while preserving power/routability: https://arxiv.org/abs/2608.13790. Treat as paper-reported, not reproduced Luminous results.
+
+A separate end-to-end evaluation workstream is [SEMI-EDA-001 #13069](https://github.com/Luminous-Dynamics/symthaea/issues/13069). Its central rule is that predicted or intermediate metrics cannot stand in for final routed outcomes.
+
+## Manufacturing intelligence and semiconductor digital-twin standards
+
+NIST's 2026 Super Intelligence for Manufacturing programme describes TIDAL (Teamed, Integrated, DT-assured and Layered Intelligence), spanning asset, site/area and enterprise levels, and includes a shared operation test bench combining real equipment and simulators: https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing.
+
+SEMI SNARF #7465 proposes a Specification for Digital Twins in Semiconductor Manufacturing covering framework definitions, application classes, external/security interfaces, lifecycle and prediction-quality metrics: https://downloads.semi.org/web/wstdsbal.nsf/0e0afa4c4969bea688256efd0062a27c/61c2bf6034c0eed988258dcd00669238%21OpenDocument. This is a standard-development activity proposal, not a final published standard or a Luminous conformance result.
