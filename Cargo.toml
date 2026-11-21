@@ -25,6 +25,9 @@ exclude = [
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
+    # Stale path matched by crates/core/* but has no Cargo.toml. Keep it
+    # explicitly outside the workspace until it is restored as a real crate.
+    "crates/core/symthaea",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
     # stack, but zero consumers — its only reference is foveation's non-default
     # `perception` feature nothing enables, and it duplicates src/perception/'s
