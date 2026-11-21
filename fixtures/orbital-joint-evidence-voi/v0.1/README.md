@@ -6,7 +6,7 @@
 
 ## Files
 
-- `scenarios.json`: 11 synthetic scenarios, explicit state/loss contexts, action proposals, resource vectors and expected qualitative/known-answer checks.
+- `scenarios.json`: 13 synthetic scenarios, explicit state/loss contexts, action proposals, resource vectors and expected qualitative/known-answer checks.
 - `scenarios.schema.json`: JSON Schema Draft 2020-12 for the v0.1 corpus.\n- [Executable dry-run preflight](https://github.com/Luminous-Dynamics/symthaea/tree/research/orbital-joint-evidence-voi-v0-1/tools/orbital-joint-evidence-voi-bench): resource/admissibility/claim checks, finite-state minimax regret and one explicit calibrated EVSI case.\n- A separately implemented standard-library Python oracle under the same tool directory.
 
 ## Scenario coverage
@@ -23,7 +23,7 @@
 | JEV-008 | Can coupon evidence be promoted to a production-joint claim without a transfer bridge? It must not. |
 | JEV-009 | Can an information-rich action replace a pre-registered critical campaign interaction? It must not. |
 | JEV-010 | Can a first-mating test resolve wear/lifecycle claims? It must not. |
-| JEV-011 | Does an aborted test retain its cost and evidence gap rather than becoming a pass? |
+| JEV-011 | Does an aborted test retain its cost and evidence gap rather than becoming a pass? |\n| JEV-012 | Are actual resources preserved when an aborted test exceeds its estimate but stays within the scenario budget? |\n| JEV-013 | Are actual resources retained and reported when an aborted test exceeds both estimate and total budget? |
 
 ## Important interpretation
 
@@ -40,4 +40,4 @@ The scenario catalogue separates:
 - pre-registered test obligations from general information gain;
 - planned actions from actual execution outcomes.
 
-The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim matching, dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. They do not rank a general action catalogue or claim that one policy is superior. The adaptive selector tournament remains unimplemented; no solver or physical test is called.
+The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim matching, dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. They do not rank a general action catalogue or claim that one policy is superior. The adaptive selector tournament remains unimplemented; no solver or physical test is called.
