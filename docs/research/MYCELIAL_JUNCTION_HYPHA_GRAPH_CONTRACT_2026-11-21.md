@@ -42,6 +42,7 @@ The current model does not identify biological plant roots. Root-directed effici
 Each segment preserves:
 
 - stable source filament ID;
+- a graph-level, sorted `source_filament_ids` list that lets deserialized validation detect a wholly omitted source curve;
 - quantized `t_start` and `t_end` parameters at one-millionth resolution;
 - start and end junction identities;
 - actual cubic-Bezier arc-length estimate;
@@ -92,8 +93,11 @@ Fail-closed checks include:
 - exact source/target contact parameter constraints;
 - maximum declared-junction gap;
 - collision of two fusion records at the same filament/parameter contact;
-- segment endpoint references, positive lengths and radius bounds;
-- full, gap-free, non-overlapping parameter coverage.
+- segment endpoint references and incidence consistency;
+- junction metadata consistency (terminal IDs are incident, fusion IDs exist only on anastomosis junctions);
+- bounded IDs, coordinates, arc lengths, weld offsets and radii;
+- full, gap-free, non-overlapping parameter coverage for every declared source filament, including detection of a completely omitted curve after deserialization;
+- serialization round-trip digest equality.
 
 The current implementation conservatively rejects two separate fusion records that claim the same curve contact. Multi-party anastomosis junctions are a follow-on; they must merge through an explicit accepted multi-contact record or a separately validated union rule, not by coordinate proximity.
 
@@ -183,6 +187,7 @@ Targets below are proposed, not achieved.
 
 ### Numerical accuracy
 
+- A deterministic high-resolution chord-length oracle now checks a high-curvature cubic-Bezier fixture against the 64-interval Simpson implementation. This is an initial regression check, not an exhaustive numerical qualification.
 - Compare Simpson arc length against an independent adaptive integrator on lines, circles approximated by cubic Beziers, high-curvature curves, inflections and near-degenerate curves.
 - Report relative and absolute integration error over a frozen [0,1] curve-parameter corpus.
 - Initial target: median relative error ≤1e-6 and P99 ≤1e-4 for non-degenerate curves; these are proposed targets to verify, not current claims.
