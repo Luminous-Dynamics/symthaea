@@ -104,5 +104,24 @@
     "optional_stopping": "only preregistered checkpoint looks are covered simultaneously; do not inspect mid-batch intervals",
     "random_stream": "one deterministic SplitMix64 feature stream; no reseeding between checkpoints",
     "claim_limit": "simultaneous bound for ideal independent spectral feature draws and random-feature integration error only; not physical solver or particle-sampling error"
+  },
+  "multi_scale_experimental": {
+    "status": "research_profile_not_yet_tournament_accepted",
+    "base_domain": "S^1_L x R",
+    "mixture": "positive_weighted_sum_of_characteristic_von_mises_periodic_position_times_gaussian_velocity_kernels",
+    "component_constraints": {
+      "maximum_components": 32,
+      "weights": "strictly positive; sum to one within 1e-12; normalized before use",
+      "scales": "spatial_concentration_kappa>0 and velocity_length_scale>0",
+      "duplicate_scale_pairs": "rejected"
+    },
+    "required_controls": [
+      "broad_global_phase_space_difference",
+      "thin_velocity_beam_or_narrow_feature",
+      "joint_position_velocity_correlation",
+      "finite_fourier_alias",
+      "signed_colocated_cancellation"
+    ],
+    "claim_limit": "positive mixture remains characteristic; bandwidth sensitivity and finite precision must still be evaluated on held-out cohorts"
   }
 }
