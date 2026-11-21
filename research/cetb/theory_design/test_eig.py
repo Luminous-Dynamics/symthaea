@@ -177,5 +177,16 @@ class ExpectedInformationGainTests(unittest.TestCase):
             })
 
 
+    def test_public_helpers_reject_boolean_and_malformed_quantile_inputs(self):
+        with self.assertRaises(DesignValidationError):
+            theory_entropy_bits({"A": 1.0}, tolerance=float("nan"))
+        with self.assertRaises(DesignValidationError):
+            weighted_lower_quantile([(True, 1.0)], 0.5)
+        with self.assertRaises(DesignValidationError):
+            weighted_lower_quantile([(0.2, True)], 0.5)
+        with self.assertRaises(DesignValidationError):
+            weighted_lower_quantile([(0.2,)], 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()
