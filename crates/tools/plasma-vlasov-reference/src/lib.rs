@@ -119,7 +119,6 @@ impl FourierModeCoefficient {
     }
 }
 
-
 /// Spectral-tail energy observations for one phase-space axis.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpectralAxisTail {
@@ -417,10 +416,10 @@ impl VlasovPoisson1d1v {
             return Err(SolverError::InvalidSpectralTailFraction);
         }
 
-        let x_start = ((tail_start_fraction * (self.config.nx / 2) as f64).ceil() as usize)
-            .max(1);
-        let v_start = ((tail_start_fraction * (self.config.nv / 2) as f64).ceil() as usize)
-            .max(1);
+        let x_start =
+            ((tail_start_fraction * (self.config.nx / 2) as f64).ceil() as usize).max(1);
+        let v_start =
+            ((tail_start_fraction * (self.config.nv / 2) as f64).ceil() as usize).max(1);
         let x = spectral_tail_axis_x(&self.distribution, self.config, x_start)?;
         let velocity = spectral_tail_axis_v(&self.distribution, self.config, v_start)?;
 
