@@ -164,6 +164,7 @@ pub fn build_mycelial_model(
             None,
             SpatialPoint3::ZERO,
             direction,
+            direction,
             length,
             branch_depth,
             0,
@@ -214,6 +215,7 @@ fn append_filament(
     parent_id: Option<u32>,
     start: SpatialPoint3,
     direction: SpatialPoint3,
+    incoming_tangent: SpatialPoint3,
     length: f32,
     remaining_depth: u8,
     generation: u8,
@@ -236,9 +238,16 @@ fn append_filament(
     let end = start
         .add(direction.scale(length))
         .add(lateral.scale(1.08));
+    // Keep child branches tangent-continuous at the fork, then let them
+    // diverge along their own deterministic direction.
+    let start_tangent = if parent_id.is_some() {
+        incoming_tangent.normalized()
+    } else {
+        direction
+    };
     let control_a = start
-        .add(direction.scale(length * 0.34))
-        .add(lateral.scale(0.20));
+        .add(start_tangent.scale(length * 0.28))
+        .add(lateral.scale(0.16));
     let control_b = start
         .add(direction.scale(length * 0.76))
         .add(lateral.scale(0.88));
@@ -277,6 +286,7 @@ fn append_filament(
             Some(id),
             end,
             child_direction,
+            direction,
             child_length,
             remaining_depth - 1,
             generation + 1,
