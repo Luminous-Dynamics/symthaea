@@ -86,7 +86,11 @@ pub enum CognitiveEventApplyOutcome {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CognitiveEventError {
+    UnsupportedSchemaVersion(u16),
     InvalidEventIdentifier,
+    SessionMismatch { expected: String, received: String },
+    InvalidEventPayload(&'static str),
+    SessionProvenanceMismatch,
     InvalidProducer,
     InvalidTraceDigest,
     InvalidSequence,
@@ -124,7 +128,17 @@ pub enum CognitiveEventError {
 impl fmt::Display for CognitiveEventError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidEventIdentifier => write!(f, "invalid event identifier"),
+            Self::UnsupportedSchemaVersion(version) => {
+                write!(f, "unsupported cognitive topology event schema version {version}")
+            }
+            Self::InvalidEventIdentifier => write!(f, "invalid event or session identifier"),
+            Self::SessionMismatch { expected, received } => {
+                write!(f, "event session {received} does not match reducer session {expected}")
+            }
+            Self::InvalidEventPayload(field) => write!(f, "invalid event payload field {field}"),
+            Self::SessionProvenanceMismatch => {
+                write!(f, "synthetic and runtime provenance cannot be mixed in one topology session")
+            }
             Self::InvalidProducer => write!(f, "invalid event producer"),
             Self::InvalidTraceDigest => write!(f, "invalid event trace digest"),
             Self::InvalidSequence => write!(f, "event sequence must be non-zero"),
@@ -236,7 +250,10 @@ impl CognitiveTopologyReducer {
         validate_event(&event)?;
 
         if event.session_id != self.topology.session_id {
-            return Err(CognitiveEventError::InvalidEventIdentifier);
+            return Err(CognitiveEventError::SessionMismatch {
+                expected: self.topology.session_id.clone(),
+                received: event.session_id,
+            });
         }
         let digest = event_digest(&event);
         for previous in &self.events {
@@ -328,20 +345,12 @@ impl CognitiveTopologyReducer {
 
 fn validate_event(event: &CognitiveTopologyEvent) -> Result<(), CognitiveEventError> {
     if event.schema_version != COGNITIVE_TOPOLOGY_EVENT_SCHEMA_VERSION {
-        return Err(CognitiveEventError::InvalidSequence);
+        return Err(CognitiveEventError::UnsupportedSchemaVersion(
+            event.schema_version,
+        ));
     }
-    if event.session_id.is_empty()
-        || event.session_id.len() > 128
-        || event.session_id.chars().any(char::is_control)
-    {
-        return Err(CognitiveEventError::InvalidEventIdentifier);
-    }
-    if event.evidence.event_id.is_empty()
-        || event.evidence.event_id.len() > 128
-        || event.evidence.event_id.chars().any(char::is_control)
-    {
-        return Err(CognitiveEventError::InvalidEventIdentifier);
-    }
+    validate_event_identifier(&event.session_id)?;
+    validate_event_identifier(&event.evidence.event_id)?;
     if event.evidence.producer.is_empty()
         || event.evidence.producer.len() > 96
         || event.evidence.producer.chars().any(char::is_control)
@@ -358,6 +367,86 @@ fn validate_event(event: &CognitiveTopologyEvent) -> Result<(), CognitiveEventEr
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
     {
         return Err(CognitiveEventError::InvalidTraceDigest);
+    }
+
+    match &event.change {
+        CognitiveTopologyChange::NodeAdded {
+            node_id,
+            label,
+            activation,
+            ..
+        } => {
+            validate_event_identifier(node_id)?;
+            if label.is_empty()
+                || label.len() > 256
+                || label.chars().any(char::is_control)
+            {
+                return Err(CognitiveEventError::InvalidEventPayload("node label"));
+            }
+            validate_event_activation(*activation)?;
+        }
+        CognitiveTopologyChange::NodeStatusChanged {
+            node_id, activation, ..
+        } => {
+            validate_event_identifier(node_id)?;
+            validate_event_activation(*activation)?;
+        }
+        CognitiveTopologyChange::EdgeAdded {
+            edge_id,
+            source,
+            target,
+            activation,
+            ..
+        } => {
+            validate_event_identifier(edge_id)?;
+            validate_event_identifier(source)?;
+            validate_event_identifier(target)?;
+            validate_event_activation(*activation)?;
+        }
+        CognitiveTopologyChange::EdgeStatusChanged {
+            edge_id, activation, ..
+        } => {
+            validate_event_identifier(edge_id)?;
+            validate_event_activation(*activation)?;
+        }
+        CognitiveTopologyChange::EpisodeStarted {
+            episode_id,
+            node_ids,
+            edge_ids,
+            ..
+        } => {
+            validate_event_identifier(episode_id)?;
+            if node_ids.len() > MAX_COGNITIVE_NODES
+                || edge_ids.len() > MAX_COGNITIVE_EDGES
+            {
+                return Err(CognitiveEventError::InvalidEventPayload(
+                    "episode membership exceeds topology bounds",
+                ));
+            }
+            for node_id in node_ids {
+                validate_event_identifier(node_id)?;
+            }
+            for edge_id in edge_ids {
+                validate_event_identifier(edge_id)?;
+            }
+        }
+        CognitiveTopologyChange::EpisodeStateChanged { episode_id, .. } => {
+            validate_event_identifier(episode_id)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_event_identifier(value: &str) -> Result<(), CognitiveEventError> {
+    if value.is_empty() || value.len() > 128 || value.chars().any(char::is_control) {
+        return Err(CognitiveEventError::InvalidEventIdentifier);
+    }
+    Ok(())
+}
+
+fn validate_event_activation(value: Option<f32>) -> Result<(), CognitiveEventError> {
+    if value.is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value)) {
+        return Err(CognitiveEventError::InvalidEventPayload("activation"));
     }
     Ok(())
 }
