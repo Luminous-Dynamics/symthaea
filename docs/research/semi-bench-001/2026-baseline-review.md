@@ -100,3 +100,10 @@ A separate end-to-end evaluation workstream is [SEMI-EDA-001 #13069](https://git
 NIST's 2026 Super Intelligence for Manufacturing programme describes TIDAL (Teamed, Integrated, DT-assured and Layered Intelligence), spanning asset, site/area and enterprise levels, and includes a shared operation test bench combining real equipment and simulators: https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing.
 
 SEMI SNARF #7465 proposes a Specification for Digital Twins in Semiconductor Manufacturing covering framework definitions, application classes, external/security interfaces, lifecycle and prediction-quality metrics: https://downloads.semi.org/web/wstdsbal.nsf/0e0afa4c4969bea688256efd0062a27c/61c2bf6034c0eed988258dcd00669238%21OpenDocument. This is a standard-development activity proposal, not a final published standard or a Luminous conformance result.
+
+
+## MixedWM38 and compositional zero-shot recognition
+
+The upstream MixedWM38 README explicitly states that GAN-generated wafer maps were added to balance class counts: https://github.com/Junliangwangdhu/WaferMap. A public multi-label reproduction reports macro-F1 0.9846 and exact-match 0.9696 but explicitly cautions that MixedWM38 is largely GAN-synthesized and saturates quickly: https://github.com/ALEX8642/wafer-mixed. These are useful pipeline-comparison results, not evidence of real-fab generalization.
+
+Yang, Jang and Kim (Expert Systems with Applications 299, 2026, article 130127) propose generalized zero-shot classification of mixed wafer patterns from imbalanced single-defect training using CMDM and PASS, reporting 74.3% harmonic-mean accuracy in the most imbalanced setting and 3.92 percentage-point improvement over a compared diffusion classifier: https://doi.org/10.1016/j.eswa.2025.130127. This supports a separate leave-combination-out track rather than only random multi-label interpolation.
