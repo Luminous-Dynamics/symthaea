@@ -47,6 +47,22 @@
         "reported_split": "stratified-60-20-20",
         "reported_pr_auc_reference": 0.2207,
         "caveat": "Only 21 defective observations in each validation and test partition; high-precision validation threshold yielded zero test recall."
+      },
+      "mirror_integrity_audit": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+      "third_party_mirror_audit": {
+        "repository": "https://github.com/Be1an001/semiconductor-pass-fail-prediction-python",
+        "commit": "0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
+        "feature_git_blob_sha1": "69fbabe279b3a1a04a51cfa3d8382078cab50c45",
+        "labels_git_blob_sha1": "3465abe5f7975bcc61d040e75860160873feb0bf",
+        "feature_rows": 1567,
+        "feature_columns": 590,
+        "missing_values": 41951,
+        "rows_with_missing": 1567,
+        "fail_count": 104,
+        "timestamp_order": "non-decreasing-source-row-order",
+        "timezone_offset_present": false,
+        "byte_identity_to_official_uci": "not-verified",
+        "audit_file": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
       }
     },
     {
@@ -322,7 +338,19 @@
         "pr_auc": 0.2192,
         "review_rate": 0.2134
       },
-      "caveat": "not time-held-out; exact UCI data/split hashes are not frozen in Symthaea; external model-card labels this a screening prototype, not production"
+      "caveat": "not time-held-out; exact UCI data/split hashes are not frozen in Symthaea; external model-card labels this a screening prototype, not production",
+      "chronological_audit": {
+        "audit_file": "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json",
+        "proposed_split": {
+          "train_fail": 76,
+          "validation_fail": 11,
+          "test_fail": 17,
+          "train_rows": 940,
+          "validation_rows": 313,
+          "test_rows": 314
+        },
+        "claim": "source-local chronology only; not a model result, not group-disjoint, not UTC, limited positive support"
+      }
     },
     {
       "id": "external-MixedWM38-multilabel-baseline",
