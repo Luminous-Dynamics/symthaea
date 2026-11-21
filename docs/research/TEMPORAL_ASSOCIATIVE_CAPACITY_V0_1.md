@@ -109,6 +109,39 @@ It cannot establish:
 - real-world data performance, hardware throughput or energy efficiency;
 - a universal HDC capacity threshold.
 
+## Matched baseline matrix for later SOTA comparison
+
+The v0.1 runner is a synthetic *associative recall* probe. It must not be presented as a forecasting, continual-learning or neuromorphic-system benchmark. Those comparisons need their own task adapters and measurement contracts.
+
+| Evaluation question | Required comparison family | Fairness rule |
+|---|---|---|
+| Static VSA capacity | MAP-I, MAP-B, sparse binary and the algebraically applicable HRR/FHRR/GHRR / Symthaea profiles | Reproduce the same symbolic task and error target. IBM's 2026 JAIR analysis concerns set membership and set-intersection estimation; this key/value recall workload is related but not the same benchmark. |
+| Key/value associative recall | Existing BinaryHV and ContinuousHV incumbents plus matched MAP / HRR / FHRR / sparse VSA baselines | Match dimension, precision, stored information, query count, bundling load, cleanup oracle, and exact candidate set. Include flat exact scan as the correctness oracle. |
+| Continuous-time state modelling | Original CfC variants (including CfC-mmRNN), HDC-LTC, NIALIM/DFA-CfN/PRDFA-CfN, Neural CDE / ODE-RNN, and strong GRU-D / GRU / LSTM controls | Use the same continuous-time task, timestamps, interpolation policy, initial conditions, training data and tuning budget. A passive-retention test is not a substitute for a forecasting or sequence-learning test. |
+| Irregular-time forecasting | BITS and TIME-compatible data/tasks, plus strong task-appropriate time-series models | Use their split/no-leakage protocols and report results by missingness, sampling irregularity and pattern, not only a single average. Do not relabel synthetic v0.1 results as BITS or TIME results. |
+| Continual learning / neuromorphic relevance | NeuroBench algorithm tasks where applicable; deployed system track only after a real target implementation exists | Algorithm quality/complexity is separate from end-to-end deployed timing and efficiency. |
+| Retrieval at scale | Exact scan first; then conventional vector index / ANN and cache baselines where corpus size justifies them | Candidate-generation recall and final exact reranking are separate. Match hardware, concurrency, filters, data residency, cold-start and update/rebuild costs. |
+
+### Current state-of-the-art context
+
+- The 2026 JAIR VSA paper derives capacity bounds for MAP-I, MAP-B and sparse-binary VSAs on set-membership and set-intersection tasks. Symthaea should reproduce those exact workloads under #11145 before extending the conclusion to other algebras.
+- The 2026 BITS benchmark covers 11 datasets across nine domains and reports that rankings vary with irregularity characteristics and metric choice; it explicitly finds no single modelling strategy consistently dominates. TIME (2026) adds 50 datasets and 98 forecasting tasks with strict zero-shot/no-leakage evaluation. Those results support regime-specific Pareto comparisons rather than one universal leaderboard score.
+- The 2026 NIALIM/DFA-CfN/PRDFA-CfN paper reports a linear-input-interpolation approach with an error-bound analysis and results across six tasks, including physical dynamics, human activity, PhysioNet, sentiment, remote sensing and energy forecasting. It is a key comparator for the #13031/#13042 temporal-integration programme. Reproduce the pinned public implementation and verify that caller-supplied timestamps are honored before making a matched comparison.
+- The original CfC work established a solver-free approximate formulation for LTC dynamics. It remains a necessary baseline, but newer input-interpolation methods mean that matching only against zero-order-held CfC would be inadequate.
+- NeuroBench separates a hardware-independent algorithm track from a deployment-aware system track. Symthaea should follow that separation: algorithmic retrieval/forecasting quality and complexity first, then measured wall latency, throughput, memory and physical energy on a declared hardware boundary.
+
+### What "better than SOTA" should mean here
+
+Do not optimize for one headline score. A credible win requires a preregistered operating regime and a Pareto improvement across:
+1. **Quality:** correct retrieval / forecast / task utility, calibration and failure rate.
+2. **Information efficiency:** useful bits retained or recovered per stored byte and per update, with the task distribution stated.
+3. **Temporal fidelity:** trajectory error, irregular-gap stability, recovery after bursts, and decision freshness.
+4. **Resource cost:** memory footprint, bytes moved, allocation, CPU/GPU time, p50/p95/p99 latency, and physical joules only when directly measured.
+5. **Robustness:** missing, delayed, duplicated, reordered, adversarial and out-of-distribution events.
+6. **Operational integrity:** deterministic replay, versioned representations, provenance, resumability and fail-closed behavior.
+
+A candidate may win in one regime and lose in another. Publish the frontier and the losing regimes; do not silently promote an architecture globally.
+
 ## Next qualification stages
 
 1. Verify exact retrieval and random-query null behavior over a larger independent seed set.
