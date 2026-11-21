@@ -613,6 +613,135 @@ mod tests {
     }
 
     #[test]
+    fn risk_adjusted_voi_triggers_on_belief_state_loss_variance() {
+        let mut current = features();
+        current.predicted_ted_reduction_us = 100;
+        current.opportunity_loss_stddev_us = 1_000;
+        current.model_confidence_ppm = 1_000_000;
+        current.prediction_horizon_us = 10_000;
+
+        // Plain VOI is 100/50 = 2 us/nJ and would wait at this threshold.
+        assert!(matches!(
+            decide_next_observation(
+                SensingPolicy::ValueOfInformation {
+                    minimum_us_per_nj_ppm: 10_000_000,
+                },
+                context(20),
+                current,
+            )
+            .unwrap(),
+            SensingDecision::Wait { .. }
+        ));
+
+        // The full-PPM risk premium adds the 1,000-us candidate-estimated
+        // opportunity-loss standard deviation, making adjusted benefit 1,100 us.
+        assert!(matches!(
+            decide_next_observation(
+                SensingPolicy::RiskAdjustedValueOfInformation {
+                    minimum_adjusted_us_per_nj_ppm: 10_000_000,
+                    risk_aversion_ppm: 1_000_000,
+                    ignorance_weight_ppm: 0,
+                },
+                context(20),
+                current,
+            )
+            .unwrap(),
+            SensingDecision::ObserveNow {
+                reason: TriggerReason::RiskAdjustedValueOfInformation,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn risk_adjusted_voi_adds_model_ignorance_exposure_as_confidence_decays() {
+        let mut current = features();
+        current.predicted_ted_reduction_us = 100;
+        current.opportunity_loss_stddev_us = 0;
+        current.model_confidence_ppm = 0;
+        current.prediction_horizon_us = 10_000;
+
+        // At zero current model confidence, the candidate estimates up to
+        // 10,000 us of ignorance exposure over this horizon.
+        assert!(matches!(
+            decide_next_observation(
+                SensingPolicy::RiskAdjustedValueOfInformation {
+                    minimum_adjusted_us_per_nj_ppm: 50_000_000,
+                    risk_aversion_ppm: 0,
+                    ignorance_weight_ppm: 1_000_000,
+                },
+                context(20),
+                current,
+            )
+            .unwrap(),
+            SensingDecision::ObserveNow {
+                reason: TriggerReason::RiskAdjustedValueOfInformation,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn fully_confident_model_has_no_ignorance_surcharge() {
+        let mut current = features();
+        current.predicted_ted_reduction_us = 100;
+        current.opportunity_loss_stddev_us = 0;
+        current.model_confidence_ppm = 1_000_000;
+        current.prediction_horizon_us = 10_000;
+
+        assert!(matches!(
+            decide_next_observation(
+                SensingPolicy::RiskAdjustedValueOfInformation {
+                    minimum_adjusted_us_per_nj_ppm: 10_000_000,
+                    risk_aversion_ppm: 0,
+                    ignorance_weight_ppm: 1_000_000,
+                },
+                context(20),
+                current,
+            )
+            .unwrap(),
+            SensingDecision::Wait {
+                reason: TriggerReason::MaximumGap,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn risk_adjusted_voi_rejects_unbounded_coefficients_and_confidence() {
+        let invalid_policy = SensingPolicy::RiskAdjustedValueOfInformation {
+            minimum_adjusted_us_per_nj_ppm: 1,
+            risk_aversion_ppm: 1_000_001,
+            ignorance_weight_ppm: 0,
+        };
+        assert_eq!(
+            decide_next_observation(invalid_policy, context(20), features()),
+            Err(SensingError::InvalidProbability {
+                field: "risk_aversion_ppm",
+                value: 1_000_001,
+            })
+        );
+
+        let mut invalid_features = features();
+        invalid_features.model_confidence_ppm = 1_000_001;
+        assert_eq!(
+            decide_next_observation(
+                SensingPolicy::RiskAdjustedValueOfInformation {
+                    minimum_adjusted_us_per_nj_ppm: 1,
+                    risk_aversion_ppm: 0,
+                    ignorance_weight_ppm: 0,
+                },
+                context(20),
+                invalid_features,
+            ),
+            Err(SensingError::InvalidProbability {
+                field: "model_confidence_ppm",
+                value: 1_000_001,
+            })
+        );
+    }
+
+    #[test]
     fn observation_and_energy_budgets_fail_closed() {
         let mut no_observations = context(100);
         no_observations.remaining_observations = 0;
