@@ -41,12 +41,6 @@ fn fail(path: &str, message: impl AsRef<str>) -> String {
     format!("{path}: {}", message.as_ref())
 }
 
-fn object<'a>(value: &'a Value, path: &str) -> Result<&'a Map<String, Value>, String> {
-    value
-        .as_object()
-        .ok_or_else(|| fail(path, "must be an object"))
-}
-
 fn array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, String> {
     value
         .as_array()
