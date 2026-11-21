@@ -39,8 +39,9 @@ pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
 pub use cognitive_layout::{
-    COGNITIVE_PROJECTION_SCHEMA_VERSION, CognitiveAnchor, CognitiveSpatialLink,
-    CognitiveSpatialProjection, project_cognitive_topology,
+    COGNITIVE_PROJECTION_SCHEMA_VERSION, CognitiveAnchor, CognitiveLayoutConfig,
+    CognitiveLayoutError, CognitiveSpatialLink, CognitiveSpatialProjection,
+    layout_cognitive_topology, project_cognitive_topology,
 };
 pub use cognitive_topology::{
     COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveEdge, CognitiveEpisode, CognitiveEpisodeKind,
