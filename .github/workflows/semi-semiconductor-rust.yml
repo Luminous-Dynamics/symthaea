@@ -76,10 +76,12 @@ jobs:
           rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
           rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
           rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/threshold_policy.rs"
           rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/lib.rs"
           rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
           rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
           rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/threshold_policy.rs"
 
       - name: Test Rust benchmark contracts
         run: cargo test --manifest-path "${RUNNER_TEMP}/semi-contract-check/crates/domains/symthaea-semiconductor/Cargo.toml"
