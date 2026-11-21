@@ -171,23 +171,39 @@ pub enum CognitiveTopologyError {
 impl fmt::Display for CognitiveTopologyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedVersion(version) => write!(f, "unsupported cognitive topology schema version {version}"),
+            Self::UnsupportedVersion(version) => {
+                write!(f, "unsupported cognitive topology schema version {version}")
+            }
             Self::InvalidIdentifier(kind) => write!(f, "invalid {kind} identifier"),
             Self::InvalidLabel => write!(f, "invalid node label"),
             Self::InvalidProducer => write!(f, "invalid evidence producer"),
-            Self::InvalidTraceDigest => write!(f, "trace digest must be 64 lowercase hexadecimal characters"),
-            Self::InvalidSequence => write!(f, "evidence sequence is zero, exceeds last_sequence, or has non-monotonic time"),
-            Self::ConflictingEventMetadata => write!(f, "one event identity or sequence has conflicting evidence metadata"),
+            Self::InvalidTraceDigest => {
+                write!(f, "trace digest must be 64 lowercase hexadecimal characters")
+            }
+            Self::InvalidSequence => {
+                write!(f, "evidence sequence is zero, exceeds last_sequence, or has non-monotonic time")
+            }
+            Self::ConflictingEventMetadata => {
+                write!(f, "one event identity or sequence has conflicting evidence metadata")
+            }
             Self::DuplicateNode(id) => write!(f, "duplicate cognitive node {id}"),
             Self::DuplicateEdge(id) => write!(f, "duplicate cognitive edge {id}"),
             Self::DuplicateEpisode(id) => write!(f, "duplicate cognitive episode {id}"),
-            Self::NodeLimitExceeded(count) => write!(f, "{count} nodes exceeds limit {MAX_COGNITIVE_NODES}"),
-            Self::EdgeLimitExceeded(count) => write!(f, "{count} edges exceeds limit {MAX_COGNITIVE_EDGES}"),
-            Self::EpisodeLimitExceeded(count) => write!(f, "{count} episodes exceeds limit {MAX_COGNITIVE_EPISODES}"),
+            Self::NodeLimitExceeded(count) => {
+                write!(f, "{count} nodes exceeds limit {MAX_COGNITIVE_NODES}")
+            }
+            Self::EdgeLimitExceeded(count) => {
+                write!(f, "{count} edges exceeds limit {MAX_COGNITIVE_EDGES}")
+            }
+            Self::EpisodeLimitExceeded(count) => {
+                write!(f, "{count} episodes exceeds limit {MAX_COGNITIVE_EPISODES}")
+            }
             Self::DanglingEdgeEndpoint(id) => write!(f, "edge references missing node {id}"),
             Self::DanglingEpisodeNode(id) => write!(f, "episode references missing node {id}"),
             Self::DanglingEpisodeEdge(id) => write!(f, "episode references missing edge {id}"),
-            Self::InvalidActivation(id) => write!(f, "node/edge {id} has activation outside finite [0, 1]"),
+            Self::InvalidActivation(id) => {
+                write!(f, "node/edge {id} has activation outside finite [0, 1]")
+            }
         }
     }
 }
@@ -215,7 +231,10 @@ impl CognitiveTopology {
         let mut node_ids = HashSet::with_capacity(self.nodes.len());
         let mut edge_ids = HashSet::with_capacity(self.edges.len());
         let mut episode_ids = HashSet::with_capacity(self.episodes.len());
-        let mut event_metadata = HashMap::<String, (String, u64, u64, CognitiveProvenance, Option<String>)>::new();
+        let mut event_metadata = HashMap::<
+            String,
+            (String, u64, u64, CognitiveProvenance, Option<String>),
+        >::new();
         let mut sequence_events = BTreeMap::<u64, String>::new();
         let mut sequence_times = BTreeMap::<u64, u64>::new();
 
@@ -425,7 +444,9 @@ fn validate_evidence(
             return Err(CognitiveTopologyError::ConflictingEventMetadata);
         }
     }
-    if let Some(previous_event) = sequence_events.insert(evidence.sequence, evidence.event_id.clone()) {
+    if let Some(previous_event) =
+        sequence_events.insert(evidence.sequence, evidence.event_id.clone())
+    {
         if previous_event != evidence.event_id {
             return Err(CognitiveTopologyError::ConflictingEventMetadata);
         }
@@ -664,15 +685,25 @@ mod tests {
                     kind: CognitiveEpisodeKind::Association,
                     state: CognitiveEpisodeState::Completed,
                     evidence: evidence("event:association", 2),
-                    node_ids: vec!["concept:soil".to_string(), "concept:mycelium".to_string(), "concept:water".to_string()],
-                    edge_ids: vec!["edge:association-a".to_string(), "edge:association-b".to_string()],
+                    node_ids: vec![
+                        "concept:soil".to_string(),
+                        "concept:mycelium".to_string(),
+                        "concept:water".to_string(),
+                    ],
+                    edge_ids: vec![
+                        "edge:association-a".to_string(),
+                        "edge:association-b".to_string(),
+                    ],
                 },
                 CognitiveEpisode {
                     id: "episode:prediction".to_string(),
                     kind: CognitiveEpisodeKind::Prediction,
                     state: CognitiveEpisodeState::Unresolved,
                     evidence: evidence("event:prediction", 3),
-                    node_ids: vec!["concept:mycelium".to_string(), "prediction:resilience".to_string()],
+                    node_ids: vec![
+                        "concept:mycelium".to_string(),
+                        "prediction:resilience".to_string(),
+                    ],
                     edge_ids: vec!["edge:prediction".to_string()],
                 },
             ],
@@ -694,12 +725,23 @@ mod tests {
         let topology = fixture();
         topology.validate().expect("fixture must be valid");
         assert_eq!(topology.nodes.len(), 5);
-        assert_eq!(topology.edges.iter().filter(|edge| edge.status == EpistemicStatus::Candidate).count(), 3);
+        assert_eq!(
+            topology
+                .edges
+                .iter()
+                .filter(|edge| edge.status == EpistemicStatus::Candidate)
+                .count(),
+            3
+        );
         assert!(topology.episodes.iter().any(|episode| {
             episode.kind == CognitiveEpisodeKind::Prediction
                 && episode.state == CognitiveEpisodeState::Unresolved
         }));
-        assert!(topology.nodes.iter().filter(|node| node.status == EpistemicStatus::Candidate).any(|node| {
+        assert!(topology
+            .nodes
+            .iter()
+            .filter(|node| node.status == EpistemicStatus::Candidate)
+            .any(|node| {
             node.kind == CognitiveNodeKind::Prediction
         }));
     }
