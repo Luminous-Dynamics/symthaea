@@ -106,21 +106,11 @@ impl MixedDistribution {
     }
 }
 
-/// Reconstruct a real-space mixed Hermite-Legendre distribution.
-///
-/// Coefficient layout:
-/// - Hermite coefficients: row-major (hermite_modes, spatial_count).
-/// - Legendre coefficients: row-major (legendre_modes, spatial_count).
-/// - Returned distributions: row-major (spatial_count, velocities.len()).
-///
-/// Either basis family may be omitted by setting its mode count to zero and
-/// passing an empty coefficient slice. At least one family must be present.
-/// The frame shift/scale is validated and used only when Hermite modes exist;
-/// the Legendre window is validated and used only when Legendre modes exist.
-///
-/// This routine expects coefficients after any source-specific inverse spatial
-/// Fourier transform. It does not interpret FFT ordering or normalization.
 /// Coefficient fields in row-major (mode, x) layout.
+///
+/// Hermite and Legendre coefficients are stored separately. Either family may
+/// be omitted with a zero mode count and an empty slice. The nonempty family
+/// still needs exactly mode_count * spatial_count values.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MixedCoefficientFields<'a> {
     pub spatial_count: usize,
@@ -140,6 +130,13 @@ pub struct MixedVelocityGrid<'a> {
     pub velocity_max: f64,
 }
 
+/// Reconstruct a real-space mixed Hermite-Legendre distribution.
+///
+/// Input coefficient arrays are row-major (mode, x); output arrays are
+/// row-major (x, v). Either the Hermite or Legendre family may be omitted.
+/// Coefficients must already be in physical space after any source-specific
+/// inverse FFT. This function does not interpret FFT ordering or normalization,
+/// perform positivity clipping, or apply a conservation correction.
 pub fn reconstruct_mixed_distribution(
     coefficients: MixedCoefficientFields<'_>,
     grid: MixedVelocityGrid<'_>,
