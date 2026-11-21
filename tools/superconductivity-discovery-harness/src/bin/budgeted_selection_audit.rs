@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashSet};
 use std::env;
@@ -182,7 +182,9 @@ fn require_group_disjoint(
     label: &str,
 ) -> Result<(), String> {
     if let Some(shared) = training.intersection(evaluation).next() {
-        return Err(format!("{label} leakage between training and evaluation: {shared}"));
+        return Err(format!(
+            "{label} leakage between training and evaluation: {shared}"
+        ));
     }
     Ok(())
 }
@@ -212,7 +214,10 @@ fn validate_unique_identities(
 ) -> Result<(), String> {
     let mut candidate_ids = HashSet::new();
     let mut material_ids = HashSet::new();
-    for identity in training.iter().chain(evaluation.iter().map(|candidate| &candidate.identity)) {
+    for identity in training
+        .iter()
+        .chain(evaluation.iter().map(|candidate| &candidate.identity))
+    {
         if !candidate_ids.insert(identity.candidate_id.as_str()) {
             return Err(format!("duplicate candidate_id {}", identity.candidate_id));
         }
@@ -238,8 +243,10 @@ fn validate_family_holdouts(
 ) -> Result<(), String> {
     for field in ["family_id", "prototype_id", "reduced_formula", "source_id"] {
         let training_values = collect_group(training.iter(), field);
-        let evaluation_values =
-            collect_group(evaluation.iter().map(|candidate| &candidate.identity), field);
+        let evaluation_values = collect_group(
+            evaluation.iter().map(|candidate| &candidate.identity),
+            field,
+        );
         require_group_disjoint(&training_values, &evaluation_values, field)?;
     }
     Ok(())
@@ -266,14 +273,12 @@ where
         let right_candidate = &candidates[*right];
         let left_efficiency = score(left_candidate) / left_candidate.cost_units as f64;
         let right_efficiency = score(right_candidate) / right_candidate.cost_units as f64;
-        right_efficiency
-            .total_cmp(&left_efficiency)
-            .then_with(|| {
-                left_candidate
-                    .identity
-                    .candidate_id
-                    .cmp(&right_candidate.identity.candidate_id)
-            })
+        right_efficiency.total_cmp(&left_efficiency).then_with(|| {
+            left_candidate
+                .identity
+                .candidate_id
+                .cmp(&right_candidate.identity.candidate_id)
+        })
     });
     indices
 }
@@ -400,7 +405,9 @@ fn calibration_metrics(candidates: &[EvaluationCandidate]) -> Result<Value, Stri
         .filter(|candidate| candidate.predicted_probability.is_some())
         .collect();
     if scored.is_empty() {
-        return Err("calibration cannot be evaluated with zero non-abstained candidates".to_owned());
+        return Err(
+            "calibration cannot be evaluated with zero non-abstained candidates".to_owned(),
+        );
     }
     let mut brier_sum = 0.0;
     let mut absolute_error_sum = 0.0;
@@ -450,8 +457,8 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema)
-        .map_err(|error| format!("schema compilation failed: {error}"))?;
+    let validator =
+        validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
     if let Some(error) = validator.iter_errors(&fixture).next() {
         return Err(format!(
             "fixture schema validation failed: {} at {}",
@@ -510,18 +517,11 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     }
     let model_order = order_by_efficiency(
         &evaluation,
-        |candidate| {
-            candidate
-                .predicted_probability
-                .unwrap_or(0.0)
-        },
+        |candidate| candidate.predicted_probability.unwrap_or(0.0),
         true,
     );
-    let heuristic_order = order_by_efficiency(
-        &evaluation,
-        |candidate| candidate.heuristic_score,
-        false,
-    );
+    let heuristic_order =
+        order_by_efficiency(&evaluation, |candidate| candidate.heuristic_score, false);
     let model_selection = select_greedily(&evaluation, model_order, budget);
     let heuristic_selection = select_greedily(&evaluation, heuristic_order, budget);
     let random_selection = select_random(&evaluation, budget);
@@ -544,7 +544,9 @@ fn audit(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
     let oracle_regret = if oracle_selection.true_positives == 0 {
         0.0
     } else {
-        (oracle_selection.true_positives.saturating_sub(model_selection.true_positives)) as f64
+        (oracle_selection
+            .true_positives
+            .saturating_sub(model_selection.true_positives)) as f64
             / oracle_selection.true_positives as f64
     };
     let calibration = calibration_metrics(&evaluation)?;
@@ -686,30 +688,37 @@ mod tests {
             "deterministic_random",
             "synthetic_truth_oracle",
         ] {
-            assert!(receipt["budgeted_selection"][key]["cost_units_used"]
-                .as_u64()
-                .expect("cost is numeric") <= 5);
+            assert!(
+                receipt["budgeted_selection"][key]["cost_units_used"]
+                    .as_u64()
+                    .expect("cost is numeric")
+                    <= 5
+            );
         }
     }
 
     #[test]
     fn out_of_domain_candidates_are_never_selected_by_the_model_policy() {
         let receipt = run_fixture();
-        let selected = receipt["budgeted_selection"]["model_probability_per_cost"]
-            ["selected_candidate_ids"]
-            .as_array()
-            .expect("selected IDs are an array");
+        let selected =
+            receipt["budgeted_selection"]["model_probability_per_cost"]["selected_candidate_ids"]
+                .as_array()
+                .expect("selected IDs are an array");
         assert!(!selected.iter().any(|id| id == "EV-006"));
     }
 
     #[test]
     fn oracle_never_finds_fewer_true_positives_than_a_policy() {
         let receipt = run_fixture();
-        let oracle = receipt["budgeted_selection"]["synthetic_truth_oracle"]
-            ["selected_true_positives"]
-            .as_u64()
-            .expect("oracle positives are numeric");
-        for key in ["model_probability_per_cost", "chemistry_heuristic_per_cost", "deterministic_random"] {
+        let oracle =
+            receipt["budgeted_selection"]["synthetic_truth_oracle"]["selected_true_positives"]
+                .as_u64()
+                .expect("oracle positives are numeric");
+        for key in [
+            "model_probability_per_cost",
+            "chemistry_heuristic_per_cost",
+            "deterministic_random",
+        ] {
             let selected = receipt["budgeted_selection"][key]["selected_true_positives"]
                 .as_u64()
                 .expect("selected positives are numeric");
@@ -729,62 +738,88 @@ mod tests {
     fn rejects_family_overlap() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][0]["family_id"] = json!("TRAIN-FAM-A");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("family_id leakage"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("family_id leakage")
+        );
     }
 
     #[test]
     fn rejects_prototype_overlap() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][0]["prototype_id"] = json!("PROTO-A");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("prototype_id leakage"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("prototype_id leakage")
+        );
     }
 
     #[test]
     fn rejects_source_paper_overlap() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][0]["source_id"] = json!("SRC-TR-A");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("source_id leakage"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("source_id leakage")
+        );
     }
 
     #[test]
     fn rejects_reduced_formula_overlap() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][0]["reduced_formula"] = json!("A2B");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("reduced_formula leakage"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("reduced_formula leakage")
+        );
     }
 
     #[test]
     fn rejects_duplicate_material_identity() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][0]["material_id"] = json!("MAT-TR-001");
-        assert!(audit_fixture(&fixture).unwrap_err().contains("duplicate material_id"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("duplicate material_id")
+        );
     }
 
     #[test]
     fn rejects_out_of_domain_candidate_with_prediction() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][5]["predicted_probability"] = json!(0.5);
-        assert!(audit_fixture(&fixture)
-            .unwrap_err()
-            .contains("out-of-domain candidates must abstain"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("out-of-domain candidates must abstain")
+        );
     }
 
     #[test]
     fn rejects_out_of_domain_candidate_without_abstention() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][5]["abstained"] = json!(false);
-        assert!(audit_fixture(&fixture)
-            .unwrap_err()
-            .contains("out-of-domain candidates must abstain"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("out-of-domain candidates must abstain")
+        );
     }
 
     #[test]
     fn rejects_in_domain_candidate_that_abstains_without_ood() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][0]["abstained"] = json!(true);
-        assert!(audit_fixture(&fixture)
-            .unwrap_err()
-            .contains("in-domain candidates require a probability"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("in-domain candidates require a probability")
+        );
     }
 
     #[test]
@@ -798,16 +833,17 @@ mod tests {
     fn rejects_duplicate_random_rank() {
         let mut fixture = fixture_value();
         fixture["evaluation_candidates"][1]["random_rank"] = json!(5);
-        assert!(audit_fixture(&fixture)
-            .unwrap_err()
-            .contains("duplicate random_rank"));
+        assert!(
+            audit_fixture(&fixture)
+                .unwrap_err()
+                .contains("duplicate random_rank")
+        );
     }
 
     #[test]
     fn rejects_candidate_identity_in_wrong_target_track() {
         let mut fixture = fixture_value();
-        fixture["evaluation_candidates"][0]["target_semantics"] =
-            json!("experimental_measured_tc");
+        fixture["evaluation_candidates"][0]["target_semantics"] = json!("experimental_measured_tc");
         assert!(audit_fixture(&fixture).is_err());
     }
 
