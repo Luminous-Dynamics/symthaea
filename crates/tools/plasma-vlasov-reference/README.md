@@ -191,3 +191,35 @@ This is a narrowly scoped analytic sensitivity primitive. It does not
 differentiate a distribution remap, Hermite coefficient projection, kinetic
 time integrator, or adaptive representation-selection policy. Those paths
 need their own discrete derivative and conditioning qualification.
+
+
+## Source-derived mixed Hermite-Legendre basis oracle
+
+`src/mixed_basis.rs` implements the normalized asymmetrically weighted
+Hermite recurrence and finite-window normalized Legendre recurrence from the
+pinned ADEPT source
+(`ergodicio/adept@0c85ce0d3d66abab51212191c2644f58a31a49cd`,
+`adept/_hermite_legendre_1d/vector_field.py`, blob
+`f65b1700f2c98ed942c0d8ed9baefca1b30bb822`).
+
+The Hermite evaluator returns row-major values using the source shift and
+positive scale. The Legendre evaluator returns row-major values on the
+configured closed velocity interval and exact zeros outside it. Both reject
+invalid inputs and shape overflow, and reserve the output allocation before
+writing values.
+
+The tests cover:
+- Hermite known answers at transformed coordinates zero and one;
+- the normalized Hermite recurrence through 256 modes;
+- Legendre values at the interval midpoint and endpoints;
+- exact zero support outside the Legendre interval;
+- invariance under affine rescaling of the Legendre interval;
+- invalid shift, scale, window and velocity rejection;
+- empty shapes and multiplication overflow.
+
+This is a basis-evaluation oracle, not a full mixed-basis solver. It does not
+reconstruct a total distribution, evolve coefficients, apply ADEPT's
+Hermite-to-Legendre closure, solve Poisson, or claim positivity/conservation.
+It is intended to make the source-faithful basis contract independently
+testable before implementing a coefficient reconstruction or trajectory
+adapter.
