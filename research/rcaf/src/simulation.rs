@@ -793,8 +793,7 @@ pub fn run_injection_recovery(
             null_gaps.push(within_similarity - null_between_similarity);
             nuisance_gaps.push(within_similarity - nuisance_between_similarity);
             injected_gaps.push(within_similarity - injected_between_similarity);
-            signal_plus_nuisance_gaps
-                .push(within_similarity - signal_plus_nuisance_similarity);
+            signal_plus_nuisance_gaps.push(within_similarity - signal_plus_nuisance_similarity);
         }
 
         let null_test = exact_sign_test(&null_gaps)?;
