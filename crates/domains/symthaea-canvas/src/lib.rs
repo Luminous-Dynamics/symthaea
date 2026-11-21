@@ -19,8 +19,8 @@ pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
 pub mod cognitive_layout;
-pub mod cognitive_topology;
 pub mod cognitive_svg;
+pub mod cognitive_topology;
 pub mod color;
 pub mod embodiment;
 pub mod embodiment_trace;
@@ -44,9 +44,7 @@ pub use cognitive_layout::{
     CognitiveLayoutError, CognitiveSpatialLink, CognitiveSpatialProjection,
     layout_cognitive_topology, project_cognitive_topology,
 };
-pub use cognitive_svg::{
-    CognitiveSvgError, CognitiveSvgOptions, render_cognitive_projection_svg,
-};
+pub use cognitive_svg::{CognitiveSvgError, CognitiveSvgOptions, render_cognitive_projection_svg};
 pub use cognitive_topology::{
     COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveEdge, CognitiveEpisode, CognitiveEpisodeKind,
     CognitiveEpisodeState, CognitiveEvidence, CognitiveNode, CognitiveNodeKind,
