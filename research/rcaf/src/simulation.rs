@@ -229,6 +229,8 @@ pub struct InjectionRecoveryConfig {
     pub global_loading: f64,
     pub module_loading: f64,
     pub loading_jitter: f64,
+    /// Strength of a shared observation-only nuisance factor injected into one repeat.
+    pub common_mode_nuisance_loading: f64,
     /// Stationary AR(1) coefficient applied to factors and residuals.
     pub temporal_autocorrelation: f64,
     pub injection_loading_delta: f64,
@@ -249,6 +251,7 @@ impl Default for InjectionRecoveryConfig {
             global_loading: 0.20,
             module_loading: 0.18,
             loading_jitter: 0.06,
+            common_mode_nuisance_loading: 0.20,
             temporal_autocorrelation: 0.30,
             injection_loading_delta: 0.40,
             alpha: 0.05,
@@ -279,12 +282,15 @@ pub struct InjectionRecoveryReport {
     pub global_loading: f64,
     pub module_loading: f64,
     pub loading_jitter: f64,
+    pub common_mode_nuisance_loading: f64,
     pub estimator: &'static str,
     pub injection_loading_delta: f64,
     pub temporal_autocorrelation: f64,
     pub alpha: f64,
     /// Type-I error estimate under exchangeable no-change matrices.
     pub null_false_positive_rate: BinomialRate,
+    /// Rejection rate when a shared observation nuisance changes but latent loadings do not.
+    pub nuisance_only_rejection_rate: BinomialRate,
     /// Two-sided difference detection, regardless of observed direction (legacy metric).
     pub injection_detection_power: BinomialRate,
     /// Significant recovery in the preregistered positive paired-gap direction.
@@ -293,6 +299,7 @@ pub struct InjectionRecoveryReport {
     pub injection_wrong_direction_rejection_rate: BinomialRate,
     /// Median across Monte Carlo replicates of participant-level median paired gaps.
     pub median_null_paired_gap: f64,
+    pub median_nuisance_only_paired_gap: f64,
     pub median_injected_paired_gap: f64,
     /// Median across replicates of the proportion of participants with positive gaps.
     pub median_null_positive_gap_fraction: f64,
@@ -432,15 +439,18 @@ impl InjectionRecoveryReport {
                 "  \"global_loading\": {:.12},\n",
                 "  \"module_loading\": {:.12},\n",
                 "  \"loading_jitter\": {:.12},\n",
+                "  \"common_mode_nuisance_loading\": {:.12},\n",
                 "  \"estimator\": \"{}\",\n",
                 "  \"injection_loading_delta\": {:.12},\n",
                 "  \"temporal_autocorrelation\": {:.12},\n",
                 "  \"alpha\": {:.12},\n",
                 "  \"null_false_positive_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"nuisance_only_rejection_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"injection_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"injection_directional_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"injection_wrong_direction_rejection_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"median_null_paired_gap\": {:.12},\n",
+                "  \"median_nuisance_only_paired_gap\": {:.12},\n",
                 "  \"median_injected_paired_gap\": {:.12},\n",
                 "  \"median_null_positive_gap_fraction\": {:.12},\n",
                 "  \"median_injected_positive_gap_fraction\": {:.12},\n",
@@ -463,6 +473,7 @@ impl InjectionRecoveryReport {
             self.global_loading,
             self.module_loading,
             self.loading_jitter,
+            self.common_mode_nuisance_loading,
             self.estimator,
             self.injection_loading_delta,
             self.temporal_autocorrelation,
@@ -472,6 +483,11 @@ impl InjectionRecoveryReport {
             self.null_false_positive_rate.estimate,
             self.null_false_positive_rate.ci95_lower,
             self.null_false_positive_rate.ci95_upper,
+            self.nuisance_only_rejection_rate.successes,
+            self.nuisance_only_rejection_rate.trials,
+            self.nuisance_only_rejection_rate.estimate,
+            self.nuisance_only_rejection_rate.ci95_lower,
+            self.nuisance_only_rejection_rate.ci95_upper,
             self.injection_detection_power.successes,
             self.injection_detection_power.trials,
             self.injection_detection_power.estimate,
@@ -488,6 +504,7 @@ impl InjectionRecoveryReport {
             self.injection_wrong_direction_rejection_rate.ci95_lower,
             self.injection_wrong_direction_rejection_rate.ci95_upper,
             self.median_null_paired_gap,
+            self.median_nuisance_only_paired_gap,
             self.median_injected_paired_gap,
             self.median_null_positive_gap_fraction,
             self.median_injected_positive_gap_fraction,
@@ -511,16 +528,19 @@ pub fn run_injection_recovery(
     validate_config(config)?;
     let mut rng = GaussianRng::new(config.seed);
     let mut null_rejections = 0usize;
+    let mut nuisance_rejections = 0usize;
     let mut injection_rejections = 0usize;
     let mut directional_injection_rejections = 0usize;
     let mut wrong_direction_rejections = 0usize;
     let mut null_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
+    let mut nuisance_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
     let mut injected_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
     let mut null_positive_fractions = Vec::with_capacity(config.monte_carlo_replicates);
     let mut injected_positive_fractions = Vec::with_capacity(config.monte_carlo_replicates);
 
     for _ in 0..config.monte_carlo_replicates {
         let mut null_gaps = Vec::with_capacity(config.participants);
+        let mut nuisance_gaps = Vec::with_capacity(config.participants);
         let mut injected_gaps = Vec::with_capacity(config.participants);
 
         for _ in 0..config.participants {
@@ -552,6 +572,7 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &module_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
             let repeat_b = sample_correlation_matrix(
                 &mut rng,
@@ -559,6 +580,7 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &module_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
             let null_c = sample_correlation_matrix(
                 &mut rng,
@@ -566,6 +588,7 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &module_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
             let injected_c = sample_correlation_matrix(
                 &mut rng,
@@ -573,6 +596,7 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &injected_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
 
             let within_similarity = correlation_similarity(&repeat_a, &repeat_b, config.estimator)?;
