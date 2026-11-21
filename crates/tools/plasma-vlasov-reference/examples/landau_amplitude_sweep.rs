@@ -1,8 +1,6 @@
 use std::error::Error;
 
-use plasma_vlasov_reference::{
-    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
-};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let config = VlasovPoissonConfig {
