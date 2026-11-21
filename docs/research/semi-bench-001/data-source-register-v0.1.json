@@ -322,9 +322,9 @@
       "local_test_count": 11,
       "local_test_result": "PASS",
       "physical_or_dataset_claim": false,
-      "test_count": 31,
+      "test_count": 35,
       "test_result": "PASS-in-hosted-GitHub-Actions",
-      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550"
+      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316"
     },
     "independent_inspection_decision_oracle": {
       "input_schema": "luminous.semi-bench.inspection-decision.v1",
@@ -389,7 +389,7 @@
       "id": "external-UCI-SECOM-source-clock-chronological-split",
       "source_snapshot": "Be1an001/semiconductor-pass-fail-prediction-python@0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3",
       "split_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
-      "status": "frozen-row-level-split-manifest; not-model-evaluated",
+      "status": "frozen-row-level-split-manifest; CI-validated; model-not-yet-evaluated",
       "method": "contiguous-60-20-20-source-row-order",
       "clock_domain_id": "uci-secom-mirror-single-source-clock",
       "time_basis": "source_local_naive",
@@ -410,7 +410,8 @@
           "pass": 297
         }
       },
-      "claim_limit": "temporal ordering within one source clock only; no timezone, lot/tool/site identity, or temporal model result"
+      "claim_limit": "temporal ordering within one source clock only; no timezone, lot/tool/site identity, or temporal model result",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316"
     }
   ]
 }
