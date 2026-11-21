@@ -142,20 +142,24 @@ def validate_split_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         "dataset_id": dataset_id,
         "dataset_snapshot_sha256": snapshot_digest,
         "split_scheme": scheme,
-        "time_basis": time_basis,
-        "clock_domain_id": clock_domain_id,
         "assignments": canonical_rows,
     }
+    # Preserve the v1 digest/report for group-disjoint and stratified manifests.
+    # Time-basis metadata is added only when it is relevant to forward-time
+    # validation, so older known-answer fixtures remain stable.
+    if scheme == "forward_time":
+        canonical_payload["time_basis"] = time_basis
+        if time_basis == "source_local_naive":
+            canonical_payload["clock_domain_id"] = clock_domain_id
+
     serialized = json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     split_digest = hashlib.sha256(serialized).hexdigest()
 
-    return {
+    report = {
         "schema": OUTPUT_SCHEMA,
         "dataset_id": dataset_id,
         "dataset_snapshot_sha256": snapshot_digest,
         "split_scheme": scheme,
-        "time_basis": time_basis,
-        "clock_domain_id": clock_domain_id,
         "split_manifest_sha256": split_digest,
         "split_counts": counts,
         "guarantees": {
@@ -177,3 +181,8 @@ def validate_split_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
             "stratified_sample_split": scheme == "stratified_sample",
         },
     }
+    if scheme == "forward_time":
+        report["time_basis"] = time_basis
+        if time_basis == "source_local_naive":
+            report["clock_domain_id"] = clock_domain_id
+    return report
