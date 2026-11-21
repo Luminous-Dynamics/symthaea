@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::mycelial_model::{
-    MycelialFilament, MycelialModel, SpatialPoint3, MYCELIAL_MODEL_VERSION,
+    MYCELIAL_MODEL_VERSION, MycelialFilament, MycelialModel, SpatialPoint3,
 };
 
 pub const MAX_MYCELIAL_FILAMENTS: usize = 512;
@@ -60,16 +60,25 @@ impl fmt::Display for TubeTessellationError {
                 write!(f, "unsupported MycelialModel version {version}")
             }
             Self::FilamentCountExceeded(count) => {
-                write!(f, "model has {count} filaments; limit is {MAX_MYCELIAL_FILAMENTS}")
+                write!(
+                    f,
+                    "model has {count} filaments; limit is {MAX_MYCELIAL_FILAMENTS}"
+                )
             }
             Self::MeshVertexLimitExceeded(count) => {
-                write!(f, "mesh requires {count} vertices; limit is {MAX_TUBE_MESH_VERTICES}")
+                write!(
+                    f,
+                    "mesh requires {count} vertices; limit is {MAX_TUBE_MESH_VERTICES}"
+                )
             }
             Self::InvalidFilamentGeometry(id) => {
                 write!(f, "filament {id} has non-finite points or invalid radii")
             }
             Self::InvalidFilamentTopology => {
-                write!(f, "filament IDs must be unique and parent references must exist")
+                write!(
+                    f,
+                    "filament IDs must be unique and parent references must exist"
+                )
             }
             Self::VertexCountOverflow => write!(f, "tube mesh exceeds u32 vertex indexing"),
         }
@@ -117,9 +126,18 @@ impl MycelialTubeMesh {
     pub fn validate(&self) -> bool {
         self.positions.len() == self.normals.len()
             && self.indices.len() % 3 == 0
-            && self.positions.iter().all(|point| point.iter().all(|v| v.is_finite()))
-            && self.normals.iter().all(|normal| normal.iter().all(|v| v.is_finite()))
-            && self.indices.iter().all(|index| (*index as usize) < self.positions.len())
+            && self
+                .positions
+                .iter()
+                .all(|point| point.iter().all(|v| v.is_finite()))
+            && self
+                .normals
+                .iter()
+                .all(|normal| normal.iter().all(|v| v.is_finite()))
+            && self
+                .indices
+                .iter()
+                .all(|index| (*index as usize) < self.positions.len())
             && self.filaments.iter().all(|range| {
                 (range.first_vertex as usize)
                     .checked_add(range.vertex_count as usize)
@@ -140,18 +158,23 @@ pub fn tessellate_mycelial_model(
 ) -> Result<MycelialTubeMesh, TubeTessellationError> {
     validate_config(config)?;
     if model.schema_version != MYCELIAL_MODEL_VERSION {
-        return Err(TubeTessellationError::UnsupportedModelVersion(model.schema_version));
+        return Err(TubeTessellationError::UnsupportedModelVersion(
+            model.schema_version,
+        ));
     }
     if model.filaments.len() > MAX_MYCELIAL_FILAMENTS {
-        return Err(TubeTessellationError::FilamentCountExceeded(model.filaments.len()));
+        return Err(TubeTessellationError::FilamentCountExceeded(
+            model.filaments.len(),
+        ));
     }
 
     // Parent-before-child order rejects cycles and makes ranges safe to replay.
     let mut seen_ids = std::collections::HashSet::with_capacity(model.filaments.len());
     for filament in &model.filaments {
-        if filament.parent_id.is_some_and(|parent_id| {
-            parent_id == filament.id || !seen_ids.contains(&parent_id)
-        }) {
+        if filament
+            .parent_id
+            .is_some_and(|parent_id| parent_id == filament.id || !seen_ids.contains(&parent_id))
+        {
             return Err(TubeTessellationError::InvalidFilamentTopology);
         }
         if !seen_ids.insert(filament.id) {
@@ -170,7 +193,9 @@ pub fn tessellate_mycelial_model(
         .checked_mul(vertices_per_filament)
         .ok_or(TubeTessellationError::VertexCountOverflow)?;
     if estimated_vertices > MAX_TUBE_MESH_VERTICES {
-        return Err(TubeTessellationError::MeshVertexLimitExceeded(estimated_vertices));
+        return Err(TubeTessellationError::MeshVertexLimitExceeded(
+            estimated_vertices,
+        ));
     }
 
     let mut mesh = MycelialTubeMesh {
@@ -271,8 +296,7 @@ fn tessellate_filament(
         let binormal = tangent.cross(normal).normalized();
         previous_normal = Some(normal);
 
-        let radius = filament.radius_start
-            + (filament.radius_end - filament.radius_start) * t;
+        let radius = filament.radius_start + (filament.radius_end - filament.radius_start) * t;
         for radial_index in 0..radial {
             let angle = radial_index as f32 * std::f32::consts::TAU / radial as f32;
             let radial_normal = normal
@@ -281,7 +305,8 @@ fn tessellate_filament(
                 .normalized();
             let position = center.add(radial_normal.scale(radius));
             mesh.positions.push([position.x, position.y, position.z]);
-            mesh.normals.push([radial_normal.x, radial_normal.y, radial_normal.z]);
+            mesh.normals
+                .push([radial_normal.x, radial_normal.y, radial_normal.z]);
         }
     }
 
@@ -355,9 +380,17 @@ fn transport_normal(
     }
 
     let reference = if tangent.z.abs() > 0.82 {
-        SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 }
+        SpatialPoint3 {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        }
     } else {
-        SpatialPoint3 { x: 0.0, y: 0.0, z: 1.0 }
+        SpatialPoint3 {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+        }
     };
     tangent.cross(reference).normalized()
 }
@@ -365,15 +398,12 @@ fn transport_normal(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mycelial_model::{build_mycelial_model, PresenceMode};
     use crate::embodiment::EmbodimentSnapshot;
+    use crate::mycelial_model::{PresenceMode, build_mycelial_model};
 
     #[test]
     fn tessellation_has_predictable_topology_and_valid_indices() {
-        let model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         let config = TubeTessellationConfig {
             axial_segments: 8,
             radial_segments: 5,
@@ -382,41 +412,43 @@ mod tests {
         let per_filament_vertices = 9 * 5;
         let per_filament_indices = 8 * 5 * 6;
         assert_eq!(mesh.filaments.len(), model.filaments.len());
-        assert_eq!(mesh.vertex_count(), model.filaments.len() * per_filament_vertices);
-        assert_eq!(mesh.indices.len(), model.filaments.len() * per_filament_indices);
+        assert_eq!(
+            mesh.vertex_count(),
+            model.filaments.len() * per_filament_vertices
+        );
+        assert_eq!(
+            mesh.indices.len(),
+            model.filaments.len() * per_filament_indices
+        );
         assert_eq!(mesh.triangle_count(), mesh.indices.len() / 3);
         assert!(mesh.validate());
     }
 
     #[test]
     fn tessellation_is_deterministic_and_normals_are_unit_length() {
-        let model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Conversational,
-        );
+        let model =
+            build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Conversational);
         let config = TubeTessellationConfig::default();
         let first = tessellate_mycelial_model(&model, config).expect("valid mesh");
         let second = tessellate_mycelial_model(&model, config).expect("valid mesh");
         assert_eq!(first, second);
         assert!(first.normals.iter().all(|normal| {
-            let length = (normal[0] * normal[0]
-                + normal[1] * normal[1]
-                + normal[2] * normal[2])
-                .sqrt();
+            let length =
+                (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
             (length - 1.0).abs() < 1.0e-3
         }));
     }
 
     #[test]
     fn tessellation_rejects_unbounded_resolution_requests() {
-        let model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         assert_eq!(
             tessellate_mycelial_model(
                 &model,
-                TubeTessellationConfig { axial_segments: 1, radial_segments: 6 },
+                TubeTessellationConfig {
+                    axial_segments: 1,
+                    radial_segments: 6
+                },
             )
             .unwrap_err(),
             TubeTessellationError::AxialResolutionOutOfRange(1)
@@ -424,7 +456,10 @@ mod tests {
         assert_eq!(
             tessellate_mycelial_model(
                 &model,
-                TubeTessellationConfig { axial_segments: 12, radial_segments: 33 },
+                TubeTessellationConfig {
+                    axial_segments: 12,
+                    radial_segments: 33
+                },
             )
             .unwrap_err(),
             TubeTessellationError::RadialResolutionOutOfRange(33)
@@ -432,20 +467,14 @@ mod tests {
     }
     #[test]
     fn malformed_geometry_and_unsupported_versions_fail_closed() {
-        let mut model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let mut model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         model.filaments[0].radius_start = f32::NAN;
         assert_eq!(
             tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
             TubeTessellationError::InvalidFilamentGeometry(0)
         );
 
-        let mut model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let mut model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         model.schema_version = MYCELIAL_MODEL_VERSION + 1;
         assert_eq!(
             tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
@@ -455,10 +484,7 @@ mod tests {
 
     #[test]
     fn mesh_resource_limits_are_checked_before_allocation() {
-        let mut model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let mut model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         let seed = model.filaments[0].clone();
         while model.filaments.len() < MAX_MYCELIAL_FILAMENTS {
             let mut filament = seed.clone();
@@ -475,9 +501,7 @@ mod tests {
                 },
             )
             .unwrap_err(),
-            TubeTessellationError::MeshVertexLimitExceeded(
-                MAX_MYCELIAL_FILAMENTS * 129 * 32
-            )
+            TubeTessellationError::MeshVertexLimitExceeded(MAX_MYCELIAL_FILAMENTS * 129 * 32)
         );
 
         model.filaments.push(seed);
@@ -489,10 +513,7 @@ mod tests {
 
     #[test]
     fn nonfinite_or_unbounded_spatial_values_are_rejected() {
-        let mut model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let mut model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         model.filaments[0].end.x = MAX_FILAMENT_COORDINATE + 1.0;
         assert_eq!(
             tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
@@ -502,20 +523,14 @@ mod tests {
 
     #[test]
     fn cyclic_or_out_of_order_parent_references_are_rejected() {
-        let mut model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let mut model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         model.filaments[0].parent_id = Some(model.filaments[0].id);
         assert_eq!(
             tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
             TubeTessellationError::InvalidFilamentTopology
         );
 
-        let mut model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
+        let mut model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
         model.filaments[1].parent_id = Some(u32::MAX);
         assert_eq!(
             tessellate_mycelial_model(&model, TubeTessellationConfig::default()).unwrap_err(),
@@ -530,10 +545,26 @@ mod tests {
             parent_id: None,
             generation: 0,
             terminal: true,
-            start: SpatialPoint3 { x: 0.0, y: 0.0, z: 0.0 },
-            control_a: SpatialPoint3 { x: 1.0, y: 0.0, z: 0.0 },
-            control_b: SpatialPoint3 { x: 2.0, y: 0.0, z: 0.0 },
-            end: SpatialPoint3 { x: 3.0, y: 0.0, z: 0.0 },
+            start: SpatialPoint3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            control_a: SpatialPoint3 {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            control_b: SpatialPoint3 {
+                x: 2.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            end: SpatialPoint3 {
+                x: 3.0,
+                y: 0.0,
+                z: 0.0,
+            },
             radius_start: 1.0,
             radius_end: 1.0,
         };
@@ -578,5 +609,4 @@ mod tests {
     fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
         a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
     }
-
 }
