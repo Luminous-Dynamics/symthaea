@@ -32,10 +32,16 @@ pub struct VlasovPoissonConfig {
 impl VlasovPoissonConfig {
     pub fn validate(self) -> Result<(), SolverError> {
         if self.nx < 4 || !self.nx.is_power_of_two() {
-            return Err(SolverError::InvalidGrid { axis: "x", value: self.nx });
+            return Err(SolverError::InvalidGrid {
+                axis: "x",
+                value: self.nx,
+            });
         }
         if self.nv < 4 || !self.nv.is_power_of_two() {
-            return Err(SolverError::InvalidGrid { axis: "v", value: self.nv });
+            return Err(SolverError::InvalidGrid {
+                axis: "v",
+                value: self.nv,
+            });
         }
         if !self.domain_length.is_finite() || self.domain_length <= 0.0 {
             return Err(SolverError::InvalidDomainLength);
@@ -58,10 +64,18 @@ impl VlasovPoissonConfig {
         Ok(())
     }
 
-    pub fn dx(self) -> f64 { self.domain_length / self.nx as f64 }
-    pub fn dv(self) -> f64 { (self.velocity_max - self.velocity_min) / self.nv as f64 }
-    pub fn x(self, ix: usize) -> f64 { ix as f64 * self.dx() }
-    pub fn velocity(self, iv: usize) -> f64 { self.velocity_min + iv as f64 * self.dv() }
+    pub fn dx(self) -> f64 {
+        self.domain_length / self.nx as f64
+    }
+    pub fn dv(self) -> f64 {
+        (self.velocity_max - self.velocity_min) / self.nv as f64
+    }
+    pub fn x(self, ix: usize) -> f64 {
+        ix as f64 * self.dx()
+    }
+    pub fn velocity(self, iv: usize) -> f64 {
+        self.velocity_min + iv as f64 * self.dv()
+    }
 }
 
 /// Raw state observations. These are not universal acceptance certificates.
@@ -83,38 +97,82 @@ pub struct VlasovPoissonDiagnostics {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SolverError {
-    InvalidGrid { axis: &'static str, value: usize },
+    InvalidGrid {
+        axis: &'static str,
+        value: usize,
+    },
     InvalidDomainLength,
     InvalidVelocityInterval,
     InvalidChargeToMass,
     InvalidPermittivity,
     InvalidBackgroundDensity,
-    DistributionLengthMismatch { expected: usize, actual: usize },
-    NonFiniteDistribution { index: usize },
+    DistributionLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteDistribution {
+        index: usize,
+    },
     InvalidTimeStep,
     InvalidThermalSpeed,
     InvalidPerturbationAmplitude,
-    InvalidSpatialMode { mode: usize, maximum_exclusive: usize },
-    InvalidElectricMode { mode: usize, maximum_exclusive: usize },
+    InvalidSpatialMode {
+        mode: usize,
+        maximum_exclusive: usize,
+    },
+    InvalidElectricMode {
+        mode: usize,
+        maximum_exclusive: usize,
+    },
     NonFiniteState,
 }
 
 impl fmt::Display for SolverError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidGrid { axis, value } => write!(f, "{axis}-grid size {value} must be a power of two >= 4"),
+            Self::InvalidGrid { axis, value } => {
+                write!(f, "{axis}-grid size {value} must be a power of two >= 4")
+            }
             Self::InvalidDomainLength => write!(f, "domain length must be finite and positive"),
-            Self::InvalidVelocityInterval => write!(f, "velocity interval endpoints must be finite and increasing"),
-            Self::InvalidChargeToMass => write!(f, "electron charge-to-mass ratio must be finite and negative"),
+            Self::InvalidVelocityInterval => write!(
+                f,
+                "velocity interval endpoints must be finite and increasing"
+            ),
+            Self::InvalidChargeToMass => write!(
+                f,
+                "electron charge-to-mass ratio must be finite and negative"
+            ),
             Self::InvalidPermittivity => write!(f, "permittivity must be finite and positive"),
-            Self::InvalidBackgroundDensity => write!(f, "background density must be finite and non-negative"),
-            Self::DistributionLengthMismatch { expected, actual } => write!(f, "distribution has {actual} values; expected {expected} (nx * nv)"),
-            Self::NonFiniteDistribution { index } => write!(f, "distribution value {index} is non-finite"),
+            Self::InvalidBackgroundDensity => {
+                write!(f, "background density must be finite and non-negative")
+            }
+            Self::DistributionLengthMismatch { expected, actual } => write!(
+                f,
+                "distribution has {actual} values; expected {expected} (nx * nv)"
+            ),
+            Self::NonFiniteDistribution { index } => {
+                write!(f, "distribution value {index} is non-finite")
+            }
             Self::InvalidTimeStep => write!(f, "time step must be finite and positive"),
             Self::InvalidThermalSpeed => write!(f, "thermal speed must be finite and positive"),
-            Self::InvalidPerturbationAmplitude => write!(f, "Maxwellian perturbation amplitude must satisfy |alpha| < 1"),
-            Self::InvalidSpatialMode { mode, maximum_exclusive } => write!(f, "spatial mode {mode} must be positive and less than {maximum_exclusive}"),
-            Self::InvalidElectricMode { mode, maximum_exclusive } => write!(f, "electric mode {mode} must be positive and less than {maximum_exclusive}"),
+            Self::InvalidPerturbationAmplitude => write!(
+                f,
+                "Maxwellian perturbation amplitude must satisfy |alpha| < 1"
+            ),
+            Self::InvalidSpatialMode {
+                mode,
+                maximum_exclusive,
+            } => write!(
+                f,
+                "spatial mode {mode} must be positive and less than {maximum_exclusive}"
+            ),
+            Self::InvalidElectricMode {
+                mode,
+                maximum_exclusive,
+            } => write!(
+                f,
+                "electric mode {mode} must be positive and less than {maximum_exclusive}"
+            ),
             Self::NonFiniteState => write!(f, "solver produced a non-finite state"),
         }
     }
@@ -139,20 +197,25 @@ pub fn maxwellian_perturbation(
         return Err(SolverError::InvalidPerturbationAmplitude);
     }
     if mode == 0 || mode >= config.nx / 2 {
-        return Err(SolverError::InvalidSpatialMode { mode, maximum_exclusive: config.nx / 2 });
+        return Err(SolverError::InvalidSpatialMode {
+            mode,
+            maximum_exclusive: config.nx / 2,
+        });
     }
 
     let mut maxwellian = Vec::with_capacity(config.nv);
     for iv in 0..config.nv {
         let velocity = config.velocity(iv);
-        maxwellian.push((-0.5 * (velocity / thermal_speed).powi(2)).exp()
-            / (TAU.sqrt() * thermal_speed));
+        maxwellian
+            .push((-0.5 * (velocity / thermal_speed).powi(2)).exp() / (TAU.sqrt() * thermal_speed));
     }
     let integral = maxwellian.iter().sum::<f64>() * config.dv();
     if !integral.is_finite() || integral <= 0.0 {
         return Err(SolverError::NonFiniteState);
     }
-    for value in &mut maxwellian { *value /= integral; }
+    for value in &mut maxwellian {
+        *value /= integral;
+    }
 
     let wave_number = TAU * mode as f64 / config.domain_length;
     let mut distribution = vec![0.0; config.nx * config.nv];
@@ -184,7 +247,10 @@ impl VlasovPoisson1d1v {
         config.validate()?;
         let expected = config.nx * config.nv;
         if distribution.len() != expected {
-            return Err(SolverError::DistributionLengthMismatch { expected, actual: distribution.len() });
+            return Err(SolverError::DistributionLengthMismatch {
+                expected,
+                actual: distribution.len(),
+            });
         }
         for (index, value) in distribution.iter().enumerate() {
             if !value.is_finite() {
@@ -201,10 +267,18 @@ impl VlasovPoisson1d1v {
         Ok(solver)
     }
 
-    pub fn config(&self) -> VlasovPoissonConfig { self.config }
-    pub fn distribution(&self) -> &[f64] { &self.distribution }
-    pub fn electric_field(&self) -> &[f64] { &self.electric_field }
-    pub fn time(&self) -> f64 { self.time }
+    pub fn config(&self) -> VlasovPoissonConfig {
+        self.config
+    }
+    pub fn distribution(&self) -> &[f64] {
+        &self.distribution
+    }
+    pub fn electric_field(&self) -> &[f64] {
+        &self.electric_field
+    }
+    pub fn time(&self) -> f64 {
+        self.time
+    }
 
     /// Advance only the free-streaming subflow. Exposed for manufactured
     /// characteristic-solution tests; this deliberately omits self-fields.
@@ -212,7 +286,9 @@ impl VlasovPoisson1d1v {
         validate_dt(dt)?;
         self.advect_x(dt);
         self.time += dt;
-        if !self.time.is_finite() { return Err(SolverError::NonFiniteState); }
+        if !self.time.is_finite() {
+            return Err(SolverError::NonFiniteState);
+        }
         self.refresh_electric_field()?;
         self.ensure_finite_state()
     }
@@ -233,10 +309,16 @@ impl VlasovPoisson1d1v {
     /// peak amplitude) for the requested electric-field mode.
     pub fn electric_mode_amplitude(&self, mode: usize) -> Result<f64, SolverError> {
         if mode == 0 || mode >= self.config.nx / 2 {
-            return Err(SolverError::InvalidElectricMode { mode, maximum_exclusive: self.config.nx / 2 });
+            return Err(SolverError::InvalidElectricMode {
+                mode,
+                maximum_exclusive: self.config.nx / 2,
+            });
         }
-        let mut spectrum: Vec<Complex> = self.electric_field.iter()
-            .map(|value| Complex::new(*value, 0.0)).collect();
+        let mut spectrum: Vec<Complex> = self
+            .electric_field
+            .iter()
+            .map(|value| Complex::new(*value, 0.0))
+            .collect();
         fft(&mut spectrum, false);
         Ok(spectrum[mode].norm() / self.config.nx as f64)
     }
@@ -267,14 +349,21 @@ impl VlasovPoisson1d1v {
                 }
             }
         }
-        let field_energy = 0.5 * config.permittivity * self.electric_field.iter()
-            .map(|value| value * value * dx).sum::<f64>();
+        let field_energy = 0.5
+            * config.permittivity
+            * self
+                .electric_field
+                .iter()
+                .map(|value| value * value * dx)
+                .sum::<f64>();
         let rho = self.charge_density()?;
         let net_charge = rho.iter().sum::<f64>() * dx;
         let max_poisson_residual = self.max_poisson_residual(&rho);
         let velocity_boundary_ratio = if maximum_abs_distribution > 0.0 {
             boundary_abs / maximum_abs_distribution
-        } else { 0.0 };
+        } else {
+            0.0
+        };
         let result = VlasovPoissonDiagnostics {
             time: self.time,
             total_mass: mass,
@@ -288,11 +377,20 @@ impl VlasovPoisson1d1v {
             velocity_boundary_ratio,
         };
         if [
-            result.time, result.total_mass, result.momentum, result.kinetic_energy,
-            result.field_energy, result.total_energy, result.net_charge,
-            result.max_poisson_residual, result.minimum_distribution,
+            result.time,
+            result.total_mass,
+            result.momentum,
+            result.kinetic_energy,
+            result.field_energy,
+            result.total_energy,
+            result.net_charge,
+            result.max_poisson_residual,
+            result.minimum_distribution,
             result.velocity_boundary_ratio,
-        ].iter().any(|value| !value.is_finite()) {
+        ]
+        .iter()
+        .any(|value| !value.is_finite())
+        {
             return Err(SolverError::NonFiniteState);
         }
         Ok(result)
@@ -300,7 +398,8 @@ impl VlasovPoisson1d1v {
 
     fn ensure_finite_state(&self) -> Result<(), SolverError> {
         if self.distribution.iter().any(|value| !value.is_finite())
-            || self.electric_field.iter().any(|value| !value.is_finite()) {
+            || self.electric_field.iter().any(|value| !value.is_finite())
+        {
             return Err(SolverError::NonFiniteState);
         }
         Ok(())
@@ -319,7 +418,9 @@ impl VlasovPoisson1d1v {
                 let phase = -k * config.velocity(iv) * dt;
                 let multiplier = if mode == config.nx / 2 {
                     Complex::new(phase.cos(), 0.0)
-                } else { Complex::cis(phase) };
+                } else {
+                    Complex::cis(phase)
+                };
                 *coefficient = coefficient.mul(multiplier);
             }
             fft(&mut line, true);
@@ -359,7 +460,9 @@ impl VlasovPoisson1d1v {
         let mut rho = vec![0.0; config.nx];
         for (ix, density) in rho.iter_mut().enumerate() {
             let number_density = self.distribution[ix * config.nv..(ix + 1) * config.nv]
-                .iter().sum::<f64>() * config.dv();
+                .iter()
+                .sum::<f64>()
+                * config.dv();
             *density = config.background_density - number_density;
         }
         if rho.iter().any(|value| !value.is_finite()) {
@@ -375,8 +478,11 @@ impl VlasovPoisson1d1v {
     }
 
     fn max_poisson_residual(&self, rho: &[f64]) -> f64 {
-        let mut spectrum: Vec<Complex> = self.electric_field.iter()
-            .map(|value| Complex::new(*value, 0.0)).collect();
+        let mut spectrum: Vec<Complex> = self
+            .electric_field
+            .iter()
+            .map(|value| Complex::new(*value, 0.0))
+            .collect();
         fft(&mut spectrum, false);
         for (mode, coefficient) in spectrum.iter_mut().enumerate() {
             let k = signed_mode(mode, self.config.nx) as f64 * TAU / self.config.domain_length;
@@ -414,8 +520,10 @@ pub fn solve_periodic_poisson_spectral(
         return Err(SolverError::NonFiniteState);
     }
 
-    let mut spectrum: Vec<Complex> = charge_density.iter()
-        .map(|value| Complex::new(*value, 0.0)).collect();
+    let mut spectrum: Vec<Complex> = charge_density
+        .iter()
+        .map(|value| Complex::new(*value, 0.0))
+        .collect();
     fft(&mut spectrum, false);
     for (mode, coefficient) in spectrum.iter_mut().enumerate() {
         if mode == 0 || mode == config.nx / 2 {
@@ -441,24 +549,51 @@ fn validate_dt(dt: f64) -> Result<(), SolverError> {
 }
 
 fn signed_mode(index: usize, length: usize) -> isize {
-    if index <= length / 2 { index as isize } else { index as isize - length as isize }
+    if index <= length / 2 {
+        index as isize
+    } else {
+        index as isize - length as isize
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct Complex { re: f64, im: f64 }
+struct Complex {
+    re: f64,
+    im: f64,
+}
 
 impl Complex {
     const ZERO: Self = Self { re: 0.0, im: 0.0 };
-    fn new(re: f64, im: f64) -> Self { Self { re, im } }
-    fn cis(angle: f64) -> Self { Self { re: angle.cos(), im: angle.sin() } }
-    fn add(self, rhs: Self) -> Self { Self::new(self.re + rhs.re, self.im + rhs.im) }
-    fn sub(self, rhs: Self) -> Self { Self::new(self.re - rhs.re, self.im - rhs.im) }
-    fn mul(self, rhs: Self) -> Self {
-        Self::new(self.re * rhs.re - self.im * rhs.im, self.re * rhs.im + self.im * rhs.re)
+    fn new(re: f64, im: f64) -> Self {
+        Self { re, im }
     }
-    fn mul_i(self, scalar: f64) -> Self { Self::new(-self.im * scalar, self.re * scalar) }
-    fn scale(self, scalar: f64) -> Self { Self::new(self.re * scalar, self.im * scalar) }
-    fn norm(self) -> f64 { self.re.hypot(self.im) }
+    fn cis(angle: f64) -> Self {
+        Self {
+            re: angle.cos(),
+            im: angle.sin(),
+        }
+    }
+    fn add(self, rhs: Self) -> Self {
+        Self::new(self.re + rhs.re, self.im + rhs.im)
+    }
+    fn sub(self, rhs: Self) -> Self {
+        Self::new(self.re - rhs.re, self.im - rhs.im)
+    }
+    fn mul(self, rhs: Self) -> Self {
+        Self::new(
+            self.re * rhs.re - self.im * rhs.im,
+            self.re * rhs.im + self.im * rhs.re,
+        )
+    }
+    fn mul_i(self, scalar: f64) -> Self {
+        Self::new(-self.im * scalar, self.re * scalar)
+    }
+    fn scale(self, scalar: f64) -> Self {
+        Self::new(self.re * scalar, self.im * scalar)
+    }
+    fn norm(self) -> f64 {
+        self.re.hypot(self.im)
+    }
 }
 
 /// In-place radix-2 Cooley-Tukey FFT. Forward is unnormalised; inverse divides by N.
@@ -474,7 +609,9 @@ fn fft(values: &mut [Complex], inverse: bool) {
             bit >>= 1;
         }
         reversed ^= bit;
-        if index < reversed { values.swap(index, reversed); }
+        if index < reversed {
+            values.swap(index, reversed);
+        }
     }
 
     let mut span = 2usize;
@@ -494,12 +631,16 @@ fn fft(values: &mut [Complex], inverse: bool) {
                 twiddle = twiddle.mul(root);
             }
         }
-        if span == length { break; }
+        if span == length {
+            break;
+        }
         span *= 2;
     }
     if inverse {
         let scale = 1.0 / length as f64;
-        for value in values { *value = value.scale(scale); }
+        for value in values {
+            *value = value.scale(scale);
+        }
     }
 }
 
@@ -509,7 +650,8 @@ mod tests {
 
     fn test_config(nx: usize, nv: usize) -> VlasovPoissonConfig {
         VlasovPoissonConfig {
-            nx, nv,
+            nx,
+            nv,
             domain_length: 4.0 * std::f64::consts::PI,
             velocity_min: -6.0,
             velocity_max: 6.0,
@@ -540,7 +682,12 @@ mod tests {
         let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
         let before = solver.diagnostics().unwrap();
         assert!(before.max_poisson_residual < 1.0e-12);
-        assert!(solver.electric_field().iter().all(|value| value.abs() < 1.0e-12));
+        assert!(
+            solver
+                .electric_field()
+                .iter()
+                .all(|value| value.abs() < 1.0e-12)
+        );
         solver.step(0.05).unwrap();
         let after = solver.diagnostics().unwrap();
         assert!(after.max_poisson_residual < 1.0e-12);
@@ -567,13 +714,17 @@ mod tests {
             for iv in 0..config.nv {
                 let original = initial[ix * config.nv + iv];
                 let maxwellian = original / (1.0 + alpha * (k * config.x(ix)).cos());
-                let characteristic = 1.0 + alpha * (k * (config.x(ix) - config.velocity(iv) * dt)).cos();
+                let characteristic =
+                    1.0 + alpha * (k * (config.x(ix) - config.velocity(iv) * dt)).cos();
                 let expected = maxwellian * characteristic;
                 let actual = solver.distribution()[ix * config.nv + iv];
                 maximum_error = maximum_error.max((actual - expected).abs());
             }
         }
-        assert!(maximum_error < 2.0e-11, "free-streaming max error {maximum_error:e}");
+        assert!(
+            maximum_error < 2.0e-11,
+            "free-streaming max error {maximum_error:e}"
+        );
     }
 
     #[test]
@@ -611,7 +762,9 @@ mod tests {
         let initial = maxwellian_perturbation(config, 1.0e-3, 1, 1.0).unwrap();
         let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
         let before = solver.diagnostics().unwrap();
-        for _ in 0..20 { solver.step(0.05).unwrap(); }
+        for _ in 0..20 {
+            solver.step(0.05).unwrap();
+        }
         let after = solver.diagnostics().unwrap();
         assert!((after.total_mass - before.total_mass).abs() < 5.0e-11);
         assert!(after.max_poisson_residual < 2.0e-11);
@@ -624,15 +777,24 @@ mod tests {
         let config = test_config(16, 32);
         let initial = maxwellian_perturbation(config, 0.0, 1, 1.0).unwrap();
         let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
-        assert!(matches!(solver.step(0.0), Err(SolverError::InvalidTimeStep)));
-        assert!(matches!(solver.advance_free_streaming(f64::NAN), Err(SolverError::InvalidTimeStep)));
+        assert!(matches!(
+            solver.step(0.0),
+            Err(SolverError::InvalidTimeStep)
+        ));
+        assert!(matches!(
+            solver.advance_free_streaming(f64::NAN),
+            Err(SolverError::InvalidTimeStep)
+        ));
     }
 
     #[test]
     fn invalid_grids_and_non_finite_inputs_fail_closed() {
         let mut config = test_config(16, 32);
         config.nx = 12;
-        assert!(matches!(config.validate(), Err(SolverError::InvalidGrid { .. })));
+        assert!(matches!(
+            config.validate(),
+            Err(SolverError::InvalidGrid { .. })
+        ));
         let config = test_config(16, 32);
         let mut initial = maxwellian_perturbation(config, 0.0, 1, 1.0).unwrap();
         initial[3] = f64::INFINITY;
