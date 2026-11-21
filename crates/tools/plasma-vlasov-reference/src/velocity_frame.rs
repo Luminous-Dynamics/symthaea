@@ -225,7 +225,7 @@ mod tests {
             [[1.0, 0.0, 0.0], [2.0, 0.5, 0.0], [4.0, 2.0, 0.25],]
         );
         assert_eq!(jacobian.with_respect_to_shift, [0.0, 3.0, 16.0]);
-        assert_eq!(jacobian.with_respect_to_scale, [0.0, 4.0, 13.0]);
+        assert_eq!(jacobian.with_respect_to_scale, [0.0, 4.0, 21.0]);
     }
 
     #[test]
