@@ -1,0 +1,171 @@
+{
+  "schema": "luminous.plasma.adept-output-adapter-contract",
+  "schema_version": "0.1.0",
+  "upstream": {
+    "repository": "ergodicio/adept",
+    "source_commit": "0c85ce0d3d66abab51212191c2644f58a31a49cd",
+    "storage_source": "adept/_hermite_legendre_1d/storage.py",
+    "storage_blob_sha": "fbd440966a620f244bc879be6a04c13adc221068",
+    "reconstruction_source": "adept/_hermite_legendre_1d/modules.py",
+    "reconstruction_blob_sha": "426336cda2b4afc7d616464c72e91be5b37ccfd5"
+  },
+  "supported_export_families": {
+    "fields": {
+      "filename_pattern": "fields-t={final_time}.nc",
+      "variables": [
+        "e",
+        "phi"
+      ],
+      "optional_variables": [
+        "de"
+      ],
+      "dimensions": [
+        "t",
+        "x"
+      ],
+      "coordinates": [
+        "t",
+        "x"
+      ],
+      "semantics": "Electric field, potential and optional external driver on the spatial mesh."
+    },
+    "hermite_coefficients": {
+      "filename_pattern": "Ck-t={final_time}.nc",
+      "variable": "Ck",
+      "dimensions": [
+        "t",
+        "mode",
+        "kx"
+      ],
+      "coordinate_semantics": {
+        "t": "Physical solver time at each saved state.",
+        "mode": "Hermite basis index n.",
+        "kx": "Integer spatial Fourier mode after fftshift."
+      },
+      "source_layout_before_export": [
+        "nt",
+        "Nh",
+        "Nx"
+      ],
+      "operation": "fftshift over spatial Fourier axis only",
+      "dtype": "complex",
+      "normalization": "Fourier coefficients use norm='forward' in the source implementation."
+    },
+    "legendre_coefficients": {
+      "filename_pattern": "Bk-t={final_time}.nc",
+      "variable": "Bk",
+      "dimensions": [
+        "t",
+        "mode",
+        "kx"
+      ],
+      "coordinate_semantics": {
+        "t": "Physical solver time at each saved state.",
+        "mode": "Legendre basis index m.",
+        "kx": "Integer spatial Fourier mode after fftshift."
+      },
+      "source_layout_before_export": [
+        "nt",
+        "Nl",
+        "Nx"
+      ],
+      "operation": "fftshift over spatial Fourier axis only",
+      "dtype": "complex",
+      "normalization": "Fourier coefficients use norm='forward' in the source implementation."
+    },
+    "default_diagnostics": {
+      "emitted_by": "get_default_save_func",
+      "quantities": [
+        "mass",
+        "momentum",
+        "energy",
+        "e_energy",
+        "n_e_max",
+        "n_e_min",
+        "Bk_max",
+        "Ck_max"
+      ],
+      "optional_quantities": [
+        "boundary_df_a_max",
+        "boundary_df_b_max",
+        "boundary_df_max",
+        "high_legendre_fraction",
+        "step_residual",
+        "conservation_correction"
+      ],
+      "caveat": "The storage module defines returned diagnostics; the exact run-artifact container and serialization path must be captured by the reproduction harness."
+    }
+  },
+  "reconstruction": {
+    "purpose": "Reconstruct the physical total distribution f=f0+delta_f at common diagnostic velocity nodes.",
+    "required_configuration": [
+      "Lx",
+      "Nx",
+      "Nh",
+      "Nl",
+      "alpha",
+      "u",
+      "v_a",
+      "v_b",
+      "spatial Fourier normalization",
+      "species and field normalization"
+    ],
+    "steps": [
+      "Read Ck(t,n,kx) and Bk(t,m,kx) with stored fftshift ordering.",
+      "Undo fftshift along kx using the stored kx coordinate and the canonical signed-mode ordering.",
+      "Apply inverse spatial FFT using the source convention norm='forward'; retain the real part only after recording the imaginary roundoff residual.",
+      "Build asymmetrically weighted Hermite functions psi_n(v;u,alpha) on the declared common velocity quadrature.",
+      "Build Legendre functions xi_m(v;v_a,v_b) on that same quadrature and set their values to zero outside [v_a,v_b].",
+      "Reconstruct f(x,v,t)=sum_n C_n(x,t)*psi_n(v)+sum_m B_m(x,t)*xi_m(v).",
+      "Retain f0 and delta_f separately in adapter diagnostics; do not apply positivity projection to delta_f.",
+      "Evaluate common-grid distribution and moment discrepancies only after mapping both solvers to the same physical velocity quadrature and normalization."
+    ],
+    "reconstructed_shape": [
+      "t",
+      "x",
+      "v"
+    ],
+    "important_semantics": [
+      "The Legendre residual is supported only on its finite velocity window.",
+      "The Hermite bulk uses the configured shift u and scale alpha; these are fixed configuration parameters in the pinned implementation, not automatically adapted per time step.",
+      "A source code visualization samples 384 velocity points, but that plotting grid is not automatically a convergence-qualified diagnostic quadrature.",
+      "The physical total f=f0+delta_f may be tested for nonnegativity where applicable; delta_f itself may be signed.",
+      "Do not compare the source scalar invariant outputs to Symthaea values without independently reconciling normalization, mass, quadrature and field-energy conventions."
+    ]
+  },
+  "canonical_fields": [
+    "time",
+    "x",
+    "v",
+    "f_total",
+    "f_hermite_bulk",
+    "f_legendre_residual",
+    "electric_field",
+    "potential",
+    "mass",
+    "momentum",
+    "kinetic_energy",
+    "field_energy",
+    "total_energy",
+    "poisson_residual",
+    "velocity_boundary_occupancy",
+    "hermite_tail",
+    "legendre_tail"
+  ],
+  "mandatory_adapter_checks": [
+    "Preserve signed complex Fourier coefficients and verify phase after import.",
+    "Verify kx ordering, FFT shift reversal and Fourier normalization with a manufactured single spatial Fourier mode.",
+    "Reconstruct a known Maxwellian and manufactured free-streaming solution.",
+    "Compare source coefficient-derived mass/momentum/energy with independently quadrature-derived moments.",
+    "Record imaginary residual before taking the real part of inverse spatial FFT.",
+    "Check total-distribution minimum and negative mass only when the represented physical f is required to be nonnegative.",
+    "Retain finite Legendre-window boundary occupancy and out-of-window residual support checks.",
+    "Bind every converted artifact to upstream source SHA, config SHA, output-file SHA, and conversion-code SHA."
+  ],
+  "limitations": [
+    "This is a source-derived adapter contract, not an implemented adapter.",
+    "NetCDF engine, complex dtype encoding, output metadata and actual saved file set must be captured from an executed, pinned ADEPT run before enabling automated ingestion.",
+    "Common diagnostic quadrature and physical normalization must be explicitly frozen for each cohort.",
+    "No ADEPT simulation has yet been executed by Symthaea."
+  ]
+}
