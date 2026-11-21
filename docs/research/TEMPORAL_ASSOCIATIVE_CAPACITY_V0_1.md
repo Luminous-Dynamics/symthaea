@@ -117,9 +117,9 @@ T90(D,K,E,CV) =
 
 Here D is representation dimension, T is elapsed horizon, E is event count, and CV is the coefficient of variation of the positive inter-event gaps. The confidence unit is the independent corpus/model seed—not the per-query result.
 
-With zero failures, at least **59 independent seeds** are required for the one-sided exact 95% lower bound on seed-success probability to reach 95% (59/59 gives approximately 0.95049). Any observed seed failures require a larger sample to qualify. The frontier tool defaults to a minimum of 59 seeds and also requires identical seed sets across fan-in levels for K95 and across horizon levels for T90. A missing or unpaired seed set prevents qualification.
+With zero failures, at least **59 independent seeds** are required for a single one-sided exact 95% lower bound on seed-success probability to reach 95% (59/59 gives approximately 0.95049). Selecting a maximum across multiple tested loads or horizons is a multiple-comparison problem, so the frontier analyzer applies a **Bonferroni family-wise correction** within each fixed D/condition/gap/horizon/event family for K95, and within each fixed D/condition/gap/fan-in/event family for T90. For L tested levels it uses per-level alpha = 0.05/L and requires at least ceil(log(0.05/L) / log(0.95)) seeds even when every seed passes. Thus 2 tested levels require 72 all-passing seeds; 3 levels require 80; 5 levels require 90. Any observed seed failures require more. The analyzer also requires identical seed sets across fan-in levels for K95 and across horizon levels for T90. A missing or unpaired seed set prevents qualification.
 
-The new Rust post-processor is `examples/temporal_capacity_frontier.rs`. Its output contract is defined in [`data/schemas/symthaea_temporal_capacity_frontier_v0_1.schema.json`](../../data/schemas/symthaea_temporal_capacity_frontier_v0_1.schema.json). It reads the raw JSONL summaries and emits per-cohort seed-reliability records plus discrete K95/T90 records. It requires a valid source Git SHA in every summary, rejects duplicate seeds and malformed counts, and groups results by exact source revision. It never interpolates between untested loads or horizons. A null K95/T90 means no tested point met the full gate; it does not mean the system has zero capacity or zero retention.
+The new Rust post-processor is `examples/temporal_capacity_frontier.rs`. Its output contract is defined in [`data/schemas/symthaea_temporal_capacity_frontier_v0_1.schema.json`](../../data/schemas/symthaea_temporal_capacity_frontier_v0_1.schema.json). It reads the raw JSONL summaries and emits per-cohort seed-reliability records plus discrete K95/T90 records. It requires a valid source Git SHA in every summary, rejects duplicate seeds and malformed counts, groups results by exact source revision, and records the tested-level count, per-level alpha and minimum all-pass seed count. Cohort reliability rows are pointwise diagnostics; K95/T90 use the family-wise Bonferroni correction described above. It never interpolates between untested loads or horizons. A null K95/T90 means no tested point met the full gate; it does not mean the system has zero capacity or zero retention.
 
 Run the raw experiment and frontier analysis from a clean, committed worktree:
 
@@ -128,7 +128,7 @@ test -z "$(git status --porcelain)" || { echo "worktree must be clean"; exit 1; 
 cargo run --release --manifest-path crates/core/symthaea-hdc-ltc/Cargo.toml \
   --example temporal_associative_capacity -- \
   --dims 1024,4096 --loads 4,8,16 --horizons 1,10 \
-  --events 1,8 --seeds 59 --source-revision "$(git rev-parse HEAD)" \
+  --events 1,8 --seeds 80 --source-revision "$(git rev-parse HEAD)" \
   --out temporal-capacity.jsonl
 
 cargo run --release --manifest-path crates/core/symthaea-hdc-ltc/Cargo.toml \
