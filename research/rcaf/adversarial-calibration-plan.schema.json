@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/adversarial-calibration-plan.schema.json",
+  "title": "RCAF adversarial instrument calibration plan",
+  "description": "A proposed, predeclared simulation challenge plan. This schema describes plans, not completed simulation results.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "status",
+    "seed_policy",
+    "sample_sizes",
+    "segment_lengths",
+    "temporal_ar1_coefficients",
+    "missingness_rates",
+    "missingness_mechanisms",
+    "response_fractions",
+    "latent_scenarios",
+    "nuisance_scenarios",
+    "connectivity_constructors",
+    "matrix_comparators",
+    "leakage_challenges",
+    "required_outputs",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.adversarial-calibration-plan/0.1.0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "pilot",
+        "confirmatory"
+      ]
+    },
+    "seed_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "development_seed",
+        "confirmatory_seed",
+        "pilot_replicates",
+        "qualification_replicates",
+        "critical_null_replicates"
+      ],
+      "properties": {
+        "development_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmatory_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pilot_replicates": {
+          "type": "integer",
+          "minimum": 20
+        },
+        "qualification_replicates": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "critical_null_replicates": {
+          "type": "integer",
+          "minimum": 1000
+        }
+      }
+    },
+    "sample_sizes": {
+      "$ref": "#/$defs/positiveIntegerArray"
+    },
+    "segment_lengths": {
+      "$ref": "#/$defs/positiveIntegerArray"
+    },
+    "temporal_ar1_coefficients": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": -1,
+        "exclusiveMaximum": 1
+      }
+    },
+    "missingness_rates": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0.95
+      }
+    },
+    "missingness_mechanisms": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "none",
+          "MCAR",
+          "MAR",
+          "MNAR"
+        ]
+      }
+    },
+    "response_fractions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "latent_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "truth_class",
+          "mechanism",
+          "injection_stage",
+          "description"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "truth_class": {
+            "enum": [
+              "null",
+              "effect"
+            ]
+          },
+          "mechanism": {
+            "enum": [
+              "none",
+              "localized_module",
+              "distributed_weak",
+              "polarity_change",
+              "transient",
+              "partial_response",
+              "mixed_direction",
+              "heterogeneous_response"
+            ]
+          },
+          "injection_stage": {
+            "enum": [
+              "none",
+              "connectivity_matrix",
+              "parcel_time_series",
+              "sensor_time_series",
+              "source_activity"
+            ]
+          },
+          "response_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "dose_points": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "nuisance_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "preserves_latent_target",
+          "mechanisms",
+          "description"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preserves_latent_target": {
+            "const": true
+          },
+          "mechanisms": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "site_gain",
+                "site_offset",
+                "scanner_scale",
+                "global_common_mode",
+                "motion_bursts",
+                "censoring",
+                "parcel_dropout",
+                "edge_dropout",
+                "snr_change",
+                "temporal_drift",
+                "nonstationarity",
+                "hrf_variation",
+                "source_leakage",
+                "sensor_mixing",
+                "preprocessing_variation"
+              ]
+            }
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dose_points": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "connectivity_constructors": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "pearson",
+          "spearman",
+          "shrinkage_covariance",
+          "oas_precision",
+          "ledoit_wolf_precision",
+          "partial_correlation",
+          "pyspi_preregistered_subset"
+        ]
+      }
+    },
+    "matrix_comparators": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "absolute_weighted_jaccard",
+          "signed_shift_weighted_jaccard",
+          "normalized_mean_absolute_edge_error",
+          "matrix_spearman",
+          "frobenius_distance",
+          "spectral_distance",
+          "graph_topology_distance"
+        ]
+      }
+    },
+    "leakage_challenges": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "participant_overlap",
+          "site_overlap",
+          "preprocessing_before_split",
+          "imputation_before_split",
+          "harmonization_before_split",
+          "feature_selection_on_test",
+          "estimator_selection_on_test",
+          "threshold_or_calibration_on_test",
+          "checkpoint_selection_on_test",
+          "target_predictor_circularity",
+          "fusion_fit_on_test"
+        ]
+      }
+    },
+    "required_outputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "type_i_error",
+          "power",
+          "wrong_direction_rejection_rate",
+          "directional_power",
+          "effect_bias",
+          "effect_rmse",
+          "interval_coverage",
+          "interval_width",
+          "dose_response",
+          "multiplicity_control",
+          "nuisance_false_positives",
+          "nuisance_only_rejection_rate",
+          "heterogeneity_recovery",
+          "site_transportability",
+          "independent_cohort_transportability",
+          "leakage_detection",
+          "selection_optimism",
+          "abstention",
+          "data_sufficiency",
+          "execution_receipt",
+          "signal_plus_nuisance_recovery"
+        ]
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "positiveIntegerArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}

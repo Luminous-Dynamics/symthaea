@@ -27,11 +27,20 @@
     "module_size",
     "global_loading",
     "module_loading",
-    "loading_jitter"
+    "loading_jitter",
+    "injection_directional_detection_power",
+    "injection_wrong_direction_rejection_rate",
+    "common_mode_nuisance_loading",
+    "nuisance_only_rejection_rate",
+    "median_nuisance_only_paired_gap",
+    "signal_plus_nuisance_detection_power",
+    "signal_plus_nuisance_directional_detection_power",
+    "signal_plus_nuisance_wrong_direction_rejection_rate",
+    "median_signal_plus_nuisance_paired_gap"
   ],
   "properties": {
     "schema_version": {
-      "const": "rcaf.injection-recovery/0.1.0"
+      "const": "rcaf.injection-recovery/0.4.0"
     },
     "seed": {
       "type": "integer",
@@ -126,6 +135,240 @@
     "loading_jitter": {
       "type": "number",
       "minimum": 0
+    },
+    "injection_directional_detection_power": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "injection_wrong_direction_rejection_rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "common_mode_nuisance_loading": {
+      "type": "number",
+      "minimum": 0
+    },
+    "nuisance_only_rejection_rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "median_nuisance_only_paired_gap": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "signal_plus_nuisance_detection_power": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "Two-sided difference detection when intended signal and common-mode observation nuisance are both present."
+    },
+    "signal_plus_nuisance_directional_detection_power": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "Significant recovery in the expected direction when intended signal and common-mode nuisance are both present."
+    },
+    "signal_plus_nuisance_wrong_direction_rejection_rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "ci95_lower",
+        "ci95_upper"
+      ],
+      "properties": {
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trials": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci95_upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "Significant rejection in the direction opposite the intended signal when common-mode nuisance is also present."
+    },
+    "median_signal_plus_nuisance_paired_gap": {
+      "type": "number",
+      "minimum": -2,
+      "maximum": 2,
+      "description": "Median across Monte-Carlo replicates of participant-level paired gaps with signal and nuisance combined."
     }
   },
   "$defs": {

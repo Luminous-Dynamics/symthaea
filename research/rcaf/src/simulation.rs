@@ -116,7 +116,7 @@ pub fn run_estimator_tournament(
         results.push(run_injection_recovery(&estimator_config)?);
     }
     Ok(EstimatorTournamentReport {
-        schema_version: "rcaf.estimator-tournament/0.1.0",
+        schema_version: "rcaf.estimator-tournament/0.4.0",
         estimators_compared: results.len(),
         results,
     })
@@ -210,7 +210,7 @@ pub fn run_estimator_dose_response_tournament(
         });
     }
     Ok(EstimatorDoseResponseTournamentReport {
-        schema_version: "rcaf.estimator-dose-response-tournament/0.1.0",
+        schema_version: "rcaf.estimator-dose-response-tournament/0.4.0",
         estimators_compared: curves.len(),
         effect_sizes: effect_sizes.to_vec(),
         curves,
@@ -229,6 +229,8 @@ pub struct InjectionRecoveryConfig {
     pub global_loading: f64,
     pub module_loading: f64,
     pub loading_jitter: f64,
+    /// Strength of a shared observation-only nuisance factor injected into one repeat.
+    pub common_mode_nuisance_loading: f64,
     /// Stationary AR(1) coefficient applied to factors and residuals.
     pub temporal_autocorrelation: f64,
     pub injection_loading_delta: f64,
@@ -249,6 +251,7 @@ impl Default for InjectionRecoveryConfig {
             global_loading: 0.20,
             module_loading: 0.18,
             loading_jitter: 0.06,
+            common_mode_nuisance_loading: 0.20,
             temporal_autocorrelation: 0.30,
             injection_loading_delta: 0.40,
             alpha: 0.05,
@@ -279,17 +282,30 @@ pub struct InjectionRecoveryReport {
     pub global_loading: f64,
     pub module_loading: f64,
     pub loading_jitter: f64,
+    pub common_mode_nuisance_loading: f64,
     pub estimator: &'static str,
     pub injection_loading_delta: f64,
     pub temporal_autocorrelation: f64,
     pub alpha: f64,
     /// Type-I error estimate under exchangeable no-change matrices.
     pub null_false_positive_rate: BinomialRate,
-    /// Detection rate under the declared factor-loading injection.
+    /// Rejection rate when a shared observation nuisance changes but latent loadings do not.
+    pub nuisance_only_rejection_rate: BinomialRate,
+    /// Two-sided difference detection, regardless of observed direction (legacy metric).
     pub injection_detection_power: BinomialRate,
+    /// Significant recovery in the preregistered positive paired-gap direction.
+    pub injection_directional_detection_power: BinomialRate,
+    /// Significant two-sided rejection in the direction opposite to the positive injection.
+    pub injection_wrong_direction_rejection_rate: BinomialRate,
+    /// Detection/recovery when the intended injection is superimposed with observation nuisance.
+    pub signal_plus_nuisance_detection_power: BinomialRate,
+    pub signal_plus_nuisance_directional_detection_power: BinomialRate,
+    pub signal_plus_nuisance_wrong_direction_rejection_rate: BinomialRate,
     /// Median across Monte Carlo replicates of participant-level median paired gaps.
     pub median_null_paired_gap: f64,
+    pub median_nuisance_only_paired_gap: f64,
     pub median_injected_paired_gap: f64,
+    pub median_signal_plus_nuisance_paired_gap: f64,
     /// Median across replicates of the proportion of participants with positive gaps.
     pub median_null_positive_gap_fraction: f64,
     pub median_injected_positive_gap_fraction: f64,
@@ -385,12 +401,147 @@ pub fn run_injection_recovery_sweep(
         .count();
 
     Ok(InjectionRecoverySweepReport {
-        schema_version: "rcaf.injection-recovery-sweep/0.1.0",
+        schema_version: "rcaf.injection-recovery-sweep/0.4.0",
         effect_size_points: reports.len(),
         endpoint_median_gap_difference: last_gap - first_gap,
         monotonic_adjacent_pair_fraction: adjacent_increases as f64 / (reports.len() - 1) as f64,
         reports,
     })
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommonModeNuisanceSweepReport {
+    pub schema_version: &'static str,
+    pub nuisance_strengths: Vec<f64>,
+    pub reports: Vec<InjectionRecoveryReport>,
+}
+
+impl CommonModeNuisanceSweepReport {
+    /// Render the nuisance dose-response curve as stable JSON.
+    pub fn to_json_pretty(&self) -> String {
+        let rendered_reports = self
+            .reports
+            .iter()
+            .map(|report| {
+                report
+                    .to_json_pretty()
+                    .lines()
+                    .map(|line| format!("  {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .collect::<Vec<_>>()
+            .join(",\n");
+        let rendered_strengths = self
+            .nuisance_strengths
+            .iter()
+            .map(|value| format!("{value:.12}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            concat!(
+                "{{\n",
+                "  \"schema_version\": \"{}\",\n",
+                "  \"nuisance_strengths\": [{}],\n",
+                "  \"strength_points\": {},\n",
+                "  \"reports\": [\n{}\n  ],\n",
+                "  \"claim_limits\": [\"synthetic_common_mode_observation_nuisance_only\", \"latent_loadings_held_fixed\", \"not_a_biological_artifact_model\", \"not_clinically_validated\"]\n",
+                "}}\n"
+            ),
+            self.schema_version,
+            rendered_strengths,
+            self.nuisance_strengths.len(),
+            rendered_reports
+        )
+    }
+}
+
+/// Evaluate common-mode observation nuisance strengths with matched latent/noise streams.
+///
+/// The first strength must be exactly zero and is the exact same-observation null control.
+/// Nuisance innovations use a deterministic participant/replicate-specific stream, separate
+/// from the latent-signal RNG. Thus latent loadings, repeats, null samples and intended
+/// injections are identical across nuisance doses; only nuisance loading changes.
+pub fn run_common_mode_nuisance_sweep(
+    config: &InjectionRecoveryConfig,
+    nuisance_strengths: &[f64],
+) -> Result<CommonModeNuisanceSweepReport, MetricError> {
+    if nuisance_strengths.len() < 2 {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "at least two nuisance strengths are required for a sweep",
+        });
+    }
+    if nuisance_strengths[0] != 0.0 {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "common-mode nuisance sweep must start with an exact zero-dose control",
+        });
+    }
+    let mut previous = -1.0;
+    for strength in nuisance_strengths {
+        if !strength.is_finite() || *strength < 0.0 || *strength <= previous {
+            return Err(MetricError::InvalidSimulationConfig {
+                reason: "nuisance strengths must be finite, non-negative and strictly increasing",
+            });
+        }
+        previous = *strength;
+    }
+
+    let mut reports = Vec::with_capacity(nuisance_strengths.len());
+    for strength in nuisance_strengths {
+        let mut point_config = config.clone();
+        point_config.common_mode_nuisance_loading = *strength;
+        reports.push(run_injection_recovery(&point_config)?);
+    }
+
+    let baseline = reports
+        .first()
+        .expect("validated nuisance-strength grid is non-empty");
+    for report in reports.iter().skip(1) {
+        let latent_metrics_match = [
+            report.null_false_positive_rate == baseline.null_false_positive_rate,
+            report.injection_detection_power == baseline.injection_detection_power,
+            report.injection_directional_detection_power
+                == baseline.injection_directional_detection_power,
+            report.injection_wrong_direction_rejection_rate
+                == baseline.injection_wrong_direction_rejection_rate,
+            report.median_null_paired_gap == baseline.median_null_paired_gap,
+            report.median_injected_paired_gap == baseline.median_injected_paired_gap,
+            report.median_null_positive_gap_fraction == baseline.median_null_positive_gap_fraction,
+            report.median_injected_positive_gap_fraction
+                == baseline.median_injected_positive_gap_fraction,
+        ]
+        .into_iter()
+        .all(|matches| matches);
+        if !latent_metrics_match {
+            return Err(MetricError::InvalidSimulationConfig {
+                reason: "common-mode nuisance sweep failed to preserve matched latent draws",
+            });
+        }
+    }
+
+    Ok(CommonModeNuisanceSweepReport {
+        schema_version: "rcaf.common-mode-nuisance-sweep/0.2.0",
+        nuisance_strengths: nuisance_strengths.to_vec(),
+        reports,
+    })
+}
+
+/// Classify a significant two-sided injection result against its known positive direction.
+///
+/// A significant result is only a correct recovery when positive paired gaps outnumber
+/// negative paired gaps. Opposite-direction significance is tracked separately and is never
+/// counted as successful directional recovery.
+fn classify_expected_positive_injection(
+    positive_count: usize,
+    negative_count: usize,
+    p_two_sided_exact: f64,
+    alpha: f64,
+) -> (bool, bool) {
+    let significant = p_two_sided_exact < alpha;
+    (
+        significant && positive_count > negative_count,
+        significant && negative_count > positive_count,
+    )
 }
 
 impl InjectionRecoveryReport {
@@ -410,14 +561,23 @@ impl InjectionRecoveryReport {
                 "  \"global_loading\": {:.12},\n",
                 "  \"module_loading\": {:.12},\n",
                 "  \"loading_jitter\": {:.12},\n",
+                "  \"common_mode_nuisance_loading\": {:.12},\n",
                 "  \"estimator\": \"{}\",\n",
                 "  \"injection_loading_delta\": {:.12},\n",
                 "  \"temporal_autocorrelation\": {:.12},\n",
                 "  \"alpha\": {:.12},\n",
                 "  \"null_false_positive_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"nuisance_only_rejection_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"injection_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"injection_directional_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"injection_wrong_direction_rejection_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"signal_plus_nuisance_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"signal_plus_nuisance_directional_detection_power\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
+                "  \"signal_plus_nuisance_wrong_direction_rejection_rate\": {{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, \"ci95_lower\": {:.12}, \"ci95_upper\": {:.12}}},\n",
                 "  \"median_null_paired_gap\": {:.12},\n",
+                "  \"median_nuisance_only_paired_gap\": {:.12},\n",
                 "  \"median_injected_paired_gap\": {:.12},\n",
+                "  \"median_signal_plus_nuisance_paired_gap\": {:.12},\n",
                 "  \"median_null_positive_gap_fraction\": {:.12},\n",
                 "  \"median_injected_positive_gap_fraction\": {:.12},\n",
                 "  \"claim_limits\": [\n",
@@ -439,6 +599,7 @@ impl InjectionRecoveryReport {
             self.global_loading,
             self.module_loading,
             self.loading_jitter,
+            self.common_mode_nuisance_loading,
             self.estimator,
             self.injection_loading_delta,
             self.temporal_autocorrelation,
@@ -448,13 +609,45 @@ impl InjectionRecoveryReport {
             self.null_false_positive_rate.estimate,
             self.null_false_positive_rate.ci95_lower,
             self.null_false_positive_rate.ci95_upper,
+            self.nuisance_only_rejection_rate.successes,
+            self.nuisance_only_rejection_rate.trials,
+            self.nuisance_only_rejection_rate.estimate,
+            self.nuisance_only_rejection_rate.ci95_lower,
+            self.nuisance_only_rejection_rate.ci95_upper,
             self.injection_detection_power.successes,
             self.injection_detection_power.trials,
             self.injection_detection_power.estimate,
             self.injection_detection_power.ci95_lower,
             self.injection_detection_power.ci95_upper,
+            self.injection_directional_detection_power.successes,
+            self.injection_directional_detection_power.trials,
+            self.injection_directional_detection_power.estimate,
+            self.injection_directional_detection_power.ci95_lower,
+            self.injection_directional_detection_power.ci95_upper,
+            self.injection_wrong_direction_rejection_rate.successes,
+            self.injection_wrong_direction_rejection_rate.trials,
+            self.injection_wrong_direction_rejection_rate.estimate,
+            self.injection_wrong_direction_rejection_rate.ci95_lower,
+            self.injection_wrong_direction_rejection_rate.ci95_upper,
+            self.signal_plus_nuisance_detection_power.successes,
+            self.signal_plus_nuisance_detection_power.trials,
+            self.signal_plus_nuisance_detection_power.estimate,
+            self.signal_plus_nuisance_detection_power.ci95_lower,
+            self.signal_plus_nuisance_detection_power.ci95_upper,
+            self.signal_plus_nuisance_directional_detection_power.successes,
+            self.signal_plus_nuisance_directional_detection_power.trials,
+            self.signal_plus_nuisance_directional_detection_power.estimate,
+            self.signal_plus_nuisance_directional_detection_power.ci95_lower,
+            self.signal_plus_nuisance_directional_detection_power.ci95_upper,
+            self.signal_plus_nuisance_wrong_direction_rejection_rate.successes,
+            self.signal_plus_nuisance_wrong_direction_rejection_rate.trials,
+            self.signal_plus_nuisance_wrong_direction_rejection_rate.estimate,
+            self.signal_plus_nuisance_wrong_direction_rejection_rate.ci95_lower,
+            self.signal_plus_nuisance_wrong_direction_rejection_rate.ci95_upper,
             self.median_null_paired_gap,
+            self.median_nuisance_only_paired_gap,
             self.median_injected_paired_gap,
+            self.median_signal_plus_nuisance_paired_gap,
             self.median_null_positive_gap_fraction,
             self.median_injected_positive_gap_fraction,
         )
@@ -477,17 +670,27 @@ pub fn run_injection_recovery(
     validate_config(config)?;
     let mut rng = GaussianRng::new(config.seed);
     let mut null_rejections = 0usize;
+    let mut nuisance_rejections = 0usize;
     let mut injection_rejections = 0usize;
+    let mut directional_injection_rejections = 0usize;
+    let mut wrong_direction_rejections = 0usize;
+    let mut signal_plus_nuisance_rejections = 0usize;
+    let mut signal_plus_nuisance_directional_rejections = 0usize;
+    let mut signal_plus_nuisance_wrong_direction_rejections = 0usize;
     let mut null_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
+    let mut nuisance_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
     let mut injected_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
+    let mut signal_plus_nuisance_median_gaps = Vec::with_capacity(config.monte_carlo_replicates);
     let mut null_positive_fractions = Vec::with_capacity(config.monte_carlo_replicates);
     let mut injected_positive_fractions = Vec::with_capacity(config.monte_carlo_replicates);
 
-    for _ in 0..config.monte_carlo_replicates {
+    for replicate_index in 0..config.monte_carlo_replicates {
         let mut null_gaps = Vec::with_capacity(config.participants);
+        let mut nuisance_gaps = Vec::with_capacity(config.participants);
         let mut injected_gaps = Vec::with_capacity(config.participants);
+        let mut signal_plus_nuisance_gaps = Vec::with_capacity(config.participants);
 
-        for _ in 0..config.participants {
+        for participant_index in 0..config.participants {
             let mut global_loadings = Vec::with_capacity(config.regions);
             let mut module_loadings = Vec::with_capacity(config.regions);
             let mut injected_loadings = Vec::with_capacity(config.regions);
@@ -516,6 +719,7 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &module_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
             let repeat_b = sample_correlation_matrix(
                 &mut rng,
@@ -523,6 +727,7 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &module_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
             let null_c = sample_correlation_matrix(
                 &mut rng,
@@ -530,6 +735,7 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &module_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
             let injected_c = sample_correlation_matrix(
                 &mut rng,
@@ -537,35 +743,112 @@ pub fn run_injection_recovery(
                 &global_loadings,
                 &injected_loadings,
                 config.temporal_autocorrelation,
+                0.0,
             );
+            // The latent global/module loadings stay fixed. Only an independent shared
+            // observation nuisance is added to this repeat. At zero strength, reuse the
+            // exact same null sample so the control is deterministic and identical.
+            // Use the same deterministic nuisance stream for nuisance-only and
+            // signal-plus-nuisance observations. This matches background/noise innovations
+            // while changing only the planted module loading between the two observations.
+            let nuisance_seed =
+                derive_nuisance_seed(config.seed, replicate_index, participant_index);
+            let nuisance_c = if config.common_mode_nuisance_loading == 0.0 {
+                null_c.clone()
+            } else {
+                let mut nuisance_rng = GaussianRng::new(nuisance_seed);
+                sample_correlation_matrix(
+                    &mut nuisance_rng,
+                    config.samples_per_segment,
+                    &global_loadings,
+                    &module_loadings,
+                    config.temporal_autocorrelation,
+                    config.common_mode_nuisance_loading,
+                )
+            };
+            let signal_plus_nuisance_c = if config.common_mode_nuisance_loading == 0.0 {
+                injected_c.clone()
+            } else {
+                let mut joint_rng = GaussianRng::new(nuisance_seed);
+                sample_correlation_matrix(
+                    &mut joint_rng,
+                    config.samples_per_segment,
+                    &global_loadings,
+                    &injected_loadings,
+                    config.temporal_autocorrelation,
+                    config.common_mode_nuisance_loading,
+                )
+            };
 
             let within_similarity = correlation_similarity(&repeat_a, &repeat_b, config.estimator)?;
             let null_between_similarity =
                 correlation_similarity(&repeat_a, &null_c, config.estimator)?;
             let injected_between_similarity =
                 correlation_similarity(&repeat_a, &injected_c, config.estimator)?;
+            let nuisance_between_similarity =
+                correlation_similarity(&repeat_a, &nuisance_c, config.estimator)?;
+            let signal_plus_nuisance_similarity =
+                correlation_similarity(&repeat_a, &signal_plus_nuisance_c, config.estimator)?;
 
             null_gaps.push(within_similarity - null_between_similarity);
+            nuisance_gaps.push(within_similarity - nuisance_between_similarity);
             injected_gaps.push(within_similarity - injected_between_similarity);
+            signal_plus_nuisance_gaps.push(within_similarity - signal_plus_nuisance_similarity);
         }
 
         let null_test = exact_sign_test(&null_gaps)?;
+        let nuisance_test = exact_sign_test(&nuisance_gaps)?;
         let injected_test = exact_sign_test(&injected_gaps)?;
+        let signal_plus_nuisance_test = exact_sign_test(&signal_plus_nuisance_gaps)?;
         if null_test.p_two_sided_exact < config.alpha {
             null_rejections += 1;
         }
+        if nuisance_test.p_two_sided_exact < config.alpha {
+            nuisance_rejections += 1;
+        }
         if injected_test.p_two_sided_exact < config.alpha {
             injection_rejections += 1;
+        }
+        let (directionally_detected, wrong_direction_detected) =
+            classify_expected_positive_injection(
+                injected_test.positive_count,
+                injected_test.negative_count,
+                injected_test.p_two_sided_exact,
+                config.alpha,
+            );
+        if directionally_detected {
+            directional_injection_rejections += 1;
+        }
+        if wrong_direction_detected {
+            wrong_direction_rejections += 1;
+        }
+        if signal_plus_nuisance_test.p_two_sided_exact < config.alpha {
+            signal_plus_nuisance_rejections += 1;
+        }
+        let (joint_directionally_detected, joint_wrong_direction_detected) =
+            classify_expected_positive_injection(
+                signal_plus_nuisance_test.positive_count,
+                signal_plus_nuisance_test.negative_count,
+                signal_plus_nuisance_test.p_two_sided_exact,
+                config.alpha,
+            );
+        if joint_directionally_detected {
+            signal_plus_nuisance_directional_rejections += 1;
+        }
+        if joint_wrong_direction_detected {
+            signal_plus_nuisance_wrong_direction_rejections += 1;
         }
         null_positive_fractions.push(null_test.positive_count as f64 / config.participants as f64);
         injected_positive_fractions
             .push(injected_test.positive_count as f64 / config.participants as f64);
         null_median_gaps.push(median(&null_gaps));
+        nuisance_median_gaps.push(median(&nuisance_gaps));
         injected_median_gaps.push(median(&injected_gaps));
+        signal_plus_nuisance_median_gaps.push(median(&signal_plus_nuisance_gaps));
     }
 
     Ok(InjectionRecoveryReport {
-        schema_version: "rcaf.injection-recovery/0.1.0",
+        schema_version: "rcaf.injection-recovery/0.4.0",
         seed: config.seed,
         participants_per_replicate: config.participants,
         regions: config.regions,
@@ -576,14 +859,41 @@ pub fn run_injection_recovery(
         global_loading: config.global_loading,
         module_loading: config.module_loading,
         loading_jitter: config.loading_jitter,
+        common_mode_nuisance_loading: config.common_mode_nuisance_loading,
         estimator: config.estimator.as_str(),
         injection_loading_delta: config.injection_loading_delta,
         temporal_autocorrelation: config.temporal_autocorrelation,
         alpha: config.alpha,
         null_false_positive_rate: wilson_rate(null_rejections, config.monte_carlo_replicates),
+        nuisance_only_rejection_rate: wilson_rate(
+            nuisance_rejections,
+            config.monte_carlo_replicates,
+        ),
         injection_detection_power: wilson_rate(injection_rejections, config.monte_carlo_replicates),
+        injection_directional_detection_power: wilson_rate(
+            directional_injection_rejections,
+            config.monte_carlo_replicates,
+        ),
+        injection_wrong_direction_rejection_rate: wilson_rate(
+            wrong_direction_rejections,
+            config.monte_carlo_replicates,
+        ),
+        signal_plus_nuisance_detection_power: wilson_rate(
+            signal_plus_nuisance_rejections,
+            config.monte_carlo_replicates,
+        ),
+        signal_plus_nuisance_directional_detection_power: wilson_rate(
+            signal_plus_nuisance_directional_rejections,
+            config.monte_carlo_replicates,
+        ),
+        signal_plus_nuisance_wrong_direction_rejection_rate: wilson_rate(
+            signal_plus_nuisance_wrong_direction_rejections,
+            config.monte_carlo_replicates,
+        ),
         median_null_paired_gap: median(&null_median_gaps),
+        median_nuisance_only_paired_gap: median(&nuisance_median_gaps),
         median_injected_paired_gap: median(&injected_median_gaps),
+        median_signal_plus_nuisance_paired_gap: median(&signal_plus_nuisance_median_gaps),
         median_null_positive_gap_fraction: median(&null_positive_fractions),
         median_injected_positive_gap_fraction: median(&injected_positive_fractions),
     })
@@ -635,6 +945,12 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
             reason: "loading_jitter must be finite and non-negative",
         });
     }
+    if !config.common_mode_nuisance_loading.is_finite() || config.common_mode_nuisance_loading < 0.0
+    {
+        return Err(MetricError::InvalidSimulationConfig {
+            reason: "common_mode_nuisance_loading must be finite and non-negative",
+        });
+    }
     if !config.temporal_autocorrelation.is_finite() || config.temporal_autocorrelation.abs() >= 1.0
     {
         return Err(MetricError::InvalidSimulationConfig {
@@ -653,7 +969,8 @@ fn validate_config(config: &InjectionRecoveryConfig) -> Result<(), MetricError> 
     let max_global = config.global_loading + config.loading_jitter / 2.0;
     let max_module =
         config.module_loading + config.loading_jitter / 2.0 + config.injection_loading_delta;
-    if max_global.powi(2) + max_module.powi(2) >= 1.0 {
+    let nuisance_loading = config.common_mode_nuisance_loading;
+    if max_global.powi(2) + max_module.powi(2) + nuisance_loading.powi(2) >= 1.0 {
         return Err(MetricError::InvalidSimulationConfig {
             reason: "factor loadings must leave positive residual variance",
         });
@@ -667,6 +984,7 @@ fn sample_correlation_matrix(
     global_loadings: &[f64],
     module_loadings: &[f64],
     temporal_autocorrelation: f64,
+    common_mode_nuisance_loading: f64,
 ) -> Vec<Vec<f64>> {
     let regions = global_loadings.len();
     let mut sums = vec![0.0; regions];
@@ -674,6 +992,11 @@ fn sample_correlation_matrix(
     let innovation_scale = (1.0 - temporal_autocorrelation * temporal_autocorrelation).sqrt();
     let mut previous_global = rng.normal();
     let mut previous_module = rng.normal();
+    let mut previous_nuisance = if common_mode_nuisance_loading > 0.0 {
+        rng.normal()
+    } else {
+        0.0
+    };
     let mut previous_residuals: Vec<f64> = (0..regions).map(|_| rng.normal()).collect();
 
     for _ in 0..samples {
@@ -681,8 +1004,13 @@ fn sample_correlation_matrix(
             temporal_autocorrelation * previous_global + innovation_scale * rng.normal();
         previous_module =
             temporal_autocorrelation * previous_module + innovation_scale * rng.normal();
+        if common_mode_nuisance_loading > 0.0 {
+            previous_nuisance =
+                temporal_autocorrelation * previous_nuisance + innovation_scale * rng.normal();
+        }
         let global_factor = previous_global;
         let module_factor = previous_module;
+        let nuisance_factor = previous_nuisance;
         let mut observation = Vec::with_capacity(regions);
         for ((region, (&global, &module)), sum) in global_loadings
             .iter()
@@ -690,11 +1018,16 @@ fn sample_correlation_matrix(
             .enumerate()
             .zip(sums.iter_mut())
         {
-            let residual = (1.0 - global * global - module * module).sqrt();
+            let residual = (1.0
+                - global * global
+                - module * module
+                - common_mode_nuisance_loading * common_mode_nuisance_loading)
+                .sqrt();
             previous_residuals[region] = temporal_autocorrelation * previous_residuals[region]
                 + innovation_scale * rng.normal();
             let value = global * global_factor
                 + module * module_factor
+                + common_mode_nuisance_loading * nuisance_factor
                 + residual * previous_residuals[region];
             observation.push(value);
             *sum += value;
@@ -726,6 +1059,17 @@ fn sample_correlation_matrix(
     }
 
     flat.chunks(regions).map(|row| row.to_vec()).collect()
+}
+
+/// Derive a deterministic, domain-separated RNG stream for a participant's nuisance.
+fn derive_nuisance_seed(seed: u64, replicate_index: usize, participant_index: usize) -> u64 {
+    let mut value = seed
+        ^ 0xD1B5_4A32_D192_ED03
+        ^ (replicate_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (participant_index as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
 }
 
 fn median(values: &[f64]) -> f64 {
@@ -842,13 +1186,31 @@ mod tests {
     }
 
     #[test]
-    fn known_network_injection_is_recovered() {
+    fn known_network_injection_is_recovered_in_the_expected_direction() {
         let result = run_injection_recovery(&test_config()).unwrap();
         assert!(
             result.injection_detection_power.estimate >= 0.80,
-            "observed injection recovery {}",
+            "observed two-sided difference detection {}",
             result.injection_detection_power.estimate
         );
+        assert!(
+            result.injection_directional_detection_power.estimate >= 0.80,
+            "observed expected-direction recovery {}",
+            result.injection_directional_detection_power.estimate
+        );
+        assert_eq!(
+            result.injection_detection_power.successes,
+            result.injection_directional_detection_power.successes
+                + result.injection_wrong_direction_rejection_rate.successes,
+            "two-sided detections must partition into expected- and wrong-direction results"
+        );
+        assert_eq!(
+            result.injection_wrong_direction_rejection_rate.successes, 0,
+            "strong positive loading injection produced wrong-direction rejection"
+        );
+        let json = result.to_json_pretty();
+        assert!(json.contains("\"injection_directional_detection_power\""));
+        assert!(json.contains("\"injection_wrong_direction_rejection_rate\""));
         assert!(
             result.median_injected_paired_gap > result.median_null_paired_gap + 0.035,
             "null gap {} vs injected gap {}",
@@ -858,12 +1220,218 @@ mod tests {
     }
 
     #[test]
+    fn opposite_direction_significance_is_never_counted_as_successful_recovery() {
+        let alpha = 0.05;
+        let n = 23usize;
+        let positive_test = exact_sign_test(&vec![1.0; n]).unwrap();
+        let negative_test = exact_sign_test(&vec![-1.0; n]).unwrap();
+        let non_significant_differences = [vec![1.0; 13], vec![-1.0; 10]].concat();
+        let non_significant_test = exact_sign_test(&non_significant_differences).unwrap();
+
+        let (correct, wrong) = classify_expected_positive_injection(
+            positive_test.positive_count,
+            positive_test.negative_count,
+            positive_test.p_two_sided_exact,
+            alpha,
+        );
+        assert!(correct);
+        assert!(!wrong);
+
+        let (correct, wrong) = classify_expected_positive_injection(
+            negative_test.positive_count,
+            negative_test.negative_count,
+            negative_test.p_two_sided_exact,
+            alpha,
+        );
+        assert!(
+            !correct,
+            "opposite-direction rejection must not count as recovery"
+        );
+        assert!(
+            wrong,
+            "opposite-direction rejection must be recorded separately"
+        );
+
+        let (correct, wrong) = classify_expected_positive_injection(
+            non_significant_test.positive_count,
+            non_significant_test.negative_count,
+            non_significant_test.p_two_sided_exact,
+            alpha,
+        );
+        assert!(
+            !correct,
+            "non-significant positive imbalance is not recovery"
+        );
+        assert!(!wrong);
+    }
+
+    #[test]
+    fn zero_strength_common_mode_nuisance_reuses_the_exact_null_control() {
+        let mut config = test_config();
+        config.monte_carlo_replicates = 30;
+        config.common_mode_nuisance_loading = 0.0;
+        let report = run_injection_recovery(&config).unwrap();
+        assert_eq!(
+            report.nuisance_only_rejection_rate,
+            report.null_false_positive_rate
+        );
+        assert_eq!(
+            report.median_nuisance_only_paired_gap,
+            report.median_null_paired_gap
+        );
+        assert_eq!(
+            report.signal_plus_nuisance_detection_power,
+            report.injection_detection_power
+        );
+        assert_eq!(
+            report.signal_plus_nuisance_directional_detection_power,
+            report.injection_directional_detection_power
+        );
+        assert_eq!(
+            report.signal_plus_nuisance_wrong_direction_rejection_rate,
+            report.injection_wrong_direction_rejection_rate
+        );
+        assert_eq!(
+            report.median_signal_plus_nuisance_paired_gap,
+            report.median_injected_paired_gap
+        );
+    }
+
+    #[test]
+    fn common_mode_nuisance_is_reported_separately_from_latent_injection() {
+        let report = run_injection_recovery(&test_config()).unwrap();
+        assert_eq!(report.common_mode_nuisance_loading, 0.20);
+        assert_eq!(
+            report.nuisance_only_rejection_rate.trials,
+            report.monte_carlo_replicates
+        );
+        assert!(report.median_nuisance_only_paired_gap.is_finite());
+        assert_eq!(
+            report.signal_plus_nuisance_detection_power.trials,
+            report.monte_carlo_replicates
+        );
+        assert_eq!(
+            report
+                .signal_plus_nuisance_directional_detection_power
+                .successes
+                + report
+                    .signal_plus_nuisance_wrong_direction_rejection_rate
+                    .successes,
+            report.signal_plus_nuisance_detection_power.successes
+        );
+        assert!(report.median_signal_plus_nuisance_paired_gap.is_finite());
+        let json = report.to_json_pretty();
+        assert!(json.contains("\"nuisance_only_rejection_rate\""));
+        assert!(json.contains("signal_plus_nuisance_directional_detection_power"));
+        assert!(json.contains("signal_plus_nuisance_wrong_direction_rejection_rate"));
+        assert!(json.contains("median_signal_plus_nuisance_paired_gap"));
+        assert!(json.contains("\"common_mode_nuisance_loading\""));
+    }
+
+    #[test]
+    fn common_mode_nuisance_sweep_preserves_matched_latent_draws() {
+        let config = InjectionRecoveryConfig {
+            monte_carlo_replicates: 30,
+            ..test_config()
+        };
+        let strengths = [0.0, 0.10, 0.20, 0.30];
+        let sweep = run_common_mode_nuisance_sweep(&config, &strengths).unwrap();
+        assert_eq!(sweep.nuisance_strengths.as_slice(), &strengths[..]);
+        assert_eq!(
+            sweep.schema_version,
+            "rcaf.common-mode-nuisance-sweep/0.2.0"
+        );
+        assert_eq!(
+            sweep.reports[0].nuisance_only_rejection_rate,
+            sweep.reports[0].null_false_positive_rate
+        );
+        assert_eq!(
+            sweep.reports[0].median_nuisance_only_paired_gap,
+            sweep.reports[0].median_null_paired_gap
+        );
+        assert_eq!(
+            sweep.reports[0].signal_plus_nuisance_detection_power,
+            sweep.reports[0].injection_detection_power
+        );
+        assert_eq!(
+            sweep.reports[0].signal_plus_nuisance_directional_detection_power,
+            sweep.reports[0].injection_directional_detection_power
+        );
+        assert_eq!(
+            sweep.reports[0].signal_plus_nuisance_wrong_direction_rejection_rate,
+            sweep.reports[0].injection_wrong_direction_rejection_rate
+        );
+        assert_eq!(
+            sweep.reports[0].median_signal_plus_nuisance_paired_gap,
+            sweep.reports[0].median_injected_paired_gap
+        );
+        for (report, strength) in sweep.reports.iter().zip(strengths) {
+            assert_eq!(report.common_mode_nuisance_loading, strength);
+            assert_eq!(
+                report.null_false_positive_rate,
+                sweep.reports[0].null_false_positive_rate
+            );
+            assert_eq!(
+                report.injection_detection_power,
+                sweep.reports[0].injection_detection_power
+            );
+            assert_eq!(
+                report.injection_directional_detection_power,
+                sweep.reports[0].injection_directional_detection_power
+            );
+            assert_eq!(
+                report.median_injected_paired_gap,
+                sweep.reports[0].median_injected_paired_gap
+            );
+        }
+        let json = sweep.to_json_pretty();
+        assert!(json.contains("rcaf.common-mode-nuisance-sweep/0.2.0"));
+        assert!(json.contains("\"nuisance_only_rejection_rate\""));
+    }
+
+    #[test]
+    fn common_mode_nuisance_sweep_rejects_missing_zero_unsorted_and_short_grids() {
+        let config = test_config();
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.2]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.1, 0.2]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.0, 0.2, 0.1]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        assert!(matches!(
+            run_common_mode_nuisance_sweep(&config, &[0.0, f64::NAN]),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+    }
+
+    #[test]
     fn seed_reproduces_report_exactly() {
         let mut config = test_config();
         config.monte_carlo_replicates = 20;
         let left = run_injection_recovery(&config).unwrap();
         let right = run_injection_recovery(&config).unwrap();
         assert_eq!(left, right);
+    }
+
+    #[test]
+    fn invalid_common_mode_nuisance_loading_fails_closed() {
+        let mut config = test_config();
+        config.common_mode_nuisance_loading = f64::NAN;
+        assert!(matches!(
+            run_injection_recovery(&config),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
+        config.common_mode_nuisance_loading = 1.2;
+        assert!(matches!(
+            run_injection_recovery(&config),
+            Err(MetricError::InvalidSimulationConfig { .. })
+        ));
     }
 
     #[test]
@@ -1000,7 +1568,7 @@ mod tests {
             );
         }
         let output = tournament.to_json_pretty();
-        assert!(output.contains("rcaf.estimator-dose-response-tournament/0.1.0"));
+        assert!(output.contains("rcaf.estimator-dose-response-tournament/0.4.0"));
         assert!(output.contains("signed_shift_weighted_jaccard"));
     }
 

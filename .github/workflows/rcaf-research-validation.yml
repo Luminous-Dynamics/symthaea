@@ -124,6 +124,15 @@ jobs:
           jsonschema.validate(report, schema)
           assert report["null_false_positive_rate"]["estimate"] <= 0.15
           assert report["injection_detection_power"]["estimate"] >= 0.80
+          assert report["injection_directional_detection_power"]["estimate"] >= 0.80
+          assert (
+              report["injection_directional_detection_power"]["successes"]
+              + report["injection_wrong_direction_rejection_rate"]["successes"]
+              == report["injection_detection_power"]["successes"]
+          )
+          assert report["common_mode_nuisance_loading"] == 0.20
+          assert report["nuisance_only_rejection_rate"]["trials"] == report["monte_carlo_replicates"]
+          assert 0.0 <= report["nuisance_only_rejection_rate"]["estimate"] <= 1.0
           assert report["median_injected_paired_gap"] > report["median_null_paired_gap"] + 0.035
           print("PASS: RCAF synthetic null calibration and injection recovery")
           PY
@@ -148,6 +157,44 @@ jobs:
           assert report["endpoint_median_gap_difference"] > 0.04
           assert report["monotonic_adjacent_pair_fraction"] >= 0.5
           print("PASS: RCAF synthetic injection-recovery dose-response sweep")
+          PY
+
+      - name: Run matched common-mode nuisance dose-response sweep
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_common_mode_nuisance_sweep -- "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/common-mode-nuisance-sweep.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-common-mode-nuisance-sweep.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          expected = [0.0, 0.10, 0.20, 0.30]
+          assert report["nuisance_strengths"] == expected
+          assert report["strength_points"] == len(expected)
+          rows = report["reports"]
+          assert [row["common_mode_nuisance_loading"] for row in rows] == expected
+          assert rows[0]["nuisance_only_rejection_rate"] == rows[0]["null_false_positive_rate"]
+          assert rows[0]["median_nuisance_only_paired_gap"] == rows[0]["median_null_paired_gap"]
+          assert rows[0]["signal_plus_nuisance_detection_power"] == rows[0]["injection_detection_power"]
+          assert rows[0]["signal_plus_nuisance_directional_detection_power"] == rows[0]["injection_directional_detection_power"]
+          assert rows[0]["signal_plus_nuisance_wrong_direction_rejection_rate"] == rows[0]["injection_wrong_direction_rejection_rate"]
+          assert rows[0]["median_signal_plus_nuisance_paired_gap"] == rows[0]["median_injected_paired_gap"]
+          for row in rows:
+              # The combined signal+nuisance cell must expose direction-qualified outcomes.
+              assert row["signal_plus_nuisance_detection_power"]["trials"] == row["monte_carlo_replicates"]
+              assert row["signal_plus_nuisance_directional_detection_power"]["successes"] + row["signal_plus_nuisance_wrong_direction_rejection_rate"]["successes"] == row["signal_plus_nuisance_detection_power"]["successes"]
+          for row in rows[1:]:
+              # Clean signal/null streams are fixed across doses; the combined cell intentionally varies with nuisance dose.
+              assert row["null_false_positive_rate"] == rows[0]["null_false_positive_rate"]
+              assert row["injection_detection_power"] == rows[0]["injection_detection_power"]
+              assert row["injection_directional_detection_power"] == rows[0]["injection_directional_detection_power"]
+              assert row["injection_wrong_direction_rejection_rate"] == rows[0]["injection_wrong_direction_rejection_rate"]
+              assert row["median_injected_paired_gap"] == rows[0]["median_injected_paired_gap"]
+          print("PASS: matched-input common-mode nuisance dose-response sweep")
           PY
 
       - name: Run matched-input RCAF estimator tournament
@@ -212,7 +259,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-injection-report.json" \
               "$RUNNER_TEMP/rcaf-injection-sweep.json" \
               "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
-              "$RUNNER_TEMP/rcaf-estimator-dose-surface.json"
+              "$RUNNER_TEMP/rcaf-estimator-dose-surface.json" \
+              "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json"
           python - <<'PY'
           import json
           import os
@@ -227,7 +275,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 4
+          assert len(receipt["simulation_reports"]) == 5
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -241,6 +289,7 @@ jobs:
             ${{ runner.temp }}/rcaf-injection-sweep.json
             ${{ runner.temp }}/rcaf-estimator-tournament.json
             ${{ runner.temp }}/rcaf-estimator-dose-surface.json
+            ${{ runner.temp }}/rcaf-common-mode-nuisance-sweep.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30

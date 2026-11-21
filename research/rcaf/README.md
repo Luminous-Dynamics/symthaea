@@ -10,7 +10,8 @@ A dependency-free Rust research crate for repeatability-calibrated comparison of
 - Participant-keyed within/between similarity summaries.
 - Participant-level bootstrap confidence intervals and exact two-sided sign tests.
 - Direct edge-polarity transition counts, including neutral-band transitions.
-- Synthetic Gaussian-factor null and injection-recovery calibration in `src/simulation.rs`.
+- Synthetic Gaussian-factor null/injection calibration plus a shared observation-only common-mode nuisance challenge in `src/simulation.rs`.
+- Matched signal-plus-nuisance dose response, with the same deterministic innovation stream as its nuisance-only counterfactual and separate direction-aware recovery outputs.
 - Draft 2020-12 schemas and semantic validation for RCAF result receipts.
 
 ## Run the kernel tests
@@ -30,15 +31,18 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_reco
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery_sweep
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose_response_tournament
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_common_mode_nuisance_sweep
 ```
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
 - null false-positive frequency under exchangeable same-state samples;
-- detection power under a declared module-loading perturbation;
+- two-sided difference detection, expected-direction recovery and wrong-direction rejection under a declared module-loading perturbation;
 - 95% Wilson Monte-Carlo confidence intervals;
 - median participant-paired gaps and positive-gap fractions.
 
-The generator creates valid correlation matrices from a Gaussian two-factor model and finite time series. Its factors and region residuals use stationary AR(1) dependence (default rho=0.30), making this more demanding than independent time-point sampling. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
+At nuisance dose zero, the signal-plus-nuisance outputs must exactly match the clean injection outputs. At positive doses, the combined signal+nuisance cell is matched to the nuisance-only cell through a shared deterministic innovation stream; only the planted module loading differs. This measures whether nuisance reduces or reverses directional recovery.
+
+The generator creates time-series observations from participant-specific global/module factors and region residuals, then estimates correlation matrices. Latent factors and region residuals use stationary AR(1) dependence (default rho=0.30). A separate common-mode nuisance factor can be injected into one observed repeat while holding latent global/module loadings fixed. The null compares two independent samples from the same underlying participant network. The alternative changes one predefined module's factor loading. Full protocol, assumptions and the next sensitivity grid are in `docs/neuroscience/RCAF_INJECTION_RECOVERY_PROTOCOL_V0.md`.
 
 This is a software calibration world, not a model of biological consciousness. A passed injection test cannot establish that an empirical network shift is real, causal or clinically meaningful. A single Gaussian factor model does not characterize the full range of acquisition artifacts, autocorrelation, nonstationarity or preprocessing choices.
 
@@ -87,7 +91,7 @@ A workflow result applies only to the exact source commit checked. Skipped, queu
 - signed-shift Weighted Jaccard: transforms each correlation from [-1, 1] to [0, 2], penalizing sign disagreement;
 - normalized mean absolute edge error: one minus mean upper-triangle absolute error divided by two.
 
-Each estimator receives the same seed, participant draws, and injection configuration. The tournament reports null false-positive frequency, injection-detection power, Monte-Carlo Wilson intervals, and participant-level gap summaries. It does not automatically select a universal winner: different estimators have different construct semantics, and estimator performance must be read together with null calibration and effect sensitivity.
+Each estimator receives the same seed, participant draws, and injection configuration. The tournament reports null false-positive frequency, two-sided difference detection, expected-direction recovery, wrong-direction rejection, Monte-Carlo Wilson intervals, and participant-level gap summaries. It does not automatically select a universal winner: different estimators have different construct semantics, and estimator performance must be read together with null calibration and effect sensitivity.
 
 The output contract is `estimator-tournament.schema.json`.
 
@@ -108,3 +112,33 @@ These are uploaded as a workflow artifact named `rcaf-simulation-evidence-<commi
 `run_estimator_dose_response_tournament` evaluates absolute WJ, signed-shift WJ and normalized mean absolute edge error across the same five injection strengths. Each metric receives the same seed and random-draw order at every dose. This is more discriminating than comparing three metrics only at a strong effect that saturates all methods.
 
 The example output is governed by `estimator-dose-response-tournament.schema.json`. It records a separate full dose-response curve, including null rejection, detection power, Wilson intervals and paired-gap distributions, for each metric. It must not be used to select a universal winner: the similarity definitions have different construct semantics.
+
+
+## Validate the proposed adversarial calibration plan
+
+The plan is currently a proposed protocol; validating it does not execute simulations or qualify biological data.
+
+```sh
+python research/rcaf/tools/validate_adversarial_plan.py research/rcaf/adversarial-calibration-plan.example.json
+python -m unittest discover -s research/rcaf/tools -p 'test_validate_adversarial_plan.py' -v
+```
+
+The validator checks the Draft 2020-12 schema plus semantic controls for separated seeds, exact nulls, positive-dose effects, matrix-level and pre-estimation signal-level injections, nuisance-only nulls, and required evidence outputs. It uses the existing `jsonschema` dependency in `requirements-validation.txt`.
+
+
+## Direction-aware and nuisance-only calibration
+
+Injection-recovery reports use schema version `rcaf.injection-recovery/0.3.0`. The separate `nuisance_only_rejection_rate` measures rejection under a common-mode observation artifact with unchanged latent loadings; it is not the exact same-observation Type-I error. The legacy `injection_detection_power` remains the two-sided significant-difference rate. It is decomposed into:
+- `injection_directional_detection_power`: significant paired gaps in the preregistered positive direction of the module-loading injection;
+- `injection_wrong_direction_rejection_rate`: significant paired gaps in the opposite direction.
+
+The two directional rates partition the two-sided detections under the exact sign test. A wrong-direction rejection is never counted as successful recovery. The same fields are carried through the sweep and both estimator tournament reports. The report also records `common_mode_nuisance_loading` and `median_nuisance_only_paired_gap`. At zero nuisance strength, the nuisance control reuses the exact null sample and must match the null rejection rate and median gap exactly. A nonzero nuisance-only rejection rate is evidence of artifact sensitivity, not proof that the latent network changed.
+
+
+
+
+The `rcaf_common_mode_nuisance_sweep` example evaluates nuisance strengths `[0.00, 0.10, 0.20, 0.30]`. It requires an exact zero-dose control. The nuisance RNG is derived from stable participant/replicate-specific streams separate from the latent-signal RNG, so the null and injected outcomes must remain identical across nuisance doses. Only the nuisance loading changes. The result contract is `common-mode-nuisance-sweep.schema.json`. This is still a synthetic common-mode artifact challenge, not a model of all motion, scanner, physiology or preprocessing artifacts.
+
+### Shared observation-only nuisance challenge
+
+The current generator adds an independent AR(1) common-mode factor to one observed repeat while leaving the participant's latent global/module loadings unchanged. Its rejection rate and median paired gap are reported separately from the exact same-observation null and the known latent module injection. This is the first nuisance family only; it does not model all physiology, motion, scanner drift, censoring or missingness. The output field `nuisance_only_rejection_rate` measures artifact-only rejection relative to latent truth, not conventional Type-I error under identical observed-data distributions.
