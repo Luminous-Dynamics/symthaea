@@ -156,11 +156,15 @@
         },
         "decisions": {
           "type": "array",
-          "minItems": 2,
+          "minItems": 3,
+          "maxItems": 3,
           "uniqueItems": true,
           "items": {
-            "type": "string",
-            "minLength": 1
+            "enum": [
+              "ACCEPT",
+              "REJECT",
+              "HOLD"
+            ]
           }
         },
         "loss_matrix": {
@@ -228,12 +232,37 @@
         },
         "decision_obligations": {
           "type": "object",
-          "additionalProperties": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "minLength": 1
+          "additionalProperties": false,
+          "required": [
+            "ACCEPT",
+            "REJECT",
+            "HOLD"
+          ],
+          "properties": {
+            "ACCEPT": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "REJECT": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "HOLD": {
+              "type": "array",
+              "maxItems": 0,
+              "items": {
+                "type": "string"
+              }
             }
           }
         }
