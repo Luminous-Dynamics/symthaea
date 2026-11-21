@@ -2,11 +2,11 @@
 
 **Tracker:** [#13111](https://github.com/Luminous-Dynamics/symthaea/issues/13111)  
 **Specification:** [ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md](../../../docs/research/ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md)  
-**Status:** 15 hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit and deterministic one-step action selector; no multi-step adaptive policy tournament yet.
+**Status:** 17 hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit and deterministic one-step action selector; no multi-step adaptive policy tournament yet.
 
 ## Files
 
-- `scenarios.json`: 15 synthetic scenarios, explicit state/loss contexts, action proposals, resource vectors and expected qualitative/known-answer checks.
+- `scenarios.json`: 17 synthetic scenarios, explicit state/loss contexts, action proposals, resource vectors and expected qualitative/known-answer checks.
 - `scenarios.schema.json`: JSON Schema Draft 2020-12 for the v0.1 corpus.
 - [Executable dry-run preflight](https://github.com/Luminous-Dynamics/symthaea/tree/research/orbital-joint-evidence-voi-v0-1/tools/orbital-joint-evidence-voi-bench): resource/admissibility/claim checks, finite-state minimax regret and one explicit calibrated EVSI case.
 - A separately implemented standard-library Python oracle under the same tool directory.
@@ -30,6 +30,8 @@
 | JEV-013 | Are actual resources retained and reported when an aborted test exceeds both estimate and total budget? |
 | JEV-014 | Do equal-value actions with incomparable resource plans trigger human review rather than a fabricated cost scalar? |
 | JEV-015 | Are self-declared-admissible actions rejected when profile, physical serial, configuration or ICD revision differs from the decision context? |
+| JEV-016 | Does an incomplete owner-native change-event frontier block even an otherwise informative requalification action? |
+| JEV-017 | Does a complete change-impact receipt require targeted coverage of each claim marked for requalification while preserving unrelated claims? |
 
 ## Important interpretation
 
@@ -46,4 +48,4 @@ The scenario catalogue separates:
 - pre-registered test obligations from general information gain;
 - planned actions from actual execution outcomes.
 
-The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The multi-step matched-budget policy tournament remains unimplemented; no solver or physical test is called.
+The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The multi-step matched-budget policy tournament remains unimplemented; no solver or physical test is called.
