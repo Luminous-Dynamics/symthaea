@@ -29,6 +29,7 @@ The crate is deliberately isolated from the root Cargo workspace and has no thir
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery_sweep
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose_response_tournament
 ```
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
@@ -100,3 +101,10 @@ The focused validation workflow runs all three simulation examples and creates:
 - `rcaf.execution-receipt/0.1.0` manifest hashing the RCAF source tree, exact commit, Rust/Cargo/Python environment and report outputs.
 
 These are uploaded as a workflow artifact named `rcaf-simulation-evidence-<commit SHA>`. The receipt proves provenance of that CI run, not independent replay or biological validity.
+
+
+## Estimator-by-effect-size surface
+
+`run_estimator_dose_response_tournament` evaluates absolute WJ, signed-shift WJ and normalized mean absolute edge error across the same five injection strengths. Each metric receives the same seed and random-draw order at every dose. This is more discriminating than comparing three metrics only at a strong effect that saturates all methods.
+
+The example output is governed by `estimator-dose-response-tournament.schema.json`. It records a separate full dose-response curve, including null rejection, detection power, Wilson intervals and paired-gap distributions, for each metric. It must not be used to select a universal winner: the similarity definitions have different construct semantics.
