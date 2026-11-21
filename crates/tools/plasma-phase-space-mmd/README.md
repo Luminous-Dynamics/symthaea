@@ -44,3 +44,18 @@ The unnormalized MMD is the RKHS metric for this characteristic kernel. The repo
 The unit tests cover permutation and split invariance, periodic representatives, a finite-Fourier alias resolved by the characteristic oracle, position/velocity correlation changes, signed measures including co-located cancellation, mass rescaling, empty and zero-weight measures, invalid inputs, overflow, and pair-evaluation metadata.
 
 The focused GitHub Actions workflow runs Rust 1.96 format, test and strict Clippy checks at the exact pull-request revision. The source being authored does not imply that those checks have passed.
+
+
+## Linear-cost spectral approximation
+
+The crate also exposes compare_phase_space_measures_spectral, an O(D(U+V)) random-feature approximation after support canonicalization, where D is the feature count and U,V are unique nonzero support atoms.
+
+The spectral sampler is exact for the declared kernel:
+- The periodic von Mises Fourier index is sampled as Skellam(kappa/2,kappa/2), i.e. the difference of two independent Poisson draws. Its probability at integer n is exp(-kappa) I_|n|(kappa).
+- The Gaussian velocity frequency is sampled from Normal(0, 1/ell_v^2).
+
+For each joint frequency, both measures are evaluated with the same feature draw. The mean squared complex signature difference estimates normalized MMD squared. The implementation reports empirical feature variance, standard error, a conservative 95% Hoeffding feature-sampling radius, a feature-bound interval, the seed, feature count, unique atom counts and total particle-feature evaluations.
+
+The Hoeffding interval applies only to random spectral-feature approximation error in normalized squared MMD. It is not a confidence interval for the physical solver, finite-particle Monte Carlo error, or a statistical two-sample test. The seed and feature count must be frozen and recorded in the benchmark identity. Compare feature-count sweeps and multiple independent seeds against the exact small-N oracle; do not select the seed or feature count after observing held-out physics results.
+
+This path uses O(N log N + M log M) canonicalization and O(D(U+V)) feature evaluation. It is designed for monitoring and large-particle approximation, while the direct quadratic oracle remains the small-N reference.
