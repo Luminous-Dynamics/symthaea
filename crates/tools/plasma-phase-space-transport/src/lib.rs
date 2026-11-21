@@ -837,7 +837,9 @@ mod tests {
 
     #[test]
     fn tiny_normalized_mass_is_not_dropped_at_large_velocity_separation() {
-        let epsilon = 1.0e-15;
+        // 2^-50 is exactly representable and remains below the old 1e-12
+        // flow stopping threshold without introducing mass-sum roundoff.
+        let epsilon = 2.0_f64.powi(-50);
         let candidate = [
             particle(0.0, 0.0, 1.0 - epsilon),
             particle(0.0, 0.0, epsilon),
@@ -847,7 +849,7 @@ mod tests {
             particle(0.0, 1.0e15, epsilon),
         ];
         let result = compare_phase_space_measures_w1(&candidate, &reference, config()).unwrap();
-        assert_near(result.normalized_w1, 1.0, 1.0e-12);
+        assert_near(result.normalized_w1, epsilon * 1.0e15, 1.0e-12);
         assert_eq!(result.transported_fraction, 1.0);
     }
 
