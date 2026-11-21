@@ -98,7 +98,6 @@ pub struct VlasovPoissonDiagnostics {
     pub velocity_boundary_ratio: f64,
 }
 
-
 /// Complex coefficient of a positive spatial Fourier mode of the electric field.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FourierModeCoefficient {
@@ -902,7 +901,9 @@ mod tests {
 
         assert!(coefficient.real.abs() < 1.0e-14);
         assert!(coefficient.imaginary > 0.0);
-        assert!((coefficient.amplitude() - solver.electric_mode_amplitude(1).unwrap()).abs() < 1.0e-15);
+        assert!(
+            (coefficient.amplitude() - solver.electric_mode_amplitude(1).unwrap()).abs() < 1.0e-15
+        );
         assert!(coefficient.phase().is_finite());
     }
 
