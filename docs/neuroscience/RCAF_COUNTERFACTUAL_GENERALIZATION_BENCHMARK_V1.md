@@ -185,7 +185,23 @@ The five-point effect sweep `[0.00, 0.10, 0.20, 0.30, 0.40]` produced directiona
 4. The execution receipt demonstrates a content-addressed record of this run; it does not prove independent replay.
 5. No biological data were downloaded or processed, and these results do not establish SOTA superiority, consciousness detection, causal inference or clinical readiness.
 
-## 9. Scope and safety of claims
+## 10. Crossed signal × nuisance qualification
+
+The implementation branch now adds a four-cell counterfactual contrast:
+
+1. Clean null: no target injection and no observation nuisance.
+2. Signal only: intended target change with no observation nuisance.
+3. Nuisance only: target held fixed while common-mode observation nuisance is added.
+4. Signal plus nuisance: the same intended target change is present while the same nuisance family is superimposed.
+
+The nuisance-only and signal-plus-nuisance cells use the same deterministic random innovation stream per participant and Monte-Carlo replicate. The planted module loading is the only intended difference between those two cells. At nuisance dose zero, the signal-plus-nuisance report fields must exactly equal the clean signal-only fields. Across nuisance-dose points, the clean signal and null results remain invariant; combined-cell outcomes are explicitly allowed to change.
+
+New outputs report two-sided detection, expected-direction recovery, wrong-direction significant rejection and median paired gap for the combined cell. This creates a direct test of whether an artifact masks a genuine effect, changes its magnitude or produces a significant result in the wrong direction. The existing nuisance-only false-alarm output remains separate; it must not be collapsed into classical Type-I error.
+
+**Implementation status at this document revision:** code, schemas, adversarial plan validator, tests, README and focused workflow assertions have been added on PR #13139. The exact-head validation run is still in progress; no numerical result for this combined cell is claimed until its report and content-addressed receipt are archived.
+
+Next qualification steps are to run the crossed dose grid with at least 1,000 replicates for screening and at least 10,000 for confirmatory primary null families, then add distinct nuisance families (site/scanner drift, regional low-rank artifact, motion-like bursts, censoring and physiological waveforms). The current shared common-mode Gaussian factor is an intentionally narrow first challenge, not a realistic scanner-artifact model.
+## 11. Scope and safety of claims
 
 - A passed synthetic challenge qualifies only the tested generator, intervention and analysis implementation.
 - Artifact-only rejection is not classical Type-I error when the nuisance intervention changes observed-data distributions.
