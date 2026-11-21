@@ -509,14 +509,15 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44881540564",
-      "run_id": 44881540564,
-      "tested_commit": "4cf0944335d38984b8fdee7d052609c8cdf704ef",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550",
+      "run_id": 44890353550,
+      "tested_commit": "452374fead7e03f4c4eef5aafb4ba59db1569fef",
       "conclusion": "success",
-      "test_count": 21,
-      "steps": [
-        "reference unit tests",
-        "byte-for-byte frozen report reproduction"
+      "test_count": 31,
+      "passed_steps": [
+        "Run reference unit tests",
+        "Reproduce binary metric report byte-for-byte",
+        "Reproduce inspection decision report byte-for-byte"
       ]
     },
     "inspection_decision_policy": {
@@ -535,7 +536,6 @@
       "claim_ceiling": "synthetic model-based expected value only; no physical savings or inspection authorization"
     },
     "total_test_count": 31,
-    "test_count_pending_hosted_ci": 31,
     "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler"
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
