@@ -534,3 +534,8 @@ Tracked by [SEMI-RUST-001 #13129](https://github.com/Luminous-Dynamics/symthaea/
 ## Rule-ordered multimodal zero-shot benchmark
 
 New preprint review and follow-up: [SEMI-ZS-LLM-001 #13146](https://github.com/Luminous-Dynamics/symthaea/issues/13146). Cao & Tao (arXiv:2610.35080, 26 Oct 2026) report a frozen GPT-4o with connected-component highlighting and morphology/location/exclusion rules: 92.9% macro / 93.8% overall on a six-class MixedWM38 subset, and 79.1% macro / 81.3% overall on six classes from WM-811K. On MixedWM38, eight alternate rule orders range 90.1–91.9% overall. This preprint excludes the remaining mixed combinations and is not a lot/time-held-out result. The benchmark therefore measures rule-order robustness, evidence grounding, open-set abstention, cost/latency and hybrid HDC+LMM performance rather than selecting only the best prompt.
+
+
+## Closed-loop fab decision-support benchmark
+
+The November 2026 human-supervised autonomous decision-support review motivates benchmarking planning, scheduling, dispatch, process-control feedback and metrology as one coupled system. New follow-up [SEMI-FAB-DECISION-001 #13147](https://github.com/Luminous-Dynamics/symthaea/issues/13147) reuses existing process/equipment/subfab/metrology and Symtropy replay owners. It compares fab-native heuristics, constrained optimization, simulation, quality-aware dispatch, inspection value-of-information and bounded LLM assistance. Its staged evidence progression is synthetic DES -> historical replay -> offline counterfactual -> shadow mode -> human-approved pilot -> preregistered outcome study. No process authority or physical yield claim is implied.
