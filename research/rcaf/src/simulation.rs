@@ -64,6 +64,7 @@ pub struct InjectionRecoveryReport {
     pub samples_per_segment: usize,
     pub monte_carlo_replicates: usize,
     pub injection_loading_delta: f64,
+    pub temporal_autocorrelation: f64,
     pub alpha: f64,
     /// Type-I error estimate under exchangeable no-change matrices.
     pub null_false_positive_rate: BinomialRate,
@@ -355,6 +356,7 @@ pub fn run_injection_recovery(
         samples_per_segment: config.samples_per_segment,
         monte_carlo_replicates: config.monte_carlo_replicates,
         injection_loading_delta: config.injection_loading_delta,
+        temporal_autocorrelation: config.temporal_autocorrelation,
         alpha: config.alpha,
         null_false_positive_rate: wilson_rate(null_rejections, config.monte_carlo_replicates),
         injection_detection_power: wilson_rate(injection_rejections, config.monte_carlo_replicates),
@@ -462,7 +464,7 @@ fn sample_correlation_matrix(
         let global_factor = previous_global;
         let module_factor = previous_module;
         let mut observation = Vec::with_capacity(regions);
-        for ((_, (&global, &module)), sum) in global_loadings
+        for ((region, (&global, &module)), sum) in global_loadings
             .iter()
             .zip(module_loadings.iter())
             .enumerate()
