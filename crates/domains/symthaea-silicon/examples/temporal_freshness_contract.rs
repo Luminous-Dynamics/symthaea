@@ -458,6 +458,12 @@ fn percentile_per_mille(values: &mut [u64], quantile_per_mille: usize) -> Option
     if values.is_empty() || quantile_per_mille == 0 || quantile_per_mille > 1000 {
         return None;
     }
+    // Do not present p99.9 as a meaningful tail statistic with fewer than
+    // 1,000 observations. This is only a minimum resolvability gate; rigorous
+    // tail claims still require confidence intervals and much larger samples.
+    if quantile_per_mille >= 999 && values.len() < 1_000 {
+        return None;
+    }
     values.sort_unstable();
     let rank = (quantile_per_mille * values.len()).div_ceil(1000);
     values.get(rank.saturating_sub(1)).copied()
@@ -578,12 +584,12 @@ mod tests {
         assert_eq!(summary.verified_accuracy_on_time, Some(1.0));
         assert_eq!(summary.correct_but_stale, 0);
         assert_eq!(summary.fresh_but_incorrect, 0);
-        assert_eq!(summary.availability_to_use_latency_p99_9_ns, Some(30));
+        assert_eq!(summary.availability_to_use_latency_p99_9_ns, None);
         assert_eq!(summary.availability_to_use_latency_max_ns, Some(30));
         assert_eq!(summary.source_to_use_latency_p50_ns, Some(30));
         assert_eq!(summary.source_to_use_latency_p95_ns, Some(40));
         assert_eq!(summary.source_to_availability_delay_p95_ns, Some(10));
-        assert_eq!(summary.evidence_age_at_use_p99_9_ns, Some(25));
+        assert_eq!(summary.evidence_age_at_use_p99_9_ns, None);
         assert_eq!(summary.evidence_age_at_use_max_ns, Some(25));
     }
 
@@ -713,6 +719,11 @@ mod tests {
         assert_eq!(percentile(&mut values, 50), Some(4));
         assert_eq!(percentile(&mut values, 95), Some(9));
         assert_eq!(percentile(&mut values, 101), None);
+
+        let mut insufficient_tail = (1_u64..=999).collect::<Vec<_>>();
+        assert_eq!(percentile_per_mille(&mut insufficient_tail, 999), None);
+        insufficient_tail.push(1_000);
+        assert_eq!(percentile_per_mille(&mut insufficient_tail, 999), Some(999));
     }
 
     #[test]
