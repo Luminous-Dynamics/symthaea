@@ -578,7 +578,7 @@ pub fn aggregate_error_components(
         if component.time_start != time_start || component.time_end != time_end {
             return Err(LedgerError::ErrorBudgetSegmentMismatch);
         }
-        if component.provenance != provenance {
+        if !component.provenance.same_run(&provenance) {
             return Err(LedgerError::ErrorBudgetProvenanceMismatch);
         }
         if component.source.trim().is_empty() {
