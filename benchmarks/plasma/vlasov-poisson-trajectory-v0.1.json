@@ -187,9 +187,9 @@
     {
       "component": "dense_distribution_space_vlasov_poisson_reference_prototype",
       "pr": 13103,
-      "head_sha": "49a82ef6b50e8b026235a77a1bfa3c45a171fc13",
+      "head_sha": "59200805851679c4f2df8a9a82875bdd5cb2ec78",
       "state_at_profile_creation": "open",
-      "claim_ceiling": "Spectral-Strang reference prototype with exact-head tests not yet confirmed; not yet L3-admitted."
+      "claim_ceiling": "Spectral-Strang reference prototype; latest source adds second-order timestep and conservation checks, but exact-head validation of 11 tests remains pending. Not yet L3-admitted."
     }
   ],
   "initial_condition_suite": [
@@ -422,7 +422,7 @@
       "repository": "https://github.com/erikasgrim/VlasovTT.jl",
       "pinned_repository_head": "99aa077b6f5e4ae4dfc8330590e502267caf298b",
       "repository_license": "MIT (repository README/license)",
-      "source_claim_status": "paper_reported_and_open_source_code_inspected_not_reproduced",
+      "source_claim_status": "paper_reported_and_current_repo_head_inspected_not_reproduced",
       "paper_reported_setup": {
         "quantics_bits_per_dimension": 10,
         "grid_points_per_dimension": 1024,
@@ -456,7 +456,15 @@
         "landau_relative_energy_deviation_order": 0.001,
         "tcifit_acceleration_step_runtime_relative_to_all_tt_mpo_contractions": "approximately one order of magnitude"
       },
-      "admission_rule": "Reproduce both the paper's TT/MPS and dense-reference paths on identical initial conditions, grids, dt, precision and final time. Retain truncation-induced damping bias, negative distribution mass, rank history, TCI reconstruction cost and full runtime. Paper observations are not independently reproduced here."
+      "admission_rule": "Reproduce both the paper's TT/MPS and dense-reference paths on identical initial conditions, grids, dt, precision and final time. Retain truncation-induced damping bias, negative distribution mass, rank history, TCI reconstruction cost and full runtime. Paper observations are not independently reproduced here.",
+      "source_default_landau_amplitude": 0.1,
+      "paper_landau_amplitude": 0.01,
+      "reproduction_blocker": "Both current repository scripts examples/landau_damping.jl and examples/reference_landau_damping.jl use A=0.1, while the paper specifies A=0.01. The reproduction must explicitly override A=0.01 for the paper-faithful lane and preserve A=0.1 as a separate source-default lane.",
+      "source_files": {
+        "repository_head": "99aa077b6f5e4ae4dfc8330590e502267caf298b",
+        "landau_tt_blob": "a1745409ea245a919068e53ad5df9d15227689f3",
+        "landau_dense_reference_blob": "1f2bcf8acb17ab321861bae2b9937b821b7e1973"
+      }
     }
   ],
   "execution_receipt": {
@@ -499,7 +507,8 @@
     "https://warpx.readthedocs.io/en/26.11/usage/parameters.html",
     "https://doi.org/10.1017/S002237781700040X",
     "https://github.com/erikasgrim/VlasovTT.jl/tree/99aa077b6f5e4ae4dfc8330590e502267caf298b",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/13104"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/13105"
   ],
   "representation_tournament": {
     "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
