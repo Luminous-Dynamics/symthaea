@@ -104,3 +104,10 @@ Do not set a universal minimum accuracy. The correct target depends on endpoint,
 The RCAF generator now supports stationary AR(1) autocorrelation in the shared factors and region-level residual processes. The default is rho=0.30; the report and JSON schemas carry the selected value. This creates autocorrelated finite time series while preserving the declared cross-sectional factor model.
 
 It is still not a realistic BOLD/EEG/MEG pipeline simulator: no hemodynamic response, motion, physiology, source leakage, sensor noise, nonstationarity or preprocessing artifacts are represented yet. The next surface should vary rho and include nuisance mechanisms separately rather than calling this model "brain-like".
+
+
+### Matched-input estimator competition
+
+RCAF now compares three estimator semantics on identical simulated matrices: absolute Weighted Jaccard, signed-shift Weighted Jaccard and normalized mean absolute edge error. The polarity-flip known-answer fixture demonstrates why their outputs are not directly interchangeable (1.0, 1/3 and 0.5 respectively for a single +0.5→−0.5 edge).
+
+The matched-input tournament runs null false-positive and injected-change sensitivity for each estimator, preserving a common seed. CETB should extend this tournament to Pearson, Spearman, shrinkage covariance/precision and modality-appropriate pyspi estimators once the data representation and estimand are matched. Do not select a universal winner from synthetic performance alone.
