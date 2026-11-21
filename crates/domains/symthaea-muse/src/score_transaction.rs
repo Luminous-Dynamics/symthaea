@@ -10,7 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use symthaea_music_theory::{Score, ScoreNote};
+use symthaea_music_theory::Score;
 
 pub const SCORE_PATCH_SCHEMA_V1: &str = "mel-score-patch-receipt-v1";
 
