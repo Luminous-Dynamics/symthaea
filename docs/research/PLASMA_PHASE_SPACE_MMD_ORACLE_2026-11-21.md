@@ -195,12 +195,13 @@ A speed claim is admissible only when particle update, field solve, deposition/g
 
 ## 10. Execution state
 
-- New standalone Rust crate and 17 authored unit tests: source created.
-- Frozen JSON kernel/profile contract: source created.
-- Focused exact-revision Rust 1.96 workflow: source created.
-- Python formula checks for the two negative controls: completed.
-- Local rustc/cargo unavailable in the authoring runtime; Rust format, compilation, tests and Clippy have not been executed locally.
-- The focused workflow must be observed on the exact PR head. Queued, skipped or absent jobs are not passes.
+The implementation is now split into three independently reviewable, exact-head-validated increments:
+
+- [PR #13033](https://github.com/Luminous-Dynamics/symthaea/pull/13033): exact characteristic-kernel MMD oracle; Rust 1.96 fmt, 17 tests and strict Clippy passed on head `32fe3591617be44d2d2a8c216e707b0dce65f56a`, focused workflow run #15.
+- [PR #13045](https://github.com/Luminous-Dynamics/symthaea/pull/13045): full-spectrum O(D(U+V)) approximation; Rust 1.96 fmt, 25 tests and strict Clippy passed on head `24970dcb5b8223f219f0f44db6e3d8bef6e6b9d7`, focused workflow run #36.
+- [PR #13048](https://github.com/Luminous-Dynamics/symthaea/pull/13048): anytime-valid adaptive feature budget; Rust 1.96 fmt, 30 tests and strict Clippy passed on head `dbe07a5cb1dc00f6b9224cee3fd436309b49bb21`, focused workflow run #49.
+
+Broad CI and PR Governance were skipped on these runs and are not claimed as passed. The new reproducible metric sweep is tracked separately in [PR #13049](https://github.com/Luminous-Dynamics/symthaea/pull/13049); its generated CSV artifact remains pending until its own exact-head workflow executes successfully.
 
 
 ## 11. Scalable spectral approximation: exact spectrum, randomized evaluation
