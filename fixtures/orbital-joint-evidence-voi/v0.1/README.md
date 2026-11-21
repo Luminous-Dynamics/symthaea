@@ -2,7 +2,7 @@
 
 **Tracker:** [#13111](https://github.com/Luminous-Dynamics/symthaea/issues/13111)  
 **Specification:** [ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md](../../../docs/research/ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md)  
-**Status:** 17 hand-authored synthetic contract fixtures consumed by a dry-run admissibility/value audit and deterministic one-step action selector; no multi-step adaptive policy tournament yet.
+**Status:** 17 hand-authored one-step contract fixtures plus one finite-horizon sequential campaign known-answer case, consumed by separate deterministic Rust auditors and independent Python reference oracles.
 
 ## Files
 
@@ -36,6 +36,22 @@
 | JEV-016 | Does an incomplete owner-native change-event frontier block even an otherwise informative requalification action? |
 | JEV-017 | Does a complete change-impact receipt require targeted coverage of each claim marked for requalification while preserving unrelated claims? |
 
+
+## Sequential campaign result (SEQ-001)
+
+This separate finite-horizon evaluator catches a failure mode the one-step selector cannot: neither test by itself improves worst-case minimax regret, but a contingent two-test policy can.
+
+| Policy | Worst-case minimax regret | Expected engineering hours | Expected facility hours |
+|---|---:|---:|---:|
+| Stop now | 5 | 0.00 | 0.00 |
+| Myopic one-step | 5 | 0.00 | 0.00 |
+| Fixed screen + thermal inspection | 0 | 1.50 | 2.00 |
+| Adaptive: screen; thermal only on PASS | 0 | 1.20 | 1.55 |
+
+The adaptive policy terminates at REJECT when the first screen returns FAIL, because all remaining states are defective. On PASS, it runs the thermal inspection; CLEAR maps to ACCEPT and INDICATION to REJECT. Its expected resource use is 20% lower in engineering hours and 22.5% lower in facility hours than the fixed campaign, while maintaining the same worst-case decision quality.
+
+The weights are synthetic and used only to calculate expected cost; the terminal structural decision remains distribution-free. These numbers are fixture calculations, not physical or industry results. The sequential oracle is a proof-of-concept, not a full held-out policy tournament.
+
 ## Important interpretation
 
 These are small deterministic known-answer controls. They do not constitute a statistically representative aerospace qualification dataset, physical test plan, calibrated probability model, or benchmark result.
@@ -51,7 +67,7 @@ The scenario catalogue separates:
 - pre-registered test obligations from general information gain;
 - planned actions from actual execution outcomes.
 
-The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. Rust also deserializes the strict proposal/outcome examples: an attempted outcome requires actual cost and external execution authority, while a proposal is permanently non-actuating and carries no authority. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The multi-step matched-budget policy tournament remains unimplemented; no solver or physical test is called.
+The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. Rust also deserializes the strict proposal/outcome examples: an attempted outcome requires actual cost and external execution authority, while a proposal is permanently non-actuating and carries no authority. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The current sequential evaluator tests one exact finite-horizon example against the fixed and myopic baselines; a broad multi-step matched-budget tournament remains unimplemented. No solver or physical test is called.
 
 
 ## Finite-horizon sequential campaign proof-of-concept
