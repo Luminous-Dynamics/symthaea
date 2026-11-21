@@ -396,7 +396,7 @@ fn smoke_fixture() -> TemporalWorkReceipt {
         kind: ReceiptKind::ContractSmokeFixture,
         profile_id: "schema-only".to_owned(),
         workload_id: "no-model-no-performance-claim".to_owned(),
-        source_revision: "synthetic-contract-fixture-v0.1".to_owned(),
+        source_revision: "synthetic-contract-fixture-v0.2".to_owned(),
         configuration_id: "no-model-configuration".to_owned(),
         seed: 0,
         logical_duration_ns: 1_000_000_000,
