@@ -24,6 +24,7 @@ pub enum MetricError {
     InvalidSimilarity { index: usize },
     InvalidBootstrapDraws { draws: usize },
     InvalidAlpha,
+    InvalidSignThreshold,
 }
 
 impl fmt::Display for MetricError {
@@ -54,6 +55,7 @@ impl fmt::Display for MetricError {
             Self::InvalidBootstrapDraws { draws } =>
                 write!(f, "at least 100 bootstrap draws are required, got {draws}"),
             Self::InvalidAlpha => write!(f, "alpha must be finite and in (0, 0.5)"),
+            Self::InvalidSignThreshold => write!(f, "sign threshold must be finite and non-negative"),
         }
     }
 }
@@ -198,6 +200,8 @@ pub struct RcafSummary {
     pub gap_ci_lower: f64,
     pub gap_ci_upper: f64,
     pub bootstrap_draws: usize,
+    /// Exact two-sided participant-level sign test on paired gaps; ties are excluded.
+    pub sign_test: SignTestSummary,
 }
 
 /// Summarize participant-paired within-state and between-state similarities.
@@ -236,6 +240,7 @@ pub fn summarize_rcaf(
     }
 
     let gaps: Vec<f64> = within.iter().zip(between.iter()).map(|(w, b)| w - b).collect();
+    let sign_test = exact_sign_test(&gaps)?;
     let excess: Vec<f64> = within.iter().zip(between.iter())
         .filter_map(|(w, b)| {
             let denominator = 1.0 - b;
@@ -271,6 +276,7 @@ pub fn summarize_rcaf(
         gap_ci_lower: quantile_sorted(&boot, alpha / 2.0),
         gap_ci_upper: quantile_sorted(&boot, 1.0 - alpha / 2.0),
         bootstrap_draws,
+        sign_test,
     })
 }
 
@@ -324,6 +330,181 @@ impl XorShift64 {
             }
         }
     }
+}
+
+
+/// Participant-level exact sign test for the median paired gap.
+///
+/// The null is that positive and negative non-tied participant gaps are equally likely.
+/// Exact zero gaps are excluded from the binomial denominator. This is a distribution-free
+/// complementary diagnostic, not a randomized treatment-assignment test and not a causal test.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SignTestSummary {
+    pub positive_count: usize,
+    pub negative_count: usize,
+    pub tie_count: usize,
+    pub non_tied_count: usize,
+    pub p_two_sided_exact: f64,
+}
+
+/// Compute a two-sided exact binomial sign-test p-value for participant-level differences.
+pub fn exact_sign_test(differences: &[f64]) -> Result<SignTestSummary, MetricError> {
+    if differences.is_empty() {
+        return Err(MetricError::EmptyInput);
+    }
+    let mut positive_count = 0usize;
+    let mut negative_count = 0usize;
+    let mut tie_count = 0usize;
+    for (index, value) in differences.iter().enumerate() {
+        if !value.is_finite() {
+            return Err(MetricError::NonFiniteValue { index });
+        }
+        if *value > 0.0 {
+            positive_count += 1;
+        } else if *value < 0.0 {
+            negative_count += 1;
+        } else {
+            tie_count += 1;
+        }
+    }
+    let non_tied_count = positive_count + negative_count;
+    let p_two_sided_exact = if non_tied_count == 0 {
+        1.0
+    } else {
+        let lower_tail = binomial_symmetric_lower_tail(
+            non_tied_count,
+            positive_count.min(negative_count),
+        );
+        (2.0 * lower_tail).min(1.0)
+    };
+    Ok(SignTestSummary {
+        positive_count,
+        negative_count,
+        tie_count,
+        non_tied_count,
+        p_two_sided_exact,
+    })
+}
+
+/// P(X <= k) for X ~ Binomial(n, 0.5), evaluated from the central mass downward.
+fn binomial_symmetric_lower_tail(n: usize, k: usize) -> f64 {
+    let mode = n / 2;
+    let mut log_mode_mass = -(n as f64) * std::f64::consts::LN_2;
+    for j in 1..=mode {
+        log_mode_mass += ((n - j + 1) as f64).ln() - (j as f64).ln();
+    }
+    let mut mass = log_mode_mass.exp();
+    let mut tail = if mode <= k { mass } else { 0.0 };
+    for j in (1..=mode).rev() {
+        mass *= j as f64 / (n - j + 1) as f64;
+        if j - 1 <= k {
+            tail += mass;
+        }
+    }
+    tail
+}
+
+/// Counts how often aligned correlation edges change polarity or enter/leave a neutral zone.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EdgeSignTransitionSummary {
+    pub total_edges: usize,
+    pub stable_positive: usize,
+    pub stable_negative: usize,
+    pub stable_neutral: usize,
+    pub positive_to_negative: usize,
+    pub negative_to_positive: usize,
+    pub positive_to_neutral: usize,
+    pub negative_to_neutral: usize,
+    pub neutral_to_positive: usize,
+    pub neutral_to_negative: usize,
+    pub polarity_reversal_count: usize,
+    pub sign_state_change_count: usize,
+    pub polarity_reversal_fraction: f64,
+    pub sign_state_change_fraction: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SignState {
+    Negative,
+    Neutral,
+    Positive,
+}
+
+fn classify_sign(value: f64, neutral_threshold: f64) -> SignState {
+    if value > neutral_threshold {
+        SignState::Positive
+    } else if value < -neutral_threshold {
+        SignState::Negative
+    } else {
+        SignState::Neutral
+    }
+}
+
+/// Summarize sign transitions over aligned upper-triangle edges.
+///
+/// A non-zero neutral_threshold treats correlations in [-threshold, +threshold] as neutral.
+/// Run this over a predeclared threshold sensitivity grid; never choose the threshold after
+/// inspecting which value best supports a state contrast. ROI ordering must be identical.
+pub fn summarize_edge_sign_transitions(
+    a: &[Vec<f64>],
+    b: &[Vec<f64>],
+    neutral_threshold: f64,
+) -> Result<EdgeSignTransitionSummary, MetricError> {
+    if !neutral_threshold.is_finite() || neutral_threshold < 0.0 {
+        return Err(MetricError::InvalidSignThreshold);
+    }
+    let n_a = validate_correlation_matrix(a)?;
+    let n_b = validate_correlation_matrix(b)?;
+    if n_a != n_b {
+        return Err(MetricError::MatrixSizeMismatch { left: n_a, right: n_b });
+    }
+
+    let mut summary = EdgeSignTransitionSummary {
+        total_edges: n_a * (n_a - 1) / 2,
+        stable_positive: 0,
+        stable_negative: 0,
+        stable_neutral: 0,
+        positive_to_negative: 0,
+        negative_to_positive: 0,
+        positive_to_neutral: 0,
+        negative_to_neutral: 0,
+        neutral_to_positive: 0,
+        neutral_to_negative: 0,
+        polarity_reversal_count: 0,
+        sign_state_change_count: 0,
+        polarity_reversal_fraction: 0.0,
+        sign_state_change_fraction: 0.0,
+    };
+
+    for i in 0..n_a {
+        for j in (i + 1)..n_a {
+            let left = classify_sign(a[i][j], neutral_threshold);
+            let right = classify_sign(b[i][j], neutral_threshold);
+            match (left, right) {
+                (SignState::Positive, SignState::Positive) => summary.stable_positive += 1,
+                (SignState::Negative, SignState::Negative) => summary.stable_negative += 1,
+                (SignState::Neutral, SignState::Neutral) => summary.stable_neutral += 1,
+                (SignState::Positive, SignState::Negative) => summary.positive_to_negative += 1,
+                (SignState::Negative, SignState::Positive) => summary.negative_to_positive += 1,
+                (SignState::Positive, SignState::Neutral) => summary.positive_to_neutral += 1,
+                (SignState::Negative, SignState::Neutral) => summary.negative_to_neutral += 1,
+                (SignState::Neutral, SignState::Positive) => summary.neutral_to_positive += 1,
+                (SignState::Neutral, SignState::Negative) => summary.neutral_to_negative += 1,
+            }
+        }
+    }
+
+    summary.polarity_reversal_count =
+        summary.positive_to_negative + summary.negative_to_positive;
+    summary.sign_state_change_count = summary.total_edges
+        - summary.stable_positive
+        - summary.stable_negative
+        - summary.stable_neutral;
+    summary.polarity_reversal_fraction =
+        summary.polarity_reversal_count as f64 / summary.total_edges as f64;
+    summary.sign_state_change_fraction =
+        summary.sign_state_change_count as f64 / summary.total_edges as f64;
+    Ok(summary)
 }
 
 #[cfg(test)]
@@ -383,6 +564,7 @@ mod tests {
         assert_eq!(a.positive_gap_fraction, 1.0);
         assert!(a.gap_ci_lower <= a.median_paired_gap);
         assert!(a.gap_ci_upper >= a.median_paired_gap);
+        assert!((a.sign_test.p_two_sided_exact - 0.0625).abs() < 1e-12);
     }
 
     #[test]
@@ -390,6 +572,54 @@ mod tests {
         assert!(matches!(summarize_rcaf(&[0.5], &[0.4, 0.3], 100, 0.05, 1), Err(MetricError::LengthMismatch { .. })));
         assert_eq!(summarize_rcaf(&[f64::NAN, 0.5], &[0.4, 0.3], 100, 0.05, 1), Err(MetricError::InvalidSimilarity { index: 0 }));
         assert!(matches!(summarize_rcaf(&[0.5, 0.6], &[0.4, 0.3], 99, 0.05, 1), Err(MetricError::InvalidBootstrapDraws { .. })));
+    }
+
+    #[test]
+    fn exact_sign_test_is_paired_tie_aware_and_exact() {
+        let all_positive = exact_sign_test(&[1.0, 2.0, 3.0, 4.0, 0.0]).unwrap();
+        assert_eq!(all_positive.positive_count, 4);
+        assert_eq!(all_positive.negative_count, 0);
+        assert_eq!(all_positive.tie_count, 1);
+        assert_eq!(all_positive.non_tied_count, 4);
+        assert!((all_positive.p_two_sided_exact - 0.125).abs() < 1e-12);
+
+        let balanced = exact_sign_test(&[1.0, -1.0, 0.0, 2.0, -2.0]).unwrap();
+        assert_eq!(balanced.positive_count, 2);
+        assert_eq!(balanced.negative_count, 2);
+        assert_eq!(balanced.tie_count, 1);
+        assert_eq!(balanced.p_two_sided_exact, 1.0);
+
+        let all_tied = exact_sign_test(&[0.0, 0.0]).unwrap();
+        assert_eq!(all_tied.non_tied_count, 0);
+        assert_eq!(all_tied.p_two_sided_exact, 1.0);
+        assert_eq!(exact_sign_test(&[f64::NAN]), Err(MetricError::NonFiniteValue { index: 0 }));
+    }
+
+    #[test]
+    fn edge_sign_transitions_expose_polarity_changes_and_neutral_edges() {
+        let a = vec![
+            vec![1.0, 0.5, -0.4],
+            vec![0.5, 1.0, 0.01],
+            vec![-0.4, 0.01, 1.0],
+        ];
+        let b = vec![
+            vec![1.0, -0.5, -0.1],
+            vec![-0.5, 1.0, 0.4],
+            vec![-0.1, 0.4, 1.0],
+        ];
+        let transitions = summarize_edge_sign_transitions(&a, &b, 0.05).unwrap();
+        assert_eq!(transitions.total_edges, 3);
+        assert_eq!(transitions.positive_to_negative, 1);
+        assert_eq!(transitions.stable_negative, 1);
+        assert_eq!(transitions.neutral_to_positive, 1);
+        assert_eq!(transitions.polarity_reversal_count, 1);
+        assert_eq!(transitions.sign_state_change_count, 2);
+        assert!((transitions.polarity_reversal_fraction - 1.0 / 3.0).abs() < 1e-12);
+        assert!((transitions.sign_state_change_fraction - 2.0 / 3.0).abs() < 1e-12);
+        assert_eq!(
+            summarize_edge_sign_transitions(&a, &b, f64::NAN),
+            Err(MetricError::InvalidSignThreshold)
+        );
     }
 
     #[test]
