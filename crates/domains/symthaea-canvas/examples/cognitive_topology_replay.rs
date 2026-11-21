@@ -13,7 +13,8 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    CognitiveLayoutConfig, CognitiveTopology, layout_cognitive_topology,
+    CognitiveLayoutConfig, CognitiveSvgOptions, CognitiveTopology,
+    layout_cognitive_topology, render_cognitive_projection_svg,
 };
 
 const DEFAULT_FIXTURE: &str =
@@ -37,6 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(value) => value.parse::<usize>()?,
         None => DEFAULT_SAMPLES,
     };
+    let svg_output = args.get(2).cloned();
     if !(1..=MAX_SAMPLES).contains(&samples) {
         return Err(format!("sample count must be in 1..={MAX_SAMPLES}").into());
     }
@@ -88,6 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("layout_algorithm: deterministic-force-v1");
     println!("layout_iterations: {}", config.iterations);
     println!("geometry_digest_1e-3: {geometry_digest}");
+    println!("svg_output: {}", svg_output.as_deref().unwrap_or("not requested"));
     println!("layout_warmup_runs: {WARMUP_RUNS}");
     println!("layout_samples: {samples}");
     println!("layout_time_ns_p50: {}", percentile(&durations_ns, 50));
