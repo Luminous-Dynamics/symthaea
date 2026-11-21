@@ -102,6 +102,9 @@ pub struct MycelialJunctionHyphaGraph {
     pub source_model_version: u16,
     pub length_unit: JunctionLengthUnit,
     pub source_model_digest: String,
+    /// Complete, sorted identity set of source filaments represented by segments.
+    /// This allows deserialized graph validation to detect a wholly omitted curve.
+    pub source_filament_ids: Vec<u32>,
     pub maximum_junction_gap_model_units: f32,
     pub junctions: Vec<MycelialJunction>,
     pub segments: Vec<MycelialHyphaSegment>,
@@ -555,6 +558,7 @@ pub fn build_mycelial_junction_hypha_graph(
         source_model_version: model.schema_version,
         length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
         source_model_digest,
+        source_filament_ids: filaments.keys().copied().collect(),
         maximum_junction_gap_model_units: maximum_gap,
         junctions: nodes.into_values().collect(),
         segments,
@@ -719,6 +723,12 @@ impl MycelialJunctionHyphaGraph {
                 "junction or segment limit exceeded",
             ));
         }
+        if self.source_filament_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(MycelialJunctionGraphError::InvalidGraph(
+                "source filament IDs must be sorted and unique",
+            ));
+        }
+        let source_filaments: HashSet<_> = self.source_filament_ids.iter().copied().collect();
         let mut segment_ids = HashSet::with_capacity(self.segments.len());
         let mut intervals = BTreeMap::<u32, Vec<(u32, u32)>>::new();
         for segment in &self.segments {
@@ -728,6 +738,7 @@ impl MycelialJunctionHyphaGraph {
                 || segment.t_end_micros > PARAMETER_SCALE
                 || !node_index.contains_key(segment.start_junction_id.as_str())
                 || !node_index.contains_key(segment.end_junction_id.as_str())
+                || !source_filaments.contains(&segment.filament_id)
                 || !segment.arc_length_model_units.is_finite()
                 || segment.arc_length_model_units <= 0.0
                 || !segment.start_junction_offset_model_units.is_finite()
@@ -747,6 +758,16 @@ impl MycelialJunctionHyphaGraph {
                 .entry(segment.filament_id)
                 .or_default()
                 .push((segment.t_start_micros, segment.t_end_micros));
+        }
+        if intervals.len() != self.source_filament_ids.len()
+            || self
+                .source_filament_ids
+                .iter()
+                .any(|filament_id| !intervals.contains_key(filament_id))
+        {
+            return Err(MycelialJunctionGraphError::InvalidGraph(
+                "one or more source filaments have no represented curve intervals",
+            ));
         }
         for coverage in intervals.values_mut() {
             coverage.sort_unstable();
@@ -938,6 +959,10 @@ impl MycelialJunctionHyphaGraph {
         hasher.update(&self.source_model_version.to_le_bytes());
         hasher.update(&[0]); // organism_local_model_unit
         hasher.update(self.source_model_digest.as_bytes());
+        hasher.update(&(self.source_filament_ids.len() as u64).to_le_bytes());
+        for filament_id in &self.source_filament_ids {
+            hasher.update(&filament_id.to_le_bytes());
+        }
         hasher.update(
             &self
                 .maximum_junction_gap_model_units
@@ -1412,6 +1437,25 @@ mod tests {
         )
         .unwrap();
         assert_eq!(graph.metrics().unwrap().connected_components, 2);
+    }
+
+    #[test]
+    fn validator_rejects_a_graph_missing_an_entire_source_filament() {
+        let model = fixture_model();
+        let mut graph = build_mycelial_junction_hypha_graph(
+            &model,
+            &[],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        graph.segments.retain(|segment| segment.filament_id != 3);
+        assert_eq!(
+            graph.validate(),
+            Err(MycelialJunctionGraphError::InvalidGraph(
+                "one or more source filaments have no represented curve intervals"
+            ))
+        );
+        assert!(graph.canonical_digest_hex().is_err());
     }
 
     #[test]
