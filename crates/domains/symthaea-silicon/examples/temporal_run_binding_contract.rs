@@ -43,6 +43,8 @@ struct CandidateTraceIdentity {
     profile_id: String,
     source_revision: String,
     configuration_id: String,
+    /// Logical timestamp origin for this evaluated workload horizon.
+    logical_time_origin_ns: u64,
     trace_sha256: String,
 }
 
@@ -89,6 +91,7 @@ struct JoinedRunBinding {
     trace_sha256: String,
     source_revision: String,
     configuration_id: String,
+    logical_time_origin_ns: u64,
     temporal_work_receipt_sha256: String,
     freshness_receipt_sha256: String,
     decision_contract_id: String,
@@ -115,6 +118,8 @@ enum BindingError {
     DecisionOpportunityCountMismatch,
     DecisionDispositionCountMismatch,
     VerifiedOutcomeCountMismatch,
+    DeadlineCountMismatch,
+    DeadlineMissCountMismatch,
     LogicalHorizonOutOfRange,
     InvalidOracleDigest,
     ArithmeticOverflow,
@@ -165,6 +170,21 @@ fn u64_field(object: &Value, key: &'static str) -> Result<u64, BindingError> {
     object_value(object, key)?
         .as_u64()
         .ok_or(BindingError::MissingField(key))
+}
+
+fn optional_string_field(
+    object: &Value,
+    key: &'static str,
+) -> Result<Option<String>, BindingError> {
+    let value = object_value(object, key)?;
+    if value.is_null() {
+        Ok(None)
+    } else {
+        value
+            .as_str()
+            .map(|value| Some(value.to_owned()))
+            .ok_or(BindingError::MissingField(key))
+    }
 }
 
 fn parse_json(bytes: &[u8], name: &'static str) -> Result<Value, BindingError> {
@@ -254,10 +274,12 @@ fn join_receipts(
         return Err(BindingError::DecisionOpportunityCountMismatch);
     }
 
+    let logical_horizon_end_ns = u64_field(&freshness, "logical_horizon_end_ns")?;
     let mut answered = 0_u64;
     let mut late = 0_u64;
     let mut abstained = 0_u64;
     let mut unserved = 0_u64;
+    let mut expired_unserved = 0_u64;
     let mut verified_correct = 0_u64;
     let mut verified_incorrect = 0_u64;
 
@@ -290,6 +312,12 @@ fn join_receipts(
             }
             "unserved" => {
                 unserved = unserved.checked_add(1).ok_or(BindingError::ArithmeticOverflow)?;
+                let deadline = u64_field(opportunity, "deadline_at_ns")?;
+                if deadline <= logical_horizon_end_ns {
+                    expired_unserved = expired_unserved
+                        .checked_add(1)
+                        .ok_or(BindingError::ArithmeticOverflow)?;
+                }
             }
             _ => return Err(BindingError::MissingField("decision disposition")),
         }
@@ -313,20 +341,46 @@ fn join_receipts(
         return Err(BindingError::VerifiedOutcomeCountMismatch);
     }
 
+    let system_section = object_value(&work, "system")?;
+    if u64_field(system_section, "deadline_count")? != freshness_count {
+        return Err(BindingError::DeadlineCountMismatch);
+    }
+    let expected_deadline_misses = late
+        .checked_add(expired_unserved)
+        .ok_or(BindingError::ArithmeticOverflow)?;
+    if u64_field(system_section, "deadline_misses")? != expected_deadline_misses {
+        return Err(BindingError::DeadlineMissCountMismatch);
+    }
+
     let logical_duration_ns = u64_field(&work, "logical_duration_ns")?;
-    let logical_horizon_end_ns = u64_field(&freshness, "logical_horizon_end_ns")?;
-    if logical_duration_ns == 0
-        || logical_horizon_end_ns == 0
-        || logical_horizon_end_ns > logical_duration_ns
-    {
+    let elapsed_horizon_ns = logical_horizon_end_ns
+        .checked_sub(identity.logical_time_origin_ns)
+        .ok_or(BindingError::LogicalHorizonOutOfRange)?;
+    if logical_duration_ns == 0 || elapsed_horizon_ns > logical_duration_ns {
         return Err(BindingError::LogicalHorizonOutOfRange);
     }
 
     let decision_contract_id = string_field(&freshness, "decision_contract_id")?;
     let independent_verifier_id = string_field(&freshness, "independent_verifier_id")?;
     let work_quality = object_value(&work, "quality")?;
-    if string_field(work_quality, "decision_contract_id")? != decision_contract_id
-        || string_field(work_quality, "independent_verifier_id")? != independent_verifier_id
+    let work_decision_contract = optional_string_field(work_quality, "decision_contract_id")?;
+    let work_independent_verifier = optional_string_field(work_quality, "independent_verifier_id")?;
+    let verified_total = verified_correct
+        .checked_add(verified_incorrect)
+        .ok_or(BindingError::ArithmeticOverflow)?;
+    if verified_total > 0
+        && (work_decision_contract.is_none() || work_independent_verifier.is_none())
+    {
+        return Err(BindingError::MissingField(
+            "verified outcomes require decision contract and verifier identity",
+        ));
+    }
+    if work_decision_contract
+        .as_deref()
+        .is_some_and(|value| value != decision_contract_id)
+        || work_independent_verifier
+            .as_deref()
+            .is_some_and(|value| value != independent_verifier_id)
     {
         return Err(BindingError::IdentityMismatch("decision contract / verifier identity"));
     }
@@ -356,6 +410,7 @@ fn join_receipts(
         trace_sha256: identity.trace_sha256.clone(),
         source_revision: identity.source_revision.clone(),
         configuration_id: identity.configuration_id.clone(),
+        logical_time_origin_ns: identity.logical_time_origin_ns,
         temporal_work_receipt_sha256: work_digest,
         freshness_receipt_sha256: freshness_digest,
         decision_contract_id,
@@ -371,6 +426,22 @@ fn example_receipts(
     identity: &CandidateTraceIdentity,
 ) -> Result<(Vec<u8>, Vec<u8>), Box<dyn Error>> {
     let workload_id = identity.workload_id();
+    let origin = identity.logical_time_origin_ns;
+    let horizon_end = origin
+        .checked_add(1_000)
+        .ok_or(BindingError::ArithmeticOverflow)?;
+    let t100 = origin.checked_add(100).ok_or(BindingError::ArithmeticOverflow)?;
+    let t108 = origin.checked_add(108).ok_or(BindingError::ArithmeticOverflow)?;
+    let t110 = origin.checked_add(110).ok_or(BindingError::ArithmeticOverflow)?;
+    let t111 = origin.checked_add(111).ok_or(BindingError::ArithmeticOverflow)?;
+    let t115 = origin.checked_add(115).ok_or(BindingError::ArithmeticOverflow)?;
+    let t160 = origin.checked_add(160).ok_or(BindingError::ArithmeticOverflow)?;
+    let t200 = origin.checked_add(200).ok_or(BindingError::ArithmeticOverflow)?;
+    let t208 = origin.checked_add(208).ok_or(BindingError::ArithmeticOverflow)?;
+    let t210 = origin.checked_add(210).ok_or(BindingError::ArithmeticOverflow)?;
+    let t211 = origin.checked_add(211).ok_or(BindingError::ArithmeticOverflow)?;
+    let t215 = origin.checked_add(215).ok_or(BindingError::ArithmeticOverflow)?;
+    let t260 = origin.checked_add(260).ok_or(BindingError::ArithmeticOverflow)?;
     let work = serde_json::json!({
         "schema": WORK_SCHEMA,
         "schema_version": WORK_VERSION,
@@ -439,32 +510,32 @@ fn example_receipts(
         "decision_contract_id": "fixture-decision-contract-v1",
         "independent_verifier_id": "fixture-independent-verifier-v1",
         "temporal_work_receipt_sha256": work_digest,
-        "logical_horizon_end_ns": 1_000_u64,
+        "logical_horizon_end_ns": horizon_end,
         "opportunities": [
             {
                 "opportunity_id": 0_u64,
-                "source_event_time_ns": 100_u64,
-                "available_at_ns": 110_u64,
-                "deadline_at_ns": 160_u64,
+                "source_event_time_ns": t100,
+                "available_at_ns": t110,
+                "deadline_at_ns": t160,
                 "freshness_budget_ns": 30_u64,
                 "disposition": "answered",
-                "emitted_at_ns": 111_u64,
-                "consumed_at_ns": 115_u64,
-                "evidence_source_time_ns": 108_u64,
-                "evidence_available_at_ns": 110_u64,
+                "emitted_at_ns": t111,
+                "consumed_at_ns": t115,
+                "evidence_source_time_ns": t108,
+                "evidence_available_at_ns": t110,
                 "correctness": "correct"
             },
             {
                 "opportunity_id": 1_u64,
-                "source_event_time_ns": 200_u64,
-                "available_at_ns": 210_u64,
-                "deadline_at_ns": 260_u64,
+                "source_event_time_ns": t200,
+                "available_at_ns": t210,
+                "deadline_at_ns": t260,
                 "freshness_budget_ns": 30_u64,
                 "disposition": "answered",
-                "emitted_at_ns": 211_u64,
-                "consumed_at_ns": 215_u64,
-                "evidence_source_time_ns": 208_u64,
-                "evidence_available_at_ns": 210_u64,
+                "emitted_at_ns": t211,
+                "consumed_at_ns": t215,
+                "evidence_source_time_ns": t208,
+                "evidence_available_at_ns": t210,
                 "correctness": "correct"
             }
         ]
@@ -481,6 +552,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         profile_id: "jittered".to_owned(),
         source_revision: "36eb3adc1dc2d5ad1ae643863fee828d594472d4".to_owned(),
         configuration_id: "scalar-leaky-tau-140-seed-17".to_owned(),
+        logical_time_origin_ns: 0,
         trace_sha256: sha256_hex(candidate_trace_bytes),
     };
     let (work, freshness) = example_receipts(&identity)?;
@@ -509,6 +581,7 @@ mod tests {
             profile_id: "jittered".to_owned(),
             source_revision: "a".repeat(40),
             configuration_id: "cfg-17".to_owned(),
+            logical_time_origin_ns: 0,
             trace_sha256: sha256_hex(trace),
         }
     }
@@ -620,14 +693,82 @@ mod tests {
     }
 
     #[test]
-    fn rejects_logical_horizon_beyond_workload_duration() {
-        let id = identity();
+    fn accepts_nonzero_logical_time_origin_within_elapsed_work_duration() {
+        let mut id = identity();
+        id.logical_time_origin_ns = 500;
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let joined = join_receipts("run-origin-valid", &id, &work, &freshness, None).unwrap();
+        assert_eq!(joined.logical_time_origin_ns, 500);
+        assert_eq!(joined.logical_horizon_end_ns - joined.logical_time_origin_ns, 1_000);
+    }
+
+    #[test]
+    fn rejects_logical_horizon_that_exceeds_elapsed_work_duration() {
+        let mut id = identity();
+        id.logical_time_origin_ns = 500;
         let (work, freshness) = example_receipts(&id).unwrap();
         let mut value: Value = serde_json::from_slice(&freshness).unwrap();
-        value["logical_horizon_end_ns"] = Value::from(1_001_u64);
+        value["logical_horizon_end_ns"] = Value::from(1_501_u64);
         let modified = serde_json::to_vec(&value).unwrap();
-        let error = join_receipts("run-7", &id, &work, &modified, None).unwrap_err();
+        let error = join_receipts("run-horizon-over", &id, &work, &modified, None).unwrap_err();
         assert_eq!(error, BindingError::LogicalHorizonOutOfRange);
+    }
+
+    #[test]
+    fn rejects_system_deadline_miss_count_that_disagrees_with_evaluator_outcomes() {
+        let id = identity();
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let mut value: Value = serde_json::from_slice(&work).unwrap();
+        value["system"]["deadline_misses"] = Value::from(1_u64);
+        let modified = serde_json::to_vec(&value).unwrap();
+        let error = join_receipts("run-deadline-miss-mismatch", &id, &modified, &freshness, None)
+            .unwrap_err();
+        assert_eq!(error, BindingError::DeadlineMissCountMismatch);
+    }
+
+    #[test]
+    fn rejects_system_deadline_count_that_disagrees_with_opportunity_count() {
+        let id = identity();
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let mut value: Value = serde_json::from_slice(&work).unwrap();
+        value["system"]["deadline_count"] = Value::from(3_u64);
+        let modified = serde_json::to_vec(&value).unwrap();
+        let error = join_receipts("run-deadline-count-mismatch", &id, &modified, &freshness, None)
+            .unwrap_err();
+        assert_eq!(error, BindingError::DeadlineCountMismatch);
+    }
+
+    #[test]
+    fn permits_missing_work_quality_identity_when_all_opportunities_are_abstentions() {
+        let id = identity();
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let mut work_value: Value = serde_json::from_slice(&work).unwrap();
+        work_value["work"]["output_decisions"] = Value::from(0_u64);
+        work_value["work"]["abstained_decisions"] = Value::from(2_u64);
+        work_value["work"]["independently_verified_correct_decisions"] = Value::from(0_u64);
+        work_value["work"]["independently_verified_incorrect_decisions"] = Value::from(0_u64);
+        work_value["quality"]["decision_contract_id"] = Value::Null;
+        work_value["quality"]["independent_verifier_id"] = Value::Null;
+        let work_modified = serde_json::to_vec(&work_value).unwrap();
+
+        let mut freshness_value: Value = serde_json::from_slice(&freshness).unwrap();
+        for opportunity in freshness_value["opportunities"].as_array_mut().unwrap() {
+            opportunity["disposition"] = Value::String("abstained".to_owned());
+            opportunity["emitted_at_ns"] = Value::Null;
+            opportunity["consumed_at_ns"] = Value::Null;
+            opportunity["evidence_source_time_ns"] = Value::Null;
+            opportunity["evidence_available_at_ns"] = Value::Null;
+            opportunity["correctness"] = Value::Null;
+        }
+        let freshness_modified = serde_json::to_vec(&freshness_value).unwrap();
+        assert!(join_receipts(
+            "run-abstained",
+            &id,
+            &work_modified,
+            &freshness_modified,
+            None
+        )
+        .is_ok());
     }
 
     #[test]
