@@ -322,7 +322,19 @@
           "source_span_sha256": null
         },
         "rights_scope": "metadata_only",
-        "source_snapshot_id": "fixture-only"
+        "source_snapshot_id": "fixture-only",
+        "external_catalog": {
+          "library_id": "fixture-synthetic-library",
+          "external_record_id": "fixture-catalog-record-001",
+          "api_version": "v1",
+          "data_version": "fixture-v0",
+          "snapshot_id": "fixture-snapshot-only",
+          "x_data_version": "fixture-v0",
+          "external_parent_ids": {
+            "material_id": "fixture-material-ef",
+            "result_id": "fixture-parent-result-019"
+          }
+        }
       },
       "assertion": {
         "property_code": "Tc",
