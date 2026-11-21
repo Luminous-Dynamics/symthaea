@@ -53,6 +53,18 @@ jobs:
             .actual_resources != null and .verification.state == "INDETERMINATE" and
             .authority_granted == false
           ' fixtures/orbital-joint-evidence-voi/v0.1/action-outcome-aborted.synthetic.json
+          jq -e '
+            .title == "OrbitalJointSequentialPlanningCorpusV0_1" and
+            ."$defs".scenario.properties.max_actions.maximum == 8 and
+            ."$defs".action.properties.admissibility.enum == ["ADMISSIBLE","INADMISSIBLE"]
+          ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.schema.json
+          jq -e '
+            .schema == "luminous.orbital-joint-evidence-voi.sequential.v0.1" and
+            .benchmark_id == "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001" and
+            (.scenarios | length == 1) and
+            .scenarios[0].resource_frequency_model.used_for == "EXPECTED_RESOURCE_USE_ONLY" and
+            (.scenarios[0].actions | all(.decision_context == .[0].decision_context))
+          ' fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json
       - name: Format
         run: cargo fmt --manifest-path tools/orbital-joint-evidence-voi-bench/Cargo.toml --check
       - name: Rust tests
