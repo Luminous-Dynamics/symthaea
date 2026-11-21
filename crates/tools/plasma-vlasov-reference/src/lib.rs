@@ -826,10 +826,14 @@ pub fn zero_pad_periodic_line(samples: &[f64], target_len: usize) -> Result<Vec<
     }
 
     // Negative modes retain their signed frequency index on the larger grid.
-    for source_index in (source_len / 2 + 1)..source_len {
+    for (source_index, coefficient) in source_spectrum
+        .iter()
+        .enumerate()
+        .skip(source_len / 2 + 1)
+    {
         let negative_mode = source_len - source_index;
         let target_index = target_len - negative_mode;
-        target_spectrum[target_index] = source_spectrum[source_index].scale(scale);
+        target_spectrum[target_index] = coefficient.scale(scale);
     }
 
     // The source Nyquist mode aliases +N/2 and -N/2 on the coarse grid.
@@ -845,7 +849,7 @@ pub fn zero_pad_periodic_line(samples: &[f64], target_len: usize) -> Result<Vec<
         .map_err(|_| SolverError::AllocationFailed {
             elements: target_len,
         })?;
-    for (index, value) in target_spectrum.iter().enumerate() {
+    for value in &target_spectrum {
         if !value.re.is_finite() || !value.im.is_finite() {
             return Err(SolverError::NonFiniteState);
         }
