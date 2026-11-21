@@ -29,6 +29,7 @@ const DEFAULT_HORIZONS: &[f64] = &[0.0, 1.0, 10.0];
 const DEFAULT_EVENTS: &[usize] = &[1, 8];
 const DEFAULT_SEEDS: usize = 3;
 const TIE_EPSILON: f32 = 1.0e-7;
+const NEURON_MIN_DT_SECONDS: f32 = 1.0e-9;
 
 #[derive(Debug)]
 struct Args {
@@ -366,9 +367,14 @@ fn evolve_state(
     let input_preparation_wall_ns = input_prep_start.elapsed().as_nanos();
 
     if gaps.len() != event_count
-        || gaps.iter().any(|dt| !dt.is_finite() || *dt <= 0.0)
+        || gaps
+            .iter()
+            .any(|dt| !dt.is_finite() || *dt < NEURON_MIN_DT_SECONDS)
     {
-        return Err("invalid time-gap schedule: every interval must be finite and positive".into());
+        return Err(
+            "invalid time-gap schedule: every interval must be finite and at least 1e-9 seconds"
+                .into(),
+        );
     }
     if condition == "hdc_ltc_distractor" && distractors.len() != event_count {
         return Err("distractor input schedule does not match the interval count".into());
