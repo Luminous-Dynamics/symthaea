@@ -150,7 +150,8 @@
           "A-FULL-TRUSS-OVER-BUDGET"
         ],
         "notes": "The mass-only action produces the same observation in both states. The coupon interaction test separates the two states; the full truss test exceeds the facility budget."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-002",
@@ -269,7 +270,8 @@
           "A-UNCALIBRATED-LABEL"
         ],
         "notes": "Prior probabilities are explicit synthetic fixture inputs, not derived from interval endpoints. The test is perfect for this two-state synthetic oracle."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-003",
@@ -341,7 +343,8 @@
           "A-NO-INFORMATION"
         ],
         "notes": "All admissible options produce identical observations in both possible states. No action changes the supported decision."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-004",
@@ -413,7 +416,8 @@
           "A-PERFECT-BUT-OVER-BUDGET"
         ],
         "notes": "A theoretically perfect test exceeds the specimen and facility budgets. Decision value does not override hard resource constraints."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-005",
@@ -487,7 +491,8 @@
           "A-STALE-CFG"
         ],
         "notes": "The only informative action targets a superseded geometry/configuration and therefore cannot resolve the current profile."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-006",
@@ -572,7 +577,9 @@
           "REFERENCE-LAB-01"
         ],
         "requirement-profile://C1": []
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": true
     },
     {
       "scenario_id": "JEV-007",
@@ -646,7 +653,8 @@
           "A-AXIAL-ONLY"
         ],
         "notes": "Axial-only measurement cannot resolve a coupled axial/shear/bending/torsion interaction. No admitted interaction profile exists, so the proposed test cannot support the target claim."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-008",
@@ -722,7 +730,8 @@
           "A-COUPON-ONLY"
         ],
         "notes": "Coupon action may support a source-scale material property but does not resolve the production-joint target claim without an admitted scale-transfer bridge."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-009",
@@ -783,7 +792,8 @@
             "CRITICAL_CAPACITY_FAILURE": "MASS-IN-RANGE"
           },
           "dependencies": [],
-          "test_obligations_covered": []
+          "test_obligations_covered": [],
+          "obligations_covered": []
         },
         {
           "action_id": "A-CRITICAL-INTERACTION-COVERAGE",
@@ -813,6 +823,9 @@
           "dependencies": [],
           "test_obligations_covered": [
             "LOAD-X-TEMP-X-EOL-001"
+          ],
+          "obligations_covered": [
+            "LOAD-X-TEMP-X-EOL-001"
           ]
         }
       ],
@@ -828,7 +841,8 @@
       },
       "required_obligations": [
         "LOAD-X-TEMP-X-EOL-001"
-      ]
+      ],
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     },
     {
       "scenario_id": "JEV-010",
@@ -896,12 +910,15 @@
           ],
           "not_covered": [
             "WEAR-LIFECYCLE-001"
+          ],
+          "obligations_covered": [
+            "INITIAL-MATE-COMPATIBILITY"
           ]
         },
         {
           "action_id": "A-REPEATED-MATING-WEAR",
           "action_class": "repeated_mating_wear_test",
-          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "target_claim_id": "WEAR-LIFECYCLE-001",
           "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
           "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
           "configuration_id": "CFG-R7",
@@ -927,6 +944,10 @@
           "claim_coverage": [
             "INITIAL-MATE-COMPATIBILITY",
             "WEAR-LIFECYCLE-001"
+          ],
+          "obligations_covered": [
+            "INITIAL-MATE-COMPATIBILITY",
+            "WEAR-LIFECYCLE-001"
           ]
         }
       ],
@@ -942,7 +963,8 @@
       },
       "required_obligations": [
         "WEAR-LIFECYCLE-001"
-      ]
+      ],
+      "target_claim_id": "WEAR-LIFECYCLE-001"
     },
     {
       "scenario_id": "JEV-011",
@@ -1024,7 +1046,8 @@
           "A-ASSUME-PASS-AFTER-ABORT"
         ],
         "notes": "The only attempted test aborted after incurring resources and produced no admissible outcome. Preserve consumed cost and missing evidence; do not infer success."
-      }
+      },
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001"
     }
   ]
 }
