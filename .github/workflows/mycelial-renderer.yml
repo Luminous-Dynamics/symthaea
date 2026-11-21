@@ -93,8 +93,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Verify Bevy Rust toolchain
+        run: rustc +1.97.1 --version
+
       - name: Test isolated Bevy 0.20.1 adapter
-        run: cargo test --locked --manifest-path .mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets
+        run: cargo +1.97.1 test --locked --manifest-path .mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets
 
       - name: Clippy isolated Bevy 0.20.1 adapter
-        run: cargo clippy --locked --manifest-path .mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets -- -D warnings
+        run: cargo +1.97.1 clippy --locked --manifest-path .mycelial-renderer-validation/Cargo.toml -p symthaea-mycelial-renderer --all-targets -- -D warnings
