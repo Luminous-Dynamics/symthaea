@@ -12,9 +12,24 @@ use crate::cognitive_bridge::{
     MusicalOutcomeError, ObservedMusicalOutcome, PredictedMusicalOutcome, SymbolicAction,
 };
 use serde::{Deserialize, Serialize};
-use symthaea_music_theory::TheoryValidationReport;
+use symthaea_music_theory::{
+    TheoryValidationReport, ValidationSeverity, score_validation::is_universal_invariant,
+};
 
 pub const MUSICAL_POLICY_VERSION: &str = "musical-policy-v1";
+
+/// Apply the music-theory crate's documented hard-gate boundary.
+///
+/// Full reports retain style-dependent Fatal findings for diagnostics, but
+/// only universal structural invariants (metadata, note bounds and
+/// same-voice overlap) make a candidate ineligible across grammar families.
+/// Style-dependent findings such as voice crossing remain visible to the
+/// artist and may be governed by a composition-specific obligation.
+pub fn passes_universal_theory_gate(report: &TheoryValidationReport) -> bool {
+    !report.issues.iter().any(|issue| {
+        issue.severity == ValidationSeverity::Fatal && is_universal_invariant(issue.rule)
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct OutcomeChannelWeights {
@@ -176,7 +191,8 @@ pub fn select_by_musical_policy(
             let outcome_utility = motif_bonus - distance - uncertainty_penalty;
             PolicyCandidateAssessment {
                 alternative_id: candidate.alternative_id.clone(),
-                eligible: candidate.theory_validation.valid && candidate.preserved_invariants,
+                eligible: passes_universal_theory_gate(&candidate.theory_validation)
+                    && candidate.preserved_invariants,
                 theory_validation: candidate.theory_validation.clone(),
                 preserved_invariants: candidate.preserved_invariants,
                 overdue_obligations_remaining: candidate.overdue_obligations_remaining,
@@ -346,6 +362,59 @@ mod tests {
             },
             observed_outcome: Some(observed),
         }
+    }
+
+    #[test]
+    fn universal_theory_gate_distinguishes_structural_defects_from_style_dependent_findings() {
+        use symthaea_music_theory::{
+            ScoreValidationIssue, ScoreValidationRule, ValidationSeverity,
+        };
+
+        let mut style_dependent = prediction(
+            "style-dependent-crossing",
+            PredictedMusicalOutcome::default(),
+            ObservedMusicalOutcome::default(),
+        );
+        style_dependent.theory_validation.valid = false;
+        style_dependent.theory_validation.issues.push(ScoreValidationIssue {
+            rule: ScoreValidationRule::VoiceCrossing,
+            severity: ValidationSeverity::Fatal,
+            note_indices: vec![0, 1],
+            start_beat: Some(0.0),
+            end_beat: Some(1.0),
+            message: "style-dependent crossing fixture".into(),
+        });
+        assert!(passes_universal_theory_gate(
+            &style_dependent.theory_validation
+        ));
+        let style_selection = select_by_musical_policy(
+            MusicalPolicyPreference::for_action(SymbolicAction::ReturnOpeningMaterial),
+            &[style_dependent],
+        );
+        assert!(style_selection.assessments[0].eligible);
+
+        let mut structural = prediction(
+            "structural-overlap",
+            PredictedMusicalOutcome::default(),
+            ObservedMusicalOutcome::default(),
+        );
+        structural.theory_validation.valid = false;
+        structural.theory_validation.issues.push(ScoreValidationIssue {
+            rule: ScoreValidationRule::VoiceMonophony,
+            severity: ValidationSeverity::Fatal,
+            note_indices: vec![0, 1],
+            start_beat: Some(0.0),
+            end_beat: Some(1.0),
+            message: "universal structural defect fixture".into(),
+        });
+        assert!(!passes_universal_theory_gate(
+            &structural.theory_validation
+        ));
+        let structural_selection = select_by_musical_policy(
+            MusicalPolicyPreference::for_action(SymbolicAction::ReturnOpeningMaterial),
+            &[structural],
+        );
+        assert!(!structural_selection.assessments[0].eligible);
     }
 
     #[test]

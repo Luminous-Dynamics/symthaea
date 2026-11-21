@@ -18,9 +18,10 @@ use crate::cognitive_bridge::{
     CognitiveDecisionTrace, CognitiveSection, SymbolicAction, SymbolicMeasurementEvidence,
 };
 use crate::intervention::{InterventionDescriptor, InterventionStrategy, ObligationClass};
+use crate::musical_inference::MusicAction;
 use crate::musical_policy::{
     MusicalPolicyPreference, MusicalPolicySelection, PolicyCandidateEvidence,
-    select_by_musical_policy,
+    passes_universal_theory_gate, select_by_musical_policy,
 };
 use serde::{Deserialize, Serialize};
 use symthaea_music_theory::{
@@ -40,6 +41,62 @@ pub enum SonataReturnStrategy {
     ContourFromCurrentRegister,
 }
 
+/// Versioned cognitive preference over *how* to realize a formal Sonata return.
+///
+/// These are subordinate subintents: they may choose only among candidates
+/// that already satisfy the source-bound Sonata obligation, canonical theory
+/// validation, and the protected-score complement. They never replace the
+/// formal `ReturnOpeningMaterial` action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SonataReturnSubintentRequestV1 {
+    PreserveCurrentReturn,
+    RestoreOpeningMotifLiterally,
+}
+
+/// Result of applying a cognitive subintent to a formally valid candidate set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SonataReturnSubintentDispositionV1 {
+    Applied {
+        selected_alternative_id: String,
+        selected_strategy: SonataReturnStrategy,
+    },
+    UnsupportedShadowOnly,
+    RejectedByFormalGates,
+}
+
+/// Evidence showing whether the FEP source action had a supported,
+/// subordinate effect on the selected Sonata return candidate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SonataReturnSubintentEvidenceV1 {
+    pub schema: String,
+    pub formal_action: SymbolicAction,
+    pub source_action: MusicAction,
+    pub driving_obligation_id: Option<u64>,
+    pub request: Option<SonataReturnSubintentRequestV1>,
+    pub disposition: SonataReturnSubintentDispositionV1,
+    pub rationale: String,
+}
+
+impl SonataReturnSubintentEvidenceV1 {
+    fn unsupported(trace: &CognitiveDecisionTrace) -> Self {
+        Self {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: trace.proposal.driving_obligation_id,
+            request: None,
+            disposition: SonataReturnSubintentDispositionV1::UnsupportedShadowOnly,
+            rationale: format!(
+                "FEP source action {:?} has no qualified Sonata-return subintent mapping;                  it remains shadow-only and cannot alter candidate selection",
+                trace.inference.source_action
+            ),
+        }
+    }
+}
+
+/// Schema identifier for subordinate Sonata return preferences.
+pub const SONATA_RETURN_SUBINTENT_SCHEMA_V1: &str = "sonata-return-subintent-v1";
+
 /// One generated score and all evidence used to assess it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SonataInterventionCandidate {
@@ -57,7 +114,7 @@ pub struct SonataInterventionCandidate {
 
 impl SonataInterventionCandidate {
     pub fn hard_constraints_valid(&self) -> bool {
-        self.theory_validation.valid
+        passes_universal_theory_gate(&self.theory_validation)
     }
 }
 
@@ -68,6 +125,7 @@ pub struct SonataInterventionBatch {
     pub target_section: SonataSectionKind,
     pub expected_transformation: ReturnTransformation,
     pub driving_obligation_id: Option<u64>,
+    pub cognitive_subintent: SonataReturnSubintentEvidenceV1,
     pub candidates: Vec<SonataInterventionCandidate>,
     pub selection: MusicalPolicySelection,
 }
@@ -248,19 +306,147 @@ pub fn generate_and_rank_sonata_return_with_model(
         });
     }
 
-    let selection = select_by_musical_policy(
+    let mut selection = select_by_musical_policy(
         MusicalPolicyPreference::for_action(trace.proposal.action),
         &policy_evidence,
     );
+
+    // A bound formal obligation is a hard gate, not merely a ranking feature.
+    // The generic musical policy exposes obligation status in its assessments,
+    // but this Sonata adapter must never recommend a candidate that misses the
+    // exact obligation that authorized this intervention.
+    if trace.proposal.driving_obligation_id.is_some() {
+        for assessment in &mut selection.assessments {
+            if assessment.target_obligation_verified != Some(true) {
+                assessment.eligible = false;
+            }
+        }
+        selection.recommended_id = selection
+            .assessments
+            .iter()
+            .find(|assessment| assessment.eligible)
+            .map(|assessment| assessment.alternative_id.clone());
+        if selection.recommended_id.is_none() {
+            selection.rationale = vec![
+                "no candidate passed the bound Sonata obligation, canonical theory, and protected-score gates".into(),
+            ];
+        } else {
+            selection.rationale.push(
+                "the bound Sonata obligation was applied as a hard eligibility gate before cognitive subintent selection".into(),
+            );
+        }
+    }
+
+    let cognitive_subintent = apply_return_subintent_v1(trace, &candidates, &mut selection);
 
     Ok(SonataInterventionBatch {
         source_section: source_kind,
         target_section: target_kind,
         expected_transformation: expected,
         driving_obligation_id: trace.proposal.driving_obligation_id,
+        cognitive_subintent,
         candidates,
         selection,
     })
+}
+
+/// Map only source actions whose meaning is represented by an existing
+/// Sonata return strategy. Do not guess a register or motif operation for
+/// unrelated FEP actions such as modulation, chromatic exploration or adding
+/// a counterline.
+fn qualified_return_subintent(
+    source_action: MusicAction,
+) -> Option<(SonataReturnSubintentRequestV1, SonataReturnStrategy)> {
+    match source_action {
+        MusicAction::RepeatMotif => Some((
+            SonataReturnSubintentRequestV1::RestoreOpeningMotifLiterally,
+            SonataReturnStrategy::LiteralRegister,
+        )),
+        MusicAction::Maintain => Some((
+            SonataReturnSubintentRequestV1::PreserveCurrentReturn,
+            SonataReturnStrategy::KeepCurrent,
+        )),
+        MusicAction::FollowHarmony
+        | MusicAction::ChromaticExplore
+        | MusicAction::ModulateKey
+        | MusicAction::IncreaseComplexity
+        | MusicAction::ResolveTension
+        | MusicAction::AddCountermelody => None,
+    }
+}
+
+/// Apply a supported cognitive subintent only after formal candidate evidence
+/// exists. The candidate score itself is never rewritten by this function.
+fn apply_return_subintent_v1(
+    trace: &CognitiveDecisionTrace,
+    candidates: &[SonataInterventionCandidate],
+    selection: &mut MusicalPolicySelection,
+) -> SonataReturnSubintentEvidenceV1 {
+    let Some((request, requested_strategy)) =
+        qualified_return_subintent(trace.inference.source_action)
+    else {
+        return SonataReturnSubintentEvidenceV1::unsupported(trace);
+    };
+
+    let Some(obligation_id) = trace.proposal.driving_obligation_id else {
+        return SonataReturnSubintentEvidenceV1 {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: None,
+            request: Some(request),
+            disposition: SonataReturnSubintentDispositionV1::RejectedByFormalGates,
+            rationale: "the cognitive subintent is recognized, but no driving formal obligation is bound; the existing musical-policy selection is retained".into(),
+        };
+    };
+
+    let selected = candidates.iter().find(|candidate| {
+        candidate.strategy == requested_strategy
+            && candidate.hard_constraints_valid()
+            && candidate.preserved_invariants
+            && candidate
+                .verification
+                .iter()
+                .any(|evidence| evidence.obligation_id == obligation_id && evidence.verified)
+            && selection.assessments.iter().any(|assessment| {
+                assessment.alternative_id == candidate.alternative_id
+                    && assessment.eligible
+                    && assessment.target_obligation_verified == Some(true)
+            })
+    });
+
+    if let Some(candidate) = selected {
+        selection.recommended_id = Some(candidate.alternative_id.clone());
+        selection.rationale.push(format!(
+            "subordinate cognitive subintent {:?} selected {} only after the driving obligation, theory validation, and protected-score checks passed",
+            request, candidate.alternative_id
+        ));
+        SonataReturnSubintentEvidenceV1 {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: Some(obligation_id),
+            request: Some(request),
+            disposition: SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: candidate.alternative_id.clone(),
+                selected_strategy: requested_strategy,
+            },
+            rationale: "the cognitive source action selected a qualified realization strategy without changing the formal Sonata objective or candidate scores".into(),
+        }
+    } else {
+        SonataReturnSubintentEvidenceV1 {
+            schema: SONATA_RETURN_SUBINTENT_SCHEMA_V1.to_owned(),
+            formal_action: trace.proposal.action,
+            source_action: trace.inference.source_action,
+            driving_obligation_id: Some(obligation_id),
+            request: Some(request),
+            disposition: SonataReturnSubintentDispositionV1::RejectedByFormalGates,
+            rationale: format!(
+                "requested strategy {:?} did not produce a candidate that passed the driving obligation, theory, and protected-score gates; the existing musical-policy selection is retained",
+                requested_strategy
+            ),
+        }
+    }
 }
 
 /// Learn symbolic outcomes from every theory-valid generated alternative.
@@ -528,6 +714,13 @@ mod tests {
     use symthaea_music_theory::{MusicalIntent, Style, compose_sonata_with_plan};
 
     fn return_trace(realization: &SonataRealization) -> CognitiveDecisionTrace {
+        return_trace_for_motif(realization, "sonata.primary")
+    }
+
+    fn return_trace_for_motif(
+        realization: &SonataRealization,
+        motif_id: &str,
+    ) -> CognitiveDecisionTrace {
         let obligation = realization
             .plan
             .obligations
@@ -536,8 +729,8 @@ mod tests {
             .find(|item| {
                 matches!(
                     &item.kind,
-                    ObligationKind::ReturnMotif { motif_id, .. }
-                        if motif_id == "sonata.primary"
+                    ObligationKind::ReturnMotif { motif_id: candidate, .. }
+                        if candidate == motif_id
                 )
             })
             .unwrap();
@@ -585,7 +778,7 @@ mod tests {
                 ],
                 urgency: 1.0,
                 confidence: 0.7,
-                rationale: vec!["restore the primary subject".into()],
+                rationale: vec![format!("restore the {motif_id} subject")],
             },
             predicted_outcome: PredictedMusicalOutcome {
                 tension_delta: -0.2,
@@ -622,7 +815,19 @@ mod tests {
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
         assert_eq!(batch.candidates.len(), 5);
+        assert_eq!(
+            batch.cognitive_subintent.schema,
+            SONATA_RETURN_SUBINTENT_SCHEMA_V1
+        );
+        assert_eq!(
+            batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "literal-register".into(),
+                selected_strategy: SonataReturnStrategy::LiteralRegister,
+            }
+        );
         let selected = batch.selection.recommended_id.as_deref().unwrap();
+        assert_eq!(selected, "literal-register");
         let selected = batch
             .candidates
             .iter()
@@ -635,6 +840,246 @@ mod tests {
             evidence.obligation_id == trace.proposal.driving_obligation_id.unwrap()
                 && evidence.verified
         }));
+    }
+
+    #[test]
+    fn invalid_current_return_rejects_maintain_but_allows_qualified_repair() {
+        let intent = MusicalIntent {
+            seed: 61,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let mut realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let target = section(&realization.plan, SonataSectionKind::RecapitulationPrimary).unwrap();
+        let target_indices =
+            melody_indices(&realization.score, target.start.beats(), target.end.beats());
+        for index in &target_indices {
+            realization.score.notes[*index].pitch =
+                realization.score.notes[*index].pitch.transpose(1);
+        }
+        let (resolution, verification) =
+            verify_sonata_obligations(&realization.score, &realization.plan);
+        realization.resolution = resolution;
+        realization.verification = verification;
+
+        let mut repeat_trace = return_trace(&realization);
+        repeat_trace.inference.source_action = MusicAction::RepeatMotif;
+        let repeat_batch = generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
+
+        let mut maintain_trace = repeat_trace.clone();
+        maintain_trace.inference.source_action = MusicAction::Maintain;
+        let maintain_batch =
+            generate_and_rank_sonata_return(&realization, &maintain_trace).unwrap();
+
+        assert_eq!(
+            repeat_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "literal-register".into(),
+                selected_strategy: SonataReturnStrategy::LiteralRegister,
+            }
+        );
+        assert_eq!(
+            maintain_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::RejectedByFormalGates
+        );
+        assert_eq!(
+            repeat_batch.selection.recommended_id,
+            maintain_batch.selection.recommended_id
+        );
+        let selected_id = repeat_batch.selection.recommended_id.as_deref().unwrap();
+        let selected = repeat_batch
+            .candidates
+            .iter()
+            .find(|candidate| candidate.alternative_id == selected_id)
+            .unwrap();
+        assert!(selected.hard_constraints_valid());
+        assert!(selected.preserved_invariants);
+        assert!(selected.verification.iter().any(|evidence| {
+            evidence.obligation_id == repeat_batch.driving_obligation_id.unwrap()
+                && evidence.verified
+        }));
+    }
+
+    #[test]
+    fn same_source_transposed_secondary_counterfactual_selects_distinct_valid_scores() {
+        let intent = MusicalIntent {
+            seed: 67,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let mut realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let target = section(
+            &realization.plan,
+            SonataSectionKind::RecapitulationSecondary,
+        )
+        .unwrap();
+        let target_indices =
+            melody_indices(&realization.score, target.start.beats(), target.end.beats());
+        for index in &target_indices {
+            realization.score.notes[*index].pitch =
+                realization.score.notes[*index].pitch.transpose(-12);
+        }
+        let (resolution, verification) =
+            verify_sonata_obligations(&realization.score, &realization.plan);
+        realization.resolution = resolution;
+        realization.verification = verification;
+
+        let mut repeat_trace = return_trace_for_motif(&realization, "sonata.secondary");
+        repeat_trace.inference.source_action = MusicAction::RepeatMotif;
+        let repeat_batch = generate_and_rank_sonata_return(&realization, &repeat_trace).unwrap();
+
+        let mut maintain_trace = repeat_trace.clone();
+        maintain_trace.inference.source_action = MusicAction::Maintain;
+        let maintain_batch =
+            generate_and_rank_sonata_return(&realization, &maintain_trace).unwrap();
+
+        assert_eq!(
+            repeat_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "literal-register".into(),
+                selected_strategy: SonataReturnStrategy::LiteralRegister,
+            }
+        );
+        assert_eq!(
+            maintain_batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::Applied {
+                selected_alternative_id: "current-score".into(),
+                selected_strategy: SonataReturnStrategy::KeepCurrent,
+            }
+        );
+        let selected_score = |batch: &SonataInterventionBatch| {
+            let selected_id = batch.selection.recommended_id.as_deref().unwrap();
+            batch
+                .candidates
+                .iter()
+                .find(|candidate| candidate.alternative_id == selected_id)
+                .unwrap()
+                .score
+                .clone()
+        };
+        assert_ne!(
+            repeat_batch.selection.recommended_id,
+            maintain_batch.selection.recommended_id
+        );
+        assert_ne!(
+            selected_score(&repeat_batch),
+            selected_score(&maintain_batch)
+        );
+        for batch in [&repeat_batch, &maintain_batch] {
+            let selected_id = batch.selection.recommended_id.as_deref().unwrap();
+            let selected = batch
+                .candidates
+                .iter()
+                .find(|candidate| candidate.alternative_id == selected_id)
+                .unwrap();
+            assert!(selected.hard_constraints_valid());
+            assert!(selected.preserved_invariants);
+            assert!(selected.verification.iter().any(|evidence| {
+                evidence.obligation_id == batch.driving_obligation_id.unwrap() && evidence.verified
+            }));
+        }
+    }
+
+    #[test]
+    fn unsupported_fep_actions_remain_shadow_only_and_do_not_change_selection() {
+        let intent = MusicalIntent {
+            seed: 47,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let mut first_trace = return_trace(&realization);
+        first_trace.inference.source_action = MusicAction::AddCountermelody;
+        let first = generate_and_rank_sonata_return(&realization, &first_trace).unwrap();
+
+        let mut second_trace = first_trace.clone();
+        second_trace.inference.source_action = MusicAction::ModulateKey;
+        let second = generate_and_rank_sonata_return(&realization, &second_trace).unwrap();
+
+        assert_eq!(
+            first.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::UnsupportedShadowOnly
+        );
+        assert_eq!(
+            second.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::UnsupportedShadowOnly
+        );
+        assert_eq!(first.cognitive_subintent.request, None);
+        assert_eq!(second.cognitive_subintent.request, None);
+        assert_eq!(
+            first.selection.recommended_id,
+            second.selection.recommended_id
+        );
+        assert_eq!(
+            first
+                .candidates
+                .iter()
+                .map(|candidate| candidate.score.clone())
+                .collect::<Vec<_>>(),
+            second
+                .candidates
+                .iter()
+                .map(|candidate| candidate.score.clone())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn cognitive_subintent_cannot_override_selection_without_driving_obligation() {
+        let intent = MusicalIntent {
+            seed: 53,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+
+        let mut supported_trace = return_trace(&realization);
+        supported_trace.proposal.driving_obligation_id = None;
+        let supported = generate_and_rank_sonata_return(&realization, &supported_trace).unwrap();
+
+        let mut unsupported_trace = supported_trace.clone();
+        unsupported_trace.inference.source_action = MusicAction::AddCountermelody;
+        let unsupported =
+            generate_and_rank_sonata_return(&realization, &unsupported_trace).unwrap();
+
+        assert_eq!(
+            supported.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::RejectedByFormalGates
+        );
+        assert_eq!(
+            supported.cognitive_subintent.request,
+            Some(SonataReturnSubintentRequestV1::RestoreOpeningMotifLiterally)
+        );
+        assert_eq!(
+            supported.selection.recommended_id,
+            unsupported.selection.recommended_id
+        );
+    }
+
+    #[test]
+    fn unknown_driving_obligation_fails_closed_with_no_recommended_candidate() {
+        let intent = MusicalIntent {
+            seed: 59,
+            bars: 4,
+            ..MusicalIntent::default()
+        };
+        let realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let mut trace = return_trace(&realization);
+        trace.proposal.driving_obligation_id = Some(u64::MAX);
+
+        let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
+        assert_eq!(batch.selection.recommended_id, None);
+        assert!(
+            batch
+                .selection
+                .assessments
+                .iter()
+                .all(|item| !item.eligible)
+        );
+        assert_eq!(
+            batch.cognitive_subintent.disposition,
+            SonataReturnSubintentDispositionV1::RejectedByFormalGates
+        );
     }
 
     #[test]
