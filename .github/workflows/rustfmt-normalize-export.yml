@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@1.96.0
         with:
@@ -38,15 +38,15 @@ jobs:
             tools/superconductivity-discovery-harness/src/bin/onset_prediction_audit.rs
             tools/superconductivity-discovery-harness/src/bin/precursor_genome_graph_audit.rs
           )
-          for file in "\${files[@]}"; do
+          for file in "${files[@]}"; do
             rustfmt --edition 2024 "$file"
             mkdir -p "$output/$(dirname "$file")"
             cp "$file" "$output/$file"
           done
           rustfmt --version > "$output/rustfmt-version.txt"
-          sha256sum "\${files[@]}" > "$output/source-sha256.txt"
+          sha256sum "${files[@]}" > "$output/source-sha256.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: rustfmt-normalized-sources
-          path: \${{ runner.temp }}/rustfmt-normalized/
+          path: ${{ runner.temp }}/rustfmt-normalized/
           if-no-files-found: error
