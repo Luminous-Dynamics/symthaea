@@ -32,7 +32,17 @@ The report contract now separately records:
 - `signal_plus_nuisance_wrong_direction_rejection_rate`: significant rejection in the opposite direction under that combined condition;
 - `median_signal_plus_nuisance_paired_gap`: median paired-gap summary for the combined condition.
 
+**Exact-head execution:** focused RCAF workflow [44950237593](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44950237593) passed on `470cf519cd76ab60aebb31bf3e96fb0607f9e24e`, including report schemas, 32 Rust tests, rustfmt, Clippy, all five simulation/report stages, content-addressed receipt and archive. Archive digest: `5a0d661f4016fa680eae511ee9227d9c9d52f05c9abca5b714352ab6ee781e31`; source-tree digest: `e7653f633d4b613bee7959c0cd569a14545da96655ac47e6c8fdc8dd00e3ec51`.
+
 At nuisance dose zero, these outputs must match the clean injection outputs exactly. At positive nuisance doses, the nuisance-only and combined signal+nuisance conditions use the same deterministic innovation stream, while only the planted module loading differs. This makes sensitivity loss or direction reversal under nuisance measurable without changing the clean signal baseline. The output schemas are now version 0.4.0 for injection and containing sweep/tournament reports and 0.2.0 for the common-mode sweep.
+## 3.1 Crossed pilot result and interpretation
+
+The archived nuisance dose sweep used 40 replicates per dose. At common-mode dose 0.30, nuisance-only rejection was 5/40 = 12.5% (95% Wilson 5.5–26.1%). At strong injection Δ=0.40, the joint signal-plus-nuisance directional recovery was 40/40, but it is not sufficient to establish robustness because the artifact-only cell also rejects too often.
+
+At Δ=0.30 and common-mode dose 0.20, absolute-WJ directional recovery rose from 18/40 = 45.0% clean (95% Wilson 30.7–60.2%) to 34/40 = 85.0% under signal-plus-nuisance (70.9–92.9%). The combined median paired gap at Δ=0.40 increased from 0.06509 without nuisance to 0.08903 at dose 0.30. This generator therefore reveals **artifact-induced amplification** of the apparent target contrast, not unambiguous improvement in sensitivity. A qualification rule must treat effect inflation and nuisance-only rejection as failures even when the combined-cell power increases.
+
+At dose 0.20, the 40-replicate estimator tournament showed nuisance-only rejection of 1/40 absolute WJ, 4/40 signed-shift WJ and 8/40 normalized mean absolute edge error. The confidence intervals are broad and no general estimator ranking is established.
+
 ## 4. Implementation
 
 The standalone Rust kernel now classifies each injected replicate into the two-sided detection, expected-direction or wrong-direction outcomes. The JSON serializer includes both new binomial rates with Wilson intervals. The injection, sweep, estimator-tournament and estimator-by-dose schemas all carry the fields and were advanced to 0.3.0.
