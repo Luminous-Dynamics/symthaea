@@ -155,8 +155,7 @@ impl EstimatorDoseResponseTournamentReport {
                         "      \"sweep\": {}\n",
                         "    }}"
                     ),
-                    curve.estimator,
-                    indented_sweep
+                    curve.estimator, indented_sweep
                 )
             })
             .collect::<Vec<_>>()
@@ -181,10 +180,7 @@ impl EstimatorDoseResponseTournamentReport {
                 "  ]\n",
                 "}}\n"
             ),
-            self.schema_version,
-            self.estimators_compared,
-            rendered_effects,
-            rendered_curves
+            self.schema_version, self.estimators_compared, rendered_effects, rendered_curves
         )
     }
 }
@@ -968,8 +964,7 @@ mod tests {
             ..test_config()
         };
         let effects = [0.0, 0.1, 0.2, 0.3];
-        let tournament =
-            run_estimator_dose_response_tournament(&config, &effects).unwrap();
+        let tournament = run_estimator_dose_response_tournament(&config, &effects).unwrap();
         assert_eq!(tournament.estimators_compared, 3);
         assert_eq!(tournament.effect_sizes, effects);
         assert_eq!(
