@@ -130,6 +130,24 @@
         "Closest live symbolic-interaction comparator, but not a matched result against Muse yet.",
         "Performance depends on instrument, clock, MIDI interface, buffering and latency compensation."
       ]
+    },
+    {
+      "source_id": "taan-timingbench-2026",
+      "title": "TimingBench: Are you rushing or dragging? A benchmark for temporal controllability in text-to-music generation",
+      "url": "https://taan.ai/research/rushing-or-dragging/",
+      "source_class": "benchmark_dataset",
+      "published_or_observed_at": "August 2026",
+      "retrieved_at": "2026-11-21",
+      "scope": "250 prompts for 30-second instrumental clips: 100 single-event, 100 timed-sequence, 50 global-tempo prompts; 399 timestamped events and 50 tempo targets across about 40 style descriptors and nine instrument families.",
+      "version_snapshot": "TimingBench August 2026 public benchmark snapshot",
+      "limitations": [
+        "The public result is published by Taan, one of the evaluated systems; independent replication is not established by this snapshot.",
+        "Its 128-event detector validation sample is development data and reports 4 false credits and 6 false positives.",
+        "A separate planned 300-clip annotation study was unfinished at the reported evaluation cutoff.",
+        "Detector localization floors vary substantially by event family; a single timing tolerance must not be interpreted as equally precise for drums, bass, vocals, and whole-mix events.",
+        "The benchmark uses a ±500 ms timed-event criterion; this is not equivalent to MIDI beat-phase precision, sub-100-ms timing, or live system latency.",
+        "FAD measures distribution similarity under a fixed VGGish/GTZAN procedure, not listener preference or reciprocal collaboration."
+      ]
     }
   ],
   "observations": [
@@ -449,6 +467,271 @@
       "comparability_group": "live-symbolic-improvisation",
       "directly_comparable_to_audio_elo": false,
       "claim_ceiling": "Published research capability reference only; no numerical Muse comparison yet."
+    },
+    {
+      "observation_id": "taan-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "Taan",
+      "system_version": "TimingBench August 2026 submission",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "250-prompt temporal-controllability benchmark; fixed 30-second instrumental clips and timestamped entrance/exit/silence/pause/energy events, with global tempo prompts scored separately.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 96.1,
+          "unit": "percent",
+          "lower_bound": 93.3,
+          "upper_bound": 99.2,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 91.3,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 92,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 4.8,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control result only; not general musical quality, human preference, exact symbolic-event editing, or live latency."
+    },
+    {
+      "observation_id": "elevenlabs-v2-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "ElevenLabs Music",
+      "system_version": "v2 (TimingBench August 2026)",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 28.9,
+          "unit": "percent",
+          "lower_bound": 25.3,
+          "upper_bound": 32.5,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 12.8,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 87,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 3.5,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; not general musical quality or human preference."
+    },
+    {
+      "observation_id": "google-lyria-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "Google Lyria",
+      "system_version": "TimingBench August 2026 snapshot",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 23.9,
+          "unit": "percent",
+          "lower_bound": 20.3,
+          "upper_bound": 27.5,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 8.6,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 89.7,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 2.6,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; the FAD score is not a preference score."
+    },
+    {
+      "observation_id": "elevenlabs-v1-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "ElevenLabs Music",
+      "system_version": "v1 (TimingBench August 2026)",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 25.4,
+          "unit": "percent",
+          "lower_bound": 21.9,
+          "upper_bound": 29.2,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 8,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 93,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 3.5,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; not general musical quality or human preference."
+    },
+    {
+      "observation_id": "suno-timingbench",
+      "source_id": "taan-timingbench-2026",
+      "system": "Suno",
+      "system_version": "TimingBench August 2026 snapshot",
+      "capability_area": "audio_generation",
+      "evidence_kind": "temporal_control_benchmark",
+      "task_scope": "Same 250-prompt temporal-controllability benchmark and scoring apparatus.",
+      "metrics": [
+        {
+          "name": "overall_instruction_success",
+          "value": 22,
+          "unit": "percent",
+          "lower_bound": 18.7,
+          "upper_bound": 25.6,
+          "confidence_level": 0.95,
+          "sample_size": 250,
+          "scope": "TimingBench August 2026 overall success; includes timing and tempo."
+        },
+        {
+          "name": "timed_events_within_tolerance",
+          "value": 6.8,
+          "unit": "percent",
+          "sample_size": 399,
+          "scope": "Timestamped events accepted within ±500 ms."
+        },
+        {
+          "name": "tempo_accuracy",
+          "value": 86.7,
+          "unit": "percent",
+          "sample_size": 50,
+          "scope": "Separate global tempo prompts."
+        },
+        {
+          "name": "frechet_audio_distance",
+          "value": 3.1,
+          "unit": "FAD",
+          "sample_size": 250,
+          "scope": "VGGish features against the fixed GTZAN reference; lower is closer under this distribution metric."
+        }
+      ],
+      "capabilities": [
+        "Timestamped event/tempo instruction following evaluated through a versioned event detector and timing tolerance."
+      ],
+      "limitations": [
+        "Benchmark results are from the August 2026 TimingBench publication and should be reproduced before a new competitive claim.",
+        "Overall instruction success, per-event timing, tempo accuracy and FAD are distinct measures.",
+        "Detector calibration limits and the incomplete follow-up annotation must be reported alongside the result."
+      ],
+      "comparability_group": "timingbench-2026-v1",
+      "directly_comparable_to_audio_elo": false,
+      "claim_ceiling": "Published temporal-control comparator only; not general musical quality or human preference."
     }
   ],
   "comparison_rules": [
