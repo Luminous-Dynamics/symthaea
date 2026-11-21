@@ -111,7 +111,8 @@
         "seed_reliability_lower_95_for_95_percent_accuracy": {
           "type": "number",
           "minimum": 0,
-          "maximum": 1
+          "maximum": 1,
+          "description": "Pointwise one-sided exact 95% Clopper-Pearson lower bound; not multiplicity-adjusted across cohort families."
         },
         "seeds_meeting_90_percent_accuracy": {
           "type": "integer",
@@ -120,7 +121,8 @@
         "seed_reliability_lower_95_for_90_percent_accuracy": {
           "type": "number",
           "minimum": 0,
-          "maximum": 1
+          "maximum": 1,
+          "description": "Pointwise one-sided exact 95% Clopper-Pearson lower bound; not multiplicity-adjusted across cohort families."
         },
         "chance_accuracy": {
           "type": "number",
@@ -249,7 +251,7 @@
         },
         "multiplicity_correction": {
           "type": "string",
-          "const": "Bonferroni within fixed family"
+          "const": "Bonferroni within the fixed D/condition/gap/horizon/event family"
         },
         "minimum_seeds_if_all_pass": {
           "type": "integer",
@@ -370,7 +372,7 @@
         },
         "multiplicity_correction": {
           "type": "string",
-          "const": "Bonferroni within fixed family"
+          "const": "Bonferroni within the fixed D/condition/gap/fan-in/event family"
         },
         "minimum_seeds_if_all_pass": {
           "type": "integer",
