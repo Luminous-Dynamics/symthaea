@@ -118,6 +118,7 @@ struct PreparedMemory {
     values: Vec<ContinuousHV>,
     bundle: ContinuousHV,
     mismatched_bundle: ContinuousHV,
+    random_query_keys: Vec<ContinuousHV>,
 }
 
 struct EvolutionOutcome {
@@ -256,12 +257,16 @@ fn prepare_memory(dim: usize, fan_in: usize, seed: u64) -> PreparedMemory {
         .collect();
     let mismatched_refs: Vec<&ContinuousHV> = mismatched.iter().collect();
     let mismatched_bundle = ContinuousHV::bundle(&mismatched_refs);
+    let random_query_keys: Vec<ContinuousHV> = (0..fan_in)
+        .map(|i| bipolar_random(dim, derive_seed(seed, 6, i as u64)))
+        .collect();
 
     PreparedMemory {
         keys,
         values,
         bundle,
         mismatched_bundle,
+        random_query_keys,
     }
 }
 
@@ -316,20 +321,24 @@ fn evolve_state(
     event_count: usize,
     gap_profile: &'static str,
     condition: &'static str,
-) -> EvolutionOutcome {
+) -> Result<EvolutionOutcome, Box<dyn Error>> {
     if condition == "static_hdc_bundle"
         || condition == "static_mismatched_pairing_control"
         || condition == "static_random_query_control"
         || horizon_seconds == 0.0
     {
-        return EvolutionOutcome {
+        return Ok(EvolutionOutcome {
             state: memory.clone(),
             api_update_count: 0,
             reported_logical_seconds: 0.0,
             model_setup_wall_ns: 0,
             input_preparation_wall_ns: 0,
             evolution_wall_ns: 0,
-        };
+        });
+    }
+
+    if condition != "hdc_ltc_zero_input" && condition != "hdc_ltc_distractor" {
+        return Err(format!("unsupported evolution condition: {condition}").into());
     }
 
     let setup_start = Instant::now();
@@ -355,21 +364,17 @@ fn evolve_state(
     };
     let input_preparation_wall_ns = input_prep_start.elapsed().as_nanos();
 
+    if gaps.len() != event_count
+        || gaps.iter().any(|dt| !dt.is_finite() || *dt <= 0.0)
+    {
+        return Err("invalid time-gap schedule: every interval must be finite and positive".into());
+    }
+    if condition == "hdc_ltc_distractor" && distractors.len() != event_count {
+        return Err("distractor input schedule does not match the interval count".into());
+    }
+
     let start = Instant::now();
     for (index, dt) in gaps.iter().enumerate() {
-        if !dt.is_finite() || *dt <= 0.0 {
-            // Invalid schedules must not be passed to the neuron. The summary
-            // retains the incomplete work count and cannot imply completion.
-            return EvolutionOutcome {
-                state: neuron.state().clone(),
-                api_update_count: neuron.update_count(),
-                reported_logical_seconds: neuron.total_time(),
-                model_setup_wall_ns,
-                input_preparation_wall_ns,
-                evolution_wall_ns: start.elapsed().as_nanos(),
-            };
-        }
-
         let input = if condition == "hdc_ltc_zero_input" {
             &zero_input
         } else {
@@ -377,15 +382,16 @@ fn evolve_state(
         };
         neuron.evolve_closed_form(*dt, input);
     }
+    let evolution_wall_ns = start.elapsed().as_nanos();
 
-    EvolutionOutcome {
+    Ok(EvolutionOutcome {
         state: neuron.state().clone(),
         api_update_count: neuron.update_count(),
         reported_logical_seconds: neuron.total_time(),
         model_setup_wall_ns,
         input_preparation_wall_ns,
-        evolution_wall_ns: start.elapsed().as_nanos(),
-    }
+        evolution_wall_ns,
+    })
 }
 
 fn decode(
@@ -520,20 +526,16 @@ fn run_cohort(
         event_count,
         gap_profile,
         condition,
-    );
+    )?;
     let state = &evolution.state;
 
     let decode_start = Instant::now();
     let mut accumulator = Accumulator::default();
+    let mut query_results = Vec::with_capacity(fan_in);
 
     for query_index in 0..fan_in {
-        let random_query_key;
         let query_key = if condition == "static_random_query_control" {
-            random_query_key = bipolar_random(
-                dim,
-                derive_seed(seed, 6, query_index as u64),
-            );
-            &random_query_key
+            &memory.random_query_keys[query_index]
         } else {
             &memory.keys[query_index]
         };
@@ -541,11 +543,12 @@ fn run_cohort(
         if scores.valid {
             accumulator.valid_queries += 1;
             accumulator.target_similarity_sum +=
-                scores.target_similarity.expect("valid score has target");
+                scores.target_similarity.expect("valid score has target") as f64;
             accumulator.distractor_similarity_sum += scores
                 .best_distractor_similarity
-                .expect("valid score has distractor");
-            accumulator.margin_sum += scores.target_margin.expect("valid score has margin");
+                .expect("valid score has distractor") as f64;
+            accumulator.margin_sum +=
+                scores.target_margin.expect("valid score has margin") as f64;
         } else {
             accumulator.invalid += 1;
         }
@@ -555,7 +558,12 @@ fn run_cohort(
         if scores.tie {
             accumulator.ties += 1;
         }
+        query_results.push((query_index, scores));
+    }
 
+    let decode_wall_ns = decode_start.elapsed().as_nanos();
+
+    for (query_index, scores) in query_results {
         write_record(
             writer,
             &OutputRecord::Query(QueryRecord {
@@ -581,7 +589,6 @@ fn run_cohort(
         )?;
     }
 
-    let decode_wall_ns = decode_start.elapsed().as_nanos();
     let accuracy = accumulator.correct as f64 / fan_in as f64;
     let mean = |sum: f64| {
         (accumulator.valid_queries > 0)
