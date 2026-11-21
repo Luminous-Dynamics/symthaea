@@ -284,7 +284,7 @@ fn contract_digest(contract: &CalibrationContractV1) -> Result<String, String> {
     let value = serde_json::to_value(contract)
         .map_err(|error| format!("calibration contract serialization failed: {error}"))?;
     Ok(domain_digest(
-        DATASET_DOMAIN_V1,
+        CONTRACT_DOMAIN_V1,
         &canonical_json_bytes(&value)?,
     ))
 }
@@ -1388,7 +1388,7 @@ mod tests {
     #[test]
     fn held_out_false_support_is_reported_by_negative_family() {
         let mut data = dataset();
-        let negatives = data
+        let mut negatives = data
             .observations
             .iter_mut()
             .filter(|row| row.split == SplitV1::HeldOut && !row.event_present)
