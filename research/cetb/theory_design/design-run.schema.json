@@ -89,6 +89,12 @@
           }
         }
       }
+    },
+    "claim_limits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "$comment": "The runner also checks that priors, scenario weights and every theory's outcome likelihoods sum to one and that outcome support is stable across all nuisance scenarios."
