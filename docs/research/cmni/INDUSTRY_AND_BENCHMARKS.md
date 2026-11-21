@@ -252,3 +252,32 @@ Add two benchmark families before claiming a new model is better than the publis
 - Target: the richer model earns credit only when its additional measured state variables improve held-out prediction; complexity alone is not a win.
 
 These benchmarks are proposed research targets, not demonstrated SOTA advantages.
+
+
+## 10. Multi-modal measurement observability benchmark
+
+The next SOTA comparison should score not just the latent-profile fit, but whether the available instruments can actually resolve the proposed feature.
+
+Generate blinded latent profiles with near-surface layers of 4, 10, 30, 70, 150 and 500 nm; apply source-grounded or explicitly synthetic instrument-response kernels for:
+- SIMS, with sputter mixing, matrix and isotope cross-talk;
+- D-specific NRA and separate ¹H-specific NRA;
+- ERDA;
+- variable-energy slow-PAS using energy-dependent Makhov implantation kernels;
+- ZEM effective defect-sensitive response;
+- lateral beam/detector point-spread as a separate axis.
+
+Compare:
+1. naive pointwise interpretation;
+2. one-modality response-aware inversion;
+3. joint multi-modal inversion with explicit covariance and modality-specific latent observables.
+
+Score feature detectability, layer thickness/amplitude bias, false-feature rate, credible-interval coverage, response-kernel mismatch sensitivity, effective rank/condition number and leave-one-modality-out reconstruction. The method must abstain when a feature is not identifiable at the supplied resolution.
+
+A richer model earns credit only if it improves held-out profile recovery and uncertainty calibration at matched measured information. It must not claim nanometre-scale resolution from a modality whose response kernel does not support it.
+
+Relevant capability sources:
+- SIMS depth profiling: https://www.nlr.gov/materials-science/dynamic-secondary-ion
+- ¹H NRA and depth response: https://pmc.ncbi.nlm.nih.gov/articles/PMC4841331/
+- D(³He,p)α NRA / overlayer broadening: https://www.sciencedirect.com/science/article/pii/S0168583X13002231
+- Slow-positron Makhov depth response: https://pmc.ncbi.nlm.nih.gov/articles/PMC9417578/
+- Pd ZEM effective defect profiling: https://doi.org/10.1021/acsnano.4c16841
