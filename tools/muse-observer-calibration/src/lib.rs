@@ -1494,6 +1494,9 @@ mod tests {
             .find(|m| m.negative_family == "cross_part_contamination")
             .unwrap();
         assert_eq!(octave.false_support_count, 0);
+        assert_eq!(octave.measured_negative_source_groups, 2);
+        assert_eq!(octave.false_support_source_groups, 0);
+        assert_eq!(octave.group_risk_status, "insufficient_evidence");
         assert_eq!(cross_part.false_support_count, 1);
         assert_eq!(cross_part.measured_negative_examples, 3);
         assert!(
