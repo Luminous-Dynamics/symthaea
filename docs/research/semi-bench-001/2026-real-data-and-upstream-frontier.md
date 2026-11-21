@@ -127,3 +127,12 @@ All are research workstreams. The public baseline projects and paper-reported re
 The audited mirror's per-file SHA-256 values and canonical two-file snapshot-manifest digest are now recorded in `secom-source-integrity-audit-v0.1.json`. A row-level chronological split manifest is frozen at `splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json`.
 
 It contains 1,567 assignments and uses a declared source-local naive clock domain. Its chronological 60/20/20 support is 76/11/17 failures. The manifest was constructed from the public mirror commit, not from a verified byte-identical official UCI download. It has not yet been used to train or evaluate a model.
+
+
+## Missingness is a time-varying observation process
+
+The pinned SECOM mirror has 41,951 missing sensor values (4.5375%). Every row contains at least one missing value. The missing-cell fraction changes from 5.14% in the chronological training block to 3.42% in validation and 3.84% in test; monthly it is 5.33% in August, 4.25% in September and 3.77% in October. Twenty-eight sensors are more than 50% missing; 52 have no missing values.
+
+In this mirror, fail rows have a slightly lower average number of missing features than pass rows (25.46 vs 26.86). Do not interpret this as a physical mechanism. It demonstrates that missingness itself can be a time-varying observation process, and that missingness-only baselines and mask-shuffle controls are needed to detect shortcuts.
+
+Follow-up: [SEMI-SECOM-MISS-001 #13115](https://github.com/Luminous-Dynamics/symthaea/issues/13115).
