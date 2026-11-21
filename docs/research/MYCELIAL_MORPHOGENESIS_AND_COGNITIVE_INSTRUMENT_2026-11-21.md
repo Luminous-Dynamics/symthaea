@@ -353,8 +353,10 @@ Implemented in source:
 5. `CognitiveSpatialProjection` binds session identity and exposes a geometry digest over sorted stable IDs, link endpoints, and coordinates quantized to 0.001 world units.
 6. `examples/cognitive_topology_replay.rs`: validates the fixture, emits semantic and geometry digests, and runs a CPU-only layout microbenchmark (20 warmups, configurable sample count, default 500; P50/P95 reported).
 7. Unit-test source covers checked-in fixture parity, order-independent semantic/layout output, semantic mutation, dangling endpoints, renderer-local provenance rejection, conflicting metadata, non-monotonic times, invalid activation, oversized graph bounds, previous-session rejection, and bounded temporal anchor drift.
+8. `cognitive_svg.rs`: a static, non-animated, accessible SVG graph view that distinguishes node kinds by shape, epistemic states by outline pattern, candidate/prediction links by line style, and retains source event/producer/sequence/provenance in inspectable attributes and titles.
+9. The replay CLI accepts an optional third output path to write this static SVG. Its synthetic-fixture banner explicitly warns that it is not live cognitive telemetry.
 
-This is not yet a smooth morphogenesis engine, live cognitive producer or human-validated instrument. The force layout is an initial relation-aware baseline, not a measured layout winner. The synthetic fixture is not live Symthaea cognition. CPU layout microbenchmark output is not a GPU frame or visual-quality result.
+This is not yet a smooth biological-style morphogenesis engine, live cognitive producer or human-validated instrument. The force layout is an initial relation-aware baseline, not a measured layout winner. The SVG is a static evidence inspection view, not a 3D GPU render or verified aesthetic result. CPU layout timings are not GPU frame or visual-quality results.
 
 Remaining:
 - exact-head formatting, compilation, all tests, Bevy adapter tests and Clippy;
