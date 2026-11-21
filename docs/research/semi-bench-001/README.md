@@ -496,7 +496,7 @@ The PPAPlace-5000 data release provides 5,000 complete placements with post-GRT 
 
 ## Contrastive-pair lineage gate
 
-The fourth-class? reference layer has been extended with a split-local contrastive-pair validator at `benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py`. It prevents positive/negative pairs from crossing train/validation/test boundaries, prohibits pair identity duplication and requires evidence for same-lot or near-time production-proximity pair labels. This is important for reproducing the 2026 wafer-map GNN that uses lot/time context in contrastive pair construction.
+The reference layer has been extended with a split-local contrastive-pair validator at `benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py`. It prevents positive/negative pairs from crossing train/validation/test boundaries, prohibits pair identity duplication and requires evidence for same-lot or near-time production-proximity pair labels. This is important for reproducing the 2026 wafer-map GNN that uses lot/time context in contrastive pair construction.
 
 See [SEMI-WM-LOT-001 #13122](https://github.com/Luminous-Dynamics/symthaea/issues/13122).
 
@@ -516,3 +516,16 @@ The clean-base successor PR [#13126](https://github.com/Luminous-Dynamics/symtha
 ## Latest verification on the current clean-base PR head
 
 Hosted GitHub Actions run [#44917385489](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489) completed successfully on commit `010faa4a517d4dc46a57a9b0f6b07015a188bf35`. All **46/46** reference tests passed, and the binary-metric, inspection-decision and contrastive-pair reports each matched their frozen expected JSON byte-for-byte. No full local run of all 46 tests is claimed.
+
+
+## Rust-first semiconductor implementation increment
+
+The earlier planning direction in ENG-SEMI #5671 proposed a semiconductor/device-physics domain crate. That has now been started on the clean-base benchmark branch:
+- `crates/domains/symthaea-semiconductor` is the initial Rust domain crate.
+- `src/benchmark/binary_metrics.rs` implements the versioned SEMI-BENCH binary-risk scoring contract with grouped ties, threshold metrics, AP/AUROC, Brier/ECE, FPR-at-recall and risk/coverage.
+- Its Rust tests load the frozen independent Python input/output fixtures and compare the complete JSON report, plus invalid-input and order-invariance tests.
+- The Python scorer remains a test/reference oracle; it is not a production dependency.
+
+The first Rust CI attempt found that the current root workspace cannot be resolved because Cargo's workspace glob includes a missing `crates/core/symthaea/Cargo.toml` on main. The new SEMI-BENCH workflow now tests this crate in a minimal temporary workspace copied from the exact checkout, avoiding an unrelated repository-wide manifest repair. Formatting, clippy and crate tests are still awaiting the isolated hosted result; no Rust pass is claimed yet.
+
+Tracked by [SEMI-RUST-001 #13129](https://github.com/Luminous-Dynamics/symthaea/issues/13129).
