@@ -130,3 +130,45 @@ jobs:
           path: ${{ runner.temp }}/workspace-manifest-evidence/
           if-no-files-found: error
           retention-days: 90
+
+  lockfile-diagnostic:
+    name: Diagnose required lockfile delta (non-qualifying)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Compute candidate lockfile and attempt Muse package check
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/workspace-lockfile-diagnostic"
+          mkdir -p "$evidence"
+          printf 'exact_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identities.txt"
+          sha256sum Cargo.lock > "$evidence/original-lock.sha256"
+          set +e
+          cargo check -p symthaea-muse --lib > "$evidence/cargo-check.log" 2>&1
+          status=$?
+          set -e
+          printf 'cargo_check_exit=%s\n' "$status" >> "$evidence/source-identities.txt"
+          cp Cargo.lock "$evidence/candidate-Cargo.lock"
+          git diff -- Cargo.lock > "$evidence/Cargo.lock.diff"
+          sha256sum "$evidence/candidate-Cargo.lock" > "$evidence/candidate-lock.sha256"
+          echo "unlocked check exit code: $status"
+          echo "candidate lockfile captured; this diagnostic job does not qualify the package"
+
+      - name: Upload candidate lockfile diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-lockfile-diagnostic-${{ github.sha }}
+          path: ${{ runner.temp }}/workspace-lockfile-diagnostic/
+          if-no-files-found: warn
+          retention-days: 14
