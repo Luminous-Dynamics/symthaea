@@ -22,10 +22,29 @@
       "license_status": "reported_in_dataset_description_and_paper",
       "participants": 26,
       "population": "healthy volunteers, ages 19-34",
-      "modalities": ["MRI", "fMRI", "behavioural"],
-      "tasks": ["tennis imagery", "spatial navigation imagery", "hand-squeeze imagery", "actual hand squeeze", "rest"],
+      "modalities": [
+        "MRI",
+        "fMRI",
+        "behavioural"
+      ],
+      "tasks": [
+        "tennis imagery",
+        "spatial navigation imagery",
+        "hand-squeeze imagery",
+        "actual hand squeeze",
+        "rest"
+      ],
       "context": "graded propofol sedation with responsive and loss-of-responsiveness periods",
-      "available_metadata": ["hand-squeeze force traces", "propofol infusion profiles", "effect-site concentrations", "task events", "motion/QC", "fMRIPrep derivatives", "XCP-D derivatives", "MRIQC derivatives"],
+      "available_metadata": [
+        "hand-squeeze force traces",
+        "propofol infusion profiles",
+        "effect-site concentrations",
+        "task events",
+        "motion/QC",
+        "fMRIPrep derivatives",
+        "XCP-D derivatives",
+        "MRIQC derivatives"
+      ],
       "published_preprocessing": {
         "fmriprep": "23.2.1",
         "xcp_d": "0.10.6",
@@ -39,7 +58,10 @@
         "segregation": "multi-level clustering coefficient",
         "segregation_adjustment": "subtract first mode after matrix eigendecomposition",
         "thresholds": 50,
-        "threshold_range": [0.001, 1.0],
+        "threshold_range": [
+          0.001,
+          1
+        ],
         "threshold_spacing": "logarithmic",
         "lor_edge_exclusion_minutes": 5
       },
@@ -48,10 +70,37 @@
         "26 participants is a small cohort for flexible machine learning",
         "behavioural unresponsiveness is not equivalent to absence of phenomenal experience",
         "task-related neural processing is not a direct subjective report",
-        "the dataset and published ISD analyses have already been described publicly; evaluation is reproduction/secondary analysis, not a blind replication"
+        "the dataset and published ISD analyses have already been described publicly; evaluation is reproduction/secondary analysis, not a blind replication",
+        "The 2026 WJ repeatability analysis uses this same ds006623 cohort; it is a same-dataset methodological comparator, not independent replication",
+        "The reported WJ within-condition floor is protocol- and segment-length-specific and must not be treated as a universal threshold"
       ],
       "acquisition_status": "metadata_audited; data_files_not_downloaded",
-      "file_manifest_status": "pending_frozen_manifest_and_checksums"
+      "file_manifest_status": "pending_frozen_manifest_and_checksums",
+      "secondary_reanalysis": {
+        "paper_title": "Architectural reorganization of functional connectivity after propofol anesthesia exceeds within-state measurement variability and is only marginally reversed during early recovery",
+        "journal": "NeuroImage: Reports",
+        "online_publication_date": "2026-10-04",
+        "volume_issue": "6(4), 100417 (2026)",
+        "doi": "10.1016/j.ynirp.2026.100417",
+        "code_repository": "https://github.com/nwharbert8-ui/brain-connectivity-wj",
+        "code_revision": "24bce9bda952311e33369422801acb85a88efcde",
+        "code_license": "MIT",
+        "primary_revision_script": "revision/revision_final_trimmed.py",
+        "group_average_control_script": "revision/revision_group_artifact_fisherz.py",
+        "reported_denominators": {
+          "dataset_release": 26,
+          "main_analysis_after_two_incomplete_condition_exclusions": 24,
+          "within_floor_after_post_lor_trim_and_two_segment_requirement": 23
+        },
+        "reported_segment_protocol": {
+          "volumes_per_segment": 300,
+          "repeated_placements_per_participant": 5,
+          "segments_per_within_condition_repeat": 2
+        },
+        "reported_within_condition_wj_floor": 0.544,
+        "status": "same_dataset_secondary_reanalysis_not_independent_replication",
+        "independent_reproduction_status": "not_run"
+      }
     },
     {
       "id": "nemar-on005620",
@@ -71,8 +120,15 @@
       "channels": "65-channel 10-10 layout as listed by the NEMAR catalogue",
       "sampling_rate_hz": 5000,
       "size_gb": 77.3,
-      "tasks": ["awake", "sed", "sed2"],
-      "modalities": ["EEG", "some sessions with TMS"],
+      "tasks": [
+        "awake",
+        "sed",
+        "sed2"
+      ],
+      "modalities": [
+        "EEG",
+        "some sessions with TMS"
+      ],
       "best_use": "secondary repeated-awakening study with report-aligned EEG complexity and perturbation analyses",
       "acquisition_strategy": "prefer NEMAR Zarr remote slice access or the smallest subject/session/task subset; do not fetch the 77.3 GB archive by default",
       "preconditions": [
@@ -108,8 +164,15 @@
         "ieeg": 38
       },
       "denominator_status": "RECONCILE_PARTICIPANT_LEVEL_QC_AND_RELEASE_PHASE_FLAGS",
-      "modalities": ["fMRI", "MEG", "iEEG/ECoG"],
-      "theories_compared": ["Integrated Information Theory", "Global Neuronal Workspace Theory"],
+      "modalities": [
+        "fMRI",
+        "MEG",
+        "iEEG/ECoG"
+      ],
+      "theories_compared": [
+        "Integrated Information Theory",
+        "Global Neuronal Workspace Theory"
+      ],
       "best_use": "reproduce the preregistered theory-discrimination analysis and test prediction-card/receipt infrastructure",
       "holdout_status": "published_results_are_public; not a new blind holdout",
       "limitations": [
@@ -127,7 +190,10 @@
       "data_url": "https://physionet.org/content/sleep-edfx/",
       "license_status": "verify_exact_release_terms_before_reuse",
       "participants_used_in_historical_hypnos_note": 2,
-      "modalities": ["EEG", "sleep-stage annotations"],
+      "modalities": [
+        "EEG",
+        "sleep-stage annotations"
+      ],
       "best_use": "sleep-stage classification and reproducibility of the two-subject pilot",
       "limitations": [
         "sleep-stage labels are not ground truth for phenomenal consciousness",

@@ -7,11 +7,11 @@
 
 ds006623 provides 26 healthy volunteers studied during graded propofol sedation, with fMRI, task events, hand-squeeze behavioural measurements and propofol infusion/effect-site information. The dataset is BIDS-organized and provides fMRIPrep, XCP-D and MRIQC derivatives.
 
-The 2026 dataset descriptor reports a decrease in integration–segregation difference (ISD) during loss of responsiveness. It also publishes the processing configuration and points to the analysis code and Zenodo archive. This gives us a reproducible, bounded first target and a direct way to audit how much of a reported effect depends on the original preprocessing choices.
+The 2026 dataset descriptor reports a decrease in integration–segregation difference (ISD) during loss of responsiveness and no task-evoked mental-imagery responses in this 26-person release cohort. Do not conflate this cohort with the separate 2018 Scientific Reports study (n=5), which reported time-locked imagery in one participant during LOR.
 
-The 2026 dataset descriptor reports no task-evoked mental-imagery responses in this 26-person release cohort. This must not be conflated with the separate 2018 Scientific Reports study (n=5), which reported time-locked imagery in one participant during LOR.
+It does not provide a direct, continuous ground-truth label for phenomenal experience. The primary ISD result is about a neural network measure across behavioural/pharmacological states.
 
-It does not provide a direct, continuous ground-truth label for phenomenal experience. The primary result is about a neural network measure across behavioural/pharmacological states.
+A second, distinct 2026 analysis of this same dataset uses Weighted Jaccard and a within-condition repeatability floor. That analysis is tracked in docs/neuroscience/DS006623_WJ_REANALYSIS_AUDIT_V1.md and the generic method is specified in docs/neuroscience/RCAF_BENCHMARK_CONSTITUTION_V1.md. WJ reproduction is not a substitute for ISD reproduction, and neither constitutes an independent dataset replication.
 
 ## 2. Frozen source inputs
 
@@ -107,10 +107,11 @@ The result can support statements about reproducibility of an ISD measure and it
 | Step | Status |
 |---|---|
 | Dataset version / DOI identified | Complete |
-| Published analysis description inspected | Complete |
-| Authors' code and Zenodo archive identified | Complete |
+| Published ISD analysis description inspected | Complete |
+| ISD authors' code and archive identified | Complete |
 | Dataset files downloaded and checksummed | Not started |
 | Exact supplement-level contrast extracted | Pending |
 | Analysis environment frozen | Pending |
-| Published analysis reproduced | Not run |
+| Published ISD analysis reproduced | Not run |
 | Secondary grouped prediction tests | Not run |
+| Separate WJ reanalysis independently reproduced | Not run |

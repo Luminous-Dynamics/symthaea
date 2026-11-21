@@ -1,0 +1,9 @@
+[package]
+name = "cetb-rcaf"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Dependency-free repeatability-calibrated similarity metrics for CETB research"
+
+[lib]
+path = "src/lib.rs"

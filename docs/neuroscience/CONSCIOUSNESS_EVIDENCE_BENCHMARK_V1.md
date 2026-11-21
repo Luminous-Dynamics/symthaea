@@ -54,6 +54,8 @@ Use OpenNeuro ds006623 v1.0.0 as the first bounded reproducibility target. It co
 
 The dataset descriptor reports a decrease in integration–segregation difference (ISD) during loss of responsiveness and no task-evoked mental-imagery responses in this 26-person release cohort. Do not conflate this cohort with the separate 2018 Scientific Reports study (n=5), which reported time-locked imagery in one participant during LOR. The descriptor provides the published processing details and points to the authors' analysis code and Zenodo archive. This target is a reproduction of published work, not a novel discovery or a direct readout of phenomenal experience.
 
+A separate 2026 NeuroImage: Reports paper reanalysed the same dataset with Weighted Jaccard and a within-condition repeatability floor (DOI 10.1016/j.ynirp.2026.100417). Track this as a second, distinct same-dataset reproduction target under RCAF. Do not merge its WJ estimand with the ISD pipeline or describe it as independent replication.
+
 ### Lane C — Repeated-awakening EEG and experience reports
 
 NEMAR on005620 contains 21 participants and 202 EEG recordings, including awake and propofol-sedation sessions, repeated awakenings and some TMS sessions. It is potentially valuable because awakening reports provide a different outcome channel from behavioural command following.
@@ -111,6 +113,10 @@ Report metrics by outcome shape:
 
 Do not make expected calibration error the only calibration metric. Include reliability diagrams, calibration slope/intercept and the declared binning convention. Do not collapse heterogeneous metrics into a single consciousness score.
 
+### Measurement-repeatability and analysis-choice layer
+
+For any neural-state similarity/distance claim, report a within-condition repeatability reference estimated at matched recording length and with the same estimator. Report per-condition floors where possible; a pooled floor is a separate estimand and must not be assumed universal. Also report a predeclared analysis-variant envelope across defensible preprocessing, estimator, segment duration and signal-quality choices. The between-state effect must be shown beside these uncertainty sources. Do not compare only against a perfect-match ceiling or select the best-performing pipeline after inspecting outcomes. See RCAF_BENCHMARK_CONSTITUTION_V1.md.
+
 ## 7. Split, leakage and statistical controls
 
 - Group all epochs, trials and windows from a participant into one split.
@@ -163,10 +169,11 @@ These are proposed gates, not achieved results:
 1. Correct the Project Hypnos evidence language and label it as a two-subject sleep-stage prototype.
 2. Qualify digital PCI examples as synthetic perturbation-propagation tests, not clinical PCI.
 3. Reproduce the published ds006623 ISD analysis from the pinned dataset and authors' archived code.
-4. Compare against the paper's published baselines before attempting HDC/CfC/LTC additions.
-5. Add subject-grouped prediction tasks only after the reproduction baseline is stable.
-6. Add on005620 selectively after exact version metadata, report alignment and licence attribution are verified.
-7. Build an external data adapter and evidence receipt only after the benchmark contract is stable; do not add a new root workspace member for the first documentation increment.
+4. Independently reproduce the same-dataset WJ-within-state-floor paper, then run the separately preregistered RCAF guard-gap and repeatability-surface extensions.
+5. Compare both network measures against their own matched baselines before attempting HDC/CfC/LTC additions.
+6. Add subject-grouped prediction tasks only after the reproduction baselines are stable.
+7. Add on005620 selectively after exact version metadata, report alignment and licence attribution are verified.
+8. Build an external data adapter and evidence receipt only after the benchmark contract is stable; do not add a new root workspace member for the first documentation increment.
 
 ## References
 
