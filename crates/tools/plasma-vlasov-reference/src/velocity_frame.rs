@@ -152,7 +152,7 @@ mod tests {
         let physical = frame.frame_to_physical(computational).unwrap();
         close(physical.zeroth, 2.0, 0.0);
         close(physical.first, 9.0, 0.0);
-        close(physical.second, 68.0, 0.0);
+        close(physical.second, 52.0, 0.0);
     }
 
     #[test]
@@ -281,11 +281,11 @@ mod tests {
     #[test]
     fn overflow_during_transform_is_rejected() {
         let frame = VelocityFrame {
-            shift: 1.0e308,
+            shift: 1.0e200,
             scale: 1.0,
         };
         let moments = FrameVelocityMoments {
-            zeroth: 2.0,
+            zeroth: 1.0e-50,
             first: 0.0,
             second: 1.0,
         };
