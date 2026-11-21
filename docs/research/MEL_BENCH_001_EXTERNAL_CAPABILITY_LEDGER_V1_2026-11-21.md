@@ -10,7 +10,7 @@
 
 Create a source-pinned, machine-readable reference for the systems and benchmarks that Muse should compare itself against. The ledger distinguishes measured results from documented product/API capabilities and from dataset-size facts. It does not manufacture a single cross-industry ranking.
 
-The dated snapshot now has ten sources and sixteen observations (21 November 2026), including a separate temporal-control benchmark.
+The dated snapshot now has eleven sources and twenty-one observations (21 November 2026), including temporal-control and reward-model benchmarks.
 
 ## Snapshot highlights
 
@@ -31,6 +31,26 @@ The observed MIREX symbolic-generation results list DAMN at 3.68 coherence, 3.39
 The reported study is small (8 prompts, 12 participants and 38 ratings per model) and uses selected outputs from a pool of eight candidates. These numbers are useful reproduction targets, not a universal music-quality metric and not comparable to audio Elo.
 
 Source: https://futuremirex.com/mirex/wiki/2026%3ASymbolic_Music_Generation_Results
+
+### Reward models — CMI-RewardBench (ICML 2026)
+
+CMI-RewardBench evaluates the evaluators: it tests music reward models over musicality, text–music alignment, and compositional instruction alignment when the generation context may include text, lyrics and reference audio. The paper reports 110k pseudo-labelled preference samples and a separate human-annotated CMI-Pref corpus; pseudo-label volume must not be confused with human-label volume.
+
+Selected official-release metrics show why reward models should be compared by task, not by one overall rank:
+
+| Reward model | MusicEval musicality SRCC | Music Arena accuracy | CMI-Pref accuracy |
+|---|---:|---:|---:|
+| CMI-RM | 0.8266 | 73.43% | 78.20% |
+| SongEval-RM | 0.6949 | 73.88% | 72.40% |
+| Gemini 3 Pro | 0.6018 | 68.85% | 65.80% |
+
+For compositional alignment, CMI-RM's CMI-Pref accuracy is 67.6% (text), 72.8% (text+lyrics), 76.4% (text+audio), and 79.2% (text+lyrics+audio), versus Gemini 3 Pro at 67.2%, 60.8%, 68.8%, and 64.8%. Gemini 3 Pro still has a higher PAM alignment SRCC (0.5373 vs CMI-RM's 0.4321). The rankings therefore depend on the test set and metric.
+
+**Implication for Muse:** a specialized reward model is a useful independent candidate-evaluation signal, especially for multimodal instruction adherence, but it is neither a music generator nor an edit-authority oracle. Use several separately calibrated signals, keep uncertainty and disagreement visible, and never let a reward score override a formal preservation constraint or artist decision.
+
+Sources:
+- [ICML 2026 / PMLR paper](https://proceedings.mlr.press/v306/ma26am.html)
+- [Official CMI-RewardBench release and selected result tables](https://github.com/Haiwen-Xia/CMI-RewardBench)
 
 ### Temporal controllability — TimingBench
 
