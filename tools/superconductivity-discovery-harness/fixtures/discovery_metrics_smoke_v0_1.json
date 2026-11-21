@@ -1,0 +1,8 @@
+[
+  {"candidate_id":"synthetic-a","score":0.99,"relevant":true},
+  {"candidate_id":"synthetic-b","score":0.90,"relevant":false},
+  {"candidate_id":"synthetic-c","score":0.80,"relevant":true},
+  {"candidate_id":"synthetic-d","score":0.70,"relevant":false},
+  {"candidate_id":"synthetic-e","score":0.60,"relevant":false},
+  {"candidate_id":"synthetic-f","score":0.50,"relevant":true}
+]

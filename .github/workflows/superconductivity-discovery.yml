@@ -1,0 +1,184 @@
+name: Superconductivity Discovery Registry Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/superconductivity-discovery-harness/**"
+      - "data/research/sc_superconductor_discovery_cases_v0_1.json"
+      - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
+      - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
+      - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
+      - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
+      - "data/schemas/sc_budgeted_selection_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
+      - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
+      - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
+      - ".github/workflows/superconductivity-discovery.yml"
+  pull_request:
+    paths:
+      - "tools/superconductivity-discovery-harness/**"
+      - "data/research/sc_superconductor_discovery_cases_v0_1.json"
+      - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
+      - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
+      - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
+      - "data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json"
+      - "data/schemas/sc_budgeted_selection_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json"
+      - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
+      - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
+      - ".github/workflows/superconductivity-discovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-discovery-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  registry-contract:
+    name: Registry schema and evidence semantics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check Rust formatting
+        run: |
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/main.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/discovery_metrics.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/observation_event_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/synthesis_protocol_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/pair_coherence_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/budgeted_selection_audit.rs
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
+
+      - name: Test registry auditor and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit
+
+      - name: Test deterministic top-K metrics and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics
+
+      - name: Test condition-bound observation event auditor and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit
+
+      - name: Test synthesis protocol contract and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit
+
+      - name: Test paired same-specimen coherence comparison and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit
+
+      - name: Test fixed-budget discovery selection auditor
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_budgeted_selection_audit
+
+      - name: Run synthetic fixed-budget discovery selection audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_budgeted_selection_audit -- \
+            --schema data/schemas/sc_budgeted_selection_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/budgeted_selection_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-budgeted-selection-smoke.json"
+          cat "$RUNNER_TEMP/sc-budgeted-selection-smoke.json"
+
+      - name: Run metrics runner on synthetic plumbing fixture
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- \
+            --predictions tools/superconductivity-discovery-harness/fixtures/discovery_metrics_smoke_v0_1.json \
+            --budgets 1,3,6 \
+            --out "$RUNNER_TEMP/sc-discovery-metrics-smoke.json"
+          cat "$RUNNER_TEMP/sc-discovery-metrics-smoke.json"
+
+      - name: Run synthetic observation event audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit -- \
+            --schema data/schemas/superconductivity_observation_event_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-observation-event-smoke.json"
+          cat "$RUNNER_TEMP/sc-observation-event-smoke.json"
+
+      - name: Run synthetic synthesis protocol audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- \
+            --schema data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json \
+            --observation-schema data/schemas/superconductivity_observation_event_v0_1.schema.json \
+            --observations tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-synthesis-protocol-smoke.json"
+          cat "$RUNNER_TEMP/sc-synthesis-protocol-smoke.json"
+
+      - name: Run synthetic paired coherence comparison audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit -- \
+            --comparison-schema data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json \
+            --comparison tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json \
+            --observation-schema data/schemas/superconductivity_observation_event_v0_1.schema.json \
+            --observations tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-pair-coherence-smoke.json"
+          cat "$RUNNER_TEMP/sc-pair-coherence-smoke.json"
+
+      - name: Run exact-input registry audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- \
+            --schema data/schemas/superconductivity_discovery_case_v0_1.schema.json \
+            --instance data/research/sc_superconductor_discovery_cases_v0_1.json \
+            --out "$RUNNER_TEMP/sc-discovery-registry-receipt.json"
+          cat "$RUNNER_TEMP/sc-discovery-registry-receipt.json"
+
+      - name: Clippy isolated auditors
+        run: |
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_budgeted_selection_audit -- -D warnings
+
+      - name: Record exact-run environment and input identities
+        if: always()
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum data/schemas/superconductivity_discovery_case_v0_1.schema.json
+            sha256sum data/schemas/superconductivity_observation_event_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json
+            sha256sum data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json
+            sha256sum data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json
+            sha256sum data/schemas/sc_budgeted_selection_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/budgeted_selection_smoke_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json
+            sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
+            sha256sum tools/superconductivity-discovery-harness/Cargo.toml
+            if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
+              sha256sum tools/superconductivity-discovery-harness/Cargo.lock
+            else
+              echo "cargo_lock=not-generated"
+            fi
+          } > "$RUNNER_TEMP/sc-discovery-environment.txt"
+
+      - name: Upload exact-run lockfile and receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-discovery-exact-run-evidence
+          if-no-files-found: warn
+          path: |
+            tools/superconductivity-discovery-harness/Cargo.lock
+            ${{ runner.temp }}/sc-discovery-environment.txt
+            ${{ runner.temp }}/sc-discovery-registry-receipt.json
+            ${{ runner.temp }}/sc-discovery-metrics-smoke.json
+            ${{ runner.temp }}/sc-observation-event-smoke.json
+            ${{ runner.temp }}/sc-synthesis-protocol-smoke.json
+            ${{ runner.temp }}/sc-pair-coherence-smoke.json
+            ${{ runner.temp }}/sc-budgeted-selection-smoke.json

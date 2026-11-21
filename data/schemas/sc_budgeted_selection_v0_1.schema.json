@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-budgeted-selection-v0.1/data/schemas/sc_budgeted_selection_v0_1.schema.json",
+  "title": "Superconductivity Budgeted Selection Benchmark v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "claim_ceiling",
+    "benchmark_id",
+    "target_track",
+    "budget_units",
+    "training_candidates",
+    "evaluation_candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sc-budgeted-selection.v0.1"
+    },
+    "evidence_class": {
+      "const": "synthetic"
+    },
+    "claim_ceiling": {
+      "const": "synthetic-budgeted-selection-and-calibration-semantics-only"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism_track",
+        "target_semantics",
+        "target_unit"
+      ],
+      "properties": {
+        "mechanism_track": {
+          "const": "conventional_electron_phonon"
+        },
+        "target_semantics": {
+          "const": "superconductor_classification"
+        },
+        "target_unit": {
+          "const": "binary"
+        }
+      }
+    },
+    "budget_units": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "training_candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "material_id",
+          "reduced_formula",
+          "family_id",
+          "prototype_id",
+          "source_id",
+          "mechanism_track",
+          "target_semantics",
+          "truth_positive"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reduced_formula": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prototype_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mechanism_track": {
+            "const": "conventional_electron_phonon"
+          },
+          "target_semantics": {
+            "const": "superconductor_classification"
+          },
+          "truth_positive": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "evaluation_candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "material_id",
+          "reduced_formula",
+          "family_id",
+          "prototype_id",
+          "source_id",
+          "mechanism_track",
+          "target_semantics",
+          "truth_positive",
+          "cost_units",
+          "predicted_probability",
+          "domain_status",
+          "abstained",
+          "abstain_reason",
+          "heuristic_score",
+          "random_rank"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reduced_formula": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prototype_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mechanism_track": {
+            "const": "conventional_electron_phonon"
+          },
+          "target_semantics": {
+            "const": "superconductor_classification"
+          },
+          "truth_positive": {
+            "type": "boolean"
+          },
+          "cost_units": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "predicted_probability": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "domain_status": {
+            "enum": [
+              "in_domain",
+              "out_of_domain"
+            ]
+          },
+          "abstained": {
+            "type": "boolean"
+          },
+          "abstain_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "heuristic_score": {
+            "type": "number"
+          },
+          "random_rank": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
