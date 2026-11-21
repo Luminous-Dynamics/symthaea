@@ -164,6 +164,16 @@ Tracking: [#13106 — spectral-tail-triggered adaptive resolution](https://githu
 
 The Rust reference prototype now has an initial diagnostic-only spectral-tail monitor that measures high-frequency and Nyquist energy independently along (x) and (v). It does not yet expand either grid and is not a truncation-error certificate. The next implementation must first qualify tail indicators on complete trajectories, then implement zero-padding transitions with their own mass, momentum, energy, (L^2), distribution-discrepancy and full compute-cost receipts.
 
+### First executed distribution-space trajectory (21 November 2026)
+
+The isolated Rust reference prototype in [PR #13103](https://github.com/Luminous-Dynamics/symthaea/pull/13103) now has an exact-head focused run: [GitHub Actions run 44895652946](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44895652946), source `7ba2dd5124f8ba36ea5c4fa9a7096a4cef90071b`, Rust 1.96.0. Strict format, all 19 tests, strict Clippy, Landau trace, independent refinement probe and CSV artifact upload passed.
+
+The (N_x=64, N_v=128), (Delta t=0.01), (t=10) run used (alpha=0.001), (v_{th}=1), (x\in[0,4\pi)), (v\in[-6,6]). Four post-initial extrema of the signed imaginary fundamental electric-field coefficient yield an exploratory log-envelope slope of approximately (-0.15445) per normalized plasma time ((R^2\approx0.99967)); using only the last three extrema gives approximately (-0.15127). Including the initial state changes the estimate to approximately (-0.18147), showing transient/window sensitivity. The VlasovTT paper reports a Landau amplitude damping rate near (-0.151\,\omega_{pe}), but its initial amplitude is (0.01), ten times larger than this run. Therefore this is a promising consistency check, **not a paper reproduction or a validated damping-rate claim**.
+
+Mass and total energy remain nearly constant in this short prototype run and the maximum collocation spectral Poisson residual remains near floating-point noise, but the run is not an L3 continuum certification. No long-horizon grid refinement, independent kinetic reference, matched external baseline, runtime or energy-to-solution comparison has yet been completed.
+
+The branch also contains a standalone periodic Fourier zero-padding interpolation oracle. Its 19-test suite exercises band-limited interpolation, old-node preservation, symmetric splitting of the source Nyquist harmonic, constant/identity cases and malformed-input rejection. It does not mutate the live Vlasov state and is not an adaptive expansion policy.
+
 ## 8. Prospective targets and statistics
 
 These are targets, not measurements:
