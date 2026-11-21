@@ -117,8 +117,7 @@ pub fn asymmetric_hermite_basis_values(
         basis.values[column] = psi_zero;
 
         if mode_count > 1 {
-            basis.values[basis.velocity_count + column] =
-                std::f64::consts::SQRT_2 * z * psi_zero;
+            basis.values[basis.velocity_count + column] = std::f64::consts::SQRT_2 * z * psi_zero;
         }
 
         for mode in 1..mode_count.saturating_sub(1) {
@@ -208,7 +207,11 @@ mod tests {
 
         close(basis.get(0, 0).unwrap(), psi_zero, 1.0e-15);
         close(basis.get(1, 0).unwrap(), 0.0, 0.0);
-        close(basis.get(2, 0).unwrap(), -psi_zero / 2.0_f64.sqrt(), 1.0e-15);
+        close(
+            basis.get(2, 0).unwrap(),
+            -psi_zero / 2.0_f64.sqrt(),
+            1.0e-15,
+        );
         close(basis.get(3, 0).unwrap(), 0.0, 0.0);
     }
 
@@ -219,17 +222,12 @@ mod tests {
 
         close(basis.get(0, 0).unwrap(), psi_zero, 1.0e-15);
         close(basis.get(1, 0).unwrap(), 2.0_f64.sqrt() * psi_zero, 1.0e-15);
-        close(
-            basis.get(2, 0).unwrap(),
-            psi_zero / 2.0_f64.sqrt(),
-            1.0e-15,
-        );
+        close(basis.get(2, 0).unwrap(), psi_zero / 2.0_f64.sqrt(), 1.0e-15);
     }
 
     #[test]
     fn hermite_basis_shape_and_row_major_access_are_explicit() {
-        let basis =
-            asymmetric_hermite_basis_values(3, &[-1.0, 0.0, 1.0], 0.0, 1.0).unwrap();
+        let basis = asymmetric_hermite_basis_values(3, &[-1.0, 0.0, 1.0], 0.0, 1.0).unwrap();
 
         assert_eq!(basis.mode_count, 3);
         assert_eq!(basis.velocity_count, 3);
@@ -253,11 +251,7 @@ mod tests {
 
         close(basis.get(0, 1).unwrap(), 1.0, 0.0);
         close(basis.get(1, 1).unwrap(), 0.0, 0.0);
-        close(
-            basis.get(2, 1).unwrap(),
-            -5.0_f64.sqrt() / 2.0,
-            1.0e-15,
-        );
+        close(basis.get(2, 1).unwrap(), -5.0_f64.sqrt() / 2.0, 1.0e-15);
         close(basis.get(1, 0).unwrap(), -3.0_f64.sqrt(), 1.0e-15);
         close(basis.get(2, 0).unwrap(), 5.0_f64.sqrt(), 1.0e-15);
         close(basis.get(1, 2).unwrap(), 3.0_f64.sqrt(), 1.0e-15);
@@ -280,8 +274,7 @@ mod tests {
     #[test]
     fn legendre_interval_scaling_is_affine_invariant() {
         let normalized =
-            legendre_window_basis_values(5, &[-1.0, -0.5, 0.0, 0.5, 1.0], -1.0, 1.0)
-                .unwrap();
+            legendre_window_basis_values(5, &[-1.0, -0.5, 0.0, 0.5, 1.0], -1.0, 1.0).unwrap();
         let shifted_scaled =
             legendre_window_basis_values(5, &[2.0, 3.0, 4.0, 5.0, 6.0], 2.0, 6.0).unwrap();
 
