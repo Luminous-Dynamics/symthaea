@@ -347,7 +347,9 @@ pub fn compare_phase_space_measures_mmd(
     } else {
         total_variation_scale
     };
-    let pair_evaluations = pair_count(candidate_atoms.len(), reference_atoms.len())?;
+    let pair_evaluations = pair_count(candidate_atoms.len(), reference_atoms.len())?
+        .checked_mul(config.components.len() as u128)
+        .ok_or(MmdError::PairCountOverflow)?;
 
     let (candidate_self, candidate_abs) =
         quadratic_sum(&candidate_atoms, &candidate_atoms, normalization, config);
@@ -2287,4 +2289,18 @@ mod tests {
                 <= 1.0e-12
         );
     }
+
+    #[test]
+    fn exact_mixture_reports_component_weighted_kernel_pair_evaluations() {
+        let candidate = [particle(0.0, 0.0, 0.5), particle(4.0, 1.0, 0.5)];
+        let reference = [particle(0.25, 0.0, 0.5), particle(4.25, 1.0, 0.5)];
+        let result =
+            compare_phase_space_measures_mmd_mixture(&candidate, &reference, &mixture_config())
+                .unwrap();
+        // Two candidate atoms and two reference atoms: 2² + 2² + 2×2 = 12
+        // base pairs, evaluated once for each of the three mixture components.
+        assert_eq!(result.aggregate.pair_evaluations, 36);
+    }
+
+
 }
