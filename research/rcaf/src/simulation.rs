@@ -3,7 +3,9 @@
 //! The generator samples valid correlation matrices from a Gaussian factor model.
 //! It is an implementation-calibration harness, not a biological simulator.
 
-use super::{exact_sign_test, weighted_jaccard_correlation_matrices, CorrelationWjMode, MetricError};
+use super::{
+    exact_sign_test, weighted_jaccard_correlation_matrices, CorrelationWjMode, MetricError,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InjectionRecoveryConfig {
@@ -328,12 +330,9 @@ pub fn run_injection_recovery(
         if injected_test.p_two_sided_exact < config.alpha {
             injection_rejections += 1;
         }
-        null_positive_fractions.push(
-            null_test.positive_count as f64 / config.participants as f64,
-        );
-        injected_positive_fractions.push(
-            injected_test.positive_count as f64 / config.participants as f64,
-        );
+        null_positive_fractions.push(null_test.positive_count as f64 / config.participants as f64);
+        injected_positive_fractions
+            .push(injected_test.positive_count as f64 / config.participants as f64);
         null_median_gaps.push(median(&null_gaps));
         injected_median_gaps.push(median(&injected_gaps));
     }
@@ -347,14 +346,8 @@ pub fn run_injection_recovery(
         monte_carlo_replicates: config.monte_carlo_replicates,
         injection_loading_delta: config.injection_loading_delta,
         alpha: config.alpha,
-        null_false_positive_rate: wilson_rate(
-            null_rejections,
-            config.monte_carlo_replicates,
-        ),
-        injection_detection_power: wilson_rate(
-            injection_rejections,
-            config.monte_carlo_replicates,
-        ),
+        null_false_positive_rate: wilson_rate(null_rejections, config.monte_carlo_replicates),
+        injection_detection_power: wilson_rate(injection_rejections, config.monte_carlo_replicates),
         median_null_paired_gap: median(&null_median_gaps),
         median_injected_paired_gap: median(&injected_median_gaps),
         median_null_positive_gap_fraction: median(&null_positive_fractions),
@@ -446,9 +439,8 @@ fn sample_correlation_matrix(
             let global = global_loadings[region];
             let module = module_loadings[region];
             let residual = (1.0 - global * global - module * module).sqrt();
-            observation[region] = global * global_factor
-                + module * module_factor
-                + residual * rng.normal();
+            observation[region] =
+                global * global_factor + module * module_factor + residual * rng.normal();
             sums[region] += observation[region];
         }
         for i in 0..regions {
@@ -461,8 +453,8 @@ fn sample_correlation_matrix(
     let sample_count = samples as f64;
     let mut variances = vec![0.0; regions];
     for region in 0..regions {
-        let centered = cross_products[region * regions + region]
-            - sums[region] * sums[region] / sample_count;
+        let centered =
+            cross_products[region * regions + region] - sums[region] * sums[region] / sample_count;
         variances[region] = centered / (sample_count - 1.0);
     }
 
@@ -470,11 +462,9 @@ fn sample_correlation_matrix(
     for i in 0..regions {
         flat[i * regions + i] = 1.0;
         for j in (i + 1)..regions {
-            let covariance = (cross_products[i * regions + j]
-                - sums[i] * sums[j] / sample_count)
+            let covariance = (cross_products[i * regions + j] - sums[i] * sums[j] / sample_count)
                 / (sample_count - 1.0);
-            let correlation = (covariance / (variances[i] * variances[j]).sqrt())
-                .clamp(-1.0, 1.0);
+            let correlation = (covariance / (variances[i] * variances[j]).sqrt()).clamp(-1.0, 1.0);
             flat[i * regions + j] = correlation;
             flat[j * regions + i] = correlation;
         }
@@ -501,9 +491,8 @@ fn wilson_rate(successes: usize, trials: usize) -> BinomialRate {
     let z_squared = Z * Z;
     let denominator = 1.0 + z_squared / n;
     let center = (estimate + z_squared / (2.0 * n)) / denominator;
-    let half_width = Z
-        * (estimate * (1.0 - estimate) / n + z_squared / (4.0 * n * n)).sqrt()
-        / denominator;
+    let half_width =
+        Z * (estimate * (1.0 - estimate) / n + z_squared / (4.0 * n * n)).sqrt() / denominator;
     BinomialRate {
         successes,
         trials,
