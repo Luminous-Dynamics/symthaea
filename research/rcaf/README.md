@@ -7,9 +7,12 @@ This is a research metric library, not a consciousness detector. It does not rea
 ## Contents
 
 - Weighted Jaccard for non-negative edge-weight vectors.
-- Upper-triangle extraction from square correlation matrices with explicit transformations: absolute, positive-only, negative-only and signed-shift.
+- Pair-aware correlation-matrix modes: absolute, positive edges in both matrices, negative edges in both matrices, and signed-shift.
+- Matrix validation for symmetry, correlation range and shape.
 - Participant-paired repeatability summaries and deterministic percentile bootstrap intervals for the median paired gap.
-- Hand-computed unit fixtures and invalid-input tests.
+- Nine unit-test cases for hand-computed values, sign-mask semantics, invalid inputs and paired summaries.
+
+The positive-only and negative-only modes apply a shared sign mask: an edge is included only when it has the requested sign in both matrices. This matches the pairwise masking convention used in the published ds006623 revision code. It is not equivalent to replacing non-matching edges with zero and including them in the denominator.
 
 ## Run
 

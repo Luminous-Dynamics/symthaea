@@ -116,6 +116,8 @@ Run each variant as a separate labelled analysis. Never select the best-looking 
 2. Positive-edge-only WJ.
 3. Negative-edge-only WJ.
 4. Signed-shift WJ with the exact transformation declared.
+
+For positive-only and negative-only WJ, use the shared sign mask: include an edge only when it has the requested sign in BOTH compared matrices. Do not independently zero non-matching signs and then include those edges in the denominator; that is a different estimand. Record the minimum selected-edge count and fail closed when the mask is too sparse.
 5. Direct sign-flip rates stratified by minimum edge magnitude.
 6. Net-versus-gross redistribution index, with formula and interpretation.
 
