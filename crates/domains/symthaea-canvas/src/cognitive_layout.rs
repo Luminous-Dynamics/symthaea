@@ -212,7 +212,9 @@ impl fmt::Display for CognitiveLayoutError {
             Self::InvalidPreviousProjection => {
                 write!(f, "previous projection has an incompatible session, schema, or anchor set")
             }
-            Self::InvalidProjection => write!(f, "spatial projection contains invalid or unbounded geometry"),
+            Self::InvalidProjection => {
+                write!(f, "spatial projection contains invalid or unbounded geometry")
+            }
             Self::Topology(error) => write!(f, "cognitive topology validation failed: {error}"),
         }
     }
