@@ -824,7 +824,11 @@ mod tests {
         let predicting_scene = build_mycelial_presence(&predicting);
         let motif_id = |scene: &SceneNode| {
             scene.children.iter().find_map(|child| match &child.kind {
-                NodeKind::Group { id } if id.as_deref().is_some_and(|value| value.starts_with("motif-")) => {
+                NodeKind::Group { id }
+                    if id
+                        .as_deref()
+                        .is_some_and(|value| value.starts_with("motif-")) =>
+                {
                     id.clone()
                 }
                 _ => None,
