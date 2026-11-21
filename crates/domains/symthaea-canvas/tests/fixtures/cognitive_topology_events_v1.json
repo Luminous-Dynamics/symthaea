@@ -18,7 +18,8 @@
         "status": "observed",
         "activation": 0.65
       }
-    }
+    },
+    "caused_by_event_id": null
   },
   {
     "schema_version": 1,
@@ -39,7 +40,8 @@
         "status": "observed",
         "activation": null
       }
-    }
+    },
+    "caused_by_event_id": "event:memory-added"
   },
   {
     "schema_version": 1,
@@ -61,7 +63,8 @@
         "status": "observed",
         "activation": null
       }
-    }
+    },
+    "caused_by_event_id": "event:concept-added"
   },
   {
     "schema_version": 1,
@@ -86,7 +89,8 @@
           "edge:retrieved-memory"
         ]
       }
-    }
+    },
+    "caused_by_event_id": "event:retrieval-link"
   },
   {
     "schema_version": 1,
@@ -105,6 +109,7 @@
         "expected_state": "started",
         "state": "completed"
       }
-    }
+    },
+    "caused_by_event_id": "event:retrieval-started"
   }
 ]
