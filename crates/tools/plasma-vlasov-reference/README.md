@@ -17,7 +17,7 @@ with
 \rho(x,t)=n_{\mathrm{background}}-\int f(x,v,t)\,dv.
 \]
 
-The common electron convention is (q/m=-1) and (n_{\mathrm{background}}=1). All parameters are explicit in `VlasovPoissonConfig`.
+The electron charge is normalized to -1, so the mass is `m = -1/(q/m)` and the configured charge-to-mass ratio must be finite and negative. The positive background charge density is `n_background`; neutrality at unit electron number density uses `n_background=1`. Kinetic moments include this particle mass, and field energy includes the configured permittivity.
 
 The spatial coordinate is periodic on a circle. Physical velocity is unbounded, but the numerical solver uses a finite periodic interval `[velocity_min, velocity_max)`. The velocity interval and its periodic boundary condition are a numerical truncation. A valid reference study must increase the velocity-domain extent and resolution and demonstrate insensitivity of the reported observables.
 
