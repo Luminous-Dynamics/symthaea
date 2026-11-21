@@ -177,6 +177,6 @@ Reference:
 - https://doi.org/10.1109/TSMC.2026.3745855
 - https://www.repository.cam.ac.uk/items/886c107c-7c63-4a48-b307-f22abb1fa3bd
 
-The v0.2 implementation adds four candidate-side tests (18 total); none has been executed. No paper reproduction, candidate comparison, SOTA or energy result is claimed.
+The v0.2 implementation adds five candidate-side tests (19 total); none has been executed. No paper reproduction, candidate comparison, SOTA or energy result is claimed.
 
 The 19 authored tests include exact component-value checks for the exported diagnostics helper. The candidate can persist those values into a per-opportunity run receipt for paired policy analysis; no receipt adapter or real run has yet been executed.
