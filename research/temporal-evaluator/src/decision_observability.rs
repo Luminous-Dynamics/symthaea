@@ -169,10 +169,10 @@ pub fn evaluate_decision_observability(
     let mut prepared = Vec::with_capacity(class.alternatives.len());
 
     for world in &class.alternatives {
-        if world.candidate_view != *reference_view {
+        if &world.candidate_view != reference_view {
             return Err(DecisionObservabilityError::CandidateViewsDiffer);
         }
-        if world.candidate_action_id != *reference_action {
+        if world.candidate_action_id.as_str() != reference_action.as_str() {
             return Err(DecisionObservabilityError::CandidateActionsDiffer);
         }
         if !world_ids.insert(world.evaluator_world_id) {
@@ -294,7 +294,7 @@ pub fn evaluate_decision_observability(
     }
 
     let mut minimax_loss_action: Option<(u32, String)> = None;
-    let mut minimax_regret_action: Option<(u32, u64, String)> = None;
+    let mut minimax_regret_action: Option<(u32, String)> = None;
     for action in &actions {
         let mut worst_loss = 0_u32;
         let mut worst_regret = 0_u32;
@@ -320,14 +320,14 @@ pub fn evaluate_decision_observability(
         let loss_candidate = (worst_loss, action.clone());
         if minimax_loss_action
             .as_ref()
-            .is_none_or(|current| loss_candidate < *current)
+            .is_none_or(|current| loss_candidate.cmp(current).is_lt())
         {
             minimax_loss_action = Some(loss_candidate);
         }
-        let regret_candidate = (worst_regret, regret_sum, action.clone());
+        let regret_candidate = (worst_regret, action.clone());
         if minimax_regret_action
             .as_ref()
-            .is_none_or(|current| regret_candidate < *current)
+            .is_none_or(|current| regret_candidate.cmp(current).is_lt())
         {
             minimax_regret_action = Some(regret_candidate);
         }
@@ -335,11 +335,17 @@ pub fn evaluate_decision_observability(
 
     let (minimax_worst_case_loss_ppm, minimax_loss_action_id) =
         minimax_loss_action.ok_or(DecisionObservabilityError::TooManyActions)?;
-    let (
-        unavoidable_worst_case_regret_ppm,
-        minimax_regret_sum,
-        minimax_regret_action_id,
-    ) = minimax_regret_action.ok_or(DecisionObservabilityError::TooManyActions)?;
+    let (unavoidable_worst_case_regret_ppm, minimax_regret_action_id) =
+        minimax_regret_action.ok_or(DecisionObservabilityError::TooManyActions)?;
+    let minimax_regret_sum = prepared.iter().try_fold(0_u64, |sum, world| {
+        let regret = *world.regret_by_action.get(&minimax_regret_action_id).ok_or(
+            DecisionObservabilityError::ActionSetMismatch {
+                world_id: world.world_id,
+            },
+        )?;
+        sum.checked_add(u64::from(regret))
+            .ok_or(DecisionObservabilityError::ArithmeticOverflow)
+    })?;
 
     Ok(DecisionObservabilityCertificate {
         equivalence_class_id: class.equivalence_class_id,
