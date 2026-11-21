@@ -169,7 +169,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("last_sequence: {}", snapshot.last_sequence);
     println!("semantic_snapshot_digest: {semantic_digest}");
     println!("event_log_digest: {event_log_digest}");
-    println!("replay_assurance_json: {}", serde_json::to_string(&replay_assurance_receipt)?);
+    println!(
+        "replay_assurance_json: {}",
+        serde_json::to_string(&replay_assurance_receipt)?
+    );
     println!("replay_assurance_schema_version: 1");
     println!("replay_assurance_scope: same-binary same-process projection replay");
     println!("replay_assertion.byte_identity: not_assessed");
