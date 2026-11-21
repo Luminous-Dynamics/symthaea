@@ -46,7 +46,7 @@
         },
         "dimension": {
           "type": "integer",
-          "minimum": 2,
+          "minimum": 8,
           "maximum": 262144
         },
         "memory_fan_in": {
@@ -163,6 +163,7 @@
         "final_state_norm",
         "api_update_count",
         "reported_logical_seconds",
+        "memory_preparation_wall_ns",
         "model_setup_wall_ns",
         "input_preparation_wall_ns",
         "evolution_wall_ns",
@@ -186,7 +187,7 @@
         },
         "dimension": {
           "type": "integer",
-          "minimum": 2,
+          "minimum": 8,
           "maximum": 262144
         },
         "memory_fan_in": {
@@ -334,6 +335,10 @@
             "type": "integer",
             "minimum": 0
           }
+        },
+        "memory_preparation_wall_ns": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }
