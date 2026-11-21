@@ -19,6 +19,7 @@ pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
 pub mod color;
+pub mod cognitive_topology;
 pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
@@ -37,6 +38,12 @@ pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
 pub use color::{Color, Palette};
+pub use cognitive_topology::{
+    COGNITIVE_TOPOLOGY_SCHEMA_VERSION, CognitiveEdge, CognitiveEpisode, CognitiveEpisodeKind,
+    CognitiveEpisodeState, CognitiveEvidence, CognitiveNode, CognitiveNodeKind, CognitiveProvenance,
+    CognitiveRelation, CognitiveTopology, CognitiveTopologyError, EpistemicStatus,
+    MAX_COGNITIVE_EDGES, MAX_COGNITIVE_EPISODES, MAX_COGNITIVE_NODES,
+};
 pub use embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
     EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError, EmbodimentSnapshot,
