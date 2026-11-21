@@ -51,24 +51,29 @@ A failed intervention, invalid policy response, or inconsistent reciprocal evalu
 
 At the default 16 seeds, this is 640 receipts.
 
-## Run locally without network or external models
+## Run locally without the monorepo workspace
 
-From the repository root, after a Rust toolchain is installed:
+The root workspace currently contains a wildcard member glob that also matches a retired \`crates/core/symthaea\` path with no \`Cargo.toml\`. Because Cargo loads the workspace before honoring \`-p symthaea-muse\`, a normal package-scoped Cargo command cannot currently start. Do not add a fake workspace member or weaken the repository-wide workspace gate to work around this.
+
+The focused qualification script stages the exact two production source files into a temporary, isolated Rust 2024 package with only the required \`serde\`, \`serde_json\` and \`sha2\` dependencies. It then generates and preserves a dedicated lockfile, checks formatting, runs evaluator tests, runner tests, warnings-denied Clippy, executes the fixture suite and verifies a fresh-process replay.
+
+From a clean repository checkout on the pinned Rust 1.96.0 toolchain:
 
 \`\`\`bash
-rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/bin/rmi_bench_track_a.rs
-cargo test -p symthaea-muse --lib rmi_benchmark::tests
-cargo test -p symthaea-muse --bin rmi_bench_track_a
-cargo run -p symthaea-muse --bin rmi_bench_track_a -- \\
-  --source-commit "$(git rev-parse HEAD)" \\
-  --seed-count 16 \\
-  --output /tmp/melothaea-rmi-track-a.json \\
-  --self-check
+bash scripts/mel_rmi_track_a_qualification.sh "$(git rev-parse HEAD)"
 \`\`\`
 
-\`--self-check\` invokes the same compiled executable in a fresh process with the same seed schedule and source commit, then compares the independently produced report digest. The report is domain-separated and SHA-256 sealed over its canonical deterministic payload. BTreeMap aggregation and fixed field/array order keep serialization stable for a fixed executable, source identity, lockfile and manifest.
+Use a larger run and preserve output explicitly:
 
-The CLI requires \`--source-commit\`, bounds the seed count, and rejects malformed commit identifiers. It reads the workspace \`Cargo.lock\` relative to \`CARGO_MANIFEST_DIR\`; a missing lockfile is an error rather than a silently omitted dependency identity.
+\`\`\`bash
+MEL_RMI_SEED_COUNT=16 \\
+MEL_RMI_EVIDENCE_DIR=/tmp/mel-rmi-track-a-evidence \\
+bash scripts/mel_rmi_track_a_qualification.sh "$(git rev-parse HEAD)"
+\`\`\`
+
+The script refuses a dirty checkout or a supplied source SHA that does not equal the exact checked-out \`HEAD\`. Its report contains the exact source commit and the staged dependency-lock digest. The runner's \`--self-check\` invokes the same compiled executable in a fresh process with the same seed schedule and source commit, then compares the independently produced report digest.
+
+**Qualification boundary:** this isolates and tests the exact RMI module and runner source, but it does not compile all of \`symthaea-muse\` or the full monorepo workspace. The root \`lib.rs\` / Cargo binary registration remains an integration seam until the unrelated workspace-member defect is repaired and the real package can be compiled. The generated standalone lockfile is uploaded with every qualification artifact; no missing dependency identity is silently omitted.
 
 ## Interpretation and claim ceiling
 
