@@ -908,8 +908,11 @@ mod tests {
             ..MusicalIntent::default()
         };
         let mut realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
-        let target =
-            section(&realization.plan, SonataSectionKind::RecapitulationSecondary).unwrap();
+        let target = section(
+            &realization.plan,
+            SonataSectionKind::RecapitulationSecondary,
+        )
+        .unwrap();
         let target_indices =
             melody_indices(&realization.score, target.start.beats(), target.end.beats());
         for index in &target_indices {
@@ -972,8 +975,7 @@ mod tests {
             assert!(selected.hard_constraints_valid());
             assert!(selected.preserved_invariants);
             assert!(selected.verification.iter().any(|evidence| {
-                evidence.obligation_id == batch.driving_obligation_id.unwrap()
-                    && evidence.verified
+                evidence.obligation_id == batch.driving_obligation_id.unwrap() && evidence.verified
             }));
         }
     }
