@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/closure-profile-and-selection-input-v0.1.schema.json",
+  "title": "Closure profile and selection input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profiles",
+    "local_state"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/profile"
+      }
+    },
+    "local_state": {
+      "$ref": "#/$defs/local_state"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "license_identifier",
+        "execute_research",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified",
+            "unverified",
+            "missing"
+          ]
+        },
+        "license_identifier": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "execute_research": {
+          "enum": [
+            "granted",
+            "denied",
+            "unknown"
+          ]
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "parameter_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "unit",
+        "minimum",
+        "maximum"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "maximum": {
+          "type": "integer"
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "physics_model_id",
+        "regime_id",
+        "dimensions",
+        "qualification_status",
+        "model_artifact_sha256",
+        "source_artifact_sha256",
+        "solver_build_sha256",
+        "tableau_sha256",
+        "qualification_receipt_sha256",
+        "rights",
+        "parameter_envelopes",
+        "physical_gates"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physics_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "regime_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimensions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        },
+        "qualification_status": {
+          "enum": [
+            "qualified",
+            "provisional",
+            "withdrawn"
+          ]
+        },
+        "model_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "solver_build_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "tableau_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "qualification_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rights": {
+          "$ref": "#/$defs/rights"
+        },
+        "parameter_envelopes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/parameter_envelope"
+          }
+        },
+        "physical_gates": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/physical_gate_evidence"
+          }
+        }
+      }
+    },
+    "parameter_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "unit",
+        "lower_value",
+        "upper_value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lower_value": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "upper_value": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "local_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physics_model_id",
+        "regime_id",
+        "dimensions",
+        "solver_build_sha256",
+        "tableau_sha256",
+        "parameter_observations"
+      ],
+      "properties": {
+        "physics_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "regime_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimensions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        },
+        "solver_build_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "tableau_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "parameter_observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parameter_observation"
+          }
+        }
+      }
+    },
+    "physical_gate": {
+      "enum": [
+        "conservation",
+        "frame_symmetry",
+        "entropy_admissibility",
+        "well_posedness",
+        "spurious_mode_stability"
+      ]
+    },
+    "gate_disposition": {
+      "enum": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ]
+    },
+    "physical_gate_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate",
+        "disposition",
+        "contract_sha256",
+        "evidence_sha256",
+        "explanation"
+      ],
+      "properties": {
+        "gate": {
+          "$ref": "#/$defs/physical_gate"
+        },
+        "disposition": {
+          "$ref": "#/$defs/gate_disposition"
+        },
+        "contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "explanation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "not_applicable"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evidence_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "not_applicable",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "explanation": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

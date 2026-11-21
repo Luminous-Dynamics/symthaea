@@ -1,0 +1,65 @@
+name: Closure atlas selector
+
+on:
+  push:
+    branches: [research/closure-atlas-selector-v0-1-2026-11-19]
+    paths:
+      - "tools/closure-atlas-selector-v0.1/**"
+      - ".github/workflows/closure-atlas-selector-v0-1.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/closure-atlas-selector-v0.1/**"
+      - ".github/workflows/closure-atlas-selector-v0-1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Profile schema, selector tests and strict Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Install pinned JSON Schema validator
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate synthetic fixture
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          root = Path("tools/closure-atlas-selector-v0.1")
+          schema = json.loads((root / "schema/closure-profile-and-selection-input-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-selection-input-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = sorted(
+              Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(fixture),
+              key=lambda error: list(error.path),
+          )
+          if errors:
+              raise SystemExit("\\n".join(error.message for error in errors))
+          if not fixture["profiles"] or fixture["profiles"][0]["profile_id"] != "synthetic-landau-linear-fno-v1":
+              raise SystemExit("synthetic known-answer profile missing")
+          if "synthetic-" not in fixture["local_state"]["physics_model_id"]:
+              raise SystemExit("fixture must remain explicitly synthetic")
+          required_gates = {
+              "conservation", "frame_symmetry", "entropy_admissibility",
+              "well_posedness", "spurious_mode_stability"
+          }
+          for profile in fixture["profiles"]:
+              actual = [gate["gate"] for gate in profile["physical_gates"]]
+              if len(actual) != 5 or set(actual) != required_gates:
+                  raise SystemExit("profile must declare each physical qualification gate exactly once")
+          PY
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/closure-atlas-selector-v0.1/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path tools/closure-atlas-selector-v0.1/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/closure-atlas-selector-v0.1/Cargo.toml --locked --all-targets -- -D warnings

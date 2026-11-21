@@ -1,0 +1,95 @@
+{
+  "schema_version": "0.1.0",
+  "profiles": [
+    {
+      "profile_id": "synthetic-landau-linear-fno-v1",
+      "physics_model_id": "synthetic-vlasov-poisson-1d-electrostatic",
+      "regime_id": "synthetic-linear-landau-damping",
+      "dimensions": 1,
+      "qualification_status": "qualified",
+      "model_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "solver_build_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tableau_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "qualification_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rights": {
+        "status": "verified",
+        "license_identifier": "SYNTHETIC-PUBLIC-DOMAIN",
+        "execute_research": "granted",
+        "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "parameter_envelopes": [
+        {
+          "name": "k_lambda_D_milli",
+          "unit": "1e-3",
+          "minimum": 100,
+          "maximum": 300
+        },
+        {
+          "name": "amplitude_micro",
+          "unit": "1e-6",
+          "minimum": 10,
+          "maximum": 80
+        }
+      ],
+      "physical_gates": [
+        {
+          "gate": "conservation",
+          "disposition": "pass",
+          "contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "explanation": null
+        },
+        {
+          "gate": "frame_symmetry",
+          "disposition": "pass",
+          "contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "explanation": null
+        },
+        {
+          "gate": "entropy_admissibility",
+          "disposition": "pass",
+          "contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "explanation": null
+        },
+        {
+          "gate": "well_posedness",
+          "disposition": "pass",
+          "contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "explanation": null
+        },
+        {
+          "gate": "spurious_mode_stability",
+          "disposition": "pass",
+          "contract_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "explanation": null
+        }
+      ]
+    }
+  ],
+  "local_state": {
+    "physics_model_id": "synthetic-vlasov-poisson-1d-electrostatic",
+    "regime_id": "synthetic-linear-landau-damping",
+    "dimensions": 1,
+    "solver_build_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tableau_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "parameter_observations": [
+      {
+        "name": "k_lambda_D_milli",
+        "unit": "1e-3",
+        "lower_value": 200,
+        "upper_value": 200
+      },
+      {
+        "name": "amplitude_micro",
+        "unit": "1e-6",
+        "lower_value": 40,
+        "upper_value": 40
+      }
+    ]
+  }
+}
