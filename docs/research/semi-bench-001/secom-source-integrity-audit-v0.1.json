@@ -11,7 +11,8 @@
       "content_characters": 5388416,
       "ascii_text": true,
       "rows": 1567,
-      "columns_per_row": 590
+      "columns_per_row": 590,
+      "sha256": "4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf"
     },
     "labels_file": {
       "path": "data/secom_labels.data",
@@ -20,14 +21,17 @@
       "ascii_text": true,
       "rows": 1567,
       "columns_per_row": 3,
-      "fields": "label and quoted date/time"
+      "fields": "label and quoted date/time",
+      "sha256": "2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef"
     },
     "uci_source_attribution": {
       "source": "https://archive.ics.uci.edu/dataset/179/secom",
       "doi": "10.24432/C54305",
       "license": "CC-BY-4.0 per official UCI metadata",
       "byte_identity_to_official_uci_download": "not-verified"
-    }
+    },
+    "canonical_snapshot_manifest_sha256": "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281",
+    "canonical_snapshot_digest_convention": "SHA256 of UTF-8 canonical string: 'SECOM-MIRROR-SNAPSHOT-v1\\n' + 'data/secom.data\\\\0' + feature-file SHA256 hex + '\\n' + 'data/secom_labels.data\\\\0' + labels-file SHA256 hex + '\\n'. This identifies the two-file mirror snapshot; it is not a claim that the mirror bytes are identical to official UCI files."
   },
   "integrity_results": {
     "feature_and_label_row_alignment": true,
@@ -159,7 +163,12 @@
       "Validation (11 failures) and test (17 failures) have low positive support; threshold and recall estimates will have wide uncertainty.",
       "No wafer/lot/tool/site identifiers are supplied by this mirror audit; do not claim group-disjoint or equipment-held-out generalization.",
       "The single-source timestamps lack timezone offsets; preserve source-local naive clock ordering only."
-    ]
+    ],
+    "frozen_manifest_path": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
+    "manifest_git_blob_sha1": "7b38864a07347410c5c90c6d8e248c7ad8a5e81e",
+    "manifest_bytes": 303070,
+    "status": "frozen-source-row-level-split-manifest; model-not-yet-evaluated",
+    "row_index_boundaries_are_inclusive": true
   },
   "limitations": [
     "The mirror's code documentation cites UCI, but feature-file byte identity to the official UCI download was not verified.",
