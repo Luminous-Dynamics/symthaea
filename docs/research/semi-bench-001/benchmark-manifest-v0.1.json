@@ -689,6 +689,67 @@
         "latency-cost",
         "query-repeatability"
       ]
+    },
+    {
+      "id": "human-supervised-closed-loop-fab-decision-support",
+      "source": "https://doi.org/10.1007/s43684-026-00146-z",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
+      "reference_review": {
+        "title": "Toward autonomous decision support in semiconductor manufacturing: a review of planning, scheduling, dispatching, and execution control",
+        "publication_date": "2026-11-06",
+        "finding": "Human-supervised closed loop integrating state sensing, planning, scheduling, dispatching, execution and metrology/quality feedback; hard constraints, bounded authority, safe fallback and audit trails remain necessary.",
+        "claim_status": "review-derived-architecture-reference-not-performance-benchmark"
+      },
+      "tasks": [
+        "reentrant-fab-scheduling",
+        "quality-aware-dispatch",
+        "multi-timescale-planning",
+        "llm-assisted-structured-recommendation",
+        "digital-twin-counterfactual-validation",
+        "shadow-mode-evaluation"
+      ],
+      "baselines": [
+        "fifo",
+        "earliest-due-date",
+        "critical-ratio",
+        "fab-native-dispatch",
+        "milp-or-cp-sat",
+        "des-no-learned-policy",
+        "risk-blind-dispatch",
+        "quality-aware-dispatch",
+        "bounded-rl-policy",
+        "llm-assisted-vs-structured-only"
+      ],
+      "metrics": [
+        "throughput",
+        "cycle-time-p95",
+        "wip",
+        "on-time-delivery",
+        "schedule-adherence",
+        "bottleneck-migration",
+        "queue-time-violations",
+        "quality-excursion-detection-lead-time",
+        "inspection-value",
+        "hard-constraint-violations",
+        "policy-regret",
+        "safe-fallback-activation"
+      ],
+      "integrity_gates": [
+        "zero-hard-constraint-violations-under-seeded-negative-controls",
+        "unknown-quality-is-not-treated-as-good",
+        "only-authorized-actions-can-change-state",
+        "all-decisions-bound-to-input-state-and-constraint-digests",
+        "unknown-outcome-requires-reconciliation"
+      ],
+      "evidence_progression": [
+        "synthetic-des",
+        "historical-event-replay",
+        "offline-counterfactual-evaluation",
+        "shadow-mode-no-control",
+        "human-approved-bounded-pilot",
+        "preregistered-controlled-outcome-study"
+      ],
+      "claim_ceiling": "simulation and replay improvements are not measured fab or yield improvements; no process authority"
     }
   ],
   "cross_cutting_protocol": {
@@ -975,7 +1036,8 @@
     "secom_missingness_drift": "https://github.com/Luminous-Dynamics/symthaea/issues/13115",
     "wafer_substrate_material_to_wafer": "https://github.com/Luminous-Dynamics/symthaea/issues/13114",
     "rust_semiconductor_metrics": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
-    "frozen_lmm_rule_ordered_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13146"
+    "frozen_lmm_rule_ordered_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
+    "fab_closed_loop_decision_support": "https://github.com/Luminous-Dynamics/symthaea/issues/13147"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
@@ -996,7 +1058,9 @@
     "semi_rust_core_path": "crates/domains/symthaea-semiconductor",
     "frozen_lmm_rule_ordered_preprint": "https://arxiv.org/abs/2610.35080",
     "frozen_lmm_rule_ordered_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
-    "semiconductor_closed_loop_decision_support_review": "https://doi.org/10.1007/s43684-026-00146-z"
+    "semiconductor_closed_loop_decision_support_review": "https://doi.org/10.1007/s43684-026-00146-z",
+    "fab_closed_loop_decision_review": "https://doi.org/10.1007/s43684-026-00146-z",
+    "fab_closed_loop_decision_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13147"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
