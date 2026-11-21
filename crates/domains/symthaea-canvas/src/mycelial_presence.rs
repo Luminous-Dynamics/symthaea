@@ -418,16 +418,18 @@ pub fn build_mycelial_presence(snapshot: &EmbodimentSnapshot) -> SceneNode {
     // activity tint the organism's branches in a restrained, coherent way.
     let base_color =
         Color::from_hsl(184.0, 0.82, 0.62).lerp(&activity_color, 0.18);
+    let golden_angle = 2.399_963_1_f32;
     for branch in 0..PRIMARY_BRANCHES {
-        let angle = (branch as f32 / PRIMARY_BRANCHES as f32) * TAU - TAU / 4.0;
+        let angle = branch as f32 * golden_angle - TAU / 4.0;
+        let length = 92.0 + ((branch * 29) % 22) as f32;
         add_branch(
             &mut hyphae,
             CENTER_X,
             CENTER_Y,
             angle,
-            112.0,
+            length,
             BRANCH_DEPTH,
-            branch,
+            branch.wrapping_mul(13).wrapping_add(5),
             base_color,
         );
     }
@@ -631,8 +633,7 @@ fn add_branch(
     if depth == 0 {
         parent.children.push(
             SceneNode::circle(end_x, end_y, 3.0).with_style(Style {
-                fill: Some(branch_color.with_alpha(0.14)),
-                filter: Some("mycelium-soft-glow".to_string()),
+                fill: Some(branch_color.with_alpha(0.22)),
                 ..Style::default()
             }),
         );
@@ -753,6 +754,21 @@ mod tests {
         assert!(svg.contains("spore-phase-4"));
         assert!(svg.contains("hyphae-pulse"));
         assert!(svg.contains("mycelium-soft-glow"));
+    }
+
+
+    #[test]
+    fn primary_hyphae_use_deterministic_non_uniform_growth() {
+        let first = render_mycelial_presence(
+            &EmbodimentSnapshot::default(),
+            SvgRenderOptions::default(),
+        );
+        let second = render_mycelial_presence(
+            &EmbodimentSnapshot::default(),
+            SvgRenderOptions::default(),
+        );
+        assert_eq!(first, second);
+        assert!(first.matches("filter=\"url(#mycelium-soft-glow)\"").count() < 16);
     }
 
     #[test]
