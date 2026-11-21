@@ -148,3 +148,18 @@ The first cheap step is exactly the affine velocity-moment oracle in [PR #13130]
 ## Claim ceiling
 
 ADEPT's exact source commit and upstream 31-test CI result are admitted as an external baseline. Symthaea has not independently reproduced its numerical results. No head-to-head win, speedup, stronger invariant guarantee, positivity guarantee or production superiority is claimed.
+
+
+## Actual upstream output contract inspected
+
+The pinned ADEPT storage source has now been inspected directly. It exports:
+- field datasets `fields-t=...` with variables `e`, `phi`, and optional `de`, on dimensions `(t,x)`;
+- Hermite coefficient datasets `Ck-t=...` with dimensions `(t,mode,kx)`;
+- Legendre coefficient datasets `Bk-t=...` with the same dimension names, but a distinct Legendre mode index;
+- a default diagnostic function returning mass, momentum, energy, field energy, density extrema, coefficient maxima and optional Legendre-boundary / correction diagnostics.
+
+The coefficient writer applies `fftshift` only on the spatial Fourier axis. The source reconstruction path reverses that ordering, applies inverse spatial FFT with `norm="forward"`, builds the configured Hermite and Legendre basis functions, zeroes the Legendre basis outside `[v_a,v_b]`, and reconstructs the total (f=f_0+\delta f).
+
+The machine-readable source-derived adapter contract is [adept-output-adapter-v0.1.json](../../benchmarks/plasma/references/adept-output-adapter-v0.1.json). It records the exact source files/blobs, dimensions, reconstruction steps, normalization caveats, mandatory known-answer tests, and fields for the future canonical Symthaea adapter.
+
+This is deliberately a **contract, not an implemented importer**. The actual output engine, complex NetCDF encoding, saved-file set and metadata must be captured from an executed pinned ADEPT run before automated ingestion is enabled. The 384-point velocity grid used by the visualization helper is a plotting choice, not an approved diagnostic quadrature.
