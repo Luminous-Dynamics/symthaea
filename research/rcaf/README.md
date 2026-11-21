@@ -67,3 +67,15 @@ The validator never promotes a synthetic fixture to biological evidence. It also
 - Rust 1.96 formatting, all kernel tests and strict Clippy.
 
 This workflow does not add the standalone crate to the root Cargo workspace or alter production CI. A workflow run is evidence only for the exact commit it checks; skipped, queued or absent runs are not passes.
+
+
+## Exact sign-test power calculator
+
+`tools/sign_test_power.py` computes the two-sided exact-binomial power of the participant sign test and can regenerate the machine-readable power grid:
+
+```sh
+python research/rcaf/tools/sign_test_power.py \
+  --output docs/neuroscience/RCAF_SIGN_TEST_POWER_V0.json
+```
+
+It is a design aid for non-tied independent participant pairs; it does not power the median-gap confidence interval or a hierarchical repeated-measures model. The unit tests verify the reported N=23 and minimum-N examples.
