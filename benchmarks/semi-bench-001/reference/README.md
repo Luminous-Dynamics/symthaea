@@ -60,3 +60,10 @@ Passing these tests establishes only that this reference implementation reproduc
 The separate helper `python/semi_threshold_policy_reference.py` selects the highest validation recall subject to a declared precision floor, with equal-score thresholds grouped. It then applies the chosen threshold once to a disjoint test subject. Validation/test identity overlap is rejected. If no threshold satisfies the floor, the specified fallback is reported rather than silently choosing one.
 
 The synthetic 10-validation / 10-test known-answer case is frozen in `fixtures/validation-threshold-known-answer-v1.json` and `fixtures/validation-threshold-known-answer-v1.expected.json`. Its 3 tests bring this reference suite to 14 tests in total. The tiny fixture demonstrates semantics only; it says nothing about real threshold reliability on rare-failure datasets.
+
+
+## Leakage-resistant split-manifest validator
+
+The independent helper `python/semi_split_manifest_reference.py` validates a frozen split assignment without reading or distributing raw dataset rows. It supports three explicitly distinct policies: `group_disjoint`, `forward_time`, and `stratified_sample`. It rejects duplicate sample identities, empty splits, cross-split group reuse, non-chronological/overlapping time windows, timezone-free timestamps and malformed dataset digests. It emits a deterministic SHA-256 identity for the sorted assignment set and states which independence claims are—and are not—established.
+
+The synthetic group-disjoint known-answer input/output are `fixtures/split-manifest-known-answer-v1.json` and `fixtures/split-manifest-known-answer-v1.expected.json`. Seven tests cover known-answer stability and adversarial leakage controls. Combined with the binary-metrics and threshold-policy suites, the reference suite now contains **21 tests**.
