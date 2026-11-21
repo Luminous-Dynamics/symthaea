@@ -920,22 +920,75 @@ mod tests {
     #[test]
     fn hdc_ltc_post_step_norm_cap_is_reportable() {
         let memory = prepare_memory(256, 4, 23);
-        assert!(memory.bundle.norm() > 5.0);
+        let initial_norm = memory.bundle.norm();
+        assert!(initial_norm > 5.0);
 
+        // At the minimum accepted dt, state decay is negligible. The post-step
+        // norm limit must therefore be the operation that bounds the state.
         let outcome = evolve_state(
             256,
             &memory.bundle,
             23,
-            0.1,
+            NEURON_MIN_DT_SECONDS as f64,
             1,
             "regular",
             "hdc_ltc_zero_input",
         )
-        .expect("one valid positive interval should evolve");
+        .expect("one minimum positive interval should evolve");
 
         assert_eq!(outcome.api_update_count, 1);
-        assert!((outcome.reported_logical_seconds - 0.1).abs() < 1.0e-6);
-        assert!(outcome.state.norm() <= 5.0 + 1.0e-5);
+        assert!(
+            (outcome.reported_logical_seconds - NEURON_MIN_DT_SECONDS as f64).abs() < 1.0e-15
+        );
+        assert!((outcome.state.norm() - 5.0).abs() < 1.0e-4);
+    }
+
+    #[test]
+    fn static_recall_and_both_negative_controls_behave_as_expected() {
+        const DIM: usize = 1_024;
+        const FAN_IN: usize = 8;
+        const SEEDS: u64 = 50;
+        let mut static_correct = 0usize;
+        let mut random_query_correct = 0usize;
+        let mut mispaired_original_correct = 0usize;
+        let total = SEEDS as usize * FAN_IN;
+
+        for seed in 0..SEEDS {
+            let memory = prepare_memory(DIM, FAN_IN, seed);
+            for query_index in 0..FAN_IN {
+                let expected_key = &memory.keys[query_index];
+
+                let static_scores = decode(&memory, &memory.bundle, query_index, expected_key);
+                static_correct += usize::from(static_scores.valid && static_scores.correct);
+
+                let random_scores = decode(
+                    &memory,
+                    &memory.bundle,
+                    query_index,
+                    &memory.random_query_keys[query_index],
+                );
+                random_query_correct +=
+                    usize::from(random_scores.valid && random_scores.correct);
+
+                let mispaired_scores =
+                    decode(&memory, &memory.mismatched_bundle, query_index, expected_key);
+                mispaired_original_correct +=
+                    usize::from(mispaired_scores.valid && mispaired_scores.correct);
+            }
+        }
+
+        // This deterministic fixture is a positive control, not a universal
+        // capacity claim. The random-query arm should be statistically near
+        // 1/FAN_IN; the deliberately wrong association should not recover
+        // the original semantic labels.
+        assert_eq!(static_correct, total);
+        let random_query_accuracy = random_query_correct as f64 / total as f64;
+        assert!(
+            (0.04..=0.22).contains(&random_query_accuracy),
+            "random-query accuracy {random_query_accuracy:.3} is not near chance {}",
+            1.0 / FAN_IN as f64
+        );
+        assert_eq!(mispaired_original_correct, 0);
     }
 
     #[test]
