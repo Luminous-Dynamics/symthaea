@@ -413,7 +413,10 @@ pub fn build_mycelial_presence(snapshot: &EmbodimentSnapshot) -> SceneNode {
     } else {
         0.96
     });
-    let base_color = Color::from_hsl(184.0, 0.82, 0.62);
+    // Preserve the signature teal identity while letting the current runtime
+    // activity tint the organism's branches in a restrained, coherent way.
+    let base_color =
+        Color::from_hsl(184.0, 0.82, 0.62).lerp(&activity_color, 0.18);
     for branch in 0..PRIMARY_BRANCHES {
         let angle = (branch as f32 / PRIMARY_BRANCHES as f32) * TAU - TAU / 4.0;
         add_branch(
