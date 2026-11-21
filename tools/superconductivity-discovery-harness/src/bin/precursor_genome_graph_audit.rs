@@ -1,5 +1,5 @@
 use jsonschema::validator_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -61,14 +61,19 @@ fn cohort_endpoint(status: CohortStatus, category: Option<&str>) -> Option<bool>
 }
 
 fn text_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value.get(key).and_then(Value::as_str).filter(|x| !x.trim().is_empty())
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|x| !x.trim().is_empty())
         .ok_or_else(|| format!("missing or empty string field {key}"))
 }
 fn optional_number(value: &Value, key: &str) -> Result<Option<f64>, String> {
     match value.get(key) {
         None | Some(Value::Null) => Ok(None),
         Some(item) => {
-            let number = item.as_f64().ok_or_else(|| format!("{key} must be numeric or null"))?;
+            let number = item
+                .as_f64()
+                .ok_or_else(|| format!("{key} must be numeric or null"))?;
             if !number.is_finite() {
                 return Err(format!("{key} must be finite"));
             }
@@ -105,7 +110,11 @@ fn category_label(category: &str) -> Option<bool> {
         _ => None,
     }
 }
-fn cohort_status(has_physical_failure: bool, quality_score: Option<u64>, category: Option<&str>) -> CohortStatus {
+fn cohort_status(
+    has_physical_failure: bool,
+    quality_score: Option<u64>,
+    category: Option<&str>,
+) -> CohortStatus {
     // Physical handling failure takes precedence; a failed specimen cannot
     // become an XRD-quality exclusion or a non-reactive label.
     if has_physical_failure {
@@ -122,42 +131,64 @@ fn cohort_status(has_physical_failure: bool, quality_score: Option<u64>, categor
 }
 fn quality_score(sample: &Value) -> Option<u64> {
     let active_scan_index = sample.get("active_scan_index")?.as_u64()? as usize;
-    let scans = sample.get("characterization")?.get("xrd")?.get("scans")?.as_array()?;
+    let scans = sample
+        .get("characterization")?
+        .get("xrd")?
+        .get("scans")?
+        .as_array()?;
     let scan = scans.get(active_scan_index)?;
     let active_case_index = scan.get("active_case_index")?.as_u64()? as usize;
     let refinements = scan.get("refinement_cases")?.as_array()?;
     let refinement = refinements.get(active_case_index)?;
-    refinement.get("verification")?.get("human_quality_score")?.as_u64()
+    refinement
+        .get("verification")?
+        .get("human_quality_score")?
+        .as_u64()
 }
 fn parse_sample(value: &Value) -> Result<ParsedSample, String> {
     let sample_id = text_field(value, "sample_id")?.to_owned();
-    let precursors = value.get("precursors").and_then(Value::as_array)
+    let precursors = value
+        .get("precursors")
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("sample {sample_id} has no precursor array"))?;
     if precursors.len() != 2 {
-        return Err(format!("sample {sample_id} must have exactly two precursors"));
+        return Err(format!(
+            "sample {sample_id} must have exactly two precursors"
+        ));
     }
     let formula = |precursor: &Value| -> Result<String, String> {
-        let cleaned = precursor.get("formula_clean").and_then(Value::as_str)
+        let cleaned = precursor
+            .get("formula_clean")
+            .and_then(Value::as_str)
             .filter(|x| !x.trim().is_empty());
-        let fallback = precursor.get("formula").and_then(Value::as_str)
+        let fallback = precursor
+            .get("formula")
+            .and_then(Value::as_str)
             .filter(|x| !x.trim().is_empty());
-        cleaned.or(fallback).map(str::to_owned)
-            .ok_or_else(|| format!("sample {sample_id} precursor missing formula and formula_clean"))
+        cleaned.or(fallback).map(str::to_owned).ok_or_else(|| {
+            format!("sample {sample_id} precursor missing formula and formula_clean")
+        })
     };
     let first = formula(&precursors[0])?;
     let second = formula(&precursors[1])?;
     let pair = canonical_pair(&first, &second)?;
-    let category = value.get("outcome").and_then(|x| x.get("reaction_category"))
-        .and_then(Value::as_str).map(str::to_owned);
-    let has_physical_failure = value.get("physical_failure")
-        .is_some_and(|x| !x.is_null());
+    let category = value
+        .get("outcome")
+        .and_then(|x| x.get("reaction_category"))
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let has_physical_failure = value.get("physical_failure").is_some_and(|x| !x.is_null());
     let quality_score = quality_score(value);
     if quality_score.is_some_and(|x| !(1..=3).contains(&x)) {
-        return Err(format!("sample {sample_id} has an out-of-contract XRD quality score"));
+        return Err(format!(
+            "sample {sample_id} has an out-of-contract XRD quality score"
+        ));
     }
-    let dwell_temperature_c = value.get("synthesis")
+    let dwell_temperature_c = value
+        .get("synthesis")
         .map(|synthesis| optional_number(synthesis, "heating_temperature"))
-        .transpose()?.flatten();
+        .transpose()?
+        .flatten();
     Ok(ParsedSample {
         sample_id,
         pair,
@@ -175,8 +206,7 @@ fn validate_complete_graph(
     if nodes.len() < 2 {
         return Err("pair graph must contain at least two precursor nodes".to_owned());
     }
-    let mut degree: BTreeMap<String, u64> = nodes.iter()
-        .map(|node| (node.clone(), 0)).collect();
+    let mut degree: BTreeMap<String, u64> = nodes.iter().map(|node| (node.clone(), 0)).collect();
     for (left, right) in observed_edges {
         if left >= right {
             return Err(format!("edge is not in canonical order: {left} / {right}"));
@@ -191,7 +221,8 @@ fn validate_complete_graph(
     if observed_edges.len() != expected_edges {
         return Err(format!(
             "complete graph requires {expected_edges} edges for {} precursors, found {}",
-            nodes.len(), observed_edges.len()
+            nodes.len(),
+            observed_edges.len()
         ));
     }
     for (index, left) in nodes.iter().enumerate() {
@@ -201,7 +232,10 @@ fn validate_complete_graph(
             }
         }
     }
-    if let Some((node, count)) = degree.iter().find(|(_, count)| **count != expected_degree as u64) {
+    if let Some((node, count)) = degree
+        .iter()
+        .find(|(_, count)| **count != expected_degree as u64)
+    {
         return Err(format!(
             "precursor {node} degree is {count}; expected {expected_degree}"
         ));
@@ -215,29 +249,44 @@ fn verify_source_manifest(source: &Value) -> Result<(), String> {
         return Err("manifest source commit/blob differs from the code-pinned release".to_owned());
     }
     if text_field(source, "raw_url")? != SOURCE_RAW_URL {
-        return Err("manifest source raw_url differs from the code-pinned immutable download".to_owned());
+        return Err(
+            "manifest source raw_url differs from the code-pinned immutable download".to_owned(),
+        );
     }
     if text_field(source, "license")? != SOURCE_LICENSE
         || text_field(source, "license_url")? != SOURCE_LICENSE_URL
     {
-        return Err("manifest licence metadata differs from the pinned Precursor Genome release".to_owned());
+        return Err(
+            "manifest licence metadata differs from the pinned Precursor Genome release".to_owned(),
+        );
     }
     Ok(())
 }
 fn expected_u64(manifest: &Value, field: &str) -> Result<u64, String> {
-    manifest.get("expected").and_then(|x| x.get(field)).and_then(Value::as_u64)
+    manifest
+        .get("expected")
+        .and_then(|x| x.get(field))
+        .and_then(Value::as_u64)
         .ok_or_else(|| format!("manifest expected.{field} must be an unsigned integer"))
 }
-fn expected_category_counts(manifest: &Value, group: &str) -> Result<BTreeMap<String, u64>, String> {
-    let object = manifest.get("expected").and_then(|x| x.get(group))
+fn expected_category_counts(
+    manifest: &Value,
+    group: &str,
+) -> Result<BTreeMap<String, u64>, String> {
+    let object = manifest
+        .get("expected")
+        .and_then(|x| x.get(group))
         .and_then(Value::as_object)
         .ok_or_else(|| format!("manifest expected.{group} must be an object"))?;
-    object.iter().map(|(key, value)| {
-        let count = value.as_u64().ok_or_else(|| {
-            format!("manifest expected.{group}.{key} must be an unsigned integer")
-        })?;
-        Ok((key.clone(), count))
-    }).collect()
+    object
+        .iter()
+        .map(|(key, value)| {
+            let count = value.as_u64().ok_or_else(|| {
+                format!("manifest expected.{group}.{key} must be an unsigned integer")
+            })?;
+            Ok((key.clone(), count))
+        })
+        .collect()
 }
 fn count_map_json(map: &BTreeMap<String, u64>) -> Value {
     let mut output = serde_json::Map::new();
@@ -255,8 +304,8 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("manifest schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema)
-        .map_err(|e| format!("manifest schema compilation failed: {e}"))?;
+    let validator =
+        validator_for(&schema).map_err(|e| format!("manifest schema compilation failed: {e}"))?;
     if let Some(error) = validator.iter_errors(&manifest).next() {
         return Err(format!(
             "precursor graph manifest validation failed: {error} at {}",
@@ -278,7 +327,9 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
     }
     let ledger: Value = serde_json::from_slice(ledger_bytes)
         .map_err(|e| format!("source ledger JSON parse failed: {e}"))?;
-    let rows = ledger.get("samples").and_then(Value::as_array)
+    let rows = ledger
+        .get("samples")
+        .and_then(Value::as_array)
         .ok_or("source ledger.samples must be an array")?;
     let sample_count = expected_u64(&manifest, "sample_count")?;
     if rows.len() as u64 != sample_count {
@@ -317,7 +368,10 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         ));
     }
     if edges.len() as u64 != edge_count {
-        return Err(format!("edge count mismatch: expected {edge_count}, found {}", edges.len()));
+        return Err(format!(
+            "edge count mismatch: expected {edge_count}, found {}",
+            edges.len()
+        ));
     }
     let raw_degrees = validate_complete_graph(&nodes, &edges, expected_degree)?;
 
@@ -326,8 +380,10 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
     let mut exclusion_counts = BTreeMap::<String, u64>::new();
     let mut quality_counts = BTreeMap::<String, u64>::new();
     let mut dwell_counts = BTreeMap::<String, u64>::new();
-    let mut node_counts: BTreeMap<String, NodeCounts> = nodes.iter()
-        .map(|node| (node.clone(), NodeCounts::default())).collect();
+    let mut node_counts: BTreeMap<String, NodeCounts> = nodes
+        .iter()
+        .map(|node| (node.clone(), NodeCounts::default()))
+        .collect();
     let mut analyzable_count = 0_u64;
     let mut positive_count = 0_u64;
     let mut negative_count = 0_u64;
@@ -337,7 +393,11 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
     let mut poor_refinement_exclusions = 0_u64;
 
     for sample in &parsed_samples {
-        let category_key = sample.category.as_deref().unwrap_or("unclassified").to_owned();
+        let category_key = sample
+            .category
+            .as_deref()
+            .unwrap_or("unclassified")
+            .to_owned();
         *raw_category_counts.entry(category_key).or_default() += 1;
         if let Some(score) = sample.quality_score {
             *quality_counts.entry(score.to_string()).or_default() += 1;
@@ -349,7 +409,9 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
             sample.quality_score,
             sample.category.as_deref(),
         );
-        *exclusion_counts.entry(status.as_str().to_owned()).or_default() += 1;
+        *exclusion_counts
+            .entry(status.as_str().to_owned())
+            .or_default() += 1;
 
         match status {
             CohortStatus::PhysicalFailure => {
@@ -368,9 +430,14 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
             }
             CohortStatus::Analyzable => {}
         }
-        let category = sample.category.as_deref().expect("analyzable sample has a category");
+        let category = sample
+            .category
+            .as_deref()
+            .expect("analyzable sample has a category");
         let positive = category_label(category).expect("analyzable category has a label");
-        *analyzable_category_counts.entry(category.to_owned()).or_default() += 1;
+        *analyzable_category_counts
+            .entry(category.to_owned())
+            .or_default() += 1;
         analyzable_count += 1;
         if positive {
             positive_count += 1;
@@ -378,7 +445,9 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
             negative_count += 1;
         }
         for node in [&sample.pair.0, &sample.pair.1] {
-            let counts = node_counts.get_mut(node).expect("node collected from this sample");
+            let counts = node_counts
+                .get_mut(node)
+                .expect("node collected from this sample");
             counts.analyzable_pairs += 1;
             if positive {
                 counts.positive_pairs += 1;
@@ -432,7 +501,8 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         ));
     }
     let expected_raw = expected_category_counts(&manifest, "raw_category_counts")?;
-    let expected_analyzable_categories = expected_category_counts(&manifest, "analyzable_category_counts")?;
+    let expected_analyzable_categories =
+        expected_category_counts(&manifest, "analyzable_category_counts")?;
     if raw_category_counts != expected_raw {
         return Err(format!(
             "raw outcome category counts differ from pinned cohort: expected {:?}, received {:?}",
@@ -533,15 +603,26 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         })
     }).collect();
 
-    let mut precursor_rates: Vec<f64> = node_counts.values()
+    let mut precursor_rates: Vec<f64> = node_counts
+        .values()
         .filter(|counts| counts.analyzable_pairs > 0)
         .map(|counts| counts.positive_pairs as f64 / counts.analyzable_pairs as f64)
         .collect();
     precursor_rates.sort_by(f64::total_cmp);
-    let precursor_eligible_degrees: Vec<u64> = node_counts.values()
-        .map(|counts| counts.analyzable_pairs).collect();
-    let minimum_eligible_degree = precursor_eligible_degrees.iter().copied().min().unwrap_or(0);
-    let maximum_eligible_degree = precursor_eligible_degrees.iter().copied().max().unwrap_or(0);
+    let precursor_eligible_degrees: Vec<u64> = node_counts
+        .values()
+        .map(|counts| counts.analyzable_pairs)
+        .collect();
+    let minimum_eligible_degree = precursor_eligible_degrees
+        .iter()
+        .copied()
+        .min()
+        .unwrap_or(0);
+    let maximum_eligible_degree = precursor_eligible_degrees
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(0);
     let mean_eligible_degree = precursor_eligible_degrees.iter().sum::<u64>() as f64
         / precursor_eligible_degrees.len().max(1) as f64;
     let precursor_rate_summary = json!({
@@ -557,24 +638,27 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
         "interpretation": "Descriptive node-level outcome fractions only; not out-of-sample precursor propensity estimates."
     });
 
-    let per_precursor: Vec<Value> = node_counts.iter().map(|(formula, counts)| {
-        json!({
-            "precursor_formula": formula,
-            "raw_pair_degree": counts.raw_pairs,
-            "analyzable_pair_degree": counts.analyzable_pairs,
-            "positive_pairs": counts.positive_pairs,
-            "negative_pairs": counts.negative_pairs,
-            "cross_precursor_product_fraction": if counts.analyzable_pairs > 0 {
-                Some(counts.positive_pairs as f64 / counts.analyzable_pairs as f64)
-            } else { None },
-            "category_counts": {
-                "transformed": counts.transformed_pairs,
-                "unreacted": counts.unreacted_pairs,
-                "completely_reacted": counts.completely_reacted_pairs,
-                "partially_reacted": counts.partially_reacted_pairs
-            }
+    let per_precursor: Vec<Value> = node_counts
+        .iter()
+        .map(|(formula, counts)| {
+            json!({
+                "precursor_formula": formula,
+                "raw_pair_degree": counts.raw_pairs,
+                "analyzable_pair_degree": counts.analyzable_pairs,
+                "positive_pairs": counts.positive_pairs,
+                "negative_pairs": counts.negative_pairs,
+                "cross_precursor_product_fraction": if counts.analyzable_pairs > 0 {
+                    Some(counts.positive_pairs as f64 / counts.analyzable_pairs as f64)
+                } else { None },
+                "category_counts": {
+                    "transformed": counts.transformed_pairs,
+                    "unreacted": counts.unreacted_pairs,
+                    "completely_reacted": counts.completely_reacted_pairs,
+                    "partially_reacted": counts.partially_reacted_pairs
+                }
+            })
         })
-    }).collect();
+        .collect();
 
     let precursor_names: Vec<String> = nodes.iter().cloned().collect();
     let node_count = precursor_names.len();
@@ -582,16 +666,19 @@ fn audit(schema_bytes: &[u8], manifest_bytes: &[u8], ledger_bytes: &[u8]) -> Res
     let lopo_test_edges = node_count - 1;
     let double_node_train_edges = (node_count - 2) * (node_count - 3) / 2;
     let double_node_test_edges = 2 * (node_count - 2) + 1;
-    let leave_one_precursor_out_folds: Vec<Value> = precursor_names.iter().map(|held| {
-        json!({
-            "fold_id": format!("leave_one_precursor_out__{held}"),
-            "held_precursor": held,
-            "training_node_count": node_count - 1,
-            "training_edge_count": lopo_train_edges,
-            "test_edge_count": lopo_test_edges,
-            "test_edge_predicate": "canonical_pair contains held_precursor"
+    let leave_one_precursor_out_folds: Vec<Value> = precursor_names
+        .iter()
+        .map(|held| {
+            json!({
+                "fold_id": format!("leave_one_precursor_out__{held}"),
+                "held_precursor": held,
+                "training_node_count": node_count - 1,
+                "training_edge_count": lopo_train_edges,
+                "test_edge_count": lopo_test_edges,
+                "test_edge_predicate": "canonical_pair contains held_precursor"
+            })
         })
-    }).collect();
+        .collect();
     let mut double_node_holdout_folds = Vec::with_capacity(node_count * (node_count - 1) / 2);
     for (index, left) in precursor_names.iter().enumerate() {
         for right in precursor_names.iter().skip(index + 1) {
@@ -729,17 +816,22 @@ fn main() {
         }
     }
     let (Some(manifest_path), Some(schema_path), Some(ledger_path)) =
-        (manifest_path, schema_path, ledger_path) else {
+        (manifest_path, schema_path, ledger_path)
+    else {
         usage(&args[0]);
         process::exit(2);
     };
-    let receipt = audit(&read(&schema_path), &read(&manifest_path), &read(&ledger_path))
-        .unwrap_or_else(|error| {
-            eprintln!("SC-PRECURSOR-GENOME-GRAPH-FAIL: {error}");
-            process::exit(1);
-        });
-    let rendered = serde_json::to_string_pretty(&receipt)
-        .expect("JSON receipt serialization cannot fail");
+    let receipt = audit(
+        &read(&schema_path),
+        &read(&manifest_path),
+        &read(&ledger_path),
+    )
+    .unwrap_or_else(|error| {
+        eprintln!("SC-PRECURSOR-GENOME-GRAPH-FAIL: {error}");
+        process::exit(1);
+    });
+    let rendered =
+        serde_json::to_string_pretty(&receipt).expect("JSON receipt serialization cannot fail");
     if let Some(path) = output_path {
         if let Err(error) = fs::write(&path, format!("{rendered}\n")) {
             eprintln!("could not write {}: {error}", path.display());
@@ -767,15 +859,27 @@ mod tests {
 
         let mut changed_url = source.clone();
         changed_url["raw_url"] = json!("https://example.invalid/ledger.json");
-        assert!(verify_source_manifest(&changed_url).unwrap_err().contains("raw_url"));
+        assert!(
+            verify_source_manifest(&changed_url)
+                .unwrap_err()
+                .contains("raw_url")
+        );
 
         let mut changed_license = source.clone();
         changed_license["license"] = json!("UNLICENSED");
-        assert!(verify_source_manifest(&changed_license).unwrap_err().contains("licence"));
+        assert!(
+            verify_source_manifest(&changed_license)
+                .unwrap_err()
+                .contains("licence")
+        );
 
         let mut changed_commit = source.clone();
         changed_commit["commit"] = json!("0000000000000000000000000000000000000000");
-        assert!(verify_source_manifest(&changed_commit).unwrap_err().contains("commit/blob"));
+        assert!(
+            verify_source_manifest(&changed_commit)
+                .unwrap_err()
+                .contains("commit/blob")
+        );
     }
 
     #[test]
@@ -787,8 +891,14 @@ mod tests {
     }
     #[test]
     fn unordered_pair_canonicalization_is_symmetric() {
-        assert_eq!(canonical_pair("A", "B").unwrap(), canonical_pair("B", "A").unwrap());
-        assert_eq!(canonical_pair("A", "B").unwrap(), ("A".to_owned(), "B".to_owned()));
+        assert_eq!(
+            canonical_pair("A", "B").unwrap(),
+            canonical_pair("B", "A").unwrap()
+        );
+        assert_eq!(
+            canonical_pair("A", "B").unwrap(),
+            ("A".to_owned(), "B".to_owned())
+        );
     }
     #[test]
     fn self_pair_is_rejected() {
@@ -797,12 +907,15 @@ mod tests {
     #[test]
     fn complete_three_node_graph_has_degree_two() {
         let nodes = ["A".to_owned(), "B".to_owned(), "C".to_owned()]
-            .into_iter().collect::<BTreeSet<_>>();
+            .into_iter()
+            .collect::<BTreeSet<_>>();
         let edges = [
             ("A".to_owned(), "B".to_owned()),
             ("A".to_owned(), "C".to_owned()),
             ("B".to_owned(), "C".to_owned()),
-        ].into_iter().collect::<HashSet<_>>();
+        ]
+        .into_iter()
+        .collect::<HashSet<_>>();
         let degrees = validate_complete_graph(&nodes, &edges, 2).unwrap();
         assert_eq!(degrees.get("A"), Some(&2));
         assert_eq!(degrees.get("B"), Some(&2));
@@ -811,12 +924,19 @@ mod tests {
     #[test]
     fn incomplete_graph_is_rejected() {
         let nodes = ["A".to_owned(), "B".to_owned(), "C".to_owned()]
-            .into_iter().collect::<BTreeSet<_>>();
+            .into_iter()
+            .collect::<BTreeSet<_>>();
         let edges = [
             ("A".to_owned(), "B".to_owned()),
             ("A".to_owned(), "C".to_owned()),
-        ].into_iter().collect::<HashSet<_>>();
-        assert!(validate_complete_graph(&nodes, &edges, 2).unwrap_err().contains("requires 3 edges"));
+        ]
+        .into_iter()
+        .collect::<HashSet<_>>();
+        assert!(
+            validate_complete_graph(&nodes, &edges, 2)
+                .unwrap_err()
+                .contains("requires 3 edges")
+        );
     }
     #[test]
     fn product_endpoint_preserves_transformed_as_negative_subtype() {
