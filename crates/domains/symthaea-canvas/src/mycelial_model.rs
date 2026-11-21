@@ -40,23 +40,23 @@ pub struct SpatialPoint3 {
 impl SpatialPoint3 {
     pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
 
-    fn add(self, other: Self) -> Self {
+    pub(crate) fn add(self, other: Self) -> Self {
         Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
     }
 
-    fn sub(self, other: Self) -> Self {
+    pub(crate) fn sub(self, other: Self) -> Self {
         Self { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
     }
 
-    fn scale(self, factor: f32) -> Self {
+    pub(crate) fn scale(self, factor: f32) -> Self {
         Self { x: self.x * factor, y: self.y * factor, z: self.z * factor }
     }
 
-    fn dot(self, other: Self) -> f32 {
+    pub(crate) fn dot(self, other: Self) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
-    fn cross(self, other: Self) -> Self {
+    pub(crate) fn cross(self, other: Self) -> Self {
         Self {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
@@ -64,11 +64,11 @@ impl SpatialPoint3 {
         }
     }
 
-    fn length(self) -> f32 {
+    pub(crate) fn length(self) -> f32 {
         self.dot(self).sqrt()
     }
 
-    fn normalized(self) -> Self {
+    pub(crate) fn normalized(self) -> Self {
         let length = self.length();
         if length.is_finite() && length > 1.0e-6 {
             self.scale(1.0 / length)
@@ -244,7 +244,7 @@ fn append_filament(
         .add(lateral.scale(0.88));
 
     let id = *next_id;
-    *next_id = next_id.wrapping_add(1);
+    *next_id = (*next_id).wrapping_add(1);
     let radius_start = 2.8 * 0.66f32.powi(generation as i32);
     output.push(MycelialFilament {
         id,
