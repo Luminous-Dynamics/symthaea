@@ -14,8 +14,8 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    AnastomosisKind, EmbodimentSnapshot, MycelialNetworkConfig, PresenceMode,
-    build_mycelial_model, build_mycelial_network_graph, detect_anastomosis_candidates,
+    AnastomosisKind, EmbodimentSnapshot, MycelialNetworkConfig, PresenceMode, build_mycelial_model,
+    build_mycelial_network_graph, detect_anastomosis_candidates,
 };
 
 const WARMUP_RUNS: usize = 5;
@@ -77,7 +77,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("tree_edges: {}", baseline_metrics.parent_branch_count);
         println!("components: {}", baseline_metrics.connected_components);
         println!("cycle_rank: {}", baseline_metrics.cycle_rank);
-        println!("articulation_filaments: {}", baseline_metrics.articulation_filament_count);
+        println!(
+            "articulation_filaments: {}",
+            baseline_metrics.articulation_filament_count
+        );
         println!(
             "max_components_after_single_filament_failure: {}",
             baseline_metrics.max_components_after_single_filament_failure
@@ -102,6 +105,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("platform_os: {}", std::env::consts::OS);
     println!("platform_arch: {}", std::env::consts::ARCH);
-    println!("benchmark_scope: CPU network topology and candidate search only; no GPU/render/biology claims");
+    println!(
+        "benchmark_scope: CPU network topology and candidate search only; no GPU/render/biology claims"
+    );
     Ok(())
 }
