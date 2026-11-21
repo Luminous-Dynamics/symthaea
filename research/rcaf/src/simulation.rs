@@ -671,6 +671,23 @@ mod tests {
     }
 
     #[test]
+    fn null_calibration_survives_stronger_temporal_dependence() {
+        let mut config = test_config();
+        config.temporal_autocorrelation = 0.65;
+        let result = run_injection_recovery(&config).unwrap();
+        assert!(
+            result.null_false_positive_rate.estimate <= 0.15,
+            "AR(1) null rejection rate {}",
+            result.null_false_positive_rate.estimate
+        );
+        assert!(
+            result.median_null_paired_gap.abs() < 0.04,
+            "AR(1) median null gap {}",
+            result.median_null_paired_gap
+        );
+    }
+
+    #[test]
     fn dose_response_sweep_uses_sorted_effect_sizes_and_increases_at_strong_endpoint() {
         let mut config = test_config();
         config.monte_carlo_replicates = 30;
