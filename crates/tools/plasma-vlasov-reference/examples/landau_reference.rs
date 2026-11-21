@@ -20,14 +20,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let steps = 200;
 
     println!(
-        "step,time,electric_mode_real,electric_mode_imag,electric_mode_amplitude,electric_mode_phase,mass,momentum,total_energy,poisson_residual,velocity_boundary_ratio"
+        "step,time,electric_mode_real,electric_mode_imag,electric_mode_amplitude,electric_mode_phase,mass,momentum,total_energy,poisson_residual,velocity_boundary_ratio,x_high_tail_fraction,v_high_tail_fraction,x_nyquist_fraction,v_nyquist_fraction"
     );
     for step in 0..=steps {
         if step % 10 == 0 {
             let d = solver.diagnostics()?;
             let coefficient = solver.electric_mode_coefficient(mode)?;
+            let tails = solver.spectral_tail_diagnostics(0.75)?;
             println!(
-                "{},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+                "{},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
                 step,
                 d.time,
                 coefficient.real,
@@ -38,7 +39,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 d.momentum,
                 d.total_energy,
                 d.max_poisson_residual,
-                d.velocity_boundary_ratio
+                d.velocity_boundary_ratio,
+                tails.x.high_frequency_fraction,
+                tails.velocity.high_frequency_fraction,
+                tails.x.nyquist_energy_fraction,
+                tails.velocity.nyquist_energy_fraction
             );
         }
         if step < steps {
