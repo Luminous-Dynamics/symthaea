@@ -3,20 +3,27 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! LTC Temporal Failure Prediction
 //!
-//! Extrapolates system telemetry forward in time using the O(1) LTC closed-form
-//! solver. Predicts disk exhaustion, memory pressure, store bloat, and error
-//! rate acceleration across multiple time horizons (1h, 6h, 24h, 7d).
+//! Extrapolates system telemetry using budgeted iterative LTC evolution for
+//! short horizons and an explicit O(D) CfC-style one-jump approximation for
+//! longer horizons. Predicts disk exhaustion, memory pressure, store bloat, and
+//! error-rate acceleration across 1h, 6h, 24h and 7d horizons.
 //!
 //! Key insight: encode telemetry as HDC vector → feed to LTC neuron →
-//! `evolve_closed_form(dt, input_hv)` → decode predicted values → check thresholds.
+//! bounded LTC evolution / explicit long-horizon approximation → decode → thresholds.
 
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
+use symthaea_core::hdc::hdc_ltc_unified::{
+    HdcLtcUnifiedNeuron, IterativeEvolutionError, UnifiedConfig,
+};
 
 use crate::encoding::codebook::{NIX_HDC_DIM, NixCodebook};
+
+/// Maximum sub-steps spent on a predictive LTC horizon before selecting the
+/// explicit bounded single-jump approximation path.
+const MAX_PREDICTIVE_LTC_ITERATIVE_SUBSTEPS: usize = 256;
 
 /// System telemetry sample for prediction input.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -32,6 +39,24 @@ pub struct SystemTelemetry {
     #[serde(default)]
     pub swap_used_pct: f64,
 }
+
+/// Provenance of the dynamical path used for an LTC forecast.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LtcPredictionMode {
+    /// Full requested horizon integrated using the bounded nonlinear solver.
+    IterativeClosedForm,
+    /// One O(D) closed-form jump after the iterative work budget was exceeded.
+    /// This is a directional approximation, not a numerically integrated path.
+    SingleJumpApproximation,
+}
+
+/// LTC telemetry together with the evolution mode that produced it.
+#[derive(Debug, Clone)]
+pub struct LtcPrediction {
+    pub telemetry: SystemTelemetry,
+    pub mode: LtcPredictionMode,
+}
+
 
 /// A single telemetry sample with its timestamp for persistence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -227,26 +252,64 @@ impl PredictiveMonitor {
         }
     }
 
-    /// Use the LTC neuron's closed-form solver to predict future telemetry.
+    /// Predict future telemetry using a bounded LTC evolution policy.
     ///
-    /// Clones the neuron, evolves it forward by `hours_ahead` hours, then
-    /// decodes the resulting state vector back to telemetry values.
-    pub fn predict_ltc(&mut self, hours_ahead: f64) -> Option<SystemTelemetry> {
+    /// Horizons that fit within MAX_PREDICTIVE_LTC_ITERATIVE_SUBSTEPS use the
+    /// nonlinear iterative solver. Longer horizons explicitly fall back to one
+    /// O(D) CfC-style closed-form jump. That approximation is only used as a
+    /// directional confidence signal; it is not presented as RK4-quality
+    /// long-horizon trajectory integration.
+    pub fn predict_ltc_with_provenance(
+        &mut self,
+        hours_ahead: f64,
+    ) -> Option<LtcPrediction> {
+        if !hours_ahead.is_finite() || hours_ahead < 0.0 {
+            return None;
+        }
         if self.history.is_empty() {
             return None;
         }
 
-        // Clone the last telemetry to avoid borrow conflict
+        // Validate before narrowing f64 hours to f32 seconds.
+        let dt_seconds_f64 = hours_ahead * 3600.0;
+        if !dt_seconds_f64.is_finite() || dt_seconds_f64 > f64::from(f32::MAX) {
+            return None;
+        }
+        let dt_seconds = dt_seconds_f64 as f32;
+
+        // Clone the last telemetry to avoid borrow conflict.
         let last_entry = self.history.last()?;
         let last_telemetry = last_entry.2.clone();
         let last_input = self.encode_telemetry(&last_telemetry);
 
         let mut future_neuron = self.neuron.clone();
-        let dt_seconds = (hours_ahead * 3600.0) as f32;
-        future_neuron.evolve_closed_form_iterative(dt_seconds, &last_input);
+        let mode = match future_neuron.evolve_closed_form_iterative(
+            dt_seconds,
+            &last_input,
+            MAX_PREDICTIVE_LTC_ITERATIVE_SUBSTEPS,
+        ) {
+            Ok(()) => LtcPredictionMode::IterativeClosedForm,
+            Err(IterativeEvolutionError::WorkBudgetExceeded { .. }) => {
+                // Explicit long-horizon approximation policy. Never cap or
+                // truncate the iterative loop and imply a full integration.
+                future_neuron.evolve_closed_form(dt_seconds, &last_input);
+                LtcPredictionMode::SingleJumpApproximation
+            }
+            Err(_) => return None,
+        };
         let predicted_hv = future_neuron.state().clone();
 
-        Some(self.decode_telemetry(&predicted_hv))
+        Some(LtcPrediction {
+            telemetry: self.decode_telemetry(&predicted_hv),
+            mode,
+        })
+    }
+
+    /// Compatibility convenience API. Use predict_ltc_with_provenance when
+    /// downstream confidence or policy decisions depend on integration mode.
+    pub fn predict_ltc(&mut self, hours_ahead: f64) -> Option<SystemTelemetry> {
+        self.predict_ltc_with_provenance(hours_ahead)
+            .map(|prediction| prediction.telemetry)
     }
 
     /// Predict all metrics at a specific time horizon.
@@ -255,24 +318,32 @@ impl PredictiveMonitor {
     /// is available (>=10 samples), the LTC neuron is consulted for directional
     /// agreement — if LTC and trend agree, confidence is boosted.
     pub fn predict(&mut self, hours_ahead: f64) -> Vec<Prediction> {
+        if !hours_ahead.is_finite() || hours_ahead < 0.0 {
+            return Vec::new();
+        }
         let current = match self.history.last() {
             Some((_, _, t)) => t.clone(),
             None => return vec![],
         };
 
         let trend = self.compute_trend();
-        let ltc_pred = if self.history.len() >= 10 {
-            self.predict_ltc(hours_ahead)
+        let ltc_prediction = if self.history.len() >= 10 {
+            self.predict_ltc_with_provenance(hours_ahead)
         } else {
             None
         };
         let mut confidence = self.compute_confidence();
 
-        // If LTC and trend agree on direction, boost confidence
-        if let Some(ref ltc) = ltc_pred {
+        // Only a fully integrated iterative path earns the agreement bonus.
+        // The single-jump path is retained as a directional diagnostic but
+        // cannot increase confidence as though it were a validated trajectory.
+        if let Some(ref ltc) = ltc_prediction {
             let trend_disk_dir = trend.disk_used_pct.signum();
-            let ltc_disk_dir = (ltc.disk_used_pct - current.disk_used_pct).signum();
-            if trend_disk_dir == ltc_disk_dir {
+            let ltc_disk_dir =
+                (ltc.telemetry.disk_used_pct - current.disk_used_pct).signum();
+            if trend_disk_dir == ltc_disk_dir
+                && ltc.mode == LtcPredictionMode::IterativeClosedForm
+            {
                 confidence = (confidence * 1.15).min(1.0);
             }
         }
@@ -870,6 +941,52 @@ mod tests {
             "Blended prediction should be in valid range, got {}",
             disk_pred.predicted_value
         );
+    }
+
+    #[test]
+    fn test_ltc_prediction_rejects_invalid_horizons() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for _ in 0..5 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+        for horizon in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
+            assert!(monitor.predict_ltc(horizon).is_none());
+            assert!(monitor.predict(horizon).is_empty());
+        }
+    }
+
+    #[test]
+    fn test_ltc_prediction_uses_bounded_policy_for_week_horizon() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for _ in 0..5 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+        let prediction = monitor.predict_ltc_with_provenance(168.0);
+        assert!(prediction.is_some(), "week horizon uses a bounded mode");
+        let prediction = prediction.unwrap();
+        assert_eq!(prediction.mode, LtcPredictionMode::SingleJumpApproximation);
+        assert!(prediction.telemetry.disk_used_pct.is_finite());
+        assert!(prediction.telemetry.memory_used_pct.is_finite());
+    }
+
+    #[test]
+    fn test_ltc_prediction_keeps_24_hour_horizon_on_iterative_path() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for _ in 0..5 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+        let prediction = monitor.predict_ltc_with_provenance(24.0).unwrap();
+        assert_eq!(prediction.mode, LtcPredictionMode::IterativeClosedForm);
+        assert!(prediction.telemetry.disk_used_pct.is_finite());
+    }
+
+    #[test]
+    fn test_legacy_ltc_prediction_api_returns_telemetry() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for _ in 0..5 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+        assert!(monitor.predict_ltc(168.0).is_some());
     }
 
     #[test]

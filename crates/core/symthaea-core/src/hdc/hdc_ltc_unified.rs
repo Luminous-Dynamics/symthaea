@@ -144,6 +144,39 @@ pub enum UnifiedActivation {
     BoundedTanh { scale: f32 },
 }
 
+/// Failure reasons for budgeted nonlinear HDC-LTC evolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IterativeEvolutionError {
+    InvalidDuration,
+    InvalidBaseTimeConstant,
+    InvalidDynamicsConfiguration,
+    InvalidWorkBudget,
+    InvalidEvolutionClock,
+    DimensionMismatch {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteVector {
+        field: &'static str,
+    },
+    InvalidEffectiveTimeConstant,
+    NonFiniteResult,
+    UpdateCounterOverflow,
+    WorkBudgetExceeded {
+        required_steps: u128,
+        max_steps: usize,
+    },
+}
+
+impl std::fmt::Display for IterativeEvolutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for IterativeEvolutionError {}
+
 impl UnifiedActivation {
     /// Apply activation element-wise to a hypervector
     #[inline]
@@ -645,21 +678,31 @@ impl HdcLtcUnifiedNeuron {
     /// When Fourier basis is configured, it is bundled in as a third component.
     #[inline]
     fn compute_equilibrium(&self, input: &ContinuousHV) -> ContinuousHV {
+        self.compute_equilibrium_for_state(&self.state, input)
+    }
+
+    /// Compute equilibrium for an explicit state. The iterative solver uses a
+    /// private working state so a validation/runtime error cannot partially
+    /// mutate the neuron before the complete horizon is accepted.
+    fn compute_equilibrium_for_state(
+        &self,
+        state: &ContinuousHV,
+        input: &ContinuousHV,
+    ) -> ContinuousHV {
         // HDC binding: W⊗x (state transformation via binding, not matrix mul)
-        let transformed_state = self.weight_hv.bind(&self.state);
+        let transformed_state = self.weight_hv.bind(state);
 
         // HDC binding: U⊗u (input transformation)
         let masked_input = self.input_mask.bind(input);
 
         // HDC bundling: combine state and input contributions
-        // If Fourier basis exists, bundle as third component
+        // If Fourier basis exists, bundle it as a third component.
         let combined = if let Some(ref fourier) = self.compute_fourier_basis() {
             ContinuousHV::bundle(&[&transformed_state, &masked_input, fourier])
         } else {
             ContinuousHV::bundle(&[&transformed_state, &masked_input])
         };
 
-        // Apply activation function
         self.config.activation.apply(&combined)
     }
 
@@ -668,7 +711,11 @@ impl HdcLtcUnifiedNeuron {
     /// Time constant adapts to both state complexity and input
     #[inline]
     fn compute_tau(&self, input: &ContinuousHV) -> f32 {
-        let state_norm = self.state.norm();
+        self.compute_tau_for_state(&self.state, input)
+    }
+
+    fn compute_tau_for_state(&self, state: &ContinuousHV, input: &ContinuousHV) -> f32 {
+        let state_norm = state.norm();
 
         // Input-dependent adjustment via similarity with tau_modulator
         let input_adjustment = input.similarity(&self.tau_modulator);
@@ -678,7 +725,6 @@ impl HdcLtcUnifiedNeuron {
             * (1.0 + self.config.backbone_tau * state_norm)
             * (1.0 + 0.2 * input_adjustment);
 
-        // Clamp to reasonable range
         tau.clamp(0.01, 10.0)
     }
 
@@ -1059,49 +1105,150 @@ impl HdcLtcUnifiedNeuron {
         self.update_stats(dt);
     }
 
-    /// **ITERATIVE CLOSED-FORM EVOLUTION** - Handles nonlinear equilibrium
+    /// **BOUNDED ITERATIVE CLOSED-FORM EVOLUTION** - Handles nonlinear equilibrium.
     ///
-    /// For accurate closed-form evolution of the nonlinear ODE where x_∞ depends on x,
-    /// this method uses sub-stepping to recompute equilibrium periodically.
+    /// This recomputes the state-dependent equilibrium at each sub-step. Work is
+    /// O(D × substeps), so callers must supply an explicit maximum substep count.
+    /// The tau/10 step-size heuristic is not a universal numerical-error bound;
+    /// accuracy must be measured against a fine-step reference for the workload.
     ///
-    /// ## Strategy
+    /// Invalid or over-budget requests are rejected before neuron state, clock,
+    /// or running statistics are mutated. The solver evolves a private working
+    /// state and commits it only after every sub-step remains numerically valid.
     ///
-    /// 1. Split large dt into smaller sub-steps (at most tau/10 per step)
-    /// 2. Apply closed-form exponential decay for each sub-step
-    /// 3. Recompute equilibrium after each sub-step
-    ///
-    /// This achieves O(dt/tau) complexity instead of O(1) but provides accuracy
-    /// comparable to RK4 integration.
-    ///
-    /// ## Parameters
-    ///
-    /// - `dt`: Total time to evolve
-    /// - `input`: Input hypervector (assumed constant during evolution)
-    pub fn evolve_closed_form_iterative(&mut self, dt: f32, input: &ContinuousHV) {
-        // Determine sub-step size based on tau
-        // Using tau/10 gives high accuracy for the nonlinear dynamics (<1% error)
-        let base_tau = self.config.tau_base;
-        let max_substep = base_tau / 10.0;
-
-        // Calculate number of sub-steps needed
-        let n_steps = ((dt / max_substep).ceil() as usize).max(1);
-        let sub_dt = dt / n_steps as f32;
-
-        // Apply closed-form evolution iteratively
-        for _ in 0..n_steps {
-            // Recompute equilibrium at current state
-            let x_inf = self.compute_equilibrium(input);
-            let tau = self.compute_tau(input);
-
-            // Apply exponential decay (clamped to prevent f32 underflow)
-            let decay = (-sub_dt / tau).max(-87.0).exp();
-            let weighted_equilibrium = x_inf.scale(1.0 - decay);
-            let weighted_current = self.state.scale(decay);
-            self.state = weighted_equilibrium.add(&weighted_current);
+    /// A zero duration is a no-op and does not increment the update counter.
+    pub fn evolve_closed_form_iterative(
+        &mut self,
+        dt: f32,
+        input: &ContinuousHV,
+        max_substeps: usize,
+    ) -> Result<(), IterativeEvolutionError> {
+        if !dt.is_finite() || dt < 0.0 {
+            return Err(IterativeEvolutionError::InvalidDuration);
+        }
+        if dt == 0.0 {
+            return Ok(());
+        }
+        if !self.config.tau_base.is_finite()
+            || self.config.tau_base <= 0.0
+            || !self.config.backbone_tau.is_finite()
+            || self.config.backbone_tau < 0.0
+        {
+            return Err(IterativeEvolutionError::InvalidBaseTimeConstant);
+        }
+        if max_substeps == 0 {
+            return Err(IterativeEvolutionError::InvalidWorkBudget);
+        }
+        if self.config.dimension == 0 {
+            return Err(IterativeEvolutionError::DimensionMismatch {
+                field: "config.dimension",
+                expected: 1,
+                actual: 0,
+            });
+        }
+        if !self.config.fourier_amplitude.is_finite()
+            || !self.config.fourier_frequencies.iter().all(|frequency| frequency.is_finite())
+            || matches!(
+                self.config.activation,
+                UnifiedActivation::BoundedTanh { scale } if !scale.is_finite()
+            )
+        {
+            return Err(IterativeEvolutionError::InvalidDynamicsConfiguration);
+        }
+        if self.update_count == u64::MAX {
+            return Err(IterativeEvolutionError::UpdateCounterOverflow);
+        }
+        if !self.total_time.is_finite()
+            || !self.running_mean.is_finite()
+            || !self.running_var.is_finite()
+            || !(self.total_time + f64::from(dt)).is_finite()
+        {
+            return Err(IterativeEvolutionError::InvalidEvolutionClock);
         }
 
-        self.apply_state_bounds();
+        let dimension = self.config.dimension;
+        for (field, vector) in [
+            ("input", input),
+            ("state", &self.state),
+            ("weight_hv", &self.weight_hv),
+            ("input_mask", &self.input_mask),
+            ("tau_modulator", &self.tau_modulator),
+        ] {
+            if vector.values.len() != dimension {
+                return Err(IterativeEvolutionError::DimensionMismatch {
+                    field,
+                    expected: dimension,
+                    actual: vector.values.len(),
+                });
+            }
+            if !vector.values.iter().all(|value| value.is_finite())
+                || !vector.norm().is_finite()
+            {
+                return Err(IterativeEvolutionError::NonFiniteVector { field });
+            }
+        }
+
+        let max_substep = self.config.tau_base / 10.0;
+        if !max_substep.is_finite() || max_substep <= 0.0 {
+            return Err(IterativeEvolutionError::InvalidBaseTimeConstant);
+        }
+
+        // Preserve the existing f32 step-count arithmetic, then promote the
+        // rounded integer request to f64 for budget checks before integer cast.
+        // This avoids adding a spurious sub-step from f32 representation error
+        // while still rejecting overflow/oversized work before the loop.
+        let requested_ratio = dt / max_substep;
+        if !requested_ratio.is_finite() {
+            return Err(IterativeEvolutionError::WorkBudgetExceeded {
+                required_steps: u128::MAX,
+                max_steps: max_substeps,
+            });
+        }
+        let requested_steps = f64::from(requested_ratio.ceil().max(1.0));
+        if requested_steps > max_substeps as f64
+            || requested_steps >= usize::MAX as f64
+        {
+            return Err(IterativeEvolutionError::WorkBudgetExceeded {
+                required_steps: requested_steps as u128,
+                max_steps: max_substeps,
+            });
+        }
+        let n_steps = requested_steps as usize;
+        let sub_dt = dt / n_steps as f32;
+        if !sub_dt.is_finite() || sub_dt <= 0.0 {
+            return Err(IterativeEvolutionError::InvalidDuration);
+        }
+
+        // Keep intermediate work local. Any numerical error leaves the neuron
+        // unchanged, including its evolution clock and running statistics.
+        let mut working_state = self.state.clone();
+        for _ in 0..n_steps {
+            let x_inf = self.compute_equilibrium_for_state(&working_state, input);
+            let tau = self.compute_tau_for_state(&working_state, input);
+            if !tau.is_finite() || tau <= 0.0 {
+                return Err(IterativeEvolutionError::InvalidEffectiveTimeConstant);
+            }
+
+            let decay = (-sub_dt / tau).max(-87.0).exp();
+            let weighted_equilibrium = x_inf.scale(1.0 - decay);
+            let weighted_current = working_state.scale(decay);
+            working_state = weighted_equilibrium.add(&weighted_current);
+            if !working_state.values.iter().all(|value| value.is_finite()) {
+                return Err(IterativeEvolutionError::NonFiniteResult);
+            }
+        }
+
+        let final_norm = working_state.norm();
+        if !final_norm.is_finite() {
+            return Err(IterativeEvolutionError::NonFiniteResult);
+        }
+        if final_norm > 5.0 {
+            working_state.scale_in_place(5.0 / final_norm);
+        }
+
+        self.state = working_state;
         self.update_stats(dt);
+        Ok(())
     }
 
     /// Compute derivative dx/dt for given state (used by RK4)
@@ -2223,6 +2370,153 @@ mod tests {
         assert_eq!(neuron.total_time(), 0.0);
     }
 
+    fn assert_iterative_rejection_is_atomic(
+        neuron: &HdcLtcUnifiedNeuron,
+        state_before: &[f32],
+        clock_before: (f64, u64),
+        running_before: (f32, f32),
+    ) {
+        assert_eq!(neuron.state().values, state_before);
+        assert_eq!(neuron.evolution_clock(), clock_before);
+        assert_eq!((neuron.running_mean, neuron.running_var), running_before);
+    }
+
+    #[test]
+    fn iterative_solver_rejects_non_finite_and_negative_durations_atomically() {
+        for dt in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0] {
+            let mut neuron = HdcLtcUnifiedNeuron::new_default(42);
+            let input = ContinuousHV::random_default(123);
+            let state_before = neuron.state().values.clone();
+            let clock_before = neuron.evolution_clock();
+            let running_before = (neuron.running_mean, neuron.running_var);
+
+            assert_eq!(
+                neuron.evolve_closed_form_iterative(dt, &input, 1_000).unwrap_err(),
+                IterativeEvolutionError::InvalidDuration
+            );
+            assert_iterative_rejection_is_atomic(
+                &neuron,
+                &state_before,
+                clock_before,
+                running_before,
+            );
+        }
+    }
+
+    #[test]
+    fn iterative_solver_rejects_invalid_tau_and_zero_budget_atomically() {
+        let input = ContinuousHV::random_default(123);
+        for tau in [0.0_f32, -0.1, f32::NAN, f32::INFINITY] {
+            let mut invalid_tau = HdcLtcUnifiedNeuron::new_default(42);
+            invalid_tau.config.tau_base = tau;
+            let before = invalid_tau.state().values.clone();
+            let clock = invalid_tau.evolution_clock();
+            let running = (invalid_tau.running_mean, invalid_tau.running_var);
+            assert_eq!(
+                invalid_tau
+                    .evolve_closed_form_iterative(1.0, &input, 1_000)
+                    .unwrap_err(),
+                IterativeEvolutionError::InvalidBaseTimeConstant
+            );
+            assert_iterative_rejection_is_atomic(&invalid_tau, &before, clock, running);
+        }
+
+        let mut invalid_budget = HdcLtcUnifiedNeuron::new_default(42);
+        let before = invalid_budget.state().values.clone();
+        let clock = invalid_budget.evolution_clock();
+        let running = (invalid_budget.running_mean, invalid_budget.running_var);
+        assert_eq!(
+            invalid_budget
+                .evolve_closed_form_iterative(1.0, &input, 0)
+                .unwrap_err(),
+            IterativeEvolutionError::InvalidWorkBudget
+        );
+        assert_iterative_rejection_is_atomic(&invalid_budget, &before, clock, running);
+    }
+
+    #[test]
+    fn iterative_solver_rejects_dimension_mismatch_and_non_finite_input_atomically() {
+        let mut neuron = HdcLtcUnifiedNeuron::new_default(42);
+        let short_input = ContinuousHV::random(8, 123);
+        let before = neuron.state().values.clone();
+        let clock = neuron.evolution_clock();
+        let running = (neuron.running_mean, neuron.running_var);
+        assert_eq!(
+            neuron
+                .evolve_closed_form_iterative(1.0, &short_input, 1_000)
+                .unwrap_err(),
+            IterativeEvolutionError::DimensionMismatch {
+                field: "input",
+                expected: HDC_DIMENSION,
+                actual: 8,
+            }
+        );
+        assert_iterative_rejection_is_atomic(&neuron, &before, clock, running);
+
+        let mut non_finite_input = ContinuousHV::random_default(123);
+        non_finite_input.values[0] = f32::NAN;
+        assert_eq!(
+            neuron
+                .evolve_closed_form_iterative(1.0, &non_finite_input, 1_000)
+                .unwrap_err(),
+            IterativeEvolutionError::NonFiniteVector { field: "input" }
+        );
+        assert_iterative_rejection_is_atomic(&neuron, &before, clock, running);
+    }
+
+    #[test]
+    fn iterative_solver_rejects_over_budget_before_mutating_state() {
+        let mut neuron = HdcLtcUnifiedNeuron::new_default(42);
+        let input = ContinuousHV::random_default(123);
+        let before = neuron.state().values.clone();
+        let clock = neuron.evolution_clock();
+        let running = (neuron.running_mean, neuron.running_var);
+        assert_eq!(
+            neuron
+                .evolve_closed_form_iterative(1.0, &input, 10)
+                .unwrap_err(),
+            IterativeEvolutionError::WorkBudgetExceeded {
+                required_steps: 100,
+                max_steps: 10,
+            }
+        );
+        assert_iterative_rejection_is_atomic(&neuron, &before, clock, running);
+
+        assert_eq!(
+            neuron
+                .evolve_closed_form_iterative(f32::MAX, &input, 10)
+                .unwrap_err(),
+            IterativeEvolutionError::WorkBudgetExceeded {
+                required_steps: u128::MAX,
+                max_steps: 10,
+            }
+        );
+        assert_iterative_rejection_is_atomic(&neuron, &before, clock, running);
+    }
+
+    #[test]
+    fn iterative_solver_zero_duration_is_a_true_no_op() {
+        let mut neuron = HdcLtcUnifiedNeuron::new_default(42);
+        let input = ContinuousHV::random_default(123);
+        let before = neuron.state().values.clone();
+        let clock = neuron.evolution_clock();
+        let running = (neuron.running_mean, neuron.running_var);
+        neuron.evolve_closed_form_iterative(0.0, &input, 0).unwrap();
+        assert_iterative_rejection_is_atomic(&neuron, &before, clock, running);
+    }
+
+    #[test]
+    fn iterative_solver_commits_valid_work_and_updates_clock_once() {
+        let mut neuron = HdcLtcUnifiedNeuron::new_default(42);
+        let input = ContinuousHV::random_default(123);
+        neuron
+            .evolve_closed_form_iterative(0.1, &input, 10)
+            .unwrap();
+        assert_eq!(neuron.update_count(), 1);
+        assert!((neuron.total_time() - 0.1).abs() < 1e-6);
+        assert!(neuron.state().norm().is_finite());
+    }
+
     #[test]
     fn test_unified_neuron_euler_evolution() {
         let mut neuron = HdcLtcUnifiedNeuron::new_default(42);
@@ -2620,7 +2914,7 @@ mod tests {
         );
 
         // Also test the iterative path
-        neuron.evolve_closed_form_iterative(100.0, &input);
+        neuron.evolve_closed_form_iterative(100.0, &input, 10_000).expect("bounded iterative evolution should fit the explicit test budget");
         let state = neuron.state();
         assert!(
             state.norm().is_finite(),

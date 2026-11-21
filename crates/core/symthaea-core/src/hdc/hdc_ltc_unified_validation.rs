@@ -18,10 +18,10 @@
 //!    - ~10% error due to nonlinear equilibrium (x_inf depends on x)
 //!    - Fast O(1) computation
 //!
-//! 3. **`evolve_closed_form_iterative`**: Sub-stepped exponential decay (RECOMMENDED)
-//!    - Handles nonlinear equilibrium by sub-stepping (tau/10 per step)
-//!    - **<1% error vs RK4** - validated across all scenarios
-//!    - O(dt/tau) complexity but still faster than Euler/RK4
+//! 3. **`evolve_closed_form_iterative`**: Budgeted sub-stepped exponential evolution
+//!    - Recomputes nonlinear equilibrium at each tau/10 step; callers must provide a work budget.
+//!    - Current regression target: <1% error vs fine-step RK4 on the frozen scenario matrix
+//!    - O(dt/tau) complexity; the dt/tau ratio sweep must execute before generalizing the error bound
 //!
 //! ## Key Finding: Nonlinear Equilibrium
 //!
@@ -46,6 +46,9 @@
 
 use crate::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 use crate::hdc::unified_hv::ContinuousHV;
+
+/// Explicit upper bound for iterative solver work in numerical validation.
+const MAX_ITERATIVE_VALIDATION_SUBSTEPS: usize = 100_000;
 
 /// Test configuration for validation runs
 #[derive(Debug, Clone)]
@@ -259,7 +262,9 @@ pub fn validate_iterative_closed_form_vs_rk4(config: &ValidationConfig) -> Valid
 
     // Iterative closed-form (handles nonlinear equilibrium)
     let mut neuron_iter = create_test_neuron(config.tau_base, config.dimension, 42);
-    neuron_iter.evolve_closed_form_iterative(config.total_time, &input);
+    neuron_iter
+        .evolve_closed_form_iterative(config.total_time, &input, MAX_ITERATIVE_VALIDATION_SUBSTEPS)
+        .expect("validation scenario must fit its explicit iterative work budget");
 
     let l2 = l2_error(neuron_rk4.state(), neuron_iter.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_iter.state());
@@ -1222,7 +1227,9 @@ mod tests {
 
         // Iterative
         let mut neuron_iter = create_test_neuron(tau, dim, 42);
-        neuron_iter.evolve_closed_form_iterative(dt, &input);
+        neuron_iter
+            .evolve_closed_form_iterative(dt, &input, MAX_ITERATIVE_VALIDATION_SUBSTEPS)
+            .expect("comparison scenario must fit its explicit iterative work budget");
 
         // Report similarities to RK4
         let cfc_sim = neuron_cfc.state().similarity(neuron_rk4.state());
@@ -1249,4 +1256,41 @@ mod tests {
             iter_sim
         );
     }
+
+    #[test]
+    fn iterative_closed_form_error_sweep_by_dt_tau_ratio() {
+        let tau_values = [0.1_f32, 1.0, 10.0];
+        let dt_tau_ratios = [0.1_f32, 1.0, 10.0];
+
+        for tau in tau_values {
+            for ratio in dt_tau_ratios {
+                let config = ValidationConfig {
+                    tau_base: tau,
+                    scenario_name: "dt/tau ratio sweep",
+                    input_scale: 1.0,
+                    total_time: tau * ratio,
+                    dimension: 64,
+                };
+                let result = validate_iterative_closed_form_vs_rk4(&config);
+                println!(
+                    "tau_base={tau:.3}, dt/tau={ratio:.3}: {}",
+                    result.report()
+                );
+                assert!(
+                    result.relative_error_percent.is_finite(),
+                    "relative error must remain finite at tau={tau}, dt/tau={ratio}"
+                );
+                assert!(
+                    result.similarity.is_finite(),
+                    "trajectory similarity must remain finite at tau={tau}, dt/tau={ratio}"
+                );
+                assert!(
+                    result.relative_error_percent < 1.0,
+                    "iterative trajectory error exceeded 1% at tau={tau}, dt/tau={ratio}: {}%",
+                    result.relative_error_percent
+                );
+            }
+        }
+    }
+
 }
