@@ -28,6 +28,7 @@ pub mod embodiment_trace;
 pub mod geometry;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
+pub mod mycelial_network;
 pub mod mycelial_presence;
 pub mod scene_features;
 pub mod scene_graph;
@@ -77,6 +78,12 @@ pub use mycelial_mesh::{
 pub use mycelial_model::{
     MYCELIAL_MODEL_VERSION, MycelialFilament, MycelialModel, OrbitalCell, PresenceMode,
     SpatialPoint3, build_mycelial_model,
+};
+pub use mycelial_network::{
+    AnastomosisKind, MAX_MYCELIAL_ANASTOMOSES, MycelialAnastomosis, MycelialConnectionKind,
+    MycelialNetworkConfig, MycelialNetworkConnection, MycelialNetworkError,
+    MycelialNetworkGraph, MycelialNetworkMetrics, MYCELIAL_NETWORK_SCHEMA_VERSION,
+    build_mycelial_network_graph,
 };
 pub use mycelial_presence::{
     build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
