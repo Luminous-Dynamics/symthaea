@@ -175,7 +175,10 @@
         "The 2026 Bryant-Whyte 246-statistic analysis uses the same COGITATE MEG source cohort; it is a same-dataset method comparator, not independent replication",
         "Its 35,280 candidate-model fits create a model-selection problem; winning measures must be re-evaluated inside nested participant-grouped validation and untouched confirmation",
         "BIDS M-EEG release availability is distinct from raw/unprocessed M-EEG availability; V1.3 lists the latter as a future release",
-        "The article's supplementary PDF was corrected on 2026-10-15; use the corrected supplement and paper version"
+        "The article's supplementary PDF was corrected on 2026-10-15; use the corrected supplement and paper version",
+        "Final article cites Zenodo 10.5281/zenodo.18294156 (empirical.zip/model.zip), while the author README still points to older preprint support data at 10.5281/zenodo.15315238 (data.zip); treat archives as distinct until file manifests are reconciled",
+        "The article states pyspi 1.1.0 but the author requirements file pins 1.1.1; 1.1.1 changes TLMI directionality, so run both and compare against archived CSVs",
+        "Author code imputes missing values from the selected participant table before grouped CV when missingness is below 10%; quantify this separately with fold-local imputation without rewriting the historical reproduction"
       ],
       "acquisition_status": "public_catalogue_and_release_documentation_audited; exact modality bundle intake_not_started",
       "paper_cohort_counts": {
@@ -278,7 +281,65 @@
           "theory_interpretation": "tentative; not strong evidence of necessity or sufficiency of either theory"
         },
         "evaluation_status": "literature_audited; independent_replay_not_started; same_COGITATE_MEg_source_cohort_not_independent_replication",
-        "protocol": "docs/neuroscience/COGITATE_MEG_ESTIMATOR_TOURNAMENT_V0.md"
+        "protocol": "docs/neuroscience/COGITATE_MEG_ESTIMATOR_TOURNAMENT_V0.md",
+        "author_code_snapshot": {
+          "repository": "https://github.com/anniegbryant/MEG_functional_connectivity",
+          "commit": "cab648bbe2eab7093f9ab7b9a5fcddabf28e60a0",
+          "commit_date": "2026-01-27",
+          "code_archive_doi": "10.5281/zenodo.15122629",
+          "requirements_blob_sha": "5406f118265796a1a91a48f11dce2ffd81930837",
+          "classifier_blob_sha": "bff12517d61fbab8b77272222074a2cb67736816",
+          "feature_extraction_blob_sha": "ef8d2b2c6d8037e39a9fd655a576933b41bf6c07",
+          "repository_requirements_pyspi": "1.1.1",
+          "paper_methods_pyspi": "1.1.0",
+          "version_resolution": "reproduce_both_versions_and_compare_archived_empirical_outputs",
+          "pyspi_1_1_1_directionality_fix": [
+            "tlmi_gaussian",
+            "tlmi_kraskov_NN-4",
+            "tlmi_kraskov_NN-4_DCE",
+            "tlmi_kernel_W-0.25"
+          ]
+        },
+        "validation_design": {
+          "folds": "StratifiedGroupKFold",
+          "fold_count": 10,
+          "shuffle": true,
+          "random_state": 127,
+          "group_key": "subject_ID",
+          "classifier": "L1_LogisticRegression_C1_liblinear_balanced",
+          "scaler": "MixedSigmoidScaler_unit_variance",
+          "reported_scores": [
+            "accuracy",
+            "balanced_accuracy",
+            "AUC"
+          ],
+          "cross_task": "train one relevance context, test the other, same participants N=94; context transfer, not unseen-participant validation"
+        },
+        "preprocessing_audit": {
+          "finding": "author classifier imputes <10% missing values with feature mean on selected full participant table before grouped CV",
+          "risk": "potential unsupervised transductive leakage",
+          "label_leakage": false,
+          "status": "effect_not_quantified",
+          "sensitivity": "separate training-fold-only imputation analysis",
+          "interpretation": "reproducing historical code and testing a corrected sensitivity are separate lanes"
+        },
+        "data_archives": [
+          {
+            "doi": "10.5281/zenodo.18294156",
+            "role": "final-paper-preprocessed-data",
+            "files": [
+              "empirical.zip",
+              "model.zip"
+            ]
+          },
+          {
+            "doi": "10.5281/zenodo.15315238",
+            "role": "older-preprint-supporting-data",
+            "files": [
+              "data.zip"
+            ]
+          }
+        ]
       }
     },
     {
