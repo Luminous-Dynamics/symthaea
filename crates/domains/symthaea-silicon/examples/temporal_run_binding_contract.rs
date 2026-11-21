@@ -108,6 +108,8 @@ enum BindingError {
     InvalidDigest(&'static str),
     WorkReceiptDigestMismatch,
     DecisionOpportunityCountMismatch,
+    DecisionDispositionCountMismatch,
+    VerifiedOutcomeCountMismatch,
     LogicalHorizonOutOfRange,
     InvalidOracleDigest,
     ArithmeticOverflow,
@@ -234,6 +236,65 @@ fn join_receipts(
         .map_err(|_| BindingError::ArithmeticOverflow)?;
     if work_opportunities != freshness_count {
         return Err(BindingError::DecisionOpportunityCountMismatch);
+    }
+
+    let mut answered = 0_u64;
+    let mut late = 0_u64;
+    let mut abstained = 0_u64;
+    let mut unserved = 0_u64;
+    let mut verified_correct = 0_u64;
+    let mut verified_incorrect = 0_u64;
+
+    for opportunity in freshness_opportunities {
+        match string_field(opportunity, "disposition")?.as_str() {
+            "answered" => {
+                answered = answered.checked_add(1).ok_or(BindingError::ArithmeticOverflow)?;
+                let consumed = u64_field(opportunity, "consumed_at_ns")?;
+                let deadline = u64_field(opportunity, "deadline_at_ns")?;
+                if consumed > deadline {
+                    late = late.checked_add(1).ok_or(BindingError::ArithmeticOverflow)?;
+                } else {
+                    match string_field(opportunity, "correctness")?.as_str() {
+                        "correct" => {
+                            verified_correct = verified_correct
+                                .checked_add(1)
+                                .ok_or(BindingError::ArithmeticOverflow)?;
+                        }
+                        "incorrect" => {
+                            verified_incorrect = verified_incorrect
+                                .checked_add(1)
+                                .ok_or(BindingError::ArithmeticOverflow)?;
+                        }
+                        _ => return Err(BindingError::MissingField("answered correctness label")),
+                    }
+                }
+            }
+            "abstained" => {
+                abstained = abstained.checked_add(1).ok_or(BindingError::ArithmeticOverflow)?;
+            }
+            "unserved" => {
+                unserved = unserved.checked_add(1).ok_or(BindingError::ArithmeticOverflow)?;
+            }
+            _ => return Err(BindingError::MissingField("decision disposition")),
+        }
+    }
+
+    for (field, observed) in [
+        ("output_decisions", answered),
+        ("late_decisions", late),
+        ("abstained_decisions", abstained),
+        ("unserved_decisions", unserved),
+    ] {
+        if u64_field(work_section, field)? != observed {
+            return Err(BindingError::DecisionDispositionCountMismatch);
+        }
+    }
+    if u64_field(work_section, "independently_verified_correct_decisions")?
+        != verified_correct
+        || u64_field(work_section, "independently_verified_incorrect_decisions")?
+            != verified_incorrect
+    {
+        return Err(BindingError::VerifiedOutcomeCountMismatch);
     }
 
     let logical_duration_ns = u64_field(&work, "logical_duration_ns")?;
