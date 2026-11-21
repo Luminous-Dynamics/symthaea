@@ -84,6 +84,8 @@ impl Action {
 /// Every required value is optional so an unknown value fails closed.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct FreshnessAtUse {
+    /// Age of evidence when first retrieved; diagnostic only, not the use gate.
+    pub evidence_age_at_retrieval_ns: Option<u64>,
     /// Age of the evidence actually supporting this decision at consumption.
     pub evidence_age_at_use_ns: Option<u64>,
     /// Frozen task-specific maximum evidence age, inclusive.
@@ -444,6 +446,7 @@ mod tests {
         // A retrieval at age 20ns can become age 120ns before consumption.
         // Only the use-time age is supplied to the decision gate.
         let fresh_at_retrieval = FreshnessAtUse {
+            evidence_age_at_retrieval_ns: Some(20),
             evidence_age_at_use_ns: Some(120),
             max_evidence_age_ns: Some(100),
             deadline_slack_at_use_ns: Some(500),
