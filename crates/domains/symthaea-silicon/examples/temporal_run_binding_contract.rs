@@ -739,6 +739,49 @@ mod tests {
     }
 
     #[test]
+    fn counts_expired_and_censors_pending_unserved_deadlines_consistently() {
+        let id = identity();
+        let (work, freshness) = example_receipts(&id).unwrap();
+        let mut work_value: Value = serde_json::from_slice(&work).unwrap();
+        work_value["work"]["output_decisions"] = Value::from(1_u64);
+        work_value["work"]["unserved_decisions"] = Value::from(1_u64);
+        work_value["work"]["independently_verified_correct_decisions"] = Value::from(1_u64);
+
+        let mut freshness_value: Value = serde_json::from_slice(&freshness).unwrap();
+        let second = &mut freshness_value["opportunities"][1];
+        second["disposition"] = Value::String("unserved".to_owned());
+        second["emitted_at_ns"] = Value::Null;
+        second["consumed_at_ns"] = Value::Null;
+        second["evidence_source_time_ns"] = Value::Null;
+        second["evidence_available_at_ns"] = Value::Null;
+        second["correctness"] = Value::Null;
+        let expired_freshness = serde_json::to_vec(&freshness_value).unwrap();
+        work_value["system"]["deadline_misses"] = Value::from(1_u64);
+        let expired_work = serde_json::to_vec(&work_value).unwrap();
+        assert!(join_receipts(
+            "run-expired-unserved",
+            &id,
+            &expired_work,
+            &expired_freshness,
+            None
+        )
+        .is_ok());
+
+        second["deadline_at_ns"] = Value::from(1_500_u64);
+        let pending_freshness = serde_json::to_vec(&freshness_value).unwrap();
+        work_value["system"]["deadline_misses"] = Value::from(0_u64);
+        let pending_work = serde_json::to_vec(&work_value).unwrap();
+        assert!(join_receipts(
+            "run-pending-unserved",
+            &id,
+            &pending_work,
+            &pending_freshness,
+            None
+        )
+        .is_ok());
+    }
+
+    #[test]
     fn permits_missing_work_quality_identity_when_all_opportunities_are_abstentions() {
         let id = identity();
         let (work, freshness) = example_receipts(&id).unwrap();
