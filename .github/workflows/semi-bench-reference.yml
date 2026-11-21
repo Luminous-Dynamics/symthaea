@@ -45,3 +45,12 @@ jobs:
           diff -u \
             benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json \
             /tmp/semi-bench-inspection-report.json
+
+      - name: Reproduce contrastive-pair validation report byte-for-byte
+        run: |
+          python benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py \
+            benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json \
+            > /tmp/semi-bench-pair-report.json
+          diff -u \
+            benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json \
+            /tmp/semi-bench-pair-report.json
