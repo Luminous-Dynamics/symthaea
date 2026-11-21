@@ -205,7 +205,10 @@ jobs:
           receipt = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-execution-receipt.json").read_text())
           jsonschema.Draft202012Validator.check_schema(schema)
           jsonschema.validate(receipt, schema)
-          assert receipt["source_commit"] == os.environ["GITHUB_SHA"]
+          import subprocess
+          checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          assert receipt["source_commit"] == checked_out_head
+          assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
           assert len(receipt["simulation_reports"]) == 3
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
