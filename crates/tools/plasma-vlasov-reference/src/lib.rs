@@ -300,7 +300,9 @@ impl VlasovPoisson1d1v {
         self.advect_velocity(dt);
         self.advect_x(0.5 * dt);
         self.time += dt;
-        if !self.time.is_finite() { return Err(SolverError::NonFiniteState); }
+        if !self.time.is_finite() {
+            return Err(SolverError::NonFiniteState);
+        }
         self.refresh_electric_field()?;
         self.ensure_finite_state()
     }
@@ -445,7 +447,9 @@ impl VlasovPoisson1d1v {
                 let phase = -eta * acceleration * dt;
                 let multiplier = if mode == config.nv / 2 {
                     Complex::new(phase.cos(), 0.0)
-                } else { Complex::cis(phase) };
+                } else {
+                    Complex::cis(phase)
+                };
                 *coefficient = coefficient.mul(multiplier);
             }
             fft(&mut line, true);
