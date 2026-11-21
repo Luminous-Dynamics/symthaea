@@ -10,9 +10,7 @@ use std::f32::consts::TAU;
 
 use crate::color::Color;
 use crate::embodiment::{EmbodimentActivity, EmbodimentSnapshot, SpeechOutputState};
-use crate::mycelial_model::{
-    build_mycelial_model, MycelialModel, PresenceMode, SpatialPoint3,
-};
+use crate::mycelial_model::{build_mycelial_model, PresenceMode, SpatialPoint3};
 use crate::scene_graph::{FilterType, GradientStop, NodeKind, SceneNode, Style};
 use crate::svg_renderer::{
     SvgRenderOptions, VIEWPORT_H, VIEWPORT_W, render_svg_with_options,
