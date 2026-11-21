@@ -4,7 +4,7 @@
 
 **Tracking:** [#13153 — qualify selective memory commitment and timely verification policy](https://github.com/Luminous-Dynamics/symthaea/issues/13153).
 
-**Related work:** [#9139 / PR #12731 — consolidation governance](https://github.com/Luminous-Dynamics/symthaea/pull/12731), [#9516 / PR #12743 — MACE causal transfer](https://github.com/Luminous-Dynamics/symthaea/pull/12743), [#11816 — evaluator independence](https://github.com/Luminous-Dynamics/symthaea/issues/11816), [#12846 — consolidation receipts](https://github.com/Luminous-Dynamics/symthaea/issues/12846), [#13128 — HDC-LTC retrieval contract](https://github.com/Luminous-Dynamics/symthaea/pull/13128), and [#13141 — paired memory-to-decision runner](https://github.com/Luminous-Dynamics/symthaea/issues/13141).
+**Related work:** [#9075 — bitemporal source-event ledger and as-known queries](https://github.com/Luminous-Dynamics/symthaea/issues/9075), [#12846 — source-bound consolidation receipts](https://github.com/Luminous-Dynamics/symthaea/issues/12846), [#9139 / PR #12731 — consolidation governance](https://github.com/Luminous-Dynamics/symthaea/pull/12731), [#9516 / PR #12743 — MACE causal transfer](https://github.com/Luminous-Dynamics/symthaea/pull/12743), [#11816 — evaluator independence](https://github.com/Luminous-Dynamics/symthaea/issues/11816), [#12846 — consolidation receipts](https://github.com/Luminous-Dynamics/symthaea/issues/12846), [#13128 — HDC-LTC retrieval contract](https://github.com/Luminous-Dynamics/symthaea/pull/13128), and [#13141 — paired memory-to-decision runner](https://github.com/Luminous-Dynamics/symthaea/issues/13141).
 
 ## 1. Paradigm shift: memory is an action policy
 
@@ -106,7 +106,11 @@ The result vector must keep these cases separate:
 
 Do not collapse them into answer accuracy or mean latency. Report QAoI-style evidence age at use, freshness-validity coverage, fresh-correct-on-time opportunity coverage, deadline misses/tails, and AoII-style wrong-belief exposure only where an independent truth trajectory and loss function support it.
 
-The research Rust selector now accepts `FreshnessAtUse`: age-at-use, maximum age and signed deadline slack are supplied as already-canonical durations by upstream time/evidence owners. Every value is optional; unknown values fail closed. `use` is excluded when age exceeds the budget or deadline slack is negative. The crate does not read wall clocks or infer freshness from similarity/retrieval time. This is a non-authoritative reference gate, not a replacement for #9954/#12401 or a production receipt verifier.
+The research Rust selector now accepts `FreshnessAtUse`: age-at-retrieval, age-at-use, maximum age and signed deadline slack are supplied as already-canonical durations by upstream time/evidence owners. Every required gate value is optional; unknown values fail closed. `use` is excluded when age exceeds the budget or deadline slack is negative.
+
+There is a second, independent fence for source lifecycle races: a cached retrieval-time "not revoked" result is insufficient. Before `use`, the canonical source/revision state must be revalidated at the decision's requested knowledge-time snapshot, with a source-bound receipt. This composes with [#9075](https://github.com/Luminous-Dynamics/symthaea/issues/9075) and [#12846](https://github.com/Luminous-Dynamics/symthaea/issues/12846); the HDC/associative index can still return an old event ID, but it cannot authorize its use. Historical as-known queries use their declared knowledge-time coordinate and remain historically reproducible; they are not rewritten by a later correction.
+
+The crate does not read wall clocks, select valid_at/known_at, authenticate receipts, or infer freshness from similarity/retrieval time. Its booleans are integration seams for already-qualified upstream facts, not credentials. This is a non-authoritative reference gate, not a replacement for #9954/#12401/#9075 or a production receipt verifier.
 
 ### Calibration and selective risk
 
