@@ -298,21 +298,7 @@
                     "minLength": 1
                   }
                 }
-              },
-              "allOf": [
-                {
-                  "not": {
-                    "properties": {
-                      "required_requalification_claims": {
-                        "contains": {
-                          "type": "string",
-                          "const": "__never__"
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+              }
             }
           ]
         }
