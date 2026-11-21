@@ -72,12 +72,12 @@ jobs:
         run: |
           set -euo pipefail
           ROOT="${RUNNER_TEMP}/semi-contract-check"
-          rustfmt --edition 2024 "\${ROOT}/crates/domains/symthaea-semiconductor/src/lib.rs"
-          rustfmt --edition 2024 "\${ROOT}/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
-          rustfmt --edition 2024 "\${ROOT}/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
-          rustfmt --edition 2024 --check "\${ROOT}/crates/domains/symthaea-semiconductor/src/lib.rs"
-          rustfmt --edition 2024 --check "\${ROOT}/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
-          rustfmt --edition 2024 --check "\${ROOT}/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/lib.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
+          rustfmt --edition 2024 "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/lib.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/mod.rs"
+          rustfmt --edition 2024 --check "$ROOT/crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs"
 
       - name: Test Rust benchmark contracts
         run: cargo test --manifest-path "${RUNNER_TEMP}/semi-contract-check/crates/domains/symthaea-semiconductor/Cargo.toml"
