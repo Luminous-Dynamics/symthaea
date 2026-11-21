@@ -314,6 +314,92 @@
         "mismatched-pdk-or-constraints"
       ],
       "claim_ceiling": "end-to-end software-flow result for exact design/PDK/constraints only; no fabricated-silicon or foundry-yield claim"
+    },
+    {
+      "id": "adaptive-wafer-inspection-and-latent-risk",
+      "sources": [
+        "https://doi.org/10.1016/j.aei.2026.104621",
+        "https://doi.org/10.1016/j.cie.2026.112291"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
+      "tasks": [
+        "budget-aware-inspection-policy",
+        "value-of-information",
+        "latent-risk-in-uninspected-wafers",
+        "noisy-label-active-learning",
+        "missing-not-at-random-inspection"
+      ],
+      "metrics": [
+        "cost-weighted-defect-discovery",
+        "time-to-detection",
+        "residual-latent-risk",
+        "defects-per-100-inspections",
+        "inspection-turnaround",
+        "policy-regret-synthetic",
+        "operator-burden"
+      ],
+      "claim_ceiling": "public/synthetic decision-policy results only; no fab-impact claim without controlled site measurements"
+    },
+    {
+      "id": "physics-bounded-ai-sem-detection-limits",
+      "sources": [
+        "https://pages.nist.gov/detection_limits/web/index.html",
+        "https://www.nist.gov/publications/detection-limits-ai-based-sem-dimensional-metrology",
+        "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy"
+      ],
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
+      "reported_reference_metadata": {
+        "simulated_image_sets": 6,
+        "images_per_set": 567,
+        "image_dimensions": [
+          512,
+          512
+        ],
+        "trained_unet_models": 3,
+        "approximate_parameters_per_unet": 7900000,
+        "published_visualization_graphs": 540
+      },
+      "tasks": [
+        "dimensional-measurement-bias",
+        "probability-of-detection",
+        "false-alarm-probability",
+        "noise-and-contrast-detection-limit",
+        "observer-comparison",
+        "sparse-scan-throughput"
+      ],
+      "metrics": [
+        "dimensional-bias",
+        "absolute-error",
+        "uncertainty-calibration",
+        "detection-limit-surface",
+        "false-alarm",
+        "missed-feature-risk",
+        "scan-time"
+      ],
+      "acquisition_status": "metadata-reviewed; raw image/model artifact availability and rights still require verification",
+      "claim_ceiling": "public NIST reference/synthetic image results only; no physical SEM metrology capability without traceable calibration"
+    },
+    {
+      "id": "chiplet-package-testability",
+      "source": "https://doi.org/10.1109/MDAT.2026.3706448",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13085",
+      "tasks": [
+        "prebond-known-good-die-test",
+        "die-to-die-interface-test",
+        "postbond-package-test",
+        "system-bringup",
+        "infield-monitoring",
+        "fault-localization"
+      ],
+      "metrics": [
+        "per-fault-family-coverage",
+        "escaped-defect-probability",
+        "diagnostic-localization",
+        "test-time",
+        "test-access-overhead",
+        "repair-and-containment"
+      ],
+      "claim_ceiling": "synthetic fault coverage only until qualified package test vehicles and independent reliability evidence exist"
     }
   ],
   "cross_cutting_protocol": {
@@ -396,8 +482,8 @@
     "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
     "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
     "mode": "test-only-independent-reference; production implementation remains Rust-first",
-    "local_tests": 21,
-    "local_status": "PASS",
+    "local_tests": null,
+    "local_status": "not-run",
     "threshold_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_threshold_policy_reference.py",
       "tests": "benchmarks/semi-bench-001/reference/python/test_semi_threshold_policy_reference.py",
@@ -420,6 +506,18 @@
       "semantics": "unique-identity; all-splits-non-empty; group-disjoint-check; strict-forward-time-check; timezone-required; deterministic-assignment-digest",
       "test_count": 7,
       "empirical_dataset_result": false
+    },
+    "hosted_ci": {
+      "workflow": "SEMI-BENCH-001 Reference Oracle",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44881540564",
+      "run_id": 44881540564,
+      "tested_commit": "4cf0944335d38984b8fdee7d052609c8cdf704ef",
+      "conclusion": "success",
+      "test_count": 21,
+      "steps": [
+        "reference unit tests",
+        "byte-for-byte frozen report reproduction"
+      ]
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
@@ -429,5 +527,11 @@
     "nist_tidal": "https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing",
     "semi_semiconductor_digital_twin_activity": "https://downloads.semi.org/web/wstdsbal.nsf/0e0afa4c4969bea688256efd0062a27c/61c2bf6034c0eed988258dcd00669238%21OpenDocument",
     "note": "TIDAL is a NIST programme architecture reference; SEMI document 7465 is a standards activity proposal, not a final published standard or conformance claim."
+  },
+  "inspection_metrology_packaging_review": "docs/research/semi-bench-001/2026-inspection-metrology-packaging-frontier.md",
+  "new_followups": {
+    "adaptive_inspection": "https://github.com/Luminous-Dynamics/symthaea/issues/13083",
+    "ai_sem_detection_limits": "https://github.com/Luminous-Dynamics/symthaea/issues/13084",
+    "chiplet_package_testability": "https://github.com/Luminous-Dynamics/symthaea/issues/13085"
   }
 }
