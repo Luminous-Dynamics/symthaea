@@ -748,13 +748,13 @@ mod tests {
         work_value["work"]["independently_verified_correct_decisions"] = Value::from(1_u64);
 
         let mut freshness_value: Value = serde_json::from_slice(&freshness).unwrap();
-        let second = &mut freshness_value["opportunities"][1];
-        second["disposition"] = Value::String("unserved".to_owned());
-        second["emitted_at_ns"] = Value::Null;
-        second["consumed_at_ns"] = Value::Null;
-        second["evidence_source_time_ns"] = Value::Null;
-        second["evidence_available_at_ns"] = Value::Null;
-        second["correctness"] = Value::Null;
+        freshness_value["opportunities"][1]["disposition"] =
+            Value::String("unserved".to_owned());
+        freshness_value["opportunities"][1]["emitted_at_ns"] = Value::Null;
+        freshness_value["opportunities"][1]["consumed_at_ns"] = Value::Null;
+        freshness_value["opportunities"][1]["evidence_source_time_ns"] = Value::Null;
+        freshness_value["opportunities"][1]["evidence_available_at_ns"] = Value::Null;
+        freshness_value["opportunities"][1]["correctness"] = Value::Null;
         let expired_freshness = serde_json::to_vec(&freshness_value).unwrap();
         work_value["system"]["deadline_misses"] = Value::from(1_u64);
         let expired_work = serde_json::to_vec(&work_value).unwrap();
@@ -767,7 +767,7 @@ mod tests {
         )
         .is_ok());
 
-        second["deadline_at_ns"] = Value::from(1_500_u64);
+        freshness_value["opportunities"][1]["deadline_at_ns"] = Value::from(1_500_u64);
         let pending_freshness = serde_json::to_vec(&freshness_value).unwrap();
         work_value["system"]["deadline_misses"] = Value::from(0_u64);
         let pending_work = serde_json::to_vec(&work_value).unwrap();
