@@ -106,6 +106,24 @@ Ten authored tests cover:
 
 The source module is evaluator-only and must remain outside candidate linking and candidate-visible payloads. Package separation is not an OS isolation boundary; #9437/#9621 remain required for confirmatory use.
 
+## 6A. Relationship to established partial-monitoring theory
+
+The minimax-regret component deliberately builds on established theory rather than claiming to invent minimax regret or partial monitoring.
+
+Bartók et al. (2014), “Partial Monitoring—Classification, Regret Bounds, and Algorithms,” characterize minimax regret for finite-action/finite-outcome partial-monitoring games. Lattimore and Szepesvári (2019) provide an information-theoretic treatment of minimax regret for finite-action partial monitoring.
+
+The contribution here is a different evaluator construction and scope:
+- candidate-view equivalence is bound explicitly to the exact observation-history digest, recurrent-state digest, model/configuration digest and frozen policy seed;
+- evaluator-only hidden worlds are grouped only after that candidate-view identity is shown equal;
+- the decision contract supplies the finite common action set and per-world loss matrix;
+- the evaluator reports shared optimal actions, deterministic minimax raw loss, deterministic minimax regret and candidate regret above that finite-set floor.
+
+This is a per-decision task-specific certificate over declared counterfactual worlds, not a general regret-rate theorem for repeated partial-monitoring games. The deterministic certificate also does not solve the randomized mixed-strategy game.
+
+References:
+- Bartók et al. (2014), DOI: https://doi.org/10.1287/moor.2014.0663
+- Lattimore & Szepesvári (2019): https://proceedings.mlr.press/v99/lattimore19a.html
+
 ## 7. Claim ceiling
 
 This is an exact finite-set bound for the supplied hidden-world alternatives, action set, loss matrix and deterministic policy seed. It is not a universal impossibility theorem for all latent processes, all sensors or randomized policies. The hidden-world set must be preregistered and independently generated; candidate actions cannot be selected after seeing hidden labels.
