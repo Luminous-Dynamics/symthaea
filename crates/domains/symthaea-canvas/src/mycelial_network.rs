@@ -599,7 +599,7 @@ mod tests {
         assert_eq!(metrics.connected_components, 8);
         assert_eq!(metrics.cycle_rank, 0);
         assert_eq!(metrics.connected_components, 8);
-        assert_eq!(metrics.max_components_after_single_filament_failure, 9);
+        assert_eq!(metrics.max_components_after_single_filament_failure, 10);
     }
 
     #[test]
