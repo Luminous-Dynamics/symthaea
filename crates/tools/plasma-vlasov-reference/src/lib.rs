@@ -12,6 +12,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod mixed_basis;
 pub mod transition;
 pub mod velocity_frame;
 
