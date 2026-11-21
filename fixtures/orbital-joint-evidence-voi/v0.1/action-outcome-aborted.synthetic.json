@@ -5,7 +5,8 @@
   "proposal_ref": {
     "id": "JEV-017-A-TARGETED-STRUCTURAL-REQUALIFICATION",
     "kind": "evidence_action_proposal",
-    "revision": "v1"
+    "revision": "v1",
+    "sha256": "be611713859e77f87f636761aceb951da07ff7479829433708a13c4e05567ff6"
   },
   "decision_context": {
     "profile_ref": "provider-client-profile://P2-C2@cfg-r8",
