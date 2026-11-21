@@ -53,6 +53,79 @@ pub struct CognitiveSpatialProjection {
     pub links: Vec<CognitiveSpatialLink>,
 }
 
+impl CognitiveSpatialProjection {
+    /// Digest quantized coordinates and link endpoints, at 0.001 world-unit
+    /// resolution. Semantic evidence is bound separately by topology_digest.
+    pub fn geometry_digest_hex(&self) -> Result<String, CognitiveLayoutError> {
+        if self.schema_version != COGNITIVE_PROJECTION_SCHEMA_VERSION
+            || self.session_id.is_empty()
+        {
+            return Err(CognitiveLayoutError::InvalidProjection);
+        }
+        let mut anchors: Vec<_> = self.anchors.iter().collect();
+        anchors.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+        let mut node_ids = HashMap::with_capacity(anchors.len());
+        for anchor in &anchors {
+            if anchor.node_id.is_empty()
+                || !anchor.position.is_finite()
+                || anchor.position.x.abs() > 64.0
+                || anchor.position.y.abs() > 64.0
+                || anchor.position.z.abs() > 64.0
+                || node_ids.insert(anchor.node_id.as_str(), ()).is_some()
+            {
+                return Err(CognitiveLayoutError::InvalidProjection);
+            }
+        }
+
+        let mut links: Vec<_> = self.links.iter().collect();
+        links.sort_by(|left, right| left.edge_id.cmp(&right.edge_id));
+        let mut edge_ids = HashMap::with_capacity(links.len());
+        for link in &links {
+            if link.edge_id.is_empty()
+                || !node_ids.contains_key(link.source_node_id.as_str())
+                || !node_ids.contains_key(link.target_node_id.as_str())
+                || edge_ids.insert(link.edge_id.as_str(), ()).is_some()
+            {
+                return Err(CognitiveLayoutError::InvalidProjection);
+            }
+        }
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.schema_version.to_le_bytes());
+        hash_layout_string(&mut hasher, &self.session_id);
+        hasher.update(&(anchors.len() as u64).to_le_bytes());
+        for anchor in anchors {
+            hash_layout_string(&mut hasher, &anchor.node_id);
+            for coordinate in [
+                anchor.position.x,
+                anchor.position.y,
+                anchor.position.z,
+            ] {
+                let quantized = (f64::from(coordinate) * 1_000.0).round() as i64;
+                hasher.update(&quantized.to_le_bytes());
+            }
+        }
+        hasher.update(&(links.len() as u64).to_le_bytes());
+        for link in links {
+            hash_layout_string(&mut hasher, &link.edge_id);
+            hash_layout_string(&mut hasher, &link.source_node_id);
+            hash_layout_string(&mut hasher, &link.target_node_id);
+        }
+
+        let mut output = String::with_capacity(64);
+        for byte in hasher.finalize().as_bytes() {
+            use fmt::Write as _;
+            write!(&mut output, "{byte:02x}").expect("writing to String cannot fail");
+        }
+        Ok(output)
+    }
+}
+
+fn hash_layout_string(hasher: &mut blake3::Hasher, value: &str) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
+}
+
 /// Project a validated topology to stable renderer-neutral anchors and links.
 /// Coordinates are a hash-based identity baseline, not a relation-aware layout.
 pub fn project_cognitive_topology(
@@ -128,6 +201,7 @@ impl Default for CognitiveLayoutConfig {
 pub enum CognitiveLayoutError {
     InvalidConfig,
     InvalidPreviousProjection,
+    InvalidProjection,
     Topology(CognitiveTopologyError),
 }
 
@@ -138,6 +212,7 @@ impl fmt::Display for CognitiveLayoutError {
             Self::InvalidPreviousProjection => {
                 write!(f, "previous projection has an incompatible session, schema, or anchor set")
             }
+            Self::InvalidProjection => write!(f, "spatial projection contains invalid or unbounded geometry"),
             Self::Topology(error) => write!(f, "cognitive topology validation failed: {error}"),
         }
     }
@@ -516,6 +591,38 @@ mod tests {
             ),
             Err(CognitiveLayoutError::InvalidPreviousProjection)
         );
+    }
+
+    #[test]
+    fn geometry_digest_is_deterministic_and_binds_layout_not_semantics() {
+        let topology = fixture();
+        let first = layout_cognitive_topology(
+            &topology,
+            None,
+            CognitiveLayoutConfig::default(),
+        )
+        .expect("valid layout");
+        let second = layout_cognitive_topology(
+            &topology,
+            None,
+            CognitiveLayoutConfig::default(),
+        )
+        .expect("valid repeated layout");
+        assert_eq!(
+            first.geometry_digest_hex().expect("valid geometry"),
+            second.geometry_digest_hex().expect("valid geometry")
+        );
+
+        let mut presentation_variant = first.clone();
+        presentation_variant.anchors.reverse();
+        presentation_variant.links.reverse();
+        assert_eq!(
+            first.geometry_digest_hex().expect("valid geometry"),
+            presentation_variant
+                .geometry_digest_hex()
+                .expect("valid reordered geometry")
+        );
+        assert_eq!(first.topology_digest, second.topology_digest);
     }
 
     #[test]
