@@ -493,7 +493,7 @@ mod tests {
     use super::*;
 
     fn run_fixture() -> Value {
-        let schema = include_bytes!("../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
+        let schema = include_bytes!("../../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
         let fixture = include_bytes!("../../fixtures/reproducibility_hierarchy_smoke_v0_1.json");
         audit(schema, fixture).expect("synthetic reproducibility fixture must pass")
     }
@@ -607,7 +607,7 @@ mod tests {
     }
 
     fn audit_fixture_value(fixture: &Value) -> Result<Value, String> {
-        let schema = include_bytes!("../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
+        let schema = include_bytes!("../../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
         let bytes = serde_json::to_vec(fixture).expect("fixture serializes");
         audit(schema, &bytes)
     }
