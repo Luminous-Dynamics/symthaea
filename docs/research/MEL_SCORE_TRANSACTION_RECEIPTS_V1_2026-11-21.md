@@ -86,3 +86,6 @@ A passing test proves the v1 symbolic note-patch receipt behavior on the tested 
 ## Stack update
 
 This revision is rebased on the qualified Sonata universal-theory gate. Candidate eligibility uses the music-theory crate's documented universal-invariant policy; style-dependent findings remain present in the full validation report without being treated as cross-style structural corruption.
+
+
+**Build identity note:** the exact-head workflow explicitly checks out the event SHA; the score-receipt branch and Sonata base both carry the same canonical import for the shared universal-theory gate. The receipt's standalone compilation is therefore tested against the source revision named in the evidence manifest.
