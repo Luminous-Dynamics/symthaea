@@ -27,9 +27,10 @@ The crate is deliberately isolated from the root Cargo workspace and has no thir
 
 ```sh
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery_sweep
 ```
 
-The example outputs a JSON report conforming to `injection-recovery.schema.json`. It estimates:
+The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
 - null false-positive frequency under exchangeable same-state samples;
 - detection power under a declared module-loading perturbation;
 - 95% Wilson Monte-Carlo confidence intervals;
