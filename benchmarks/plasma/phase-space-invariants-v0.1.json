@@ -20,12 +20,16 @@
     "total_variation": "TV = sum over unique co-located support atoms of abs(aggregated_weight)",
     "normalized_first_velocity_moment": "M1 / velocity_scale",
     "normalized_half_second_velocity_moment": "K2 / velocity_scale^2",
-    "positive_measure": "true iff every nonzero aggregated support coefficient is positive"
+    "positive_measure": "true iff every nonzero aggregated support coefficient is positive",
+    "mean_velocity": "For nonnegative measures with positive zeroth moment: u = M1/M0; undefined for signed or zero-mass measures.",
+    "half_second_central_velocity_moment": "For nonnegative measures with positive zeroth moment: 0.5*sum_i w_i*(v_i-u)^2; accumulated directly, not by subtracting two large raw moments.",
+    "normalized_half_second_central_velocity_moment": "Half second central velocity moment / velocity_scale^2."
   },
   "interpretation": {
     "kinetic_energy": "K2 is physical kinetic energy only for nonnegative particle measures with the appropriate mass/weight normalization.",
     "signed_delta_f": "For signed delta-f representations, M0, M1 and K2 are signed moment contributions, not positive density or kinetic energy by themselves.",
-    "normalization": "Raw moments are never divided by total weight; dimensionless companions use the explicit velocity_scale."
+    "normalization": "Raw moments are never divided by total weight; dimensionless companions use the explicit velocity_scale.",
+    "central_moment": "The central velocity moment is a dispersion/thermal contribution only on nonnegative positive-mass measures; a physical thermal-energy interpretation still depends on the particle mass/weight normalization."
   },
   "reference_fixtures": [
     {
@@ -50,7 +54,10 @@
         "normalized_half_second_velocity_moment": 0.5,
         "total_variation": 1,
         "is_nonnegative_measure": true,
-        "unique_atom_count": 2
+        "unique_atom_count": 2,
+        "mean_velocity": 1,
+        "half_second_central_velocity_moment": 1.5,
+        "normalized_half_second_central_velocity_moment": 0.375
       }
     },
     {
@@ -75,7 +82,10 @@
         "normalized_half_second_velocity_moment": -0.125,
         "total_variation": 1.5,
         "is_nonnegative_measure": false,
-        "unique_atom_count": 2
+        "unique_atom_count": 2,
+        "mean_velocity": null,
+        "half_second_central_velocity_moment": null,
+        "normalized_half_second_central_velocity_moment": null
       }
     },
     {
@@ -98,7 +108,10 @@
         "half_second_velocity_moment": 0.03125,
         "total_variation": 0.25,
         "is_nonnegative_measure": true,
-        "unique_atom_count": 1
+        "unique_atom_count": 1,
+        "mean_velocity": -0.5,
+        "half_second_central_velocity_moment": 0,
+        "normalized_half_second_central_velocity_moment": 0
       },
       "note": "Positions 2 and 10 are co-located modulo L=8; their signed weights aggregate to +0.25 before total variation."
     }
