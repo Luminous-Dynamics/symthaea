@@ -456,7 +456,7 @@ impl SplitMix64 {
     /// singularities in Box-Muller and transformed-rejection sampling.
     fn uniform_open(&mut self) -> f64 {
         let mantissa = self.next_u64() >> 11;
-        (mantissa as f64 + 0.5) * (1.0 / 9_007_199_254_740_992.0)
+        (mantissa as f64 + 1.0) / 9_007_199_254_740_993.0
     }
 
     fn standard_normal(&mut self) -> f64 {
