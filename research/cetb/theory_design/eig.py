@@ -51,6 +51,8 @@ def expected_information_gain_bits(
     Each theory must provide a normalized likelihood over the same explicit
     outcome space, including missing, ambiguous and failed outcomes.
     """
+    if isinstance(tolerance, bool) or not math.isfinite(tolerance) or tolerance < 0.0:
+        raise DesignValidationError("tolerance must be finite and non-negative")
     _validate_distribution(prior, "prior", tolerance)
     if set(likelihoods) != set(prior):
         raise DesignValidationError("likelihood theory keys must match prior theory keys")
@@ -125,12 +127,20 @@ def evaluate_design_scenarios(
     tolerance: float = 1e-10,
 ) -> dict[str, float | int]:
     """Summarize EIG across predeclared nuisance scenarios and a declared cost."""
-    if not math.isfinite(cost) or cost <= 0.0:
-        raise DesignValidationError("design cost must be finite and positive")
+    if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost <= 0.0:
+        raise DesignValidationError("design cost must be finite, numeric and positive")
+    if isinstance(tolerance, bool) or not math.isfinite(tolerance) or tolerance < 0.0:
+        raise DesignValidationError("tolerance must be finite and non-negative")
     if not scenario_likelihoods:
         raise DesignValidationError("at least one nuisance scenario is required")
     weighted_eigs = []
+    reference_outcomes: set[str] | None = None
     for index, (weight, likelihoods) in enumerate(scenario_likelihoods):
+        this_outcomes = set(next(iter(likelihoods.values()), {}))
+        if reference_outcomes is None:
+            reference_outcomes = this_outcomes
+        elif this_outcomes != reference_outcomes:
+            raise DesignValidationError("all nuisance scenarios must use the same explicit outcome space")
         if isinstance(weight, bool) or not isinstance(weight, (int, float)):
             raise DesignValidationError(f"scenario {index} weight must be numeric")
         if not math.isfinite(weight) or weight < 0.0:
@@ -140,6 +150,8 @@ def evaluate_design_scenarios(
     total_weight = math.fsum(weight for _, weight in weighted_eigs)
     if total_weight <= 0.0:
         raise DesignValidationError("scenario weights must have positive mass")
+    if abs(total_weight - 1.0) > tolerance:
+        raise DesignValidationError("nuisance-scenario weights must sum to 1")
     expected = math.fsum(value * weight for value, weight in weighted_eigs) / total_weight
     robust = weighted_lower_quantile(weighted_eigs, lower_quantile)
     return {
