@@ -1,0 +1,77 @@
+name: Orbital Capture Handoff Reference
+
+on:
+  push:
+    branches: ["research/orbital-capture-handoff-bench-v0-1"]
+    paths:
+      - "tools/orbital-capture-handoff-bench/**"
+      - ".github/workflows/orbital-capture-handoff-bench.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/orbital-capture-handoff-bench/**"
+      - ".github/workflows/orbital-capture-handoff-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orbital-capture-handoff-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Resolve standalone dependency graph
+        run: cargo generate-lockfile --manifest-path tools/orbital-capture-handoff-bench/Cargo.toml
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/orbital-capture-handoff-bench/Cargo.toml -- --check
+
+      - name: Run all-target tests
+        run: cargo test --locked --manifest-path tools/orbital-capture-handoff-bench/Cargo.toml --all-targets
+
+      - name: Run Clippy with warnings denied
+        run: cargo clippy --locked --manifest-path tools/orbital-capture-handoff-bench/Cargo.toml --all-targets -- -D warnings
+
+      - name: Generate and verify deterministic receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          test "$source_commit" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          cargo run --locked --quiet --manifest-path tools/orbital-capture-handoff-bench/Cargo.toml -- \
+            tools/orbital-capture-handoff-bench/fixtures/v0.1/cases.json \
+            --source-commit "$source_commit" > orbital-capture-handoff-receipt.json
+          jq -e '
+            .result == "pass"
+            and (.source_commit | test("^[0-9a-f]{40}$"))
+            and (.fixture_sha256 | test("^[0-9a-f]{64}$"))
+            and .report.summary.case_count == 22
+            and .report.summary.accepted_for_handoff == 1
+            and .report.summary.rejected == 16
+            and .report.summary.indeterminate == 5
+            and .report.summary.proximity_only_false_accepts == 20
+            and .report.summary.expected_result_mismatches == 0
+            and (.report.cases | any(.case_id == "NOMINAL_CAPTURE" and .status == "accepted_for_handoff" and .client_id == "serviced-client-001" and .interface_id == "COOPERATIVE-CAPTURE-PORT-A" and .interface_revision == 3 and .frame_id == "TARGET-LVLH-001" and .epoch_tick == 1000))
+            and (.report.cases | all(.authority_granted == false))
+          ' orbital-capture-handoff-receipt.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbital-capture-handoff-receipt-${{ github.sha }}
+          path: orbital-capture-handoff-receipt.json
+          if-no-files-found: error
