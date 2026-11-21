@@ -1,11 +1,11 @@
-pub mod simulation;
-
 //! Repeatability-calibrated similarity metrics for CETB research.
 //!
 //! This crate deliberately contains no data loader, correlation estimator or clinical
 //! classifier. It operates on already-computed correlation matrices and participant-level
 //! within-/between-condition similarities. Participant-level inference is performed only
 //! after repeated segment measurements have been reduced within participant.
+
+pub mod simulation;
 
 use std::fmt;
 
@@ -33,6 +33,7 @@ pub enum MetricError {
     DuplicateRoiLabel { index: usize },
     EmptyParticipantId { index: usize },
     DuplicateParticipantId { index: usize },
+    InvalidSimulationConfig { reason: &'static str },
 }
 
 impl fmt::Display for MetricError {
@@ -86,6 +87,9 @@ impl fmt::Display for MetricError {
             }
             Self::DuplicateParticipantId { index } => {
                 write!(f, "duplicate participant ID at index {index}")
+            }
+            Self::InvalidSimulationConfig { reason } => {
+                write!(f, "invalid injection-recovery configuration: {reason}")
             }
         }
     }
