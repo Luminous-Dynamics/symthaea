@@ -13,7 +13,7 @@ This is a narrow measurement bridge between static VSA capacity and continuous-t
 
 ## Existing algebra and task
 
-For each seed, dimension (D), and fan-in (K), generate independent bipolar key/value codebooks:
+For each seed, dimension (D), and fan-in K, generate independent bipolar key/value codebooks:
 
 [
  k_i,v_iin{-1,+1}^D.
@@ -65,7 +65,7 @@ Each cohort also emits:
 For K balanced labels and top-1 error rate e, Fano's inequality gives the diagnostic:
 
 ```text
-I(Y; Ŷ) ≥ max(0, log₂(K) − h₂(e) − e·log₂(K−1))
+I(Y; Ŷ) ≥ max(0, log₂K − h₂(e) − e·log₂(K−1))
 ```
 
 The JSON field is named `plug_in_fano_information_lower_bound_bits`, but the value is calculated from the finite cohort's observed error rate. It is a descriptive plug-in diagnostic—not a confidence interval, a distribution-free finite-sample guarantee, or a substitute for estimating mutual information under a specified sampling distribution. The diagnostic is not the same as retrieval accuracy: a deterministic but wrong permutation can still preserve information about the label while failing the original semantic lookup. The per-query rows are retained so that uncertainty estimation and alternative estimators can be applied later.
@@ -93,11 +93,11 @@ Arguments:
 - `--source-revision`: optional 40- or 64-character hexadecimal Git SHA; use the current source commit for publishable measurements. The summary receipt stores null when omitted;
 - `--out`: JSONL destination; omit it or pass `-` for stdout.
 
-The JSONL stream contains one `query` record per item followed by one `summary` record for each cohort. Each summary carries the source revision used for the run (or null when the caller did not pin one). A summary with (K) queries uses all (K) queries as its denominator; invalid and tied queries remain visible and cannot improve the correctness count.
+The JSONL stream contains one `query` record per item followed by one `summary` record for each cohort. Each summary carries the source revision used for the run (or null when the caller did not pin one). A summary with K queries uses all K queries as its denominator; invalid and tied queries remain visible and cannot improve the correctness count.
 
 ## Capacity targets for the next qualification phase
 
-**Seed-count warning:** the default three seeds in the raw runner are smoke-scale only. They are not suitable for a confirmatory claim. The independent unit is the corpus/model seed; the (K) queries within one bundled memory are correlated observations and must never be counted as (K) independent replicates.
+**Seed-count warning:** the default three seeds in the raw runner are smoke-scale only. They are not suitable for a confirmatory claim. The independent unit is the corpus/model seed; the K queries within one bundled memory are correlated observations and must never be counted as K independent replicates.
 
 Do not define capacity as the largest fan-in observed once. The target is a temporal capacity surface with a two-level reliability requirement:
 
@@ -119,7 +119,7 @@ Here D is representation dimension, T is elapsed horizon, E is event count, and 
 
 With zero failures, at least **59 independent seeds** are required for the one-sided exact 95% lower bound on seed-success probability to reach 95% (59/59 gives approximately 0.95049). Any observed seed failures require a larger sample to qualify. The frontier tool defaults to a minimum of 59 seeds and also requires identical seed sets across fan-in levels for K95 and across horizon levels for T90. A missing or unpaired seed set prevents qualification.
 
-The new Rust post-processor is `examples/temporal_capacity_frontier.rs`. It reads the raw JSONL summaries and emits per-cohort seed-reliability records plus discrete K95/T90 records. It never interpolates between untested loads or horizons. A null K95/T90 means no tested point met the full gate; it does not mean the system has zero capacity or zero retention.
+The new Rust post-processor is `examples/temporal_capacity_frontier.rs`. It reads the raw JSONL summaries and emits per-cohort seed-reliability records plus discrete K95/T90 records. It requires a valid source Git SHA in every summary, rejects duplicate seeds and malformed counts, and groups results by exact source revision. It never interpolates between untested loads or horizons. A null K95/T90 means no tested point met the full gate; it does not mean the system has zero capacity or zero retention.
 
 Run the raw experiment and frontier analysis from a clean, committed worktree:
 
