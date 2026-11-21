@@ -28,10 +28,6 @@ struct Factor {
 #[derive(Clone, Debug)]
 struct Arm {
     arm_id: String,
-    specimen_id: String,
-    material_state_id: String,
-    factor_a_on: bool,
-    factor_b_on: bool,
     randomization_order: u64,
     outcomes: BTreeMap<String, f64>,
 }
@@ -263,10 +259,6 @@ fn parse_arm(
 
     Ok(Arm {
         arm_id,
-        specimen_id,
-        material_state_id,
-        factor_a_on,
-        factor_b_on,
         randomization_order,
         outcomes: outcome_map,
     })
@@ -625,8 +617,8 @@ mod tests {
     #[test]
     fn rejects_same_specimen_reused_across_arms() {
         let mut fixture = fixture_value();
-        fixture["blocks"][0]["arms"][1]["specimen_id"] =
-            fixture["blocks"][0]["arms"][0]["specimen_id"].clone();
+        let reused_specimen = fixture["blocks"][0]["arms"][0]["specimen_id"].clone();
+        fixture["blocks"][0]["arms"][1]["specimen_id"] = reused_specimen;
         assert!(audit_fixture(&fixture).unwrap_err().contains("specimen_id"));
     }
 
