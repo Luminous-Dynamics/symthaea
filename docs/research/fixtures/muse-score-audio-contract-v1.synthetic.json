@@ -1,0 +1,11 @@
+{
+  "schema": "muse-score-audio-contract-v1",
+  "scope_kind": "isolated_stem",
+  "scope_id": "stem-melody-001",
+  "sample_rate_hz": 16000,
+  "channels": 1,
+  "analysis_window_frames": 4096,
+  "minimum_signal_rms_dbfs": -65,
+  "pitch_tolerance_cents": 35,
+  "minimum_salience_margin": 0.15
+}
