@@ -75,16 +75,17 @@ An isolated Bevy 0.20.1 preview adapter now lives at `crates/bridges/symthaea-my
 
 Implemented in source:
 1. CPU tube geometry is uploaded as one Bevy `Mesh3d` with `StandardMaterial` PBR shading.
-2. The preview assembles an emissive central nucleus, a translucent outer membrane, and orbital cell spheres.
-3. Ambient, Cognitive, and Conversational modes are selectable on the command line.
-4. `--reduced-motion` disables renderer-local core breathing and orbital movement.
-5. The model and tessellation remain in `symthaea-canvas`; the adapter only converts them to renderer assets.
+2. The preview assembles an emissive central nucleus, a translucent outer membrane, orbital cells, and terminal spores; generation metadata drives a restrained teal-to-violet vertex colour ramp.
+3. Bevy's natural HDR bloom preset is paired with TonyMcMapface tonemapping; bloom remains low and material emissive values carry local brightness.
+4. Ambient, Cognitive, and Conversational modes are selectable on the command line.
+5. `--reduced-motion` disables renderer-local core breathing and orbital movement.
+6. The model and tessellation remain in `symthaea-canvas`; the adapter only converts them to renderer assets.
 
 Still required:
 1. Build and run the isolated adapter on a supported native GPU, inspect actual output, and fix any API or visual issues.
 2. Replace the shared filament material with generation/branch-aware material data without duplicating semantic geometry.
-3. Add custom WESL material extensions for a restrained Fresnel rim and bounded glow; do not make mesh shaders a requirement.
-4. Instance terminal spores, apply level-of-detail, and set strict geometry/particle budgets on mobile.
+3. Add custom WESL material extensions for a restrained Fresnel rim and material refinements; do not make mesh shaders a requirement.
+4. Optimize terminal-spore draw calls, apply level-of-detail, and set strict geometry/particle budgets on mobile.
 5. Add camera interaction, runtime event streaming, and renderer telemetry only after the baseline is stable.
 6. Keep camera motion user-controlled or very subtle. The organism should remain legible without motion.
 
