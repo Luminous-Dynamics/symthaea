@@ -508,6 +508,44 @@
       "split_protocol": "full-paper protocol requires independent reproduction",
       "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
       "claim_status": "cluster metric report, not pseudo-label correctness or manufacturing validation"
+    },
+    {
+      "id": "ViT-Tiny-WM38K-2026",
+      "title": "Scalable and lightweight vision transformers for mixed-defect classification in semiconductor wafer maps",
+      "source": "https://doi.org/10.1038/s41598-026-63752-0",
+      "publication_date": "2026-08-25",
+      "evidence_class": "peer-reviewed-article",
+      "reported_results": {
+        "dataset": "WM-38K",
+        "accuracy": 0.984,
+        "parameters": 5700000,
+        "inference_speedup_vs_comparable_transformers": 1.77,
+        "memory_reduction_factor": 4.47
+      },
+      "protocol_review": "reproduce exact split, label definition, hardware, latency and memory before direct leaderboard comparison",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149"
+    },
+    {
+      "id": "Hybrid-Deep-Handcrafted-WM811K-2026",
+      "title": "A hybrid deep and handcrafted feature learning approach for imbalanced wafer map defect classification",
+      "source": "https://doi.org/10.1038/s41598-026-68884-x",
+      "publication_date": "2026-09-10",
+      "evidence_class": "peer-reviewed-article",
+      "reported_results": {
+        "dataset": "WM-811K",
+        "accuracy": 0.9889,
+        "macro_f1": 0.9441,
+        "trainable_parameters": 64967
+      },
+      "components": [
+        "StyleGAN2-ADA-offline-generator",
+        "global-local-MobileNetV2",
+        "cross-attention",
+        "five-handcrafted-geometric-feature-groups",
+        "class-balanced-focal-loss"
+      ],
+      "resource_review": "64,967 parameter count excludes offline generator and handcrafted feature extraction; full lifecycle and runtime components must be reported",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149"
     }
   ],
   "benchmark_reference_artifacts": {
