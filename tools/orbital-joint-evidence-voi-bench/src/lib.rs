@@ -33,6 +33,8 @@ pub struct Scenario {
     pub target_claim_id: String,
     pub requires_independent_evidence: bool,
     pub decision_context: DecisionContext,
+    #[serde(default)]
+    pub change_impact: Option<ChangeImpact>,
     pub states: Vec<String>,
     pub loss_matrix: BTreeMap<String, BTreeMap<String, f64>>,
     pub prior: Option<BTreeMap<String, f64>>,
@@ -51,6 +53,17 @@ pub struct DecisionContext {
     pub article_subject_ref: String,
     pub configuration_id: String,
     pub icd_revision: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChangeImpact {
+    pub source_owner: String,
+    pub receipt_ref: String,
+    pub event_frontier_ref: String,
+    pub completeness: String,
+    pub required_requalification_claims: Vec<String>,
+    pub unaffected_claims: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -118,6 +131,8 @@ pub struct ActionAudit {
     pub article_subject_matches: bool,
     pub configuration_matches: bool,
     pub icd_revision_matches: bool,
+    pub change_frontier_complete: bool,
+    pub requalification_claims_covered: bool,
     pub common_cause_conflict: bool,
     pub mandatory_obligations_covered: bool,
     pub decision_informative: bool,
@@ -371,6 +386,27 @@ fn obligations_covered(scenario: &Scenario, action: &Action) -> bool {
         .all(|obligation| covered.contains(obligation))
 }
 
+fn change_frontier_complete(scenario: &Scenario) -> bool {
+    scenario
+        .change_impact
+        .as_ref()
+        .is_none_or(|impact| impact.completeness == "COMPLETE")
+}
+
+fn requalification_claims_covered(scenario: &Scenario, action: &Action) -> bool {
+    let Some(impact) = &scenario.change_impact else {
+        return true;
+    };
+    if impact.completeness != "COMPLETE" {
+        return false;
+    }
+    let covered = metadata_strings(action, "requalification_claims_covered");
+    impact
+        .required_requalification_claims
+        .iter()
+        .all(|claim| covered.contains(claim))
+}
+
 fn decision_regret(
     loss_matrix: &BTreeMap<String, BTreeMap<String, f64>>,
     decisions: &[String],
@@ -601,6 +637,46 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             ));
         }
     }
+    if let Some(impact) = &scenario.change_impact {
+        if impact.source_owner != "mycelix:6219"
+            || impact.receipt_ref.trim().is_empty()
+            || impact.event_frontier_ref.trim().is_empty()
+            || !matches!(impact.completeness.as_str(), "COMPLETE" | "INCOMPLETE")
+        {
+            return Err(format!(
+                "{} has an invalid owner-native change-impact receipt",
+                scenario.scenario_id
+            ));
+        }
+        let required: BTreeSet<&str> = impact
+            .required_requalification_claims
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let unaffected: BTreeSet<&str> =
+            impact.unaffected_claims.iter().map(String::as_str).collect();
+        if required.len() != impact.required_requalification_claims.len()
+            || unaffected.len() != impact.unaffected_claims.len()
+            || required.iter().any(|claim| claim.trim().is_empty())
+            || unaffected.iter().any(|claim| claim.trim().is_empty())
+            || !required.is_disjoint(&unaffected)
+        {
+            return Err(format!(
+                "{} has duplicate, empty or overlapping change-impact claim sets",
+                scenario.scenario_id
+            ));
+        }
+        if impact.completeness == "INCOMPLETE"
+            && impact.required_requalification_claims.is_empty()
+            && impact.unaffected_claims.is_empty()
+        {
+            return Err(format!(
+                "{} incomplete change-impact receipt must preserve known affected/unaffected claims when available",
+                scenario.scenario_id
+            ));
+        }
+    }
+
     if scenario
         .current_evidence_refs
         .iter()
@@ -792,6 +868,8 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         let configuration_matches =
             action.configuration_id == scenario.decision_context.configuration_id;
         let icd_revision_matches = action.icd_revision == scenario.decision_context.icd_revision;
+        let change_frontier_complete = change_frontier_complete(scenario);
+        let requalification_claims_covered = requalification_claims_covered(scenario, action);
         let common_cause_conflict = !action_is_independent(scenario, action);
         let mandatory_obligations_covered = obligations_covered(scenario, action);
         let terminal_nonresult = is_terminal_nonresult(action);
@@ -830,6 +908,11 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
         if !icd_revision_matches {
             reasons.push("ICD_REVISION_MISMATCH".to_owned());
         }
+        if !change_frontier_complete {
+            reasons.push("CHANGE_FRONTIER_INCOMPLETE".to_owned());
+        } else if !requalification_claims_covered {
+            reasons.push("REQUALIFICATION_CLAIM_NOT_COVERED".to_owned());
+        }
         if common_cause_conflict {
             reasons.push("COMMON_CAUSE_DEPENDENCY".to_owned());
         }
@@ -861,6 +944,8 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             && article_subject_matches
             && configuration_matches
             && icd_revision_matches
+            && change_frontier_complete
+            && requalification_claims_covered
             && !common_cause_conflict
             && mandatory_obligations_covered
             && !terminal_nonresult
@@ -921,6 +1006,8 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
             article_subject_matches,
             configuration_matches,
             icd_revision_matches,
+            change_frontier_complete,
+            requalification_claims_covered,
             common_cause_conflict,
             mandatory_obligations_covered,
             decision_informative,
