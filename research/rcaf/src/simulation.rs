@@ -1311,8 +1311,12 @@ mod tests {
             report.monte_carlo_replicates
         );
         assert_eq!(
-            report.signal_plus_nuisance_directional_detection_power.successes
-                + report.signal_plus_nuisance_wrong_direction_rejection_rate.successes,
+            report
+                .signal_plus_nuisance_directional_detection_power
+                .successes
+                + report
+                    .signal_plus_nuisance_wrong_direction_rejection_rate
+                    .successes,
             report.signal_plus_nuisance_detection_power.successes
         );
         assert!(report.median_signal_plus_nuisance_paired_gap.is_finite());
