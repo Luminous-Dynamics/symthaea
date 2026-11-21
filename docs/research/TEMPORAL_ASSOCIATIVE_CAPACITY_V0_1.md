@@ -93,6 +93,31 @@ Arguments:
 
 The JSONL stream contains one `query` record per item followed by one `summary` record for each cohort. A summary with (K) queries uses all (K) queries as its denominator; invalid and tied queries remain visible and cannot improve the correctness count.
 
+## Capacity targets for the next qualification phase
+
+Do not define capacity as the largest fan-in observed once. The target object is a temporal capacity surface:
+
+```text
+K95(D, T, E, CV) =
+  largest fan-in K whose seed-level 95% lower confidence bound
+  on semantic top-1 retrieval is at least 95%
+
+T90(D, K, E, CV) =
+  largest elapsed horizon whose seed-level 95% lower confidence bound
+  on semantic top-1 retrieval is at least 90%
+```
+
+Here D is representation dimension, T is elapsed horizon, E is event count, and CV is the coefficient of variation of the positive inter-event gaps. Estimates and confidence intervals must be computed across independent corpus/model seeds; queries sharing one bundled memory are correlated observations and must not be treated as independent replicates.
+
+Report the whole capacity surface with:
+- semantic top-1 accuracy and target-vs-best-distractor margin;
+- random-query false-match rate and the number of comparisons performed;
+- plug-in Fano diagnostic plus a separately qualified information estimator when added;
+- information retained per stored byte, per evolution update, and per joule only when physical energy is measured;
+- horizon, event count, irregularity CV and time-to-recovery following a regime change.
+
+The 95% / 90% operating points are **proposed qualification targets**, not existing Symthaea results or universal thresholds. A candidate only wins if its confidence-qualified capacity surface and resource frontier outperform the matched baseline under the same workload and measurement boundary.
+
 ## What v0.1 can and cannot establish
 
 It can characterize, on synthetic bipolar key/value codebooks:
