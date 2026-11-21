@@ -10,8 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::embodiment::{
-    EmbodimentActivity, EmbodimentSnapshot, GazeTarget, Observed, SpeechOutputState,
-    VisemeSignal,
+    EmbodimentActivity, EmbodimentSnapshot, GazeTarget, Observed, SpeechOutputState, VisemeSignal,
 };
 
 pub const MYCELIAL_MODEL_VERSION: u16 = 1;
@@ -38,18 +37,34 @@ pub struct SpatialPoint3 {
 }
 
 impl SpatialPoint3 {
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     pub(crate) fn add(self, other: Self) -> Self {
-        Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        }
     }
 
     pub(crate) fn sub(self, other: Self) -> Self {
-        Self { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        }
     }
 
     pub(crate) fn scale(self, factor: f32) -> Self {
-        Self { x: self.x * factor, y: self.y * factor, z: self.z * factor }
+        Self {
+            x: self.x * factor,
+            y: self.y * factor,
+            z: self.z * factor,
+        }
     }
 
     pub(crate) fn dot(self, other: Self) -> f32 {
@@ -73,7 +88,11 @@ impl SpatialPoint3 {
         if length.is_finite() && length > 1.0e-6 {
             self.scale(1.0 / length)
         } else {
-            Self { x: 1.0, y: 0.0, z: 0.0 }
+            Self {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            }
         }
     }
 
@@ -127,7 +146,10 @@ impl MycelialModel {
     }
 
     pub fn terminal_filament_count(&self) -> usize {
-        self.filaments.iter().filter(|filament| filament.terminal).count()
+        self.filaments
+            .iter()
+            .filter(|filament| filament.terminal)
+            .count()
     }
 }
 
@@ -135,10 +157,7 @@ impl MycelialModel {
 ///
 /// Mode changes presentation complexity only. It never changes the meaning of
 /// runtime signals, and generated geometry is explicitly renderer-local.
-pub fn build_mycelial_model(
-    snapshot: &EmbodimentSnapshot,
-    mode: PresenceMode,
-) -> MycelialModel {
+pub fn build_mycelial_model(snapshot: &EmbodimentSnapshot, mode: PresenceMode) -> MycelialModel {
     let (primary_count, branch_depth, canopy_scale) = match mode {
         PresenceMode::Ambient => (8usize, 3u8, 1.0f32),
         PresenceMode::Cognitive => (10usize, 3u8, 0.92f32),
@@ -230,9 +249,17 @@ fn append_filament(
 ) {
     let direction = direction.normalized();
     let reference = if direction.z.abs() > 0.82 {
-        SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 }
+        SpatialPoint3 {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        }
     } else {
-        SpatialPoint3 { x: 0.0, y: 0.0, z: 1.0 }
+        SpatialPoint3 {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+        }
     };
     let side = direction.cross(reference).normalized();
     let lift = side.cross(direction).normalized();
@@ -242,9 +269,7 @@ fn append_filament(
         .scale(bend_a * length * 0.075)
         .add(lift.scale(bend_b * length * 0.052));
 
-    let end = start
-        .add(direction.scale(length))
-        .add(lateral.scale(1.08));
+    let end = start.add(direction.scale(length)).add(lateral.scale(1.08));
     // Keep child branches tangent-continuous at the fork, then let them
     // diverge along their own deterministic direction.
     let start_tangent = if parent_id.is_some() {
@@ -296,7 +321,8 @@ fn append_filament(
             child_length,
             remaining_depth - 1,
             generation + 1,
-            seed.wrapping_mul(1664525).wrapping_add(1013904223 ^ child_slot),
+            seed.wrapping_mul(1664525)
+                .wrapping_add(1013904223 ^ child_slot),
         );
     }
 }
@@ -353,10 +379,7 @@ mod tests {
 
     #[test]
     fn every_curve_is_finite_bounded_and_has_a_valid_parent_order() {
-        let model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Cognitive,
-        );
+        let model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Cognitive);
         let mut seen = std::collections::HashSet::new();
         for filament in &model.filaments {
             assert!(seen.insert(filament.id));
@@ -369,7 +392,12 @@ mod tests {
             if let Some(parent_id) = filament.parent_id {
                 assert!(seen.contains(&parent_id), "parent must precede child");
             }
-            for point in [filament.start, filament.control_a, filament.control_b, filament.end] {
+            for point in [
+                filament.start,
+                filament.control_a,
+                filament.control_b,
+                filament.end,
+            ] {
                 assert!(point.length() < 700.0, "unbounded point: {point:?}");
             }
         }
@@ -393,7 +421,10 @@ mod tests {
         use crate::embodiment::{Viseme, VisemeSignal};
         let mut snapshot = EmbodimentSnapshot::default();
         snapshot.viseme = Some(observed(
-            VisemeSignal { viseme: Viseme::Aa, weight: 0.8 },
+            VisemeSignal {
+                viseme: Viseme::Aa,
+                weight: 0.8,
+            },
             2,
         ));
         assert!(
@@ -410,11 +441,12 @@ mod tests {
     }
     #[test]
     fn child_filaments_begin_at_parent_endpoint_with_matching_tangent() {
-        let model = build_mycelial_model(
-            &EmbodimentSnapshot::default(),
-            PresenceMode::Ambient,
-        );
-        for child in model.filaments.iter().filter(|filament| filament.parent_id.is_some()) {
+        let model = build_mycelial_model(&EmbodimentSnapshot::default(), PresenceMode::Ambient);
+        for child in model
+            .filaments
+            .iter()
+            .filter(|filament| filament.parent_id.is_some())
+        {
             let parent_id = child.parent_id.expect("filtered child");
             let parent = model
                 .filaments
@@ -438,17 +470,29 @@ mod tests {
         let mut snapshot = EmbodimentSnapshot::default();
         snapshot.speech_output = Some(observed(SpeechOutputState::Playing, 1));
         snapshot.viseme = Some(observed(
-            VisemeSignal { viseme: Viseme::Ee, weight: 1.7 },
+            VisemeSignal {
+                viseme: Viseme::Ee,
+                weight: 1.7,
+            },
             2,
         ));
         let model = build_mycelial_model(&snapshot, PresenceMode::Ambient);
-        assert_eq!(model.viseme.as_ref().map(|value| value.value.weight), Some(1.0));
+        assert_eq!(
+            model.viseme.as_ref().map(|value| value.value.weight),
+            Some(1.0)
+        );
 
         snapshot.viseme = Some(observed(
-            VisemeSignal { viseme: Viseme::Ee, weight: f32::NAN },
+            VisemeSignal {
+                viseme: Viseme::Ee,
+                weight: f32::NAN,
+            },
             3,
         ));
-        assert!(build_mycelial_model(&snapshot, PresenceMode::Ambient).viseme.is_none());
+        assert!(
+            build_mycelial_model(&snapshot, PresenceMode::Ambient)
+                .viseme
+                .is_none()
+        );
     }
-
 }
