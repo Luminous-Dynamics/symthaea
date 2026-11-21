@@ -250,7 +250,6 @@
       "test_observation_ids": [
         "OBS-005",
         "OBS-006",
-        "OBS-007",
         "OBS-008"
       ],
       "paired_specimen_transfer": false
