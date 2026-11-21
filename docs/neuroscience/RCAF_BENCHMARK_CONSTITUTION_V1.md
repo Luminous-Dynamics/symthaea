@@ -233,3 +233,15 @@ research/rcaf/rcaf-report.schema.json defines the participant-level output contr
 The 2026 Network Similarity Index (NSI) offers an external quality-assessment comparator for precision functional mapping. CETB should evaluate it where individual functional-connectivity mapping assumptions fit, and should treat it as an optional quality covariate—not a universal gate across task-fMRI, anesthesia, EEG or iEEG.
 
 The 2025 239-statistic functional-connectivity benchmark shows that estimator choice changes network properties, identifiability and prediction. RCAF must therefore keep WJ as one estimator within an objective-matched estimator tournament. Compare Pearson/Spearman, covariance/precision and graph/network measures under frozen analysis variants; do not use the best-performing estimator selected on the final test cohort.
+
+
+## 13. Identity- and label-safe kernel entry points
+
+The v1.2 kernel adds preferred entry points for empirical comparisons:
+
+- `summarize_rcaf_by_participant` accepts a record containing the pseudonymous participant key, within-state summary and between-state summary together. Empty or duplicated keys are rejected. This avoids silently pairing independently assembled vectors by their row order.
+- `weighted_jaccard_labeled_correlation_matrices` checks that both matrices have exactly the same ordered, unique, non-empty ROI labels before the metric is computed.
+- `summarize_edge_sign_transitions_labeled` applies the same label-order contract to polarity analyses.
+- Neutral-band thresholds must be finite and in [0,1], matching the correlation domain.
+
+The lower-level vector and unlabeled-matrix functions remain available for fixtures and controlled callers, but empirical pipelines should use the identity- and label-aware APIs. A report validator must independently recompute every participant gap and summary; a schema-valid JSON document is not sufficient evidence that the arithmetic or identity mapping is correct.
