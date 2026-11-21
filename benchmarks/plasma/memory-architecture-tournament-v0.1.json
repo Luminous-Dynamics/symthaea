@@ -1,0 +1,177 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "plasma-memory-architecture-tournament-v0.1",
+  "created_at": "2026-11-19",
+  "status": "specification_only",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12921",
+  "parent_issues": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12907",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12910",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12914"
+  ],
+  "benchmark_scope": {
+    "primary_task": "one_dimensional_electrostatic_landau_damping",
+    "comparison_rule": "only common-system runs with matched equations, data splits, solver, time semantics, initial conditions and compute budgets may be ranked head-to-head",
+    "separate_task_lanes": [
+      "ADEPT_original_Euler_Poisson_hidden_variable_reproduction",
+      "FNO_ten_moment_or_declared_fluid_closure_reproduction",
+      "Fourier_Hermite_Vlasov_velocity_space_reservoir_reproduction"
+    ],
+    "claim_ceiling": "protocol_and_source_inventory_only"
+  },
+  "candidates": [
+    {
+      "id": "hammett_perkins",
+      "memory_kind": "analytic_nonlocal_response",
+      "common_system_candidate": true,
+      "status": "baseline_to_reproduce"
+    },
+    {
+      "id": "markovian",
+      "memory_kind": "instantaneous_resolved_state",
+      "common_system_candidate": true,
+      "status": "ablation"
+    },
+    {
+      "id": "fixed_window_fno",
+      "memory_kind": "explicit_trailing_resolved_history",
+      "common_system_candidate": true,
+      "status": "paper_exact_reproduction_pending"
+    },
+    {
+      "id": "adept_prognostic_hidden_field",
+      "memory_kind": "evolving_spatiotemporal_auxiliary_field",
+      "common_system_candidate": "only_after_task_compatible_adaptation",
+      "status": "own_task_reproduction_pending"
+    },
+    {
+      "id": "nonlinear_state_space",
+      "memory_kind": "compact_recurrent_latent_state",
+      "common_system_candidate": true,
+      "status": "candidate_not_implemented"
+    },
+    {
+      "id": "symthaea_cfc_ltc",
+      "memory_kind": "continuous_time_latent_state",
+      "common_system_candidate": true,
+      "status": "hypothesis_not_validated"
+    },
+    {
+      "id": "hybrid_window_latent",
+      "memory_kind": "short_explicit_window_plus_latent_state",
+      "common_system_candidate": true,
+      "status": "candidate_not_implemented"
+    },
+    {
+      "id": "fourier_hermite_reservoir",
+      "memory_kind": "fixed_recurrent_reservoir_plus_trained_readout",
+      "common_system_candidate": "separate_velocity_space_task_only_until_adapted",
+      "status": "reproduction_pending"
+    },
+    {
+      "id": "sparse_regression",
+      "memory_kind": "explicit_equation",
+      "common_system_candidate": true,
+      "status": "source_admission_pending"
+    }
+  ],
+  "fairness_slices": [
+    "equal_parameter_count",
+    "equal_inference_flops_or_latency",
+    "equal_inference_memory",
+    "equal_training_wall_time_and_accelerator_time"
+  ],
+  "training_memory_methods": [
+    {
+      "id": "full_reverse_mode",
+      "status": "reference_gradient"
+    },
+    {
+      "id": "exact_checkpoint_recomputation",
+      "status": "must_match_reference_gradient_within_registered_tolerance"
+    },
+    {
+      "id": "truncated_backpropagation_through_time",
+      "status": "approximate_gradient_bias_must_be_measured"
+    },
+    {
+      "id": "adjoint_or_implicit",
+      "status": "only_when_solver_and_model_assumptions_are_valid"
+    }
+  ],
+  "interventions": [
+    "regular_sampling",
+    "irregular_sampling",
+    "variable_timestep",
+    "physical_time_lag_vs_step_count",
+    "accepted_vs_provisional_rk_stage",
+    "memory_reset",
+    "missing_history",
+    "state_freeze",
+    "state_permutation",
+    "state_transplant",
+    "latent_dimension_ablation",
+    "amplitude_shift",
+    "collision_frequency_shift",
+    "wavenumber_shift",
+    "second_integrator_zero_shot_transfer"
+  ],
+  "metrics": [
+    "coupled_trajectory_error_by_field",
+    "electric_field_energy_phase_damping_error",
+    "nonlinear_saturation_and_trapping_fidelity",
+    "physical_admissibility",
+    "inference_memory_bytes_vs_rollout_duration",
+    "training_peak_memory",
+    "gradient_relative_error_vs_full_reverse_mode",
+    "training_wall_time",
+    "inference_latency_and_flops",
+    "cost_per_stable_simulated_plasma_time",
+    "ood_selective_risk",
+    "false_safe_rate",
+    "solver_transfer_degradation"
+  ],
+  "sources": [
+    {
+      "id": "adept_hidden_variable_paper",
+      "doi": "10.1088/2632-2153/acf81a",
+      "arxiv": "2306.10709",
+      "uri": "https://arxiv.org/abs/2306.10709",
+      "status": "source_read"
+    },
+    {
+      "id": "adept_code",
+      "repository": "https://github.com/ergodicio/adept",
+      "revision": "0c85ce0d3d66abab51212191c2644f58a31a49cd",
+      "license": "MIT",
+      "license_evidence_uri": "https://github.com/ergodicio/adept/blob/main/LICENSE",
+      "status": "revision_pinned_license_observed_data_inventory_pending"
+    },
+    {
+      "id": "adept_notebooks",
+      "repository": "https://github.com/ergodicio/adept-notebooks",
+      "revision": "3e3800bc085adb75d3b67ea9b3e2c634cdf2f85d",
+      "license": "unknown_pending_review",
+      "status": "examples_inventory_visible_license_unreviewed"
+    },
+    {
+      "id": "online_fno_2026",
+      "doi": "10.1017/S0022377826102517",
+      "artifact_doi": "10.5281/zenodo.22800112",
+      "status": "versioned_hash_and_record_license_audit_pending"
+    },
+    {
+      "id": "fourier_hermite_reservoir_2025",
+      "doi": "10.1017/S0022377825100822",
+      "arxiv": "2504.13313",
+      "status": "article_source_read_code_data_artifact_not_admitted"
+    }
+  ],
+  "execution": {
+    "reproduction_results": null,
+    "common_system_comparison": "not_started",
+    "cfc_ltc_advantage": "untested_hypothesis",
+    "solver_runs": "not_performed",
+    "physical_validation": "not_performed"
+  }
+}
