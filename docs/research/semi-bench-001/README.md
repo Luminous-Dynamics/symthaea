@@ -529,3 +529,8 @@ The earlier planning direction in ENG-SEMI #5671 proposed a semiconductor/device
 The first Rust CI attempt found that the current root workspace cannot be resolved because Cargo's workspace glob includes a missing `crates/core/symthaea/Cargo.toml` on main. The new SEMI-BENCH workflow now tests this crate in a minimal temporary workspace copied from the exact checkout, avoiding an unrelated repository-wide manifest repair. Formatting, clippy and crate tests are still awaiting the isolated hosted result; no Rust pass is claimed yet.
 
 Tracked by [SEMI-RUST-001 #13129](https://github.com/Luminous-Dynamics/symthaea/issues/13129).
+
+
+## Rule-ordered multimodal zero-shot benchmark
+
+New preprint review and follow-up: [SEMI-ZS-LLM-001 #13146](https://github.com/Luminous-Dynamics/symthaea/issues/13146). Cao & Tao (arXiv:2610.35080, 26 Oct 2026) report a frozen GPT-4o with connected-component highlighting and morphology/location/exclusion rules: 92.9% macro / 93.8% overall on a six-class MixedWM38 subset, and 79.1% macro / 81.3% overall on six classes from WM-811K. On MixedWM38, eight alternate rule orders range 90.1–91.9% overall. This preprint excludes the remaining mixed combinations and is not a lot/time-held-out result. The benchmark therefore measures rule-order robustness, evidence grounding, open-set abstention, cost/latency and hybrid HDC+LMM performance rather than selecting only the best prompt.
