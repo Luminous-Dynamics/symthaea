@@ -34,3 +34,11 @@ jobs:
         run: cargo test --locked --manifest-path crates/tools/plasma-phase-space-mmd/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path crates/tools/plasma-phase-space-mmd/Cargo.toml --all-targets -- -D warnings
+      - name: Exact-oracle spectral feature sweep
+        run: cargo run --release --locked --manifest-path crates/tools/plasma-phase-space-mmd/Cargo.toml --example spectral_mmd_sweep > spectral-mmd-sweep.csv
+      - name: Upload spectral MMD sweep
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-phase-space-mmd-sweep
+          path: spectral-mmd-sweep.csv
+          if-no-files-found: error
