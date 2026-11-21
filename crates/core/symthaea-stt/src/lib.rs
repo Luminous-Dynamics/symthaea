@@ -149,7 +149,7 @@ pub use phoneme::{
 };
 pub use rls::{FastRlsClassifier, RlsClassifier};
 pub use sleep_sentinel::{BandPowers, ConsciousnessSentinel, ConsciousnessState};
-pub use streaming::{StreamConfig, StreamProcessor, StreamSession};
+pub use streaming::{StreamConfig, StreamDiscontinuity, StreamFrame, StreamProcessor, StreamSession};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

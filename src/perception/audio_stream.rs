@@ -283,8 +283,25 @@ pub(super) fn run_worker(
     while !shutdown.load(Ordering::Relaxed) {
         let n = consumer.pop_slice(&mut scratch);
         if n > 0 {
-            processor.push_audio(&scratch[..n]);
-            for frame in processor.process() {
+            if let Err(error) = processor.push_audio(&scratch[..n]) {
+                tracing::error!(?error, "STT worker rejected an audio chunk; stopping this stream segment");
+                break;
+            }
+
+            let frames = processor.process();
+            if let Some(gap) = processor.take_discontinuity() {
+                // Pending HDC frames must not be bundled across missing audio.
+                pending.clear();
+                tracing::warn!(
+                    segment_index = gap.segment_index,
+                    lost_start_sample = gap.lost_start_sample,
+                    lost_end_sample = gap.lost_end_sample,
+                    lost_samples = gap.lost_samples(),
+                    "STT input discontinuity; temporal state restarted"
+                );
+            }
+
+            for frame in frames {
                 if let Some(ref ph) = frame.phoneme {
                     phonemes_decoded += 1;
                     if phonemes_decoded.is_multiple_of(100) {

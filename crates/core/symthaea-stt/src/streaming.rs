@@ -83,44 +83,103 @@ impl StreamConfig {
 pub struct AudioRingBuffer {
     buffer: VecDeque<f32>,
     capacity: usize,
-    write_pos: usize,
+    /// Absolute sample index of the oldest retained sample.
+    base_sample_pos: u64,
+    /// Absolute, exclusive sample index after the newest written sample.
+    write_pos: u64,
 }
 
 impl AudioRingBuffer {
-    /// Create a new ring buffer
+    /// Create a new ring buffer.
     pub fn new(capacity: usize) -> Self {
+        let capacity = capacity.max(1);
         Self {
             buffer: VecDeque::with_capacity(capacity),
             capacity,
+            base_sample_pos: 0,
             write_pos: 0,
         }
     }
 
-    /// Write samples to the buffer
-    pub fn write(&mut self, samples: &[f32]) {
-        for &sample in samples {
-            if self.buffer.len() >= self.capacity {
+    /// Append samples while preserving their absolute position in the stream.
+    pub fn write(&mut self, samples: &[f32]) -> Result<(), String> {
+        if samples.is_empty() {
+            return Ok(());
+        }
+
+        let incoming = u64::try_from(samples.len())
+            .map_err(|_| "audio chunk length exceeds u64 sample indexing".to_string())?;
+        let next_write_pos = self
+            .write_pos
+            .checked_add(incoming)
+            .ok_or_else(|| "absolute audio sample position overflow".to_string())?;
+
+        if samples.len() >= self.capacity {
+            // The new chunk alone fills or exceeds the buffer.
+            let skipped = u64::try_from(samples.len() - self.capacity)
+                .map_err(|_| "audio overflow length exceeds u64".to_string())?;
+            self.base_sample_pos = self
+                .write_pos
+                .checked_add(skipped)
+                .ok_or_else(|| "audio buffer base position overflow".to_string())?;
+            self.buffer.clear();
+            self.buffer
+                .extend(samples[samples.len() - self.capacity..].iter().copied());
+        } else {
+            let overflow = self
+                .buffer
+                .len()
+                .saturating_add(samples.len())
+                .saturating_sub(self.capacity);
+            for _ in 0..overflow {
                 self.buffer.pop_front();
             }
-            self.buffer.push_back(sample);
+            let overflow = u64::try_from(overflow)
+                .map_err(|_| "audio overflow length exceeds u64".to_string())?;
+            self.base_sample_pos = self
+                .base_sample_pos
+                .checked_add(overflow)
+                .ok_or_else(|| "audio buffer base position overflow".to_string())?;
+            self.buffer.extend(samples.iter().copied());
         }
-        self.write_pos += samples.len();
+
+        self.write_pos = next_write_pos;
+        debug_assert_eq!(
+            self.base_sample_pos + self.buffer.len() as u64,
+            self.write_pos,
+            "retained audio range must match absolute write position"
+        );
+        Ok(())
     }
 
-    /// Read a frame of samples at a given position
-    pub fn read_frame(&self, start: usize, length: usize) -> Option<Vec<f32>> {
-        if start + length > self.buffer.len() {
+    /// Read a frame by its absolute source-sample position.
+    pub fn read_frame(&self, start_sample: u64, length: usize) -> Option<Vec<f32>> {
+        let length_u64 = u64::try_from(length).ok()?;
+        let end_sample = start_sample.checked_add(length_u64)?;
+        if start_sample < self.base_sample_pos || end_sample > self.write_pos {
+            return None;
+        }
+
+        let relative_start =
+            usize::try_from(start_sample.checked_sub(self.base_sample_pos)?).ok()?;
+        let relative_end = relative_start.checked_add(length)?;
+        if relative_end > self.buffer.len() {
             return None;
         }
 
         Some(
             self.buffer
                 .iter()
-                .skip(start)
+                .skip(relative_start)
                 .take(length)
                 .copied()
                 .collect(),
         )
+    }
+
+    /// Absolute index of the oldest sample still retained.
+    pub fn base_sample_pos(&self) -> u64 {
+        self.base_sample_pos
     }
 
     /// Number of available samples
@@ -131,22 +190,48 @@ impl AudioRingBuffer {
     /// Clear the buffer
     pub fn clear(&mut self) {
         self.buffer.clear();
+        self.base_sample_pos = 0;
         self.write_pos = 0;
     }
 
-    /// Total samples written
-    pub fn total_written(&self) -> usize {
+    /// Total samples written since the last buffer reset.
+    pub fn total_written(&self) -> u64 {
         self.write_pos
     }
 }
 
-/// Streaming frame result
+/// A source-sample interval lost before the processor could consume it.
+///
+/// The interval is half-open: [lost_start_sample, lost_end_sample).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StreamDiscontinuity {
+    /// Monotonic segment number after this discontinuity.
+    pub segment_index: u64,
+    /// First sample that the processor still needed but could no longer read.
+    pub lost_start_sample: u64,
+    /// First retained sample after the lost interval.
+    pub lost_end_sample: u64,
+}
+
+impl StreamDiscontinuity {
+    /// Exact number of source samples skipped by this discontinuity.
+    pub fn lost_samples(&self) -> u64 {
+        self.lost_end_sample.saturating_sub(self.lost_start_sample)
+    }
+}
+
+/// Streaming frame result.
 #[derive(Debug, Clone)]
 pub struct StreamFrame {
-    /// Frame index
+    /// Monotonic output frame index within the current processor session.
     pub frame_idx: usize,
-    /// Timestamp (seconds)
+    /// Source start time in seconds, derived from the absolute sample index.
     pub timestamp: f32,
+    /// Absolute half-open source sample interval represented by this frame.
+    pub source_start_sample: u64,
+    pub source_end_sample: u64,
+    /// Temporal segment; changes after an unrecoverable source gap.
+    pub segment_index: u64,
     /// Acoustic hypervector
     pub hv: HV16,
     /// Salience score
@@ -179,8 +264,16 @@ pub struct StreamProcessor {
     samples_per_frame: usize,
     /// Samples per hop
     samples_per_hop: usize,
-    /// Next sample position to process
-    next_sample: usize,
+    /// Next absolute source-sample position to process.
+    next_sample: u64,
+    /// Monotonic temporal segment, advanced after a source gap.
+    segment_index: u64,
+    /// Total source samples skipped due to buffer overrun.
+    dropped_sample_count: u64,
+    /// Estimated frame starts skipped with source samples that became unavailable.
+    skipped_frame_count: u64,
+    /// Most recent discontinuity, consumed with take_discontinuity().
+    last_discontinuity: Option<StreamDiscontinuity>,
     /// Recent frames for smoothing
     recent_frames: VecDeque<StreamFrame>,
     /// Salience threshold for boundary detection
@@ -190,7 +283,8 @@ pub struct StreamProcessor {
 impl StreamProcessor {
     /// Create a new streaming processor
     pub fn new(config: StreamConfig) -> Self {
-        let buffer_samples = (config.sample_rate as f32 * config.buffer_duration) as usize;
+        let buffer_samples =
+            ((config.sample_rate as f32 * config.buffer_duration) as usize).max(1);
         let buffer = AudioRingBuffer::new(buffer_samples);
 
         let ltc_config = LtcConfig {
@@ -208,8 +302,10 @@ impl StreamProcessor {
         };
         let frontend = AudioFrontend::new(audio_config);
 
-        let samples_per_frame = (config.sample_rate as f32 * config.frame_duration) as usize;
-        let samples_per_hop = (config.sample_rate as f32 * config.hop_duration) as usize;
+        let samples_per_frame =
+            ((config.sample_rate as f32 * config.frame_duration) as usize).max(1);
+        let samples_per_hop =
+            ((config.sample_rate as f32 * config.hop_duration) as usize).max(1);
 
         Self {
             config,
@@ -222,6 +318,10 @@ impl StreamProcessor {
             samples_per_frame,
             samples_per_hop,
             next_sample: 0,
+            segment_index: 0,
+            dropped_sample_count: 0,
+            skipped_frame_count: 0,
+            last_discontinuity: None,
             recent_frames: VecDeque::with_capacity(10),
             salience_threshold: 0.5,
         }
@@ -235,32 +335,108 @@ impl StreamProcessor {
         }
     }
 
-    /// Push audio samples into the processor
-    pub fn push_audio(&mut self, samples: &[f32]) {
-        self.buffer.write(samples);
+    /// Push audio samples into the processor.
+    pub fn push_audio(&mut self, samples: &[f32]) -> Result<(), String> {
+        self.buffer.write(samples)
     }
 
-    /// Process available frames and return results
+    /// Process available frames and return results.
+    ///
+    /// A consumer that falls behind the bounded buffer resumes in a new
+    /// temporal segment. Missing source samples are recorded exactly, and
+    /// temporal/smoothing state is cleared rather than bridged over the gap.
     pub fn process(&mut self) -> Vec<StreamFrame> {
         let mut results = Vec::new();
 
-        // Process all available complete frames
-        while self.next_sample + self.samples_per_frame <= self.buffer.available() {
-            if let Some(frame) = self.process_frame() {
-                results.push(frame);
+        let retained_base = self.buffer.base_sample_pos();
+        if self.next_sample < retained_base {
+            let lost_start_sample = self.next_sample;
+            let lost_end_sample = retained_base;
+            let lost_samples = lost_end_sample - lost_start_sample;
+
+            self.segment_index = self.segment_index.saturating_add(1);
+            self.dropped_sample_count =
+                self.dropped_sample_count.saturating_add(lost_samples);
+            let hop_samples = u64::try_from(self.samples_per_hop)
+                .unwrap_or(u64::MAX)
+                .max(1);
+            let skipped_frames = lost_samples
+                .saturating_add(hop_samples.saturating_sub(1))
+                / hop_samples;
+            self.skipped_frame_count =
+                self.skipped_frame_count.saturating_add(skipped_frames);
+            self.last_discontinuity = Some(StreamDiscontinuity {
+                segment_index: self.segment_index,
+                lost_start_sample,
+                lost_end_sample,
+            });
+
+            // Start at the first retained sample and establish a new hop grid.
+            self.next_sample = retained_base;
+            self.ltc.reset();
+            self.prev_state.fill(0.0);
+            self.recent_frames.clear();
+        }
+
+        loop {
+            let frame_samples = match u64::try_from(self.samples_per_frame) {
+                Ok(value) => value,
+                Err(_) => break,
+            };
+            let Some(frame_end) = self.next_sample.checked_add(frame_samples) else {
+                break;
+            };
+            if frame_end > self.buffer.total_written() {
+                break;
             }
-            self.next_sample += self.samples_per_hop;
+
+            let Some(frame) = self.process_frame() else {
+                break;
+            };
+            results.push(frame);
+
+            let hop_samples = match u64::try_from(self.samples_per_hop) {
+                Ok(value) => value,
+                Err(_) => break,
+            };
+            let Some(next_sample) = self.next_sample.checked_add(hop_samples) else {
+                break;
+            };
+            self.next_sample = next_sample;
         }
 
         results
     }
 
+    /// Take the most recent input discontinuity, if one was detected.
+    pub fn take_discontinuity(&mut self) -> Option<StreamDiscontinuity> {
+        self.last_discontinuity.take()
+    }
+
+    /// Total number of source samples skipped after the processor fell behind.
+    pub fn dropped_sample_count(&self) -> u64 {
+        self.dropped_sample_count
+    }
+
+    /// Number of frame starts skipped because their source samples were lost.
+    pub fn skipped_frame_count(&self) -> u64 {
+        self.skipped_frame_count
+    }
+
+    /// Current temporal segment number.
+    pub fn segment_index(&self) -> u64 {
+        self.segment_index
+    }
+
     /// Process a single frame
     fn process_frame(&mut self) -> Option<StreamFrame> {
-        // Get audio frame
+        // Read the exact absolute source interval for this frame.
+        let source_start_sample = self.next_sample;
+        let source_end_sample =
+            source_start_sample.checked_add(u64::try_from(self.samples_per_frame).ok()?)?;
         let audio = self
             .buffer
-            .read_frame(self.next_sample, self.samples_per_frame)?;
+            .read_frame(source_start_sample, self.samples_per_frame)?;
 
         // Extract features (simplified - would use mel spectrogram)
         let features = self.extract_simple_features(&audio);
@@ -292,7 +468,10 @@ impl StreamProcessor {
 
         let frame = StreamFrame {
             frame_idx: self.frame_count,
-            timestamp: self.frame_count as f32 * self.config.hop_duration,
+            timestamp: source_start_sample as f32 / self.config.sample_rate.max(1) as f32,
+            source_start_sample,
+            source_end_sample,
+            segment_index: self.segment_index,
             hv,
             salience,
             phoneme,
@@ -404,6 +583,10 @@ impl StreamProcessor {
         self.prev_state = vec![0.0; 64];
         self.frame_count = 0;
         self.next_sample = 0;
+        self.segment_index = 0;
+        self.dropped_sample_count = 0;
+        self.skipped_frame_count = 0;
+        self.last_discontinuity = None;
         self.recent_frames.clear();
     }
 
@@ -430,8 +613,12 @@ pub struct StreamSession {
     processor: StreamProcessor,
     /// Accumulated phonemes
     phonemes: Vec<String>,
-    /// Word boundaries
+    /// Word boundaries (phoneme offsets).
     boundaries: Vec<usize>,
+    /// Phoneme offsets where an audio discontinuity starts a new segment.
+    segment_boundaries: Vec<usize>,
+    /// Most recent discontinuity retained for the session caller.
+    last_discontinuity: Option<StreamDiscontinuity>,
     /// Is session active
     active: bool,
 }
@@ -443,6 +630,8 @@ impl StreamSession {
             processor: StreamProcessor::new(config),
             phonemes: Vec::new(),
             boundaries: Vec::new(),
+            segment_boundaries: Vec::new(),
+            last_discontinuity: None,
             active: false,
         }
     }
@@ -458,6 +647,8 @@ impl StreamSession {
         self.processor.reset();
         self.phonemes.clear();
         self.boundaries.clear();
+        self.segment_boundaries.clear();
+        self.last_discontinuity = None;
     }
 
     /// Stop the session
@@ -466,13 +657,20 @@ impl StreamSession {
     }
 
     /// Push audio and get incremental results
-    pub fn push(&mut self, samples: &[f32]) -> Vec<String> {
+    pub fn push(&mut self, samples: &[f32]) -> Result<Vec<String>, String> {
         if !self.active {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
-        self.processor.push_audio(samples);
+        self.processor.push_audio(samples)?;
         let frames = self.processor.process();
+
+        if let Some(gap) = self.processor.take_discontinuity() {
+            if !self.phonemes.is_empty() {
+                self.segment_boundaries.push(self.phonemes.len());
+            }
+            self.last_discontinuity = Some(gap);
+        }
 
         let mut new_phonemes = Vec::new();
 
@@ -490,37 +688,81 @@ impl StreamSession {
             }
         }
 
-        new_phonemes
+        Ok(new_phonemes)
     }
 
-    /// Get full transcription so far
+    /// Format one contiguous phoneme segment, preserving word-boundary markers.
+    fn format_segment(&self, start: usize, end: usize) -> String {
+        let mut pieces = Vec::new();
+        let mut cursor = start;
+
+        for &boundary in &self.boundaries {
+            if boundary > cursor && boundary <= end {
+                pieces.push(self.phonemes[cursor..boundary].join(" "));
+                cursor = boundary;
+            }
+        }
+
+        if cursor < end {
+            pieces.push(self.phonemes[cursor..end].join(" "));
+        }
+
+        pieces.join(" | ")
+    }
+
+    /// Get full transcription so far. Audio gaps are rendered explicitly;
+    /// phonemes on opposite sides of a discontinuity are not joined silently.
     pub fn get_transcription(&self) -> String {
         if self.phonemes.is_empty() {
             return String::new();
         }
 
-        // Insert spaces at word boundaries
-        let mut result = String::new();
-        let mut last_boundary = 0;
+        let mut segments = Vec::new();
+        let mut start = 0usize;
 
-        for &boundary in &self.boundaries {
-            if boundary > last_boundary && boundary <= self.phonemes.len() {
-                result.push_str(&self.phonemes[last_boundary..boundary].join(" "));
-                result.push_str(" | ");
-                last_boundary = boundary;
+        for &end in &self.segment_boundaries {
+            if end > start && end <= self.phonemes.len() {
+                let segment = self.format_segment(start, end);
+                if !segment.is_empty() {
+                    segments.push(segment);
+                }
+                start = end;
             }
         }
 
-        if last_boundary < self.phonemes.len() {
-            result.push_str(&self.phonemes[last_boundary..].join(" "));
+        if start < self.phonemes.len() {
+            let segment = self.format_segment(start, self.phonemes.len());
+            if !segment.is_empty() {
+                segments.push(segment);
+            }
         }
 
-        format!("/{result}/")
+        format!("/{}/", segments.join(" [audio gap] "))
     }
 
     /// Is session active
     pub fn is_active(&self) -> bool {
         self.active
+    }
+
+    /// Take the most recent input discontinuity, if one occurred.
+    pub fn take_discontinuity(&mut self) -> Option<StreamDiscontinuity> {
+        self.last_discontinuity.take()
+    }
+
+    /// Number of source samples skipped by input overruns.
+    pub fn dropped_sample_count(&self) -> u64 {
+        self.processor.dropped_sample_count()
+    }
+
+    /// Number of frame starts skipped because their source samples were lost.
+    pub fn skipped_frame_count(&self) -> u64 {
+        self.processor.skipped_frame_count()
+    }
+
+    /// Current temporal segment number.
+    pub fn segment_index(&self) -> u64 {
+        self.processor.segment_index()
     }
 
     /// Get latency in milliseconds
@@ -537,7 +779,7 @@ mod tests {
     fn test_ring_buffer() {
         let mut buffer = AudioRingBuffer::new(100);
 
-        buffer.write(&[1.0, 2.0, 3.0]);
+        buffer.write(&[1.0, 2.0, 3.0]).unwrap();
         assert_eq!(buffer.available(), 3);
 
         let frame = buffer.read_frame(0, 3).unwrap();
@@ -554,7 +796,7 @@ mod tests {
             .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 16000.0).sin())
             .collect();
 
-        processor.push_audio(&samples);
+        processor.push_audio(&samples).unwrap();
         let frames = processor.process();
 
         // Should produce several frames
@@ -572,6 +814,221 @@ mod tests {
 
         session.stop();
         assert!(!session.is_active());
+    }
+
+    #[test]
+    fn ring_buffer_uses_absolute_sample_positions_after_overwrite() {
+        let mut buffer = AudioRingBuffer::new(5);
+        buffer.write(&[0.0, 1.0, 2.0, 3.0]).unwrap();
+        buffer.write(&[4.0, 5.0, 6.0]).unwrap();
+
+        assert_eq!(buffer.base_sample_pos(), 2);
+        assert_eq!(buffer.total_written(), 7);
+        assert_eq!(buffer.read_frame(0, 2), None);
+        assert_eq!(
+            buffer.read_frame(2, 5).unwrap(),
+            vec![2.0, 3.0, 4.0, 5.0, 6.0]
+        );
+    }
+
+    #[test]
+    fn oversized_chunk_retains_its_tail_and_exact_origin() {
+        let mut buffer = AudioRingBuffer::new(4);
+        let samples: Vec<f32> = (0..9).map(|value| value as f32).collect();
+        buffer.write(&samples).unwrap();
+
+        assert_eq!(buffer.base_sample_pos(), 5);
+        assert_eq!(buffer.total_written(), 9);
+        assert_eq!(
+            buffer.read_frame(5, 4).unwrap(),
+            vec![5.0, 6.0, 7.0, 8.0]
+        );
+        assert_eq!(buffer.read_frame(4, 4), None);
+    }
+
+
+    #[test]
+    fn ring_buffer_absolute_reads_match_reference_across_chunk_shapes() {
+        // Deterministic reference-model stress test: vary capacities, empty
+        // writes, partial writes, exact-capacity writes, and multi-capacity
+        // overruns. Every readable absolute interval must match the retained
+        // source samples exactly; every unavailable interval must return None.
+        for capacity in 1usize..=8 {
+            let mut buffer = AudioRingBuffer::new(capacity);
+            let mut reference = VecDeque::<f32>::new();
+            let mut total_written = 0u64;
+
+            for round in 0usize..48 {
+                let chunk_len = (round * 11 + capacity * 7) % (capacity * 3 + 2);
+                let samples: Vec<f32> = (0..chunk_len)
+                    .map(|offset| (total_written + offset as u64) as f32)
+                    .collect();
+                buffer.write(&samples).unwrap();
+                total_written += chunk_len as u64;
+
+                for sample in samples {
+                    if reference.len() == capacity {
+                        reference.pop_front();
+                    }
+                    reference.push_back(sample);
+                }
+
+                let retained: Vec<f32> = reference.iter().copied().collect();
+                let expected_base = total_written - retained.len() as u64;
+                assert_eq!(buffer.base_sample_pos(), expected_base);
+                assert_eq!(buffer.total_written(), total_written);
+                assert_eq!(buffer.available(), retained.len());
+
+                for start in expected_base.saturating_sub(1)..=total_written {
+                    for length in 0..=capacity + 1 {
+                        let end = start + length as u64;
+                        let expected = if start >= expected_base && end <= total_written {
+                            let relative_start = (start - expected_base) as usize;
+                            Some(retained[relative_start..relative_start + length].to_vec())
+                        } else {
+                            None
+                        };
+                        assert_eq!(
+                            buffer.read_frame(start, length),
+                            expected,
+                            "capacity={capacity}, round={round}, start={start}, length={length}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    fn small_stream_config() -> StreamConfig {
+        StreamConfig {
+            // Use the production 16 kHz / 40-bin mel profile so the regression
+            // exercises a physically plausible frontend, not a 1 kHz test-only
+            // configuration whose mel filterbank exceeds Nyquist.
+            sample_rate: 16_000,
+            frame_duration: 0.025,
+            hop_duration: 0.010,
+            buffer_duration: 0.1,
+            n_mels: 40,
+            min_frames: 1,
+            smoothing_window: 2,
+        }
+    }
+
+    #[test]
+    fn processor_continues_for_more_than_ten_buffer_durations() {
+        let mut processor = StreamProcessor::new(small_stream_config());
+        let mut total_frames = 0usize;
+
+        // 1.2 seconds through a 100 ms buffer, processing after each irregular
+        // 137-sample chunk. This must not stall as the absolute origin advances.
+        let samples: Vec<f32> = (0..19_200)
+            .map(|index| (index as f32 * 0.00071).sin())
+            .collect();
+        for chunk in samples.chunks(137) {
+            processor.push_audio(chunk).unwrap();
+            total_frames += processor.process().len();
+        }
+
+        assert!(total_frames > 100, "frame count must keep advancing");
+        assert_eq!(processor.frame_count(), total_frames);
+        assert_eq!(processor.dropped_sample_count(), 0);
+        assert_eq!(processor.skipped_frame_count(), 0);
+        assert_eq!(processor.segment_index(), 0);
+    }
+
+    #[test]
+    fn overrun_emits_exact_gap_and_starts_a_new_segment() {
+        let mut processor = StreamProcessor::new(small_stream_config());
+
+        // Consume three 25 ms windows at a 10 ms hop. Their starts are
+        // 0, 160 and 320; after the third window the consumer cursor is 480.
+        // Then block it while 4,000 samples arrive into the 1,600-sample buffer.
+        let initial: Vec<f32> = (0..720)
+            .map(|value| (value as f32 * 0.001).sin())
+            .collect();
+        processor.push_audio(&initial).unwrap();
+        let first = processor.process();
+        assert_eq!(first.len(), 3);
+        assert_eq!(first[0].source_start_sample, 0);
+        assert_eq!(first[2].source_end_sample, 720);
+        assert_eq!(processor.frame_count(), 3);
+
+        let overrun: Vec<f32> = (0..4_000)
+            .map(|value| (value as f32 * 0.0013).sin())
+            .collect();
+        processor.push_audio(&overrun).unwrap();
+        let resumed = processor.process();
+
+        let gap = processor
+            .take_discontinuity()
+            .expect("overrun must be observable");
+        assert_eq!(gap.segment_index, 1);
+        assert_eq!(gap.lost_start_sample, 480);
+        assert_eq!(gap.lost_end_sample, 3_120);
+        assert_eq!(gap.lost_samples(), 2_640);
+        assert_eq!(processor.dropped_sample_count(), 2_640);
+        assert_eq!(processor.skipped_frame_count(), 17);
+        assert_eq!(processor.segment_index(), 1);
+
+        assert!(!resumed.is_empty());
+        assert_eq!(resumed[0].source_start_sample, 3_120);
+        assert_eq!(resumed[0].segment_index, 1);
+        assert_eq!(resumed[0].frame_idx, 3, "frame IDs remain monotonic");
+        assert!(resumed.iter().all(|frame| frame.source_start_sample >= 3_120));
+        assert!(resumed.iter().all(|frame| frame.segment_index == 1));
+        assert!(resumed.windows(2).all(|pair| {
+            pair[0].source_start_sample < pair[1].source_start_sample
+                && pair[0].frame_idx < pair[1].frame_idx
+        }));
+    }
+
+    #[test]
+    fn reset_starts_a_new_origin_and_clears_gap_counters() {
+        let mut processor = StreamProcessor::new(small_stream_config());
+        let initial: Vec<f32> = (0..720)
+            .map(|value| (value as f32 * 0.001).sin())
+            .collect();
+        let overrun: Vec<f32> = (0..4_000)
+            .map(|value| (value as f32 * 0.0013).sin())
+            .collect();
+        processor.push_audio(&initial).unwrap();
+        processor.process();
+        processor.push_audio(&overrun).unwrap();
+        processor.process();
+        assert!(processor.take_discontinuity().is_some());
+
+        processor.reset();
+        assert_eq!(processor.frame_count(), 0);
+        assert_eq!(processor.segment_index(), 0);
+        assert_eq!(processor.dropped_sample_count(), 0);
+        assert_eq!(processor.skipped_frame_count(), 0);
+        assert!(processor.take_discontinuity().is_none());
+
+        let fresh: Vec<f32> = (0..800)
+            .map(|value| (value as f32 * 0.002).sin())
+            .collect();
+        processor.push_audio(&fresh).unwrap();
+        let frames = processor.process();
+        assert_eq!(frames[0].source_start_sample, 0);
+        assert_eq!(frames[0].segment_index, 0);
+    }
+
+    #[test]
+    fn stream_session_transcription_marks_audio_gaps() {
+        let mut session = StreamSession::new(small_stream_config());
+        session.phonemes = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ];
+        session.boundaries = vec![1, 3];
+        session.segment_boundaries = vec![2];
+
+        assert_eq!(
+            session.get_transcription(),
+            "/a | b [audio gap] c | d/"
+        );
     }
 
     #[test]
