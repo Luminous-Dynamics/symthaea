@@ -557,7 +557,11 @@ fn validate_scenario(scenario: &Scenario) -> Result<ScenarioAudit, String> {
     if scenario.scenario_id.trim().is_empty()
         || scenario.target_claim_id.trim().is_empty()
         || scenario.decision_context.profile_ref.trim().is_empty()
-        || scenario.decision_context.article_subject_ref.trim().is_empty()
+        || scenario
+            .decision_context
+            .article_subject_ref
+            .trim()
+            .is_empty()
         || scenario.decision_context.configuration_id.trim().is_empty()
         || scenario.decision_context.icd_revision.trim().is_empty()
         || scenario.states.len() < 2
