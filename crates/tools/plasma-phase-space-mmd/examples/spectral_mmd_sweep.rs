@@ -1,6 +1,6 @@
 use plasma_phase_space_mmd::{
-    compare_phase_space_measures_mmd, compare_phase_space_measures_spectral, MmdConfig,
-    PhaseSpaceParticle1d, SpectralMmdConfig,
+    MmdConfig, PhaseSpaceParticle1d, SpectralMmdConfig, compare_phase_space_measures_mmd,
+    compare_phase_space_measures_spectral,
 };
 use std::error::Error;
 use std::time::Instant;
@@ -83,11 +83,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     for case in cases() {
-        let exact = compare_phase_space_measures_mmd(
-            &case.candidate,
-            &case.reference,
-            case.kernel,
-        )?;
+        let exact =
+            compare_phase_space_measures_mmd(&case.candidate, &case.reference, case.kernel)?;
 
         for feature_count in FEATURE_COUNTS {
             for seed in SEEDS {
@@ -105,10 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let absolute_error =
                     (approximate.normalized_mmd_squared - exact.normalized_mmd_squared).abs();
                 let relative_error = if exact.normalized_mmd_squared > 1.0e-12 {
-                    format!(
-                        "{:.17e}",
-                        absolute_error / exact.normalized_mmd_squared
-                    )
+                    format!("{:.17e}", absolute_error / exact.normalized_mmd_squared)
                 } else {
                     String::new()
                 };
