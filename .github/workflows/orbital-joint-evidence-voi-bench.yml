@@ -169,10 +169,10 @@ jobs:
             .scenarios[0].myopic_worst_case_regret == 2 and
             .scenarios[0].fixed_campaign_worst_case_regret == 0 and
             .scenarios[0].adaptive_expected_resources.engineering_hours == 1.2 and
-            .scenarios[0].adaptive_expected_resources.facility_hours == 1.55 and
+            ((.scenarios[0].adaptive_expected_resources.facility_hours - 1.55) | fabs) < 0.000000001 and
             .scenarios[1].scenario_id == "SEQ-002" and
             .scenarios[1].adaptive_first_action == "B-THERMAL-INSPECTION" and
             .scenarios[1].adaptive_worst_case_regret == 0 and
-            .scenarios[1].adaptive_expected_resources.engineering_hours == 1.15 and
-            .scenarios[1].adaptive_expected_resources.facility_hours == 1.65
+            ((.scenarios[1].adaptive_expected_resources.engineering_hours - 1.15) | fabs) < 0.000000001 and
+            ((.scenarios[1].adaptive_expected_resources.facility_hours - 1.65) | fabs) < 0.000000001
           ' /tmp/sequential-campaign-oracle.json
