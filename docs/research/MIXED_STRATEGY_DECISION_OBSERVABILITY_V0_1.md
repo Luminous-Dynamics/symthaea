@@ -95,7 +95,7 @@ The solver profile, candidate policy digest, candidate view identity and output 
 
 ## 5. Required controls and tests
 
-Ten Rust test functions are authored for:
+Eleven Rust test functions are authored for:
 
 1. the opposed-world case where mixing halves the deterministic worst-case regret;
 2. bounding a poor candidate policy's excess regret above the mixed floor;
