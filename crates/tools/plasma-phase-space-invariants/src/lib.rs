@@ -342,7 +342,11 @@ mod tests {
         assert_eq!(a.half_second_velocity_moment, b.half_second_velocity_moment);
         assert_near(c.zeroth_moment, a.zeroth_moment, 1.0e-14);
         assert_near(c.first_velocity_moment, a.first_velocity_moment, 1.0e-14);
-        assert_near(c.half_second_velocity_moment, a.half_second_velocity_moment, 1.0e-14);
+        assert_near(
+            c.half_second_velocity_moment,
+            a.half_second_velocity_moment,
+            1.0e-14,
+        );
         assert_eq!(c.unique_atom_count, 2);
     }
 
@@ -359,10 +363,7 @@ mod tests {
 
     #[test]
     fn signed_colocated_cancellation_uses_measure_total_variation() {
-        let measure = [
-            particle(2.0, -0.5, 0.5),
-            particle(10.0, -0.5, -0.25),
-        ];
+        let measure = [particle(2.0, -0.5, 0.5), particle(10.0, -0.5, -0.25)];
         let report = evaluate_phase_space_moments(&measure, config()).unwrap();
         assert_near(report.zeroth_moment, 0.25, 1.0e-14);
         assert_near(report.first_velocity_moment, -0.125, 1.0e-14);
@@ -393,7 +394,11 @@ mod tests {
         let a = evaluate_phase_space_moments(&measure, config()).unwrap();
         let b = evaluate_phase_space_moments(&scaled, config()).unwrap();
         assert_near(b.zeroth_moment, 3.0 * a.zeroth_moment, 1.0e-14);
-        assert_near(b.first_velocity_moment, 3.0 * a.first_velocity_moment, 1.0e-14);
+        assert_near(
+            b.first_velocity_moment,
+            3.0 * a.first_velocity_moment,
+            1.0e-14,
+        );
         assert_near(
             b.half_second_velocity_moment,
             3.0 * a.half_second_velocity_moment,
@@ -434,10 +439,7 @@ mod tests {
         assert!(empty.is_nonnegative_measure);
         assert_eq!(empty.unique_atom_count, 0);
 
-        let with_zero = [
-            particle(0.0, 0.0, 1.0),
-            particle(4.0, 1.0, 0.0),
-        ];
+        let with_zero = [particle(0.0, 0.0, 1.0), particle(4.0, 1.0, 0.0)];
         let without_zero = [particle(0.0, 0.0, 1.0)];
         let a = evaluate_phase_space_moments(&with_zero, config()).unwrap();
         let b = evaluate_phase_space_moments(&without_zero, config()).unwrap();
@@ -476,19 +478,13 @@ mod tests {
 
     #[test]
     fn aggregate_and_total_variation_overflow_fail_closed() {
-        let aggregate_overflow = [
-            particle(0.0, 0.0, f64::MAX),
-            particle(8.0, 0.0, f64::MAX),
-        ];
+        let aggregate_overflow = [particle(0.0, 0.0, f64::MAX), particle(8.0, 0.0, f64::MAX)];
         assert_eq!(
             evaluate_phase_space_moments(&aggregate_overflow, config()),
             Err(MomentError::AggregateWeightOverflow)
         );
 
-        let tv_overflow = [
-            particle(0.0, 0.0, f64::MAX),
-            particle(1.0, 0.0, f64::MAX),
-        ];
+        let tv_overflow = [particle(0.0, 0.0, f64::MAX), particle(1.0, 0.0, f64::MAX)];
         assert_eq!(
             evaluate_phase_space_moments(&tv_overflow, config()),
             Err(MomentError::TotalVariationOverflow)
