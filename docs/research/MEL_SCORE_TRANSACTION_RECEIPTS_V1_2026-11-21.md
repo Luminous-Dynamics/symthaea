@@ -26,22 +26,20 @@ The receipt is independently recomputable from the source Score, result Score an
 
 The current shared ScoreNote type has no intrinsic event identifier. Adding a required field to it would be a broad, potentially breaking schema change across every composer, importer, renderer and fixture.
 
-v1 instead derives an event identity from:
-- a domain-separated identifier prefix;
-- the immutable source Score SHA-256;
-- the original Score.notes vector index encoded as a fixed-width integer.
+v1 instead derives an event identity from a domain-separated identifier prefix, the immutable source Score SHA-256, and the original Score.notes vector index encoded as a fixed-width integer.
 
-This identity is explicitly scoped to one immutable source revision. It remains stable when the note's pitch or expressive fields change within that transaction, but it is not represented as universal cross-revision identity.
+This identity is explicitly scoped to one immutable source revision. It remains stable as the note at that source index receives an in-place pitch or expressive-field update. It is not universal cross-revision identity and it does not establish musical ancestry after a move, insertion, deletion or reorder.
 
 ## Fail-closed v1 scope
 
-The first version supports in-place note edits where event count and ordering remain unchanged. It rejects:
+The first version supports in-place note edits where event count is fixed and the target set is interpreted as source-indexed in-place updates. It rejects:
 - score-level key, tempo, meter or total-duration changes;
-- note insertion or deletion;
-- event reordering that changes indexed note values;
+- note insertion or deletion (event-count changes);
 - duplicated or out-of-range target indices;
 - any changed note outside the authorized target set;
 - modified or stale receipt contents.
+
+**Ordering limitation:** v1 does not infer event moves. A permutation that changes a protected index is rejected by the protected-complement check. A permutation wholly inside the authorized target set is represented only as per-index note changes; the current Score schema cannot distinguish that from in-place replacements. Therefore v1 must not be used to claim event-reorder lineage or preserved identity after moving events. A future lineage-aware patch schema must model explicit move and parent/child relationships.
 
 Identical duplicate notes are indistinguishable under the current Score schema; the immutable source index is therefore part of the identity. Operations that insert/delete/reorder events need a richer lineage map and a new receipt schema rather than an implicit best-effort matching heuristic.
 
