@@ -1,0 +1,65 @@
+name: Acoustic prosody qualification
+
+on:
+  push:
+    branches:
+      - feat/voice-prosody-001-frame-acoustic-evidence
+    paths:
+      - "src/perception/audio.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audio-prosody-qualification.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/perception/audio.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audio-prosody-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audio-prosody-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  exact-head-prosody:
+    name: Exact-head acoustic F0, voicing and alignment tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact checkout
+        run: test "$(git rev-parse HEAD)" = "${QUALIFIED_SHA}"
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Assert pinned toolchain
+        run: |
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+          cargo --version
+          rustfmt --version
+
+      - name: Check root package formatting
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea -- --check
+
+      - name: Run audio perception tests with voice-stt
+        run: cargo test --manifest-path Cargo.toml -p symthaea --lib --features voice-stt --locked
+
+      - name: Run strict audio perception Clippy
+        run: cargo clippy --manifest-path Cargo.toml -p symthaea --lib --features voice-stt --locked -- -D warnings

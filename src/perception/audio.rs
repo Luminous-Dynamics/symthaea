@@ -133,17 +133,57 @@ pub struct AudioPerceptionResult {
     pub num_frames: usize,
 }
 
-/// Prosody features extracted from audio
-#[derive(Debug, Clone)]
+/// Schema version for frame-aligned acoustic prosody evidence.
+pub const ACOUSTIC_PROSODY_SCHEMA_VERSION: u32 = 1;
+
+/// Energy normalization applied by the current formant-track extractor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProsodyEnergyNormalization {
+    /// Frame RMS is normalized against the peak RMS of this utterance.
+    UtterancePeak,
+}
+
+/// One frame of measurable acoustic prosody evidence.
+///
+/// The F0 field is absent for unvoiced/low-periodicity frames. The periodicity
+/// field is an estimator score, not a calibrated probability of voicing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AcousticProsodyFrameV1 {
+    pub frame_index: u64,
+    /// Half-open sample interval in the original input stream.
+    pub source_start_sample: u64,
+    pub source_end_sample: u64,
+    /// Frame start relative to this utterance, in seconds.
+    pub time_seconds: f32,
+    /// Estimated F0 only when the voicing/periodicity threshold is met.
+    pub f0_hz: Option<f32>,
+    /// Normalized-autocorrelation periodicity score in [0, 1].
+    pub periodicity: f32,
+    /// RMS energy normalized by the utterance peak RMS (not calibrated SPL).
+    pub energy_utterance_peak_normalized: f32,
+}
+
+/// Frame-aligned acoustic prosody features.
+///
+/// Summary fields are optional because silence or unvoiced input may provide no
+/// valid F0 observations. Speaking rate remains unavailable until qualified
+/// phoneme/word timing is supplied; it is never replaced with a fabricated 0.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProsodyFeatures {
-    /// Average pitch (Hz)
-    pub avg_pitch: f32,
-    /// Pitch variance
-    pub pitch_variance: f32,
-    /// Average energy
-    pub avg_energy: f32,
-    /// Speaking rate (phonemes per second)
-    pub speaking_rate: f32,
+    pub schema_version: u32,
+    pub extractor_id: &'static str,
+    pub source_sample_rate: u32,
+    pub frame_rate_hz: f32,
+    pub energy_normalization: ProsodyEnergyNormalization,
+    pub frames: Vec<AcousticProsodyFrameV1>,
+    /// Mean of voiced, valid frame F0 estimates.
+    pub avg_pitch_hz: Option<f32>,
+    /// Population variance of voiced, valid frame F0 estimates (Hz²).
+    pub pitch_variance_hz2: Option<f32>,
+    /// Mean utterance-peak-normalized energy.
+    pub avg_energy_utterance_peak_normalized: Option<f32>,
+    /// Phonemes/s from qualified alignment; None when no alignment is supplied.
+    pub speaking_rate_phonemes_per_second: Option<f32>,
 }
 
 /// Audio perception system - bridges symthaea-stt to perception pipeline
@@ -159,7 +199,18 @@ pub struct AudioPerception {
 impl AudioPerception {
     /// Create a new audio perception system
     pub fn new(config: AudioPerceptionConfig) -> Result<Self> {
-        let projector = symthaea_stt::AudioProjector::default_config();
+        if config.sample_rate == 0 {
+            return Err(anyhow::anyhow!(
+                "audio perception sample rate must be greater than zero"
+            ));
+        }
+        let projector = symthaea_stt::AudioProjector::new(
+            symthaea_stt::AudioConfig {
+                sample_rate: config.sample_rate,
+                ..Default::default()
+            },
+            symthaea_stt::LtcConfig::default(),
+        );
         let mut decoder = symthaea_stt::PhonemeDecoder::new();
         let mut has_prototypes = false;
 
@@ -186,10 +237,11 @@ impl AudioPerception {
         let start = std::time::Instant::now();
 
         // Load audio
-        let (samples, _sample_rate) =
+        let (samples, sample_rate) =
             symthaea_stt::AudioFrontend::load_wav(path).context("Failed to load audio file")?;
+        self.validate_sample_rate(sample_rate)?;
 
-        // Project through LTC
+        // Project through the configured acoustic encoder
         let hvs = self.projector.project(&samples);
 
         // Decode phonemes (if prototypes loaded)
@@ -239,7 +291,9 @@ impl AudioPerception {
         Ok(input)
     }
 
-    /// Process raw audio samples
+    /// Process mono PCM samples at `AudioPerceptionConfig::sample_rate`.
+    ///
+    /// Callers with a known source rate should prefer process_samples_at_rate().
     pub fn process_samples(&mut self, samples: &[f32]) -> Result<AudioPerceptionResult> {
         let start = std::time::Instant::now();
 
@@ -265,7 +319,7 @@ impl AudioPerception {
 
         // Extract prosody if enabled
         let prosody = if self.config.enable_prosody {
-            Some(self.extract_prosody(samples, &hvs))
+            Some(self.extract_prosody(samples, self.config.sample_rate))
         } else {
             None
         };
@@ -279,34 +333,118 @@ impl AudioPerception {
         })
     }
 
-    /// Extract prosody features from audio
-    fn extract_prosody(&self, samples: &[f32], _hvs: &[symthaea_stt::HV16]) -> ProsodyFeatures {
-        // Simple prosody extraction
-        if samples.is_empty() {
-            return ProsodyFeatures {
-                avg_pitch: 0.0,
-                pitch_variance: 0.0,
-                avg_energy: 0.0,
-                speaking_rate: 0.0,
-            };
+    /// Reject PCM whose source sample rate does not match the configured HDC frontend.
+    fn validate_sample_rate(&self, sample_rate: u32) -> Result<()> {
+        if sample_rate == self.config.sample_rate && sample_rate > 0 {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "audio sample-rate mismatch: received {sample_rate} Hz, perception is configured for {} Hz; resample explicitly before processing",
+                self.config.sample_rate
+            ))
         }
-        let energy: f32 = samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
+    }
 
-        // Count zero crossings as rough pitch proxy
-        let mut zero_crossings = 0u32;
-        for i in 1..samples.len() {
-            if (samples[i - 1] > 0.0) != (samples[i] > 0.0) {
-                zero_crossings += 1;
-            }
-        }
-        let zc_rate = zero_crossings as f32 / samples.len() as f32;
-        let rough_pitch = zc_rate * self.config.sample_rate as f32 / 2.0;
+    /// Validate source rate when known, then process mono PCM.
+    pub fn process_samples_at_rate(
+        &mut self,
+        samples: &[f32],
+        sample_rate: u32,
+    ) -> Result<AudioPerceptionResult> {
+        self.validate_sample_rate(sample_rate)?;
+        self.process_samples(samples)
+    }
+
+    /// Extract frame-aligned F0, periodicity and normalized RMS evidence.
+    ///
+    /// The existing formant extractor internally resamples to its configured
+    /// analysis rate. Its F1–F3 fallback peaks are deliberately not surfaced
+    /// here as measured formants; this API only exports F0/voicing/energy fields
+    /// whose validity can be stated without confusing fallback values with
+    /// observed spectral peaks.
+    fn extract_prosody(&self, samples: &[f32], sample_rate: u32) -> ProsodyFeatures {
+        use symthaea_vocal_tract::formant_extraction::{
+            ExtractionConfig, extract_formant_frames,
+        };
+
+        const EXTRACTOR_ID: &str = "symthaea-vocal-tract.lpc-autocorrelation.v1";
+        let extraction_config = ExtractionConfig::default();
+        let extracted = extract_formant_frames(samples, sample_rate, &extraction_config);
+        let window_samples =
+            (extraction_config.window_secs * sample_rate as f32).round() as u64;
+
+        let frames: Vec<AcousticProsodyFrameV1> = extracted
+            .iter()
+            .enumerate()
+            .map(|(index, frame)| {
+                let source_start_sample =
+                    (frame.time.max(0.0) * sample_rate as f32).round() as u64;
+                let source_end_sample = source_start_sample
+                    .saturating_add(window_samples)
+                    .min(samples.len() as u64);
+                let f0_hz = if frame.f0 > 0.0
+                    && frame.voicing >= extraction_config.voicing_threshold
+                {
+                    Some(frame.f0)
+                } else {
+                    None
+                };
+
+                AcousticProsodyFrameV1 {
+                    frame_index: index as u64,
+                    source_start_sample,
+                    source_end_sample,
+                    time_seconds: frame.time,
+                    f0_hz,
+                    periodicity: frame.voicing.clamp(0.0, 1.0),
+                    energy_utterance_peak_normalized: frame.energy.clamp(0.0, 1.0),
+                }
+            })
+            .collect();
+
+        let voiced_f0: Vec<f32> = frames.iter().filter_map(|frame| frame.f0_hz).collect();
+        let avg_pitch_hz = if voiced_f0.is_empty() {
+            None
+        } else {
+            Some(voiced_f0.iter().sum::<f32>() / voiced_f0.len() as f32)
+        };
+        let pitch_variance_hz2 = if voiced_f0.len() < 2 {
+            None
+        } else {
+            let mean = avg_pitch_hz.unwrap_or(0.0);
+            Some(
+                voiced_f0
+                    .iter()
+                    .map(|pitch| (pitch - mean).powi(2))
+                    .sum::<f32>()
+                    / voiced_f0.len() as f32,
+            )
+        };
+        let avg_energy_utterance_peak_normalized = if frames.is_empty() {
+            None
+        } else {
+            Some(
+                frames
+                    .iter()
+                    .map(|frame| frame.energy_utterance_peak_normalized)
+                    .sum::<f32>()
+                    / frames.len() as f32,
+            )
+        };
 
         ProsodyFeatures {
-            avg_pitch: rough_pitch,
-            pitch_variance: 0.0, // Would need more sophisticated analysis
-            avg_energy: energy,
-            speaking_rate: 0.0, // Would need phoneme timing
+            schema_version: ACOUSTIC_PROSODY_SCHEMA_VERSION,
+            extractor_id: EXTRACTOR_ID,
+            source_sample_rate: sample_rate,
+            frame_rate_hz: extraction_config.frame_rate,
+            energy_normalization: ProsodyEnergyNormalization::UtterancePeak,
+            frames,
+            avg_pitch_hz,
+            pitch_variance_hz2,
+            avg_energy_utterance_peak_normalized,
+            // Speaking rate requires word/phone timing from the aligned ASR
+            // contract; waveform periodicity is not a valid substitute.
+            speaking_rate_phonemes_per_second: None,
         }
     }
 
@@ -337,6 +475,14 @@ impl AudioPerception {
         Err(anyhow!("Audio perception requires 'voice-stt' feature"))
     }
 
+    pub fn process_samples_at_rate(
+        &mut self,
+        _samples: &[f32],
+        _sample_rate: u32,
+    ) -> Result<AudioPerceptionResult> {
+        Err(anyhow!("Audio perception requires 'voice-stt' feature"))
+    }
+
     pub fn has_prototypes(&self) -> bool {
         false
     }
@@ -357,6 +503,16 @@ mod tests {
         assert!(config.enable_prosody);
         assert!(config.prototypes_path.is_none());
         assert!((config.confidence_threshold - 0.3).abs() < 0.01);
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn audio_perception_rejects_zero_sample_rate_configuration() {
+        let config = AudioPerceptionConfig {
+            sample_rate: 0,
+            ..AudioPerceptionConfig::default()
+        };
+        assert!(AudioPerception::new(config).is_err());
     }
 
     #[test]
@@ -453,33 +609,100 @@ mod tests {
     }
 
     // =========================================================================
-    // ProsodyFeatures Tests
+    // Frame-aligned acoustic prosody tests
     // =========================================================================
 
+    #[cfg(feature = "voice-stt")]
+    fn sine_wave(sample_rate: u32, frequency_hz: f32, seconds: f32) -> Vec<f32> {
+        let sample_count = (sample_rate as f32 * seconds).round() as usize;
+        (0..sample_count)
+            .map(|index| {
+                let time = index as f32 / sample_rate as f32;
+                0.4 * (std::f32::consts::TAU * frequency_hz * time).sin()
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "voice-stt")]
     #[test]
-    fn test_prosody_features_creation() {
-        let prosody = ProsodyFeatures {
-            avg_pitch: 150.0,
-            pitch_variance: 25.0,
-            avg_energy: 0.5,
-            speaking_rate: 4.5,
-        };
-        assert!((prosody.avg_pitch - 150.0).abs() < 0.01);
-        assert!((prosody.pitch_variance - 25.0).abs() < 0.01);
-        assert!((prosody.avg_energy - 0.5).abs() < 0.01);
-        assert!((prosody.speaking_rate - 4.5).abs() < 0.01);
+    fn prosody_extracts_frame_aligned_f0_and_preserves_source_support() {
+        let perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        let samples = sine_wave(16_000, 200.0, 1.5);
+        let prosody = perception.extract_prosody(&samples, 16_000);
+
+        assert_eq!(prosody.schema_version, ACOUSTIC_PROSODY_SCHEMA_VERSION);
+        assert_eq!(prosody.extractor_id, "symthaea-vocal-tract.lpc-autocorrelation.v1");
+        assert_eq!(prosody.source_sample_rate, 16_000);
+        assert_eq!(prosody.energy_normalization, ProsodyEnergyNormalization::UtterancePeak);
+        assert!(prosody.frames.len() > 250);
+        let mean_f0 = prosody.avg_pitch_hz.expect("voiced tone should yield F0");
+        assert!(
+            (180.0..220.0).contains(&mean_f0),
+            "estimated F0 {mean_f0} Hz should be close to 200 Hz"
+        );
+        assert!(prosody.pitch_variance_hz2.is_some());
+        assert!(prosody.speaking_rate_phonemes_per_second.is_none());
+        assert!(
+            prosody
+                .frames
+                .iter()
+                .all(|frame| frame.energy_utterance_peak_normalized <= 0.851)
+        );
+
+        for pair in prosody.frames.windows(2) {
+            assert!(pair[1].time_seconds > pair[0].time_seconds);
+            assert!(pair[1].source_start_sample > pair[0].source_start_sample);
+            assert!(pair[0].source_end_sample > pair[0].source_start_sample);
+            assert!(pair[0].f0_hz.is_some());
+        }
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn prosody_marks_silence_as_unvoiced_instead_of_zero_pitch_observation() {
+        let perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        let silence = vec![0.0; 16_000];
+        let prosody = perception.extract_prosody(&silence, 16_000);
+
+        assert!(!prosody.frames.is_empty());
+        assert!(prosody.avg_pitch_hz.is_none());
+        assert!(prosody.pitch_variance_hz2.is_none());
+        assert_eq!(prosody.avg_energy_utterance_peak_normalized, Some(0.0));
+        assert!(prosody.frames.iter().all(|frame| frame.f0_hz.is_none()));
+        assert!(prosody.frames.iter().all(|frame| frame.periodicity == 0.0));
+    }
+
+    #[cfg(feature = "voice-stt")]
+    #[test]
+    fn rate_aware_pcm_entry_point_rejects_unresampled_audio() {
+        let mut perception = AudioPerception::new(AudioPerceptionConfig::default()).unwrap();
+        assert!(perception.process_samples_at_rate(&[0.0; 160], 48_000).is_err());
     }
 
     #[test]
-    fn test_prosody_features_clone() {
+    fn prosody_features_clone_preserves_optional_measurements_and_frames() {
         let prosody = ProsodyFeatures {
-            avg_pitch: 200.0,
-            pitch_variance: 30.0,
-            avg_energy: 0.7,
-            speaking_rate: 5.0,
+            schema_version: ACOUSTIC_PROSODY_SCHEMA_VERSION,
+            extractor_id: "test-extractor",
+            source_sample_rate: 16_000,
+            frame_rate_hz: 200.0,
+            energy_normalization: ProsodyEnergyNormalization::UtterancePeak,
+            frames: vec![AcousticProsodyFrameV1 {
+                frame_index: 0,
+                source_start_sample: 0,
+                source_end_sample: 400,
+                time_seconds: 0.0,
+                f0_hz: Some(200.0),
+                periodicity: 0.9,
+                energy_utterance_peak_normalized: 0.7,
+            }],
+            avg_pitch_hz: Some(200.0),
+            pitch_variance_hz2: None,
+            avg_energy_utterance_peak_normalized: Some(0.7),
+            speaking_rate_phonemes_per_second: None,
         };
         let cloned = prosody.clone();
-        assert!((prosody.avg_pitch - cloned.avg_pitch).abs() < 0.01);
+        assert_eq!(prosody, cloned);
     }
 
     // =========================================================================
