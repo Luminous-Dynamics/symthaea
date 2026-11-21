@@ -161,11 +161,12 @@ CETB's proposed differentiator is the qualification contract joining known-truth
 ## 8. Biological validation sequence
 
 1. Complete adversarial synthetic qualification and audit all generated truth labels.
-2. Reproduce one authorized published biological analysis with the exact published pipeline and frozen dataset/version manifest.
+2. **Primary reproduction:** reproduce the published RCAF/WJ and relevant connectivity analyses on OpenNeuro [ds006623 v1.0.0](https://doi.org/10.18112/openneuro.ds006623.v1.0.0), using the exact published code, preprocessing version, participant flow and frozen file manifest. This is the Michigan cohort (26 released participants; downstream analysis denominators must be recomputed from the pinned protocol), not external validation.
 3. Run prespecified sensitivity analyses separately from the primary reproduction.
-4. Add a genuinely independent participant cohort/site/device for transportability; a new split within the source cohort does not qualify.
-5. Only after the conventional baseline is reproduced, compare Symthaea HDC/CfC/LTC representations as additional candidates under the same locked folds, estimands, budgets and reporting rules.
-6. Keep behavioural report, task performance, physiology, perturbational complexity and phenomenal-experience interpretations distinct. No single proxy or model score establishes consciousness.
+4. **External transportability:** after freezing all choices on ds006623, test the locked pipeline on OpenNeuro [ds003171 v2.0.1](https://doi.org/10.18112/openneuro.ds003171.v2.0.1), a distinct Western University cohort of 17 healthy adults acquired on a 3T Siemens scanner. It has awake, light, deep-sedation and recovery conditions, with resting-state and naturalistic auditory-listening runs. The current dataset description reports CC0 and BIDS 1.0.1; verify the pinned release and its checksums before analysis. The registry records this as a planned independent-cohort/site validation, not completed evidence.
+5. Use **resting-state awake versus deep sedation** as the primary cross-dataset contrast, conditional on harmonizable acquisition/condition definitions. Analyse auditory-listening awake versus deep sedation separately; treat light sedation and recovery as secondary trajectory analyses. Never pool rest and task runs or retune on ds003171 outcomes. A prior analysis reported only 10 participants retained for some awake/deep comparisons after motion exclusions, so freeze participant-flow rules and treat wide intervals/inconclusive results honestly rather than interpreting low power as a failed replication.
+6. Only after the conventional baseline is reproduced and external analysis is locked, compare Symthaea HDC/CfC/LTC representations as additional candidates under the same folds, estimands, budgets and reporting rules.
+7. Keep behavioural report, task performance, physiology, perturbational complexity and phenomenal-experience interpretations distinct. No single proxy or model score establishes consciousness.
 
 ## 9. Claim ceiling and implementation status
 
