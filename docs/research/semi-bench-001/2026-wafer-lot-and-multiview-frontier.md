@@ -166,3 +166,44 @@ A separate July 5, 2026 FAD-Net paper reports 95.35–98.63% accuracy, F1 0.9255
 Sources:
 - https://link.springer.com/article/10.1007/s10845-026-02906-3
 - https://doi.org/10.1002/qre.70321
+
+
+## 7. Frozen multimodal models and rule-ordered zero-shot reasoning
+
+Cao & Tao, *Zero-Shot Multi-Class Wafer Map Classification with Rule-Ordered Prompts for Large Multimodal Models*, arXiv:2610.35080 (26 October 2026):
+https://arxiv.org/abs/2610.35080
+
+The preprint uses frozen GPT-4o (gpt-4o-2024-08-06), connected-component visual marks and class rules that specify positive morphology, spatial anchor and exclusion boundaries. It performs no task-specific training, fine-tuning or few-shot prompting. Its six-class subset results are:
+- Mixed-WM38: 6,866 single-pattern maps; multi-region prompting reports 92.9% macro accuracy and 93.8% overall.
+- WM-811K: 9,000 maps; multi-region prompting reports 79.1% macro and 81.3% overall.
+- Changing only rule order moves Mixed-WM38 overall accuracy across 90.1–91.9% in the eight tested alternatives, versus 93.8% for the selected order.
+- API inference is reported at roughly 0.5–1 second per image in the authors' environment.
+
+This is a useful alternative to trained CNN/GNN/HDC approaches for the no-label stage of deployment, but it is not a full MixedWM38 result: only six single-pattern classes were retained. The WM-811K six-class evaluation is sample-selected, not lot-disjoint. A single call per image also does not establish repeatability or prompt-order invariance.
+
+### New paradigm: semantic policy + deterministic geometric evidence
+
+Treat class descriptions, positive features, spatial anchors and exclusion boundaries as a versioned, inspectable decision specification. Compute objective geometry—connected components, radial occupancy, angular continuity, elongation, cluster count, mask coverage—outside the LMM, then pass those grounded observations and selected regions to an interpreter. This lets us separate "what is visible" from "what the model thinks it means."
+
+The crucial research issue is prompt-order sensitivity. Rather than trusting one favorable order, test all feasible permutations or a preregistered sample, pairwise tournament, order-ensemble, paraphrase perturbations and an order-invariant symbolic/HDC alternative. Report per-class flips and worst-order degradation; never tune order on the final test labels.
+
+New follow-up: [SEMI-ZS-LLM-001 #13146](https://github.com/Luminous-Dynamics/symthaea/issues/13146), covering exact preprint reproduction, order robustness, evidence-grounded explanations, full mixed-composition generalization, open-set abstention, group/time transfer and LMM/HDC/CNN comparisons.
+
+## 8. Semiconductor manufacturing should be benchmarked as a closed-loop decision system
+
+Li et al., *Toward autonomous decision support in semiconductor manufacturing: a review of planning, scheduling, dispatching, and execution control*, published 6 November 2026:
+https://doi.org/10.1007/s43684-026-00146-z
+
+The review's central model connects fab state sensing, planning, scheduling, dispatching, execution, metrology feedback and explicit human oversight. It warns against treating a locally improved dispatching rule as a system improvement when it can create downstream congestion, yield risk or delivery instability. It also argues that learning and LLM orchestration must sit behind validated offline/simulation evaluation, bounded authority, safe fallbacks and auditable records.
+
+This supplies a broader integration target for the programme:
+- perception estimates evidence and uncertainty;
+- process/material models constrain plausible state transitions;
+- inspection policy decides what to measure next;
+- scheduling/dispatching optimizes only within qualified process/tool, queue-time, capacity, material and quality constraints;
+- approved execution produces evidence, not assumed state changes;
+- metrology and quality feedback update future beliefs and decisions.
+
+The benchmark should be a multi-fidelity ladder: synthetic DES/replay -> frozen historical trace -> offline counterfactual evaluation -> shadow-mode recommendations -> human-approved limited pilot -> controlled physical outcome study. Report system-level cycle time, WIP, OEE, excursion detection, inspection cost, throughput and delivery reliability jointly; every improvement must preserve quality/safety and respect hard constraints. No autonomous process authority is implied.
+
+Source: https://link.springer.com/article/10.1007/s43684-026-00146-z
