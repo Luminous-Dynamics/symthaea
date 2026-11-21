@@ -108,3 +108,15 @@ These are uploaded as a workflow artifact named `rcaf-simulation-evidence-<commi
 `run_estimator_dose_response_tournament` evaluates absolute WJ, signed-shift WJ and normalized mean absolute edge error across the same five injection strengths. Each metric receives the same seed and random-draw order at every dose. This is more discriminating than comparing three metrics only at a strong effect that saturates all methods.
 
 The example output is governed by `estimator-dose-response-tournament.schema.json`. It records a separate full dose-response curve, including null rejection, detection power, Wilson intervals and paired-gap distributions, for each metric. It must not be used to select a universal winner: the similarity definitions have different construct semantics.
+
+
+## Validate the proposed adversarial calibration plan
+
+The plan is currently a proposed protocol; validating it does not execute simulations or qualify biological data.
+
+```sh
+python research/rcaf/tools/validate_adversarial_plan.py research/rcaf/adversarial-calibration-plan.example.json
+python -m unittest discover -s research/rcaf/tools -p 'test_validate_adversarial_plan.py' -v
+```
+
+The validator checks the Draft 2020-12 schema plus semantic controls for separated seeds, exact nulls, positive-dose effects, matrix-level and pre-estimation signal-level injections, nuisance-only nulls, and required evidence outputs. It uses the existing `jsonschema` dependency in `requirements-validation.txt`.
