@@ -526,7 +526,9 @@ fn audit(value: &Value) -> Result<Value, String> {
         if hard_rejected && known_positive {
             hard_false_negatives += 1;
         }
-        if known_positive && result != Disposition::RobustHarmonicInstability {
+        if known_positive {
+            // Robust harmonic instability routes the structure to a distortion
+            // search; it is not a global rejection of the material candidate.
             triage_preserved_positives += 1;
         }
         if result == Disposition::HarmonicStable
@@ -574,8 +576,8 @@ fn audit(value: &Value) -> Result<Value, String> {
         "known_positive_count": known_positive_count,
         "hard_any_imaginary_gate_false_negatives": hard_false_negatives,
         "hard_any_imaginary_gate_positive_recall": hard_gate_positive_recall,
-        "triage_policy_preserved_positive_count": triage_preserved_positives,
-        "triage_policy_positive_preservation_fraction": triage_positive_recall,
+        "triage_policy_preserved_or_routed_positive_count": triage_preserved_positives,
+        "triage_policy_positive_preservation_or_routing_fraction": triage_positive_recall,
         "unsupported_harmonic_stability_claim_count": unsupported_stability_claims,
         "disposition_counts": disposition_counts,
         "candidate_dispositions": rows,
@@ -659,8 +661,23 @@ mod tests {
     fn hard_any_imaginary_gate_misses_synthetic_positive_control_but_triage_retains_it() {
         let receipt = audit(&fixture()).expect("fixture should validate");
         assert_eq!(receipt["hard_any_imaginary_gate_false_negatives"], 1);
-        assert_eq!(receipt["triage_policy_preserved_positive_count"], 1);
+        assert_eq!(receipt["triage_policy_preserved_or_routed_positive_count"], 1);
         assert_eq!(receipt["unsupported_harmonic_stability_claim_count"], 0);
+    }
+
+    #[test]
+    fn robustly_unstable_positive_is_routed_not_silently_discarded() {
+        let mut value = fixture();
+        value["synthetic_candidates"][2]["evaluation_truth"] =
+            json!("synthetic_known_positive");
+        let receipt = audit(&value).expect("fixture should validate");
+        assert_eq!(
+            receipt["triage_policy_preserved_or_routed_positive_count"],
+            2
+        );
+        let row = &receipt["candidate_dispositions"][2];
+        assert_eq!(row["disposition"], "ROBUST_HARMONIC_INSTABILITY");
+        assert_eq!(row["queue_status"], "ROUTE_TO_DISTORTED_PHASE_SEARCH");
     }
 
     #[test]
