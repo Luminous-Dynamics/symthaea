@@ -21,7 +21,11 @@ pub const CALIBRATOR_ID_V1: &str = "muse-isotonic-salience-calibrator";
 pub const CALIBRATOR_VERSION_V1: &str = "0.1.0";
 pub const MAX_DATASET_OBSERVATIONS_V1: usize = 2_000_000;
 const DATASET_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-dataset-v1";
+const SPLIT_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-split-v1";
+const CONTRACT_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-contract-v1";
+const MODEL_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-model-v1";
 const BUNDLE_DOMAIN_V1: &[u8] = b"luminous-dynamics-muse-observer-calibration-bundle-v1";
+const MAX_BOOTSTRAP_SCORING_ROWS_V1: usize = 100_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -100,6 +104,9 @@ pub struct CalibrationContractV1 {
     /// Positive support may be emitted only under this false-support ceiling.
     pub maximum_false_support_rate: f64,
     pub ece_bins: u16,
+    pub minimum_held_out_groups: u16,
+    pub bootstrap_replicates: u16,
+    pub bootstrap_seed: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -143,10 +150,41 @@ pub struct ThresholdSelectionV1 {
     pub selection_status: String,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BootstrapIntervalV1 {
+    pub lower_95: Option<f64>,
+    pub upper_95: Option<f64>,
+    pub valid_replicates: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NegativeFamilyMetricsV1 {
+    pub negative_family: String,
+    pub total_negative_examples: u64,
+    pub measured_negative_examples: u64,
+    pub false_support_count: u64,
+    pub false_support_rate_all_negatives: Option<f64>,
+    pub false_support_rate_measured_negatives: Option<f64>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClusterBootstrapMetricsV1 {
+    pub support_precision: BootstrapIntervalV1,
+    pub false_support_rate_all_negatives: BootstrapIntervalV1,
+    pub false_support_rate_measured_negatives: BootstrapIntervalV1,
+    pub event_recall: BootstrapIntervalV1,
+    pub support_coverage: BootstrapIntervalV1,
+    pub brier_score: BootstrapIntervalV1,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HeldOutMetricsV1 {
     pub held_out_dataset_sha256: String,
+    pub cluster_bootstrap: ClusterBootstrapMetricsV1,
     pub total_examples: u64,
     pub measured_examples: u64,
     pub unmeasured_examples: u64,
@@ -167,6 +205,7 @@ pub struct HeldOutMetricsV1 {
     pub false_support_rate_all_negatives: Option<f64>,
     pub false_support_rate_measured_negatives: Option<f64>,
     pub event_recall: Option<f64>,
+    pub negative_family_metrics: Vec<NegativeFamilyMetricsV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -235,7 +274,7 @@ fn dataset_digest(dataset: &CalibrationDatasetV1) -> Result<String, String> {
     let mut value = serde_json::to_value(dataset)
         .map_err(|error| format!("calibration dataset serialization failed: {error}"))?;
     value["dataset_sha256"] = Value::String(String::new());
-    Ok(domain_digest(DATASET_DOMAIN_V1, &canonical_json_bytes(&value)?))
+    Ok(domain_digest(SPLIT_DOMAIN_V1, &canonical_json_bytes(&value)?))
 }
 
 fn contract_digest(contract: &CalibrationContractV1) -> Result<String, String> {
@@ -277,8 +316,8 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
 
     let mut sample_ids = std::collections::BTreeSet::new();
     let mut group_splits = std::collections::BTreeMap::new();
-    let mut audio_splits = std::collections::BTreeMap::new();
-    let mut midi_splits = std::collections::BTreeMap::new();
+    let mut audio_lineage = std::collections::BTreeMap::new();
+    let mut midi_lineage = std::collections::BTreeMap::new();
     for (index, observation) in dataset.observations.iter().enumerate() {
         if observation.sample_id.trim().is_empty()
             || observation.sample_id.len() > 256
@@ -336,12 +375,15 @@ pub fn validate_dataset_v1(dataset: &CalibrationDatasetV1) -> Result<(), String>
             }
         }
         for (map, digest, label) in [
-            (&mut audio_splits, observation.source_audio_sha256.as_str(), "source_audio"),
-            (&mut midi_splits, observation.source_midi_sha256.as_str(), "source_midi"),
+            (&mut audio_lineage, observation.source_audio_sha256.as_str(), "source_audio"),
+            (&mut midi_lineage, observation.source_midi_sha256.as_str(), "source_midi"),
         ] {
-            if let Some(split) = map.insert(digest.to_string(), observation.split) {
-                if split != observation.split {
-                    return Err(format!("{label} digest leaks across dataset splits"));
+            let lineage = (observation.split, observation.source_group_id.clone());
+            if let Some(previous) = map.insert(digest.to_string(), lineage.clone()) {
+                if previous != lineage {
+                    return Err(format!(
+                        "{label} digest is assigned to multiple splits or source groups"
+                    ));
                 }
             }
         }
@@ -380,6 +422,8 @@ pub fn validate_contract_v1(contract: &CalibrationContractV1) -> Result<(), Stri
         || !contract.maximum_false_support_rate.is_finite()
         || !(0.0..=0.5).contains(&contract.maximum_false_support_rate)
         || !(2..=100).contains(&contract.ece_bins)
+        || !(3..=10_000).contains(&contract.minimum_held_out_groups)
+        || !(100..=5_000).contains(&contract.bootstrap_replicates)
     {
         return Err("calibration contract has unsupported schema or invalid bounds".into());
     }
@@ -630,10 +674,36 @@ fn held_out_metrics(
     let true_support = supported.iter().filter(|row| row.event_present).count() as u64;
     let false_support = supported.len() as u64 - true_support;
     let measured_negatives = measured.iter().filter(|row| !row.event_present).count() as u64;
-    let raw_scores = probs.clone();
-
+    let mut negative_family_rows = std::collections::BTreeMap::<String, Vec<&CalibrationObservationV1>>::new();
+    for row in rows.iter().filter(|row| !row.event_present) {
+        let family = row.negative_family.as_deref().unwrap_or("unclassified_negative");
+        negative_family_rows.entry(family.to_string()).or_default().push(*row);
+    }
+    let negative_family_metrics = negative_family_rows.into_iter().map(|(family, family_rows)| {
+        let family_measured = family_rows.iter()
+            .filter(|row| row.measurement_state == MeasurementStateV1::Measured)
+            .collect::<Vec<_>>();
+        let family_false_support = family_measured.iter()
+            .filter(|row| threshold_value.is_some_and(|t|
+                predict(model, row.raw_score_db.expect("measured row has score")) >= t
+            ))
+            .count() as u64;
+        NegativeFamilyMetricsV1 {
+            negative_family: family,
+            total_negative_examples: family_rows.len() as u64,
+            measured_negative_examples: family_measured.len() as u64,
+            false_support_count: family_false_support,
+            false_support_rate_all_negatives: (!family_rows.is_empty()).then_some(
+                family_false_support as f64 / family_rows.len() as f64
+            ),
+            false_support_rate_measured_negatives: (!family_measured.is_empty()).then_some(
+                family_false_support as f64 / family_measured.len() as f64
+            ),
+        }
+    }).collect::<Vec<_>>();
     HeldOutMetricsV1 {
         held_out_dataset_sha256: held_out_dataset_sha256.into(),
+        cluster_bootstrap: ClusterBootstrapMetricsV1::default(),
         total_examples: total,
         measured_examples: measured.len() as u64,
         unmeasured_examples: unmeasured,
@@ -641,8 +711,8 @@ fn held_out_metrics(
         negative_examples: negative_total,
         brier_score,
         expected_calibration_error: ece,
-        roc_auc: roc_auc(&labels, &raw_scores),
-        average_precision: average_precision(&labels, &raw_scores),
+        roc_auc: roc_auc(&labels, &probs),
+        average_precision: average_precision(&labels, &probs),
         supported_examples: supported.len() as u64,
         abstained_examples: total - supported.len() as u64,
         true_support_count: true_support,
@@ -654,7 +724,113 @@ fn held_out_metrics(
         false_support_rate_all_negatives: (negative_total > 0).then_some(false_support as f64 / negative_total as f64),
         false_support_rate_measured_negatives: (measured_negatives > 0).then_some(false_support as f64 / measured_negatives as f64),
         event_recall: (positive_total > 0).then_some(true_support as f64 / positive_total as f64),
+        negative_family_metrics,
     }
+}
+
+#[derive(Clone, Debug)]
+struct SplitMix64V1 {
+    state: u64,
+}
+
+impl SplitMix64V1 {
+    fn new(seed: u64) -> Self { Self { state: seed } }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E3779B97F4A7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D049BB133111EB);
+        value ^ (value >> 31)
+    }
+}
+
+fn percentile(sorted: &[f64], probability: f64) -> Option<f64> {
+    if sorted.is_empty() { return None; }
+    let position = probability.clamp(0.0, 1.0) * (sorted.len() - 1) as f64;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    if lower == upper {
+        Some(sorted[lower])
+    } else {
+        let weight = position - lower as f64;
+        Some(sorted[lower] * (1.0 - weight) + sorted[upper] * weight)
+    }
+}
+
+fn bootstrap_interval(mut samples: Vec<f64>) -> BootstrapIntervalV1 {
+    if samples.is_empty() {
+        return BootstrapIntervalV1::default();
+    }
+    samples.sort_by(f64::total_cmp);
+    BootstrapIntervalV1 {
+        lower_95: percentile(&samples, 0.025),
+        upper_95: percentile(&samples, 0.975),
+        valid_replicates: samples.len().min(u16::MAX as usize) as u16,
+    }
+}
+
+fn cluster_bootstrap_metrics(
+    model: &IsotonicModelV1,
+    threshold: &ThresholdSelectionV1,
+    rows: &[&CalibrationObservationV1],
+    dataset_sha256: &str,
+    contract: &CalibrationContractV1,
+) -> Result<ClusterBootstrapMetricsV1, String> {
+    let mut clusters = std::collections::BTreeMap::<String, Vec<&CalibrationObservationV1>>::new();
+    for row in rows {
+        clusters.entry(row.source_group_id.clone()).or_default().push(*row);
+    }
+    if clusters.len() < contract.minimum_held_out_groups as usize {
+        return Err(format!(
+            "held-out split has {} source groups; contract requires at least {}",
+            clusters.len(), contract.minimum_held_out_groups
+        ));
+    }
+    let cluster_rows = clusters.into_values().collect::<Vec<_>>();
+    let largest_cluster = cluster_rows.iter().map(Vec::len).max().unwrap_or(0);
+    let worst_case_resampled_rows = largest_cluster
+        .checked_mul(cluster_rows.len())
+        .and_then(|per_replicate| per_replicate.checked_mul(contract.bootstrap_replicates as usize))
+        .unwrap_or(usize::MAX);
+    if worst_case_resampled_rows > MAX_BOOTSTRAP_SCORING_ROWS_V1 {
+        return Err("requested cluster bootstrap exceeds the bounded scoring-work budget".into());
+    }
+    let seed_material = format!("{}:{}", dataset_sha256, contract.bootstrap_seed);
+    let seed_digest = domain_digest(BUNDLE_DOMAIN_V1, seed_material.as_bytes());
+    let seed = u64::from_str_radix(&seed_digest[..16], 16)
+        .map_err(|error| format!("bootstrap seed parse failed: {error}"))?;
+    let mut rng = SplitMix64V1::new(seed);
+
+    let mut support_precision = Vec::new();
+    let mut false_support_all = Vec::new();
+    let mut false_support_measured = Vec::new();
+    let mut event_recall = Vec::new();
+    let mut support_coverage = Vec::new();
+    let mut brier = Vec::new();
+
+    for _ in 0..contract.bootstrap_replicates {
+        let mut sampled = Vec::new();
+        for _ in 0..cluster_rows.len() {
+            let index = (rng.next_u64() % cluster_rows.len() as u64) as usize;
+            sampled.extend(cluster_rows[index].iter().copied());
+        }
+        let metrics = held_out_metrics(model, threshold, &sampled, dataset_sha256, contract.ece_bins);
+        if let Some(value) = metrics.support_precision { support_precision.push(value); }
+        if let Some(value) = metrics.false_support_rate_all_negatives { false_support_all.push(value); }
+        if let Some(value) = metrics.false_support_rate_measured_negatives { false_support_measured.push(value); }
+        if let Some(value) = metrics.event_recall { event_recall.push(value); }
+        support_coverage.push(metrics.support_coverage);
+        if let Some(value) = metrics.brier_score { brier.push(value); }
+    }
+    Ok(ClusterBootstrapMetricsV1 {
+        support_precision: bootstrap_interval(support_precision),
+        false_support_rate_all_negatives: bootstrap_interval(false_support_all),
+        false_support_rate_measured_negatives: bootstrap_interval(false_support_measured),
+        event_recall: bootstrap_interval(event_recall),
+        support_coverage: bootstrap_interval(support_coverage),
+        brier_score: bootstrap_interval(brier),
+    })
 }
 
 /// Fit the calibrator, choose a conservative support threshold on a separate
@@ -717,7 +893,7 @@ pub fn run_calibration_v1(
         "fit_positive_count": fit_positive,
         "blocks": blocks
     });
-    let model_sha = domain_digest(BUNDLE_DOMAIN_V1, &canonical_json_bytes(&model_value)?);
+    let model_sha = domain_digest(MODEL_DOMAIN_V1, &canonical_json_bytes(&model_value)?);
     let model: IsotonicModelV1 = serde_json::from_value({
         let mut value = model_value;
         value["model_sha256"] = Value::String(model_sha);
@@ -729,9 +905,12 @@ pub fn run_calibration_v1(
         &threshold_split_sha256,
         contract.maximum_false_support_rate,
     );
-    let held_out = held_out_metrics(
+    let mut held_out = held_out_metrics(
         &model, &threshold, &held_out_rows, &held_out_split_sha256, contract.ece_bins
     );
+    held_out.cluster_bootstrap = cluster_bootstrap_metrics(
+        &model, &threshold, &held_out_rows, &held_out_split_sha256, contract
+    )?;
     let mut bundle = CalibrationBundleV1 {
         schema: BUNDLE_SCHEMA_V1.into(),
         dataset_sha256: dataset.dataset_sha256.clone(),
@@ -859,6 +1038,9 @@ mod tests {
             minimum_held_out_examples_per_class: 5,
             maximum_false_support_rate: 0.01,
             ece_bins: 10,
+            minimum_held_out_groups: 5,
+            bootstrap_replicates: 200,
+            bootstrap_seed: 12345,
         }
     }
 
@@ -945,6 +1127,34 @@ mod tests {
     }
 
     #[test]
+    fn identical_audio_cannot_be_split_into_multiple_source_groups() {
+        let mut data = dataset();
+        data.observations[0].source_audio_sha256 =
+            data.observations[2].source_audio_sha256.clone();
+        data.observations[0].source_group_id = "other-work".into();
+        assert!(seal_calibration_dataset_v1(&mut data).is_err());
+    }
+
+    #[test]
+    fn identical_midi_cannot_be_split_into_multiple_source_groups() {
+        let mut data = dataset();
+        data.observations[0].source_midi_sha256 =
+            data.observations[2].source_midi_sha256.clone();
+        data.observations[0].source_group_id = "other-work".into();
+        assert!(seal_calibration_dataset_v1(&mut data).is_err());
+    }
+
+    #[test]
+    fn repeated_source_artifacts_within_the_same_group_are_allowed() {
+        let mut data = dataset();
+        data.observations[1].source_audio_sha256 =
+            data.observations[0].source_audio_sha256.clone();
+        data.observations[1].source_midi_sha256 =
+            data.observations[0].source_midi_sha256.clone();
+        assert!(seal_calibration_dataset_v1(&mut data).is_ok());
+    }
+
+    #[test]
     fn duplicate_case_ids_are_rejected() {
         let mut data = dataset();
         data.observations[1].sample_id = data.observations[0].sample_id.clone();
@@ -955,9 +1165,7 @@ mod tests {
     fn measured_rows_require_finite_raw_scores() {
         let mut data = dataset();
         data.observations[0].raw_score_db = Some(f64::NAN);
-        data.dataset_sha256.clear();
-        data.dataset_sha256 = dataset_digest(&data).unwrap();
-        assert!(validate_dataset_v1(&data).is_err());
+        assert!(seal_calibration_dataset_v1(&mut data).is_err());
     }
 
     #[test]
@@ -967,6 +1175,53 @@ mod tests {
         row.raw_score_db = Some(7.0);
         data.dataset_sha256 = dataset_digest(&data).unwrap();
         assert!(validate_dataset_v1(&data).is_err());
+    }
+
+    #[test]
+    fn held_out_false_support_is_reported_by_negative_family() {
+        let mut data = dataset();
+        let negatives = data.observations.iter_mut().filter(|row|
+            row.split == SplitV1::HeldOut && !row.event_present
+        ).collect::<Vec<_>>();
+        for (index, row) in negatives.iter_mut().enumerate() {
+            row.negative_family = Some(if index < 3 {
+                "octave_collision".into()
+            } else {
+                "cross_part_contamination".into()
+            });
+        }
+        // One held-out cross-part negative is deliberately assigned a
+        // high-salience feature to exercise family-specific false support.
+        negatives[3].raw_score_db = Some(16.0);
+        seal_calibration_dataset_v1(&mut data).unwrap();
+        let bundle = run_calibration_v1(&data, &contract()).unwrap();
+        let metrics = &bundle.held_out.negative_family_metrics;
+        assert_eq!(metrics.len(), 2);
+        let octave = metrics.iter().find(|m| m.negative_family == "octave_collision").unwrap();
+        let cross_part = metrics.iter().find(|m| m.negative_family == "cross_part_contamination").unwrap();
+        assert_eq!(octave.false_support_count, 0);
+        assert_eq!(cross_part.false_support_count, 1);
+        assert_eq!(cross_part.measured_negative_examples, 3);
+        assert!((cross_part.false_support_rate_measured_negatives.unwrap() - 1.0 / 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn group_cluster_bootstrap_is_reproducible_and_reports_intervals() {
+        let data = dataset();
+        let first = run_calibration_v1(&data, &contract()).unwrap();
+        let second = run_calibration_v1(&data, &contract()).unwrap();
+        assert_eq!(first.held_out.cluster_bootstrap, second.held_out.cluster_bootstrap);
+        assert!(first.held_out.cluster_bootstrap.support_coverage.lower_95.is_some());
+        assert!(first.held_out.cluster_bootstrap.support_coverage.upper_95.is_some());
+        assert!(first.held_out.cluster_bootstrap.support_coverage.valid_replicates > 0);
+    }
+
+    #[test]
+    fn too_few_held_out_source_groups_are_rejected() {
+        let mut case = contract();
+        case.minimum_held_out_groups = 8;
+        let error = run_calibration_v1(&dataset(), &case).unwrap_err();
+        assert!(error.contains("source groups"));
     }
 
     #[test]
