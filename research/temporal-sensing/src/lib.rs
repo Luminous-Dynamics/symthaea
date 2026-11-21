@@ -810,6 +810,22 @@ mod tests {
             })
         );
 
+        assert_eq!(
+            decide_next_observation(
+                SensingPolicy::RiskAdjustedValueOfInformation {
+                    minimum_adjusted_us_per_nj_ppm: 1,
+                    risk_aversion_ppm: 0,
+                    ignorance_weight_ppm: 1_000_001,
+                },
+                context(20),
+                features(),
+            ),
+            Err(SensingError::InvalidProbability {
+                field: "ignorance_weight_ppm",
+                value: 1_000_001,
+            })
+        );
+
         let mut invalid_features = features();
         invalid_features.model_confidence_ppm = 1_000_001;
         assert_eq!(
