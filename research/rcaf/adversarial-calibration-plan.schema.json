@@ -233,6 +233,15 @@
           "description": {
             "type": "string",
             "minLength": 1
+          },
+          "dose_points": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
           }
         }
       }
@@ -306,6 +315,7 @@
           "dose_response",
           "multiplicity_control",
           "nuisance_false_positives",
+          "nuisance_only_rejection_rate",
           "heterogeneity_recovery",
           "site_transportability",
           "independent_cohort_transportability",
