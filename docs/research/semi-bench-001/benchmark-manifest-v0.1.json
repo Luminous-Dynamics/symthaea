@@ -764,8 +764,28 @@
       "test_count": 10,
       "claim_ceiling": "synthetic model-based expected value only; no physical savings or inspection authorization"
     },
-    "total_test_count": 35,
-    "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler"
+    "total_test_count": 46,
+    "policy_claim_limits": "expected values are modeled; uninspected wafers remain unknown; reference oracle is not a production scheduler",
+    "contrastive_pair_manifest_validator": {
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_pair_manifest_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
+      "rules": [
+        "unique-sample-ids",
+        "unique-pair-ids",
+        "unique-unordered-pairs",
+        "no-self-pairs",
+        "endpoints-exist",
+        "pair-scope-matches-both-endpoint-splits",
+        "same-lot-pairs-require-matching-group-ids",
+        "time-near-pairs-require-clock-domain-and-within-embargo"
+      ],
+      "test_count": 11,
+      "claim_ceiling": "pair-manifest-integrity-only; no proof of pair-semantic correctness or model quality"
+    },
+    "test_count_pending_hosted_ci": 46,
+    "pair_validator_hosted_ci_status": "pending"
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
   "eda_end_to_end_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
