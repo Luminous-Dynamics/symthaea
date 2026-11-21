@@ -168,11 +168,21 @@ CETB's proposed differentiator is the qualification contract joining known-truth
 6. Only after the conventional baseline is reproduced and external analysis is locked, compare Symthaea HDC/CfC/LTC representations as additional candidates under the same folds, estimands, budgets and reporting rules.
 7. Keep behavioural report, task performance, physiology, perturbational complexity and phenomenal-experience interpretations distinct. No single proxy or model score establishes consciousness.
 
-## 9. Claim ceiling and implementation status
+## 9. Implementation status and remaining gap
 
-This document defines a proposed protocol only. It does not add an adversarial simulator, implement signal-level injection, validate a preprocessing pipeline, analyse biological data or demonstrate SOTA superiority. The existing Gaussian-factor/AR(1) results remain limited to their declared synthetic generator.
+The research kernel now implements:
+- deterministic Gaussian-factor time-series generation with participant-specific loadings and stationary AR(1) dependence;
+- positive module-loading perturbation before sample-correlation estimation;
+- a separate observation-only common-mode factor injected into one repeat while holding latent global/module loadings fixed;
+- exact same-observation null, two-sided difference detection, expected-direction recovery and wrong-direction rejection;
+- a zero-strength nuisance control that reuses the exact null sample as a known-answer invariant;
+- report schema 0.3.0 with separate null, nuisance-only and injection outcomes, plus Wilson intervals.
 
-The accompanying `adversarial-calibration-plan.schema.json` and `tools/validate_adversarial_plan.py` now validate the plan's JSON structure and key semantic invariants: distinct development/confirmation seeds, exact null controls, effect scenarios with nonzero doses, pre-estimation signal-level and matrix-level injection controls, nuisance-only scenarios that preserve the latent target, and required output dimensions. Ten focused unit tests cover these invariants. This validation qualifies the plan document, not a simulator or biological pipeline. The next implementation must add deterministic scenario generators, planted-positive and clean-negative leakage controls, an end-to-end signal-level example, and exact-head execution receipts before any scenario can be described as executed.
+The common-mode nuisance is the first implemented adversarial nuisance family. It does not model motion, censoring, site/scanner scale shifts, physiological waveforms, parcel dropout, MCAR/MAR/MNAR missingness, nonstationarity, source leakage or a full neuroimaging preprocessing pipeline. It measures the sensitivity of this observed-matrix comparison to one controlled artifact; it does not prove that the metric can distinguish artifact from neural change on real data.
+
+The accompanying `adversarial-calibration-plan.schema.json` and `tools/validate_adversarial_plan.py` validate the plan structure and key semantic invariants: separated development/confirmation seeds, exact null controls, nonzero effect doses, pre-estimation signal-level and matrix-level controls, nuisance-only scenarios that preserve latent truth, and required output dimensions. Eleven focused plan-validator unit tests were added. The separate Rust tests now also cover direction classification, common-mode nuisance reporting, zero-nuisance equivalence and invalid nuisance strengths. These tests still require an exact-head run to claim CI validation.
+
+Still outstanding: deterministic implementations for the other nuisance families, planted-positive and clean-negative leakage controls, the independent biological reproduction, external-cohort execution and exact-head evidence receipts for the final source head. No biological data have been analysed by this increment.
 
 ## References
 
