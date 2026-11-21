@@ -18,13 +18,13 @@
 pub mod aesthetic_engine;
 pub mod aesthetic_score;
 pub mod animation;
+pub mod color;
 pub mod embodiment;
 pub mod embodiment_trace;
-pub mod color;
 pub mod geometry;
-pub mod mycelial_presence;
-pub mod mycelial_model;
 pub mod mycelial_mesh;
+pub mod mycelial_model;
+pub mod mycelial_presence;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
@@ -36,32 +36,29 @@ use serde::{Deserialize, Serialize};
 pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
 pub use animation::{FrameContext, MotionPreference};
+pub use color::{Color, Palette};
 pub use embodiment::{
     EmbodimentActivity, EmbodimentController, EmbodimentEvent, EmbodimentEventKind,
-    EmbodimentIngestError, EmbodimentSequenceError, EmbodimentEventSequencer,
-    EmbodimentSnapshot, GazeTarget, Observed, SignalProvenance,
-    SpeechOutputState, Viseme, VisemeSignal,
+    EmbodimentEventSequencer, EmbodimentIngestError, EmbodimentSequenceError, EmbodimentSnapshot,
+    GazeTarget, Observed, SignalProvenance, SpeechOutputState, Viseme, VisemeSignal,
 };
 pub use embodiment_trace::{
-    EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentTrace, EmbodimentTraceError,
-    EmbodimentSession, EmbodimentSessionError, EmbodimentTraceSummary,
-    MAX_EMBODIMENT_SESSION_ID_BYTES, MAX_EMBODIMENT_TRACE_EVENTS,
-    OpenActivityInterval, OpenPlaybackInterval,
+    EMBODIMENT_TRACE_SCHEMA_VERSION, EmbodimentSession, EmbodimentSessionError, EmbodimentTrace,
+    EmbodimentTraceError, EmbodimentTraceSummary, MAX_EMBODIMENT_SESSION_ID_BYTES,
+    MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
 };
-pub use color::{Color, Palette};
 pub use geometry::build_scene;
-pub use mycelial_presence::{
-    build_mycelial_presence, build_mycelial_presence_with_mode,
-    render_mycelial_presence, render_mycelial_presence_with_mode,
+pub use mycelial_mesh::{
+    FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
+    TubeTessellationConfig, TubeTessellationError, tessellate_mycelial_model,
 };
 pub use mycelial_model::{
-    build_mycelial_model, MycelialFilament, MycelialModel, OrbitalCell,
-    PresenceMode, SpatialPoint3, MYCELIAL_MODEL_VERSION,
+    MYCELIAL_MODEL_VERSION, MycelialFilament, MycelialModel, OrbitalCell, PresenceMode,
+    SpatialPoint3, build_mycelial_model,
 };
-pub use mycelial_mesh::{
-    tessellate_mycelial_model, FilamentMeshRange, MycelialTubeMesh,
-    TubeTessellationConfig, TubeTessellationError, MAX_MYCELIAL_FILAMENTS,
-    MAX_TUBE_MESH_VERTICES,
+pub use mycelial_presence::{
+    build_mycelial_presence, build_mycelial_presence_with_mode, render_mycelial_presence,
+    render_mycelial_presence_with_mode,
 };
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
