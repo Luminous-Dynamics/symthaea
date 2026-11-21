@@ -711,6 +711,17 @@ mod tests {
         let result = report(2);
         assert_eq!(result.payload.manifest.seed_schedule, vec![0, 1]);
         assert_eq!(result.payload.receipts.len(), 2 * 4 * 5 * 2);
+        let receipt_ids: std::collections::BTreeSet<_> = result
+            .payload
+            .receipts
+            .iter()
+            .map(|receipt| receipt.receipt_id.as_str())
+            .collect();
+        assert_eq!(receipt_ids.len(), result.payload.receipts.len());
+        assert!(result.payload.receipts.iter().all(|receipt| {
+            receipt.intervention.trial_id == receipt.trial_id
+                && receipt.intervention.target == receipt.target
+        }));
         assert_eq!(result.payload.agent_to_input_sensitivity.len(), 4 * 5);
         assert_eq!(result.payload.agent_to_partner_sensitivity.len(), 4 * 5 * 2);
         assert!(result
