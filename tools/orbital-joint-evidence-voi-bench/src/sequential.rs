@@ -1155,6 +1155,66 @@ mod tests {
     }
 
     #[test]
+    fn accept_leaf_carries_every_required_path_obligation() {
+        let result = receipt();
+        let scenario = &result.scenarios[0];
+        let PolicyNode::Test { branches, .. } = &scenario.adaptive_campaign.policy else {
+            panic!("adaptive policy must start at the combined-load screen");
+        };
+        let Some(PolicyNode::Test { branches, .. }) = branches.get("PASS") else {
+            panic!("PASS branch must execute targeted thermal evidence");
+        };
+        let Some(PolicyNode::Terminal {
+            decision,
+            covered_obligations,
+            ..
+        }) = branches.get("CLEAR") else {
+            panic!("CLEAR branch must end in a terminal disposition");
+        };
+        assert_eq!(decision, "ACCEPT");
+        assert_eq!(
+            covered_obligations.iter().cloned().collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "COMBINED-LOAD-CAPABILITY-001".to_owned(),
+                "THERMAL-WEAR-INSPECTABILITY-001".to_owned(),
+            ])
+        );
+        let PolicyNode::Test { branches, .. } = &scenario.adaptive_campaign.policy else {
+            unreachable!();
+        };
+        let Some(PolicyNode::Terminal {
+            decision,
+            covered_obligations,
+            ..
+        }) = branches.get("FAIL") else {
+            panic!("FAIL branch must be a terminal rejection");
+        };
+        assert_eq!(decision, "REJECT");
+        assert_eq!(
+            covered_obligations,
+            &vec!["COMBINED-LOAD-CAPABILITY-001".to_owned()]
+        );
+    }
+
+    #[test]
+    fn missing_thermal_coverage_cannot_produce_accept() {
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        value["scenarios"][0]["actions"][1]["obligations_covered"] =
+            serde_json::json!([]);
+        let changed = serde_json::to_vec(&value).unwrap();
+        assert!(run_sequential_audit(&changed, SOURCE).is_err());
+    }
+
+    #[test]
+    fn unknown_action_obligation_is_rejected() {
+        let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
+        value["scenarios"][0]["actions"][0]["obligations_covered"] =
+            serde_json::json!(["UNDECLARED-REQUIREMENT"]);
+        let changed = serde_json::to_vec(&value).unwrap();
+        assert!(run_sequential_audit(&changed, SOURCE).is_err());
+    }
+
+    #[test]
     fn action_order_does_not_change_contingent_policy() {
         let original = receipt();
         let mut value: Value = serde_json::from_slice(FIXTURE).unwrap();
