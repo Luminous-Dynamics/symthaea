@@ -148,3 +148,32 @@ The portable evidence shape is described in
 The evaluator tests acceptance, measured failure, missing evidence, malformed
 hashes/measurements, invalid budgets, resource exhaustion, and the signed vs
 nonnegative distribution distinction.
+
+
+## Affine velocity-frame moment oracle
+
+The optional research module `velocity_frame.rs` records exact raw-moment
+identities for an affine velocity coordinate (v=u+\alpha\xi), with
+(alpha>0) and computational density
+(g(\xi)=\alpha f(u+\alpha\xi)). The convention makes the zeroth moment
+invariant:
+
+[
+M_0=\mu_0,\qquad
+M_1=u\mu_0+\alpha\mu_1,\qquad
+M_2=u^2\mu_0+2u\alpha\mu_1+\alpha^2\mu_2.
+]
+
+The inverse transform is also provided. This is an algebraic moment oracle,
+not a remap of sampled values, adaptive Hermite projection, positivity
+preserver, or live representation switch. It applies equally to signed
+perturbation moments; positivity is not assumed. The second raw moment is
+reported before multiplying by particle mass or one half, which belong to the
+physical model's kinetic-energy convention.
+
+The tests cover known-answer identities, inverse and inter-frame round trips,
+zeroth-moment invariance, signed moments, invalid shifts/scales, non-finite
+moments and overflow. The module is research infrastructure for
+[#13130 — adaptive Hermite coordinates and kinetic residual compression](https://github.com/Luminous-Dynamics/symthaea/issues/13130);
+it does not claim an adaptive Hermite implementation or invariant preservation
+for a discretized, remapped distribution.
