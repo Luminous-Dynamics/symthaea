@@ -37,4 +37,11 @@ See `docs/research/MUSE_OBSERVER_CALIBRATION_V1.md` and issue #12998 for the ful
 
 ## Qualification
 
-The dedicated exact-head workflow runs Rust formatting, tests, Clippy and JSON Schema Draft 2020-12 checks. Source tests are authored; do not treat them as executed until the workflow reports a successful result on the exact PR head.
+The source-group family-risk implementation passed the dedicated exact-head workflow at code commit `280c5e6524f44f9d01319e16f7ae53d3bf2da31d`:
+- Rust formatting: passed.
+- Library, CLI and adversarial tests: 18 passed.
+- Clippy with `-D warnings`: passed.
+- CLI help smoke: passed.
+- Draft 2020-12 schema/fixture checks: passed.
+
+This qualifies the implementation and synthetic fixture, not real-audio calibration, annotation authenticity, rights or instrument/renderer generalization. See the research note for the exact-head boundary and current evidence gaps.
