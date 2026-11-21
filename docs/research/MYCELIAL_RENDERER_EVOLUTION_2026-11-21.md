@@ -83,7 +83,7 @@ Implemented in source:
 
 Still required:
 1. Build and run the isolated adapter on a supported native GPU, inspect actual output, and fix any API or visual issues.
-2. Replace the shared filament material with generation/branch-aware material data without duplicating semantic geometry.
+2. Add subtle per-generation material profiles (roughness/emissive response) on top of the existing generation-based vertex tint, without duplicating semantic geometry.
 3. Add custom WESL material extensions for a restrained Fresnel rim and material refinements; do not make mesh shaders a requirement.
 4. Optimize terminal-spore draw calls, apply level-of-detail, and set strict geometry/particle budgets on mobile.
 5. Add camera interaction, runtime event streaming, and renderer telemetry only after the baseline is stable.
