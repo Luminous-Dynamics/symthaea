@@ -9,13 +9,14 @@
 
 use std::collections::HashMap;
 use std::error::Error;
+use std::fmt;
 use std::fmt::Write as _;
 
 use crate::cognitive_layout::{
     CognitiveSpatialProjection, CognitiveSpatialLink,
 };
 use crate::cognitive_topology::{
-    CognitiveEpisodeState, CognitiveNodeKind, CognitiveProvenance, CognitiveRelation,
+    CognitiveNodeKind, CognitiveProvenance, CognitiveRelation,
     EpistemicStatus,
 };
 
@@ -226,7 +227,7 @@ fn render_link(
     let dash = status_dash(link.status);
     let opacity = status_opacity(link.status);
     let title = format!(
-        "{}: {} — {} → {}; status={:?}; event={}; sequence={}; provenance={:?}",
+        "{}: {} — {:?} → {}; status={:?}; event={}; sequence={}; provenance={:?}",
         link.edge_id,
         link.source_node_id,
         link.relation,
@@ -269,7 +270,7 @@ fn render_anchor(
 ) {
     let z = anchor.position.z.clamp(-6.0, 6.0);
     let radius = (9.0 + z * 0.35).clamp(6.5, 11.5);
-    let (color, symbol) = node_style(anchor.node_kind);
+    let color = node_color(anchor.node_kind);
     let dash = status_dash(anchor.status);
     let opacity = status_opacity(anchor.status);
     let title = format!(
@@ -278,7 +279,7 @@ fn render_anchor(
         anchor.label,
         anchor.status,
         anchor.source_event_id,
-        anchor.node_kind,
+        anchor.source_producer,
         anchor.source_sequence,
         anchor.provenance
     );
@@ -406,7 +407,6 @@ fn render_anchor(
         );
     }
     output.push_str("</g>\n");
-    let _ = symbol;
 }
 
 fn render_legend(output: &mut String, width: u32, height: u32, has_synthetic: bool) {
@@ -424,16 +424,16 @@ fn render_legend(output: &mut String, width: u32, height: u32, has_synthetic: bo
     );
 }
 
-fn node_style(kind: CognitiveNodeKind) -> (&'static str, &'static str) {
+fn node_color(kind: CognitiveNodeKind) -> &'static str {
     match kind {
-        CognitiveNodeKind::Memory => ("#40d4c9", "M"),
-        CognitiveNodeKind::Concept => ("#7fbfff", "C"),
-        CognitiveNodeKind::Observation => ("#8edaa9", "O"),
-        CognitiveNodeKind::Task => ("#c4a4ff", "T"),
-        CognitiveNodeKind::Tool => ("#f2b36e", "U"),
-        CognitiveNodeKind::Plan => ("#bd95ec", "P"),
-        CognitiveNodeKind::Prediction => ("#ffca7a", "?"),
-        CognitiveNodeKind::Entity => ("#b9c8d9", "E"),
+        CognitiveNodeKind::Memory => "#40d4c9",
+        CognitiveNodeKind::Concept => "#7fbfff",
+        CognitiveNodeKind::Observation => "#8edaa9",
+        CognitiveNodeKind::Task => "#c4a4ff",
+        CognitiveNodeKind::Tool => "#f2b36e",
+        CognitiveNodeKind::Plan => "#bd95ec",
+        CognitiveNodeKind::Prediction => "#ffca7a",
+        CognitiveNodeKind::Entity => "#b9c8d9",
     }
 }
 
