@@ -206,9 +206,22 @@
       "local_test_count": 11,
       "local_test_result": "PASS",
       "physical_or_dataset_claim": false,
-      "test_count": 21,
+      "test_count": 31,
       "test_result": "PASS-in-hosted-GitHub-Actions",
-      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44881540564"
+      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550"
+    },
+    "independent_inspection_decision_oracle": {
+      "input_schema": "luminous.semi-bench.inspection-decision.v1",
+      "output_schema": "luminous.semi-bench.inspection-decision-report.v1",
+      "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_inspection_decision_reference.py",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json",
+      "algorithm": "exact-exhaustive-selection-for-at-most-18-candidates-under-cash-time-and-group-capacity",
+      "comparator": "matched-budget-risk-only-greedy",
+      "test_count": 10,
+      "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550",
+      "claim_ceiling": "synthetic expected-net-value only; not measured inspection savings or authorization"
     }
   }
 }
