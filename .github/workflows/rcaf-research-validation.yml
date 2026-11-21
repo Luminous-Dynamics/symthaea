@@ -111,3 +111,25 @@ jobs:
           assert report["median_injected_paired_gap"] > report["median_null_paired_gap"] + 0.035
           print("PASS: RCAF synthetic null calibration and injection recovery")
           PY
+
+      - name: Run RCAF injection-recovery dose-response sweep
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_recovery_sweep -- "$RUNNER_TEMP/rcaf-injection-sweep.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/injection-recovery-sweep.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-injection-sweep.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          points = report["reports"]
+          deltas = [point["injection_loading_delta"] for point in points]
+          assert deltas == [0.0, 0.10, 0.20, 0.30, 0.40]
+          assert report["effect_size_points"] == 5
+          assert report["endpoint_median_gap_difference"] > 0.04
+          assert report["monotonic_adjacent_pair_fraction"] >= 0.5
+          print("PASS: RCAF synthetic injection-recovery dose-response sweep")
+          PY
