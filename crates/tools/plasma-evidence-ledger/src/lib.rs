@@ -109,15 +109,22 @@ pub enum ApplicabilityRule {
 /// Identity of the source, input, configuration and operator that produced evidence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Provenance {
+    /// Stable identity shared by all evidence generated from one trajectory run.
+    pub run_id: String,
+    /// Revision of the code that produced this particular evidence record.
     pub source_revision: String,
+    /// Digest of the trajectory input shared by every record in the run.
     pub input_digest: String,
+    /// Digest of the frozen run configuration shared by every record.
     pub config_digest: String,
+    /// Solver or diagnostic operator identity for this particular record.
     pub operator_id: String,
 }
 
 impl Provenance {
     pub fn validate(&self) -> Result<(), LedgerError> {
         for (field, value) in [
+            ("run_id", self.run_id.as_str()),
             ("source_revision", self.source_revision.as_str()),
             ("input_digest", self.input_digest.as_str()),
             ("config_digest", self.config_digest.as_str()),
@@ -128,6 +135,16 @@ impl Provenance {
             }
         }
         Ok(())
+    }
+
+    /// Whether two evidence receipts refer to the same frozen trajectory run.
+    ///
+    /// Source revisions and operator IDs are intentionally excluded: separate
+    /// independently versioned diagnostics may evaluate the same run.
+    pub fn same_run(&self, other: &Self) -> bool {
+        self.run_id == other.run_id
+            && self.input_digest == other.input_digest
+            && self.config_digest == other.config_digest
     }
 }
 
@@ -364,7 +381,7 @@ impl TrajectoryLedger {
                 continue;
             };
 
-            if observation.provenance != self.provenance {
+            if !observation.provenance.same_run(&self.provenance) {
                 decisions.push(MetricDecision::unresolved(
                     requirement.metric,
                     Some(observation.bound_kind),
@@ -514,7 +531,7 @@ pub struct AggregatedErrorBound {
     pub units: String,
     pub time_start: f64,
     pub time_end: f64,
-    pub provenance: Provenance,
+    pub component_provenance: Vec<Provenance>,
     pub upper_bound: f64,
     pub bound_kind: AggregatedBoundKind,
     pub component_count: usize,
@@ -607,7 +624,10 @@ pub fn aggregate_error_components(
         units,
         time_start,
         time_end,
-        provenance,
+        component_provenance: components
+            .iter()
+            .map(|component| component.provenance.clone())
+            .collect(),
         upper_bound,
         bound_kind,
         component_count: components.len(),
@@ -751,6 +771,7 @@ mod tests {
 
     fn provenance() -> Provenance {
         Provenance {
+            run_id: "run-0001".to_owned(),
             source_revision: "0123456789abcdef".to_owned(),
             input_digest: "input-sha256".to_owned(),
             config_digest: "config-sha256".to_owned(),
@@ -934,6 +955,9 @@ mod tests {
             0.03,
             BoundKind::Deterministic,
         );
+        let mut energy = energy;
+        energy.provenance.source_revision = "energy-diagnostic-build".to_owned();
+        energy.provenance.operator_id = "energy-ledger-v2".to_owned();
         let result = ledger(vec![field, energy])
             .qualify(&policy(vec![
                 requirement(MetricId::FieldL2Error, 0.1),
@@ -1010,7 +1034,7 @@ mod tests {
             0.1,
             BoundKind::Deterministic,
         );
-        item.provenance.source_revision = "different-head".to_owned();
+        item.provenance.run_id = "different-run".to_owned();
         let result = ledger(vec![item])
             .qualify(&policy(vec![requirement(MetricId::FieldL2Error, 0.1)]))
             .unwrap();
@@ -1120,6 +1144,28 @@ mod tests {
     }
 
     #[test]
+    fn distinct_diagnostic_revisions_can_share_one_run_identity() {
+        let mut second = component("independent_mmd_oracle", 0.2, BoundKind::Deterministic);
+        second.provenance.source_revision = "diagnostic-revision-b".to_owned();
+        second.provenance.operator_id = "independent-mmd-v2".to_owned();
+        let result = aggregate_error_components(&[
+            component("solver-reference", 0.1, BoundKind::Deterministic),
+            second,
+        ])
+        .unwrap();
+        assert!((result.upper_bound - 0.3).abs() < 1.0e-14);
+        assert_eq!(result.component_provenance.len(), 2);
+        assert_ne!(
+            result.component_provenance[0].source_revision,
+            result.component_provenance[1].source_revision
+        );
+        assert_ne!(
+            result.component_provenance[0].operator_id,
+            result.component_provenance[1].operator_id
+        );
+    }
+
+    #[test]
     fn empirical_components_cannot_enter_qualified_error_budget() {
         assert_eq!(
             aggregate_error_components(&[component(
@@ -1164,7 +1210,7 @@ mod tests {
         );
 
         let mut changed = component("field", 0.2, BoundKind::Deterministic);
-        changed.provenance.source_revision = "other-head".to_owned();
+        changed.provenance.run_id = "other-run".to_owned();
         assert_eq!(
             aggregate_error_components(&[first, changed]),
             Err(LedgerError::ErrorBudgetProvenanceMismatch)
