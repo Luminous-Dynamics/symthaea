@@ -105,5 +105,8 @@
   ],
   "claim_ceiling": "proposal_only_no_qualification_authority",
   "no_actuation": true,
-  "authority_granted": false
+  "authority_granted": false,
+  "requalification_claims_covered": [
+    "STRUCTURAL-INTERFACE-CAPABILITY-001"
+  ]
 }
