@@ -180,9 +180,10 @@ impl fmt::Display for CognitiveTopologyError {
             Self::InvalidTraceDigest => {
                 write!(f, "trace digest must be 64 lowercase hexadecimal characters")
             }
-            Self::InvalidSequence => {
-                write!(f, "evidence sequence is zero, exceeds last_sequence, or has non-monotonic time")
-            }
+            Self::InvalidSequence => write!(
+                f,
+                "evidence sequence is zero, exceeds last_sequence, or has non-monotonic time"
+            ),
             Self::ConflictingEventMetadata => {
                 write!(f, "one event identity or sequence has conflicting evidence metadata")
             }
@@ -778,6 +779,24 @@ mod tests {
             topology.validate(),
             Err(CognitiveTopologyError::DanglingEdgeEndpoint("missing-node".to_string()))
         );
+    }
+
+    #[test]
+    fn renderer_local_provenance_cannot_be_admitted_as_cognitive_evidence() {
+        let mut value: serde_json::Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/cognitive_topology_v1.json"
+        ))
+        .expect("fixture JSON");
+        value["nodes"][0]["evidence"]["provenance"] =
+            serde_json::Value::String("renderer_local".to_string());
+        assert!(serde_json::from_value::<CognitiveTopology>(value).is_err());
+    }
+
+    #[test]
+    fn non_monotonic_event_time_is_rejected() {
+        let mut topology = fixture();
+        topology.nodes[0].evidence.monotonic_ns = 4_000;
+        assert_eq!(topology.validate(), Err(CognitiveTopologyError::InvalidSequence));
     }
 
     #[test]
