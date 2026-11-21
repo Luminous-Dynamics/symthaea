@@ -762,6 +762,58 @@ mod tests {
     }
 
     #[test]
+    fn convergence_replicates_must_span_distinct_q_mesh_and_supercell_settings() {
+        let mut value = fixture();
+        value["synthetic_candidates"][1]["phonon_runs"][1]["q_mesh"] =
+            value["synthetic_candidates"][1]["phonon_runs"][0]["q_mesh"].clone();
+        value["synthetic_candidates"][1]["phonon_runs"][1]["supercell"] =
+            value["synthetic_candidates"][1]["phonon_runs"][0]["supercell"].clone();
+        let receipt = audit(&value).expect("duplicate settings remain a valid but underconverged record");
+        assert_eq!(
+            receipt["candidate_dispositions"][1]["disposition"],
+            "UNDERCONVERGED_OR_UNKNOWN"
+        );
+    }
+
+    #[test]
+    fn convergence_profile_ids_must_be_unique() {
+        let mut value = fixture();
+        let first = value["synthetic_candidates"][0]["phonon_runs"][0]
+            ["convergence_profile_id"]
+            .clone();
+        value["synthetic_candidates"][0]["phonon_runs"][1]["convergence_profile_id"] = first;
+        assert!(
+            audit(&value)
+                .unwrap_err()
+                .contains("duplicate convergence_profile_id")
+        );
+    }
+
+    #[test]
+    fn convergence_runs_cannot_pool_different_functionals_or_pseudopotentials() {
+        let mut value = fixture();
+        value["synthetic_candidates"][0]["phonon_runs"][1]["functional_id"] =
+            json!("OTHER-FUNCTIONAL");
+        assert!(
+            audit(&value)
+                .unwrap_err()
+                .contains("same functional and pseudopotential set")
+        );
+    }
+
+    #[test]
+    fn q_mesh_and_supercell_triplets_must_be_positive() {
+        let mut value = fixture();
+        value["synthetic_candidates"][0]["phonon_runs"][0]["q_mesh"] =
+            json!([6, 0, 6]);
+        assert!(
+            audit(&value)
+                .unwrap_err()
+                .contains("q_mesh[1] is outside the valid range")
+        );
+    }
+
+    #[test]
     fn robust_instability_routes_to_distortion_path_not_global_candidate_rejection() {
         let receipt = audit(&fixture()).expect("fixture should validate");
         let rows = receipt["candidate_dispositions"].as_array().unwrap();
