@@ -90,3 +90,11 @@ The semantic validator distinguishes metadata-only work from signal analysis and
 - If edge-polarity results are included, their neutral threshold must equal the analysis-level frozen threshold.
 
 A schema-valid report is still not a scientific result by itself. The validator checks arithmetic and declared provenance fields, not source-data truth or the correctness of the underlying neuroimaging pipeline.
+
+
+## Current research test inventory
+
+- Rust kernel: 14 authored unit tests. Exact-head focused workflow run `44889597933` passed all 14 on source commit `c6397e9a4c65a36658f207a5a56482568a16a26a`, including strict rustfmt and Clippy.
+- Python report validator: 13 tests after adding verified-download, attrition, independent-replay receipt and threshold-consistency checks.
+- Exact sign-test power calculator: 5 tests.
+- The combined 18-test Python suite after the latest semantic-hardening commit still requires a fresh exact-head run. Do not transfer the earlier 14-test workflow result to these newer validator changes.
