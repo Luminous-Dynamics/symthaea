@@ -26,6 +26,15 @@ pub struct SensingFeatures {
     pub past_residual_ppm: u32,
     /// Candidate-estimated wrong-belief exposure avoided by observing now.
     pub predicted_ted_reduction_us: u64,
+    /// Candidate-estimated standard deviation of opportunity loss over current
+    /// belief states, in microseconds. This is not evaluator-side hidden truth.
+    pub opportunity_loss_stddev_us: u64,
+    /// Candidate-estimated predictive-model confidence after posterior feedback,
+    /// in PPM. Age/horizon decay should be incorporated by the candidate estimator.
+    pub model_confidence_ppm: u32,
+    /// Candidate-visible horizon over which model ignorance could expose future
+    /// decisions to wrong-belief loss, in microseconds.
+    pub prediction_horizon_us: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -60,9 +69,18 @@ pub enum SensingPolicy {
     NoveltyThreshold { threshold_ppm: u32 },
     UncertaintyThreshold { threshold_ppm: u32 },
     PastResidualThreshold { threshold_ppm: u32 },
-    /// Observe when predicted avoided TED per nJ exceeds this fixed-point
-    /// threshold (microseconds/nJ, scaled by 1e6).
+    /// Observe when expected avoided TED per nJ exceeds this threshold.
+    /// The threshold is in microseconds/nJ, scaled by 1e6.
     ValueOfInformation { minimum_us_per_nj_ppm: u64 },
+    /// Candidate-side risk-adjusted VOI ablation. It adds a risk premium for
+    /// opportunity-loss variability across belief states and an ignorance
+    /// surcharge for low predictive-model confidence over the current horizon.
+    /// All coefficients are fixed-point PPM values in [0, 1_000_000].
+    RiskAdjustedValueOfInformation {
+        minimum_adjusted_us_per_nj_ppm: u64,
+        risk_aversion_ppm: u32,
+        ignorance_weight_ppm: u32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -75,6 +93,7 @@ pub enum TriggerReason {
     Uncertainty,
     PastResidual,
     ValueOfInformation,
+    RiskAdjustedValueOfInformation,
     MaximumGap,
     MinimumGap,
 }
@@ -313,6 +332,46 @@ fn proposed_delay(
                 (context.maximum_gap_us, TriggerReason::MaximumGap)
             }
         }
+        SensingPolicy::RiskAdjustedValueOfInformation {
+            minimum_adjusted_us_per_nj_ppm,
+            risk_aversion_ppm,
+            ignorance_weight_ppm,
+        } => {
+            let risk_premium_us = u128::from(features.opportunity_loss_stddev_us)
+                .checked_mul(u128::from(risk_aversion_ppm))
+                .ok_or(SensingError::ArithmeticOverflow)?
+                / PPM;
+
+            let confidence_shortfall = PPM
+                .checked_sub(u128::from(features.model_confidence_ppm))
+                .ok_or(SensingError::ArithmeticOverflow)?;
+            let ignorance_exposure_us = u128::from(features.prediction_horizon_us)
+                .checked_mul(confidence_shortfall)
+                .ok_or(SensingError::ArithmeticOverflow)?
+                / PPM;
+            let ignorance_penalty_us = ignorance_exposure_us
+                .checked_mul(u128::from(ignorance_weight_ppm))
+                .ok_or(SensingError::ArithmeticOverflow)?
+                / PPM;
+
+            // This is a transparent, candidate-side heuristic ablation inspired
+            // by risk/ignorance-aware VoI. It is not a reimplementation of the
+            // IEEE paper's full belief-state value function.
+            let adjusted_benefit_us = u128::from(features.predicted_ted_reduction_us)
+                .checked_add(risk_premium_us)
+                .and_then(|value| value.checked_add(ignorance_penalty_us))
+                .ok_or(SensingError::ArithmeticOverflow)?;
+            let adjusted_value_per_nj_ppm = adjusted_benefit_us
+                .checked_mul(PPM)
+                .ok_or(SensingError::ArithmeticOverflow)?
+                / u128::from(context.estimated_observation_energy_nj);
+
+            if adjusted_value_per_nj_ppm >= u128::from(minimum_adjusted_us_per_nj_ppm) {
+                (elapsed, TriggerReason::RiskAdjustedValueOfInformation)
+            } else {
+                (context.maximum_gap_us, TriggerReason::MaximumGap)
+            }
+        }
     };
 
     let delay = target_interval.saturating_sub(elapsed);
@@ -325,6 +384,7 @@ fn validate_features(features: SensingFeatures) -> Result<(), SensingError> {
         ("uncertainty_ppm", features.uncertainty_ppm),
         ("novelty_ppm", features.novelty_ppm),
         ("past_residual_ppm", features.past_residual_ppm),
+        ("model_confidence_ppm", features.model_confidence_ppm),
     ] {
         if u128::from(value) > PPM {
             return Err(SensingError::InvalidProbability { field, value });
@@ -378,6 +438,23 @@ fn validate_policy(policy: SensingPolicy) -> Result<(), SensingError> {
         SensingPolicy::PastResidualThreshold { threshold_ppm } if !valid_threshold(threshold_ppm) => {
             Err(SensingError::InvalidProbability { field: "threshold_ppm", value: threshold_ppm })
         }
+        SensingPolicy::RiskAdjustedValueOfInformation {
+            risk_aversion_ppm,
+            ignorance_weight_ppm,
+            ..
+        } if !valid_threshold(risk_aversion_ppm) || !valid_threshold(ignorance_weight_ppm) => {
+            if !valid_threshold(risk_aversion_ppm) {
+                Err(SensingError::InvalidProbability {
+                    field: "risk_aversion_ppm",
+                    value: risk_aversion_ppm,
+                })
+            } else {
+                Err(SensingError::InvalidProbability {
+                    field: "ignorance_weight_ppm",
+                    value: ignorance_weight_ppm,
+                })
+            }
+        }
         _ => Ok(()),
     }
 }
@@ -405,6 +482,9 @@ mod tests {
             novelty_ppm: 100_000,
             past_residual_ppm: 0,
             predicted_ted_reduction_us: 100,
+            opportunity_loss_stddev_us: 0,
+            model_confidence_ppm: 1_000_000,
+            prediction_horizon_us: 0,
         }
     }
 
