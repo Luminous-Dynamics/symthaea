@@ -56,9 +56,10 @@
   },
   "evidence_record": {
     "required_identity": [
-      "source_revision",
+      "run_id",
       "input_digest",
       "config_digest",
+      "source_revision",
       "operator_id",
       "equation_cohort",
       "metric_id",
@@ -89,7 +90,12 @@
       "fail",
       "unresolved",
       "not_applicable"
-    ]
+    ],
+    "provenance_rules": {
+      "run_identity": "All observations for the same trajectory must agree on run_id, input_digest and config_digest.",
+      "independent_sources": "Each metric observation retains its own source_revision and operator_id; diagnostic implementations are allowed to be independently versioned.",
+      "error_budget": "All components must share run identity and segment, while retaining separate per-component source receipts."
+    }
   },
   "qualification": {
     "pass": "Applicable deterministic or probabilistic upper error bound is no greater than the exact tolerance frozen in the cohort policy.",
