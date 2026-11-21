@@ -541,11 +541,17 @@ fn build_report(
 }
 
 fn cargo_lock_sha256() -> Result<String, String> {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let lock_path = Path::new(manifest_dir).join("../../..").join("Cargo.lock");
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace_lock = manifest_dir.join("../../..").join("Cargo.lock");
+    let standalone_lock = manifest_dir.join("Cargo.lock");
+    let lock_path = if workspace_lock.is_file() {
+        workspace_lock
+    } else {
+        standalone_lock
+    };
     let bytes = fs::read(&lock_path).map_err(|error| {
         format!(
-            "could not read workspace Cargo.lock at {}: {error}",
+            "could not read workspace or staged standalone Cargo.lock at {}: {error}",
             lock_path.display()
         )
     })?;
