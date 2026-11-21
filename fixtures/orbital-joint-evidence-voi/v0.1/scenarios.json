@@ -1077,6 +1077,178 @@
       "requires_independent_evidence": false,
       "required_obligations": [],
       "current_evidence_dependency_groups": {}
+    },
+    {
+      "scenario_id": "JEV-012",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "current_evidence_dependency_groups": {},
+      "required_obligations": [],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-ABORTED-OVER-PLAN",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://aborted-coupon-test",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.2
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "NO-RESULT",
+            "CRITICAL_CAPACITY_FAILURE": "NO-RESULT"
+          },
+          "dependencies": [],
+          "observed_execution_state": "ABORTED",
+          "actual_resources": {
+            "engineering_hours": 1.2,
+            "compute_core_hours": 0,
+            "facility_hours": 0.8,
+            "specimen_count": 1,
+            "review_hours": 0.4,
+            "external_cost_units": 0.5
+          },
+          "evidence_disposition": "INCOMPLETE"
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "REPLAN-AFTER-FAILED-ACTION",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-ABORTED-OVER-PLAN"
+        ],
+        "notes": "The aborted coupon trial consumed more engineering, facility, review and external resources than estimated, but remained within the total scenario budget. Preserve actual consumption and flag plan variance."
+      }
+    },
+    {
+      "scenario_id": "JEV-013",
+      "claim_ceiling": "synthetic_decision_value_semantics_only",
+      "evidence_class": "synthetic",
+      "decision_regime": "distribution_free",
+      "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+      "requires_independent_evidence": false,
+      "states": [
+        "CAPABILITY_WITHIN_PROFILE",
+        "CRITICAL_CAPACITY_FAILURE"
+      ],
+      "loss_matrix": {
+        "ACCEPT": {
+          "CAPABILITY_WITHIN_PROFILE": 0,
+          "CRITICAL_CAPACITY_FAILURE": 100
+        },
+        "REJECT": {
+          "CAPABILITY_WITHIN_PROFILE": 5,
+          "CRITICAL_CAPACITY_FAILURE": 0
+        }
+      },
+      "prior": null,
+      "current_evidence_refs": [
+        "structural-profile://P1",
+        "requirement-profile://C1"
+      ],
+      "current_evidence_dependency_groups": {},
+      "required_obligations": [],
+      "budget": {
+        "engineering_hours": 2,
+        "compute_core_hours": 1,
+        "facility_hours": 2,
+        "specimen_count": 1,
+        "review_hours": 2,
+        "external_cost_units": 2
+      },
+      "actions": [
+        {
+          "action_id": "A-ABORTED-OVER-BUDGET",
+          "action_class": "coupon_test",
+          "target_claim_id": "STRUCTURAL-COMPATIBILITY-001",
+          "profile_ref": "provider-client-profile://P1-C1@cfg-r7",
+          "article_subject_ref": "physical-unit://JOINT-SPECIMEN-0001",
+          "configuration_id": "CFG-R7",
+          "icd_revision": "R3",
+          "method_ref": "synthetic-method://aborted-coupon-test",
+          "admissibility": {
+            "state": "ADMISSIBLE",
+            "reason_codes": []
+          },
+          "resources": {
+            "engineering_hours": 0.5,
+            "compute_core_hours": 0,
+            "facility_hours": 0.5,
+            "specimen_count": 1,
+            "review_hours": 0.1,
+            "external_cost_units": 0.2
+          },
+          "observation_by_state": {
+            "CAPABILITY_WITHIN_PROFILE": "NO-RESULT",
+            "CRITICAL_CAPACITY_FAILURE": "NO-RESULT"
+          },
+          "dependencies": [],
+          "observed_execution_state": "ABORTED",
+          "actual_resources": {
+            "engineering_hours": 2.4,
+            "compute_core_hours": 0.1,
+            "facility_hours": 2.5,
+            "specimen_count": 2,
+            "review_hours": 2.2,
+            "external_cost_units": 2.5
+          },
+          "evidence_disposition": "INCOMPLETE"
+        }
+      ],
+      "expected": {
+        "baseline_minimax_regret": 5,
+        "best_action_id": "REPLAN-AFTER-FAILED-ACTION",
+        "post_action_worst_case_regret": 5,
+        "abstain": true,
+        "must_not_select": [
+          "A-ABORTED-OVER-BUDGET"
+        ],
+        "notes": "The aborted coupon trial exceeded the planned estimate and the total scenario budget. Preserve actual consumption; report over-plan and over-budget rather than dropping or rejecting the cost record."
+      }
     }
   ]
 }
