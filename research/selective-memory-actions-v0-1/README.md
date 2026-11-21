@@ -14,8 +14,13 @@ cargo fmt --manifest-path research/selective-memory-actions-v0-1/Cargo.toml -- -
 - Separates ingestion actions from query-time information actions.
 - Ranks precomputed probability-weighted loss distributions using integer fixed-point arithmetic.
 - Applies hard admission gates before cost ranking.
+- Enforces an upstream-derived evidence freshness assessment at actual use time (age budget plus signed deadline slack); unknown or late use is blocked. Retrieval age is recorded separately for diagnostics.
 - Uses deterministic tie-breaking from a frozen policy rank.
 - Rejects mixed-stage options, duplicate actions, invalid probability mass and arithmetic overflow.
+
+## Tests and current validation
+
+Sixteen focused unit tests are authored, including use-time staleness after queue delay, unknown freshness, overdue decisions, inclusive age boundary and exact-deadline behavior. They have not been run because the current environment has no Cargo/Rust toolchain.
 
 ## Deliberate limitations
 
