@@ -107,3 +107,33 @@ They must not be averaged into one score or treated as equivalent constructs.
 ## Claim ceiling
 
 This report establishes software behaviour under the declared Gaussian-factor/AR(1) synthetic model only. It does not establish biological validity, causal interpretation, consciousness detection, clinical utility, or SOTA superiority. No EEG/fMRI/MEG/iEEG data were downloaded or analysed in this run, and no published COGITATE or ds006623 result was reproduced.
+
+
+## 6. Matched-input estimator-by-dose surface (run 44899300679)
+
+A follow-on experiment compared all three estimator definitions across the same five injection increments `[0.00, 0.10, 0.20, 0.30, 0.40]`, using the same seed and common random draws for every estimator and dose. There were 40 Monte-Carlo replicates per estimator-dose cell.
+
+Null rejection was 1/40 (2.5%) for all three estimators (95% Wilson interval 0.44%–12.88%). Injection detection:
+
+| Estimator | 0.00 | 0.10 | 0.20 | 0.30 | 0.40 |
+|---|---:|---:|---:|---:|---:|
+| Absolute Weighted Jaccard | 5% | 0% | 5% | 45% | 100% |
+| Signed-shift Weighted Jaccard | 0% | 0% | 22.5% | 85% | 100% |
+| Normalized mean absolute edge error | 0% | 0% | 22.5% | 92.5% | 100% |
+
+At `delta=0.30`, Wilson intervals were approximately 30.7%–60.2% (absolute WJ), 70.9%–92.9% (signed-shift WJ), and 80.1%–97.4% (normalized mean absolute edge error). At `delta=0.40`, all reached 40/40; the 95% Wilson lower bound is approximately 91.2%.
+
+Within this Gaussian-factor/AR(1) generator, signed-shift WJ and normalized mean absolute edge error are more sensitive than absolute WJ at moderate loading changes. This is not a universal ranking: only 40 replicates per cell were used, some intervals overlap, and the metrics have different construct semantics. A larger simulation grid (at least 1,000 replicates per final cell) and additional nuisance processes are required before making a more general statement.
+
+## 7. Exact workflow and artifact receipt
+
+- Exact checked-out RCAF source commit: `335d7430246ff01f013b96a934601de256f3ea23`.
+- Focused workflow: `44899300679`, all 20 steps passed.
+- Python tests: 18 report/power, 13 EIG, 7 multiverse, 8 measurement qualification (46 total).
+- Rust tests: 26 passed.
+- rustfmt and strict Clippy passed.
+- Artifact ID: `14705510877`.
+- Artifact SHA-256: `47c8f220bb17bf36814d073b8540765df8e6a64a9945da8b0c8baa4e501b80c9`.
+- The artifact contains the single-point report, absolute-WJ dose curve, one-point three-estimator comparison, three-estimator dose surface and content-addressed execution receipt.
+
+Broad repository CI/governance jobs remained skipped.
