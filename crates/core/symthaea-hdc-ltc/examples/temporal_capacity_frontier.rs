@@ -736,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    fn analysis_qualifies_only_paired_59_seed_capacity_points() {
+    fn analysis_rejects_underpowered_and_qualifies_paired_familywise_frontiers() {
         let revision = "a".repeat(40);
         let mut cohorts = BTreeMap::new();
 
