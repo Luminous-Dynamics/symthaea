@@ -72,16 +72,22 @@ def build_receipt(root: Path, reports: list[Path]) -> dict[str, Any]:
             parsed = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             raise ValueError(f"simulation output is not valid JSON: {path}: {exc}") from exc
+        nested_reports = []
+        for collection_key in ("results", "reports"):
+            collection = parsed.get(collection_key, [])
+            if isinstance(collection, list):
+                nested_reports.extend(item for item in collection if isinstance(item, dict))
+        estimator_ids = {
+            item["estimator"]
+            for item in [parsed, *nested_reports]
+            if isinstance(item.get("estimator"), str)
+        }
         report_entries.append({
             "filename": path.name,
             "sha256": sha256_file(path),
             "bytes": path.stat().st_size,
             "schema_version": parsed.get("schema_version"),
-            "estimator_ids": sorted({
-                item.get("estimator")
-                for item in parsed.get("results", [])
-                if isinstance(item, dict) and isinstance(item.get("estimator"), str)
-            }),
+            "estimator_ids": sorted(estimator_ids),
         })
 
     revision = os.environ.get("GITHUB_SHA", "")
