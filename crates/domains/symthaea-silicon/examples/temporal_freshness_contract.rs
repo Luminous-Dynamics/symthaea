@@ -118,8 +118,16 @@ impl DecisionOpportunity {
         Ok(())
     }
 
-    fn event_to_use_latency_ns(&self) -> Option<u64> {
+    fn availability_to_use_latency_ns(&self) -> Option<u64> {
         self.consumed_at_ns?.checked_sub(self.available_at_ns)
+    }
+
+    fn source_to_use_latency_ns(&self) -> Option<u64> {
+        self.consumed_at_ns?.checked_sub(self.source_event_time_ns)
+    }
+
+    fn source_to_availability_delay_ns(&self) -> Option<u64> {
+        self.available_at_ns.checked_sub(self.source_event_time_ns)
     }
 
     fn evidence_age_at_emission_ns(&self) -> Option<u64> {
@@ -322,9 +330,17 @@ impl FreshnessRun {
             })
             .count() as u64;
 
-        let mut event_to_use: Vec<u64> = answered
+        let mut availability_to_use: Vec<u64> = answered
             .iter()
-            .filter_map(|item| item.event_to_use_latency_ns())
+            .filter_map(|item| item.availability_to_use_latency_ns())
+            .collect();
+        let mut source_to_use: Vec<u64> = answered
+            .iter()
+            .filter_map(|item| item.source_to_use_latency_ns())
+            .collect();
+        let mut source_to_availability: Vec<u64> = answered
+            .iter()
+            .filter_map(|item| item.source_to_availability_delay_ns())
             .collect();
         let mut evidence_age_at_use: Vec<u64> = answered
             .iter()
@@ -334,7 +350,7 @@ impl FreshnessRun {
             .opportunities
             .iter()
             .filter(|item| item.is_fresh_correct_on_time())
-            .filter_map(|item| item.event_to_use_latency_ns())
+            .filter_map(|item| item.availability_to_use_latency_ns())
             .collect();
 
         Ok(FreshnessSummary {
@@ -357,11 +373,18 @@ impl FreshnessRun {
             on_time_decision_coverage: ratio(on_time.len() as u64, opportunities),
             fresh_correct_on_time_coverage: ratio(fresh_correct_on_time, opportunities),
             verified_accuracy_on_time: ratio(correct_on_time, on_time.len() as u64),
-            event_to_use_latency_p50_ns: percentile(&mut event_to_use, 50),
-            event_to_use_latency_p95_ns: percentile(&mut event_to_use, 95),
-            event_to_use_latency_p99_ns: percentile(&mut event_to_use, 99),
-            event_to_use_latency_p99_9_ns: percentile_per_mille(&mut event_to_use, 999),
-            event_to_use_latency_max_ns: percentile(&mut event_to_use, 100),
+            availability_to_use_latency_p50_ns: percentile(&mut availability_to_use, 50),
+            availability_to_use_latency_p95_ns: percentile(&mut availability_to_use, 95),
+            availability_to_use_latency_p99_ns: percentile(&mut availability_to_use, 99),
+            availability_to_use_latency_p99_9_ns: percentile_per_mille(&mut availability_to_use, 999),
+            availability_to_use_latency_max_ns: percentile(&mut availability_to_use, 100),
+            source_to_use_latency_p50_ns: percentile(&mut source_to_use, 50),
+            source_to_use_latency_p95_ns: percentile(&mut source_to_use, 95),
+            source_to_use_latency_p99_ns: percentile(&mut source_to_use, 99),
+            source_to_use_latency_p99_9_ns: percentile_per_mille(&mut source_to_use, 999),
+            source_to_use_latency_max_ns: percentile(&mut source_to_use, 100),
+            source_to_availability_delay_p95_ns: percentile(&mut source_to_availability, 95),
+            source_to_availability_delay_p99_ns: percentile(&mut source_to_availability, 99),
             evidence_age_at_use_p50_ns: percentile(&mut evidence_age_at_use, 50),
             evidence_age_at_use_p95_ns: percentile(&mut evidence_age_at_use, 95),
             evidence_age_at_use_p99_ns: percentile(&mut evidence_age_at_use, 99),
@@ -398,11 +421,18 @@ struct FreshnessSummary {
     fresh_correct_on_time_coverage: Option<f64>,
     /// Correct timely outputs / all timely outputs.
     verified_accuracy_on_time: Option<f64>,
-    event_to_use_latency_p50_ns: Option<u64>,
-    event_to_use_latency_p95_ns: Option<u64>,
-    event_to_use_latency_p99_ns: Option<u64>,
-    event_to_use_latency_p99_9_ns: Option<u64>,
-    event_to_use_latency_max_ns: Option<u64>,
+    availability_to_use_latency_p50_ns: Option<u64>,
+    availability_to_use_latency_p95_ns: Option<u64>,
+    availability_to_use_latency_p99_ns: Option<u64>,
+    availability_to_use_latency_p99_9_ns: Option<u64>,
+    availability_to_use_latency_max_ns: Option<u64>,
+    source_to_use_latency_p50_ns: Option<u64>,
+    source_to_use_latency_p95_ns: Option<u64>,
+    source_to_use_latency_p99_ns: Option<u64>,
+    source_to_use_latency_p99_9_ns: Option<u64>,
+    source_to_use_latency_max_ns: Option<u64>,
+    source_to_availability_delay_p95_ns: Option<u64>,
+    source_to_availability_delay_p99_ns: Option<u64>,
     evidence_age_at_use_p50_ns: Option<u64>,
     evidence_age_at_use_p95_ns: Option<u64>,
     evidence_age_at_use_p99_ns: Option<u64>,
@@ -523,7 +553,9 @@ mod tests {
         let item = &run.opportunities[0];
         assert_eq!(item.evidence_age_at_emission_ns(), Some(15));
         assert_eq!(item.evidence_age_at_use_ns(), Some(25));
-        assert_eq!(item.event_to_use_latency_ns(), Some(20));
+        assert_eq!(item.availability_to_use_latency_ns(), Some(20));
+        assert_eq!(item.source_to_use_latency_ns(), Some(30));
+        assert_eq!(item.source_to_availability_delay_ns(), Some(10));
     }
 
     #[test]
@@ -546,8 +578,11 @@ mod tests {
         assert_eq!(summary.verified_accuracy_on_time, Some(1.0));
         assert_eq!(summary.correct_but_stale, 0);
         assert_eq!(summary.fresh_but_incorrect, 0);
-        assert_eq!(summary.event_to_use_latency_p99_9_ns, Some(30));
-        assert_eq!(summary.event_to_use_latency_max_ns, Some(30));
+        assert_eq!(summary.availability_to_use_latency_p99_9_ns, Some(30));
+        assert_eq!(summary.availability_to_use_latency_max_ns, Some(30));
+        assert_eq!(summary.source_to_use_latency_p50_ns, Some(30));
+        assert_eq!(summary.source_to_use_latency_p95_ns, Some(40));
+        assert_eq!(summary.source_to_availability_delay_p95_ns, Some(10));
         assert_eq!(summary.evidence_age_at_use_p99_9_ns, Some(25));
         assert_eq!(summary.evidence_age_at_use_max_ns, Some(25));
     }
