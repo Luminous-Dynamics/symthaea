@@ -598,6 +598,25 @@
         "validation": "aluminium results compared with BCS theory; demonstrated on multilayer NbSe2"
       },
       "primary_claim_boundary": "Kinetic inductance is a useful stiffness metrology observable, but conversion to penetration depth or superfluid stiffness depends on sample geometry, current profile, locality, anisotropy and nonlocal electrodynamics. The paper explicitly discusses these limits; do not use a universal geometry-free conversion."
+    },
+    {
+      "source_id": "gaggl_2025_yru3b2_bulk_superconductivity",
+      "doi": "10.1088/1402-4896/ae3c65",
+      "arxiv_id": "2512.09314",
+      "url": "https://doi.org/10.1088/1402-4896/ae3c65",
+      "published": "2026",
+      "source_type": "peer_reviewed_experimental_report_preprint_first_posted_2025_12_10",
+      "title": "Bulk superconductivity in the kagome metal YRu3B2",
+      "primary_claim_boundary": "Reports a superconducting transition near 0.7 K in YRu3B2 using magnetization, resistivity and heat-capacity measurements. This source predates the 2026 machine-learning-guided kagome study and must be considered when adjudicating novelty of YRu3B2. It is not evidence for LuRu3B2."
+    },
+    {
+      "source_id": "mustaf_2026_ml_guided_kagome_superconductors",
+      "doi": "10.1103/lpqj-7hyg",
+      "url": "https://doi.org/10.1103/lpqj-7hyg",
+      "published": "2026-06-17",
+      "source_type": "peer_reviewed_machine_learning_guided_prediction_and_experimental_report",
+      "title": "Machine-learning-guided discovery of kagome superconductors YRu3B2 and LuRu3B2",
+      "primary_claim_boundary": "Reports an ML-guided / first-principles discovery and experimental characterization workflow, with reported superconducting transition temperatures of 0.81 K for YRu3B2 and 0.95 K for LuRu3B2 and bulk evidence from magnetization, specific heat and electrical transport. YRu3B2 had already been reported as bulk-superconducting in a December 2025 preprint / 2026 Physica Scripta paper, so the ML study is a positive control for workflow integration and further characterization, not an unqualified first-discovery claim for both compounds. It does not demonstrate high-temperature or room-temperature superconductivity."
     }
   ],
   "candidate_records": [
@@ -1052,6 +1071,61 @@
       "engineering_readiness": "monolayer research specimen, not a practical conductor",
       "sample_identity_resolution": "Data are available from corresponding authors upon request; no raw dataset is mirrored. Keep single-monolayer and bulk Bi-2201 separate.",
       "primary_claim_boundary": "Dimensionality-reduction baseline, not a candidate for higher Tc on current evidence."
+    },
+    {
+      "candidate_id": "SC-KAGOME-YRU3B2-BULK-REPRO-2026",
+      "formula": "YRu3B2",
+      "family": "kagome ruthenium boride",
+      "form": "bulk",
+      "source_ids": [
+        "gaggl_2025_yru3b2_bulk_superconductivity",
+        "mustaf_2026_ml_guided_kagome_superconductors"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "reported_superconducting_transition",
+          "value_k": 0.7,
+          "pressure_gpa": 0,
+          "status": "reported_by_Gaggl_et_al_arXiv_2512_09314_preprint_2025_12_10_and_Physica_Scripta_2026"
+        },
+        {
+          "observable": "reported_superconducting_transition",
+          "value_k": 0.81,
+          "pressure_gpa": 0,
+          "status": "reported_by_Mustaf_et_al_Physical_Review_Research_2026"
+        }
+      ],
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "Two distinct source-linked reports are preserved. The 0.70 K and 0.81 K values are not averaged and are not asserted to describe the same specimen, batch, measurement criterion or lab. Exact sample-level/raw-data joins and criteria require source/supplement review. Earlier 2025 preprint reporting means YRu3B2 should not be represented as an unqualified new discovery of the June 2026 ML paper.",
+      "engineering_readiness": "bulk material evidence only; no qualified wire/tape/conductor/device or industrial process is established",
+      "safety_review": "not_applicable_to_literature_record_only"
+    },
+    {
+      "candidate_id": "SC-KAGOME-LURU3B2-BULK-2026",
+      "formula": "LuRu3B2",
+      "family": "kagome ruthenium boride",
+      "form": "bulk",
+      "source_ids": [
+        "mustaf_2026_ml_guided_kagome_superconductors"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "reported_superconducting_transition",
+          "value_k": 0.95,
+          "pressure_gpa": 0,
+          "status": "reported_by_Mustaf_et_al_Physical_Review_Research_2026"
+        }
+      ],
+      "bulk_thermodynamic_transition_k": null,
+      "sample_identity_resolution": "ML-guided study reports LuRu3B2 with magnetization, specific-heat and electrical-transport evidence. Raw specimen/batch IDs, exact criteria and digitized uncertainty are not added here; bulk evidence is source-reported pending full specimen-level extraction and independent reproduction.",
+      "engineering_readiness": "bulk material evidence only; no qualified wire/tape/conductor/device or industrial process is established",
+      "safety_review": "not_applicable_to_literature_record_only"
     }
   ],
   "benchmark_catalogs": [
@@ -1346,6 +1420,16 @@
       },
       "metric_interpretation": "Complementary experimental metrology references. Kinetic inductance to stiffness conversion requires explicit geometry/electrodynamic assumptions; field-free ring method resolves tensor components in the studied LSCO case.",
       "local_reproducibility_status": "not reproduced; method adapters and calibration/geometry uncertainty requirements tracked in #12677"
+    },
+    {
+      "catalog_id": "KAGOME-ML-BULK-SUPERCONDUCTOR-POSITIVE-CONTROL-2026",
+      "source_ids": [
+        "gaggl_2025_yru3b2_bulk_superconductivity",
+        "mustaf_2026_ml_guided_kagome_superconductors"
+      ],
+      "reported_record_count": 2,
+      "metric_interpretation": "End-to-end ML / first-principles / synthesis / bulk-characterization positive-control cohort. Use YRu3B2 to test pre-existing discovery and cross-source chronology resolution; use LuRu3B2 as the source-reported additional material. Keep the 0.70 K and 0.81 K YRu3B2 observations separate, do not call either result a high-Tc breakthrough, and do not score source-reported Tc values as locally reproduced.",
+      "local_reproducibility_status": "source_inventory_only_not_reproduced"
     }
   ],
   "required_future_fields": [
