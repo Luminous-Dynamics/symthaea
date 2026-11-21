@@ -62,29 +62,59 @@ pub enum TransportError {
     InvalidPositionScale,
     InvalidVelocityScale,
     InvalidMassTolerance,
-    NegativeWeight { measure: &'static str, particle: usize },
-    NonFinitePosition { measure: &'static str, particle: usize },
-    NonFiniteVelocity { measure: &'static str, particle: usize },
-    NonFiniteWeight { measure: &'static str, particle: usize },
-    TotalMassOverflow { measure: &'static str },
-    RelativeMassMismatch { value: f64, maximum: f64 },
+    NegativeWeight {
+        measure: &'static str,
+        particle: usize,
+    },
+    NonFinitePosition {
+        measure: &'static str,
+        particle: usize,
+    },
+    NonFiniteVelocity {
+        measure: &'static str,
+        particle: usize,
+    },
+    NonFiniteWeight {
+        measure: &'static str,
+        particle: usize,
+    },
+    TotalMassOverflow {
+        measure: &'static str,
+    },
+    RelativeMassMismatch {
+        value: f64,
+        maximum: f64,
+    },
     NonFiniteGroundCost,
     NoAugmentingPath,
     NoProgress,
     IterationLimitExceeded,
     NonFiniteOutput,
-    MateriallyNegativeTransportCost { value: f64, tolerance: f64 },
+    MateriallyNegativeTransportCost {
+        value: f64,
+        tolerance: f64,
+    },
 }
 
 impl fmt::Display for TransportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidDomainLength => write!(f, "domain length must be finite and positive"),
-            Self::InvalidPositionScale => write!(f, "position length scale must be finite and positive"),
-            Self::InvalidVelocityScale => write!(f, "velocity length scale must be finite and positive"),
-            Self::InvalidMassTolerance => write!(f, "relative mass mismatch tolerance must be finite and in [0, 1e-6]"),
+            Self::InvalidPositionScale => {
+                write!(f, "position length scale must be finite and positive")
+            }
+            Self::InvalidVelocityScale => {
+                write!(f, "velocity length scale must be finite and positive")
+            }
+            Self::InvalidMassTolerance => write!(
+                f,
+                "relative mass mismatch tolerance must be finite and in [0, 1e-6]"
+            ),
             Self::NegativeWeight { measure, particle } => {
-                write!(f, "{measure} particle {particle} has a negative weight; signed OT is unsupported")
+                write!(
+                    f,
+                    "{measure} particle {particle} has a negative weight; signed OT is unsupported"
+                )
             }
             Self::NonFinitePosition { measure, particle } => {
                 write!(f, "{measure} particle {particle} has a non-finite position")
@@ -97,15 +127,23 @@ impl fmt::Display for TransportError {
             }
             Self::TotalMassOverflow { measure } => write!(f, "{measure} total mass overflowed"),
             Self::RelativeMassMismatch { value, maximum } => {
-                write!(f, "relative total-mass mismatch {value:e} exceeds maximum {maximum:e}")
+                write!(
+                    f,
+                    "relative total-mass mismatch {value:e} exceeds maximum {maximum:e}"
+                )
             }
             Self::NonFiniteGroundCost => write!(f, "ground metric produced a non-finite cost"),
             Self::NoAugmentingPath => write!(f, "transport residual graph has no augmenting path"),
             Self::NoProgress => write!(f, "transport solver made no positive progress"),
-            Self::IterationLimitExceeded => write!(f, "transport solver exceeded its augmenting-path limit"),
+            Self::IterationLimitExceeded => {
+                write!(f, "transport solver exceeded its augmenting-path limit")
+            }
             Self::NonFiniteOutput => write!(f, "transport solver produced a non-finite output"),
             Self::MateriallyNegativeTransportCost { value, tolerance } => {
-                write!(f, "transport objective is materially negative ({value:e}; tolerance {tolerance:e})")
+                write!(
+                    f,
+                    "transport objective is materially negative ({value:e}; tolerance {tolerance:e})"
+                )
             }
         }
     }
@@ -174,16 +212,28 @@ fn aggregate_positive_measure(
     let mut atoms = Vec::with_capacity(particles.len());
     for (index, particle) in particles.iter().enumerate() {
         if !particle.position.is_finite() {
-            return Err(TransportError::NonFinitePosition { measure, particle: index });
+            return Err(TransportError::NonFinitePosition {
+                measure,
+                particle: index,
+            });
         }
         if !particle.velocity.is_finite() {
-            return Err(TransportError::NonFiniteVelocity { measure, particle: index });
+            return Err(TransportError::NonFiniteVelocity {
+                measure,
+                particle: index,
+            });
         }
         if !particle.weight.is_finite() {
-            return Err(TransportError::NonFiniteWeight { measure, particle: index });
+            return Err(TransportError::NonFiniteWeight {
+                measure,
+                particle: index,
+            });
         }
         if particle.weight < 0.0 {
-            return Err(TransportError::NegativeWeight { measure, particle: index });
+            return Err(TransportError::NegativeWeight {
+                measure,
+                particle: index,
+            });
         }
         if particle.weight > 0.0 {
             atoms.push(WeightedAtom {
@@ -208,7 +258,10 @@ fn aggregate_positive_measure(
         let position = atoms[index].position;
         let velocity = atoms[index].velocity;
         let mut weight = CompensatedSum::default();
-        while index < atoms.len() && atoms[index].position == position && atoms[index].velocity == velocity {
+        while index < atoms.len()
+            && atoms[index].position == position
+            && atoms[index].velocity == velocity
+        {
             weight.add(atoms[index].weight);
             index += 1;
         }
@@ -218,7 +271,11 @@ fn aggregate_positive_measure(
         }
         if weight > 0.0 {
             total_mass.add(weight);
-            aggregate.push(WeightedAtom { position, velocity, weight });
+            aggregate.push(WeightedAtom {
+                position,
+                velocity,
+                weight,
+            });
         }
     }
 
@@ -235,7 +292,8 @@ fn ground_cost(
     config: TransportConfig,
 ) -> Result<f64, TransportError> {
     let raw_position_delta = (left.position - right.position).abs();
-    let periodic_delta = raw_position_delta.min((config.domain_length - raw_position_delta).max(0.0));
+    let periodic_delta =
+        raw_position_delta.min((config.domain_length - raw_position_delta).max(0.0));
     let velocity_delta = (left.velocity - right.velocity).abs();
     let scaled_position = periodic_delta / config.position_length_scale;
     let scaled_velocity = velocity_delta / config.velocity_length_scale;
@@ -339,7 +397,13 @@ fn min_cost_transport(
     }
     for (i, cost_row) in costs.iter().enumerate() {
         for (j, cost) in cost_row.iter().enumerate() {
-            add_edge(&mut graph, left_start + i, right_start + j, f64::INFINITY, *cost);
+            add_edge(
+                &mut graph,
+                left_start + i,
+                right_start + j,
+                f64::INFINITY,
+                *cost,
+            );
         }
     }
     for (index, demand) in demands.iter().enumerate() {
@@ -366,7 +430,8 @@ fn min_cost_transport(
         let mut amount = TARGET_FLOW - total_flow;
         let mut node = sink;
         while node != source {
-            let (previous, edge_index) = predecessor[node].ok_or(TransportError::NoAugmentingPath)?;
+            let (previous, edge_index) =
+                predecessor[node].ok_or(TransportError::NoAugmentingPath)?;
             amount = amount.min(graph[previous][edge_index].residual_capacity);
             node = previous;
         }
@@ -410,7 +475,11 @@ fn min_cost_transport(
             tolerance: roundoff_tolerance,
         });
     }
-    Ok((raw_cost.max(0.0), augmenting_paths, shortest_path_relaxations))
+    Ok((
+        raw_cost.max(0.0),
+        augmenting_paths,
+        shortest_path_relaxations,
+    ))
 }
 
 /// Compute balanced W1 for finite nonnegative phase-space measures.
@@ -528,7 +597,11 @@ mod tests {
     }
 
     fn particle(position: f64, velocity: f64, weight: f64) -> PhaseSpaceParticle1d {
-        PhaseSpaceParticle1d { position, velocity, weight }
+        PhaseSpaceParticle1d {
+            position,
+            velocity,
+            weight,
+        }
     }
 
     fn assert_near(left: f64, right: f64, tolerance: f64) {
@@ -556,10 +629,8 @@ mod tests {
             particle(6.0, -0.5, 0.2),
             particle(6.0, -0.5, 0.3),
         ];
-        let permuted =
-            compare_phase_space_measures_w1(&candidate, &permutation, config()).unwrap();
-        let split =
-            compare_phase_space_measures_w1(&candidate, &positive_split, config()).unwrap();
+        let permuted = compare_phase_space_measures_w1(&candidate, &permutation, config()).unwrap();
+        let split = compare_phase_space_measures_w1(&candidate, &positive_split, config()).unwrap();
         assert_near(permuted.normalized_w1, 0.0, 1.0e-12);
         assert_near(split.normalized_w1, 0.0, 1.0e-12);
         assert_eq!(split.reference_atom_count, 2);
@@ -605,7 +676,10 @@ mod tests {
         let reference = [particle(0.0, 0.0, 1.0)];
         assert!(matches!(
             compare_phase_space_measures_w1(&candidate, &reference, config()),
-            Err(TransportError::NegativeWeight { measure: "candidate", particle: 1 })
+            Err(TransportError::NegativeWeight {
+                measure: "candidate",
+                particle: 1
+            })
         ));
     }
 
