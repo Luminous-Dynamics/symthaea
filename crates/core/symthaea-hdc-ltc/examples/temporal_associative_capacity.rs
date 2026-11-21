@@ -779,6 +779,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 run_cohort(
                                     &mut writer,
                                     &memory,
+                                    memory_preparation_wall_ns,
                                     seed,
                                     dim,
                                     fan_in,
