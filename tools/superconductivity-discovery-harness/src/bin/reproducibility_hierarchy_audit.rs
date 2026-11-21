@@ -493,7 +493,8 @@ mod tests {
     use super::*;
 
     fn run_fixture() -> Value {
-        let schema = include_bytes!("../../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
+        let schema =
+            include_bytes!("../../../../data/schemas/sc_reproducibility_design_v0_1.schema.json");
         let fixture = include_bytes!("../../fixtures/reproducibility_hierarchy_smoke_v0_1.json");
         audit(schema, fixture).expect("synthetic reproducibility fixture must pass")
     }
