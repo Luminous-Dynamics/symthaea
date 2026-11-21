@@ -90,7 +90,8 @@
         "time_semantics_profile_sha256",
         "freshness_metric_profile_sha256",
         "freshness_budget_profile_sha256",
-        "resource_budget_profile_sha256"
+        "resource_budget_profile_sha256",
+        "bitemporal_policy_profile_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -173,6 +174,9 @@
           "$ref": "#/$defs/sha256"
         },
         "resource_budget_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bitemporal_policy_profile_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
@@ -317,6 +321,9 @@
         },
         "resource_feasibility_receipt_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "canonical_revalidation_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
@@ -455,6 +462,23 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_action": {
+                "const": "use"
+              }
+            },
+            "required": [
+              "declared_action"
+            ]
+          },
+          "then": {
+            "required": [
+              "canonical_revalidation_receipt_sha256"
+            ]
+          }
         }
       ]
     },
@@ -484,7 +508,8 @@
         "persistence_receipt_valid",
         "freshness_valid_at_use",
         "fresh_correct_on_time",
-        "hard_resource_violation_count"
+        "hard_resource_violation_count",
+        "canonical_revalidation_receipt_valid"
       ],
       "properties": {
         "schema_version": {
@@ -658,6 +683,12 @@
         "hard_resource_violation_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "canonical_revalidation_receipt_valid": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "allOf": [
