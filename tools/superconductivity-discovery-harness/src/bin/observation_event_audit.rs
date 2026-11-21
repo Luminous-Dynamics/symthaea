@@ -641,7 +641,7 @@ mod tests {
         let receipt = validate_fixture(&schema, &bytes).unwrap();
         assert_eq!(receipt["observation_count"], 8);
         assert_eq!(receipt["process_step_count"], 2);
-        assert_eq!(receipt["origin_counts"]["observed"], 5);
+        assert_eq!(receipt["origin_counts"]["observed"], 6);
         assert_eq!(receipt["measurement_scope_counts"]["local_probe"], 1);
         assert_eq!(receipt["measurement_scope_counts"]["bulk"], 5);
         assert_eq!(receipt["measurement_scope_counts"]["theoretical_model"], 2);
