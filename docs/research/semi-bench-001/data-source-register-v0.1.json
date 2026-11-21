@@ -1,0 +1,174 @@
+{
+  "schema": "luminous.semi-bench.data-source-register.v0.1",
+  "version": "0.1.0",
+  "review_date": "2026-11-21",
+  "rule": "A source metadata record is not a dataset acquisition record. Raw data is not vendored. Every actual dataset snapshot requires file-level digests, licence review and a frozen split manifest.",
+  "datasets": [
+    {
+      "id": "UCI-SECOM-179",
+      "title": "SECOM",
+      "official_source": "https://archive.ics.uci.edu/dataset/179/secom",
+      "doi": "10.24432/C54305",
+      "citation": "McCann, M. & Johnston, A. (2008). SECOM [Dataset]. UCI Machine Learning Repository.",
+      "license": {
+        "expression": "CC-BY-4.0",
+        "status": "verified-from-official-UCI-metadata",
+        "source": "https://archive.ics.uci.edu/dataset/179/secom"
+      },
+      "metadata": {
+        "instances": 1567,
+        "uci_reported_features": 591,
+        "failures": 104,
+        "missing_values": true,
+        "source_files": [
+          "secom.data",
+          "secom_labels.data",
+          "secom.names"
+        ]
+      },
+      "source_semantics": {
+        "pass_label": -1,
+        "fail_label": 1,
+        "timestamp": "provided-in-label-file-for-each-test-point",
+        "positive_class_for_risk_benchmarks": "fail",
+        "preserve_official_feature_count_and_raw_file_schema": true
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_file_sha256": null,
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "recent_reference": {
+        "paper": "https://www.mdpi.com/2075-1702/14/7/716",
+        "doi": "10.3390/machines14070716",
+        "publication_date": "2026-06-24",
+        "protocol_role": "supplementary-SECOM-experiment-in-a-Bosch-manufacturing-paper",
+        "reported_split": "stratified-60-20-20",
+        "reported_pr_auc_reference": 0.2207,
+        "caveat": "Only 21 defective observations in each validation and test partition; high-precision validation threshold yielded zero test recall."
+      }
+    },
+    {
+      "id": "WM-811K",
+      "title": "Wafer Map 811K dataset",
+      "primary_paper_doi": "10.1109/TSM.2014.2364237",
+      "recent_reference": "https://www.mdpi.com/2227-9717/14/7/1134",
+      "recent_reference_doi": "10.3390/pr14071134",
+      "metadata": {
+        "total_maps": 811457,
+        "labeled_maps": 172950,
+        "unlabeled_maps": 638507,
+        "single_pattern_classes": [
+          "Center",
+          "Donut",
+          "Edge-Loc",
+          "Edge-Ring",
+          "Loc",
+          "Random",
+          "Scratch",
+          "Near-full"
+        ],
+        "mixed_or_none_maps": 147431
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_distributor_snapshot": null,
+        "exact_file_sha256": null,
+        "license_status": "must-be-verified-against-exact-distributor-before-copy-or-redistribution",
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "recent_baseline": {
+        "model": "PSS-HNet",
+        "split": "stratified-80-20-sample-level",
+        "seeds": 3,
+        "macro_f1_mean": 0.9098,
+        "macro_f1_std": 0.0008,
+        "macro_recall_mean": 0.8954,
+        "macro_recall_std": 0.0034,
+        "parameter_count": 4381000,
+        "flops_giga": 0.754,
+        "reported_latency_ms": 7.682,
+        "latency_hardware": "NVIDIA RTX 3060 Ti",
+        "training_hardware": "NVIDIA H100",
+        "caveat": "Single public dataset; no cross-dataset or different-process-condition generalization demonstrated; per-sample latency does not establish batch throughput."
+      }
+    },
+    {
+      "id": "CircuitNet",
+      "title": "CircuitNet EDA dataset",
+      "official_source": "https://circuitnet.github.io/intro/intro.html",
+      "variants": [
+        "CircuitNet-N28",
+        "CircuitNet-N14",
+        "CircuitNet-ISPD15"
+      ],
+      "metadata": {
+        "sample_count": "more-than-20000",
+        "supported_tasks": [
+          "congestion",
+          "DRC-violations",
+          "IR-drop",
+          "net-delay"
+        ],
+        "technology_and_task_coverage_varies_by_variant": true
+      },
+      "acquisition": {
+        "raw_data_in_repository": false,
+        "exact_release_ref": null,
+        "exact_file_sha256": null,
+        "license_status": "verify-exact-release-terms-before-caching-or-redistribution",
+        "data_snapshot_status": "not-yet-frozen",
+        "split_manifest_status": "not-yet-frozen"
+      },
+      "evaluation_rule": "Hold out complete designs. Do not mix technology variants or task definitions into a single pooled score without explicit normalization and separate reporting."
+    },
+    {
+      "id": "OpenROAD-Flow-PDK",
+      "title": "OpenROAD RTL-to-GDS reference flow",
+      "official_source": "https://openroad-flow-scripts.readthedocs.io/en/latest/contrib/Metrics.html",
+      "candidate_pdks": [
+        {
+          "name": "SKY130",
+          "source": "https://github.com/google/skywater-pdk",
+          "status_note": "public release documented as experimental preview/alpha; not production qualified",
+          "exact_commit": null
+        },
+        {
+          "name": "IHP-SG13G2",
+          "source": "https://github.com/IHP-GmbH/IHP-Open-PDK",
+          "status_note": "early access; IHP states open release is not intended for production use at this time",
+          "exact_commit": null
+        },
+        {
+          "name": "GF180MCU",
+          "source": "https://github.com/google/gf180mcu-pdk",
+          "status_note": "verify current release status and exact commit for each experiment",
+          "exact_commit": null
+        }
+      ],
+      "acquisition": {
+        "tool_version": null,
+        "pdk_versions": "not-yet-pinned",
+        "constraints_digest": null,
+        "flow_config_digest": null
+      },
+      "evaluation_rule": "Compare only runs with matching designs, constraints, PDK, libraries, corners, tool versions and activity assumptions."
+    }
+  ],
+  "benchmark_reference_artifacts": {
+    "independent_binary_metrics_scorer": {
+      "input_schema": "luminous.semi-bench.binary-scores.v1",
+      "output_schema": "luminous.semi-bench.binary-metrics.v1",
+      "source": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
+      "tests": "benchmarks/semi-bench-001/reference/python/test_semi_binary_metrics_reference.py",
+      "known_answer_input": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
+      "known_answer_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
+      "implementation_class": "test-only-independent-standard-library-reference; production implementation remains Rust-first",
+      "local_test_count": 11,
+      "local_test_result": "PASS",
+      "physical_or_dataset_claim": false
+    }
+  }
+}
