@@ -1011,9 +1011,20 @@
         "tie-grouped-risk-coverage"
       ],
       "implementation_class": "production-Rust-scorer-with-independent-test-only-Python-reference",
-      "hosted_ci_status": "pending",
+      "hosted_ci_status": "success",
       "claim_ceiling": "known-answer metric semantic agreement only; not a model-quality or physical manufacturing result",
-      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129"
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44933592943",
+      "test_count": 6,
+      "test_result": "6/6 Rust tests passed; fmt, clippy and CLI report parity passed",
+      "tested_commit": "b0d17926ccedd5bd283556aec275302ea294a199",
+      "verification_steps": [
+        "cargo fmt --check",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo test: 6 passed, 0 failed",
+        "Rust CLI report matched frozen Python JSON byte-for-byte"
+      ],
+      "workspace_note": "Checks were run in a temporary minimal workspace because the repository root workspace currently references missing crates/core/symthaea/Cargo.toml; this avoids modifying unrelated root workspace state."
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
