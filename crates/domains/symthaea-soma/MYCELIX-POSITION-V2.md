@@ -20,7 +20,7 @@ Unknown calibration/configuration/provenance and unresolved frames remain Unknow
 
 ## Exact real-dependency adapter test
 
-The dedicated workflow pins Mycelix commit 9722ecb7350307e4d01337254272d2808e1a7095, the v2 API head that passed 79 tests in each mirrored Position workspace.
+The dedicated workflow pins Mycelix commit 98ec2d2dccaf90d6fe52731818954dc98e4ae20e, the v2 API head that passed 82 tests in each mirrored Position workspace.
 
 CI copies the actual Mycelix pure positioning package into a temporary path, renames it to avoid colliding with Symthaea's offline stub, and creates a tiny standalone Cargo harness. The harness imports the exact committed SOMA adapter file with `#[path]`, builds against the real Mycelix source, then runs rustfmt check, Clippy and all-target tests.
 
