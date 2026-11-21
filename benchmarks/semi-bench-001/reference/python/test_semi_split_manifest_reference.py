@@ -134,5 +134,32 @@ class SplitManifestReferenceTests(unittest.TestCase):
             split_validator.validate_split_manifest(manifest)
 
 
+    def test_frozen_secom_source_clock_manifest_has_expected_support(self) -> None:
+        repo_root = HERE.parents[4]
+        manifest_path = (
+            repo_root / "docs" / "research" / "semi-bench-001" / "splits"
+            / "uci-secom-mirror-0d27427a" / "chronological-60-20-20-v0.1.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        report = split_validator.validate_split_manifest(manifest)
+        self.assertEqual(manifest["dataset_snapshot_sha256"],
+                         "26c59ab70a7339d82ab4e4006a5230d1a2ffff48c2df3fc423a458f9ef152281")
+        self.assertEqual(manifest["time_basis"], "source_local_naive")
+        self.assertEqual(report["clock_domain_id"], "uci-secom-mirror-single-source-clock")
+        self.assertEqual(report["split_counts"]["train"], {
+            "samples": 940, "positive": 76, "negative": 864
+        })
+        self.assertEqual(report["split_counts"]["validation"], {
+            "samples": 313, "positive": 11, "negative": 302
+        })
+        self.assertEqual(report["split_counts"]["test"], {
+            "samples": 314, "positive": 17, "negative": 297
+        })
+        self.assertEqual(
+            report["claim_limits"]["temporal_independence"],
+            "established-within-declared-source-clock-domain-only",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
