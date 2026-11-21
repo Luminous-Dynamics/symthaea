@@ -465,3 +465,10 @@ The split validator now supports either offset-aware timestamps or source-local 
 The source audit now has a machine-readable row-level split manifest at [splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json](splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json). It binds all 1,567 row identities, source labels and source-local timestamps to the exact public mirror commit and per-file digests. The split is contiguous by source row/time, with no timestamp group crossing the cut points.
 
 Positive support is 76 failures in train, 11 in validation and 17 in test. This is a frozen chronology stress split—not a trained-model result. The source has no timezone and no lot/tool IDs. It supports only within-source-clock ordering, not UTC, equipment-held-out or lot-held-out claims.
+
+
+## Latest hosted verification and frozen data split
+
+The current hosted reference workflow passed **35/35 tests** in [GitHub Actions run #44899113316](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44899113316), on executable-content commit `b98ca276e416f22113e6ad3065c14380294c6b3c`. The run includes the source-local chronological SECOM manifest test and byte-for-byte reproduction of the binary-metric and inspection-decision reports. No local test execution is claimed.
+
+The actual row-level chronology manifest is frozen at [the SECOM split file](splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json). It contains 1,567 source-row identities with 76/11/17 failures in train/validation/test. It is not a trained-model result and supports only source-local chronological ordering; no timezone, lot, tool or site identity is inferred.
