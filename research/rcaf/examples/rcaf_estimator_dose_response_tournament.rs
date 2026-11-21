@@ -1,6 +1,4 @@
-use cetb_rcaf::simulation::{
-    run_estimator_dose_response_tournament, InjectionRecoveryConfig,
-};
+use cetb_rcaf::simulation::{run_estimator_dose_response_tournament, InjectionRecoveryConfig};
 use std::error::Error;
 use std::fs;
 use std::io::{self, Write};
