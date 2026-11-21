@@ -1487,6 +1487,16 @@ mod tests {
                 action.icd_revision_matches,
                 action.action_id != "A-WRONG-ICD-REVISION"
             );
+            let expected_reason = match action.action_id.as_str() {
+                "A-WRONG-PROFILE" => Some("PROFILE_REFERENCE_MISMATCH"),
+                "A-WRONG-SERIAL" => Some("ARTICLE_SUBJECT_MISMATCH"),
+                "A-WRONG-CONFIGURATION" => Some("CONFIGURATION_IDENTITY_MISMATCH"),
+                "A-WRONG-ICD-REVISION" => Some("ICD_REVISION_MISMATCH"),
+                _ => None,
+            };
+            if let Some(reason) = expected_reason {
+                assert!(action.reasons.iter().any(|actual| actual == reason));
+            }
         }
     }
 
