@@ -118,8 +118,8 @@
       "campaign": 3,
       "phase_i_rate": {
         "value": 138.6,
-        "reported_uncertainty": 1.3,
-        "notation": "138.6(13)",
+        "reported_uncertainty": 0.3,
+        "notation": "138.6(3)",
         "unit": "neutrons_per_second",
         "provenance_kind": "published_summary"
       },
@@ -139,7 +139,7 @@
       },
       "derived_ratio_from_rounded_rates_pct": 18.5425685426,
       "difference_vs_reported_percentage_points": 0.0425685426,
-      "reconciliation_status": "reported percentage and printed rounded saturation rates are close but not interchangeable; preserve source claims separately"
+      "reconciliation_status": "source-confirmed: Phase I is 138.6(3) n/s and Phase II is 164.3(13) n/s; the separately reported 18.5(2)% percentage is retained as its own paper claim"
     }
   ],
   "aggregate": {
@@ -159,6 +159,60 @@
     "Rounded rate pairs and source-reported percent changes are kept as separate claims because direct division does not reproduce every printed campaign percentage.",
     "The D/Pd ratio during fusion was not directly measured in each fusion run; the paper relates it to separate in-situ XRD characterization.",
     "This result is accelerator-driven D-D fusion and does not demonstrate cold fusion, excess-energy generation, or net energy.",
-    "The printed campaign saturation-rate uncertainties are 0.5, 0.5, and 1.3 n/s for Phase I, and 0.4, 0.5, and 1.3 n/s for Phase II. The earlier fixture transcription of the third Phase I uncertainty as 0.3 was corrected to 1.3 after checking the article PDF."
-  ]
+    "The full article text and Supplementary Information cross-check confirm the third campaign Phase I saturation rate is 138.6(3) n/s (uncertainty 0.3), not 138.6(13). Phase II is 164.3(13) n/s."
+  ],
+  "additional_published_controls": {
+    "background": {
+      "value": 0.21,
+      "reported_uncertainty": 0.09,
+      "notation": "0.21(9)",
+      "unit": "neutrons_per_second",
+      "condition": "pre-experiment background measurement; paper also reports a stable background over 24 hours",
+      "provenance_kind": "published_summary"
+    },
+    "repeated_beam_loading": {
+      "count": 7,
+      "targets": "different palladium targets",
+      "reported_rate": {
+        "value": 69.3,
+        "reported_uncertainty": 0.2,
+        "notation": "69.3(2)",
+        "unit": "neutrons_per_second"
+      },
+      "condition": "D+ beam loading at -30 kV and 0.2 mA after 120 minutes of reactor operation",
+      "provenance_kind": "published_summary"
+    },
+    "isotope_control": {
+      "electrolyte": "2 M K2CO3 in H2O instead of D2O",
+      "reported_change": {
+        "value": -88.3,
+        "reported_uncertainty": 0.3,
+        "notation": "88.3(3)% decrease",
+        "unit": "percent"
+      },
+      "interpretation": "D2O/H2O isotope control; paper attributes difference to D vs H loading, while exact fuel composition in each fusion run was not directly measured",
+      "provenance_kind": "published_summary"
+    },
+    "beam_voltage_off_control": {
+      "condition": "sheath voltage turned off after steady beam-loading state",
+      "background_return_rate": {
+        "value": 0.2,
+        "unit": "neutrons_per_second"
+      },
+      "note": "Supplementary Note 6 reports return to background when beam voltage is turned off; this supports beam-driven lattice reaction rather than accelerator-free electrochemical LENR",
+      "provenance_kind": "published_summary"
+    },
+    "electrochemical_cycle_off_on": {
+      "off_period_variation_max_percent": 2,
+      "reactivation_increase_percent": 6,
+      "initial_activation_increase_percent": 20,
+      "note": "During the reported cycle, rate varied by no more than 2% during electrochemical off periods; reactivation produced a smaller increase than the initial electrochemical-loading cycle",
+      "provenance_kind": "published_summary"
+    },
+    "fuel_state_measurement_limit": {
+      "exact_d_pd_ratio_during_fusion_run_measured": false,
+      "separate_in_situ_xrd_characterization_ratio": 0.7,
+      "interpretation": "Paper explicitly states D/Pd during fusion was not directly measured; it assumes a similar ratio from independent in-situ XRD characterization."
+    }
+  }
 }
