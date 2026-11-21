@@ -404,21 +404,39 @@ mod tests {
     #[test]
     fn metric_confidence_interval_requires_two_finite_ordered_bounds() {
         let mut ledger = current_ledger();
-        let metric = &mut ledger
-            .observations
-            .iter_mut()
-            .find(|item| item.observation_id == "taan-timingbench")
-            .unwrap()
-            .metrics[0];
-        metric.lower_bound = Some(99.0);
-        metric.upper_bound = None;
+        {
+            let metric = &mut ledger
+                .observations
+                .iter_mut()
+                .find(|item| item.observation_id == "taan-timingbench")
+                .unwrap()
+                .metrics[0];
+            metric.lower_bound = Some(99.0);
+            metric.upper_bound = None;
+        }
         assert!(validate_ledger(&ledger).is_err());
 
-        metric.upper_bound = Some(98.0);
+        {
+            let metric = &mut ledger
+                .observations
+                .iter_mut()
+                .find(|item| item.observation_id == "taan-timingbench")
+                .unwrap()
+                .metrics[0];
+            metric.upper_bound = Some(98.0);
+        }
         assert!(validate_ledger(&ledger).is_err());
 
-        metric.upper_bound = Some(99.5);
-        metric.confidence_level = Some(1.0);
+        {
+            let metric = &mut ledger
+                .observations
+                .iter_mut()
+                .find(|item| item.observation_id == "taan-timingbench")
+                .unwrap()
+                .metrics[0];
+            metric.upper_bound = Some(99.5);
+            metric.confidence_level = Some(1.0);
+        }
         assert!(validate_ledger(&ledger).is_err());
     }
 
