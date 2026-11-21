@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/OrbitalJointSequentialPlanningV0_1.json",
+  "title": "OrbitalJointSequentialPlanningCorpusV0_1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "evidence_class",
+    "claim_ceiling",
+    "resource_frequency_semantics",
+    "policies_to_compare",
+    "scenarios"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.orbital-joint-evidence-voi.sequential.v0.1"
+    },
+    "benchmark_id": {
+      "const": "ORBITAL-JOINT-SEQUENTIAL-PLANNING-001"
+    },
+    "evidence_class": {
+      "const": "synthetic"
+    },
+    "claim_ceiling": {
+      "const": "finite_horizon_sequential_campaign_semantics_only"
+    },
+    "resource_frequency_semantics": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policies_to_compare": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    }
+  },
+  "$defs": {
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_ref",
+        "article_subject_ref",
+        "configuration_id",
+        "icd_revision"
+      ],
+      "properties": {
+        "profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "article_subject_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "icd_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engineering_hours",
+        "compute_core_hours",
+        "facility_hours",
+        "specimen_count",
+        "review_hours",
+        "external_cost_units"
+      ],
+      "properties": {
+        "engineering_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "compute_core_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "facility_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "specimen_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "review_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "external_cost_units": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "evidence_class",
+        "claim_ceiling",
+        "decision_context",
+        "states",
+        "decisions",
+        "loss_matrix",
+        "resource_frequency_model",
+        "budget",
+        "max_actions",
+        "fixed_campaign_sequence",
+        "actions",
+        "expected"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_class": {
+          "const": "synthetic"
+        },
+        "claim_ceiling": {
+          "const": "finite_horizon_sequential_campaign_semantics_only"
+        },
+        "decision_context": {
+          "$ref": "#/$defs/context"
+        },
+        "states": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "loss_matrix": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "resource_frequency_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_ref",
+            "calibration_status",
+            "used_for",
+            "state_weights"
+          ],
+          "properties": {
+            "model_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "calibration_status": {
+              "const": "calibrated_for_fixture_only"
+            },
+            "used_for": {
+              "const": "EXPECTED_RESOURCE_USE_ONLY"
+            },
+            "state_weights": {
+              "type": "object",
+              "minProperties": 2,
+              "additionalProperties": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "budget": {
+          "$ref": "#/$defs/resources"
+        },
+        "max_actions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "fixed_campaign_sequence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "expected": {
+          "type": "object"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "action_class",
+        "decision_context",
+        "method_ref",
+        "admissibility",
+        "resource_plan",
+        "observation_by_state"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_context": {
+          "$ref": "#/$defs/context"
+        },
+        "method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "admissibility": {
+          "enum": [
+            "ADMISSIBLE",
+            "INADMISSIBLE"
+          ]
+        },
+        "resource_plan": {
+          "$ref": "#/$defs/resources"
+        },
+        "observation_by_state": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
