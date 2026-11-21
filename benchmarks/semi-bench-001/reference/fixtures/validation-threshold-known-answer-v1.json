@@ -1,0 +1,117 @@
+{
+  "schema": "luminous.semi-bench.validation-threshold-input.v1",
+  "case_id": "SEMI-BENCH-001-THRESHOLD-KA-001",
+  "minimum_validation_precision": 0.9,
+  "fallback_threshold": 0.5,
+  "validation_samples": [
+    {
+      "sample_id": "V01",
+      "positive": true,
+      "score": 0.95
+    },
+    {
+      "sample_id": "V02",
+      "positive": true,
+      "score": 0.93
+    },
+    {
+      "sample_id": "V03",
+      "positive": true,
+      "score": 0.91
+    },
+    {
+      "sample_id": "V04",
+      "positive": true,
+      "score": 0.8
+    },
+    {
+      "sample_id": "V05",
+      "positive": true,
+      "score": 0.7
+    },
+    {
+      "sample_id": "V06",
+      "positive": false,
+      "score": 0.88
+    },
+    {
+      "sample_id": "V07",
+      "positive": false,
+      "score": 0.6
+    },
+    {
+      "sample_id": "V08",
+      "positive": false,
+      "score": 0.3
+    },
+    {
+      "sample_id": "V09",
+      "positive": false,
+      "score": 0.2
+    },
+    {
+      "sample_id": "V10",
+      "positive": false,
+      "score": 0.1
+    }
+  ],
+  "test_subject": {
+    "schema": "luminous.semi-bench.binary-scores.v1",
+    "case_id": "SEMI-BENCH-001-THRESHOLD-KA-001",
+    "decision_threshold": 0.5,
+    "calibration_bins": 4,
+    "recall_target": 0.75,
+    "samples": [
+      {
+        "sample_id": "T01",
+        "positive": true,
+        "score": 0.99
+      },
+      {
+        "sample_id": "T02",
+        "positive": true,
+        "score": 0.91
+      },
+      {
+        "sample_id": "T03",
+        "positive": true,
+        "score": 0.8
+      },
+      {
+        "sample_id": "T04",
+        "positive": true,
+        "score": 0.75
+      },
+      {
+        "sample_id": "T05",
+        "positive": true,
+        "score": 0.65
+      },
+      {
+        "sample_id": "T06",
+        "positive": false,
+        "score": 0.92
+      },
+      {
+        "sample_id": "T07",
+        "positive": false,
+        "score": 0.86
+      },
+      {
+        "sample_id": "T08",
+        "positive": false,
+        "score": 0.5
+      },
+      {
+        "sample_id": "T09",
+        "positive": false,
+        "score": 0.3
+      },
+      {
+        "sample_id": "T10",
+        "positive": false,
+        "score": 0.1
+      }
+    ]
+  }
+}
