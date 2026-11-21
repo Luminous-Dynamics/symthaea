@@ -111,3 +111,40 @@ The focused GitHub workflow executes both examples on its exact head after forma
 This crate does not import or reuse the L0 particle Fourier oracle, the staggered Gauss verifier, the finite-difference Poisson certificate, the MMD implementation, W1 transport, or the trajectory ledger. This intentional isolation avoids circular validation. Future adapters should consume its raw states and bind their receipts to the exact solver and diagnostic revisions.
 
 The L0 Fourier particle operator, the L0 staggered finite-volume Gauss operator, and this distribution-space spectral Poisson solver are three separate discrete operators. A certificate for one must never be transferred to another.
+
+
+## Offline representation-transition qualification
+
+`src/transition.rs` exposes a dependency-free, fail-closed evaluator for
+proposed representation handoffs:
+
+- `qualify_transition(&TransitionEvidence, TransitionBudget)` returns
+  `Accepted`, `Rejected`, or `Inconclusive`.
+- An `Accepted` decision requires every mandatory measurement, valid
+  source/destination SHA-256 identities, and all measured errors and resource
+  costs within the frozen budget.
+- A measured fidelity or resource-budget violation is `Rejected`.
+- Missing or malformed observations, identities, or budgets are
+  `Inconclusive`; they cannot be interpreted as a pass.
+- Positivity and negative-mass checks run only when the caller explicitly
+  declares `DistributionSemantics::Nonnegative`. Signed delta-f states do not
+  receive an invalid positivity gate.
+
+The evidence contract expects weighted L1/L2 distribution discrepancies on a
+common declared diagnostic domain and quadrature, invariant errors computed
+with a frozen denominator convention, a destination field residual for the
+destination's own discrete operator, and end-to-end transition memory/time
+measurements. The negative-mass fraction is
+`integral(max(-f, 0)) / integral(abs(f))`.
+
+This is an **offline qualification gate**, not a transfer operator, adaptive
+controller, rigorous continuum error bound, or permission to change a live
+solver state. Thresholds must be calibrated and preregistered for the relevant
+equation cohort. Persist the complete evidence and budget next to each receipt;
+the returned Rust value is not itself a JSON serializer. Persist missing measurements as explicit JSON null values when recording an inconclusive attempt; the schema allows these nulls, while an accepted record requires complete numeric measurements and valid SHA-256 identities.
+
+The portable evidence shape is described in
+`benchmarks/plasma/schemas/representation-transition-v0.1.schema.json`.
+The evaluator tests acceptance, measured failure, missing evidence, malformed
+hashes/measurements, invalid budgets, resource exhaustion, and the signed vs
+nonnegative distribution distinction.

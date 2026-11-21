@@ -12,6 +12,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod transition;
+
 use std::error::Error;
 use std::f64::consts::TAU;
 use std::fmt;

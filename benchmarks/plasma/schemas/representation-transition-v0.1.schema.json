@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/schemas/representation-transition-v0.1.schema.json",
+  "title": "Plasma representation transition evidence and qualification receipt",
+  "description": "Portable evidence contract for one offline representation handoff. Accepted is an empirical, profile-scoped decision, not a rigorous continuum error certificate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "transition_id",
+    "source_representation",
+    "destination_representation",
+    "distribution_semantics",
+    "budget",
+    "measurements",
+    "qualification"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.plasma.representation-transition"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "transition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_representation": {
+      "$ref": "#/$defs/representation"
+    },
+    "destination_representation": {
+      "$ref": "#/$defs/representation"
+    },
+    "distribution_semantics": {
+      "enum": [
+        "nonnegative",
+        "signed"
+      ]
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_weighted_l1_relative_error",
+        "max_weighted_l2_relative_error",
+        "max_mass_relative_error",
+        "max_momentum_absolute_error",
+        "max_total_energy_relative_error",
+        "max_destination_field_residual",
+        "minimum_destination_distribution",
+        "max_destination_negative_mass_fraction",
+        "max_peak_memory_bytes",
+        "max_wall_time_nanoseconds"
+      ],
+      "properties": {
+        "max_weighted_l1_relative_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_weighted_l2_relative_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_mass_relative_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_momentum_absolute_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_total_energy_relative_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_destination_field_residual": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_destination_distribution": {
+          "type": "number"
+        },
+        "max_destination_negative_mass_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_wall_time_nanoseconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "weighted_l1_relative_error",
+        "weighted_l2_relative_error",
+        "mass_relative_error",
+        "momentum_absolute_error",
+        "total_energy_relative_error",
+        "destination_field_residual",
+        "peak_memory_bytes",
+        "wall_time_nanoseconds"
+      ],
+      "properties": {
+        "weighted_l1_relative_error": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "weighted_l2_relative_error": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "mass_relative_error": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "momentum_absolute_error": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "total_energy_relative_error": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "destination_field_residual": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "destination_minimum_distribution": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "destination_negative_mass_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "wall_time_nanoseconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "reasons"
+      ],
+      "properties": {
+        "decision": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "inconclusive"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metric": {
+                "type": "string"
+              },
+              "observed": {
+                "type": [
+                  "number",
+                  "integer",
+                  "string"
+                ]
+              },
+              "limit": {
+                "type": [
+                  "number",
+                  "integer",
+                  "string"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "state_sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_sha256": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "acceptedRepresentation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/representation"
+        },
+        {
+          "properties": {
+            "state_sha256": {
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "distribution_semantics": {
+            "const": "nonnegative"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "measurements": {
+            "required": [
+              "destination_minimum_distribution",
+              "destination_negative_mass_fraction"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification": {
+            "properties": {
+              "decision": {
+                "const": "accepted"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_representation": {
+            "$ref": "#/$defs/acceptedRepresentation"
+          },
+          "destination_representation": {
+            "$ref": "#/$defs/acceptedRepresentation"
+          },
+          "measurements": {
+            "properties": {
+              "weighted_l1_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "weighted_l2_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "mass_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "momentum_absolute_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "total_energy_relative_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "destination_field_residual": {
+                "type": "number",
+                "minimum": 0
+              },
+              "peak_memory_bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "wall_time_nanoseconds": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
