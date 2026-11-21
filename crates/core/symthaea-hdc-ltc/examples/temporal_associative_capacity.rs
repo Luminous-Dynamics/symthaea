@@ -207,8 +207,8 @@ fn parse_args() -> Result<Args, Box<dyn Error>> {
         }
     }
 
-    if args.dims.iter().any(|&d| d < 2 || d > 262_144) {
-        return Err("dimensions must be in 2..=262144".into());
+    if args.dims.iter().any(|&d| d < 8 || d > 262_144) {
+        return Err("dimensions must be in 8..=262144".into());
     }
     if args.loads.iter().any(|&n| n < 2 || n > 512) {
         return Err("memory loads must be in 2..=512".into());
