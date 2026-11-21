@@ -12,7 +12,7 @@ use positioning::navigation_v2::{
     CalibrationRef, ConfigurationRef, ContentCommitment, ContractError,
     EvidenceClassRef, FailureDomainRef, NavigationClaimV2, PositionObservationV2,
     ProvenanceRef, Qualification, QualificationReason, SourceEvidenceRefsV2,
-    SourceRef, SpatialReferenceRef, TimeBasisRef, TimeEvidenceV2, TimeUnitV2,
+    SourceRef, SpatialReferenceRef, TimeEvidenceV2, TimeUnitV2,
 };
 use serde::Serialize;
 
