@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-reproducibility-v0.1/data/schemas/sc_reproducibility_design_v0_1.schema.json",
+  "title": "Superconductivity Reproducibility Design v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "claim_ceiling",
+    "material_state",
+    "observations",
+    "tasks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sc-reproducibility-design.v0.1"
+    },
+    "evidence_class": {
+      "const": "synthetic"
+    },
+    "claim_ceiling": {
+      "const": "group-split-and-reproducibility-design-semantics-only"
+    },
+    "material_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material_id",
+        "state_id",
+        "property_id",
+        "property_unit"
+      ],
+      "properties": {
+        "material_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property_unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "specimen_id",
+          "batch_id",
+          "campaign_id",
+          "lab_id",
+          "instrument_id",
+          "protocol_id",
+          "condition_id",
+          "property_id",
+          "property_unit",
+          "value",
+          "timestamp_utc",
+          "replicate_index",
+          "evidence_class",
+          "evidence_authority"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "campaign_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lab_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instrument_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "condition_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "property_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "property_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number"
+          },
+          "timestamp_utc": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+          },
+          "replicate_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evidence_class": {
+            "const": "synthetic"
+          },
+          "evidence_authority": {
+            "const": "synthetic_measurement"
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "task_type",
+          "train_observation_ids",
+          "test_observation_ids",
+          "paired_specimen_transfer"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_type": {
+            "enum": [
+              "same_specimen_repeatability",
+              "instrument_transfer",
+              "within_batch_specimen_holdout",
+              "between_batch_holdout",
+              "between_campaign_holdout",
+              "inter_lab_transfer",
+              "protocol_transfer",
+              "time_forward"
+            ]
+          },
+          "train_observation_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "test_observation_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "paired_specimen_transfer": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
