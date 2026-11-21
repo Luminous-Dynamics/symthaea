@@ -21,8 +21,7 @@ Memory allocation asks what should be retained. Active sensing asks when to acqu
 - novelty threshold;
 - uncertainty threshold;
 - past-residual threshold;
-- candidate-estimated value-of-information per observation nJ;
-- risk-adjusted value-of-information with belief-state opportunity-loss variability and a model-ignorance surcharge.
+- candidate-estimated value-of-information per observation nJ.
 
 The candidate API receives only:
 - current time and last-observation time;
@@ -34,43 +33,6 @@ The candidate API receives only:
 There are no evaluator labels, hidden events, future samples, oracle trajectories, task-generation seeds or future schedule fields in this API.
 
 A VOI trigger compares estimated TED reduction per observation nJ to a preregistered fixed-point threshold. It is a candidate estimate, not an evaluator outcome.
-
-## 3A. Risk- and ignorance-adjusted VOI research arm
-
-The candidate policy package adds `RiskAdjustedValueOfInformation` as a separate ablation alongside the existing plain expected-VOI policy.
-
-It is motivated by direct 2026 prior art: Li and Parlikad, “Value-Based Active Sensing for Improving Sampling Efficiency,” *IEEE Transactions on Systems, Man, and Cybernetics: Systems*, early access 30 October 2026, DOI 10.1109/TSMC.2026.3745855. The paper formulates observe-then-plan sensing using expected opportunity loss relative to observation cost and adds a risk premium for opportunity-loss variability across belief states plus an ignorance penalty as predictive-model confidence decays. It reports a temperature-alert case and a CO2-aware office deployment. This is a comparator, not a Symthaea result or a claim of reproducing the paper's full method.
-
-Candidate features for the new arm:
-- `opportunity_loss_stddev_us`: candidate estimate of the standard deviation of opportunity loss over current belief states;
-- `model_confidence_ppm`: candidate predictive-model confidence after posterior feedback and age/horizon decay;
-- `prediction_horizon_us`: candidate-visible horizon for the future exposure estimate.
-
-The prototype's declared fixed-point heuristic is:
-
-```text
-risk_premium_us       = stddev_us × risk_aversion_ppm / 1,000,000
-ignorance_exposure_us = horizon_us × (1,000,000 - confidence_ppm) / 1,000,000
-ignorance_penalty_us  = ignorance_exposure_us × ignorance_weight_ppm / 1,000,000
-adjusted_benefit_us   = predicted_ted_reduction_us
-                      + risk_premium_us
-                      + ignorance_penalty_us
-score_us_per_nJ_ppm  = adjusted_benefit_us × 1,000,000 / observation_energy_nJ
-```
-
-All coefficients are candidate policy parameters, and all belief-state statistics/confidence values are candidate estimates. Hidden evaluator trajectories, labels and oracle losses remain unavailable. The policy uses checked integer arithmetic and PPM bounds. Its ignorance term is an explicit independent heuristic; it is **not** the paper's exact value-function replication.
-
-Compare four separate arms:
-1. expected VOI per nJ;
-2. risk premium only;
-3. ignorance penalty only;
-4. combined risk + ignorance VOI.
-
-Also include a confidence-calibration ablation: use candidate-only posterior confidence, age-decayed confidence, and deliberately miscalibrated confidence. Report observation count, TED, FCOT, transient miss probability, risk-stratum performance, energy and deadline exposure at matched sensor/compute budgets.
-
-Reference:
-- https://doi.org/10.1109/TSMC.2026.3745855
-- https://www.repository.cam.ac.uk/items/886c107c-7c63-4a48-b307-f22abb1fa3bd
 
 ## 3. Scheduling invariants
 
@@ -172,12 +134,8 @@ No schedule should be called "energy-efficient" based on fewer samples alone. Me
 ## 10. Validation status
 
 - `research/temporal-sensing/Cargo.toml` and `src/lib.rs` authored.
-- Eighteen Rust test functions authored for fixed interval, event trigger, multi-rate, min/max gap, VOI, risk-adjusted VOI, belief-state risk premium, ignorance penalty, budget exhaustion, novelty, residual and invalid-input controls.
+- Fourteen Rust test functions authored for fixed interval, event trigger, multi-rate, min/max gap, VOI, budget exhaustion, novelty, residual and invalid-input controls.
 - No Cargo build, rustfmt, Clippy or tests have run; the authoring environment lacks cargo/rustc/rustfmt.
 - No candidate model, real sensor, baseline or hardware/energy campaign has run.
 - No production model or default changed.
 
-
-### Risk-adjusted VOI extension verification
-
-The risk-adjusted arm is implemented in the candidate-side Rust package with four additional authored tests. It is a fixed-point heuristic inspired by, but not a reproduction of, the 30 October 2026 IEEE active-sensing paper. No Cargo build or tests have executed.
