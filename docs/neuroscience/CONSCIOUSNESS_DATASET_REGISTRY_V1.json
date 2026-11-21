@@ -413,9 +413,23 @@
           "rest_awake_vs_rest_recovery",
           "naturalistic_listening_awake_vs_naturalistic_listening_deep_sedation"
         ],
-        "analysis_rule": "Keep rest and auditory-listening analyses separate; lock ROI/edge mapping, preprocessing, estimator, comparator, exclusions and thresholds on ds006623 before opening ds003171 outcomes.",
+        "analysis_rule": "Keep rest and auditory-listening analyses separate; lock ROI/edge mapping, preprocessing, estimator, comparator, exclusions and thresholds on ds006623 before opening ds003171 outcomes. Do not apply PFM-NSI to the released NIfTI inputs as if they directly satisfy its CIFTI/fsLR input contract; record NSI as not assessed unless a separately validated compatible input is obtained.",
         "tuning_on_external_outcomes": false,
         "evidence_status": "planned_not_run"
+      },
+      "available_data_formats": [
+        "BIDS functional BOLD NIfTI files (.nii.gz)",
+        "T1-weighted anatomical NIfTI files (.nii.gz)",
+        "diffusion NIfTI files (.nii.gz) with bval/bvec sidecars",
+        "task events TSV and JSON sidecars"
+      ],
+      "pfm_nsi_compatibility": {
+        "status": "not_directly_compatible_on_current_release",
+        "inspected_release_tree": "OpenNeuro ds003171 v2.0.1 GitHub release tree (534 files; complete tree response)",
+        "observed_input": "BOLD NIfTI (.nii.gz); no CIFTI .dtseries.nii files in the inspected release tree",
+        "pfm_nsi_default_contract": "CIFTI dtseries.nii on fsLR-32k; optional fsaverage6 input is resampled to packaged fsLR-32k resources and requires Connectome Workbench",
+        "disposition": "Do not claim NSI has been applied. A NIfTI-to-CIFTI/surface mapping would need its own validated conversion and must match the NSI acquisition, surface, parcellation and preprocessing assumptions.",
+        "evidence_status": "not_run"
       }
     }
   ]
