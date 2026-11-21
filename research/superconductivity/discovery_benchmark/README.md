@@ -95,3 +95,31 @@ These methods create complementary benchmark tracks rather than one unified lead
 5. synthesis/phase realization and same-specimen experimental confirmation.
 
 Do not score a candidate merely because it is ranked highly. A useful discovery claim requires the identity, mechanism applicability, predicted and observed properties, synthesis pathway, and independent validation to be separately evidenced.
+
+
+## Soft-mode false-negative / recovery benchmark
+
+This child benchmark is linked to SC-SOFT-MODE-RECALL-001 (#13134) and composes the BEE-NET pipeline/VOI owner (#12644) with the harmonic dynamic-stability evidence owner (#5016).
+
+Schema: `data/schemas/sc_soft_mode_triage_v0_1.schema.json`.
+
+Synthetic fixture: `data/research/sc_soft_mode_triage_fixture_v0_1.json`.
+
+Auditor: `tools/superconductivity-discovery-benchmark-auditor/src/bin/soft_mode_triage_audit.rs`.
+
+Run:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-benchmark-auditor/Cargo.toml --bin sc_soft_mode_triage_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-benchmark-auditor/Cargo.toml --bin sc_soft_mode_triage_audit -- \
+  --schema data/schemas/sc_soft_mode_triage_v0_1.schema.json \
+  --fixture data/research/sc_soft_mode_triage_fixture_v0_1.json
+```
+
+The auditor separates four dispositions: harmonic stable for the declared 0 K method, marginal/unresolved, robust harmonic instability, and underconverged/unknown. Its screening action is distinct from the physical stability claim. Marginal cases are retained for re-evaluation; robustly unstable high-symmetry structures are routed to a lower-symmetry distortion pathway rather than globally labelling the nominal material impossible. Underconverged records stay unknown.
+
+**Source reference and synthetic values are separate.** The LuRu3B2 literature reference records only the paper-reported weakly imaginary phonon observation and experimental bulk-superconductivity evidence (Tc=0.95 K); it explicitly records that numeric raw phonon artifacts are not admitted. Every numerical frequency, uncertainty and convergence value in the smoke fixture belongs to fabricated synthetic candidate controls and must never be attributed to LuRu3B2 or used as scientific data.
+
+The test fixture includes an intentionally false-negative case for the simple any-imaginary-mode hard gate, plus stable, robustly unstable, underconverged and sign-sensitive controls. The receipt compares the hard-gate false negative with the triage queue's ability to preserve a positive case, while ensuring no unsupported harmonic-stability claim is emitted.
+
+This proves only software disposition semantics on synthetic inputs and a source-linked positive-control citation. It does not reproduce material phonons, validate a universal imaginary-frequency threshold, establish anharmonic stabilization or prove an improved physical discovery rate.
