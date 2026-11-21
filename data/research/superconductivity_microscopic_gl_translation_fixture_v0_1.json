@@ -1,0 +1,156 @@
+{
+  "contract": "SC-MICROSCOPIC-GL-TRANSLATION-0.1",
+  "bundle_id": "paper-method-record-prl137-196001-2026-v0",
+  "fixture_only": true,
+  "source_record": {
+    "record_kind": "paper_method_summary",
+    "title": "First-Principles Calculation of Coherence Length and Penetration Depth Based on Density Functional Theory for Superconductors",
+    "doi": "10.1103/lrhl-j9bt",
+    "publication_status": "published",
+    "evidence_status": "paper_reported",
+    "material_coverage": [
+      {
+        "coverage_id": "elemental_cases",
+        "description": "Representative elemental superconductors; exact material list and tabulated values not embedded in this metadata-only fixture.",
+        "state_specific_parameters_available": false
+      },
+      {
+        "coverage_id": "v3si",
+        "description": "A15 compound V3Si.",
+        "state_specific_parameters_available": false
+      },
+      {
+        "coverage_id": "h3s_high_pressure",
+        "description": "H3S under high pressure; precise pressure point and tabulated values must be extracted from full article/supplement before numerical use.",
+        "state_specific_parameters_available": false
+      }
+    ],
+    "source_url": "https://journals.aps.org/prl/abstract/10.1103/lrhl-j9bt",
+    "source_revision": "Phys. Rev. Lett. 137, 196001 (published 2026-11-03)"
+  },
+  "material_states": [
+    {
+      "state_id": "method_summary_only",
+      "material_id": "source-paper-material-family",
+      "composition": "multiple systems listed in publication",
+      "structure_id": "source-specific-per-material",
+      "phase_id": "source-specific-per-material",
+      "specimen_id": null,
+      "batch_id": null,
+      "synthesis_history_id": null,
+      "pressure": null,
+      "pressure_unit": "not extracted",
+      "temperature": null,
+      "temperature_unit": "calculation-specific; not extracted",
+      "doping": null,
+      "strain": null,
+      "field_magnitude": null,
+      "field_unit": "not extracted",
+      "field_orientation": "not extracted",
+      "calculation_provenance": {
+        "calculation_family": "scdft",
+        "code_name": "Quantum ESPRESSO + Superconducting-Toolkit (SCTK)",
+        "code_version": null,
+        "exchange_correlation_method": "PBE for normal-state DFT; Eliashberg-combined SCDFT functional; RPA plasmon-assisted kernel and mass renormalization; adiabatic-LDA spin-fluctuation kernel",
+        "pseudopotential_or_basis_set": "Material-specific PSL/GBRV/SG15 library; exact per-material choice not extracted in this abstract-level record",
+        "k_mesh": null,
+        "q_mesh": null,
+        "energy_cutoff": null,
+        "energy_cutoff_unit": "per-material cutoff in Ry; not extracted",
+        "phonon_treatment": "DFPT",
+        "spin_orbit_included": null,
+        "provenance_note": "Method-level summary only. Exact settings belong to the separately versioned arXiv:2603.05123v2 material fixtures; no numeric outputs or code version are inferred here. Public SCTK upstream main head inspected 2026-11-18: 4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33; not asserted to be the exact revision used for this paper calculation.",
+        "upstream_code_repository": "https://github.com/mitsuaki1987/sctk",
+        "inspected_upstream_commit": "4bc883e5dfd8a2b38f47f2cb6efba26b773d5b33",
+        "upstream_snapshot_relation": "inspected_current_upstream_not_asserted_as_paper_revision"
+      }
+    }
+  ],
+  "microscopic_method": {
+    "calculation_family": "scdft",
+    "method_name": "SCDFT including finite-momentum Cooper-pair response",
+    "code_name": "not extracted from abstract-level source record",
+    "code_version": null,
+    "exchange_correlation_or_many_body_method": "SCDFT; exact functional/kernel and implementation metadata require full paper/supplement extraction",
+    "includes_spin_orbit": null,
+    "includes_finite_q_pair_response": true,
+    "mechanism_scope": "conventional_electron_phonon",
+    "applicability_note": "The publication reports a conventional-superconductor SCDFT framework. Do not generalize this method result to strongly correlated cuprates/nickelates or PDW states without a mechanism-appropriate theory."
+  },
+  "numerical_provenance": {
+    "pseudopotential_or_basis_set": "not extracted",
+    "k_mesh": null,
+    "q_mesh": null,
+    "energy_cutoff": null,
+    "energy_cutoff_unit": "not extracted",
+    "phonon_treatment": "not extracted",
+    "coulomb_treatment": "not extracted",
+    "convergence_thresholds": {
+      "status": "not extracted; full article and supplementary material required"
+    },
+    "software_environment_digest": null,
+    "input_digest": null,
+    "output_digest": null
+  },
+  "environment": {
+    "measurement_or_calculation_scope": "method_summary",
+    "source_temperature": "Tc and length-scale outputs are calculated; exact per-material temperature conventions must be extracted",
+    "source_pressure": "includes a high-pressure H3S case; exact pressure values not embedded here",
+    "state_linkage_rule": "method_level_only"
+  },
+  "derived_observables": [],
+  "effective_gl_coefficients": [
+    {
+      "coefficient_id": "scalar_GL_a_slope",
+      "coefficient_kind": "a_temperature_slope",
+      "value_kind": "null",
+      "value": null,
+      "unit": "not specified",
+      "basis_normalization": "not specified",
+      "temperature_regime": "near-Tc GL expansion not extracted",
+      "field_regime": "not specified",
+      "status": "not_identifiable",
+      "derivation_method": "The abstract-level record reports Tc, xi0 and lambdaL framework, but no explicit free-energy derivative or basis normalization from which a'(Tc) can be reproduced.",
+      "supporting_observable_ids": [],
+      "uncertainty_or_covariance": null,
+      "model_family": "conventional_electron_phonon",
+      "non_identifiability_reason": "Metadata-only source reconstruction; full microscopic thermodynamic-potential expansion and basis convention have not been extracted.",
+      "state_id": "method_summary_only"
+    },
+    {
+      "coefficient_id": "scalar_GL_b_quartic",
+      "coefficient_kind": "b_quartic",
+      "value_kind": "null",
+      "value": null,
+      "unit": "not specified",
+      "basis_normalization": "not specified",
+      "temperature_regime": "near-Tc GL expansion not extracted",
+      "field_regime": "not specified",
+      "status": "not_identifiable",
+      "derivation_method": "No quartic free-energy derivative or nonlinear order-parameter response is present in the abstract-level record.",
+      "supporting_observable_ids": [],
+      "uncertainty_or_covariance": null,
+      "model_family": "conventional_electron_phonon",
+      "non_identifiability_reason": "Tc, xi0 and lambdaL alone do not uniquely determine b.",
+      "state_id": "method_summary_only"
+    },
+    {
+      "coefficient_id": "scalar_GL_K_gradient",
+      "coefficient_kind": "K_gradient_tensor",
+      "value_kind": "null",
+      "value": null,
+      "unit": "not specified",
+      "basis_normalization": "not specified",
+      "temperature_regime": "near-Tc GL expansion not extracted",
+      "field_regime": "finite-q pair response is part of the reported method, but the q expansion, normalization and tensor outputs have not been extracted",
+      "status": "not_identifiable",
+      "derivation_method": "Finite-momentum pair response is a candidate source for gradient information; no K value is encoded until the full response and field normalization are reconstructed.",
+      "supporting_observable_ids": [],
+      "uncertainty_or_covariance": null,
+      "model_family": "conventional_electron_phonon",
+      "non_identifiability_reason": "The paper method includes finite-q response, but the abstract-level source record does not contain quantitative q-dependence, field normalization or a fitted gradient expansion from which K can be extracted.",
+      "state_id": "method_summary_only"
+    }
+  ],
+  "claim_ceiling": "Provenance-bound microscopic/effective response record only; no coefficient is promoted beyond its declared evidence status and no material Tc or phase is independently established by this fixture."
+}

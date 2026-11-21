@@ -1,0 +1,793 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_microscopic_gl_translation_v0_1.schema.json",
+  "title": "Superconductivity Microscopic-to-GL Evidence Bundle",
+  "description": "Provenance-bound microscopic calculation and experimental response bundle with explicit effective-GL coefficient identifiability semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "bundle_id",
+    "fixture_only",
+    "source_record",
+    "material_states",
+    "microscopic_method",
+    "numerical_provenance",
+    "environment",
+    "derived_observables",
+    "effective_gl_coefficients",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-MICROSCOPIC-GL-TRANSLATION-0.1"
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "source_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_kind",
+        "title",
+        "doi",
+        "publication_status",
+        "evidence_status",
+        "material_coverage",
+        "source_url"
+      ],
+      "properties": {
+        "record_kind": {
+          "enum": [
+            "paper_method_summary",
+            "reproduced_calculation",
+            "experimental_dataset"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "doi": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publication_status": {
+          "enum": [
+            "published",
+            "preprint",
+            "unpublished",
+            "not_applicable"
+          ]
+        },
+        "evidence_status": {
+          "enum": [
+            "paper_reported",
+            "independently_reproduced",
+            "experimental_measurement",
+            "synthetic_fixture"
+          ]
+        },
+        "material_coverage": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "coverage_id",
+              "description",
+              "state_specific_parameters_available"
+            ],
+            "properties": {
+              "coverage_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state_specific_parameters_available": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_revision": {
+          "type": "string"
+        }
+      }
+    },
+    "material_states": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state_id",
+          "material_id",
+          "composition",
+          "structure_id",
+          "phase_id",
+          "specimen_id",
+          "batch_id",
+          "synthesis_history_id",
+          "pressure",
+          "pressure_unit",
+          "temperature",
+          "temperature_unit",
+          "doping",
+          "strain",
+          "field_magnitude",
+          "field_unit",
+          "field_orientation",
+          "calculation_provenance"
+        ],
+        "properties": {
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "material_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "composition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "structure_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "batch_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "synthesis_history_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pressure": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pressure_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "temperature": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "temperature_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "doping": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "strain": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "field_magnitude": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "field_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "field_orientation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "calculation_provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "calculation_family",
+              "code_name",
+              "code_version",
+              "exchange_correlation_method",
+              "pseudopotential_or_basis_set",
+              "k_mesh",
+              "q_mesh",
+              "energy_cutoff",
+              "energy_cutoff_unit",
+              "phonon_treatment",
+              "spin_orbit_included",
+              "provenance_note",
+              "upstream_code_repository",
+              "inspected_upstream_commit",
+              "upstream_snapshot_relation"
+            ],
+            "properties": {
+              "calculation_family": {
+                "enum": [
+                  "scdft",
+                  "eliashberg",
+                  "dfpt_epc",
+                  "dft",
+                  "dft_dmft",
+                  "hubbard_cluster",
+                  "qmc",
+                  "functional_rg",
+                  "phenomenological",
+                  "experimental",
+                  "other"
+                ]
+              },
+              "code_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "code_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exchange_correlation_method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pseudopotential_or_basis_set": {
+                "type": "string",
+                "minLength": 1
+              },
+              "k_mesh": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "q_mesh": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "energy_cutoff": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "energy_cutoff_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "phonon_treatment": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spin_orbit_included": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "provenance_note": {
+                "type": "string",
+                "minLength": 1
+              },
+              "upstream_code_repository": {
+                "type": "string",
+                "format": "uri"
+              },
+              "inspected_upstream_commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "upstream_snapshot_relation": {
+                "const": "inspected_current_upstream_not_asserted_as_paper_revision"
+              }
+            }
+          }
+        }
+      }
+    },
+    "microscopic_method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calculation_family",
+        "method_name",
+        "code_name",
+        "code_version",
+        "exchange_correlation_or_many_body_method",
+        "includes_spin_orbit",
+        "includes_finite_q_pair_response",
+        "mechanism_scope",
+        "applicability_note"
+      ],
+      "properties": {
+        "calculation_family": {
+          "enum": [
+            "scdft",
+            "eliashberg",
+            "dfpt_epc",
+            "dft",
+            "dft_dmft",
+            "hubbard_cluster",
+            "qmc",
+            "functional_rg",
+            "phenomenological",
+            "experimental",
+            "other"
+          ]
+        },
+        "method_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exchange_correlation_or_many_body_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "includes_spin_orbit": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "includes_finite_q_pair_response": {
+          "type": "boolean"
+        },
+        "mechanism_scope": {
+          "enum": [
+            "conventional_electron_phonon",
+            "correlated_unconventional",
+            "multiband_interband",
+            "finite_q_pdw",
+            "experiment_only",
+            "method_review_only",
+            "other"
+          ]
+        },
+        "applicability_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "numerical_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pseudopotential_or_basis_set",
+        "k_mesh",
+        "q_mesh",
+        "energy_cutoff",
+        "phonon_treatment",
+        "coulomb_treatment",
+        "convergence_thresholds",
+        "software_environment_digest",
+        "input_digest",
+        "output_digest"
+      ],
+      "properties": {
+        "pseudopotential_or_basis_set": {
+          "type": "string",
+          "minLength": 1
+        },
+        "k_mesh": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "q_mesh": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "energy_cutoff": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "energy_cutoff_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phonon_treatment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coulomb_treatment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "convergence_thresholds": {
+          "type": "object"
+        },
+        "software_environment_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "input_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "output_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_or_calculation_scope",
+        "source_temperature",
+        "source_pressure",
+        "state_linkage_rule"
+      ],
+      "properties": {
+        "measurement_or_calculation_scope": {
+          "enum": [
+            "single_state",
+            "multi_state",
+            "method_summary"
+          ]
+        },
+        "source_temperature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_pressure": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_linkage_rule": {
+          "enum": [
+            "exact_state_id",
+            "separate_state_records",
+            "method_level_only"
+          ]
+        }
+      }
+    },
+    "derived_observables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observable_id",
+          "state_id",
+          "observable_kind",
+          "value_kind",
+          "value",
+          "unit",
+          "tensor_axes",
+          "isotropy_assumption",
+          "uncertainty",
+          "evidence_status",
+          "measurement_or_derivation_method",
+          "source_artifact_digest",
+          "source_reference",
+          "result_authority"
+        ],
+        "properties": {
+          "observable_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observable_kind": {
+            "enum": [
+              "Tc",
+              "xi0_microscopic",
+              "xi_GL",
+              "lambda_L_scalar",
+              "lambda_L_tensor",
+              "superfluid_stiffness_tensor",
+              "kappa",
+              "Hc2",
+              "Hc",
+              "finite_q_pair_susceptibility",
+              "pairing_gap",
+              "other",
+              "quadratic_pair_susceptibility",
+              "quartic_free_energy_response",
+              "J_dp_intrinsic",
+              "electron_phonon_mass_enhancement",
+              "fermi_surface_average_gap",
+              "fermi_surface_average_velocity",
+              "lambda_L_from_current_slope",
+              "lambda_L_from_depairing_peak"
+            ]
+          },
+          "value_kind": {
+            "enum": [
+              "scalar",
+              "vector",
+              "matrix",
+              "spectrum",
+              "not_reported"
+            ]
+          },
+          "value": {
+            "type": [
+              "number",
+              "array",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tensor_axes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isotropy_assumption": {
+            "enum": [
+              "isotropic_declared",
+              "anisotropic_tensor",
+              "not_applicable",
+              "not_specified",
+              "scalar_paper_reported_directionality_unspecified"
+            ]
+          },
+          "uncertainty": {
+            "type": [
+              "number",
+              "array",
+              "null"
+            ]
+          },
+          "evidence_status": {
+            "enum": [
+              "paper_reported",
+              "independently_reproduced",
+              "experimental_measurement",
+              "synthetic_fixture"
+            ]
+          },
+          "measurement_or_derivation_method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_artifact_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source_reference": {
+            "type": "string",
+            "format": "uri"
+          },
+          "length_scale_definition": {
+            "enum": [
+              "microscopic_xi0",
+              "GL_near_Tc_xi",
+              "not_applicable"
+            ]
+          },
+          "result_authority": {
+            "enum": [
+              "calculated",
+              "measured",
+              "predicted",
+              "inferred",
+              "reported_summary"
+            ]
+          }
+        }
+      }
+    },
+    "effective_gl_coefficients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "coefficient_id",
+          "coefficient_kind",
+          "value_kind",
+          "value",
+          "unit",
+          "basis_normalization",
+          "temperature_regime",
+          "field_regime",
+          "status",
+          "derivation_method",
+          "supporting_observable_ids",
+          "uncertainty_or_covariance",
+          "model_family",
+          "non_identifiability_reason",
+          "state_id"
+        ],
+        "properties": {
+          "coefficient_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coefficient_kind": {
+            "enum": [
+              "a_temperature_slope",
+              "a_quadratic_matrix",
+              "b_quartic",
+              "K_gradient_tensor",
+              "phase_locking_matrix",
+              "current_response_tensor",
+              "other"
+            ]
+          },
+          "value_kind": {
+            "enum": [
+              "scalar",
+              "vector",
+              "matrix",
+              "null"
+            ]
+          },
+          "value": {
+            "type": [
+              "number",
+              "array",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basis_normalization": {
+            "type": "string",
+            "minLength": 1
+          },
+          "temperature_regime": {
+            "type": "string",
+            "minLength": 1
+          },
+          "field_regime": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "derived",
+              "constrained",
+              "phenomenological_fit",
+              "not_identifiable",
+              "not_applicable"
+            ]
+          },
+          "derivation_method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supporting_observable_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "uncertainty_or_covariance": {
+            "type": [
+              "number",
+              "array",
+              "null"
+            ]
+          },
+          "model_family": {
+            "enum": [
+              "conventional_electron_phonon",
+              "correlated_unconventional",
+              "multicomponent",
+              "experimental_effective",
+              "other"
+            ]
+          },
+          "non_identifiability_reason": {
+            "type": "string"
+          },
+          "state_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "enum": [
+        "Provenance-bound microscopic/effective response record only; no coefficient is promoted beyond its declared evidence status and no material Tc or phase is independently established by this fixture.",
+        "Calculated numerical observables transcribed from the paper-reported arXiv:2603.05123v2 tables only; not independently reproduced and not reconciled against the 2026-11-03 PRL publication version. No phenomenological GL coefficient is derived by this fixture."
+      ]
+    }
+  }
+}
