@@ -84,8 +84,9 @@ pub struct MixedStrategyDecisionObservabilityCertificate {
     pub admissible_action_count: u64,
     pub candidate_action_distribution: Vec<ActionProbability>,
     pub candidate_probability_support_size: u64,
-    /// Worst-case expected regret of the candidate's probability kernel.
-    pub candidate_worst_case_expected_regret_ppm: u32,
+    /// Outward-rounded bounds on the candidate's worst-case expected regret.
+    pub candidate_worst_case_expected_regret_lower_bound_ppm: u32,
+    pub candidate_worst_case_expected_regret_upper_bound_ppm: u32,
     /// Best pure action's worst-case regret. This is not a lower bound for
     /// randomized policies; it is retained as an ablation/comparison.
     pub deterministic_minimax_regret_ppm: u32,
@@ -156,7 +157,6 @@ impl std::error::Error for MixedStrategyError {}
 
 #[derive(Clone, Debug)]
 struct PreparedWorld {
-    world_id: u64,
     regrets_ppm: Vec<u32>,
 }
 
@@ -418,10 +418,7 @@ pub fn evaluate_mixed_strategy_decision_observability(
                     })
             })
             .collect::<Result<Vec<_>, _>>()?;
-        prepared.push(PreparedWorld {
-            world_id: world.evaluator_world_id,
-            regrets_ppm,
-        });
+        prepared.push(PreparedWorld { regrets_ppm });
     }
 
     // Canonical world order prevents input serialization order from changing
@@ -438,9 +435,14 @@ pub fn evaluate_mixed_strategy_decision_observability(
         deterministic_minimax_regret = deterministic_minimax_regret.min(worst);
     }
 
-    let mut candidate_worst_case = 0_u32;
+    let mut candidate_worst_case_lower = 0_u32;
+    let mut candidate_worst_case_upper = 0_u32;
     for world in &prepared {
-        candidate_worst_case = candidate_worst_case.max(ceil_weighted_regret(
+        candidate_worst_case_lower = candidate_worst_case_lower.max(floor_weighted_regret(
+            &world.regrets_ppm,
+            &candidate_probabilities,
+        )?);
+        candidate_worst_case_upper = candidate_worst_case_upper.max(ceil_weighted_regret(
             &world.regrets_ppm,
             &candidate_probabilities,
         )?);
@@ -526,8 +528,10 @@ pub fn evaluate_mixed_strategy_decision_observability(
     let duality_gap = mixed_upper_bound
         .checked_sub(mixed_lower_bound)
         .ok_or(MixedStrategyError::ArithmeticOverflow)?;
-    let avoidable_lower = candidate_worst_case.saturating_sub(mixed_upper_bound);
-    let avoidable_upper = candidate_worst_case.saturating_sub(mixed_lower_bound);
+    // The candidate value can be fractional in PPM units. Use outward-rounded
+    // endpoints for the avoidable-regret interval as well.
+    let avoidable_lower = candidate_worst_case_lower.saturating_sub(mixed_upper_bound);
+    let avoidable_upper = candidate_worst_case_upper.saturating_sub(mixed_lower_bound);
 
     let mixed_strategy = action_ids
         .iter()
@@ -553,7 +557,8 @@ pub fn evaluate_mixed_strategy_decision_observability(
             .map_err(|_| MixedStrategyError::ArithmeticOverflow)?,
         candidate_action_distribution: reference_distribution.clone(),
         candidate_probability_support_size: support_size,
-        candidate_worst_case_expected_regret_ppm: candidate_worst_case,
+        candidate_worst_case_expected_regret_lower_bound_ppm: candidate_worst_case_lower,
+        candidate_worst_case_expected_regret_upper_bound_ppm: candidate_worst_case_upper,
         deterministic_minimax_regret_ppm: deterministic_minimax_regret,
         mixed_minimax_lower_bound_ppm: mixed_lower_bound,
         mixed_minimax_upper_bound_ppm: mixed_upper_bound,
@@ -639,7 +644,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.deterministic_minimax_regret_ppm, 1_000_000);
-        assert_eq!(result.candidate_worst_case_expected_regret_ppm, 500_000);
+        assert_eq!(result.candidate_worst_case_expected_regret_lower_bound_ppm, 500_000);
+        assert_eq!(result.candidate_worst_case_expected_regret_upper_bound_ppm, 500_000);
         assert_eq!(result.mixed_minimax_lower_bound_ppm, 500_000);
         assert_eq!(result.mixed_minimax_upper_bound_ppm, 500_000);
         assert_eq!(result.mixed_solver_duality_gap_ppm, 0);
@@ -656,7 +662,8 @@ mod tests {
             MixedSolverConfig::default(),
         )
         .unwrap();
-        assert_eq!(result.candidate_worst_case_expected_regret_ppm, 1_000_000);
+        assert_eq!(result.candidate_worst_case_expected_regret_lower_bound_ppm, 1_000_000);
+        assert_eq!(result.candidate_worst_case_expected_regret_upper_bound_ppm, 1_000_000);
         assert!(result.avoidable_regret_lower_bound_ppm >= 490_000);
         assert!(result.avoidable_regret_upper_bound_ppm >= result.avoidable_regret_lower_bound_ppm);
         assert!(result.solver_tolerance_met);
@@ -678,7 +685,8 @@ mod tests {
         .unwrap();
         assert_eq!(result.mixed_minimax_lower_bound_ppm, 0);
         assert_eq!(result.mixed_minimax_upper_bound_ppm, 0);
-        assert_eq!(result.candidate_worst_case_expected_regret_ppm, 0);
+        assert_eq!(result.candidate_worst_case_expected_regret_lower_bound_ppm, 0);
+        assert_eq!(result.candidate_worst_case_expected_regret_upper_bound_ppm, 0);
     }
 
     #[test]
@@ -739,7 +747,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.candidate_probability_support_size, 1);
-        assert_eq!(result.candidate_worst_case_expected_regret_ppm, 1_000_000);
+        assert_eq!(result.candidate_worst_case_expected_regret_lower_bound_ppm, 1_000_000);
+        assert_eq!(result.candidate_worst_case_expected_regret_upper_bound_ppm, 1_000_000);
         assert!(result.mixed_minimax_upper_bound_ppm <= result.deterministic_minimax_regret_ppm);
     }
 
@@ -764,6 +773,28 @@ mod tests {
             result.mixed_minimax_upper_bound_ppm - result.mixed_minimax_lower_bound_ppm
         );
         assert!(result.mixed_minimax_upper_bound_ppm <= 1_000_000);
+    }
+
+    #[test]
+    fn fractional_candidate_regret_uses_outward_rounded_avoidable_bounds() {
+        let class = MixedStrategyEquivalenceClass {
+            equivalence_class_id: 10,
+            alternatives: vec![
+                world(1, 10, distribution(500_000, 500_000), &[("left", 0), ("right", 1)]),
+                world(2, 11, distribution(500_000, 500_000), &[("left", 0), ("right", 1)]),
+            ],
+        };
+        let result = evaluate_mixed_strategy_decision_observability(
+            &class,
+            MixedSolverConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(result.candidate_worst_case_expected_regret_lower_bound_ppm, 0);
+        assert_eq!(result.candidate_worst_case_expected_regret_upper_bound_ppm, 1);
+        assert_eq!(result.mixed_minimax_lower_bound_ppm, 0);
+        assert_eq!(result.mixed_minimax_upper_bound_ppm, 0);
+        assert_eq!(result.avoidable_regret_lower_bound_ppm, 0);
+        assert_eq!(result.avoidable_regret_upper_bound_ppm, 1);
     }
 
     #[test]
