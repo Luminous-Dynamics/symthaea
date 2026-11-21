@@ -34,7 +34,7 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
 - null false-positive frequency under exchangeable same-state samples;
-- detection power under a declared module-loading perturbation;
+- two-sided difference detection, expected-direction recovery and wrong-direction rejection under a declared module-loading perturbation;
 - 95% Wilson Monte-Carlo confidence intervals;
 - median participant-paired gaps and positive-gap fractions.
 
@@ -87,7 +87,7 @@ A workflow result applies only to the exact source commit checked. Skipped, queu
 - signed-shift Weighted Jaccard: transforms each correlation from [-1, 1] to [0, 2], penalizing sign disagreement;
 - normalized mean absolute edge error: one minus mean upper-triangle absolute error divided by two.
 
-Each estimator receives the same seed, participant draws, and injection configuration. The tournament reports null false-positive frequency, injection-detection power, Monte-Carlo Wilson intervals, and participant-level gap summaries. It does not automatically select a universal winner: different estimators have different construct semantics, and estimator performance must be read together with null calibration and effect sensitivity.
+Each estimator receives the same seed, participant draws, and injection configuration. The tournament reports null false-positive frequency, two-sided difference detection, expected-direction recovery, wrong-direction rejection, Monte-Carlo Wilson intervals, and participant-level gap summaries. It does not automatically select a universal winner: different estimators have different construct semantics, and estimator performance must be read together with null calibration and effect sensitivity.
 
 The output contract is `estimator-tournament.schema.json`.
 
@@ -120,3 +120,12 @@ python -m unittest discover -s research/rcaf/tools -p 'test_validate_adversarial
 ```
 
 The validator checks the Draft 2020-12 schema plus semantic controls for separated seeds, exact nulls, positive-dose effects, matrix-level and pre-estimation signal-level injections, nuisance-only nulls, and required evidence outputs. It uses the existing `jsonschema` dependency in `requirements-validation.txt`.
+
+
+## Direction-aware injection recovery
+
+Injection-recovery reports use schema version `rcaf.injection-recovery/0.2.0`. The legacy `injection_detection_power` remains the two-sided significant-difference rate. It is decomposed into:
+- `injection_directional_detection_power`: significant paired gaps in the preregistered positive direction of the module-loading injection;
+- `injection_wrong_direction_rejection_rate`: significant paired gaps in the opposite direction.
+
+The two directional rates partition the two-sided detections under the exact sign test. A wrong-direction rejection is never counted as successful recovery. The same fields are carried through the sweep and both estimator tournament reports.
