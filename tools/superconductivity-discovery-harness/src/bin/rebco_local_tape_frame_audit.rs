@@ -470,7 +470,10 @@ mod tests {
         assert_eq!(station["local_field_vector_t"], json!([0.0, 0.0, -5.0]));
         let theta = station["theta_from_local_normal_rad"].as_f64().unwrap();
         assert!((theta - std::f64::consts::PI).abs() < 1.0e-12);
-        assert_eq!(station["phi_from_longitudinal_toward_width_rad"], Value::Null);
+        assert_eq!(
+            station["phi_from_longitudinal_toward_width_rad"],
+            Value::Null
+        );
     }
 
     #[test]
