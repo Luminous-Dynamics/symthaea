@@ -212,3 +212,10 @@ Source: https://link.springer.com/article/10.1007/s43684-026-00146-z
 ## 9. Cross-source pseudo-label alignment and boundary safety
 
 The 16 October 2026 IEEE Access paper on pseudo-label-based integration of WM-811K and Mixed38 reports relative gains of 207.75% in silhouette coefficient and 16.19% in Ratkowsky-Lance index. Source: https://doi.org/10.1109/ACCESS.2026.3744016 . These are cluster-structure measures and do not establish pseudo-label precision, correctness or future-lot transfer. The follow-up [SEMI-WM-ALIGN-001 #13148](https://github.com/Luminous-Dynamics/symthaea/issues/13148) benchmarks partial label alignment, boundary-aware pseudo-label admission, unknown preservation, and source/lot-held-out performance.
+
+
+## 10. Deployment Pareto: compact hybrid and ViT-Tiny challengers
+
+Two additional 2026 references change the competitive target. Mohammad et al. (25 Aug 2026) report ViT-Tiny at 98.4% accuracy on WM-38K with 5.7M parameters, 1.77× faster inference and 4.47× lower memory than comparable transformers: https://doi.org/10.1038/s41598-026-63752-0 . Hu (10 Sep 2026) reports a hybrid global/local MobileNetV2 + handcrafted geometry model at 98.89% accuracy and 94.41% macro-F1 on WM-811K with 64,967 trainable parameters; the offline StyleGAN2-ADA generator and handcrafted feature extraction are additional lifecycle costs: https://doi.org/10.1038/s41598-026-68884-x . Neither result is an apples-to-apples comparison with the 2026 GNN or FAD-Net until split, label protocol, resolution, hardware and resource measurement are matched.
+
+New follow-up [SEMI-PARETO-001 #13149](https://github.com/Luminous-Dynamics/symthaea/issues/13149) benchmarks accuracy, per-class recall, open-set calibration, p95 latency, peak memory, artifact size, training/update cost and measured energy where instrumented. The Luminous differentiator should be a measured resource/reliability Pareto win, not an unsupported claim of beating a 98–99% headline.
