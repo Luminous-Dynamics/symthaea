@@ -1005,7 +1005,7 @@ mod tests {
         for phase in phases {
             let sample = phased_sample(0.0, 1.0, phase);
             let observed = sample.phase();
-            assert!(observed >= -PI && observed <= PI);
+            assert!((-PI..=PI).contains(&observed));
             assert!((observed - phase).abs() < 1.0e-14);
         }
     }
