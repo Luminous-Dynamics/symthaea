@@ -1,0 +1,264 @@
+{
+  "schema_version": "2.0.0",
+  "case_id": "marine-freight-synthetic-screen-v2",
+  "evidence_class": "synthetic_illustration",
+  "decision_use": "not_for_decision",
+  "system_boundary": {
+    "includes": [
+      "declared route and berth dimensional envelopes",
+      "declared payload capacity",
+      "integrated propulsion and auxiliary energy inputs for one round trip",
+      "battery temperature and end-of-life capacity factors",
+      "declared battery reserve",
+      "shore connection, charger power, charging efficiency, and time windows"
+    ],
+    "excludes": [
+      "hull resistance or propulsive-efficiency prediction",
+      "CFD or empirical hydrodynamics",
+      "intact or damaged stability and structural strength",
+      "wave, wind, current, shallow-water, or blockage corrections",
+      "battery thermal dynamics, power taper, degradation dynamics, and fire safety",
+      "lifecycle emissions, economics, statutory approval, class approval, and operating authority"
+    ]
+  },
+  "provenance": [
+    {
+      "id": "synthetic-route",
+      "class": "synthetic_illustration",
+      "description": "Invented geometry and waterway limits used only to exercise deterministic arithmetic; not a real route or design envelope.",
+      "source_uri": null
+    },
+    {
+      "id": "synthetic-duty-cycle",
+      "class": "synthetic_illustration",
+      "description": "Invented integrated load, payload, and timing values; not measured data and not a hydrodynamics result.",
+      "source_uri": null
+    },
+    {
+      "id": "synthetic-energy-terminal",
+      "class": "synthetic_illustration",
+      "description": "Invented battery and terminal values used only for arithmetic regression tests; not equipment specifications.",
+      "source_uri": null
+    }
+  ],
+  "route": {
+    "maximum_vessel_length_m": {
+      "status": "known",
+      "value": 100,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 100,
+      "upper_bound": 100
+    },
+    "maximum_vessel_beam_m": {
+      "status": "known",
+      "value": 12,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 12,
+      "upper_bound": 12
+    },
+    "maximum_vessel_draft_m": {
+      "status": "known",
+      "value": 2.5,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 2.5,
+      "upper_bound": 2.5
+    },
+    "available_water_depth_m": {
+      "status": "known",
+      "value": 3.2,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 3.2,
+      "upper_bound": 3.2
+    },
+    "minimum_under_keel_clearance_m": {
+      "status": "known",
+      "value": 0.5,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 0.5,
+      "upper_bound": 0.5
+    }
+  },
+  "vessel": {
+    "length_overall_m": {
+      "status": "known",
+      "value": 80,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 80,
+      "upper_bound": 80
+    },
+    "beam_m": {
+      "status": "known",
+      "value": 9.5,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 9.5,
+      "upper_bound": 9.5
+    },
+    "design_draft_m": {
+      "status": "known",
+      "value": 2.2,
+      "unit": "m",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 2.2,
+      "upper_bound": 2.2
+    },
+    "cargo_capacity_tonnes": {
+      "status": "known",
+      "value": 900,
+      "unit": "t",
+      "provenance_id": "synthetic-route",
+      "lower_bound": 900,
+      "upper_bound": 900
+    }
+  },
+  "duty_cycle": {
+    "loaded_leg_propulsion_kwh": {
+      "status": "known",
+      "value": 1850,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle",
+      "lower_bound": 1850,
+      "upper_bound": 1850
+    },
+    "loaded_leg_auxiliary_kwh": {
+      "status": "known",
+      "value": 125,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle",
+      "lower_bound": 125,
+      "upper_bound": 125
+    },
+    "return_leg_propulsion_kwh": {
+      "status": "known",
+      "value": 1150,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle",
+      "lower_bound": 1150,
+      "upper_bound": 1150
+    },
+    "return_leg_auxiliary_kwh": {
+      "status": "known",
+      "value": 110,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle",
+      "lower_bound": 110,
+      "upper_bound": 110
+    },
+    "required_payload_tonnes": {
+      "status": "known",
+      "value": 800,
+      "unit": "t",
+      "provenance_id": "synthetic-duty-cycle",
+      "lower_bound": 800,
+      "upper_bound": 800
+    },
+    "round_trip_duration_h": {
+      "status": "known",
+      "value": 15,
+      "unit": "h",
+      "provenance_id": "synthetic-duty-cycle",
+      "lower_bound": 15,
+      "upper_bound": 15
+    }
+  },
+  "energy_system": {
+    "architecture_id": "fixed_battery_electric_v1",
+    "nominal_battery_kwh": {
+      "status": "known",
+      "value": 5400,
+      "unit": "kWh",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 5400,
+      "upper_bound": 5400
+    },
+    "temperature_capacity_factor": {
+      "status": "known",
+      "value": 0.9,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 0.9,
+      "upper_bound": 0.9
+    },
+    "end_of_life_capacity_factor": {
+      "status": "known",
+      "value": 0.85,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 0.85,
+      "upper_bound": 0.85
+    },
+    "reserve_fraction": {
+      "status": "known",
+      "value": 0.15,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 0.15,
+      "upper_bound": 0.15
+    },
+    "charger_power_kw": {
+      "status": "known",
+      "value": 600,
+      "unit": "kW",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 600,
+      "upper_bound": 600
+    }
+  },
+  "terminal": {
+    "berth_length_m": {
+      "status": "known",
+      "value": 95,
+      "unit": "m",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 95,
+      "upper_bound": 95
+    },
+    "berth_beam_limit_m": {
+      "status": "known",
+      "value": 11,
+      "unit": "m",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 11,
+      "upper_bound": 11
+    },
+    "shore_connection_power_kw": {
+      "status": "known",
+      "value": 750,
+      "unit": "kW",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 750,
+      "upper_bound": 750
+    },
+    "charging_efficiency": {
+      "status": "known",
+      "value": 0.92,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 0.92,
+      "upper_bound": 0.92
+    },
+    "available_charge_window_h": {
+      "status": "known",
+      "value": 8,
+      "unit": "h",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 8,
+      "upper_bound": 8
+    },
+    "available_service_window_h": {
+      "status": "known",
+      "value": 24,
+      "unit": "h",
+      "provenance_id": "synthetic-energy-terminal",
+      "lower_bound": 24,
+      "upper_bound": 24
+    }
+  },
+  "claim_ceiling": "Arithmetic screening of declared inputs only; no hydrodynamic optimization, structural qualification, seaworthiness, environmental benefit, regulatory compliance, or operating authority."
+}
