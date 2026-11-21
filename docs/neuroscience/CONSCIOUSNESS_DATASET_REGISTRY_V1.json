@@ -171,7 +171,11 @@
         "paper iEEG cohort is endpoint-dependent: 34 recruited, two excluded for incomplete data, and a specific identity-RDM analysis reports 29 after further completion filtering",
         "public release documentation reports 118 fMRI, 100 MEG/EEG and 38 iEEG records; release presence does not imply inclusion in the primary published analysis",
         "optimization and replication phase membership must be frozen from participant-level metadata or the exact supplementary mapping, never inferred by random repartition",
-        "published outcomes have been inspected; subsequent analysis is reproduction or secondary analysis, not a blind holdout"
+        "published outcomes have been inspected; subsequent analysis is reproduction or secondary analysis, not a blind holdout",
+        "The 2026 Bryant-Whyte 246-statistic analysis uses the same COGITATE MEG source cohort; it is a same-dataset method comparator, not independent replication",
+        "Its 35,280 candidate-model fits create a model-selection problem; winning measures must be re-evaluated inside nested participant-grouped validation and untouched confirmation",
+        "BIDS M-EEG release availability is distinct from raw/unprocessed M-EEG availability; V1.3 lists the latter as a future release",
+        "The article's supplementary PDF was corrected on 2026-10-15; use the corrected supplement and paper version"
       ],
       "acquisition_status": "public_catalogue_and_release_documentation_audited; exact modality bundle intake_not_started",
       "paper_cohort_counts": {
@@ -213,13 +217,10 @@
           "note": "Official introduction states raw/unprocessed and BIDS fMRI Experiment 1 are released."
         },
         "meeg_experiment_1": {
-          "status": "release_documentation_exists_but_current_v1.3_overview_lists_raw_all_batches_as_future",
-          "documentation_versions": [
-            "V1.0 batch 1",
-            "V1.2 batch 2",
-            "V1.3 overview"
-          ],
-          "note": "The introduction lists raw/unprocessed M-EEG batch 1 and batch 2 among future releases. Verify exact content and format of each versioned bundle before declaring a file-level release complete."
+          "bids": "prior versioned M-EEG releases V1.0 (batch 1) and V1.2 (batch 2); 2026 Bryant-Whyte analysis confirms use of BIDS MEG data for 100 participants",
+          "raw_unprocessed": "V1.3 introduction lists raw/unprocessed batch 1 and batch 2 as future releases",
+          "status": "bids_release_available_by_versioned_docs; raw_unprocessed_release_pending_in_v1_3",
+          "note": "Do not conflate BIDS availability with raw/unprocessed availability. For a new intake, verify exact BIDS bundle, participant manifest, source commit, terms and checksums."
         },
         "ieeg": {
           "status": "versioned_release_documentation_exists",
@@ -240,7 +241,45 @@
         "endpoint": "cross-task stimulus-category decoding across task-relevant and task-irrelevant conditions",
         "status": "protocol_authored; data_not_downloaded"
       },
-      "construct_warning": "task-irrelevant is not an unconscious label; stimulus decoding is not a universal consciousness detector"
+      "construct_warning": "task-irrelevant is not an unconscious label; stimulus decoding is not a universal consciousness detector",
+      "secondary_meg_reanalysis": {
+        "title": "A data-driven approach to identifying and evaluating connectivity-based neural correlates of conscious visual perception",
+        "authors": [
+          "Annie G. Bryant",
+          "Christopher J. Whyte"
+        ],
+        "journal": "Neuroscience of Consciousness 2026, niag029",
+        "doi": "10.1093/nc/niag029",
+        "correction": {
+          "date": "2026-10-15",
+          "doi": "10.1093/nc/niag071",
+          "note": "Corrected supplement replaces earlier PDF; corrected equation and tables must be used."
+        },
+        "data_doi": "10.17617/1.wqa3-wk71",
+        "preprocessing_zenodo_doi": "10.5281/zenodo.18294156",
+        "code_repository": "https://github.com/anniegbryant/MEG_functional_connectivity",
+        "software": "pyspi 1.1.0",
+        "participant_counts": {
+          "bids_meg": 100,
+          "source_localization_with_anatomy": 94
+        },
+        "measures": {
+          "initial": 262,
+          "retained": 246,
+          "qc_coverage": 0.9,
+          "qc_minimum_n": 85
+        },
+        "model_fits_primary_aim": 35280,
+        "findings_summary": {
+          "stimulus_type_accuracy_band": "approximately 0.60-0.67 for many configurations",
+          "task_relevance_accuracy_upper_bound": "no candidate measure exceeded 0.56 in reported analysis",
+          "notable_family": "barycenter-derived measures",
+          "fold_variability": "marked variability; authors emphasize relative trends over absolute accuracy",
+          "theory_interpretation": "tentative; not strong evidence of necessity or sufficiency of either theory"
+        },
+        "evaluation_status": "literature_audited; independent_replay_not_started; same_COGITATE_MEg_source_cohort_not_independent_replication",
+        "protocol": "docs/neuroscience/COGITATE_MEG_ESTIMATOR_TOURNAMENT_V0.md"
+      }
     },
     {
       "id": "sleep-edf-hypnos",
