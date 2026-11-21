@@ -1,0 +1,168 @@
+# RCAF Counterfactual Generalization Benchmark V1
+
+**Status:** Proposed benchmark contract; design and acceptance targets only. No empirical dataset evaluation or SOTA claim is made here.  
+**Date:** 2026-11-21  
+**Scope:** CETB/RCAF measurement and inference qualification  
+**Parent:** CETB measurement qualification stack V0 and RCAF adversarial instrument calibration V1
+
+## 1. The paradigm shift: benchmark claims, not leaderboard scores
+
+Most neuroimaging benchmarks optimize one stage or one endpoint: preprocessing, connectome construction, pairwise estimator quality, dataset sufficiency, classification accuracy, or test–retest reliability. These are important but not interchangeable.
+
+CETB should be a **counterfactual qualification layer** across the complete measurement-to-claim chain:
+
+`latent target → signal generation/acquisition → preprocessing → connectivity estimator → matrix comparator → participant-level inference → claim`
+
+The benchmark asks two paired questions:
+
+1. When the target changes and the observation process is held fixed, does the method recover the intended change, in the intended direction, with calibrated uncertainty?
+2. When the observation process changes but the latent target is held fixed, does the method avoid inventing a target change, or explicitly qualify the result as nuisance-sensitive?
+
+This turns "robustness" into an experimentally testable claim. It also prevents a high classification score from being mistaken for measurement validity, repeatability, or construct validity.
+
+## 2. Formal counterfactual design
+
+Represent an observation as:
+
+`X_{p,s} = G(T_p, N_s, A_s, epsilon_{p,s})`
+
+where:
+
+- `T_p` is participant `p`'s declared latent target;
+- `N_s` is the nuisance/intervention state for session or site `s`;
+- `A_s` is the acquisition and preprocessing configuration;
+- `epsilon` is finite-sample and measurement noise;
+- `G` is the versioned observation generator or empirical acquisition process.
+
+The benchmark requires paired interventions:
+
+- **Signal intervention:** vary `T`, hold `N` and `A` fixed.
+- **Nuisance intervention:** vary `N), hold `T` fixed.
+- **Acquisition intervention:** vary `A), preserve the target and disclose the measurement transformation.
+- **Interaction intervention:** cross signal and nuisance factors to test whether nuisance alters sensitivity to genuine changes.
+- **Leakage intervention:** plant a known information-boundary violation, pair it with a clean negative control, and test detection plus localization.
+
+Do not call every nuisance intervention a classical Type-I error. A nuisance shift changes the observed-data distribution; its rejection frequency is an **artifact-only operational false-alarm rate** relative to the unchanged latent target. Classical null calibration must remain a separate same-observation-distribution test.
+
+Each intervention cell records its latent target, observed-data distribution, expected result, random seed namespace, factor levels, analysis access boundary and predeclared acceptance test. The generator must expose truth to the simulator/validator, never to the analysis function being tested.
+
+## 3. Metamorphic qualification: invariance versus equivariance
+
+A single invariance rule is scientifically wrong. Some transformations should leave an estimand unchanged; others should transform the result in a predictable way.
+
+For every estimator/endpoint pair, publish a **transformation contract**:
+
+| Transformation | Required relation | Example |
+|---|---|---|
+| ROI label permutation with a correspondingly permuted matrix | Invariant after label-aware reindexing | Identical result after restoring the canonical ROI order |
+| Exact duplicate input / replay | Bitwise or tolerance-bounded reproducibility | Same seed, config and binary produce same receipt |
+| Global gain or offset | Endpoint-specific invariant or known equivariance | Do not assume all connectivity statistics are scale invariant |
+| Signal polarity inversion | Explicit sign equivariance or declared non-invariance | Signed edges must not be silently absolutized |
+| Time-series resampling / duration change | No assumed invariance | Re-estimate uncertainty and effective sample size |
+| Site/scanner transform | Transportability test, not automatic invariance | Train-only harmonization and locked test site |
+| Missingness/censoring | Explicit missingness-mechanism sensitivity | MCAR, MAR and MNAR are separate cells |
+
+Metamorphic failures should report the broken contract and affected claim. They must not be repaired by silently normalizing away the discrepancy.
+
+## 4. Keep four benchmark layers separate
+
+| Layer | Question | Candidate comparators |
+|---|---|---|
+| Data / measurement sufficiency | Is there enough recoverable signal for this endpoint? | NSI where its precision-fMRI input assumptions match; blinded QC |
+| Connectivity construction | How is the connectivity matrix estimated? | Pearson, Spearman, shrinkage covariance, precision/partial correlation, selected pyspi statistics |
+| Matrix comparison | How are two matrices compared? | Current RCAF measures plus preregistered matrix distances and graph comparisons |
+| Inference / decision | Does the participant-level result support the declared contrast? | RCAF paired inference, sign/permutation procedures, bootstrap intervals, calibrated decision rules |
+
+No comparator is credited for a capability outside its purpose. In particular, NSI is a precision-fMRI measurement-sufficiency/QC instrument, not a state-contrast inferential method. pyspi benchmarks pairwise interaction estimators, not participant-level repeatability. Pipeline classification accuracy is not a substitute for latent-target recovery.
+
+## 5. Required multi-objective scorecard
+
+Never collapse these outputs into a single unqualified "reliability" or "consciousness" score.
+
+### Statistical calibration
+- Same-observation-distribution null rejection rate, exact nominal alpha, Monte-Carlo interval and seed count.
+- Directional true-positive recovery and wrong-direction significant rejection, separately.
+- Effect bias, interval coverage, interval width and calibration of any reported probability.
+- Type-I error, power and confidence intervals stratified by every predeclared critical cell.
+
+### Counterfactual robustness
+- Artifact-only operational false-alarm frequency by nuisance family and dose.
+- Maximum nuisance-induced drift in the target estimate, not just its average.
+- Signal × nuisance interaction: degradation in directional recovery under each nuisance dose.
+- Dose-response ordering and non-monotonicity diagnostics.
+- Worst-stratum performance and lower-tail performance; do not report only pooled means.
+
+### Transport and selection integrity
+- Participant holdout, unseen-site holdout, unseen-device/acquisition holdout and independent-cohort confirmation as distinct results.
+- All preprocessing, harmonization, feature selection, estimator selection, calibration and thresholds fitted within training folds only.
+- Planted leakage detection sensitivity, clean-control false-alarm frequency and the exact boundary crossed.
+- Defensible multiverse effect/interval distribution, including sign reversals and conclusions that depend on one pipeline choice.
+
+### Operational and evidence quality
+- Runtime, peak memory, wall-clock cost and data volume for each compared pipeline.
+- Exact source commit, dependencies, environment, data manifest, configuration, seeds and output digests.
+- A machine-readable claim-scoped receipt that records pass, fail, inconclusive and not-assessed separately.
+
+## 6. Proposed engineering gates
+
+These are **stretch targets for a future preregistered qualification protocol**, not published field standards and not current RCAF results. Thresholds must be reviewed against endpoint-specific error costs and the attainable sample size before confirmatory runs.
+
+| Gate | Proposed target | Interpretation |
+|---|---|---|
+| Deterministic replay | 100% exact match for deterministic fixtures | Same artifacts for same frozen inputs |
+| Nominal null calibration | At `alpha=0.05`, Monte-Carlo 95% interval contains 0.05; at least 10,000 replicates for primary confirmatory null families | Must be evaluated separately across null families |
+| Directional recovery | At the preregistered minimally meaningful effect, point recovery ≥0.80 and lower 95% Wilson bound ≥0.75 | Strong-power objective, not a biological truth threshold |
+| Wrong-direction rejection | ≤0.01 point rate at the minimally meaningful positive effect; upper 95% bound reported | Opposite-sign significance is never successful recovery |
+| Nuisance-only false alarm | ≤0.05 at each predeclared moderate nuisance challenge, with upper 95% bound reported | Operational artifact robustness, explicitly not Type-I error |
+| Effect-interval coverage | 95% interval coverage within 0.93–0.97 on calibrated synthetic families | Only for generators whose ground-truth effect and interval estimand match |
+| Nuisance-induced target drift | ≤0.10 of the minimally meaningful effect, unless the endpoint contract predicts equivariance | Require per-family worst-case reporting |
+| Leakage controls | Detect every seeded leakage fixture; no more than 0.05 false flags on clean fixtures | Controlled software benchmark, followed by empirical audit |
+| Robust direction across defensible workflows | ≥0.90 sign concordance, or classify the result as analysis-sensitive | Only compare workflows that estimate the same declared target |
+| External confirmation | Frozen endpoint and decision rule reproduce direction with interval and calibration reported; no retuning on external labels | No universal accuracy threshold |
+
+For a nominal 5% error rate, 10,000 replicates are a starting point, not a substitute for an interval or a power calculation. Small exploratory grids must not be used to claim precise tail calibration.
+
+## 7. Competitive comparison: what the field has already achieved
+
+The benchmark should compare against the right public baselines, not manufacture a single leaderboard.
+
+1. **768 connectome construction pipelines / 13,824 pipeline-criterion-data evaluations.** Luppi et al. evaluated combinations of parcellation, connectivity definition, global-signal regression and graph construction. Only 9 of 768 satisfied all their stringent multi-criterion requirements across their test–retest datasets. This is a baseline for multi-criterion pipeline qualification—not a comparator for RCAF's participant-level inference statistic.
+2. **239 pairwise interaction statistics.** The 2025 *Nature Methods* pyspi-based benchmark showed that estimator rankings vary by objective, including structure–function coupling, individual identification, brain–behaviour prediction and motion sensitivity. This is a construction-estimator benchmark; it argues against choosing a universal winner.
+3. **256 pipelines in two-site eye-state classification.** Medvedeva et al. (2026) compared 256 fMRI pipelines under cross-site validation and few-shot adaptation and reported approximately 90% accuracy for top-performing configurations on the controlled eyes-open/eyes-closed task. This is a useful cross-site classification baseline, not a ceiling for sedation, consciousness, RCAF repeatability or construct validity.
+4. **Network Similarity Index.** Buchanan et al. (2026) provide an expert-anchored precision-fMRI map-quality assessment with nested-CV usability prediction. RCAF/CETB should reuse NSI when input compatibility and its intended PFM use case match, rather than clone or relabel it.
+5. **External validation.** Rosenblatt et al. (2026) emphasize independent-dataset validation as stricter evidence than unseen-sample validation within one dataset. CETB's tiers must preserve that distinction.
+
+### The actual route to outperformance
+
+A credible advantage is not "beat 90% accuracy" on a different task. It is to deliver a benchmark where the **same frozen input, target, split, and preprocessing** pass through all four layers; where signal and nuisance interventions are independently controlled; where failure modes are localized; and where external confirmation is untouched.
+
+The proposed differentiator is a *claim-conditional evidence frontier*: for each endpoint, show the Pareto surface across directional recovery, null calibration, nuisance robustness, transportability, uncertainty calibration, runtime and memory. Publish dominated and Pareto-optimal configurations, not one composite winner. The best configuration can differ by endpoint.
+
+## 8. Execution sequence
+
+1. Repair and pass the existing exact-head Rust test/format/lint gate; execute the current synthetic reports and retain the content-addressed receipt.
+2. Complete the currently implemented shared common-mode challenge and inspect its observed dose curve.
+3. Add a second nuisance family that is mathematically distinct (spatially structured low-rank gradient or scanner/site gain-plus-offset), with matched latent random numbers and explicit invariance expectations.
+4. Add a crossed signal × nuisance experiment so that sensitivity loss under artifacts can be measured directly.
+5. Build a transformation-contract fixture suite (ROI permutation, polarity, gain/offset, missingness and duration) for declared invariance/equivariance.
+6. Compare connectivity estimators and matrix-comparison methods as separate layers on identical inputs; include selected pyspi baselines only where dependencies, inputs and estimands match.
+7. Reproduce the frozen ds006623 source analysis before using ds003171 as an independent transport cohort. Freeze preprocessing, labels, quality exclusions and estimator selection before opening external outcomes.
+8. Publish raw per-cell outputs, confidence intervals, resource costs, source/configuration/environment digests and all failed cells.
+
+## 9. Scope and safety of claims
+
+- A passed synthetic challenge qualifies only the tested generator, intervention and analysis implementation.
+- Artifact-only rejection is not classical Type-I error when the nuisance intervention changes observed-data distributions.
+- A within-release held-out site is not automatically an independent cohort.
+- A high eyes-open/eyes-closed classifier accuracy does not establish consciousness detection.
+- Precision-fMRI data-sufficiency scores do not validate EEG/MEG or propofol-state inference.
+- No result in this document establishes clinical readiness, causal identification, consciousness detection or superiority over the state of the art.
+
+## References
+
+- Luppi et al. (2024), *Systematic evaluation of fMRI data-processing pipelines for consistent functional connectomics*, Nature Communications, [10.1038/s41467-024-48781-5](https://doi.org/10.1038/s41467-024-48781-5).
+- Benchmarking methods for mapping functional connectivity in the brain (2025), Nature Methods, [10.1038/s41592-025-02704-4](https://doi.org/10.1038/s41592-025-02704-4).
+- Medvedeva et al. (2026), *Benchmarking resting state fMRI connectivity pipelines for classification: robust accuracy despite processing variability in cross-site eye state prediction*, Brain Informatics, [10.1186/s40708-026-00305-1](https://doi.org/10.1186/s40708-026-00305-1).
+- Buchanan et al. (2026), *Objective quality assessment for precision functional MRI data*, Neuron, [10.1016/j.neuron.2026.05.020](https://doi.org/10.1016/j.neuron.2026.05.020).
+- Rosenblatt et al. (2026), *External validation improves generalizability, replicability and reproducibility in predictive models for neuroimaging*, Nature Methods, [10.1038/s41592-026-03115-9](https://doi.org/10.1038/s41592-026-03115-9).
+- CETB/RCAF, *RCAF Adversarial Instrument Calibration Protocol V1* and *CETB multidimensional measurement qualification stack V0*.
