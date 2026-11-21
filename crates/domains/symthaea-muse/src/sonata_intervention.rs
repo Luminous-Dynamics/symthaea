@@ -995,8 +995,7 @@ mod tests {
             bars: 4,
             ..MusicalIntent::default()
         };
-        let realization =
-            compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
+        let realization = compose_sonata_with_plan(&intent, &Style::Sonata.spec()).unwrap();
         let mut trace = return_trace(&realization);
         trace.proposal.driving_obligation_id = Some(u64::MAX);
 
