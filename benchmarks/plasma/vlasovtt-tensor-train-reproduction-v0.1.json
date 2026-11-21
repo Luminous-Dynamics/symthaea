@@ -1,0 +1,271 @@
+{
+  "profile_version": "0.1.0",
+  "benchmark_id": "plasma.vlasov_poisson.1d1v.vlasovtt_reproduction",
+  "profile_date": "2026-11-21",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
+  "parent_cohort": "https://github.com/Luminous-Dynamics/symthaea/issues/13072",
+  "status": {
+    "classification": "source_admission_and_reproduction_protocol",
+    "external_code_executed": false,
+    "paper_reproduced": false,
+    "matched_symthaea_comparison": false,
+    "physical_validation": "not_run",
+    "claim_ceiling": "Source inspection and protocol only; no result or performance claim."
+  },
+  "source": {
+    "paper": "https://arxiv.org/abs/2602.13092",
+    "title": "Tensor Network Compression for Fully Spectral Vlasov-Poisson Simulation",
+    "repository": "https://github.com/erikasgrim/VlasovTT.jl",
+    "inspected_repository_head": "99aa077b6f5e4ae4dfc8330590e502267caf298b",
+    "license": "MIT (repository LICENSE inspected)",
+    "important_caveat": "The inspected current HEAD is a reproducible pin, but has not yet been proven identical to the precise source revision used to generate the paper figures.",
+    "files": [
+      {
+        "path": "Project.toml",
+        "blob_sha": "7cc4eebe40fba860faf4880527ccf7c1d7c5f6e7"
+      },
+      {
+        "path": "README.md",
+        "blob_sha": "6da931cce05e8a904d1f722ba04d320d33170df6"
+      },
+      {
+        "path": "examples/landau_damping.jl",
+        "blob_sha": "a1745409ea245a919068e53ad5df9d15227689f3"
+      },
+      {
+        "path": "examples/reference_landau_damping.jl",
+        "blob_sha": "1f2bcf8acb17ab321861bae2b9937b821b7e1973"
+      },
+      {
+        "path": "examples/two_stream.jl",
+        "blob_sha": "95e6c2716d569a0340cff12136968ea5ab0ec88d"
+      },
+      {
+        "path": "examples/reference_two_stream.jl",
+        "blob_sha": "55127484472463a3cf149e438ca8f05cea5edd18"
+      },
+      {
+        "path": "LICENSE",
+        "blob_sha": "df9b271d7d4065bd66203827d161674759750b03"
+      }
+    ],
+    "packages": [
+      "ITensors",
+      "ITensorMPS",
+      "TensorCrossInterpolation",
+      "Quantics",
+      "QuanticsGrids",
+      "QuanticsTCI",
+      "FFTW",
+      "CUDA",
+      "HDF5"
+    ],
+    "language": "Julia"
+  },
+  "paper_reported_setup": {
+    "quantics_bits_per_dimension": 10,
+    "points_per_dimension": 1024,
+    "phase_space_points": 1048576,
+    "timestep": 0.1,
+    "tci_tolerance": 1e-8,
+    "spectral_modes_retained": 128,
+    "filter_beta": 2,
+    "electric_field_max_bond_dimension": 32,
+    "tt_truncation_cutoffs": [
+      1e-7,
+      1e-8,
+      1e-9,
+      1e-10
+    ]
+  },
+  "paper_reported_landau": {
+    "domain_x": [
+      -6.283185307179586,
+      6.283185307179586
+    ],
+    "domain_v": [
+      -6,
+      6
+    ],
+    "thermal_speed": 1,
+    "perturbation_amplitude": 0.01,
+    "spatial_mode": 1,
+    "expected_electric_field_amplitude_damping_rate": -0.151,
+    "relative_energy_deviation_order": 0.001,
+    "maximum_tt_rank_range": [
+      15,
+      45
+    ],
+    "note": "Paper reports localized negative f artifacts; magnitude depends on TT truncation. No positivity guarantee."
+  },
+  "paper_reported_two_stream": {
+    "domain_x": [
+      -1.0266642658790173,
+      1.0266642658790173
+    ],
+    "domain_v": [
+      -0.6,
+      0.6
+    ],
+    "thermal_speed": 0.01,
+    "beam_speed": 0.2,
+    "perturbation_amplitude": 0.01,
+    "expected_electric_field_amplitude_growth_rate": 0.354,
+    "maximum_tt_rank_range": [
+      120,
+      150
+    ]
+  },
+  "source_script_defaults": {
+    "landau_tt": {
+      "timestep": 0.1,
+      "final_time": 30,
+      "quantics_bits_per_dimension": 10,
+      "spectral_modes_parameter": 64,
+      "filter_beta": 2,
+      "domain_x": [
+        -6.283185307179586,
+        6.283185307179586
+      ],
+      "domain_v": [
+        -6,
+        6
+      ],
+      "tci_tolerance": 1e-8,
+      "maximum_tt_rank": 500,
+      "electric_field_maximum_bond_dimension": 32,
+      "svd_cutoff": 1e-10,
+      "gpu_enabled_by_default": true,
+      "gpu_precision": "double",
+      "initial_amplitude": 0.1
+    },
+    "landau_dense_reference": {
+      "timestep": 0.1,
+      "final_time": 30,
+      "quantics_bits_per_dimension": 10,
+      "domain_x": [
+        -6.283185307179586,
+        6.283185307179586
+      ],
+      "domain_v": [
+        -6,
+        6
+      ],
+      "spectral_modes_parameter": -1,
+      "tci_tolerance": 0,
+      "svd_cutoff": 0,
+      "maximum_tt_rank": null,
+      "electric_field_maximum_bond_dimension": null,
+      "gpu_enabled": false,
+      "algorithm": "reference",
+      "initial_amplitude": 0.1
+    },
+    "two_stream_tt": {
+      "perturbation_amplitude": 0.01,
+      "thermal_speed": 0.01,
+      "beam_speed": 0.2,
+      "spatial_mode": 1,
+      "domain_x": [
+        -1.026267,
+        1.026267
+      ],
+      "domain_v": [
+        -0.6,
+        0.6
+      ]
+    }
+  },
+  "source_to_paper_discrepancies": [
+    {
+      "field": "linear Landau perturbation amplitude",
+      "paper_value": 0.01,
+      "current_tt_script_value": 0.1,
+      "current_dense_reference_script_value": 0.1,
+      "ratio": "10x",
+      "disposition": "reproduction_blocker",
+      "action": "Override to A=0.01 for paper-faithful reproduction; keep A=0.1 as a separately labelled source-default lane. Do not silently call the default script a reproduction."
+    }
+  ],
+  "mandatory_metrics": [
+    "electric_field_fundamental_mode_amplitude_and_phase",
+    "linear_damping_or_growth_rate",
+    "field_spectrum",
+    "phase_space_distribution_error",
+    "mass",
+    "momentum",
+    "kinetic_energy",
+    "field_energy",
+    "total_energy",
+    "minimum_distribution",
+    "negative_mass",
+    "tt_rank_history_per_bond",
+    "tci_fit_queries_and_runtime",
+    "tt_mpo_contraction_runtime",
+    "setup_and_conversion_runtime",
+    "full_step_wall_time",
+    "peak_memory",
+    "energy_to_solution"
+  ],
+  "comparison_rules": {
+    "same_physical_initial_condition": true,
+    "same_grid_and_final_time": true,
+    "same_normalization_and_field_operator": true,
+    "same_host_for_primary_paired_comparison": true,
+    "separate_cpu_and_gpu_reports": true,
+    "include_setup_and_tci_cost": true,
+    "preserve_failures_and_rank_cap_events": true,
+    "no_single_scalar_accuracy_score": true
+  },
+  "representation_tournament": {
+    "tracking_issue": 13104,
+    "alternatives": [
+      "dense_spectral_fixed_grid",
+      "adaptive_fourier_spectral_zero_padding",
+      "tensor_train_mps_quantics",
+      "positivity_preserving_dynamical_low_rank",
+      "fourier_hermite_velocity",
+      "weighted_particle_measure",
+      "learned_particle_measure_field"
+    ],
+    "transition_receipt_required": true,
+    "transition_metrics": [
+      "phase_space_error",
+      "mass",
+      "momentum",
+      "energy",
+      "positivity",
+      "conversion_runtime",
+      "peak_memory"
+    ],
+    "abstain_allowed": true,
+    "adaptive_fourier": {
+      "paper": "https://arxiv.org/abs/2607.12368",
+      "method": "high-order splitting with spectral-tail-triggered Fourier wavenumber-domain expansion by zero-padding",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13106",
+      "required_diagnostics": [
+        "x_spectral_tail_fraction",
+        "v_spectral_tail_fraction",
+        "x_nyquist_energy_fraction",
+        "v_nyquist_energy_fraction",
+        "transition_mass_and_L2_change",
+        "full_expansion_cost"
+      ]
+    },
+    "positivity_preserving_low_rank": {
+      "paper": "https://arxiv.org/abs/2606.31662",
+      "method": "minimal positivity correction via constrained quadratic programming; one scheme also preserves mass and momentum",
+      "source_claim_status": "paper_reported_not_reproduced",
+      "applicability": "nonnegative distribution f only; signed delta-f requires a different contract"
+    }
+  },
+  "references": [
+    "https://arxiv.org/abs/2602.13092",
+    "https://github.com/erikasgrim/VlasovTT.jl/tree/99aa077b6f5e4ae4dfc8330590e502267caf298b",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13104",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13072",
+    "https://arxiv.org/abs/2607.12368",
+    "https://arxiv.org/abs/2606.31662",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/13106"
+  ]
+}
