@@ -79,3 +79,14 @@ python research/rcaf/tools/sign_test_power.py \
 ```
 
 It is a design aid for non-tied independent participant pairs; it does not power the median-gap confidence interval or a hierarchical repeated-measures model. The unit tests verify the reported N=23 and minimum-N examples.
+
+
+## Evidence-status and replay receipt rules
+
+The semantic validator distinguishes metadata-only work from signal analysis and independent replay:
+- `signal_analysis` and `independent_replay` require a `downloaded_verified` source state and a lowercase SHA-256 manifest digest.
+- `independent_replay` also requires a non-empty code revision, configuration digest, environment digest and top-level result digest.
+- Participant attrition is reported as the unique total difference between acquired/recruited and analysis-included participants; a separate flow note explains intermediate exclusion stages.
+- If edge-polarity results are included, their neutral threshold must equal the analysis-level frozen threshold.
+
+A schema-valid report is still not a scientific result by itself. The validator checks arithmetic and declared provenance fields, not source-data truth or the correctness of the underlying neuroimaging pipeline.
