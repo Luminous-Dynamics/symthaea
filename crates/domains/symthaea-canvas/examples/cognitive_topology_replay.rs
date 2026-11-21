@@ -13,8 +13,8 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    CognitiveLayoutConfig, CognitiveSvgOptions, CognitiveTopology,
-    layout_cognitive_topology, render_cognitive_projection_svg,
+    CognitiveLayoutConfig, CognitiveSvgOptions, CognitiveTopology, layout_cognitive_topology,
+    render_cognitive_projection_svg,
 };
 
 const DEFAULT_FIXTURE: &str =
@@ -50,11 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = CognitiveLayoutConfig::default();
 
     for _ in 0..WARMUP_RUNS {
-        let projection = layout_cognitive_topology(
-            black_box(&topology),
-            None,
-            config,
-        )?;
+        let projection = layout_cognitive_topology(black_box(&topology), None, config)?;
         black_box(projection.geometry_digest_hex()?);
     }
 
@@ -63,8 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut final_projection = None;
     for _ in 0..samples {
         let started = Instant::now();
-        let projection =
-            layout_cognitive_topology(black_box(&topology), None, config)?;
+        let projection = layout_cognitive_topology(black_box(&topology), None, config)?;
         let digest = projection.geometry_digest_hex()?;
         durations_ns.push(started.elapsed().as_nanos());
         geometry_digest = Some(digest);
