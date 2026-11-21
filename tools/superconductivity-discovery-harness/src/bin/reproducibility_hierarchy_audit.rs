@@ -586,6 +586,50 @@ mod tests {
     }
 
     #[test]
+    fn repeatability_rejects_condition_mismatch() {
+        let mut fixture = fixture_value();
+        fixture["observations"][1]["condition_id"] = json!("COND-OTHER");
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("condition must be the same single identity")
+        );
+    }
+
+    #[test]
+    fn instrument_transfer_rejects_same_instrument() {
+        let mut fixture = fixture_value();
+        fixture["observations"][2]["instrument_id"] = json!("INST-001");
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("instrument leakage")
+        );
+    }
+
+    #[test]
+    fn rejects_observation_from_different_material_state() {
+        let mut fixture = fixture_value();
+        fixture["observations"][0]["material_state_id"] = json!("OTHER-STATE");
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("does not match material_state")
+        );
+    }
+
+    #[test]
+    fn rejects_impossible_calendar_date_even_when_timestamp_shape_matches() {
+        let mut fixture = fixture_value();
+        fixture["observations"][0]["timestamp_utc"] = json!("2026-02-30T09:00:00Z");
+        assert!(
+            audit_fixture_value(&fixture)
+                .unwrap_err()
+                .contains("canonical UTC")
+        );
+    }
+
+    #[test]
     fn rejects_unknown_observation_references() {
         let mut fixture = fixture_value();
         fixture["tasks"][0]["train_observation_ids"][0] = json!("MISSING");
