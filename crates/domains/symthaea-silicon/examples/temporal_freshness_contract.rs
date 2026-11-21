@@ -245,6 +245,59 @@ impl FreshnessRun {
             .iter()
             .filter(|item| item.is_fresh_at_use() == Some(true))
             .count() as u64;
+        let expired_unserved = self
+            .opportunities
+            .iter()
+            .filter(|item| {
+                item.disposition == Disposition::Unserved
+                    && item.deadline_at_ns <= self.logical_horizon_end_ns
+            })
+            .count() as u64;
+        let pending_unserved = unserved - expired_unserved;
+
+        // Deadline failures are late outputs or unserved opportunities whose
+        // deadlines have elapsed by the evaluator horizon. Abstentions remain
+        // separate coverage failures and do not masquerade as missed responses.
+        let mut ordered: Vec<&DecisionOpportunity> = self.opportunities.iter().collect();
+        ordered.sort_by_key(|item| (item.available_at_ns, item.opportunity_id));
+        let mut max_consecutive_misses = 0_u64;
+        let mut current_miss_run = 0_u64;
+        let mut previous_was_miss: Option<bool> = None;
+        let mut previous_miss_pairs = 0_u64;
+        let mut following_miss_pairs = 0_u64;
+        for item in ordered {
+            let miss = match item.disposition {
+                Disposition::Answered => Some(item.is_late()),
+                Disposition::Abstained => Some(false),
+                Disposition::Unserved if item.deadline_at_ns <= self.logical_horizon_end_ns => {
+                    Some(true)
+                }
+                Disposition::Unserved => None,
+            };
+            match miss {
+                Some(true) => {
+                    current_miss_run += 1;
+                    max_consecutive_misses = max_consecutive_misses.max(current_miss_run);
+                    if previous_was_miss == Some(true) {
+                        previous_miss_pairs += 1;
+                        following_miss_pairs += 1;
+                    }
+                    previous_was_miss = Some(true);
+                }
+                Some(false) => {
+                    if previous_was_miss == Some(true) {
+                        previous_miss_pairs += 1;
+                    }
+                    current_miss_run = 0;
+                    previous_was_miss = Some(false);
+                }
+                None => {
+                    current_miss_run = 0;
+                    previous_was_miss = None;
+                }
+            }
+        }
+        let deadline_misses = late + expired_unserved;
         let fresh_correct_on_time = self
             .opportunities
             .iter()
@@ -291,6 +344,11 @@ impl FreshnessRun {
             late_answered: late,
             abstained,
             unserved,
+            expired_unserved,
+            pending_unserved,
+            deadline_misses,
+            max_consecutive_deadline_misses: max_consecutive_misses,
+            miss_to_miss_transition_rate: ratio(following_miss_pairs, previous_miss_pairs),
             fresh_at_use,
             fresh_correct_on_time,
             correct_on_time,
@@ -302,9 +360,13 @@ impl FreshnessRun {
             event_to_use_latency_p50_ns: percentile(&mut event_to_use, 50),
             event_to_use_latency_p95_ns: percentile(&mut event_to_use, 95),
             event_to_use_latency_p99_ns: percentile(&mut event_to_use, 99),
+            event_to_use_latency_p99_9_ns: percentile_per_mille(&mut event_to_use, 999),
+            event_to_use_latency_max_ns: percentile(&mut event_to_use, 100),
             evidence_age_at_use_p50_ns: percentile(&mut evidence_age_at_use, 50),
             evidence_age_at_use_p95_ns: percentile(&mut evidence_age_at_use, 95),
             evidence_age_at_use_p99_ns: percentile(&mut evidence_age_at_use, 99),
+            evidence_age_at_use_p99_9_ns: percentile_per_mille(&mut evidence_age_at_use, 999),
+            evidence_age_at_use_max_ns: percentile(&mut evidence_age_at_use, 100),
             time_to_fresh_correct_p95_ns: percentile(&mut time_to_fresh_correct, 95),
         })
     }
@@ -319,6 +381,12 @@ struct FreshnessSummary {
     late_answered: u64,
     abstained: u64,
     unserved: u64,
+    expired_unserved: u64,
+    pending_unserved: u64,
+    deadline_misses: u64,
+    max_consecutive_deadline_misses: u64,
+    /// P(next resolved opportunity misses | previous resolved opportunity missed).
+    miss_to_miss_transition_rate: Option<f64>,
     fresh_at_use: u64,
     fresh_correct_on_time: u64,
     correct_on_time: u64,
@@ -333,9 +401,13 @@ struct FreshnessSummary {
     event_to_use_latency_p50_ns: Option<u64>,
     event_to_use_latency_p95_ns: Option<u64>,
     event_to_use_latency_p99_ns: Option<u64>,
+    event_to_use_latency_p99_9_ns: Option<u64>,
+    event_to_use_latency_max_ns: Option<u64>,
     evidence_age_at_use_p50_ns: Option<u64>,
     evidence_age_at_use_p95_ns: Option<u64>,
     evidence_age_at_use_p99_ns: Option<u64>,
+    evidence_age_at_use_p99_9_ns: Option<u64>,
+    evidence_age_at_use_max_ns: Option<u64>,
     time_to_fresh_correct_p95_ns: Option<u64>,
 }
 
@@ -345,11 +417,19 @@ fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
 
 /// Nearest-rank percentile. Empty samples produce None, never a fabricated zero.
 fn percentile(values: &mut [u64], percentile: usize) -> Option<u64> {
-    if values.is_empty() || percentile == 0 || percentile > 100 {
+    if percentile == 0 || percentile > 100 {
+        return None;
+    }
+    percentile_per_mille(values, percentile * 10)
+}
+
+/// Quantile expressed in per-mille units, so 999 means p99.9 and 1000 means max.
+fn percentile_per_mille(values: &mut [u64], quantile_per_mille: usize) -> Option<u64> {
+    if values.is_empty() || quantile_per_mille == 0 || quantile_per_mille > 1000 {
         return None;
     }
     values.sort_unstable();
-    let rank = (percentile * values.len()).div_ceil(100);
+    let rank = (quantile_per_mille * values.len()).div_ceil(1000);
     values.get(rank.saturating_sub(1)).copied()
 }
 
@@ -455,12 +535,21 @@ mod tests {
         assert_eq!(summary.late_answered, 1);
         assert_eq!(summary.abstained, 1);
         assert_eq!(summary.unserved, 1);
+        assert_eq!(summary.expired_unserved, 1);
+        assert_eq!(summary.pending_unserved, 0);
+        assert_eq!(summary.deadline_misses, 2);
+        assert_eq!(summary.max_consecutive_deadline_misses, 1);
+        assert_eq!(summary.miss_to_miss_transition_rate, None);
         assert_eq!(summary.fresh_correct_on_time, 1);
         assert_eq!(summary.fresh_correct_on_time_coverage, Some(0.25));
         assert_eq!(summary.on_time_decision_coverage, Some(0.25));
         assert_eq!(summary.verified_accuracy_on_time, Some(1.0));
         assert_eq!(summary.correct_but_stale, 0);
         assert_eq!(summary.fresh_but_incorrect, 0);
+        assert_eq!(summary.event_to_use_latency_p99_9_ns, Some(30));
+        assert_eq!(summary.event_to_use_latency_max_ns, Some(30));
+        assert_eq!(summary.evidence_age_at_use_p99_9_ns, Some(25));
+        assert_eq!(summary.evidence_age_at_use_max_ns, Some(25));
     }
 
     #[test]
@@ -498,6 +587,36 @@ mod tests {
         let summary = run.summary().unwrap();
         assert_eq!(summary.late_answered, 2);
         assert_eq!(summary.opportunities, 4);
+    }
+
+    #[test]
+    fn deadline_tail_reports_bursts_and_conditional_miss_probability() {
+        let mut run = fixture_run();
+        let third = &mut run.opportunities[2];
+        third.disposition = Disposition::Answered;
+        third.emitted_at_ns = Some(320);
+        third.consumed_at_ns = Some(350);
+        third.evidence_source_time_ns = Some(315);
+        third.evidence_available_at_ns = Some(318);
+        third.correctness = Some(Correctness::Incorrect);
+        third.deadline_at_ns = 340;
+        run.opportunities[3].deadline_at_ns = 400;
+
+        let summary = run.summary().unwrap();
+        assert_eq!(summary.deadline_misses, 3);
+        assert_eq!(summary.max_consecutive_deadline_misses, 3);
+        assert_eq!(summary.miss_to_miss_transition_rate, Some(1.0));
+    }
+
+    #[test]
+    fn unserved_opportunities_with_future_deadlines_are_censored_not_counted_as_misses() {
+        let mut run = fixture_run();
+        run.opportunities[3].deadline_at_ns = 1_500;
+        let summary = run.summary().unwrap();
+        assert_eq!(summary.unserved, 1);
+        assert_eq!(summary.expired_unserved, 0);
+        assert_eq!(summary.pending_unserved, 1);
+        assert_eq!(summary.deadline_misses, 1);
     }
 
     #[test]
