@@ -488,8 +488,8 @@ pub(super) fn derive_as_known(
         }
 
         let Some(admission) = verified_consolidations.get(&event.event_id).filter(|entry| {
-            entry.proposal.as_known.valid_at_ms == valid_at_ms as i64
-                && entry.proposal.as_known.known_at_ms == known_at_ms as i64
+            entry.proposal.as_known.valid_at_ms == valid_at_i64
+                && entry.proposal.as_known.known_at_ms == known_at_i64
         }) else {
             report.unpromoted_observation_count += 1;
             continue;
@@ -500,7 +500,7 @@ pub(super) fn derive_as_known(
         let Ok((_verified_receipt, released)) = verify_and_release_promoted_experiences(
             &admission.proposal,
             &admission.evidence_pack,
-            known_at_ms as i64,
+            known_at_i64,
             &verifier,
         ) else {
             report.unpromoted_observation_count += 1;
@@ -963,8 +963,10 @@ mod tests {
                 .collect(),
         };
         let query = AsKnownQuery {
-            valid_at_ms: valid_at_ms as i64,
-            known_at_ms: known_at_ms as i64,
+            valid_at_ms: i64::try_from(valid_at_ms)
+                .expect("fixture valid_at_ms must fit canonical timestamp range"),
+            known_at_ms: i64::try_from(known_at_ms)
+                .expect("fixture known_at_ms must fit canonical timestamp range"),
         };
         let batch = ingest_batch_as_known(&raw_events, query, &verifier)
             .expect("raw evidence passes canonical ingress in fixture");
