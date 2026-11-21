@@ -92,3 +92,6 @@ The split-manifest validator supports two explicit time bases for forward-time m
 - source_local_naive: timestamps must be timezone-free and the manifest must declare a non-empty clock_domain_id.
 
 The second mode proves only ordered, non-overlapping chronology within that one source clock. It does not convert timestamps to UTC or permit comparisons across sites/clock domains. This is needed for sources such as SECOM whose timestamps provide a date/time string but no timezone offset. Tests reject silent timezone assumptions and require the clock-domain declaration.
+
+
+Implementation compatibility note: non-temporal v1 split manifests retain their original canonical payload and known-answer digest. The `time_basis` and `clock_domain_id` fields are included only for `forward_time` manifests, preserving compatibility for existing group-disjoint and stratified fixtures.
