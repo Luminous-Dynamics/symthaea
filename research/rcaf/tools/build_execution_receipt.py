@@ -77,6 +77,18 @@ def build_receipt(root: Path, reports: list[Path]) -> dict[str, Any]:
             collection = parsed.get(collection_key, [])
             if isinstance(collection, list):
                 nested_reports.extend(item for item in collection if isinstance(item, dict))
+        curve_entries = parsed.get("curves", [])
+        if isinstance(curve_entries, list):
+            for curve in curve_entries:
+                if not isinstance(curve, dict):
+                    continue
+                if isinstance(curve.get("estimator"), str):
+                    nested_reports.append({"estimator": curve["estimator"]})
+                sweep = curve.get("sweep", {})
+                if isinstance(sweep, dict) and isinstance(sweep.get("reports"), list):
+                    nested_reports.extend(
+                        item for item in sweep["reports"] if isinstance(item, dict)
+                    )
         estimator_ids = {
             item["estimator"]
             for item in [parsed, *nested_reports]
