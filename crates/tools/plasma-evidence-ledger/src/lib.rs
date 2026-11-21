@@ -380,7 +380,9 @@ impl TrajectoryLedger {
                 ));
                 continue;
             }
-            if observation.acceptance_tolerance != Some(requirement.acceptance_tolerance) {
+            if observation.applicability == Applicability::Applicable
+                && observation.acceptance_tolerance != Some(requirement.acceptance_tolerance)
+            {
                 decisions.push(MetricDecision::unresolved(
                     requirement.metric,
                     Some(observation.bound_kind),
