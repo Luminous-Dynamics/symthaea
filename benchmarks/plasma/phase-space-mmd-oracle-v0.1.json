@@ -122,6 +122,16 @@
       "finite_fourier_alias",
       "signed_colocated_cancellation"
     ],
-    "claim_limit": "positive mixture remains characteristic; bandwidth sensitivity and finite precision must still be evaluated on held-out cohorts"
+    "claim_limit": "positive mixture remains characteristic; bandwidth sensitivity and finite precision must still be evaluated on held-out cohorts",
+    "component_diagnostics": {
+      "exact_output": "aggregate normalized MMD^2 plus per-component exact normalized MMD^2 values",
+      "spectral_output": "aggregate mixture estimate and bound plus per-component feature counts, conditional squared-MMD estimates, sample variances and standard errors",
+      "component_estimate_claim_limit": "component-conditional estimates are descriptive; the mixture-wide Hoeffding interval does not automatically provide independent component-wise coverage"
+    },
+    "spectral_sampling": {
+      "component_selection": "sample component with normalized positive mixture weight",
+      "within_component_spectrum": "exact Skellam(kappa/2,kappa/2) spatial harmonic and Normal(0,1/ell_v^2) velocity frequency",
+      "common_random_features": true
+    }
   }
 }
