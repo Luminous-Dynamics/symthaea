@@ -301,7 +301,7 @@ Symthaea proposes and ranks actions only. Competent human/test authorities appro
 
 P0: this contract and owner map.  
 P1: machine-readable action and outcome schema plus 14 frozen synthetic scenarios.  
-P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 13 known-answer scenarios. No solver or physical execution is invoked.  
+P2: executable dry-run admissibility audit and one-step selector that ranks admissible actions by decision-regret/EVSI improvement, then resolves equal-value options only through resource-vector Pareto dominance or requests human review; it also audits claim identity, common-cause labels, mandatory obligations and actual resource consumption including aborted-test overruns. A separately implemented standard-library Python oracle independently checks all 14 known-answer scenarios. No solver or physical execution is invoked.  
 P3: matched-budget policy tournament and policy evaluation against the independent oracle.  
 P4: adapter to Symtropy compatibility/test-matrix/lifecycle receipts and Mycelix/Sol-Atlas references.  
 P5: only after review, authorized human-supervised physical evidence handoff.
