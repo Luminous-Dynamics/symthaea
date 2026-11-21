@@ -270,4 +270,8 @@ The targets are intentionally multi-objective. If higher action accuracy comes f
 
 ## 10. Current execution boundary
 
-This document and its schema define a research contract. They do not implement a production policy or change current memory behavior. The executable Rust selector and benchmark harness are follow-on work after the protocol is reviewed. Any implementation must retain exact source revisions and report local, CI and physical validation separately.
+This document and its schema define a research contract. They do not implement a production policy or change current memory behavior. A first dependency-free Rust reference selector now lives at `research/selective-memory-actions-v0-1/`. It ranks caller-supplied probability-weighted loss distributions using integer fixed-point arithmetic, rejects invalid probability mass/overflow, separates ingestion from query actions, and applies admission gates before cost ranking. It deliberately does not calculate/calibrate probabilities, author costs, verify sources, authenticate gate snapshots, call tools or write memory.
+
+The reference selector includes focused unit tests for lower expected loss, hard-gate precedence, stale-use rejection, unavailable verification, clarification authorization, deterministic tie-breaking, stage mismatch, duplicate actions, invalid probability mass, empty distributions and overflow. **Those tests have not been run**: this environment has no `cargo`, `rustc` or `rustfmt`. The source has been read back from GitHub; this is not compile or test evidence.
+
+The next implementation tranche is the calibration/expected-loss estimator and deterministic benchmark runner, with independent labels and action/tool receipts. Any implementation must retain exact source revisions and report local, CI and physical validation separately.
