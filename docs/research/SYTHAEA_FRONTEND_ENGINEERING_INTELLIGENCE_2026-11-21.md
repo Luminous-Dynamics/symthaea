@@ -421,7 +421,7 @@ As rechecked on 2026-11-22:
 - **Interaction-as-a-Judge (paper vs dataset-card snapshot):** the paper reports 65.6% → 69.1% human-preference prediction, 77.0% → 81.6% requirement verification and 55.4% → 75.5% iterative repair within five attempts. It describes 6,858 preference pairs / 222 correctness applications; the released dataset cards list 6,390 pairs / 189 versions and 362 requirements. These denominators differ and are unresolved.
 - **Arena HTML board:** 213,322 votes / 161 models, GPT-6.2 Astra (Max) 1,854 rating.
 - **Arena React board:** 682,332 votes / 146 models, Claude Fable 5.2 (xHigh) 1,885 rating. It is a React board, not a Leptos score.
-**Interaction-as-a-Judge** (Arena, November 12, 2026) is a particularly relevant emerging evaluation method: computer-use agents inspect generated applications through interaction. The paper reports requirement-defect detection 63.0% → 71.1% and iterative repair 55.4% → 75.5% under its own evaluation. It releases 6,390 application-pair preference traces and 189 game versions with 362 human-verified requirements. Use this as a secondary, calibrated judge—not as the verifier's trust root. The preference dataset is CC-BY-4.0 for user prompts, while generated model outputs remain subject to provider terms.
+**Interaction-as-a-Judge** (paper dated October 13, 2026) is a particularly relevant evaluation direction: computer-use agents inspect generated applications through interaction. The paper reports preference prediction 65.6% → 69.1%, requirement verification 77.0% → 81.6%, and iterative repair 55.4% → 75.5% within five attempts. It describes 6,858 preference pairs and 222 correctness applications; released dataset cards list 6,390 preference pairs and 189 application versions with 362 human-verified requirements. The count difference is unresolved, so preserve paper and dataset-card denominators separately. Use interaction judging as a calibrated secondary evaluator, not the verifier's trust root. The preference dataset card licenses user prompts CC-BY-4.0, but model outputs remain subject to provider terms.
 - **Leptos upstream** is the API authority. Pin and record the actual lockfile version rather than treating a semver requirement as a resolved version.
 
 External benchmarks measure different capabilities. Do not collapse visual generation, browser operation, software engineering, full-stack completion and framework expertise into one cross-benchmark ranking.
@@ -819,12 +819,14 @@ acceptance remains anchored in executable oracles, not a VLM's confidence.
   while a separate DeepSeek V4.1 Flash run reports 58/100. A direct page
   render on November 22 showed an empty run-log state, so these figures are
   historical, model-context-dependent snapshots, not a live leaderboard.
-- Arena's Interaction-as-a-Judge work reports stronger broken-requirement
-  detection (63.0% → 71.1%) and iterative repair (55.4% → 75.5%) when
-  computer-use interaction is included in judging. This is a promising
-  secondary evaluator and repair signal, not an independent acceptance
-  authority. The released preference dataset's prompt license is CC-BY-4.0,
-  but model outputs remain governed by each provider's terms.
+- Arena's Interaction-as-a-Judge paper reports preference prediction
+  65.6% → 69.1%, requirement verification 77.0% → 81.6%, and iterative repair
+  55.4% → 75.5% within five attempts. The paper describes 6,858 preference
+  pairs/222 correctness applications; released dataset cards list 6,390
+  pairs/189 versions and 362 requirements. This discrepancy is unresolved.
+  Interaction judging remains a calibrated secondary signal, not the trust
+  root. Preference prompts are CC-BY-4.0; generated model outputs remain
+  under provider terms.
 - OpenAI's July 8, 2026 SWE-Bench Pro audit flagged 200/731 tasks automatically
   and 249/731 through human annotation. These are task-quality findings on
   that benchmark's public split, not a defect-rate estimate for SFEB.
