@@ -847,7 +847,7 @@ fn run_seed(
 }
 
 fn report() {
-    println!("MACE portfolio interaction benchmark v0.2");
+    println!("MACE portfolio interaction benchmark v0.3");
     println!(
         concat!(
             "train_clusters={}, calibration_clusters={}, ",
@@ -905,8 +905,12 @@ fn report() {
         pairwise_total.false_redundancy += pairwise.false_redundancy;
         pairwise_total.pairwise_abstentions += pairwise.pairwise_abstentions;
         paired.extend(differences);
-        interval_total.stable_correct_label_pairs += intervals.stable_correct_label_pairs;
-        interval_total.stable_covered_pairs += intervals.stable_covered_pairs;
+        interval_total.conformal_correct_label_pairs +=
+            intervals.conformal_correct_label_pairs;
+        interval_total.conformal_covered_pairs += intervals.conformal_covered_pairs;
+        interval_total.ood_stable_correct_label_pairs +=
+            intervals.ood_stable_correct_label_pairs;
+        interval_total.ood_stable_covered_pairs += intervals.ood_stable_covered_pairs;
         interval_total.shifted_correct_label_pairs += intervals.shifted_correct_label_pairs;
         interval_total.shifted_covered_pairs += intervals.shifted_covered_pairs;
         interval_total.relation_label_errors += intervals.relation_label_errors;

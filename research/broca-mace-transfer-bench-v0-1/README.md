@@ -623,11 +623,11 @@ The source-level canonicality checks now verify more than a recalculable digest:
 This is internal consistency and semantic validation, **not** authenticity. A public digest is not a signature; production plans still require the appropriate Mycelix-signed receipt and policy/authority validation at use. The portfolio module now has **13 authored tests** by source count (not execution status).
 
 
-## Portfolio interaction benchmark v0.1
+## Portfolio interaction benchmark v0.3
 
 A new evaluator binary, `mace_portfolio_interactions`, implements the first held-out diagnostic requested by [#13184 — portfolio-level marginal utility](https://github.com/Luminous-Dynamics/symthaea/issues/13184). It compares exact additive selection with a conservative pairwise-interaction selector fitted on historical pair observations and an evaluator-only oracle over complete selected sets.
 
-The generator includes redundant, complementary, independent and conflicting item pairs, plus noisy relation labels and a shifted-regime negative control. Training, calibration and held-out task-family/source-root clusters are disjoint. The pairwise selector uses the calibrated lower bound of each interaction interval and abstains on unknown pair relations or an unsupported regime; it does not silently assume a missing interaction is zero. Both selectors obey the same token budget and one-representation-per-event constraint.
+The generator includes redundant, complementary, independent and conflicting item pairs, plus noisy relation labels and three separately reported evaluation domains: a same-family split-conformal holdout, a stable out-of-family holdout and a shifted-regime negative control. Training/calibration clusters and roots are disjoint; the conformal holdout shares the calibration task family but uses fresh cluster/root identities. The pairwise selector uses the calibrated lower bound of each interaction interval and abstains on unknown pair relations or an unsupported regime; it does not silently assume a missing interaction is zero. Both selectors obey the same token budget and one-representation-per-event constraint.
 
 Run:
 ```bash
@@ -637,4 +637,4 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 
 The current implementation is a synthetic pairwise diagnostic, not the production portfolio optimiser. Its relation labels and training observations are generated fixtures; calibration radii are empirical envelopes, not statistical confidence intervals. The test suite is authored but has not been executed in this environment.
 
-**Verification:** 13 Rust tests are authored in the binary, but have not run here; no Cargo/Rust/rustfmt toolchain is available. Source audits are not test passes.
+**Verification:** 17 Rust tests are authored in the binary, but have not run here; no Cargo/Rust/rustfmt toolchain is available. The conformal protocol reports nominal 90% coverage only for correctly classified relation labels in the same-family holdout; stable-family OOD and shifted-regime coverage are separate diagnostics. Source audits are not test passes.
