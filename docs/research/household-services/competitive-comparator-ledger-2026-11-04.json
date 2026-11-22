@@ -1,7 +1,7 @@
 {
-  "schema_version": "0.2",
-  "snapshot_date": "2026-11-04",
-  "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results.",
+  "schema_version": "0.3",
+  "snapshot_date": "2026-11-22",
+  "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results. Snapshot refreshed 2026-11-22 with current Topten European desk references and the direct-DC PV-water-heating research frontier; all added catalogue values remain supplier-declared/database/modelled evidence, not Luminous physical results.",
   "claim_ceiling": [
     "Manufacturer product fiches are source evidence for what the manufacturer declares, not independent performance verification.",
     "Numbers from different programmes, markets, standards editions or loading protocols are not directly comparable without a matched test.",
@@ -267,6 +267,132 @@
         "source_date": null,
         "retrieved_date": "2026-11-04"
       }
+    },
+    {
+      "id": "AEG-LR9WW80409-TOPTEN-2026",
+      "category": "front_load_washer",
+      "manufacturer": "AEG",
+      "model": "LR9WW80409",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "one EU Eco 40-60 declared cycle; energy value per 100 label cycles",
+      "programme": "Eco 40-60",
+      "capacity_kg": 10,
+      "metrics": {
+        "electricity_kwh_per_100_cycles": 20,
+        "water_l_per_cycle": 50,
+        "duration_min_per_cycle": 235,
+        "spin_drying_class": "B",
+        "maximum_spin_speed_rpm": 1351,
+        "noise_class": "A"
+      },
+      "notes": [
+        "Topten page last updated 17 August 2026; its selection methodology states data sources include supplier declarations, National Topten sites and Encodex.",
+        "Values are label/database discovery evidence, not an independent physical test by Topten or Luminous.",
+        "European label/programme basis is not automatically comparable with legacy South African labels or household cycles.",
+        "Exact regional type plate, firmware, availability, price, warranty, spare parts and local approval must be verified before selecting a physical control."
+      ],
+      "source": {
+        "title": "Topten — best washing machines on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/washing_machines",
+        "source_date": "2026-08-17",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "AEG-TR9HH9AY-TOPTEN-2026",
+      "category": "heat_pump_tumble_dryer",
+      "manufacturer": "AEG",
+      "model": "TR9HH9AY",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "one declared Eco cycle; energy value per 100 label cycles",
+      "programme": "Eco",
+      "capacity_kg": 9,
+      "metrics": {
+        "electricity_kwh_per_100_cycles": 79,
+        "energy_efficiency_index_percent": 42.9,
+        "condenser_efficiency_class": "A",
+        "noise_class": "A"
+      },
+      "notes": [
+        "Topten page last updated 19 May 2026; its product-list values are selection-database/label evidence, not independent physical test results.",
+        "Noise class is not a numeric sound-pressure measurement and must not be converted to dB.",
+        "Confirm exact PNC, local variant, programme and label fiche before selecting a physical control."
+      ],
+      "source": {
+        "title": "Topten — best tumble driers on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/tumble_driers",
+        "source_date": "2026-05-19",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "AEG-TR948V4BC-TOPTEN-2026",
+      "category": "heat_pump_tumble_dryer",
+      "manufacturer": "AEG",
+      "model": "TR948V4BC",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "one declared Eco cycle; energy value per 100 label cycles",
+      "programme": "Eco",
+      "capacity_kg": 8,
+      "metrics": {
+        "electricity_kwh_per_100_cycles": 73,
+        "energy_efficiency_index_percent": 42.9,
+        "condenser_efficiency_class": "A",
+        "noise_class": "A"
+      },
+      "notes": [
+        "Topten lists this 8 kg model at 73 kWh/100 cycles; this does not imply the same throughput or drying result as a 9 kg model.",
+        "Topten page last updated 19 May 2026; values are database/label evidence, not independent physical testing.",
+        "Use the exact PNC 916900129 and region-specific fiche for control admission; other model numbers are not assumed equivalent."
+      ],
+      "source": {
+        "title": "Topten — best tumble driers on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/tumble_driers",
+        "source_date": "2026-05-19",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "LIEBHERR-CBNBSA20-575I-TOPTEN-2026",
+      "category": "refrigerator_freezer",
+      "manufacturer": "Liebherr",
+      "model": "CBNbsa20 575i",
+      "market_variant": "Europe / Topten European selection database",
+      "evidence_status": "third_party_selection_database_supplier_declared_label_data",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_in_Topten_Europe; South African market availability not established",
+      "functional_unit": "standardized annual energy label declaration for one refrigerator-freezer",
+      "metrics": {
+        "energy_kwh_per_year": 92,
+        "total_net_volume_l": 362,
+        "refrigerator_net_volume_l": 259,
+        "freezer_net_volume_l": 103,
+        "ambient_temperature_min_c": 10,
+        "ambient_temperature_max_c": 43,
+        "noise_class": "A",
+        "frost_free": true
+      },
+      "notes": [
+        "Topten page last updated 10 September 2026.",
+        "The 10–43°C ambient range is a published operating class/specification, not evidence of equal energy or temperature performance across all ambient conditions.",
+        "Annual label energy does not establish outage holdover, loaded temperature uniformity, warm-load pull-down or food safety.",
+        "Not a South African physical comparator until exact local SKU, type plate, approval, service/spares and market availability are verified."
+      ],
+      "source": {
+        "title": "Topten — best refrigerators on the European Market (2026)",
+        "url": "https://www.topten.eu/private/products/refrigerators",
+        "source_date": "2026-09-10",
+        "retrieved_date": "2026-11-22"
+      }
     }
   ],
   "research_frontier": [
@@ -312,6 +438,34 @@
         "score_0": 100
       },
       "claim_ceiling": "Narrow soil/substrate assay lead, not a universal cleanliness detector. Intermediate-class accuracy and external assay validity require further qualification."
+    },
+    {
+      "id": "DIRECT-DC-PV-EWH-SUBSAHARAN-2026",
+      "category": "household_thermal_service_simulation",
+      "publication_date": "2026-10",
+      "doi": "10.1016/j.esd.2026.102053",
+      "title": "Assessment of solar PV-assisted domestic water heating in Sub-Saharan African cities",
+      "authors": [
+        "Felix Walker",
+        "Bernd Thomas",
+        "M.J. Booysen"
+      ],
+      "method": [
+        "1.68 kWp four-module direct-DC-PV-to-electric-water-heater configuration",
+        "five-minute simulation",
+        "two-node thermal stratification model",
+        "stochastic hot-water draw-off profiles",
+        "2024 satellite-derived meteorology",
+        "seven Sub-Saharan African cities including Johannesburg"
+      ],
+      "reported_results": {
+        "johannesburg_heavy_user_annual_solar_energy_accepted_kwh": ">2200",
+        "savings_percent_across_cities_and_demand_profiles": "21–47",
+        "johannesburg_heavy_user_avoidable_cold_draw_percent": 10.3
+      },
+      "data_availability": "authors report public simulation code and results; exact code/data revision correspondence to the journal paper requires independent verification",
+      "code_repository": "https://github.com/WalkerFelix/Simulation-Based-Solar-PV-Assisted-Domestic-Water-Heating-in-Sub-Saharan-African-Cities",
+      "claim_ceiling": "Peer-reviewed journal simulation, not physical product qualification or an independently reproduced Luminous result. Public repository code currently has reproducibility questions recorded in HEATBANK-DIRECTPV-REPRO-001; do not treat reported savings or comfort as guaranteed."
     }
   ],
   "standards_and_adjacent_baselines": [
@@ -386,6 +540,53 @@
         "title": "French repairability index",
         "url": "https://www.ecologie.gouv.fr/politiques-publiques/indice-reparabilite",
         "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "IEC-60379-2023-SCOPE",
+      "category": "electric_storage_water_heater_performance_method",
+      "version": "IEC 60379:2023 Edition 4",
+      "status": "current_research_reference_scope_limited",
+      "relevant_changes": [
+        "Methods for measuring electric storage water-heater performance for household purposes.",
+        "Does not apply to storage water heaters that use electricity as a secondary source of heating the water.",
+        "Does not specify product safety; safety is separately addressed by IEC 60335-1 with IEC 60335-2-21."
+      ],
+      "source": {
+        "title": "IEC 60379:2023",
+        "url": "https://webstore.iec.ch/en/publication/61520",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "ISO-9459-4-2013-SOLAR-BACKUP",
+      "category": "solar_water_heater_system_performance",
+      "version": "ISO 9459-4:2013",
+      "status": "published_confirmed_2022",
+      "relevant_changes": [
+        "Evaluates annual solar water-heater energy performance using component tests plus a mathematical model.",
+        "Scope includes solar water heaters with integral backup or preheating into a conventional storage or instantaneous water heater.",
+        "Does not provide product design or operation requirements."
+      ],
+      "source": {
+        "title": "ISO 9459-4:2013",
+        "url": "https://www.iso.org/standard/41695.html",
+        "retrieved_date": "2026-11-22"
+      }
+    },
+    {
+      "id": "ISO-9459-2-1995-UNDER-REVISION",
+      "category": "solar_only_water_heater_outdoor_performance_method",
+      "version": "ISO 9459-2:1995; revision project ISO/AWI 9459-2 registered 2026",
+      "status": "published_edition_current_revision_in_progress",
+      "relevant_changes": [
+        "Outdoor test methods for performance characterization and yearly prediction of solar-only domestic water-heating systems.",
+        "ISO/AWI 9459-2 Edition 2 was registered in September 2026 and will replace the 1995 edition when published; do not describe the work item as a published standard."
+      ],
+      "source": {
+        "title": "ISO 9459-2:1995 and ISO/AWI 9459-2",
+        "url": "https://www.iso.org/standard/17187.html",
+        "retrieved_date": "2026-11-22"
       }
     }
   ],
