@@ -11,7 +11,6 @@ struct AgencyPanelV1 {
     session_id: String,
     collaborator_id: String,
     clock_domain_id: String,
-    commit_at_ns: u64,
     hard_constraints: Vec<HardConstraintV1>,
     soft_preferences: Vec<SoftPreferenceV1>,
     proposals: Vec<MusicalProposalV1>,
@@ -244,7 +243,11 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
             }
             "veto" => {
                 vetoed_proposals.insert(intervention.proposal_id.as_str());
-                if intervention.acted_at_ns <= panel.commit_at_ns {
+                if panel
+                    .decision
+                    .committed_at_ns
+                    .is_some_and(|committed_at_ns| intervention.acted_at_ns <= committed_at_ns)
+                {
                     veto_before_commit.insert(intervention.proposal_id.as_str());
                 }
             }
@@ -414,29 +417,21 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
             && owner_matches
             && grant_matches
             && update.purpose == required_purpose;
-        if update.committed && !authorized {
+        if update.committed && (!update.attempted || !authorized) {
             unauthorized_updates += 1;
+            let reason = if !update.attempted {
+                "was committed without a recorded attempt"
+            } else if update.authorization_status == "revoked" {
+                "was committed after its authorization was revoked"
+            } else if update.authorization_status == "unavailable" {
+                "was committed while its authorization verifier was unavailable"
+            } else {
+                "was committed without matching purpose, owner and authorization scope"
+            };
             findings.push(format!(
-                "persistent update {} was committed without matching purpose, owner and authorization scope",
+                "persistent update {} {reason}",
                 update.update_id
             ));
-        }
-        if update.authorization_status == "revoked" && update.committed {
-            unauthorized_updates += 1;
-            findings.push(format!(
-                "revoked persistent update {} was committed",
-                update.update_id
-            ));
-        }
-        if update.authorization_status == "unavailable" && update.committed {
-            unauthorized_updates += 1;
-            findings.push(format!(
-                "persistent update {} committed while its authorization verifier was unavailable",
-                update.update_id
-            ));
-        }
-        if update.committed && !update.attempted {
-            unauthorized_updates += 1;
         }
     }
 
