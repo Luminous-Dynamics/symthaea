@@ -13,6 +13,7 @@
 
 #[path = "mace_generated_stress.rs"]
 mod mace_generated_stress;
+mod acquisition;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -459,6 +460,10 @@ fn run() -> Result<(), String> {
     if !epsilon.is_finite() || epsilon < 0.0 {
         return Err("epsilon must be finite and non-negative".to_string());
     }
+    let acquisition_path = args
+        .get(5)
+        .map(String::as_str)
+        .unwrap_or("mace_sufficiency_acquisition.jsonl");
 
     let cases = mace_generated_stress::generated_worlds(clusters);
     let source_revision = env::var("MACE_SOURCE_REVISION").ok();
@@ -472,6 +477,7 @@ fn run() -> Result<(), String> {
     let mut code_hasher = Sha256::new();
     code_hasher.update(include_bytes!("mace_sufficiency_frontier.rs"));
     code_hasher.update(include_bytes!("mace_generated_stress.rs"));
+    code_hasher.update(include_bytes!("mace_sufficiency_frontier/acquisition.rs"));
     code_hasher.update(include_bytes!("../../../policy/src/lib.rs"));
     code_hasher.update(include_bytes!("../../../hdc-retrieval/src/lib.rs"));
     code_hasher.update(include_bytes!("../../../hdc-retrieval/src/typed_content.rs"));
@@ -485,9 +491,15 @@ fn run() -> Result<(), String> {
         ))
         .as_slice(),
     );
+    let acquisition_schema_sha256 = hex_digest(
+        Sha256::digest(include_bytes!(
+            "../../../../../data/schemas/mace_evidence_acquisition_v0_1.schema.json"
+        ))
+        .as_slice(),
+    );
     let source_revision_label = source_revision.as_deref().unwrap_or("unspecified");
     let run_identity = format!(
-        "{clusters}:{public_seed}:{epsilon:.12}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{source_revision_label}"
+        "{clusters}:{public_seed}:{epsilon:.12}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{acquisition_schema_sha256}:{source_revision_label}"
     );
     let run_id = format!(
         "mace-sufficiency-{}-{}",
@@ -652,8 +664,50 @@ fn run() -> Result<(), String> {
         }
     }
 
+    let acquisition_plan = acquisition::reference_fixture_plan()?;
+    let mut acquisition_records = Vec::new();
+    for evaluation in &acquisition_plan.evaluations {
+        acquisition_records.push(json!({
+            "schema_version": "mace_evidence_acquisition_v0_1",
+            "record_type": "query_evaluation",
+            "run_id": run_id,
+            "fixture_id": "two_hypothesis_decision_relevance_v1",
+            "query_id": evaluation.query_id,
+            "observation_model_sha256": evaluation.observation_model_digest,
+            "admissible": evaluation.admissible,
+            "rejection_reason": evaluation.rejection_reason,
+            "risk_before": evaluation.risk_before,
+            "expected_post_query_risk": evaluation.expected_post_query_risk,
+            "expected_risk_reduction": evaluation.expected_risk_reduction,
+            "acquisition_cost": evaluation.acquisition_cost,
+            "delay_cost": evaluation.delay_cost,
+            "disclosure_exposure_cost": evaluation.disclosure_exposure_cost,
+            "total_cost": evaluation.total_cost,
+            "net_evsi": evaluation.net_evsi,
+            "selected": evaluation.selected,
+            "observation_executed": false,
+            "observation_receipt_sha256": null,
+            "scope": "synthetic_policy_fixture_not_agent_benchmark"
+        }));
+    }
+    acquisition_records.push(json!({
+        "schema_version": "mace_evidence_acquisition_v0_1",
+        "record_type": "plan_decision",
+        "run_id": run_id,
+        "fixture_id": "two_hypothesis_decision_relevance_v1",
+        "risk_before": acquisition_plan.risk_before,
+        "chosen_query_id": acquisition_plan.chosen_query_id,
+        "planner_action": if acquisition_plan.chosen_query_id.is_some() { "propose_acquisition" } else { "stop_or_abstain" },
+        "stop_reason": acquisition_plan.stop_reason,
+        "query_count": acquisition_plan.evaluations.len(),
+        "observation_executed": false,
+        "authority_or_execution_granted": false,
+        "scope": "synthetic_policy_fixture_not_agent_benchmark"
+    }));
+
     write_jsonl(candidate_path, &candidate_records)?;
     write_jsonl(evaluator_path, &evaluator_records)?;
+    write_jsonl(acquisition_path, &acquisition_records)?;
     eprintln!(
         "diagnostic-only MACE sufficiency frontier: worlds={}, candidate_records={}, evaluator_records={}, epsilon={epsilon}",
         cases.len(),
@@ -662,6 +716,7 @@ fn run() -> Result<(), String> {
     );
     eprintln!("candidate stream: {candidate_path}");
     eprintln!("evaluator stream: {evaluator_path}");
+    eprintln!("acquisition policy fixture: {acquisition_path} (no source contacted; no authority granted)");
     eprintln!("lineage: unauthenticated/absent; evidence-qualified sufficiency is never reported");
     Ok(())
 }
