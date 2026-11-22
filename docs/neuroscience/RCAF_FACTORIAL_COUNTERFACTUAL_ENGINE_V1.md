@@ -48,13 +48,13 @@ The current CLI example evaluates four independent nuisance families using the s
 3. **Localized heat-kernel:** calibrated S2 ROI-seeded diffusion field.
 4. **Motion-like transient:** S3 broad and localized event-triggered exponential fields.
 
-S1 and S2 are calibrated against the same clean observations to a 10% component-variance fraction. Common-mode and transient fields are intentionally marked as uncalibrated in this smoke fixture rather than implying that their amplitudes are comparable. Their clean–nuisance covariance is still reported.
+All four nuisance families are calibrated against the same clean observations to a requested 10% component-variance fraction using the family-agnostic matrix calibrator. The report preserves requested and realized fractions separately and reports each family’s clean–nuisance covariance, so a calibration miss or different signal alignment remains visible. Equal component fractions do not imply equal physical realism, temporal structure, estimator impact or biological plausibility; this is a synthetic magnitude-matching control only.
 
 The exact graph-based nuisance field or event realization is generated once and then passed to the factorial engine. Within each family, all four cells use that same field. Each experiment has a distinct stable nuisance-instance identifier.
 
 ## 4. Full experiment surface to build next
 
-The current implementation constructs one small smoke fixture per family. The full research campaign should cross the factors below while preserving the same four-cell design for every cell.
+The current implementation constructs one small smoke fixture per family and matches the nuisance component-variance fractions. The full research campaign should cross the factors below while preserving the same four-cell design for every cell.
 
 ### Signal factor
 - exact null;
