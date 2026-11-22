@@ -358,7 +358,6 @@ pub fn evaluate_secom_observation_drift_v1(
 mod tests {
     use super::*;
     use crate::benchmark::split_manifest::SplitManifestV1;
-    use serde_json::Value;
 
     const FEATURES: &[u8] = include_bytes!(
         "../../../../../benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data"
@@ -448,17 +447,18 @@ mod tests {
 
     #[test]
     fn feature_permutation_preserves_aggregate_drift_statistics() {
-        let permuted = FEATURES
-            .split(|byte| *byte == b'\n')
+        let permuted = std::str::from_utf8(FEATURES)
+            .unwrap()
+            .lines()
             .map(|row| {
-                let mut cells: Vec<&[u8]> = row.split(|byte| *byte == b' ').collect();
+                let mut cells: Vec<&str> = row.split_whitespace().collect();
                 cells.reverse();
-                [cells[0], b" ", cells[1]].concat()
+                format!("{} {}", cells[0], cells[1])
             })
             .collect::<Vec<_>>()
-            .join(&b'\n');
+            .join("\n");
         let original = evaluate(FEATURES, LABELS);
-        let changed = evaluate(&permuted, LABELS);
+        let changed = evaluate(permuted.as_bytes(), LABELS);
         for split in HELD_OUT_SPLITS {
             assert_eq!(
                 original.drift_vs_training[split].mean_absolute_feature_rate_delta,
