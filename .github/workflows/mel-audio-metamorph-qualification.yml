@@ -2,7 +2,7 @@ name: MEL audio metamorph qualification
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, research/mel-judge-grounding-audit-v1-20261122]
     paths:
       - "tools/mel-judge-grounding-audit/**"
       - "docs/research/MEL_AUDIO_TRANSFORM_QUALIFICATION_V1_2026-11-22.md"
