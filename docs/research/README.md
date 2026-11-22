@@ -338,6 +338,8 @@ The proof-to-concept reconstruction and human-transfer research programme is tra
 
 - [MATH-COMPREHENSION-001 design](MATH_PROOF_COMPREHENSION_001_V0_1.md)
 - [Pilot seed and source annotations](MATH_PROOF_COMPREHENSION_PILOT_V1.md)
+- [2026 competitive landscape ledger](MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md) — separate benchmarks, baselines and prospective Symthaea targets.
+- [Human comprehension / transfer preregistration](MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md) — study arms, blinded scoring, outcomes, ethics and sample-size plan; no participants/data yet.
 - [Mathlib proof-comprehension pilot](MATHLIB_PROOF_COMPREHENSION_PILOT_V1.md) — four source-pinned Mathlib theorem examples spanning recursion, simplification, quotient induction and embeddings.
 - [RH proof-graph reference baseline](RH_PROOF_GRAPH_BASELINE_V1.md) and [machine-readable snapshot](RH_PROOF_GRAPH_BASELINE_V1.json) — pinned CC0 v0.2.1 external kernel dependency analysis; graph prioritization only, not a proof explanation.
 - [RH main inequality (M) source map](RH_MAIN_INEQUALITY_M_MAP_V1.md), [machine map](RH_MAIN_INEQUALITY_M_MAP_V1.json), and [schema](RH_MAIN_INEQUALITY_M_MAP_V1.schema.json) — pinned formal declarations for the ASK/MAIN → per-translate bound → gapA bridge, plus explicit non-used/quoted inputs.
