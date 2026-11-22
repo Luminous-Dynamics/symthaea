@@ -124,6 +124,39 @@ The commands are authored but have not been executed in this environment
 because the Rust toolchain is unavailable. JSON documents were parsed and the
 fixture digest was independently confirmed with `sha256sum`.
 
+## Leptos knowledge corpus
+
+The versioned starter corpus is in
+`knowledge/leptos-0.8/patterns-v0.json`, with schema
+`knowledge/leptos-0.8/pattern-v1.schema.json`. It currently records eight
+source-grounded patterns for Leptos 0.8 CSR and exact Git blob SHA-1 provenance
+for every example:
+
+- function components and view composition;
+- `RwSignal` local state;
+- tracked reads versus `get_untracked()`;
+- Effects and external side effects;
+- client-side async work with `spawn_local`;
+- keyed list rendering with `For`;
+- typed `NodeRef`;
+- the HTTP/WebSocket service boundary.
+
+Patterns have explicit promotion states:
+`source_observed_not_compiled`,
+`source_observed_reference_checked`, `compiled`, `unit_tested`, and
+`browser_verified`. Each promotion requires stronger evidence; source
+presence or generated examples do not imply compilation.
+
+Validate the pattern schema and exact Git blob provenance with:
+
+```bash
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns
+```
+
+The validator rejects duplicate pattern IDs, unsafe paths, stale source blobs,
+and invalid corpus structure. It is authored but not yet executed because the
+Rust toolchain is unavailable in this environment.
+
 ## Task lifecycle
 
 A task moves through these states:
