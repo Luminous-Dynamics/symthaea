@@ -728,6 +728,46 @@ mod tests {
     }
 
     #[test]
+    fn every_dose_point_contains_all_estimator_response_scores() {
+        let report =
+            run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
+        for point in &report.points {
+            assert_eq!(
+                point
+                    .estimators
+                    .iter()
+                    .map(|item| item.estimator_id)
+                    .collect::<Vec<_>>(),
+                vec![
+                    "absolute_weighted_jaccard",
+                    "signed_shift_weighted_jaccard",
+                    "normalized_mean_absolute_edge_error",
+                ]
+            );
+            assert!(point.estimators.iter().all(|item| {
+                (0.0..=1.0).contains(&item.clean_to_signal_similarity)
+                    && (0.0..=1.0).contains(&item.clean_to_nuisance_similarity)
+                    && (0.0..=1.0).contains(&item.signal_to_combined_similarity)
+            }));
+            assert!(point.connectivity_direction.clean_signal_change_norm >= 0.0);
+            assert!(point.connectivity_direction.combined_signal_change_norm >= 0.0);
+        }
+    }
+
+    #[test]
+    fn zero_signal_axis_produces_undefined_estimator_retention() {
+        let report =
+            run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
+        for point in &report.points[..4] {
+            assert!(point
+                .estimators
+                .iter()
+                .all(|item| item.signal_retention_fraction.is_none()));
+            assert!(point.connectivity_direction.signal_projection_gain.is_none());
+        }
+    }
+
+    #[test]
     fn invalid_or_unsorted_grids_fail_closed() {
         let clean = clean();
         let signal = signal();
