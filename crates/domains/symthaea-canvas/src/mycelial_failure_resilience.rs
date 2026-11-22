@@ -1538,6 +1538,8 @@ impl MycelialFailureDeliveryProfile {
                 "source graph, demand, plan, scenario or trial inventory mismatch",
             ));
         }
+        let indexed = index_source_graph(graph)?;
+        validate_demands(&indexed, demands)?;
         let mut cursor = 0usize;
         for (scenario_index, scenario) in plan.scenarios.iter().enumerate() {
             let start = cursor;
@@ -1569,6 +1571,25 @@ impl MycelialFailureDeliveryProfile {
                 {
                     return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
                         "trial delivery realization or metric fields are inconsistent",
+                    ));
+                }
+                let recomputed = evaluate_one(
+                    &indexed,
+                    demands,
+                    &scenario.scenario_id,
+                    &expected_segments,
+                    &expected_junctions,
+                    graph.length_unit,
+                )?;
+                if trial.weighted_reachability != recomputed.weighted_reachability
+                    || trial.weighted_mean_directness != recomputed.weighted_mean_directness
+                    || trial.weighted_mean_network_path_length
+                        != recomputed.weighted_mean_network_path_length
+                    || trial.connected_components != recomputed.connected_components
+                    || trial.cycle_rank != recomputed.cycle_rank
+                {
+                    return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                        "trial metrics do not match recomputation from realized failures",
                     ));
                 }
                 cursor += 1;
