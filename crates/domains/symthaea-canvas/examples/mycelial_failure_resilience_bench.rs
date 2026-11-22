@@ -362,6 +362,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     run_attack_family(
         &graph,
         &demands,
+        MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments,
+        0,
+        None,
+    )?;
+    run_attack_family(
+        &graph,
+        &demands,
+        MycelialFailureAttackStrategy::AdaptiveDemandPathLoadJunctions,
+        0,
+        None,
+    )?;
+    run_attack_family(
+        &graph,
+        &demands,
         MycelialFailureAttackStrategy::SpatialClusterJunctions,
         0,
         Some("A"),
