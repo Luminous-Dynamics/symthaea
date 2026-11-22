@@ -551,8 +551,12 @@ fn kendall_tau_b(left: &[f64], right: &[f64]) -> Option<f64> {
 
     for i in 0..n {
         for j in (i + 1)..n {
-            let left_order = left[i].partial_cmp(&left[j]).unwrap_or(std::cmp::Ordering::Equal);
-            let right_order = right[i].partial_cmp(&right[j]).unwrap_or(std::cmp::Ordering::Equal);
+            let left_order = left[i]
+                .partial_cmp(&left[j])
+                .unwrap_or(std::cmp::Ordering::Equal);
+            let right_order = right[i]
+                .partial_cmp(&right[j])
+                .unwrap_or(std::cmp::Ordering::Equal);
             match (left_order, right_order) {
                 (std::cmp::Ordering::Equal, std::cmp::Ordering::Equal) => {
                     ties_left += 1.0;
