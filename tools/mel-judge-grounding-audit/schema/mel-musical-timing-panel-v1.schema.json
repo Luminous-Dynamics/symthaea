@@ -104,7 +104,8 @@
       "additionalProperties": false,
       "required": [
         "maximum_relative_period_error",
-        "required_consecutive_stable_estimates"
+        "required_consecutive_stable_estimates",
+        "minimum_estimate_spacing_ns"
       ],
       "properties": {
         "maximum_relative_period_error": {
@@ -113,6 +114,10 @@
           "maximum": 1
         },
         "required_consecutive_stable_estimates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_estimate_spacing_ns": {
           "type": "integer",
           "minimum": 1
         }
