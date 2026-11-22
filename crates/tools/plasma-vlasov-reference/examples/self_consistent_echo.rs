@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::f64::consts::TAU;
+use std::time::Instant;
 
 use plasma_vlasov_reference::echo_analysis::{
     EchoMeasurementConfig, EchoModeTrace, EchoPulsePair, EchoTraceSample, measure_echo_trace,
@@ -144,6 +145,7 @@ fn run_resolution(
     dt: f64,
     sample_every: usize,
 ) -> Result<(), Box<dyn Error>> {
+    let wall_clock_start = Instant::now();
     let pulse_pair = EchoPulsePair {
         first_mode: FIRST_MODE as i32,
         second_mode: SECOND_MODE as i32,
@@ -429,7 +431,7 @@ fn run_resolution(
     )?;
 
     println!(
-        "# summary,{label},{},{},{dt:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_phase={:.12e},detected={},fwhm={}",
+        "# summary,{label},{},{},{dt:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_phase={:.12e},detected={},fwhm={},wall_seconds={:.6}",
         config.nx,
         config.nv,
         prediction.echo_mode,
@@ -442,6 +444,7 @@ fn run_resolution(
             .full_width_half_maximum
             .map(|width| format!("{width:.8}"))
             .unwrap_or_else(|| "unbracketed".to_string()),
+        wall_clock_start.elapsed().as_secs_f64(),
     );
 
     Ok(())
