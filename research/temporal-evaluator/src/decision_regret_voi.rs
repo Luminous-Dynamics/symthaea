@@ -25,6 +25,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 const MAX_OUTCOME_ROWS: usize = 65_536;
+const MAX_REGRET_PPM: u32 = 1_000_000;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SensorOutcomeSupport {
@@ -48,6 +49,9 @@ pub struct ObservationSupportModel {
     pub support_evidence_sha256: [u8; 32],
     /// Deadline on the same clock as candidate-visible availability.
     pub decision_deadline_us: u64,
+    /// Task-declared maximum acceptable worst-case regret, in PPM.
+    /// This is a decision-quality threshold, not a safety/authority gate.
+    pub decision_regret_tolerance_ppm: u32,
     /// Rows enumerate possible outcomes, not probabilities. Probabilities and
     /// posterior qualification remain owned by #12567/#12551.
     pub possible_outcomes: Vec<SensorOutcomeSupport>,
@@ -72,6 +76,7 @@ pub struct ObservationOutcomeRegretBound {
     /// Evaluator-only minimax-regret-optimal action after this visible outcome.
     pub minimax_regret_action_id: String,
     pub worst_case_regret_ppm: u32,
+    pub regret_within_tolerance: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -82,6 +87,9 @@ pub struct RobustDecisionRegretObservationCertificate {
     pub decision_deadline_us: u64,
     pub baseline_worst_case_regret_ppm: u32,
     pub post_observation_worst_case_regret_ppm: u32,
+    /// Regret-threshold status only; other hard gates remain independent.
+    pub baseline_regret_within_tolerance: bool,
+    pub post_observation_regret_within_tolerance: bool,
     /// Guaranteed reduction across every outcome in the declared support.
     pub guaranteed_regret_reduction_ppm: u32,
     pub outcomes: Vec<ObservationOutcomeRegretBound>,
@@ -91,6 +99,7 @@ pub struct RobustDecisionRegretObservationCertificate {
 pub enum RobustObservationVoiError {
     EmptySensorModelIdentity,
     EmptySupportEvidenceCommitment,
+    RegretToleranceOutOfRange { tolerance_ppm: u32 },
     TooManyOutcomeRows,
     OutcomeWorldUnknown { world_id: u64 },
     WorldHasNoPossibleOutcome { world_id: u64 },
@@ -104,6 +113,7 @@ impl fmt::Display for RobustObservationVoiError {
         match self {
             Self::EmptySensorModelIdentity => write!(formatter, "sensor-model digest must be nonzero"),
             Self::EmptySupportEvidenceCommitment => write!(formatter, "outcome-support evidence digest must be nonzero"),
+            Self::RegretToleranceOutOfRange { tolerance_ppm } => write!(formatter, "decision-regret tolerance {tolerance_ppm} exceeds the one-million PPM scale"),
             Self::TooManyOutcomeRows => write!(formatter, "sensor outcome rows exceed the bounded evaluator limit"),
             Self::OutcomeWorldUnknown { world_id } => write!(formatter, "sensor outcome references unknown world {world_id}"),
             Self::WorldHasNoPossibleOutcome { world_id } => write!(formatter, "world {world_id} has no declared possible sensor outcome"),
@@ -239,6 +249,11 @@ pub fn evaluate_robust_decision_regret_observation(
     if is_zero_digest(&model.support_evidence_sha256) {
         return Err(RobustObservationVoiError::EmptySupportEvidenceCommitment);
     }
+    if model.decision_regret_tolerance_ppm > MAX_REGRET_PPM {
+        return Err(RobustObservationVoiError::RegretToleranceOutOfRange {
+            tolerance_ppm: model.decision_regret_tolerance_ppm,
+        });
+    }
 
     let baseline = evaluate_decision_observability(class)?;
     let partitions = validate_and_partition_support(class, model)?;
@@ -267,6 +282,7 @@ pub fn evaluate_robust_decision_regret_observation(
             possible_world_count,
             minimax_regret_action_id: minimax_action,
             worst_case_regret_ppm: worst_case_regret,
+            regret_within_tolerance: worst_case_regret <= model.decision_regret_tolerance_ppm,
         });
     }
 
@@ -282,6 +298,10 @@ pub fn evaluate_robust_decision_regret_observation(
         decision_deadline_us: model.decision_deadline_us,
         baseline_worst_case_regret_ppm: baseline.unavoidable_worst_case_regret_ppm,
         post_observation_worst_case_regret_ppm: post_worst_case_regret,
+        baseline_regret_within_tolerance: baseline.unavoidable_worst_case_regret_ppm
+            <= model.decision_regret_tolerance_ppm,
+        post_observation_regret_within_tolerance: post_worst_case_regret
+            <= model.decision_regret_tolerance_ppm,
         guaranteed_regret_reduction_ppm,
         outcomes: outcome_bounds,
     })
@@ -340,6 +360,7 @@ mod tests {
             sensor_model_sha256: digest(4),
             support_evidence_sha256: digest(5),
             decision_deadline_us: deadline,
+            decision_regret_tolerance_ppm: 0,
             possible_outcomes: rows,
         }
     }
@@ -367,6 +388,8 @@ mod tests {
         assert_eq!(result.baseline_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 0);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 1_000_000);
+        assert!(!result.baseline_regret_within_tolerance);
+        assert!(result.post_observation_regret_within_tolerance);
         assert_eq!(result.outcomes.len(), 2);
     }
 
@@ -386,6 +409,7 @@ mod tests {
         assert_eq!(result.baseline_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
+        assert!(!result.post_observation_regret_within_tolerance);
         assert_eq!(result.outcomes.len(), 2);
         assert!(result.outcomes.iter().all(|outcome| outcome.possible_world_count == 2));
     }
@@ -407,6 +431,8 @@ mod tests {
         assert_eq!(result.baseline_worst_case_regret_ppm, 0);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 0);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
+        assert!(result.baseline_regret_within_tolerance);
+        assert!(result.post_observation_regret_within_tolerance);
     }
 
     #[test]
@@ -421,6 +447,7 @@ mod tests {
         assert_eq!(result.outcomes[0].candidate_visible_outcome_sha256, None);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
+        assert!(!result.post_observation_regret_within_tolerance);
     }
 
     #[test]
@@ -495,6 +522,46 @@ mod tests {
         assert_eq!(
             evaluate_robust_decision_regret_observation(&class, &model),
             Err(RobustObservationVoiError::WorldHasNoPossibleOutcome { world_id: 2 })
+        );
+    }
+
+    #[test]
+    
+    #[test]
+    fn epsilon_regret_sufficiency_accepts_near_optimal_common_action() {
+        let class = ObservationalEquivalenceClass {
+            equivalence_class_id: 79,
+            alternatives: vec![
+                world(1, "left", &[("left", 0), ("right", 100_000)]),
+                world(2, "left", &[("left", 100_000), ("right", 0)]),
+            ],
+        };
+        let mut model = model(
+            vec![row(1, 10, Some(50)), row(2, 10, Some(50))],
+            100,
+        );
+        model.decision_regret_tolerance_ppm = 100_000;
+
+        let exact = evaluate_decision_observability(&class).unwrap();
+        assert!(!exact.decision_identifiable);
+        assert_eq!(exact.unavoidable_worst_case_regret_ppm, 100_000);
+
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
+        assert!(result.baseline_regret_within_tolerance);
+        assert!(result.post_observation_regret_within_tolerance);
+        assert!(result.outcomes.iter().all(|outcome| outcome.regret_within_tolerance));
+    }
+
+    #[test]
+    fn rejects_regret_tolerance_outside_declared_scale() {
+        let class = opposed_worlds();
+        let mut model = model(vec![row(1, 10, Some(50)), row(2, 20, Some(50))], 100);
+        model.decision_regret_tolerance_ppm = 1_000_001;
+        assert_eq!(
+            evaluate_robust_decision_regret_observation(&class, &model),
+            Err(RobustObservationVoiError::RegretToleranceOutOfRange {
+                tolerance_ppm: 1_000_001
+            })
         );
     }
 
