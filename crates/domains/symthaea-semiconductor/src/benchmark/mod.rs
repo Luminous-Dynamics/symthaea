@@ -17,10 +17,9 @@ pub mod stratified_repeat;
 
 pub use conformal_abstention::{
     ConformalCalibrationSampleV1, ConformalClassEvaluationV1, ConformalClassThresholdV1,
-    ConformalError, ConformalEvaluationV1, ConformalPredictionSampleV1,
-    ConformalPredictionSetV1, ConformalReportV1, ConformalSubjectV1,
-    ConformalTruthSampleV1, SelectiveDecisionV1, build_mondrian_conformal_sets_v1,
-    evaluate_conformal_sets_v1,
+    ConformalError, ConformalEvaluationV1, ConformalPredictionSampleV1, ConformalPredictionSetV1,
+    ConformalReportV1, ConformalSubjectV1, ConformalTruthSampleV1, SelectiveDecisionV1,
+    build_mondrian_conformal_sets_v1, evaluate_conformal_sets_v1,
 };
 
 pub use binary_metrics::{
