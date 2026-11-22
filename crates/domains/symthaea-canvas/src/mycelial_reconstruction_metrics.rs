@@ -632,6 +632,83 @@ pub fn evaluate_mycelial_reconstruction(
 
 impl MycelialReconstructionScore {
     pub fn validate(&self) -> Result<(), MycelialReconstructionError> {
+        let mut predicted_matches = BTreeSet::new();
+        let mut truth_matches = BTreeSet::new();
+        if self.identity_matches.iter().any(|matched| {
+            !valid_id(&matched.predicted_junction_id)
+                || !valid_id(&matched.ground_truth_junction_id)
+                || !predicted_matches.insert(matched.predicted_junction_id.as_str())
+                || !truth_matches.insert(matched.ground_truth_junction_id.as_str())
+        }) {
+            return Err(MycelialReconstructionError::InvalidGraph(
+                "identity-match receipt is invalid or not one-to-one",
+            ));
+        }
+        let class_true_positive: usize = self
+            .junction_kind_scores
+            .iter()
+            .map(|score| score.counts.true_positive)
+            .sum();
+        let class_false_positive: usize = self
+            .junction_kind_scores
+            .iter()
+            .map(|score| score.counts.false_positive)
+            .sum();
+        let class_false_negative: usize = self
+            .junction_kind_scores
+            .iter()
+            .map(|score| score.counts.false_negative)
+            .sum();
+        let expected_macro_f1_values: Vec<_> = self
+            .junction_kind_scores
+            .iter()
+            .filter_map(|score| score.counts.f1())
+            .collect();
+        let expected_macro_f1 = if expected_macro_f1_values.is_empty() {
+            None
+        } else {
+            Some(
+                expected_macro_f1_values.iter().sum::<f64>()
+                    / expected_macro_f1_values.len() as f64,
+            )
+        };
+        let expected_topology_delta = ReconstructionTopologyDelta {
+            junction_count: signed_difference(
+                self.prediction_topology.junction_count,
+                self.ground_truth_topology.junction_count,
+            ),
+            segment_count: signed_difference(
+                self.prediction_topology.segment_count,
+                self.ground_truth_topology.segment_count,
+            ),
+            connected_components: signed_difference(
+                self.prediction_topology.connected_components,
+                self.ground_truth_topology.connected_components,
+            ),
+            cycle_rank: signed_difference(
+                self.prediction_topology.cycle_rank,
+                self.ground_truth_topology.cycle_rank,
+            ),
+        };
+        let localization_values_valid = [
+            self.localization_error.mean_error,
+            self.localization_error.median_error,
+            self.localization_error.p95_error,
+            self.localization_error.maximum_error,
+        ]
+        .into_iter()
+        .flatten()
+        .all(|value| value.is_finite() && value >= 0.0);
+        let length_values_valid = [
+            self.segment_length_error.mean_absolute_error,
+            self.segment_length_error.mean_absolute_relative_error,
+            self.segment_length_error.p95_absolute_error,
+        ]
+        .into_iter()
+        .flatten()
+        .all(|value| value.is_finite() && value >= 0.0);
+        let localization_is_empty = self.localization_error.matched_junction_count == 0;
+        let length_is_empty = self.segment_length_error.matched_segment_count == 0;
         if self.schema_version != MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION
             || !valid_id(&self.frame_id)
             || !valid_digest(&self.source_observation_digest)
@@ -647,6 +724,11 @@ impl MycelialReconstructionScore {
                 .iter()
                 .zip(ANNOTATED_JUNCTION_KINDS)
                 .any(|(score, expected)| score.kind != expected || score.f1 != score.counts.f1())
+            || self.junction_kind_macro_f1 != expected_macro_f1
+            || class_true_positive + class_false_positive
+                != self.prediction_topology.junction_count
+            || class_true_positive + class_false_negative
+                != self.ground_truth_topology.junction_count
             || self.false_anastomosis_junction_count
                 != self
                     .junction_kind_scores
@@ -655,10 +737,33 @@ impl MycelialReconstructionScore {
                     .map(|score| score.counts.false_positive)
                     .unwrap_or(0)
             || self.junction_detection.true_positive != self.identity_matches.len()
+            || self.junction_detection.false_positive
+                + self.junction_detection.true_positive
+                != self.prediction_topology.junction_count
+            || self.junction_detection.false_negative
+                + self.junction_detection.true_positive
+                != self.ground_truth_topology.junction_count
             || self.localization_error.matched_junction_count != self.identity_matches.len()
-            || self.edge_topology.true_positive
-                + self.edge_topology.false_negative
-                < self.ground_truth_topology.segment_count
+            || (localization_is_empty
+                != self.localization_error.mean_error.is_none()
+                || localization_is_empty != self.localization_error.median_error.is_none()
+                || localization_is_empty != self.localization_error.p95_error.is_none()
+                || localization_is_empty != self.localization_error.maximum_error.is_none())
+            || !localization_values_valid
+            || self.edge_topology.true_positive + self.edge_topology.false_positive
+                != self.prediction_topology.segment_count
+            || self.edge_topology.true_positive + self.edge_topology.false_negative
+                != self.ground_truth_topology.segment_count
+            || self.unmatched_prediction_edge_count > self.edge_topology.false_positive
+            || self.segment_length_error.matched_segment_count
+                != self.edge_topology.true_positive
+            || (length_is_empty
+                != self.segment_length_error.mean_absolute_error.is_none()
+                || length_is_empty
+                    != self.segment_length_error.mean_absolute_relative_error.is_none()
+                || length_is_empty != self.segment_length_error.p95_absolute_error.is_none())
+            || !length_values_valid
+            || self.topology_delta != expected_topology_delta
         {
             return Err(MycelialReconstructionError::InvalidGraph(
                 "reconstruction score receipt is internally inconsistent",
