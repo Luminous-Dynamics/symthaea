@@ -53,16 +53,16 @@ pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, Str
 }
 
 /// Open the live telemetry WebSocket and invoke `on_message` for each
-/// `CycleMetadata` JSON payload received. Runs until the socket closes;
-/// callers spawn this via `wasm_bindgen_futures::spawn_local`.
-pub async fn stream_telemetry(gateway: &str, mut on_message: impl FnMut(Value)) {
-    let ws_url = format!(
-        "{}/v1/ws/live",
-        gateway
-            .trim_end_matches('/')
-            .replacen("http://", "ws://", 1)
-            .replacen("https://", "wss://", 1)
-    );
+/// `CycleMetadata` JSON payload received. `on_connection_change(true)` is
+/// called only after `WebSocket::open` succeeds; `false` is emitted when the
+/// stream ends. Callers own retry/backoff policy and should spawn this via
+/// `wasm_bindgen_futures::spawn_local`.
+pub async fn stream_telemetry(
+    gateway: &str,
+    mut on_message: impl FnMut(Value),
+    mut on_connection_change: impl FnMut(bool),
+) {
+    let ws_url = telemetry_ws_url(gateway);
     let ws = match WebSocket::open(&ws_url) {
         Ok(ws) => ws,
         Err(e) => {
@@ -70,6 +70,9 @@ pub async fn stream_telemetry(gateway: &str, mut on_message: impl FnMut(Value)) 
             return;
         }
     };
+
+    // Do not report a connection before the browser accepted the WebSocket.
+    on_connection_change(true);
     let (_write, mut read) = ws.split();
     while let Some(msg) = read.next().await {
         match msg {
@@ -83,5 +86,41 @@ pub async fn stream_telemetry(gateway: &str, mut on_message: impl FnMut(Value)) 
                 break;
             }
         }
+    }
+    on_connection_change(false);
+}
+
+fn telemetry_ws_url(gateway: &str) -> String {
+    format!(
+        "{}/v1/ws/live",
+        gateway
+            .trim_end_matches('/')
+            .replacen("http://", "ws://", 1)
+            .replacen("https://", "wss://", 1)
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::telemetry_ws_url;
+
+    #[test]
+    fn telemetry_endpoint_maps_http_schemes_to_websocket_schemes() {
+        assert_eq!(
+            telemetry_ws_url("http://127.0.0.1:8090/"),
+            "ws://127.0.0.1:8090/v1/ws/live"
+        );
+        assert_eq!(
+            telemetry_ws_url("https://gateway.example.test"),
+            "wss://gateway.example.test/v1/ws/live"
+        );
+    }
+
+    #[test]
+    fn telemetry_endpoint_trims_multiple_trailing_slashes() {
+        assert_eq!(
+            telemetry_ws_url("http://localhost:8090///"),
+            "ws://localhost:8090/v1/ws/live"
+        );
     }
 }
