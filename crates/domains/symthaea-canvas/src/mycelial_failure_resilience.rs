@@ -785,15 +785,6 @@ pub fn build_single_failure_resilience_profile(
     build_mycelial_failure_resilience_profile(graph, demands, &scenarios)
 }
 
-fn attack_strategy_is_adaptive(strategy: MycelialFailureAttackStrategy) -> bool {
-    matches!(
-        strategy,
-        MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions
-            | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments
-            | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadJunctions
-    )
-}
-
 fn attack_strategy_targets_segments(strategy: MycelialFailureAttackStrategy) -> bool {
     matches!(
         strategy,
@@ -2299,6 +2290,77 @@ mod tests {
         }
     }
 
+    fn adaptive_path_load_graph() -> MycelialJunctionHyphaGraph {
+        let junction = |id: &str, incident_filament_ids: Vec<u32>| MycelialJunction {
+            id: id.to_string(),
+            kind: JunctionKind::Branch,
+            position: match id {
+                "A" => SpatialPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                "B" => SpatialPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+                "C" => SpatialPoint3 { x: 1.0, y: 1.0, z: 0.0 },
+                "D" => SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
+                _ => SpatialPoint3::ZERO,
+            },
+            incident_filament_ids,
+            terminal_filament_ids: Vec::new(),
+            anastomosis_ids: Vec::new(),
+        };
+        let segment =
+            |id: &str, filament_id, start: &str, end: &str, length: f64| MycelialHyphaSegment {
+                id: id.to_string(),
+                filament_id,
+                t_start_micros: 0,
+                t_end_micros: PARAMETER_SCALE,
+                start_junction_id: start.to_string(),
+                end_junction_id: end.to_string(),
+                arc_length_model_units: length,
+                start_junction_offset_model_units: 0.0,
+                end_junction_offset_model_units: 0.0,
+                radius_start_model_units: 1.0,
+                radius_end_model_units: 1.0,
+            };
+        let mut graph = MycelialJunctionHyphaGraph {
+            schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
+            source_model_version: 1,
+            length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
+            source_model_digest: "e".repeat(64),
+            source_filament_ids: vec![1, 2, 3, 4, 5],
+            maximum_junction_gap_model_units: 0.0,
+            junctions: vec![
+                junction("A", vec![1, 3, 4]),
+                junction("B", vec![1, 2]),
+                junction("C", vec![2, 3, 5]),
+                junction("D", vec![4, 5]),
+            ],
+            segments: vec![
+                segment("edge-ab", 1, "A", "B", 1.0),
+                segment("edge-ac", 3, "A", "C", 10.0),
+                segment("edge-ad", 4, "A", "D", 1.0),
+                segment("edge-bc", 2, "B", "C", 1.0),
+                segment("edge-cd", 5, "C", "D", 1.0),
+            ],
+        };
+        graph.segments.sort_by(|left, right| left.id.cmp(&right.id));
+        graph
+    }
+
+    fn adaptive_path_load_demands() -> Vec<MycelialDemandPair> {
+        vec![
+            MycelialDemandPair {
+                id: "demand-ab".to_string(),
+                source_junction_id: "A".to_string(),
+                target_junction_id: "B".to_string(),
+                weight: 1,
+            },
+            MycelialDemandPair {
+                id: "demand-ac".to_string(),
+                source_junction_id: "A".to_string(),
+                target_junction_id: "C".to_string(),
+                weight: 10,
+            },
+        ]
+    }
+
     fn demands() -> Vec<MycelialDemandPair> {
         vec![
             MycelialDemandPair {
@@ -2613,6 +2675,48 @@ mod tests {
             spatial.scenarios[1].failed_junction_ids,
             vec!["A".to_string(), "B".to_string()]
         );
+    }
+
+    #[test]
+    fn adaptive_demand_path_load_recomputes_on_the_residual_graph() {
+        let graph = adaptive_path_load_graph();
+        graph.validate().unwrap();
+        let demand_pairs = adaptive_path_load_demands();
+
+        let static_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::DemandPathLoadSegments,
+                seed: 0,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let adaptive_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments,
+                seed: 0,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(&static_plan.ranked_entity_ids[..2], &["edge-ab", "edge-bc"]);
+        assert_eq!(&adaptive_plan.ranked_entity_ids[..2], &["edge-ab", "edge-ad"]);
+        assert_eq!(
+            adaptive_plan.ranked_entity_ids_per_step[1][0],
+            "edge-ad"
+        );
+        assert!(
+            adaptive_plan.ranked_entity_ids_per_step[1]
+                .iter()
+                .all(|id| id != "edge-ab")
+        );
+        adaptive_plan.validate_against(&graph, &demand_pairs).unwrap();
     }
 
     #[test]
