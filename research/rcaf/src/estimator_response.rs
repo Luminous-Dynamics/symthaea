@@ -301,11 +301,13 @@ pub fn pearson_connectivity_matrix(
     let means = (0..roi_count)
         .map(|roi| observations.iter().map(|row| row[roi]).sum::<f64>() / time_points as f64)
         .collect::<Vec<_>>();
-    let mut sums_squares = vec![0.0; roi_count];
-    for row in observations {
-        for (roi, value) in row.iter().enumerate() {
-            sums_squares[roi] += (value - means[roi]).powi(2);
-        }
+    let mut sums_squares = Vec::with_capacity(roi_count);
+    for (roi, mean) in means.iter().enumerate() {
+        let variance_sum = observations
+            .iter()
+            .map(|row| (row[roi] - mean).powi(2))
+            .sum::<f64>();
+        sums_squares.push(variance_sum);
     }
     for (roi, variance_sum) in sums_squares.iter().enumerate() {
         if !variance_sum.is_finite() || *variance_sum <= 1e-20 {
@@ -314,12 +316,12 @@ pub fn pearson_connectivity_matrix(
     }
 
     let mut matrix = vec![vec![0.0; roi_count]; roi_count];
-    for i in 0..roi_count {
+    for (i, mean_i) in means.iter().enumerate() {
         matrix[i][i] = 1.0;
-        for j in (i + 1)..roi_count {
+        for (j, mean_j) in means.iter().enumerate().skip(i + 1) {
             let covariance_sum = observations
                 .iter()
-                .map(|row| (row[i] - means[i]) * (row[j] - means[j]))
+                .map(|row| (row[i] - mean_i) * (row[j] - mean_j))
                 .sum::<f64>();
             let correlation = covariance_sum / (sums_squares[i] * sums_squares[j]).sqrt();
             if !correlation.is_finite() {
