@@ -28,6 +28,7 @@ pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
 pub mod mycelial_junction_graph;
+pub mod mycelial_contact_persistence;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
@@ -87,6 +88,14 @@ pub use mycelial_junction_graph::{
     MycelialJunction, MycelialJunctionGraphConfig, MycelialJunctionGraphError,
     MycelialJunctionGraphMetrics, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
     build_mycelial_junction_hypha_graph,
+};
+pub use mycelial_contact_persistence::{
+    DEFAULT_MAX_CONTACT_TOLERANCE_MODEL_UNITS, MAX_CONTACT_FILTRATION_CANDIDATES,
+    MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION, MycelialContactComponentMerge,
+    MycelialContactCycleBirth, MycelialContactFiltration, MycelialContactFiltrationConfig,
+    MycelialContactFiltrationError, MycelialContactFiltrationMetrics,
+    MycelialContactFiltrationSnapshot, MycelialCyclePathStep,
+    build_mycelial_contact_filtration,
 };
 pub use mycelial_mesh::{
     FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
