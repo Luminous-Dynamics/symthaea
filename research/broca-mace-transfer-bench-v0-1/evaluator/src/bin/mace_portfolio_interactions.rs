@@ -907,12 +907,12 @@ fn report() {
         pairwise_total.pairwise_abstentions += pairwise.pairwise_abstentions;
         paired.extend(differences);
         interval_total.conformal_evaluated_pairs +=
-            intervals.conformal_correct_label_pairs;
+            intervals.conformal_evaluated_pairs;
         interval_total.conformal_covered_pairs += intervals.conformal_covered_pairs;
         interval_total.ood_stable_evaluated_pairs +=
-            intervals.ood_stable_correct_label_pairs;
+            intervals.ood_stable_evaluated_pairs;
         interval_total.ood_stable_covered_pairs += intervals.ood_stable_covered_pairs;
-        interval_total.shifted_evaluated_pairs += intervals.shifted_correct_label_pairs;
+        interval_total.shifted_evaluated_pairs += intervals.shifted_evaluated_pairs;
         interval_total.shifted_covered_pairs += intervals.shifted_covered_pairs;
         interval_total.relation_label_errors += intervals.relation_label_errors;
         interval_total.unknown_relation_pairs += intervals.unknown_relation_pairs;
@@ -951,29 +951,29 @@ fn report() {
     println!(
         "conformal_coverage_pct={:.2}",
         100.0 * interval_total.conformal_covered_pairs as f64
-            / interval_total.conformal_correct_label_pairs.max(1) as f64
+            / interval_total.conformal_evaluated_pairs.max(1) as f64
     );
     println!(
         "conformal_evaluated_pairs={}",
-        interval_total.conformal_correct_label_pairs
+        interval_total.conformal_evaluated_pairs
     );
     println!(
         "ood_stable_coverage_pct={:.2}",
         100.0 * interval_total.ood_stable_covered_pairs as f64
-            / interval_total.ood_stable_correct_label_pairs.max(1) as f64
+            / interval_total.ood_stable_evaluated_pairs.max(1) as f64
     );
     println!(
         "ood_stable_evaluated_pairs={}",
-        interval_total.ood_stable_correct_label_pairs
+        interval_total.ood_stable_evaluated_pairs
     );
     println!(
         "shifted_coverage_pct={:.2}",
         100.0 * interval_total.shifted_covered_pairs as f64
-            / interval_total.shifted_correct_label_pairs.max(1) as f64
+            / interval_total.shifted_evaluated_pairs.max(1) as f64
     );
     println!(
         "shifted_evaluated_pairs={}",
-        interval_total.shifted_correct_label_pairs
+        interval_total.shifted_evaluated_pairs
     );
     println!("relation_label_errors={}", interval_total.relation_label_errors);
     println!("unknown_relation_pairs={}", interval_total.unknown_relation_pairs);
