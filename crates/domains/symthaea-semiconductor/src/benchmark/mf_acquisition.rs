@@ -32,6 +32,7 @@ pub struct AcquisitionSubjectV1 {
     pub policy_id: String,
     pub prediction_packet_sha256: String,
     pub model_sha256: String,
+    pub uncertainty_calibration_sha256: String,
     pub objective_spec_sha256: String,
     pub budget_unit: String,
     pub total_cost_budget: u64,
@@ -67,6 +68,7 @@ pub struct AcquisitionReportV1 {
     pub policy_id: String,
     pub prediction_packet_sha256: String,
     pub model_sha256: String,
+    pub uncertainty_calibration_sha256: String,
     pub objective_spec_sha256: String,
     pub budget_unit: String,
     pub total_cost_budget: u64,
@@ -124,6 +126,10 @@ fn validate_subject(subject: &AcquisitionSubjectV1) -> Result<(), AcquisitionErr
         "prediction_packet_sha256",
     )?;
     require_sha256(&subject.model_sha256, "model_sha256")?;
+    require_sha256(
+        &subject.uncertainty_calibration_sha256,
+        "uncertainty_calibration_sha256",
+    )?;
     require_sha256(&subject.objective_spec_sha256, "objective_spec_sha256")?;
     require_text(&subject.budget_unit, "budget_unit")?;
     finite(subject.exploration_weight, "exploration_weight")?;
@@ -291,6 +297,7 @@ pub fn select_high_fidelity_candidates_v1(
         policy_id: subject.policy_id.clone(),
         prediction_packet_sha256: subject.prediction_packet_sha256.clone(),
         model_sha256: subject.model_sha256.clone(),
+        uncertainty_calibration_sha256: subject.uncertainty_calibration_sha256.clone(),
         objective_spec_sha256: subject.objective_spec_sha256.clone(),
         budget_unit: subject.budget_unit.clone(),
         total_cost_budget: subject.total_cost_budget,
@@ -408,6 +415,10 @@ mod tests {
     fn input_digests_and_exploration_weight_are_validated() {
         let mut subject = known_answer();
         subject.model_sha256 = "invalid".to_string();
+        assert!(select_high_fidelity_candidates_v1(&subject).is_err());
+
+        let mut subject = known_answer();
+        subject.uncertainty_calibration_sha256 = "invalid".to_string();
         assert!(select_high_fidelity_candidates_v1(&subject).is_err());
 
         let mut subject = known_answer();
