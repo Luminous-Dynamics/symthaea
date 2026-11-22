@@ -11,7 +11,7 @@ MEL-JUDGE-GROUNDING-001 extends this with semantic-preserving nuisance transform
 
 ## What the evaluator checks
 
-For each case, the baseline stores pair scores and exact prompt, instruction and audio digest references. The post-judge probe outcomes then test:
+For each case, the baseline stores pair scores and exact prompt, instruction and audio digest references. Probe executions are frozen before the independent human reference is released. Only after that release is a scoring-time panel assembled with the post-freeze human-reference direction; this assembled panel must never be passed to the judge. The probe outcomes then test:
 
 - prompt-only margin collapse after removing audio;
 - preference reversal when the two exact audio assets are exchanged under a fixed prompt;
