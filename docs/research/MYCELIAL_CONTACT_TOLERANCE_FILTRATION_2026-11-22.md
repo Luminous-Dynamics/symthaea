@@ -56,7 +56,9 @@ The builder:
 
 It never calls a fusion-acceptance operation, changes a source curve, alters semantic CognitiveTopology, or turns candidate evidence into accepted topology.
 
-The output contains the complete candidate observation inventory, including candidates above the sweep maximum. It includes the source-filament identity list and explicit baseline parent edges. Each cycle witness can be checked against those baseline edges and previously admitted candidate observations. Canonical digests bind those inputs, threshold snapshots, component-merge events and cycle-birth witnesses.
+The candidate set is a **union-of-proposals upper-bound graph**, not a set of links guaranteed to be jointly executable. Different candidates can claim the same filament/curve-parameter contact (for example, one terminal tip can be close to two different target hyphae). Under the current pairwise-fusion contract, these are competing hypotheses; multiway fusion and contact-capacity resolution are not implemented. The profile therefore includes `contact_conflict_groups`, listing each shared source-curve contact and its candidate IDs, plus the number of conflict groups and distinct candidates participating in them. Cycle births in the union graph are possible cycles in the candidate supergraph, not proof that all conflicting candidates can co-exist in one accepted morphology.
+
+The output contains the complete candidate observation inventory, including candidates above the sweep maximum. It includes the source-filament identity list and explicit baseline parent edges. Each cycle witness can be checked against those baseline edges and previously admitted candidate observations. Canonical digests bind those inputs, conflict groups, threshold snapshots, component-merge events and cycle-birth witnesses.
 
 ## 4. Deterministic computation
 
@@ -75,6 +77,7 @@ The disjoint-set implementation tracks component counts. When a candidate closes
 
 The profile validator checks:
 - sorted, unique source-filament and candidate identities;
+- complete, deterministic conflict groups for candidates that reuse a curve contact;
 - contact parameters and candidate endpoint references;
 - candidate distance/admission consistency;
 - one topological event for every admitted candidate;
