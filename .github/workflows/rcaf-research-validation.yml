@@ -299,9 +299,17 @@ jobs:
               "heat_kernel_localized",
           }
           for item in report["families"]:
+              clean = item["clean_component_variance"]
+              nuisance = item["nuisance_component_variance"]
+              covariance = item["clean_nuisance_covariance"]
+              component_fraction = nuisance / (clean + nuisance)
+              covariance_fraction = 2.0 * covariance / (clean + nuisance)
+              combined_variance = clean + nuisance + 2.0 * covariance
               assert abs(item["realized_component_variance_fraction"] - 0.10) <= 1e-12
-              assert item["clean_component_variance"] > 0.0
-              assert item["nuisance_component_variance"] > 0.0
+              assert abs(component_fraction - 0.10) <= 1e-12
+              assert abs(item["covariance_contribution_fraction"] - covariance_fraction) <= 1e-10
+              assert abs(item["combined_observed_variance"] - combined_variance) <= 1e-10
+              assert clean > 0.0 and nuisance > 0.0
               assert item["combined_observed_variance"] >= 0.0
               assert item["applied_scale_multiplier"] > 0.0
           print("PASS: RCAF spatial nuisance variance-fraction calibration and covariance report")
