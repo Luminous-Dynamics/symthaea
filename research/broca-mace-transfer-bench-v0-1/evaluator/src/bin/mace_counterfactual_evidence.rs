@@ -443,6 +443,13 @@ fn stable_key_seed(key: &str) -> u64 {
     u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 prefix is eight bytes"))
 }
 
+fn valid_git_revision(value: &str) -> bool {
+    matches!(value.len(), 40 | 64)
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn action_name(action: Option<Action>) -> &'static str {
     match action {
         Some(Action::A) => "action_a",
@@ -564,6 +571,12 @@ fn run() -> Result<(), String> {
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
     let source_revision = env::var("MACE_SOURCE_REVISION").ok();
+    if source_revision
+        .as_deref()
+        .is_some_and(|revision| !valid_git_revision(revision))
+    {
+        return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
+    }
     let run_identity = format!(
         "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{}",
         source_revision.as_deref().unwrap_or("unspecified")
@@ -770,6 +783,14 @@ mod tests {
 
     fn first_memory() -> Vec<Experience> {
         generated_worlds(1)[0].memory.clone()
+    }
+
+    #[test]
+    fn source_revision_accepts_only_canonical_lowercase_git_shas() {
+        assert!(valid_git_revision(&"a".repeat(40)));
+        assert!(valid_git_revision(&"b".repeat(64)));
+        assert!(!valid_git_revision("deadbeef"));
+        assert!(!valid_git_revision(&"A".repeat(40)));
     }
 
     #[test]
