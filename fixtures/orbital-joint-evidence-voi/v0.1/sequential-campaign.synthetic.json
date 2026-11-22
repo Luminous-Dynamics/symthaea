@@ -361,7 +361,7 @@
       "claim_ceiling": "finite_horizon_sequential_campaign_semantics_only",
       "decision_context": {
         "profile_ref": "provider-client-profile://AER01@cfg-A1",
-        "article_subject_ref": "physical-unit://AER01-COUPON-0007",
+        "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
         "configuration_id": "AER01-CFG-A1",
         "icd_revision": "R1"
       },
@@ -438,7 +438,7 @@
           "action_class": "INDEPENDENT_CALIBRATION_CHAIN_AUDIT",
           "decision_context": {
             "profile_ref": "provider-client-profile://AER01@cfg-A1",
-            "article_subject_ref": "physical-unit://AER01-COUPON-0007",
+            "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
             "configuration_id": "AER01-CFG-A1",
             "icd_revision": "R1"
           },
@@ -470,7 +470,7 @@
           "action_class": "NON_DESTRUCTIVE_COMBINED_LOAD_COUPON",
           "decision_context": {
             "profile_ref": "provider-client-profile://AER01@cfg-A1",
-            "article_subject_ref": "physical-unit://AER01-COUPON-0007",
+            "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
             "configuration_id": "AER01-CFG-A1",
             "icd_revision": "R1"
           },
@@ -505,7 +505,7 @@
           "action_class": "FIXED_TARGET_ULTRASONIC_SCREEN",
           "decision_context": {
             "profile_ref": "provider-client-profile://AER01@cfg-A1",
-            "article_subject_ref": "physical-unit://AER01-COUPON-0007",
+            "article_subject_ref": "physical-unit://AER01-COUPON-SET-0007",
             "configuration_id": "AER01-CFG-A1",
             "icd_revision": "R1"
           },
@@ -515,7 +515,7 @@
             "engineering_hours": 0.6,
             "compute_core_hours": 0,
             "facility_hours": 0.8,
-            "specimen_count": 0,
+            "specimen_count": 1,
             "review_hours": 0.15,
             "external_cost_units": 0.3
           },
@@ -547,7 +547,7 @@
           "engineering_hours": 1.25,
           "compute_core_hours": 0,
           "facility_hours": 1.215,
-          "specimen_count": 0.95,
+          "specimen_count": 1.75,
           "review_hours": 0.235,
           "external_cost_units": 0.5275
         },
@@ -555,14 +555,14 @@
           "engineering_hours": 1.4,
           "compute_core_hours": 0,
           "facility_hours": 1.4,
-          "specimen_count": 1,
+          "specimen_count": 2,
           "review_hours": 0.27,
           "external_cost_units": 0.6
         },
         "require_adaptive_resource_pareto_dominates_fixed": true,
         "notes": "Synthetic AER-01 inspection campaign only. An independent calibration-chain audit runs first. Invalid calibration/correlation evidence terminates in HOLD. A valid chain permits a non-flight combined-load coupon; FAIL produces an outcome-specific rejection basis and stops. PASS permits fixed-target ultrasonic inspection; CLEAR completes the NDE coverage obligation and supports ACCEPT, while INDICATION produces a rejection basis. Frequency weights affect expected resource use only; worst-case regret remains distribution-free. All observations, costs, specimen counts, calibration status and method applicability are synthetic and are not physical NDE or structural evidence."
       },
-      "notes": "Synthetic AER-01 inspection campaign only. An independent calibration-chain audit runs first. Invalid calibration/correlation evidence terminates in HOLD. A valid chain permits a non-destructive combined-load proof screen on the identified coupon; FAIL produces an outcome-specific rejection basis and stops. PASS permits fixed-target ultrasonic inspection of the same coupon; the NDE action adds no new specimen count because the physical article is already counted by the load screen. CLEAR completes the NDE coverage obligation and supports ACCEPT, while INDICATION produces a rejection basis. Frequency weights affect expected resource use only; worst-case regret remains distribution-free. All observations, costs, specimen counts, calibration status and method applicability are synthetic and are not physical NDE or structural evidence."
+      "notes": "Synthetic AER-01 inspection campaign only. The decision context identifies a coupon set with separately identified load and NDE specimens. An independent calibration-chain audit runs first. Invalid calibration/correlation evidence terminates in HOLD. A valid chain permits a non-destructive combined-load proof screen on the load coupon; FAIL produces an outcome-specific rejection basis and stops. PASS permits fixed-target ultrasonic inspection on the separate NDE coupon. CLEAR completes the calibration, load and NDE obligations required for ACCEPT; INDICATION produces a rejection basis. Frequency weights affect expected resource use only; worst-case regret remains distribution-free. All observations, costs, specimen counts, calibration status and method applicability are synthetic and are not physical NDE or structural evidence."
     }
   ]
 }
