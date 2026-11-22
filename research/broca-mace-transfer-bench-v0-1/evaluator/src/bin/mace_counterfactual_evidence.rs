@@ -11,11 +11,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::experience_view_digest;
 use broca_mace_policy::{
-    decide, Action, Decision, DecisionNeedV1, Experience, Policy, Query, SourceRootDigest,
+    decide, Action, Decision, DecisionNeedV1, Experience, Objective, Policy, Query, Regime, SourceRootDigest,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -151,12 +152,6 @@ impl EvidenceDependencyIndex {
             .collect()
     }
 
-    fn records_for_ids(&self, ids: &BTreeSet<u32>) -> Vec<Experience> {
-        ids.iter()
-            .filter_map(|event_id| self.records.get(event_id).copied())
-            .collect()
-    }
-
     fn support_closure_counts(&self, support_ids: &[u32]) -> (usize, usize, usize, usize) {
         let mut roots = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -224,23 +219,30 @@ fn matched_random_ids(
     seed: u64,
 ) -> Option<Vec<u32>> {
     let target: BTreeSet<u32> = target_ids.iter().copied().collect();
-    let mut required = BTreeMap::<Action, usize>::new();
+    let mut required = BTreeMap::<(Regime, Objective, Action, String), usize>::new();
     for event_id in target_ids {
         let item = index.records.get(event_id)?;
-        *required.entry(item.action).or_default() += 1;
+        let stratum = (
+            item.scope.regime,
+            item.scope.objective,
+            item.action,
+            item.causal_identification.estimand_digest.to_hex(),
+        );
+        *required.entry(stratum).or_default() += 1;
     }
 
     let mut selected = Vec::new();
-    for action in [Action::A, Action::B] {
-        let needed = required.get(&action).copied().unwrap_or(0);
-        if needed == 0 {
-            continue;
-        }
-
+    for ((regime, objective, action, estimand), needed) in required {
         let mut eligible: Vec<&Experience> = index
             .records
             .values()
-            .filter(|item| item.action == action && !target.contains(&item.event_id))
+            .filter(|item| {
+                item.scope.regime == regime
+                    && item.scope.objective == objective
+                    && item.action == action
+                    && item.causal_identification.estimand_digest.to_hex() == estimand
+                    && !target.contains(&item.event_id)
+            })
             .collect();
         eligible.sort_by_key(|item| {
             mix64(seed ^ u64::from(item.event_id) ^ 0x4d41_5443_4845_4401)
@@ -586,6 +588,7 @@ fn run() -> Result<(), String> {
             "support_known_family_count": baseline_support.2,
             "support_unresolved_count": baseline_support.3,
             "available_event_count": baseline.evidence_event_count,
+            "available_experience_struct_bytes_lower_bound": baseline.evidence_event_count.saturating_mul(size_of::<Experience>()),
             "available_known_root_count": baseline.evidence_root_count,
             "available_known_family_count": baseline.evidence_family_count,
             "unknown_root_event_count": baseline.unknown_root_event_count,
@@ -641,6 +644,7 @@ fn run() -> Result<(), String> {
                 "support_known_family_count": support.2,
                 "support_unresolved_count": support.3,
                 "available_event_count": candidate.evidence_event_count,
+                "available_experience_struct_bytes_lower_bound": candidate.evidence_event_count.saturating_mul(size_of::<Experience>()),
                 "available_known_root_count": candidate.evidence_root_count,
                 "available_known_family_count": candidate.evidence_family_count,
                 "unknown_root_event_count": candidate.unknown_root_event_count,
@@ -663,6 +667,7 @@ fn run() -> Result<(), String> {
                 "matched_to": intervention.matched_to,
                 "removed_event_ids": intervention.removed_event_ids,
                 "removed_event_count": intervention.removed_event_ids.len(),
+                "removed_experience_struct_bytes_lower_bound": intervention.removed_event_ids.len().saturating_mul(size_of::<Experience>()),
                 "decision": action_name(candidate.decision.action),
                 "full_evidence_decision": action_name(baseline_action),
                 "decision_agrees_with_full": candidate.decision.action == baseline_action,
@@ -803,8 +808,15 @@ mod tests {
         let random = matched_random_ids(&index, &target, 42).unwrap();
         assert_eq!(random.len(), 1);
         assert!(!random.iter().any(|id| target.contains(id)));
-        let target_action = index.records[&target[0]].action;
-        assert!(random.iter().all(|id| index.records[id].action == target_action));
+        let target_item = index.records[&target[0]];
+        assert!(random.iter().all(|id| {
+            let item = index.records[id];
+            item.action == target_item.action
+                && item.scope.regime == target_item.scope.regime
+                && item.scope.objective == target_item.scope.objective
+                && item.causal_identification.estimand_digest
+                    == target_item.causal_identification.estimand_digest
+        }));
     }
 
     #[test]
