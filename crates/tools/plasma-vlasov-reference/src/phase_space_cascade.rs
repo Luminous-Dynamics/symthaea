@@ -386,9 +386,9 @@ mod tests {
         let mut maximum_error = 0.0_f64;
         let mut reference_scale = 0.0_f64;
         for ix in 0..config.nx {
-            for iv in 0..config.nv {
+            for (iv, maxwellian_value) in maxwellian.iter().copied().enumerate() {
                 let phase = wave_number * (config.x(ix) - config.velocity(iv) * time);
-                let expected = maxwellian[iv] * (1.0 + alpha * phase.cos());
+                let expected = maxwellian_value * (1.0 + alpha * phase.cos());
                 let observed = solver.distribution[ix * config.nv + iv];
                 maximum_error = maximum_error.max((observed - expected).abs());
                 reference_scale = reference_scale.max(expected.abs());
