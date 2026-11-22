@@ -729,7 +729,7 @@ jobs:
               "disposition": "abstain_unseen_sketch_cell",
           }
           assert len(report["cells"]) == 3
-          expected_radius = math.sqrt(math.log(4.0 * 3.0 / 0.05) / (2.0 * 99.0))
+          expected_radius = math.sqrt(math.log(4.0 * 3.0 * 3.0 / 0.05) / (2.0 * 99.0))
           for cell in report["cells"]:
               assert cell["disposition"] == "audited"
               assert cell["source_replicates"] == 99
