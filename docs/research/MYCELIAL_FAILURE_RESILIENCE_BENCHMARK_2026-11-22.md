@@ -120,11 +120,13 @@ Implemented attack strategies:
 | Highest-degree junctions | Junctions | Descending incident-segment count on original graph; stable ID tie-break | Static hub-targeted attack |
 | Adaptive highest-degree junctions | Junctions | Recompute degree on residual graph after every prior removal; stable ID tie-break | Adaptive hub-targeted attack with per-step rankings |
 | Lowest-degree junctions | Junctions | Ascending incident-segment count on original graph; stable ID tie-break | Peripheral/leaf-targeted negative comparator |
-| Demand-path-load segments | Hypha segments | Descending declared-demand weight on deterministic shortest paths; stable ID tie-break | Demand-conditioned edge load, not generic all-pairs betweenness |
-| Demand-path-load junctions | Junctions | Weighted internal transit-node use on deterministic shortest paths | Demand-conditioned node load, not generic all-pairs betweenness |
+| Demand-path-load segments | Hypha segments | Descending declared-demand weight on original shortest paths; stable ID tie-break | Static demand-conditioned edge load |
+| Demand-path-load junctions | Junctions | Weighted internal transit-node use on original shortest paths | Static demand-conditioned node load |
+| Adaptive demand-path-load segments | Hypha segments | Recompute declared-demand shortest-path load after each prior removal | Adaptive demand-conditioned edge load |
+| Adaptive demand-path-load junctions | Junctions | Recompute internal transit-node load after each prior removal | Adaptive demand-conditioned node load |
 | Spatial-cluster junctions | Junctions | Ascending Euclidean distance to a declared seed junction; stable ID tie-break | Localized correlated structural-damage proxy |
 
-For each strategy, the plan contains budgets 1 through k, each budget being a nested prefix of the selected attack order. Scenario IDs encode the policy version, seed and budget. The plan retains both the selected sequence and the complete candidate ranking at every step. The plan validator re-computes the rankings from the source graph and demand set, then checks every scenario is exactly the matching prefix. A changed graph, demand, seed, per-step ranking or failed-identity list invalidates the plan.
+For each strategy, the plan contains budgets 1 through k, each budget being a nested prefix of the selected attack order. Scenario IDs encode the policy version, seed and budget. The plan retains both the selected sequence and the complete candidate ranking at every step. The plan validator re-computes the rankings from the source graph and demand set, including every residual-graph step for adaptive policies, then checks every scenario is exactly the matching prefix. A changed graph, demand, seed, per-step ranking or failed-identity list invalidates the plan. Attack plans use their own schema version, distinct from the downstream failure-profile schema.
 
 ### Static versus adaptive degree
 
@@ -134,7 +136,16 @@ This separates two questions:
 - Does the original graph's hub ranking identify critical junctions?
 - Does an adaptive attacker find a different vulnerability after earlier hubs have been removed?
 
-The current dynamic policy adapts degree only. Dynamic demand-path load, recalculated betweenness, articulation/min-cut recomputation and partial-capacity attacks remain separate future strategies. The current adaptive intervention is still a sequence of fully enacted structural removals; probability-of-delivery is a separate optional simulation profile.
+The adaptive attack family now includes:
+- `AdaptiveHighestDegreeJunctions`: recompute residual degree after each prior junction removal;
+- `AdaptiveDemandPathLoadSegments`: recompute weighted declared-demand shortest paths and rank surviving hypha edges by their current path load;
+- `AdaptiveDemandPathLoadJunctions`: recompute weighted demand transit-junction load on the residual graph.
+
+For adaptive demand-path load, a failed junction excludes all incident edges; a failed segment is excluded directly. Demand pairs whose endpoints are removed or whose remaining path is disconnected contribute no load to the residual ranking. All equal-load ties use stable entity IDs. This is a demand-conditioned residual-graph ranking, not all-pairs betweenness or measured biological flow.
+
+A synthetic counterexample proves the policy changes the second selection: static demand-load selects `edge-ab`, then `edge-bc`; after `edge-ab` is removed, demand reroutes around the opposite side of the square, and adaptive demand-load selects `edge-ad`. Both the full residual candidate ranking and the chosen sequence are stored and validated.
+
+The present adaptive strategies are still sequences of fully enacted binary structural removals; probability-of-delivery is a separate optional simulation profile. Dynamic betweenness, articulation/min-cut, common-cause/correlated delivery and partial-capacity attacks remain future work.
 
 The demand-path-load strategy computes weighted shortest routes only for the supplied demand pairs. It must not be called global betweenness: it is explicitly demand-conditioned. Equal-cost route ties are resolved by stable node/edge ordering. The spatial-cluster policy uses source graph model coordinates and is currently a local geometric stress proxy; coordinates are not calibrated physical distances.
 
