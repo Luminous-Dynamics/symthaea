@@ -10,6 +10,7 @@ pub mod secom_observation_drift;
 pub mod secom_raw;
 pub mod secom_tabular_baselines;
 pub mod split_manifest;
+pub mod stratified_repeat;
 
 pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
@@ -18,6 +19,12 @@ pub use binary_metrics::{
 pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
+pub use stratified_repeat::{
+    StratifiedRepeatManifestV1, StratifiedRepeatReportV1, StratifiedSampleV1,
+    StratifiedSplitAssignmentV1, StratifiedSplitError, StratifiedSplitSubjectV1,
+    generate_repeated_stratified_splits_v1,
+};
+
 pub use split_manifest::{
     SplitManifestError, SplitManifestV1, SplitValidationReportV1, validate_split_manifest_v1,
 };
