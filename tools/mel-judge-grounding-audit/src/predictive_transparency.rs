@@ -355,22 +355,33 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     }
 
     for forecast in &panel.forecasts {
-        let has_child = series_members
+        let child_commit_time = series_members
             .get(forecast.commitment_series_id.as_str())
-            .is_some_and(|members| {
-                members.iter().any(|candidate| {
-                    candidate.supersedes_forecast_id.as_deref()
-                        == Some(forecast.forecast_id.as_str())
-                })
+            .and_then(|members| {
+                members
+                    .iter()
+                    .find(|candidate| {
+                        candidate.supersedes_forecast_id.as_deref()
+                            == Some(forecast.forecast_id.as_str())
+                    })
+                    .map(|candidate| candidate.committed_at_ns)
             });
         if let Some(disposition) = dispositions_by_forecast.get(forecast.forecast_id.as_str())
             && matches!(disposition.action.as_str(), "steer" | "branch")
-            && !has_child
         {
-            findings.push(format!(
-                "{} disposition for {} has no superseding forecast",
-                disposition.action, forecast.forecast_id
-            ));
+            match child_commit_time {
+                None => findings.push(format!(
+                    "{} disposition for {} has no superseding forecast",
+                    disposition.action, forecast.forecast_id
+                )),
+                Some(committed_at_ns) if committed_at_ns <= disposition.acted_at_ns => {
+                    findings.push(format!(
+                        "{} disposition for {} occurred after its successor was already committed",
+                        disposition.action, forecast.forecast_id
+                    ));
+                }
+                _ => {}
+            }
         }
     }
 
@@ -416,6 +427,12 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         if realization.started_at_ns < forecast.target_start_ns {
             findings.push(format!(
                 "forecast {} realization started before its target window",
+                forecast.forecast_id
+            ));
+        }
+        if realization.started_at_ns > forecast.target_end_ns {
+            findings.push(format!(
+                "forecast {} realization started after its target window ended",
                 forecast.forecast_id
             ));
         }
@@ -484,6 +501,14 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                         return Err(format!(
                             "realized event {} references unknown forecast event {}",
                             event.event_id, forecast_event_id
+                        ));
+                    }
+                    if event.onset_ns < forecast.target_start_ns
+                        || event.onset_ns >= forecast.target_end_ns
+                    {
+                        findings.push(format!(
+                            "realized event {} falls outside forecast {} target window",
+                            event.event_id, forecast.forecast_id
                         ));
                     }
                     if realized_by_forecast_event
@@ -1102,6 +1127,48 @@ mod tests {
                 .iter()
                 .any(|finding| finding.contains("superseded forecast"))
         );
+    }
+
+    #[test]
+    fn steer_after_successor_commit_is_stale_and_unqualified() {
+        let mut value = panel();
+        let mut second = value["forecasts"][0].clone();
+        second["forecast_id"] = serde_json::json!("forecast-2");
+        second["revision"] = serde_json::json!(2);
+        second["supersedes_forecast_id"] = serde_json::json!("forecast-001");
+        second["input_snapshot_id"] = serde_json::json!("snapshot-2");
+        second["input_history_sha256"] =
+            serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
+        second["committed_at_ns"] = serde_json::json!(900_000_000_u64);
+        value["input_snapshots"].as_array_mut().unwrap().push(serde_json::json!({
+            "input_snapshot_id":"snapshot-2",
+            "available_at_ns":850_000_000_u64,
+            "input_history_sha256":"9999999999999999999999999999999999999999999999999999999999999999"
+        }));
+        value["forecasts"].as_array_mut().unwrap().push(second);
+        value["dispositions"][0]["action"] = serde_json::json!("steer");
+        value["dispositions"][0]["acted_at_ns"] = serde_json::json!(950_000_000_u64);
+        let report = audit(&value).expect("late steer remains reportable");
+        assert!(!report.structurally_valid_anticipatory_trace);
+        assert!(report
+            .qualification_findings
+            .iter()
+            .any(|finding| finding.contains("successor was already committed")));
+    }
+
+    #[test]
+    fn realization_after_target_window_is_rejected_even_before_expiry() {
+        let mut value = panel();
+        value["realizations"][0]["started_at_ns"] = serde_json::json!(1_550_000_000_u64);
+        value["realizations"][0]["completed_at_ns"] = serde_json::json!(1_560_000_000_u64);
+        value["realizations"][0]["events"][0]["onset_ns"] =
+            serde_json::json!(1_555_000_000_u64);
+        let report = audit(&value).expect("late realization remains reportable");
+        assert!(!report.structurally_valid_anticipatory_trace);
+        assert!(report
+            .qualification_findings
+            .iter()
+            .any(|finding| finding.contains("target window ended")));
     }
 
     #[test]
