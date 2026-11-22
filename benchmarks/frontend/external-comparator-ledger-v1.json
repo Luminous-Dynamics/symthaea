@@ -488,6 +488,33 @@
         "https://arena.ai/leaderboard/code/webdev/react",
         "https://arena.ai/how-it-works"
       ]
+    },
+    {
+      "id": "arena-webdev-overall",
+      "name": "Arena Code Arena — WebDev overall",
+      "scope": "Live pairwise human-preference arena for generated web applications; broader WebDev aggregate, distinct from frontend/HTML/React/Fullstack sub-boards.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-22",
+          "user_votes": 1044803,
+          "models": 164,
+          "leader": "Claude Fable 5.2 (xHigh)",
+          "leader_rating": 1822,
+          "next_rank": "Claude Opus 5.5 (Max)"
+        }
+      ],
+      "limitations": [
+        "Human preference rating, not deterministic task-success or requirement-correctness evidence.",
+        "The overall board and frontend/HTML/React/Fullstack sub-boards are separately calibrated; do not blend their ratings.",
+        "Vote count is not a count of unique benchmark tasks.",
+        "Model, configuration and reasoning budget are part of submission identity."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev"
+      ]
     }
   ]
 }

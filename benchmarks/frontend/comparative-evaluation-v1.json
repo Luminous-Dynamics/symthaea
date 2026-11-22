@@ -139,9 +139,11 @@
   },
   "success_criteria": {
     "benchmark_qualification": "The separate mutation/oracle qualification must pass before any agent score is called qualified.",
-    "superiority": "For the primary A4 vs A0 success difference, require a positive paired 95% confidence interval excluding zero and all hard gates passing.",
+    "superiority": "For the primary A4 vs A0 accepted-task-rate difference, target at least +5 percentage points, require the paired 95% confidence interval to exclude zero, and require every hard gate to pass. Lock the minimum effect before opening the holdout and perform task-clustered power analysis from the blinded pilot.",
     "noninferiority_efficiency": "Alternatively, require success within a pre-registered 2 percentage-point non-inferiority margin and at least 30% lower cost per accepted task.",
-    "no_cross_benchmark_blending": "Never pool SFEB, Vision2Web, Design2Code or browser-agent scores; reproduce each external benchmark's own protocol and report separately."
+    "no_cross_benchmark_blending": "Never pool SFEB, Vision2Web, Design2Code or browser-agent scores; reproduce each external benchmark's own protocol and report separately.",
+    "minimum_practically_meaningful_effect_pp": 5,
+    "cross_benchmark": "Target at least +3 percentage points against the strongest matched Vision2Web per-level baseline only after reproducing the official task split, model, harness, budget, browser and scorer; publish confidence intervals and report every level separately. This is a research target, not an achieved comparison."
   },
   "external_comparators": [
     {
@@ -193,6 +195,11 @@
       "name": "Arena Code Arena React",
       "scope": "React-specific preference sub-board; ecosystem comparator rather than Leptos equivalence",
       "reference": "https://arena.ai/leaderboard/code/webdev/react"
+    },
+    {
+      "name": "Arena Code Arena WebDev overall",
+      "scope": "overall pairwise human-preference board; 2026-11-22 snapshot, distinct from the frontend-specific sub-board",
+      "reference": "https://arena.ai/leaderboard/code/webdev"
     }
   ],
   "limits": [
