@@ -170,10 +170,9 @@ impl AudioPerception {
             if Path::new(path).exists() {
                 let prototypes = symthaea_stt::TrainedPrototypes::load(path)
                     .context("Failed to load phoneme prototypes")?;
-                let raw_expected =
-                    symthaea_stt::PrototypeEncoderMetadata::direct_mel_frame_v1(
-                        projector.config().clone(),
-                    );
+                let raw_expected = symthaea_stt::PrototypeEncoderMetadata::direct_mel_frame_v1(
+                    projector.config().clone(),
+                );
                 let temporal_expected =
                     symthaea_stt::PrototypeEncoderMetadata::direct_mel_temporal_window7_v1(
                         projector.config().clone(),
