@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/groupwise-null-calibration.schema.json",
+  "title": "RCAF stratum-conditional null calibration report",
+  "description": "Synthetic groupwise thresholds and a max-over-strata guard, with abstention for unseen and under-resolved acquisition strata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "calibration_split_id",
+    "evaluation_split_id",
+    "alpha",
+    "minimum_direction_cosine",
+    "calibration_replicates",
+    "evaluation_replicates",
+    "expected_strata",
+    "unseen_evaluation_strata",
+    "strata",
+    "estimators",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": { "const": "rcaf.groupwise-null-calibration/0.1.0" },
+    "source_status": { "const": "synthetic_groupwise_null_calibration" },
+    "calibration_split_id": { "const": "site-calibration-v1" },
+    "evaluation_split_id": { "const": "site-evaluation-v1" },
+    "alpha": { "const": 0.05 },
+    "minimum_direction_cosine": { "const": 0.0 },
+    "calibration_replicates": { "const": 297 },
+    "evaluation_replicates": { "const": 310 },
+    "expected_strata": {
+      "const": [
+        "high_motion_single_echo",
+        "low_motion_single_echo",
+        "multi_echo"
+      ]
+    },
+    "unseen_evaluation_strata": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stratum_id", "evaluation_replicates", "disposition"],
+        "properties": {
+          "stratum_id": { "const": "unseen_scanner" },
+          "evaluation_replicates": { "const": 10 },
+          "disposition": { "const": "abstain_unseen_stratum" }
+        }
+      }
+    },
+    "strata": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/stratum" }
+    },
+    "estimators": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "estimator_id",
+          "all_strata_resolvable",
+          "all_strata_evaluated",
+          "worst_observed_adaptive_fpr",
+          "worst_observed_guard_fpr"
+        ],
+        "properties": {
+          "estimator_id": {
+            "enum": [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error"
+            ]
+          },
+          "all_strata_resolvable": { "const": true },
+          "all_strata_evaluated": { "const": true },
+          "worst_observed_adaptive_fpr": { "$ref": "#/$defs/worstRate" },
+          "worst_observed_guard_fpr": { "$ref": "#/$defs/worstRate" }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "proportion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "wilson_95_lower",
+        "wilson_95_upper"
+      ],
+      "properties": {
+        "successes": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "trials": { "const": 100 },
+        "estimate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wilson_95_lower": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wilson_95_upper": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "rateSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "held_out_false_positive_rate",
+        "signal_detection_rate",
+        "directionally_correct_signal_rate",
+        "wrong_direction_acceptance_rate"
+      ],
+      "properties": {
+        "held_out_false_positive_rate": { "$ref": "#/$defs/proportion" },
+        "signal_detection_rate": { "$ref": "#/$defs/proportion" },
+        "directionally_correct_signal_rate": { "$ref": "#/$defs/proportion" },
+        "wrong_direction_acceptance_rate": { "$ref": "#/$defs/proportion" }
+      }
+    },
+    "stratumEstimator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimator_id",
+        "calibration_replicates",
+        "evaluation_replicates",
+        "minimum_resolvable_alpha",
+        "stratum_critical_value",
+        "worst_group_guard_critical_value",
+        "stratum_threshold_rates",
+        "worst_group_guard_rates"
+      ],
+      "properties": {
+        "estimator_id": {
+          "enum": [
+            "absolute_weighted_jaccard",
+            "signed_shift_weighted_jaccard",
+            "normalized_mean_absolute_edge_error"
+          ]
+        },
+        "calibration_replicates": { "const": 99 },
+        "evaluation_replicates": { "const": 100 },
+        "minimum_resolvable_alpha": { "const": 0.01 },
+        "stratum_critical_value": { "type": "number", "minimum": 0 },
+        "worst_group_guard_critical_value": { "type": "number", "minimum": 0 },
+        "stratum_threshold_rates": { "$ref": "#/$defs/rateSet" },
+        "worst_group_guard_rates": { "$ref": "#/$defs/rateSet" }
+      }
+    },
+    "stratum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stratum_id", "estimators"],
+      "properties": {
+        "stratum_id": {
+          "enum": [
+            "high_motion_single_echo",
+            "low_motion_single_echo",
+            "multi_echo"
+          ]
+        },
+        "estimators": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/stratumEstimator" }
+        }
+      }
+    },
+    "worstRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stratum_id", "rate"],
+      "properties": {
+        "stratum_id": {
+          "enum": [
+            "high_motion_single_echo",
+            "low_motion_single_echo",
+            "multi_echo"
+          ]
+        },
+        "rate": { "$ref": "#/$defs/proportion" }
+      }
+    }
+  }
+}

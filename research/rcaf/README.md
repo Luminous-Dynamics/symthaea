@@ -264,3 +264,24 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_held_out_null_
 The report contract is `held-out-null-calibration.schema.json`. The implementation refuses overlapping calibration/evaluation replicate identifiers, duplicate IDs, invalid statistics and undefined signal directions. If the requested alpha is below the finite calibration resolution, it returns no critical value and makes no rejections. See `docs/neuroscience/RCAF_HELD_OUT_NULL_CALIBRATION_V1.md`.
 
 These Wilson intervals describe Monte Carlo binomial uncertainty only. The current smoke fixture does not establish empirical FPR, power, participant/site independence or biological transportability. Calibration/evaluation splits in real data must be separated by independent participant/session/site clusters where dependence exists.
+
+
+## Stratum-conditional calibration and worst-group shift guard
+
+The `groupwise_null_calibration` module addresses a limitation of pooled null thresholds: an acceptable average false-positive rate can conceal a badly miscalibrated site, scanner, echo regime or motion-burden subgroup.
+
+It supports two policies:
+- a **stratum-specific threshold**, calibrated only on that predeclared stratum;
+- a **common worst-group guard**, set to the maximum of the thresholds across all expected strata.
+
+The common guard is unavailable if any expected stratum lacks enough calibration replicates to resolve alpha. An unseen evaluation stratum is explicitly assigned `abstain_unseen_stratum`; it never inherits another group's threshold. Missing evaluation groups are marked incomplete rather than recorded as zero false positives.
+
+Run the synthetic three-stratum smoke fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_groupwise_null_calibration
+```
+
+The report contract is `groupwise-null-calibration.schema.json`. It reports local and common-guard FPR, signal detection, directionally correct detections, wrong-direction acceptance, Wilson intervals, calibration resolution and worst observed group results. The specification is `docs/neuroscience/RCAF_GROUPWISE_SHIFT_CALIBRATION_V1.md`.
+
+The finite-sample interpretation remains conditional on exchangeability within each predeclared stratum. This does not solve arbitrary continuous covariate shift, participant/site dependence or unseen-domain generalization. Per-estimator alpha is reported separately; post-hoc selection among the three estimators requires multiplicity control.

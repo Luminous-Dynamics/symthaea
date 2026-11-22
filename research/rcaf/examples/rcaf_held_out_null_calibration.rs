@@ -1,6 +1,5 @@
 use cetb_rcaf::held_out_null_calibration::{
-    calibrate_and_evaluate_held_out_null, HeldOutEvaluationObservation,
-    NullCalibrationObservation,
+    calibrate_and_evaluate_held_out_null, HeldOutEvaluationObservation, NullCalibrationObservation,
 };
 use std::error::Error;
 use std::fs;

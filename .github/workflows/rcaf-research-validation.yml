@@ -572,6 +572,76 @@ jobs:
           print("PASS: disjoint held-out calibration, null FPR, direction-aware signal outcomes and Wilson intervals")
           PY
 
+      - name: Run stratum-conditional null calibration and worst-group guard
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_groupwise_null_calibration -- "$RUNNER_TEMP/rcaf-groupwise-null-calibration.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/groupwise-null-calibration.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-groupwise-null-calibration.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          expected_strata = [
+              "high_motion_single_echo",
+              "low_motion_single_echo",
+              "multi_echo",
+          ]
+          estimator_ids = [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          assert report["source_status"] == "synthetic_groupwise_null_calibration"
+          assert report["calibration_split_id"] != report["evaluation_split_id"]
+          assert report["calibration_replicates"] == 297
+          assert report["evaluation_replicates"] == 310
+          assert report["expected_strata"] == expected_strata
+          assert len(report["unseen_evaluation_strata"]) == 1
+          unseen = report["unseen_evaluation_strata"][0]
+          assert unseen == {
+              "stratum_id": "unseen_scanner",
+              "evaluation_replicates": 10,
+              "disposition": "abstain_unseen_stratum",
+          }
+          assert len(report["strata"]) == 3
+          strata = {item["stratum_id"]: item for item in report["strata"]}
+          scales = {
+              "low_motion_single_echo": 1.0,
+              "high_motion_single_echo": 2.0,
+              "multi_echo": 3.0,
+          }
+          base_thresholds = [0.95, 0.76, 0.57]
+          for estimator_index, estimator_id in enumerate(estimator_ids):
+              aggregate = report["estimators"][estimator_index]
+              assert aggregate["estimator_id"] == estimator_id
+              assert aggregate["all_strata_resolvable"] is True
+              assert aggregate["all_strata_evaluated"] is True
+              assert abs(aggregate["worst_observed_adaptive_fpr"]["rate"]["estimate"] - 0.05) <= 1e-12
+              assert abs(aggregate["worst_observed_guard_fpr"]["rate"]["estimate"] - 0.05) <= 1e-12
+              for stratum_id, scale in scales.items():
+                  values = strata[stratum_id]["estimators"]
+                  item = values[estimator_index]
+                  expected_threshold = base_thresholds[estimator_index] * scale
+                  assert item["calibration_replicates"] == 99
+                  assert item["evaluation_replicates"] == 100
+                  assert abs(item["minimum_resolvable_alpha"] - 0.01) <= 1e-12
+                  assert abs(item["stratum_critical_value"] - expected_threshold) <= 1e-12
+                  assert abs(item["worst_group_guard_critical_value"] - base_thresholds[estimator_index] * 3.0) <= 1e-12
+                  adaptive = item["stratum_threshold_rates"]
+                  guard = item["worst_group_guard_rates"]
+                  assert adaptive["held_out_false_positive_rate"]["successes"] == 5
+                  assert abs(adaptive["held_out_false_positive_rate"]["estimate"] - 0.05) <= 1e-12
+                  assert guard["held_out_false_positive_rate"]["successes"] <= 5
+                  assert adaptive["directionally_correct_signal_rate"]["successes"] + adaptive["wrong_direction_acceptance_rate"]["successes"] == adaptive["signal_detection_rate"]["successes"]
+                  expected_wrong = [4, 10, 10][estimator_index]
+                  assert adaptive["wrong_direction_acceptance_rate"]["successes"] == expected_wrong
+          print("PASS: per-stratum calibration, common max-quantile guard, worst-group rates and unseen-stratum abstention")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -587,7 +657,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-spatial-variance-calibration.json" \
               "$RUNNER_TEMP/rcaf-factorial-counterfactual.json" \
               "$RUNNER_TEMP/rcaf-factorial-dose-response.json" \
-              "$RUNNER_TEMP/rcaf-held-out-null-calibration.json"
+              "$RUNNER_TEMP/rcaf-held-out-null-calibration.json" \
+              "$RUNNER_TEMP/rcaf-groupwise-null-calibration.json"
           python - <<'PY'
           import json
           import os
@@ -602,7 +673,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 11
+          assert len(receipt["simulation_reports"]) == 12
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -622,6 +693,7 @@ jobs:
             ${{ runner.temp }}/rcaf-factorial-counterfactual.json
             ${{ runner.temp }}/rcaf-factorial-dose-response.json
             ${{ runner.temp }}/rcaf-held-out-null-calibration.json
+            ${{ runner.temp }}/rcaf-groupwise-null-calibration.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
