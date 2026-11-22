@@ -36,19 +36,31 @@ impl fmt::Display for SpatialVarianceCalibrationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidTargetFraction => {
-                write!(f, "target nuisance component-variance fraction must be finite in [0, 1)")
+                write!(
+                    f,
+                    "target nuisance component-variance fraction must be finite in [0, 1)"
+                )
             }
             Self::DimensionMismatch => {
-                write!(f, "clean observations must match spatial nuisance field dimensions")
+                write!(
+                    f,
+                    "clean observations must match spatial nuisance field dimensions"
+                )
             }
             Self::NonFiniteInput => {
                 write!(f, "clean observations and nuisance values must be finite")
             }
             Self::ZeroCleanVariance => {
-                write!(f, "clean observations must have positive pooled within-ROI variance")
+                write!(
+                    f,
+                    "clean observations must have positive pooled within-ROI variance"
+                )
             }
             Self::ZeroNuisanceVariance => {
-                write!(f, "a positive target fraction requires a non-zero nuisance field")
+                write!(
+                    f,
+                    "a positive target fraction requires a non-zero nuisance field"
+                )
             }
             Self::NonFiniteScale => {
                 write!(f, "variance calibration produced a non-finite scale")
@@ -75,10 +87,8 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
     clean_observations: &[Vec<f64>],
     nuisance_field: &SpatialNuisanceField,
     target_fraction: f64,
-) -> Result<
-    (SpatialNuisanceField, SpatialVarianceCalibrationReport),
-    SpatialVarianceCalibrationError,
-> {
+) -> Result<(SpatialNuisanceField, SpatialVarianceCalibrationReport), SpatialVarianceCalibrationError>
+{
     if !target_fraction.is_finite() || !(0.0..1.0).contains(&target_fraction) {
         return Err(SpatialVarianceCalibrationError::InvalidTargetFraction);
     }
@@ -89,7 +99,10 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
         || roi_count < 2
         || nuisance_field.values.len() != time_points
         || clean_observations.iter().any(|row| row.len() != roi_count)
-        || nuisance_field.values.iter().any(|row| row.len() != roi_count)
+        || nuisance_field
+            .values
+            .iter()
+            .any(|row| row.len() != roi_count)
     {
         return Err(SpatialVarianceCalibrationError::DimensionMismatch);
     }
@@ -117,9 +130,7 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
     let scale_multiplier = if target_fraction == 0.0 {
         0.0
     } else {
-        ((target_fraction / (1.0 - target_fraction))
-            * (clean_variance / nuisance_variance))
-            .sqrt()
+        ((target_fraction / (1.0 - target_fraction)) * (clean_variance / nuisance_variance)).sqrt()
     };
     if !scale_multiplier.is_finite() {
         return Err(SpatialVarianceCalibrationError::NonFiniteScale);
@@ -146,9 +157,8 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
     } else {
         0.0
     };
-    let combined_variance = calibrated_clean_variance
-        + calibrated_nuisance_variance
-        + 2.0 * calibrated_covariance;
+    let combined_variance =
+        calibrated_clean_variance + calibrated_nuisance_variance + 2.0 * calibrated_covariance;
 
     if [
         realized_fraction,
@@ -177,10 +187,7 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
     ))
 }
 
-fn pooled_within_roi_moments(
-    clean: &[Vec<f64>],
-    nuisance: &[Vec<f64>],
-) -> (f64, f64, f64) {
+fn pooled_within_roi_moments(clean: &[Vec<f64>], nuisance: &[Vec<f64>]) -> (f64, f64, f64) {
     let time_points = clean.len();
     let roi_count = clean[0].len();
     let divisor = (time_points * roi_count) as f64;
@@ -190,8 +197,7 @@ fn pooled_within_roi_moments(
 
     for roi in 0..roi_count {
         let clean_mean = clean.iter().map(|row| row[roi]).sum::<f64>() / time_points as f64;
-        let nuisance_mean =
-            nuisance.iter().map(|row| row[roi]).sum::<f64>() / time_points as f64;
+        let nuisance_mean = nuisance.iter().map(|row| row[roi]).sum::<f64>() / time_points as f64;
         for time in 0..time_points {
             let clean_centered = clean[time][roi] - clean_mean;
             let nuisance_centered = nuisance[time][roi] - nuisance_mean;
@@ -212,8 +218,7 @@ fn pooled_within_roi_moments(
 mod tests {
     use super::*;
     use crate::spatial_nuisance::{
-        generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig,
-        SpatialNuisanceFamily,
+        generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig, SpatialNuisanceFamily,
     };
 
     fn graph() -> SpatialGraph {
@@ -261,7 +266,11 @@ mod tests {
             calibrate_spatial_nuisance_to_component_fraction(&clean, &field, 0.15).unwrap();
         assert!((report.realized_component_variance_fraction - 0.15).abs() < 1e-12);
         assert!(report.applied_scale_multiplier.is_finite());
-        assert!(calibrated.values.iter().flatten().any(|value| *value != 0.0));
+        assert!(calibrated
+            .values
+            .iter()
+            .flatten()
+            .any(|value| *value != 0.0));
     }
 
     #[test]
@@ -270,8 +279,16 @@ mod tests {
         let field = generate_spatial_nuisance_field(&graph(), &config(2, 0.2, 18), None).unwrap();
         let (calibrated, report) =
             calibrate_spatial_nuisance_to_component_fraction(&clean, &field, 0.0).unwrap();
-        assert!(calibrated.values.iter().flatten().all(|value| *value == 0.0));
-        assert!(calibrated.factor_series.iter().flatten().all(|value| *value == 0.0));
+        assert!(calibrated
+            .values
+            .iter()
+            .flatten()
+            .all(|value| *value == 0.0));
+        assert!(calibrated
+            .factor_series
+            .iter()
+            .flatten()
+            .all(|value| *value == 0.0));
         assert_eq!(report.realized_component_variance_fraction, 0.0);
         assert_eq!(report.applied_scale_multiplier, 0.0);
     }
@@ -292,10 +309,8 @@ mod tests {
     fn component_fraction_calibration_is_invariant_to_initial_additive_dose() {
         let clean = clean_observations();
         let graph = graph();
-        let field_a =
-            generate_spatial_nuisance_field(&graph, &config(1, 0.05, 20), None).unwrap();
-        let field_b =
-            generate_spatial_nuisance_field(&graph, &config(3, 0.40, 21), None).unwrap();
+        let field_a = generate_spatial_nuisance_field(&graph, &config(1, 0.05, 20), None).unwrap();
+        let field_b = generate_spatial_nuisance_field(&graph, &config(3, 0.40, 21), None).unwrap();
         let (_, report_a) =
             calibrate_spatial_nuisance_to_component_fraction(&clean, &field_a, 0.20).unwrap();
         let (_, report_b) =
