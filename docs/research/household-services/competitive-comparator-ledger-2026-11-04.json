@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.4",
+  "schema_version": "0.5",
   "snapshot_date": "2026-11-22",
   "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results. Snapshot refreshed 2026-11-22 with current Topten European desk references and the direct-DC PV-water-heating research frontier; all added catalogue values remain supplier-declared/database/modelled evidence, not Luminous physical results. South African direct-PV water-heating incumbents and the IEC 63349 controller standards family added 2026-11-22; all manufacturer performance data are claims, not independent measurements.",
   "claim_ceiling": [
@@ -465,7 +465,22 @@
       },
       "data_availability": "authors report public simulation code and results; exact code/data revision correspondence to the journal paper requires independent verification",
       "code_repository": "https://github.com/WalkerFelix/Simulation-Based-Solar-PV-Assisted-Domestic-Water-Heating-in-Sub-Saharan-African-Cities",
-      "claim_ceiling": "Peer-reviewed journal simulation, not physical product qualification or an independently reproduced Luminous result. Public repository code currently has reproducibility questions recorded in HEATBANK-DIRECTPV-REPRO-001; do not treat reported savings or comfort as guaranteed."
+      "claim_ceiling": "Peer-reviewed journal simulation, not physical product qualification or an independently reproduced Luminous result. Public repository code currently has reproducibility questions recorded in HEATBANK-DIRECTPV-REPRO-001; do not treat reported savings or comfort as guaranteed. The nine-city config may correspond to the June 2026 South Africa-only SSRN preprint; this version relationship remains to be confirmed by exact commit/data/output mapping.",
+      "related_preprint": {
+        "title": "Simulation-Based Assessment of Solar PV-Assisted Domestic Water Heating in South African Cities",
+        "publication_type": "SSRN preprint",
+        "posted_date": "2026-06-13",
+        "scope": "nine South African cities",
+        "url": "https://papers.ssrn.com/sol3/Delivery.cfm/82011b4b-e1c6-4d6a-b907-e55e6f9fef0b-MECA.pdf?abstractid=6929312",
+        "relation_to_journal_article": "Related earlier manuscript; not assumed identical to the October 2026 seven-city journal article."
+      },
+      "code_repository_correspondence": {
+        "observed_public_repo_config_scope": "nine South African city keys",
+        "likely_relationship": "appears consistent with the June 2026 South Africa-only preprint",
+        "exact_code_commit_to_paper_mapping": "unverified",
+        "exact_input_data_and_result_bundle_mapping": "unverified",
+        "claim_ceiling": "Do not claim the public repository reproduces the seven-city October journal article or the nine-city June preprint until commit, input data and result outputs are matched to each version."
+      }
     }
   ],
   "standards_and_adjacent_baselines": [
