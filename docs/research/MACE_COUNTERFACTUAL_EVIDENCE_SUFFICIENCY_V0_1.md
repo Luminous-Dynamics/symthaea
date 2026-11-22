@@ -622,3 +622,275 @@ For rare integrity failures, report exact one-sided confidence bounds and indepe
 5. Reproduce the public AML, TimlMemBench, FAMA, StateMemBench, MemoryArena, WorldMemArena and AMA-Bench protocols separately, then run matched-budget MACE extensions.
 6. Move hidden labels, seeds and primary evaluator custody outside the candidate implementation before confirmatory claims.
 
+
+
+## 15. First executable decision-sufficiency frontier and EVSI planner (2026-11-23)
+
+### Deliverables on the stacked frontier branch
+
+The new Rust binary is \`mace_sufficiency_frontier\` in the existing evaluator crate. It is a separate increment stacked on the receipt-lineage branch and tracked under #13284. It does not modify the receipt-lineage PR's ownership.
+
+Invocation from the repository root:
+
+\`\`\`text
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml --bin mace_sufficiency_frontier -- 64 candidate.jsonl evaluator.jsonl 557... 0.01 acquisition.jsonl
+\`\`\`
+
+Arguments are: world-cluster count (1..=1000), candidate JSONL output, evaluator JSONL output, public random seed, regret-gap epsilon and acquisition-plan JSONL output. Omitted arguments use documented defaults in the binary.
+
+Each generated world has:
+- a no-memory reference;
+- a full-scope information reference (not an equal-cost competitor);
+- event-ID-ordered candidate selection (explicitly not a learned key/value retriever);
+- a deterministic seed-clustered random control;
+- static event-ID HDC;
+- typed-content HDC.
+
+The four budgeted arms are swept at per-action top-k values 1, 2, 4 and 8. The same frozen \`Policy::CausalQualified\` is applied to every selected evidence set. HDC and typed-content indexes are built once per world/arm and their build time and payload lower bound are reported for each corresponding budget point.
+
+### Decision-sufficiency outputs
+
+The candidate JSONL contains task contracts, selected event IDs, candidate decisions, exact candidate-input digests, method/budget identity, profile identity and measured costs. It contains no evaluator optimal action, realized utility, scenario-family label or regret.
+
+The evaluator JSONL separately scores:
+- absolute regret against the evaluator-only optimal action;
+- regret gap against the full-scope reference;
+- epsilon sufficiency by regret alone;
+- full-scope decision agreement;
+- oracle-optimal agreement;
+- per-world Pareto-frontier membership over selected Experience-struct bytes, index-payload bytes, measured index-build plus selection/decision latency, and absolute regret.
+
+The exact-scope/full-scope reference is an information reference, not proof of world completeness. A lower regret gap is not by itself an evidence-qualification certificate.
+
+**Accounting boundary:** current byte values are lower bounds from \`size_of::<Experience>()\` and retrieval index payload. They exclude allocator/container overhead, receipts, sidecars, raw source bytes, journals, lifecycle metadata, serialization, background maintenance and verification work. Token cost is null because the synthetic typed Experience records are not raw conversational text. Do not present these fields as all-in cost.
+
+**Evidence boundary:** the current generated-world lane has no authenticated dependency sidecar. Every available event is counted as lineage-incomplete, imported/verified sidecar fields are null, and \`evidence_qualified_sufficient\` is always false. The runner can explore decision-regret sufficiency only; it cannot claim evidence-qualified or production memory sufficiency.
+
+### Active evidence acquisition: first decision-specific EVSI core
+
+The new \`acquisition.rs\` module implements exact finite-hypothesis expected value of sample information (EVSI). For a candidate query \(q\):
+
+\`\`\`text
+prior Bayes risk
+  - expected posterior Bayes risk after q
+  - acquisition cost
+  - delay cost
+  - approved-disclosure exposure cost
+= net EVSI
+\`\`\`
+
+It ranks positive-net-EVSI requests deterministically and otherwise returns \`stop_or_abstain\`. It compares decision-relevant measurement with a high-entropy but decision-irrelevant observation. Source authorization, scope validity, privacy approval and deadline feasibility are hard admissibility gates; no amount of predicted utility can override them.
+
+The planner receives prior probabilities, declared action-loss vectors and candidate observation likelihoods. It does not inspect realized future outcomes or evaluator labels. The current CLI emits a small analytic two-hypothesis fixture to \`acquisition.jsonl\`; it does not contact a source, execute a measurement or obtain a receipt. Cost and loss terms must be expressed in a common, declared decision-loss unit; the code does not invent a conversion from dollars, seconds or privacy exposure. The exposure term applies only after the separate hard privacy-approval gate has passed.
+
+The planner now reports three parallel query selectors under the same hard admissibility gates:
+- **EVSI** — maximize expected decision-risk reduction after the observation, less normalized acquisition/delay/approved-disclosure costs.
+- **Uncertainty-only** — maximize predictive outcome entropy, deliberately ignoring decision relevance and cost.
+- **Seeded random** — choose among admissible requests using a stable public-seed/query-ID hash.
+
+The fixture's decision-relevant measurement has two equiprobable outcomes (1 bit predictive entropy) and reduces Bayes risk from 0.5 to 0.1. Its irrelevant signal has four equiprobable outcomes (2 bits) yet leaves the posterior decision risk unchanged. Thus the uncertainty-only selector deliberately chooses the irrelevant query, while EVSI chooses the measurement that changes the optimal decision. The unauthorized perfect-information query is rejected by the same source-authority gate for all three selectors. This is an analytic counterexample to treating entropy reduction as decision value, not an empirical agent result.
+
+The fixture is a policy unit test, not an empirical agent benchmark. The module has regression tests for decision-relevant versus uncertainty-only evidence, unauthorized high-value queries, malformed observation models and query/outcome order invariance. The EVSI and uncertainty-only selectors are compared against a seeded-random admissible-request control. The frontier also tests retrieval-profile binding in candidate identity and random-control selection invariance under reversed memory ordering.
+
+### Current competitor and baseline boundaries
+
+The latest official AML Cycle 2 open-method references are Resurface 61.22 (textual), Khipu 43.26 (multimodal) and InsightMem 63.33% resolved (coding), published 19 November 2026. Keep the commercial/closed-source divisions separate. These are leaderboard targets, not MACE measurements.
+
+MemoryArena evaluates interdependent multi-session agent/environment tasks and reports a gap between long-context recall and downstream task completion. StateMemBench has 234 evolving-state scenarios and demonstrates the value of explicit current-state tracking. FAMA penalizes obsolete-memory reuse. WorldMemArena covers 400 multimodal multi-session tasks and separates write, maintain, retrieve and use. These external benchmarks provide distinct qualification lanes; their raw percentages must not be pooled with MACE regret.
+
+References:
+- AML Cycle 2 official results: https://agentmemoryleaderboard.ai/results/cycle-2/
+- MemoryArena, ICML 2026: https://proceedings.mlr.press/v306/he26am.html
+- StateMemBench: https://arxiv.org/abs/2608.19652
+- FAMA / Memora benchmark, Findings ACL 2026: https://aclanthology.org/2026.findings-acl.1337/
+- WorldMemArena: https://worldmemarena-mem.github.io/
+
+### Next qualification gates for this slice
+
+1. Execute exact-head \`cargo fmt --check\`, \`cargo check\`, unit tests and deterministic fixture run on a real Rust toolchain. Authored tests are not passes.
+2. Validate both JSON Schemas with an independent Draft 2020-12 validator and replay the JSONL outputs through a separate schema/receipt checker.
+3. Add a raw-trajectory adapter; only then add BM25, dense, hybrid retrieval and strong reranker arms. Do not create synthetic language from the Experience struct.
+4. Add independent source verification and V2 multi-parent/root-closure/history semantics from #13264 before any evidence-qualified frontier point.
+5. Replace the analytic EVSI fixture with a sealed multi-session query/observation dataset; calibrate the likelihood models on train/calibration clusters, evaluate on held-out clusters, and record realized observation receipts.
+6. Add cluster-level paired inference and bootstrap over independent world/root clusters. Intervention rows and budget points are not independent samples.
+7. Add uncertainty over observation-model likelihoods and robust EVSI bounds. Point-estimate EVSI is only the first planner core.
+8. Move evaluator labels, seed custody and primary evaluation outside the candidate implementation before making superiority claims.
+
+The branch is source-authored and statically inspected, not compiled. No frontier metric, EVSI gain, empirical utility lift or SOTA result is claimed yet.
+
+
+
+## 16. Frontier runner implementation and active-acquisition fixture (2026-11-23)
+
+### Frontier sweep dimensions
+
+The new \`mace_sufficiency_frontier\` runner emits three separate JSONL streams:
+- candidate-only decisions;
+- evaluator-only regret/Pareto scores;
+- an evidence-acquisition EVSI policy fixture.
+
+The generated stress fixture defines 21 scenarios per independent world cluster. The frontier evaluates 18 points per scenario: no-memory, full-scope reference, and four retrieval/control arms at four per-action budgets. At the default 64 clusters, the expected output is 24,192 candidate rows and 24,192 evaluator rows, plus four EVSI fixture rows. This is a code-derived expected count, not an executed-run result.
+
+The event-ID arm is intentionally named an **ordered control**, not a key/value retrieval system: it ranks by deterministic event ID and does not implement a separately retained KV store. The HDC arms remain typed candidate indexes, not natural-language retrievers. BM25, dense and hybrid retrieval are not fabricated by tokenizing \`Experience\`; they require the raw-session adapter.
+
+The Pareto filter is an exact within-world non-dominance check over four dimensions: selected struct-byte lower bound, index-payload-byte lower bound, measured index-build plus candidate-selection/decision latency, and evaluator absolute regret. It is not an aggregate statistical frontier across independent worlds. The latter requires cluster-level paired aggregation/bootstrapping and is a subsequent increment.
+
+### EVSI comparator arms: entropy-only and seeded random
+
+The EVSI fixture now emits three candidate request selectors under the same admissibility gates:
+1. **Decision-specific EVSI:** maximize positive expected decision-risk reduction minus normalized costs.
+2. **Uncertainty-only:** choose the admissible request with maximum predictive outcome entropy, intentionally ignoring decision relevance and acquisition cost.
+3. **Seeded random:** choose an admissible request by a deterministic public-seed hash. This is a reproducible random-selection control, not a uniform random number generator guarantee.
+
+The two-hypothesis fixture makes the entropy-only trap explicit. The decision-relevant measurement has two equally likely outcomes (1 bit) and reduces Bayes decision risk from 0.5 to 0.1. The irrelevant signal has four equally likely outcomes (2 bits) but leaves the posterior action losses unchanged, so it provides zero decision-risk reduction. With its small positive acquisition cost it has negative net EVSI. The EVSI policy therefore selects the relevant measurement, while the uncertainty-only comparator selects the irrelevant signal. An unauthorized perfect-information query is excluded by the source-authority gate from EVSI, uncertainty-only and random selection alike.
+
+This is a policy-mechanics unit fixture, not an empirical agent benchmark. The 2-bit/1-bit values are analytic properties of the authored likelihood table, not measured entropy from a real source.
+
+### EVSI core and policy boundary
+
+The finite-state EVSI core validates:
+- prior probabilities sum to one;
+- query observation likelihoods are finite, normalized per hypothesis and have consistent dimensions;
+- action-loss inputs and all cost components are finite and non-negative;
+- query IDs and outcome IDs are unique;
+- the observation-model digest is canonical lowercase SHA-256.
+
+For every query it computes prior Bayes decision risk, expected posterior Bayes risk, expected risk reduction, acquisition cost, delay cost, approved-disclosure exposure cost and net EVSI. It ranks only admissible positive-net-EVSI queries. When no query qualifies, the output is \`stop_or_abstain\`.
+
+The query carries upstream gate results for source authorization, exact scope validity, privacy approval and deadline feasibility. This module does not authenticate those booleans or issue authority; a real adapter must obtain them from the appropriate verifier/policy service. Rights/privacy prohibition is never converted into an EVSI penalty. The disclosure-exposure cost only describes a burden after the separate privacy-approval gate has passed. All scalar costs must be calibrated into the same explicit decision-loss unit; this module does not invent conversions between dollars, seconds, privacy and utility.
+
+The current fixture has two equally likely hypotheses, one decision-relevant measurement, one high-entropy but decision-irrelevant signal, and one unauthorized perfect measurement. It demonstrates policy mechanics only. No observation is executed, no source is contacted, no receipt is obtained, and no empirical agent improvement is claimed.
+
+### Reproduction and provenance
+
+\`\`\`text
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml --bin mace_sufficiency_frontier -- 64 candidate.jsonl evaluator.jsonl 557... 0.01 acquisition.jsonl
+\`\`\`
+
+The run identity binds the runner source, generated fixture, policy and retrieval implementation sources, both JSON Schemas, arguments and optional \`MACE_SOURCE_REVISION\`. Candidate and evaluator streams remain separate. The candidate stream excludes scenario-family labels and evaluator utilities; the evaluator stream records the world cluster and hidden scores. Evaluator custody is nevertheless co-located in the same binary and repository, so this is still diagnostic rather than independent evaluation.
+
+### Comparator interpretation and claim boundary
+
+Current external paradigm arms to reproduce:
+- **MRAgent** dynamically explores and prunes associative memory paths during reasoning, reporting up to 23% gains on its LoCoMo/LongMemEval protocol. It is a direct comparator for active reconstruction, not an EVSI or causal-authority result. https://proceedings.mlr.press/v306/ji26d.html
+- **MemoPilot** learns memory updates over a frozen player using multi-turn GRPO, reporting 1762 Elo on Limit Texas Hold'em and 1590 on Rock-Paper-Scissors. Those game-specific Elo values are not comparable to MACE regret or AML track scores. https://proceedings.mlr.press/v306/cai26b.html
+- **Darwinian Memory** uses utility-driven pruning in GUI-agent trajectories, reporting average gains of 18.0% in task success and 33.9% in execution stability in its own multi-app protocol. MACE should reproduce it as a governed pruning comparator and add anti-poisoning, lifecycle and worst-family gates. https://proceedings.mlr.press/v306/mi26b.html
+
+The research opportunity is to combine active reconstruction, learned consolidation, utility-aware pruning and receipt-governed evidence eligibility without letting the memory learner certify its own sources or labels. We must reproduce each competitor under its native protocol before building any common matched-budget comparison.
+
+### Current verification
+
+Five frontier unit tests and four EVSI unit tests are authored. They have not been run. No Cargo, rustc, rustfmt or Nix toolchain is available in the authoring environment. JSON Schema files parse as JSON, but independent schema validation, build, test, formatting and deterministic execution remain pending. All results remain unexecuted source work; no SOTA, benchmark, safety or empirical utility claim is made.
+
+
+
+## 17. Cluster-paired frontier aggregation (2026-11-23)
+
+### Reducer
+
+A separate Rust binary \`mace_sufficiency_aggregate\` now consumes the evaluator-only JSONL stream from \`mace_sufficiency_frontier\`:
+
+\`\`\`text
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml --bin mace_sufficiency_aggregate -- evaluator.jsonl summary.jsonl 1234
+\`\`\`
+
+It performs the comparison in the correct hierarchy:
+1. require exact run/source/schema provenance across every evaluator record;
+2. reject duplicate \`(world_cluster, scenario_family, method, per_action_top_k)\` rows;
+3. require every method/budget to cover the same independent world clusters and the same scenario-family set within each cluster;
+4. average scenario-family outcomes with equal weight inside each world cluster;
+5. calculate paired method-minus-no-memory utility and absolute-regret deltas within each same world cluster;
+6. bootstrap 2,000 replicates by resampling independent world-cluster deltas, not individual scenario rows or budget points;
+7. calculate the aggregate mean-cost/mean-regret Pareto frontier across arm/budget points.
+
+Output includes mean utility/regret, epsilon-sufficiency rate by regret alone, oracle-optimal and full-scope-agreement rates, lower-bound resource metrics, paired mean utility/regret deltas vs no-memory, cluster-bootstrap 95% percentile intervals, worst-family regret increase and worst-family utility decrease (with family labels), resampling unit, provenance hashes and frontier membership.
+
+The reducer labels fewer-than-10-cluster results descriptive-only. It also labels the comparisons exploratory because no multiplicity correction or preregistered primary arm has yet been applied. The confidence intervals are not presented as confirmatory significance claims.
+
+### Inferential boundary
+
+Scenario families within a generated world are not independent samples. The reducer gives each family equal weight within its cluster and treats only distinct world clusters as resampling units. It also requires complete, identical family/cluster coverage across arms before calculating paired contrasts, preventing a method with missing difficult cases from looking artificially better.
+
+This is still a synthetic diagnostic benchmark:
+- 21 generated scenario families per cluster; 18 arm/budget points per family;
+- default 64 clusters imply 24,192 evaluator rows and 18 aggregate rows (code-derived expected counts, not executed results);
+- no authenticated source-lineage sidecars, so evidence-qualified sufficiency remains false;
+- resource estimates remain Experience-struct and HDC index-payload lower bounds;
+- no multiplicity correction, external evaluator custody or raw-session competitor adapters yet.
+
+The aggregate schema is \`mace_sufficiency_aggregate_v0_1\`. The reducer binds the exact evaluator JSONL bytes, its own source and output schema, input run/source/schema provenance, bootstrap seed and replicate count.
+
+### Tests authored
+
+Six reducer tests cover equal-weight within-cluster aggregation, deterministic cluster bootstrap, paired world-cluster matching/regret-delta direction, worst-family harm visibility, multi-dimensional Pareto dominance and canonical source revision validation. They have not been run in this environment.
+
+
+
+## 18. Updated 2026 long-term memory research and matched comparator requirements (2026-11-23)
+
+### Official AML Cycle 2 reference
+
+The official Cycle 2 page (published 19 November 2026) reports separate open-method, commercial-product and closed-source standings for textual, multimodal and coding tracks. Keep the divisions and metrics distinct:
+
+| Track / division | Leader | Result | Capability detail |
+|---|---|---:|---|
+| Textual / open method | Resurface | 61.22 overall | Explicit fact 62.98; relational/multi-hop 58.94; temporal 57.76; governance 76.55; personalization/care 38.82; workflow 59.67; epistemic safety/privacy 68.59; streaming 49.65 |
+| Multimodal / open method | Khipu | 43.26 overall | Retrieval 50.28; relational 45.82; temporal 34.23; continual learning 38.45; personalization 11.04; evidence governance 31.29 |
+| Coding / open method | InsightMem | 63.33% resolved | New-feature 74.51%; bug-fix 57.58% |
+| Textual / commercial and closed-source | MemoraX | 69.26 overall | A distinct division, not an open-source result |
+| Multimodal / commercial and closed-source | MemoraX | 53.68 overall | A distinct division, not an open-source result |
+| Coding / commercial and closed-source | MemoraX | 68.00% resolved | A distinct division, not an open-source result |
+
+Source: https://agentmemoryleaderboard.ai/results/cycle-2/ (published 2026-11-19). Capability gaps—not just overall rank—should drive the next MACE extensions. In particular, personalization/streaming and multimodal evidence governance remain weak points on the open boards. MACE has not entered Cycle 2 and cannot infer AML performance from synthetic regret results.
+
+The #13284 future open-method targets remain +3-point initial hurdles and +5-point stretch goals against the Cycle 2 open leaders:
+- Textual: 64.22 initial, 66.22 stretch.
+- Multimodal: 46.26 initial, 48.26 stretch.
+- Coding: 66.33% initial, 68.33% stretch.
+
+These must be reached on a future official cycle's exact rules and splits.
+
+### New direct and adjacent research comparators
+
+1. **MRAgent — active memory reconstruction (ICML 2026).** It represents memory as a Cue–Tag–Content associative graph and uses reasoning-time exploration/pruning of paths rather than a fixed retrieve-then-reason pipeline. Its paper reports up to 23% gains over strong baselines on LoCoMo/LongMemEval with lower retrieval cost in its own protocol. MACE should reproduce it as the active-reconstruction arm, then compare an evidence-gated variant where every expanded path is checked against scope, source identity, lineage and lifecycle before it is eligible to affect a decision. Source: https://proceedings.mlr.press/v306/ji26d.html
+
+2. **Complementary episodic + relational memory (Findings AACL 2026).** The Microsoft paper *Long-Term Agent Memory through Complementary Curation and Consolidation* combines episodic and structured relational memories with consolidation. It reports 90.2% LoCoMo accuracy and 85.5% LongMemEval-S accuracy under its own benchmark setup. This is a particularly relevant baseline because it tests whether multiple memory representations complement each other. Reproduce its exact backbone, metrics, data and adapter before comparing it with a MACE hybrid. Do not equate its accuracy values with MRAgent's judge score or AML's track score. Source: https://aclanthology.org/2026.findings-aacl.218/
+
+3. **REALM — retrieval-driven reconsolidation (2026).** It uses retrieval feedback to reorganize memory over time rather than treating retrieval as the endpoint. Its arXiv report gives 75.97% LoCoMo and 65.11% LongMemEval. Include it as a reconsolidation comparator, but reproduce its exact version/protocol before using these numbers in a table of measured results. Source: https://arxiv.org/abs/2609.16053
+
+4. **MemoPilot — learned memory-update policy (ICML 2026).** It optimizes updates to explicit memory for a frozen LLM/player through multi-turn GRPO. It reports 1,762 Elo on Limit Texas Hold'em and 1,590 on Rock-Paper-Scissors. These are game-specific results, not long-dialogue accuracy, AML scores or MACE regret. Its transferable method is learning *when and how to update memory* with sequential credit assignment. Source: https://proceedings.mlr.press/v306/cai26b.html
+
+5. **Darwinian Memory — utility-driven pruning (ICML 2026).** It breaks GUI trajectories into reusable units and uses utility-driven selection/pruning; it reports 18.0% average task-success and 33.9% execution-stability gains in its own multi-app GUI protocol. Include it as a governed-pruning comparator and add poison resistance, lineage and invalidation controls. Those percentages are not comparable to MACE. Source: https://proceedings.mlr.press/v306/mi26b.html
+
+6. **MemoryArena and FAMA.** MemoryArena evaluates interdependent multi-session Memory-Agent-Environment loops, exposing the gap between remembering and using experience. FAMA explicitly penalizes reliance on obsolete/invalidated memory. Use each benchmark's official evaluator separately. Sources: https://proceedings.mlr.press/v306/he26am.html and https://aclanthology.org/2026.findings-acl.1337/
+
+### Updated matched benchmark matrix
+
+The frontier must not stop at the synthetic HDC methods. Extend the comparison in stages:
+
+| Arm | Scientific question | Required control |
+|---|---|---|
+| No memory / full history | Lower and information-reference bounds | Same frozen answer model and context budget |
+| BM25 / dense / hybrid RRF + reranker | Does conventional retrieval beat typed HDC on raw sessions? | Real dialogue/trajectory source adapter, not stringified structs |
+| Episodic + relational hybrid | Are memory representations complementary? | Reproduce Microsoft AACL 2026 protocol, then matched MACE subset |
+| MRAgent-style active reconstruction | Does iterative path reconstruction improve use-time support? | Same task/model/tool/observation budget |
+| REALM-style reconsolidation | Does retrieval feedback improve long-run memory organization? | Freeze update horizon, measure maintenance cost and stale-use |
+| MemoPilot-style learned update policy | Does learned consolidation improve future task utility? | Frozen backbone, matched sequential environment, separate game-native replication |
+| Darwinian-style utility pruning | Does utility pruning reduce cost without deleting rare critical knowledge? | Poison, retraction, rare-detail and shift controls |
+| MACE receipt-governed decision-sufficient memory | Does evidence validity + active acquisition + lifecycle governance improve downstream regret? | Independent labels, authenticated lineage, current-at-use verification |
+| Oracle evidence/minimal memory | What is the evaluator-only upper bound? | Must never be candidate-visible |
+
+First reproduce each paper's own protocol. Only afterward build a distinct common matched-budget suite with exact adapters. Use one fixed backbone per comparison lane, same raw sessions, same observation/tool limits, same total model/token/compute budget, and same reader/judge. Keep per-benchmark native numbers in separate columns.
+
+### What would constitute a meaningful win
+
+A MACE result is stronger than a recall score only if it demonstrates all of the following on held-out independent world clusters:
+- positive paired downstream utility improvement versus no-memory and strongest reproduced non-oracle baseline;
+- lower regret and no unacceptable worst-family regression;
+- evidence selection with zero false independence or unauthorized/stale activation on deterministic and adversarial integrity panels;
+- positive net-EVSI gain over uncertainty-only and seeded-random acquisition after costs;
+- lower full lifecycle cost, including source verification, sidecar and graph maintenance, updates, tombstones, replay, context, latency and acquisition;
+- no loss of evidence validity under correction, retraction, supersession, distribution shift or multi-parent derivation.
+
+This is a staged research target, not a result. The current frontier/EVSI code uses a typed synthetic corpus, an analytic acquisition fixture and no authenticated dependency sidecar. It is a first runner—not a benchmark winner or a production memory system.
+

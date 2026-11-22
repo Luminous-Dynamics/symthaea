@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_sufficiency_aggregate_v0_1.schema.json",
+  "title": "MACE Cluster-Paired Sufficiency Frontier Summary v0.1",
+  "description": "Diagnostic aggregate of per-world MACE frontier scores. Scenario families are equally averaged within independent world clusters; paired method-minus-no-memory contrasts bootstrap only over those world clusters. The schema intentionally labels current output diagnostic-only and evidence unqualified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "input_run_id",
+    "input_public_seed",
+    "input_source_revision",
+    "input_source_code_sha256",
+    "input_fixture_sha256",
+    "input_schema_sha256",
+    "input_evaluator_jsonl_sha256",
+    "aggregation_source_sha256",
+    "summary_schema_sha256",
+    "bootstrap_seed",
+    "bootstrap_replicates",
+    "resampling_unit",
+    "within_cluster_aggregation",
+    "world_cluster_count",
+    "scenario_family_count_per_cluster",
+    "method",
+    "per_action_top_k",
+    "mean_utility",
+    "mean_absolute_regret",
+    "mean_regret_gap_vs_full_scope_reference",
+    "regret_only_epsilon_sufficiency_rate",
+    "oracle_optimal_rate",
+    "agreement_with_full_scope_rate",
+    "mean_selected_experience_struct_bytes_lower_bound",
+    "mean_index_payload_bytes_lower_bound",
+    "mean_index_and_selection_latency_ns",
+    "mean_utility_delta_vs_no_memory",
+    "mean_regret_delta_vs_no_memory",
+    "worst_family_regret_delta_vs_no_memory",
+    "worst_family_regret_delta_family",
+    "worst_family_utility_delta_vs_no_memory",
+    "worst_family_utility_delta_family",
+    "utility_delta_vs_no_memory_cluster_bootstrap_95pct_ci",
+    "regret_delta_vs_no_memory_cluster_bootstrap_95pct_ci",
+    "paired_contrast_baseline",
+    "multiple_comparison_status",
+    "pareto_frontier_member",
+    "evaluation_validity",
+    "evidence_qualified_sufficiency",
+    "inference_note",
+    "baseline_arm"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_sufficiency_aggregate_v0_1"
+    },
+    "record_type": {
+      "const": "cluster_paired_frontier_summary"
+    },
+    "input_run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "input_public_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_source_revision": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "input_source_code_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_fixture_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_schema_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_evaluator_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "aggregation_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "summary_schema_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bootstrap_replicates": {
+      "const": 2000
+    },
+    "resampling_unit": {
+      "const": "independent_world_cluster"
+    },
+    "within_cluster_aggregation": {
+      "const": "equal_weight_mean_over_scenario_families"
+    },
+    "world_cluster_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "scenario_family_count_per_cluster": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "method": {
+      "enum": [
+        "no_memory",
+        "full_scope_reference",
+        "event_id_ordered_control",
+        "random_control",
+        "static_hdc",
+        "typed_content_hdc"
+      ]
+    },
+    "per_action_top_k": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "enum": [
+            1,
+            2,
+            4,
+            8
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mean_utility": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mean_absolute_regret": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_regret_gap_vs_full_scope_reference": {
+      "type": "number"
+    },
+    "regret_only_epsilon_sufficiency_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "oracle_optimal_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "agreement_with_full_scope_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mean_selected_experience_struct_bytes_lower_bound": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_index_payload_bytes_lower_bound": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_index_and_selection_latency_ns": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_utility_delta_vs_no_memory": {
+      "type": "number"
+    },
+    "mean_regret_delta_vs_no_memory": {
+      "type": "number"
+    },
+    "utility_delta_vs_no_memory_cluster_bootstrap_95pct_ci": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "regret_delta_vs_no_memory_cluster_bootstrap_95pct_ci": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "paired_contrast_baseline": {
+      "const": "no_memory"
+    },
+    "multiple_comparison_status": {
+      "const": "exploratory_no_multiplicity_correction"
+    },
+    "pareto_frontier_member": {
+      "type": "boolean"
+    },
+    "evaluation_validity": {
+      "const": "diagnostic_only"
+    },
+    "evidence_qualified_sufficiency": {
+      "const": false
+    },
+    "inference_note": {
+      "enum": [
+        "descriptive_only_fewer_than_10_independent_world_clusters",
+        "cluster_bootstrap_95pct_interval"
+      ]
+    },
+    "baseline_arm": {
+      "type": "boolean"
+    },
+    "worst_family_regret_delta_vs_no_memory": {
+      "type": "number"
+    },
+    "worst_family_regret_delta_family": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "worst_family_utility_delta_vs_no_memory": {
+      "type": "number"
+    },
+    "worst_family_utility_delta_family": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    }
+  }
+}

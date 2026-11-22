@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_sufficiency_frontier_v0_1.schema.json",
+  "title": "MACE Decision-Sufficiency Frontier v0.1",
+  "description": "Candidate-only budgeted typed-memory observations and evaluator-only regret/Pareto scores. The generated-world lane lacks authenticated dependency receipts and MUST remain diagnostic-only.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/candidate_decision"
+    },
+    {
+      "$ref": "#/$defs/evaluator_score"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "eventIds": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 4294967295
+      },
+      "uniqueItems": true
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "action_a",
+        "action_b",
+        "abstain"
+      ]
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "no_memory",
+        "full_scope_reference",
+        "event_id_ordered_control",
+        "random_control",
+        "static_hdc",
+        "typed_content_hdc"
+      ]
+    },
+    "perActionTopK": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "enum": [
+            1,
+            2,
+            4,
+            8
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "candidate_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "pair_block_id",
+        "candidate_observation_id",
+        "candidate_input_sha256",
+        "decision_need_sha256",
+        "method",
+        "policy",
+        "per_action_top_k",
+        "selected_event_ids",
+        "decision",
+        "decision_support_event_ids",
+        "probe_requested",
+        "available_event_count",
+        "selected_event_count",
+        "available_experience_struct_bytes_lower_bound",
+        "selected_experience_struct_bytes_lower_bound",
+        "index_payload_bytes_lower_bound",
+        "index_build_ns",
+        "candidate_selection_and_decision_ns",
+        "dependency_sidecar_sha256",
+        "dependency_sidecar_ingress_verified",
+        "lineage_incomplete_event_count",
+        "evidence_qualification",
+        "token_cost",
+        "all_in_cost_accounting",
+        "public_seed",
+        "source_revision",
+        "source_code_sha256",
+        "fixture_sha256",
+        "schema_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_sufficiency_frontier_v0_1"
+        },
+        "record_type": {
+          "const": "candidate_decision"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "pair_block_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_observation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_need_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "policy": {
+          "const": "causal_qualified"
+        },
+        "per_action_top_k": {
+          "$ref": "#/$defs/perActionTopK"
+        },
+        "selected_event_ids": {
+          "$ref": "#/$defs/eventIds"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "decision_support_event_ids": {
+          "$ref": "#/$defs/eventIds"
+        },
+        "probe_requested": {
+          "type": "boolean"
+        },
+        "available_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selected_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_experience_struct_bytes_lower_bound": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selected_experience_struct_bytes_lower_bound": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_payload_bytes_lower_bound": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_build_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_selection_and_decision_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retrieval_profile_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dependency_sidecar_sha256": {
+          "type": "null"
+        },
+        "dependency_sidecar_ingress_verified": {
+          "type": "null"
+        },
+        "lineage_incomplete_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_qualification": {
+          "const": "diagnostic_only_missing_authenticated_lineage"
+        },
+        "token_cost": {
+          "type": "null"
+        },
+        "all_in_cost_accounting": {
+          "const": "struct_and_index_payload_lower_bounds_only"
+        },
+        "public_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_revision": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evaluator_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "pair_block_id",
+        "candidate_observation_id",
+        "method",
+        "per_action_top_k",
+        "scenario_family",
+        "decision",
+        "evaluator_optimal_action",
+        "utility",
+        "absolute_regret",
+        "full_scope_reference_regret",
+        "regret_gap_vs_full_scope_reference",
+        "epsilon",
+        "decision_sufficient_by_regret_only",
+        "evidence_qualified_sufficient",
+        "decision_agrees_with_full_scope_reference",
+        "oracle_optimal",
+        "pareto_frontier_member",
+        "selected_experience_struct_bytes_lower_bound",
+        "index_payload_bytes_lower_bound",
+        "measured_index_and_selection_ns",
+        "evidence_qualification",
+        "oracle_visibility",
+        "public_seed",
+        "source_revision",
+        "source_code_sha256",
+        "fixture_sha256",
+        "schema_sha256",
+        "world_cluster"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_sufficiency_frontier_v0_1"
+        },
+        "record_type": {
+          "const": "evaluator_score"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "pair_block_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_observation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "per_action_top_k": {
+          "$ref": "#/$defs/perActionTopK"
+        },
+        "scenario_family": {
+          "$ref": "#/$defs/id"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "evaluator_optimal_action": {
+          "$ref": "#/$defs/decision"
+        },
+        "utility": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "absolute_regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "full_scope_reference_regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "regret_gap_vs_full_scope_reference": {
+          "type": "number"
+        },
+        "epsilon": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decision_sufficient_by_regret_only": {
+          "type": "boolean"
+        },
+        "evidence_qualified_sufficient": {
+          "const": false
+        },
+        "decision_agrees_with_full_scope_reference": {
+          "type": "boolean"
+        },
+        "oracle_optimal": {
+          "type": "boolean"
+        },
+        "pareto_frontier_member": {
+          "type": "boolean"
+        },
+        "selected_experience_struct_bytes_lower_bound": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_payload_bytes_lower_bound": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measured_index_and_selection_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_qualification": {
+          "const": "diagnostic_only_missing_authenticated_lineage"
+        },
+        "oracle_visibility": {
+          "const": "evaluator_only"
+        },
+        "public_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_revision": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "world_cluster": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    }
+  }
+}
