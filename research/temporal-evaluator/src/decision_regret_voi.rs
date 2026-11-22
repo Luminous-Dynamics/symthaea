@@ -24,7 +24,6 @@ use crate::decision_observability::{
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-pub const ROBUST_OBSERVATION_VOI_PPM: u32 = 1_000_000;
 const MAX_OUTCOME_ROWS: usize = 65_536;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
