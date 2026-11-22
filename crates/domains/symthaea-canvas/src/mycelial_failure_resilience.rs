@@ -2834,6 +2834,53 @@ mod tests {
     }
 
     #[test]
+    fn static_brandes_betweenness_matches_known_diamond_centrality_and_shared_ties() {
+        let graph = adaptive_path_load_graph();
+        graph.validate().unwrap();
+        let indexed = index_source_graph(&graph).unwrap();
+        let scores = unweighted_static_betweenness(&indexed);
+        let a = indexed.node_index["A"];
+        let b = indexed.node_index["B"];
+        let c = indexed.node_index["C"];
+        let d = indexed.node_index["D"];
+        assert!((scores[a] - scores[c]).abs() <= 1.0e-12);
+        assert!(scores[a] > scores[b]);
+        assert!(scores[c] > scores[d]);
+
+        let priority_first = if failure_entity_tie_priority(19, 1, "A")
+            < failure_entity_tie_priority(19, 1, "C")
+        {
+            "A"
+        } else {
+            "C"
+        };
+        let betweenness = build_mycelial_failure_attack_plan(
+            &graph,
+            &adaptive_path_load_demands(),
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::BetweennessJunctions,
+                seed: 19,
+                maximum_failure_budget: 1,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let degree = build_mycelial_failure_attack_plan(
+            &graph,
+            &adaptive_path_load_demands(),
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::HighestDegreeJunctions,
+                seed: 19,
+                maximum_failure_budget: 1,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(betweenness.ranked_entity_ids[0], priority_first);
+        assert_eq!(degree.ranked_entity_ids[0], priority_first);
+    }
+
+    #[test]
     fn adaptive_demand_path_load_recomputes_on_the_residual_graph() {
         let graph = adaptive_path_load_graph();
         graph.validate().unwrap();
