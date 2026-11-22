@@ -9,13 +9,17 @@
     "session_id",
     "case_id",
     "clock_domain_id",
-    "input_history_sha256",
     "policy",
     "forecasts",
     "displays",
     "dispositions",
     "realizations",
-    "claim_ceiling"
+    "claim_ceiling",
+    "reference_time_map_id",
+    "reference_time_map_version",
+    "reference_time_map_kind",
+    "reference_time_map_receipt_sha256",
+    "input_snapshots"
   ],
   "properties": {
     "schema_version": {
@@ -32,9 +36,6 @@
     "clock_domain_id": {
       "type": "string",
       "minLength": 1
-    },
-    "input_history_sha256": {
-      "$ref": "#/$defs/sha256"
     },
     "policy": {
       "$ref": "#/$defs/policy"
@@ -70,6 +71,30 @@
       "items": {
         "type": "string",
         "minLength": 1
+      }
+    },
+    "reference_time_map_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_time_map_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_time_map_kind": {
+      "enum": [
+        "notation_tempo",
+        "performance_time"
+      ]
+    },
+    "reference_time_map_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "input_snapshots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/inputSnapshot"
       }
     }
   },
@@ -149,7 +174,8 @@
         "expires_at_ns",
         "input_history_sha256",
         "policy_sha256",
-        "events"
+        "events",
+        "input_snapshot_id"
       ],
       "properties": {
         "forecast_id": {
@@ -199,6 +225,10 @@
           "items": {
             "$ref": "#/$defs/predictedEvent"
           }
+        },
+        "input_snapshot_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -339,6 +369,28 @@
           "items": {
             "$ref": "#/$defs/realizedEvent"
           }
+        }
+      }
+    },
+    "inputSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_snapshot_id",
+        "available_at_ns",
+        "input_history_sha256"
+      ],
+      "properties": {
+        "input_snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "available_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_history_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
