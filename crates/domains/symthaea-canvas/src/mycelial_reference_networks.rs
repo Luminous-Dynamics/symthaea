@@ -53,7 +53,10 @@ impl fmt::Display for MycelialReferenceNetworkError {
                 write!(f, "invalid source junction–hypha graph: {message}")
             }
             Self::TooManyJunctions(count) => {
-                write!(f, "reference calculation is bounded to {MAX_REFERENCE_NETWORK_JUNCTIONS} junctions, got {count}")
+                write!(
+                    f,
+                    "reference calculation is bounded to {MAX_REFERENCE_NETWORK_JUNCTIONS} junctions, got {count}"
+                )
             }
             Self::UnknownRootJunction(id) => {
                 write!(f, "unknown declared root junction {id}")
@@ -157,12 +160,7 @@ pub fn build_observed_network_minimum_spanning_forest(
 
     let components = disjoint.component_count();
     let selected_segment_count = selected_segment_ids.len();
-    if selected_segment_count
-        != graph
-            .junctions
-            .len()
-            .saturating_sub(components)
-    {
+    if selected_segment_count != graph.junctions.len().saturating_sub(components) {
         return Err(MycelialReferenceNetworkError::InvalidReferenceGraph(
             "selected edge count does not describe a spanning forest",
         ));
@@ -218,8 +216,7 @@ fn global_efficiency(
         }
     }
     Ok(GeometricEfficiencyReport {
-        mean_directness: (reachable_pairs > 0)
-            .then_some(sum_directness / reachable_pairs as f64),
+        mean_directness: (reachable_pairs > 0).then_some(sum_directness / reachable_pairs as f64),
         eligible_pairs,
         reachable_pairs,
         unreachable_pairs: eligible_pairs - reachable_pairs,
@@ -245,9 +242,7 @@ fn root_directed_efficiency(
         let root = index_by_id
             .get(root_id.as_str())
             .copied()
-            .ok_or_else(|| MycelialReferenceNetworkError::UnknownRootJunction(
-                root_id.clone(),
-            ))?;
+            .ok_or_else(|| MycelialReferenceNetworkError::UnknownRootJunction(root_id.clone()))?;
         roots.insert(root);
     }
     let terminals: Vec<_> = graph
@@ -293,8 +288,7 @@ fn root_directed_efficiency(
     }
     let eligible_pairs = terminals.len();
     Ok(GeometricEfficiencyReport {
-        mean_directness: (reachable_pairs > 0)
-            .then_some(sum_directness / reachable_pairs as f64),
+        mean_directness: (reachable_pairs > 0).then_some(sum_directness / reachable_pairs as f64),
         eligible_pairs,
         reachable_pairs,
         unreachable_pairs: eligible_pairs - reachable_pairs,
@@ -421,7 +415,9 @@ mod tests {
     use crate::mycelial_junction_graph::{
         MycelialJunctionGraphConfig, build_mycelial_junction_hypha_graph,
     };
-    use crate::mycelial_model::{MycelialFilament, MycelialModel, OrbitalCell, PresenceMode, SpatialPoint3};
+    use crate::mycelial_model::{
+        MycelialFilament, MycelialModel, OrbitalCell, PresenceMode, SpatialPoint3,
+    };
     use crate::mycelial_network::{AnastomosisKind, MycelialAnastomosis};
 
     fn filament(
@@ -467,8 +463,16 @@ mod tests {
                     None,
                     false,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 7.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 7.0,
+                        z: 0.0,
+                    },
                     branch,
                 ),
                 filament(
@@ -476,27 +480,49 @@ mod tests {
                     Some(1),
                     true,
                     branch,
-                    SpatialPoint3 { x: 0.0, y: 11.5, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 13.5, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 15.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 11.5,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 13.5,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 15.0,
+                        z: 0.0,
+                    },
                 ),
                 filament(
                     3,
                     Some(1),
                     true,
                     branch,
-                    SpatialPoint3 { x: 0.0, y: 12.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 18.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 20.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 12.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 18.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 20.0,
+                        z: 0.0,
+                    },
                 ),
             ],
             orbital_cells: Vec::<OrbitalCell>::new(),
         }
     }
 
-    fn brute_force_minimum_forest_traversal_cost(
-        graph: &MycelialJunctionHyphaGraph,
-    ) -> f64 {
+    fn brute_force_minimum_forest_traversal_cost(graph: &MycelialJunctionHyphaGraph) -> f64 {
         let components = graph.metrics().unwrap().connected_components;
         let required_edges = graph.junctions.len().saturating_sub(components);
         let edge_count = graph.segments.len();
@@ -557,8 +583,7 @@ mod tests {
         )
         .unwrap();
         let roots = vec!["origin:1".to_string()];
-        let report =
-            build_observed_network_minimum_spanning_forest(&graph, &roots).unwrap();
+        let report = build_observed_network_minimum_spanning_forest(&graph, &roots).unwrap();
         let metrics = graph.metrics().unwrap();
         assert_eq!(report.selected_segment_count, 3);
         assert_eq!(report.connected_components, 1);
@@ -589,7 +614,11 @@ mod tests {
             target_filament_id: 3,
             target_t: 0.5,
             kind: AnastomosisKind::TipToSide,
-            junction_position: SpatialPoint3 { x: 0.0, y: 15.0, z: 0.0 },
+            junction_position: SpatialPoint3 {
+                x: 0.0,
+                y: 15.0,
+                z: 0.0,
+            },
         };
         let graph = build_mycelial_junction_hypha_graph(
             &model,
@@ -598,11 +627,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(graph.metrics().unwrap().cycle_rank, 1);
-        let report = build_observed_network_minimum_spanning_forest(
-            &graph,
-            &["origin:1".to_string()],
-        )
-        .unwrap();
+        let report =
+            build_observed_network_minimum_spanning_forest(&graph, &["origin:1".to_string()])
+                .unwrap();
         assert_eq!(
             report.selected_segment_count,
             graph.junctions.len() - graph.metrics().unwrap().connected_components
@@ -610,7 +637,10 @@ mod tests {
         assert_eq!(report.connected_components, 1);
         assert!(
             report.hypha_arc_cost_model_units_microunits
-                <= graph.metrics().unwrap().total_hypha_length_model_units_microunits
+                <= graph
+                    .metrics()
+                    .unwrap()
+                    .total_hypha_length_model_units_microunits
         );
     }
 
@@ -663,18 +693,46 @@ mod tests {
                     None,
                     true,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
                 filament(
                     5,
                     None,
                     true,
-                    SpatialPoint3 { x: 10.0, y: 0.0, z: 0.0 },
-                    SpatialPoint3 { x: 10.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 10.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 10.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 10.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 10.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 10.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 10.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
             ],
             orbital_cells: Vec::<OrbitalCell>::new(),
