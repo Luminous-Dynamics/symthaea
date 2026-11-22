@@ -857,7 +857,6 @@ fn read_beneath(root: &Path, relative_path: &str) -> Result<Vec<u8>, String> {
 
 fn validate_evidence_run(
     run: &Value,
-    report_root: &Path,
     artifact_root: &Path,
     case_id: &str,
     phase: &str,
@@ -1009,6 +1008,13 @@ fn validate_evidence_run(
                     .and_then(Value::as_f64)
                     .ok_or_else(|| format!("{case_id} {phase}: invalid viewport scale factor"))?;
                 if !scale.is_finite()
+                    || !(0.5..=4.0).contains(&scale)
+                    || css_width <= 0.0
+                    || css_height <= 0.0
+                    || png_width == 0
+                    || png_height == 0
+                    || png_width > 4_096
+                    || png_height > 4_096
                     || (png_width as f64 - (css_width * scale).round()).abs() > f64::EPSILON
                     || (png_height as f64 - (css_height * scale).round()).abs() > f64::EPSILON
                 {
@@ -1042,7 +1048,6 @@ fn validate_evidence_run(
         }
     }
 
-    let _ = report_root;
     Ok(())
 }
 
@@ -1086,8 +1091,13 @@ fn validate_qualification_report(
         return Err("report has malformed baseline source or environment digest".to_string());
     }
 
-    let report_dir = report_path.parent().unwrap_or_else(|| Path::new("."))
-        .canonicalize().map_err(|error| format!("cannot resolve report directory: {error}"))?;
+    let report_parent = report_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let report_dir = report_parent
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve report directory: {error}"))?;
     let artifact_root_relative = report.get("artifact_root").and_then(Value::as_str)
         .ok_or_else(|| "artifact_root is required".to_string())?;
     validate_relative_repo_path(artifact_root_relative)?;
@@ -1162,7 +1172,7 @@ fn validate_qualification_report(
             {
                 return Err(format!("{id}: malformed fixture digest"));
             }
-            validate_evidence_run(run, &report_dir, &artifact_root, id,
+            validate_evidence_run(run, &artifact_root, id,
                 if std::ptr::eq(run, baseline) { "baseline" } else { "candidate" },
                 task_id, fixture_id, environment_sha)?;
         }
@@ -1228,7 +1238,7 @@ fn validate_qualification_report(
             {
                 return Err(format!("{id}: paired runs must use identical fixture and environment digests"));
             }
-            validate_evidence_run(run, &report_dir, &artifact_root, id, "positive",
+            validate_evidence_run(run, &artifact_root, id, "positive",
                 task_id, fixture_id, environment_sha)?;
         }
         if baseline.get("disposition").and_then(Value::as_str) != Some("accepted") {
@@ -1275,7 +1285,7 @@ fn validate_qualification_report(
             {
                 return Err(format!("{id}: paired runs must use identical fixture and environment digests"));
             }
-            validate_evidence_run(run, &report_dir, &artifact_root, id, "metamorphic",
+            validate_evidence_run(run, &artifact_root, id, "metamorphic",
                 task_id, fixture_id, environment_sha)?;
         }
         let required_oracle = definition.get("oracle").and_then(Value::as_str)
