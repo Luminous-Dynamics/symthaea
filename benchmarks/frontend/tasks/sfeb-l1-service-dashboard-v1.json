@@ -124,13 +124,13 @@
   },
   "reference_fixture": {
     "path": "benchmarks/frontend/fixtures/service-dashboard/",
-    "sha256": "4e7280d4c9dd017add81956c1f253899aaf69cccdd352f0de7752291851d34f7",
+    "sha256": "171f292603f159866224dbbe748141198b8f81f845e9c012d78c7486b1004c67",
     "purpose": "Original static HTML/CSS reference fixture. The digest is SHA-256 over UTF-8 bytes of reference.html, one NUL byte, then UTF-8 bytes of style.css. Do not expose fixture source to the evaluated agent when the benchmark is run in screenshot-conditioned mode."
   },
   "required_regions": [
     {
       "id": "dashboard.shell",
-      "role": "application container",
+      "role": "generic container",
       "accessible_name": null,
       "required": true
     },
@@ -143,7 +143,7 @@
     {
       "id": "dashboard.sidebar",
       "role": "complementary",
-      "accessible_name": "Workspace navigation",
+      "accessible_name": "Workspace",
       "required": true
     },
     {
@@ -357,6 +357,7 @@
   "notes": [
     "Fixture assets are original and contain no remote resources.",
     "The fixture source is the visual reference; screenshot-conditioned evaluations should provide screenshots and the product brief, not the fixture HTML/CSS.",
-    "This task is not yet runnable: an isolated fixture server, exact browser pin, screenshot baseline and independent oracle implementation remain pending."
+    "This task is not yet runnable: an isolated fixture server, exact browser pin, screenshot baseline and independent oracle implementation remain pending.",
+    "The reference fixture labels dashboard heading, activity and schedule regions with aria-labelledby, and labels the workspace complementary landmark. Three metric cards carry unique dashboard.metric-card.* source anchors for layout assertions."
   ]
 }
