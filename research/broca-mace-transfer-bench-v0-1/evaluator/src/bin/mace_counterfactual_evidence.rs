@@ -1474,6 +1474,43 @@ mod tests {
     }
 
     #[test]
+    fn all_hdc_representations_rebuild_after_source_root_knockout() {
+        let case = generated_worlds(1).remove(0);
+        let dependency_index = EvidenceDependencyIndex::build(&case.memory).unwrap();
+        let root_group = dependency_index.root_groups().next().unwrap().1;
+        let retained = dependency_index.retain_without(&root_group);
+
+        for mode in [
+            CandidateMode::StaticHdc,
+            CandidateMode::HdcLtcZeroInput,
+            CandidateMode::TypedContentHdc,
+        ] {
+            let full = run_candidate(
+                mode,
+                case.query,
+                case.decision_need,
+                &case.memory,
+            )
+            .unwrap();
+            let reduced = run_candidate(
+                mode,
+                case.query,
+                case.decision_need,
+                &retained,
+            )
+            .unwrap();
+
+            assert_ne!(full.evidence_sha256, reduced.evidence_sha256, "{}", mode.name());
+            assert!(reduced.retrieved_event_ids.iter().all(|event_id| {
+                retained.iter().any(|item| item.event_id == *event_id)
+            }), "{}", mode.name());
+            assert!(reduced.retrieved_event_ids.iter().all(|event_id| {
+                !root_group.contains(event_id)
+            }), "{}", mode.name());
+        }
+    }
+
+    #[test]
     fn no_memory_outside_option_is_not_action_b_payoff() {
         let truth = mace_generated_stress::Truth {
             utility_a: 0.1,
