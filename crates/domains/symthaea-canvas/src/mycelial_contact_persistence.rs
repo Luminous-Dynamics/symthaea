@@ -1187,9 +1187,11 @@ mod tests {
     fn tip_to_side_candidate(
         model: &MycelialModel,
         id: u32,
-        _distance: f32,
+        distance: f32,
     ) -> MycelialAnastomosisCandidate {
-        tip_to_side_candidate_between(model, id, 2, 3)
+        let mut candidate = tip_to_side_candidate_between(model, id, 2, 3);
+        candidate.contact_distance = distance;
+        candidate
     }
 
     #[test]
