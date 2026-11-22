@@ -274,7 +274,7 @@ fn run_resolution(
             let pulse_tails = pulsed.spectral_tail_diagnostics(0.75)?;
 
             println!(
-                "{label},{},{},{dt:.8},{step},{time:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+                "{label},{},{},{dt:.8},{impulse_amplitude:.8},{step},{time:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
                 config.nx,
                 config.nv,
                 pulse_echo.real,
@@ -325,11 +325,11 @@ fn run_resolution(
                 ));
             }
             println!(
-                "# negative_control,{label},{step},{time:.8},{},{},{impulse_amplitude:.8},{:.12e},{:.12e},{:.12e},{:.8},{},{:.12e},{:.8},{:.12e}",
+                "# negative_control,{label},{step},{time:.8},{},{},{impulse_amplitude:.8},{:.12e},{:.8},{:.12e},{:.8},{:.12e},{:.8},{:.12e}",
                 WRONG_SECOND_MODE,
                 wrong_prediction.echo_mode,
                 wrong_delta_real.hypot(wrong_delta_imaginary),
-                wrong_echo.phase(),
+                wrong_delta_imaginary.atan2(wrong_delta_real),
                 wrong_echo.amplitude(),
                 wrong_prediction.echo_time,
                 wrong_mode_off_target_peak,
