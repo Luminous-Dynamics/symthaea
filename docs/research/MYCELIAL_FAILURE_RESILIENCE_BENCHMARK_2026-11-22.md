@@ -34,11 +34,13 @@ Removing a junction also removes all its incident segments. Combined scenarios c
 
 The profile binds:
 - source junction–hypha graph digest;
-- demand inventory digest;
+- complete sorted demand inventory and demand digest;
 - exact failed segment/junction IDs for every scenario;
-- a per-demand outcome record;
+- a per-demand outcome record (direct distance and surviving network path, or both explicitly absent);
 - baseline and intervention summaries;
 - canonical profile digest.
+
+Profile validation recomputes each scenario's reachable/unreachable pair counts, weights, weighted reachability, directness and path-length aggregates from the per-demand outcomes. It rejects a graph path shorter than the Euclidean endpoint separation instead of omitting that demand from the summary.
 
 ## 3. Metrics
 
