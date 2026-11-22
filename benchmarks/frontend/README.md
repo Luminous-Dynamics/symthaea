@@ -4,11 +4,12 @@ This directory contains the **Symthaea Frontend Engineering Benchmark (SFEB)**.
 
 ## Current status
 
-- `sfeb-v0.json` is a machine-readable task inventory.
-- The manifest status is `specification_only`.
-- There is no runnable SFEB evaluator yet.
-- Reference assets, fixture services, browser automation, independent oracles and result receipts must be added before any score can be reported.
-- No benchmark result or SOTA claim is implied by the existence of the inventory.
+- `sfeb-v0.json` contains 11 staged task specifications; the end-to-end SFEB benchmark remains `specification_only`.
+- One local service-dashboard reference fixture and its task contract are checked in as a **public pilot**. This is not a hidden holdout.
+- `contract-check/` validates interface/task schemas, source anchors, fixture digests, provenance and retrieval-query references. Its Rust source and tests are authored but have not been compiled or executed here.
+- `retrieval-eval/` contains keyword, BM25, TF-IDF, deterministic bipolar-HDC and hybrid-RRF retrieval methods. It has not been compiled or run; no retrieval score exists yet.
+- `symthaea-browser` contains the CDP evidence-capture primitive, but the isolated full browser runner and task-level independent oracles remain pending.
+- No benchmark score or SOTA claim is implied by these artifacts.
 
 See [the research programme](../../docs/research/SYTHAEA_FRONTEND_ENGINEERING_INTELLIGENCE_2026-11-21.md) for rationale, repository audit, external comparisons, metrics, targets and the staged implementation plan.
 
@@ -292,3 +293,13 @@ Never let the tested agent be the only evaluator of its own output. Use determin
 6. Run controlled ablations: base model, retrieval, interface contract, browser observation/repair, and full Symthaea integration.
 
 Until those steps are complete, SFEB remains a research specification, not a measured capability.
+
+
+## Benchmark-oracle qualification
+
+Before comparing agents, qualify the evaluator itself. The seeded mutation campaign in
+[`qualification/README.md`](qualification/README.md) defines 20 negative controls,
+5 semantics-preserving positive controls and 5 metamorphic relations. It is a
+qualification plan, not an executed result. Critical security and evidence-integrity
+mutants must be rejected; harmless controls must remain accepted. Do not publish SFEB
+leaderboard claims until the independent oracles pass this campaign on a pinned runner.
