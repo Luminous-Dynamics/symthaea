@@ -112,7 +112,8 @@
         "schema_sha256",
         "dependency_sidecar_sha256",
         "lineage_incomplete_event_count",
-        "unresolved_parent_reference_count"
+        "unresolved_parent_reference_count",
+        "dependency_sidecar_schema_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -203,6 +204,9 @@
         "unresolved_parent_reference_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "dependency_sidecar_schema_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
