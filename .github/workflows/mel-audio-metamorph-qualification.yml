@@ -1,0 +1,100 @@
+name: MEL audio metamorph qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_AUDIO_TRANSFORM_QUALIFICATION_V1_2026-11-22.md"
+      - ".github/workflows/mel-audio-metamorph-qualification.yml"
+  push:
+    branches:
+      - research/mel-audio-metamorph-v1-20261122
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_AUDIO_TRANSFORM_QUALIFICATION_V1_2026-11-22.md"
+      - ".github/workflows/mel-audio-metamorph-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  metamorph-qualification:
+    name: Absolute judge drift and task-scoped transform receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Verify committed dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch tools/mel-judge-grounding-audit/Cargo.lock > /dev/null
+          test -f tools/mel-judge-grounding-audit/Cargo.lock
+      - name: Run deterministic Rust tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schemas and replay both known-answer fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-judge-grounding-probe-panel-v1.schema.json > /dev/null
+          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-audio-transform-qualification-v1.schema.json > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml -- \
+            audit tools/mel-judge-grounding-audit/fixtures/valid-probe-panel-v1.json \
+            "$RUNNER_TEMP/mel-judge-grounding-report.json"
+          jq -e '.case_count == 1 and .total_probe_count == 5 and .baseline_human_reference_accuracy == 1 and .nuisance_transform.pass_rate == 1 and .nuisance_transform.mean_maximum_absolute_score_drift <= 0.2' \
+            "$RUNNER_TEMP/mel-judge-grounding-report.json" > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-audio-transform-qualification -- \
+            audit tools/mel-judge-grounding-audit/fixtures/valid-transform-qualification-v1.json \
+            tools/mel-judge-grounding-audit/fixtures/source-audio.bin \
+            tools/mel-judge-grounding-audit/fixtures/variant-audio.bin \
+            "$RUNNER_TEMP/mel-audio-transform-report.json"
+          jq -e '.eligible_for_declared_task_dimension == true and .listener_count == 24 and .item_count == 40' \
+            "$RUNNER_TEMP/mel-audio-transform-report.json" > /dev/null
+      - name: Assemble exact-head reproducibility evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-audio-metamorph-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/lib.rs > "$evidence/grounding-lib-blob.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/transform_qualification.rs > "$evidence/transform-lib-blob.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/bin/mel-audio-transform-qualification.rs > "$evidence/transform-cli-blob.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-judge-grounding-audit/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-judge-grounding-audit/Cargo.lock "$evidence/Cargo.lock"
+          cp tools/mel-judge-grounding-audit/README.md "$evidence/README.md"
+          cp tools/mel-judge-grounding-audit/schema/*.json "$evidence/"
+          cp tools/mel-judge-grounding-audit/fixtures/*.json "$evidence/"
+          cp tools/mel-judge-grounding-audit/fixtures/*.bin "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/*.rs "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/bin/*.rs "$evidence/"
+          if [[ -f "$RUNNER_TEMP/mel-judge-grounding-report.json" ]]; then
+            cp "$RUNNER_TEMP/mel-judge-grounding-report.json" "$evidence/"
+          fi
+          if [[ -f "$RUNNER_TEMP/mel-audio-transform-report.json" ]]; then
+            cp "$RUNNER_TEMP/mel-audio-transform-report.json" "$evidence/"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-audio-metamorph-${ github.event.pull_request.head.sha || github.sha }
+          path: ${ runner.temp }/mel-audio-metamorph-evidence/
+          if-no-files-found: error
+          retention-days: 90
