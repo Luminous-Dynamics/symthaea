@@ -425,12 +425,11 @@ fn symmetric_eigendecomposition(matrix: &[Vec<f64>]) -> Result<EigenSystem, Spat
         let row_updates = diagonalized
             .iter()
             .enumerate()
-            .filter_map(|(k, row)| {
-                (k != p && k != q).then(|| {
-                    let akp = row[p];
-                    let akq = row[q];
-                    (k, cosine * akp - sine * akq, sine * akp + cosine * akq)
-                })
+            .filter(|(k, _)| *k != p && *k != q)
+            .map(|(k, row)| {
+                let akp = row[p];
+                let akq = row[q];
+                (k, cosine * akp - sine * akq, sine * akp + cosine * akq)
             })
             .collect::<Vec<_>>();
         for (k, new_kp, new_kq) in row_updates {
