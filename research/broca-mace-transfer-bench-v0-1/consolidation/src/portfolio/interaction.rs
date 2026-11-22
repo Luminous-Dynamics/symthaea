@@ -141,8 +141,8 @@ pub struct PortfolioInteractionCalibrationReceiptV1 {
     pub heldout_multi_event_sample_count: u32,
     pub heldout_higher_order_residual_micros: u64,
     pub maximum_allowed_higher_order_residual_micros: u64,
-    pub verified_at_ms: u64,
-    pub valid_until_ms: u64,
+    pub verified_at_ms: i64,
+    pub valid_until_ms: i64,
     pub verifier_id: String,
     pub receipt_sha256: String,
 }

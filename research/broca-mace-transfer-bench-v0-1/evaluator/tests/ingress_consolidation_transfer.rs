@@ -592,7 +592,7 @@ fn build_portfolio_interaction_option(
     .expect("representation alternatives must be re-derived");
     let plan = alternatives
         .iter()
-        .find(|option| option.disposition == ReobservationDispositionV1::StoreLocator)
+        .find(|option| option.disposition() == ReobservationDispositionV1::StoreLocator)
         .expect("locator representation must be available");
 
     MemoryPortfolioOptionV1::from_verified_plan(
