@@ -716,6 +716,9 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
+    if MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES && !(a_ok && b_ok) {
+        return Decision::abstain();
+    }
     if MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS
         && a_ok
         && b_ok
