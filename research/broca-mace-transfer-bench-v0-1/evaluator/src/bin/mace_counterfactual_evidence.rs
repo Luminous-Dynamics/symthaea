@@ -39,6 +39,8 @@ enum InterventionKind {
     Event,
     SourceRoot,
     SourceFamily,
+    UnknownRoot,
+    UnknownFamily,
     SourceRootPair,
     MatchedRandom,
     NoMemory,
@@ -371,6 +373,25 @@ fn build_manifest(
                 Some(key.clone()),
             );
         }
+    }
+
+    if !index.unknown_root_ids.is_empty() {
+        push_intervention(
+            &mut interventions,
+            InterventionKind::UnknownRoot,
+            "unknown_source_roots".to_string(),
+            index.unknown_root_ids.iter().copied().collect(),
+            None,
+        );
+    }
+    if !index.unknown_family_ids.is_empty() {
+        push_intervention(
+            &mut interventions,
+            InterventionKind::UnknownFamily,
+            "unknown_source_families".to_string(),
+            index.unknown_family_ids.iter().copied().collect(),
+            None,
+        );
     }
 
     let mut emitted_pairs = 0_usize;
@@ -1041,6 +1062,16 @@ mod tests {
         assert_eq!(index.known_family_count(), 2);
         assert_eq!(index.unknown_root_event_count(), 2);
         assert_eq!(index.unknown_family_event_count(), 2);
+
+        let manifest = build_manifest(&memory, 9, 4).unwrap();
+        assert!(manifest.interventions.iter().any(|item| {
+            item.kind == InterventionKind::UnknownRoot
+                && item.removed_event_ids == vec![memory[0].event_id, memory[1].event_id]
+        }));
+        assert!(manifest.interventions.iter().any(|item| {
+            item.kind == InterventionKind::UnknownFamily
+                && item.removed_event_ids == vec![memory[0].event_id, memory[1].event_id]
+        }));
     }
 
     #[test]
