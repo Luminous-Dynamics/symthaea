@@ -340,6 +340,108 @@ pub struct Query {
     pub scope: Scope,
 }
 
+/// Canonical identity of the MACE causal-transfer qualification profile.
+/// Changing any predicate or threshold must increment the version/domain.
+pub fn transfer_qualification_profile_digest() -> EvidenceDigest256 {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:transfer-qualification-profile:v1\0");
+    hasher.update([1_u8]); // IdentificationMethodV1::RandomizedControlledTrial
+    hasher.update(500_u16.to_be_bytes()); // minimum propensity lower bound
+    hasher.update(9_500_u16.to_be_bytes()); // maximum propensity upper bound
+    hasher.update(100_000_u32.to_be_bytes()); // maximum standardized mean difference
+    hasher.update([1_u8]); // intervention required
+    hasher.update([1_u8]); // prediction pre-registered required
+    hasher.update([1_u8]); // outcome reconciled required
+    hasher.update([1_u8]); // source trusted required
+    hasher.update([1_u8]); // source retracted forbidden
+    hasher.update([1_u8]); // interference controlled required
+    hasher.update([1_u8]); // confounders controlled required
+    hasher.update([1_u8]); // delayed horizon complete required
+    hasher.update([0_u8, 1_u8]); // observed utility and measurement bound in [0, 1]
+    let digest = hasher.finalize();
+    let mut bytes = [0_u8; 32];
+    bytes.copy_from_slice(&digest);
+    EvidenceDigest256::from_bytes(bytes)
+}
+
+/// Candidate-visible contract declaring what future decision is being made.
+/// It contains task requirements only: no realized utility, optimal action,
+/// hidden mechanism parameters, or evaluator outcome labels.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DecisionNeedV1 {
+    pub schema_version: u16,
+    pub scope: Scope,
+    pub action_alternatives: [Action; 2],
+    pub semantic_estimand: SemanticEstimandV1,
+    pub identification_method: IdentificationMethodV1,
+    pub qualification_profile_digest: EvidenceDigest256,
+}
+
+impl DecisionNeedV1 {
+    /// Build a task contract for the current MACE binary-action comparison.
+    /// None means the task did not supply a complete, canonical estimand.
+    pub fn new(scope: Scope, semantic_estimand: SemanticEstimandV1) -> Option<Self> {
+        if !semantic_estimand.is_complete()
+            || semantic_estimand.canonical_digest() == EvidenceDigest256::UNKNOWN
+        {
+            return None;
+        }
+        Some(Self {
+            schema_version: 1,
+            scope,
+            action_alternatives: [Action::A, Action::B],
+            semantic_estimand,
+            identification_method: IdentificationMethodV1::RandomizedControlledTrial,
+            qualification_profile_digest: transfer_qualification_profile_digest(),
+        })
+    }
+
+    pub fn is_valid(self) -> bool {
+        self.schema_version == 1
+            && self.action_alternatives == [Action::A, Action::B]
+            && self.semantic_estimand.is_complete()
+            && self.qualification_profile_digest == transfer_qualification_profile_digest()
+            && self.identification_method == IdentificationMethodV1::RandomizedControlledTrial
+    }
+
+    /// Domain-separated digest of the candidate-visible task requirements.
+    /// It does not authenticate who supplied the task contract.
+    pub fn canonical_digest(self) -> EvidenceDigest256 {
+        use sha2::{Digest, Sha256};
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"luminous:mace:decision-need:v1\0");
+        hasher.update(self.schema_version.to_be_bytes());
+        hasher.update([
+            match self.scope.regime {
+                Regime::Baseline => 1,
+                Regime::Shifted => 2,
+            },
+            match self.scope.objective {
+                Objective::Quality => 1,
+                Objective::Cost => 2,
+                Objective::Speed => 3,
+            },
+            1_u8, // Action::A
+            2_u8, // Action::B
+            match self.identification_method {
+                IdentificationMethodV1::RandomizedControlledTrial => 1,
+                IdentificationMethodV1::QuasiExperimental => 2,
+                IdentificationMethodV1::Observational => 3,
+                IdentificationMethodV1::Unknown => 4,
+            },
+        ]);
+        hasher.update(self.semantic_estimand.canonical_digest().as_bytes());
+        hasher.update(self.qualification_profile_digest.as_bytes());
+        let digest = hasher.finalize();
+        let mut bytes = [0_u8; 32];
+        bytes.copy_from_slice(&digest);
+        EvidenceDigest256::from_bytes(bytes)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Policy {
     NoMemory,
