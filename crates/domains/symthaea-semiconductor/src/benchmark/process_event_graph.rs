@@ -374,33 +374,33 @@ fn validate_label(label: &MetrologyLabelV1, index: usize) -> Result<(), ProcessE
         )));
     }
 
-    if let Some(value) = label.value {
-        if !value.is_finite() {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.value: expected finite number"
-            )));
-        }
+    if let Some(value) = label.value
+        && !value.is_finite()
+    {
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.value: expected finite number"
+        )));
     }
-    if let Some(uncertainty) = label.standard_uncertainty {
-        if !uncertainty.is_finite() || uncertainty < 0.0 {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.standard_uncertainty: expected finite non-negative number"
-            )));
-        }
+    if let Some(uncertainty) = label.standard_uncertainty
+        && (!uncertainty.is_finite() || uncertainty < 0.0)
+    {
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.standard_uncertainty: expected finite non-negative number"
+        )));
     }
-    if let Some(bound) = label.censoring_lower_bound {
-        if !bound.is_finite() {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.censoring_lower_bound: expected finite number"
-            )));
-        }
+    if let Some(bound) = label.censoring_lower_bound
+        && !bound.is_finite()
+    {
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.censoring_lower_bound: expected finite number"
+        )));
     }
-    if let Some(bound) = label.censoring_upper_bound {
-        if !bound.is_finite() {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.censoring_upper_bound: expected finite number"
-            )));
-        }
+    if let Some(bound) = label.censoring_upper_bound
+        && !bound.is_finite()
+    {
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.censoring_upper_bound: expected finite number"
+        )));
     }
     if let (Some(lower), Some(upper)) = (label.censoring_lower_bound, label.censoring_upper_bound)
         && lower > upper
@@ -942,9 +942,17 @@ mod tests {
         };
         let snapshot = build_information_cutoff_snapshot_v1(&input, &cutoff).unwrap();
         assert!(snapshot.unaligned_event_ids.contains(&"process-17".into()));
-        assert!(snapshot.unaligned_label_ids.contains(&"label-validated".into()));
+        assert!(
+            snapshot
+                .unaligned_label_ids
+                .contains(&"label-validated".into())
+        );
         assert!(!snapshot.available_event_ids.contains(&"process-17".into()));
-        assert!(!snapshot.matured_validated_label_ids.contains(&"label-validated".into()));
+        assert!(
+            !snapshot
+                .matured_validated_label_ids
+                .contains(&"label-validated".into())
+        );
     }
 
     #[test]
