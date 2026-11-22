@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-musical-timing-panel-v1.schema.json",
+  "title": "MEL Musical Timing Panel v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "case_id",
+    "track",
+    "clock_domain_id",
+    "instrument_scope",
+    "reference_grid_receipt_sha256",
+    "onset_capture_receipt_sha256",
+    "policy",
+    "tempo_segments",
+    "target_events",
+    "tempo_estimates",
+    "extra_onsets",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-timing-panel-v1"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "track": {
+      "enum": [
+        "midi",
+        "rendered_audio"
+      ]
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instrument_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_grid_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "onset_capture_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "tempo_segments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/segment"
+      }
+    },
+    "target_events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    },
+    "tempo_estimates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/estimate"
+      }
+    },
+    "extra_onsets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/extra"
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_relative_period_error",
+        "required_consecutive_stable_estimates"
+      ],
+      "properties": {
+        "maximum_relative_period_error": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "required_consecutive_stable_estimates": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "segment_id",
+        "start_beat_index",
+        "phase_zero_ns",
+        "change_observed_ns",
+        "beat_period_ns"
+      ],
+      "properties": {
+        "segment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_beat_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase_zero_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "change_observed_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "beat_period_ns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "instrument_id",
+        "segment_id",
+        "beat_index",
+        "subdivision_index",
+        "subdivision_count",
+        "outcome",
+        "observed_onset_ns",
+        "capture_receipt_sha256"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beat_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subdivision_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subdivision_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "outcome": {
+          "enum": [
+            "observed",
+            "missed"
+          ]
+        },
+        "observed_onset_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "capture_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        }
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimate_id",
+        "segment_id",
+        "observed_at_ns",
+        "estimated_period_ns",
+        "confidence",
+        "provenance_sha256"
+      ],
+      "properties": {
+        "estimate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_period_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "provenance_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "instrument_id",
+        "observed_onset_ns",
+        "capture_receipt_sha256"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_onset_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capture_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
