@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::time::Instant;
@@ -16,7 +16,7 @@ const RRF_K: f64 = 60.0;
 struct PatternDoc {
     id: String,
     tokens: Vec<String>,
-    term_frequency: HashMap<String, usize>,
+    term_frequency: BTreeMap<String, usize>,
     hdc: Vec<i8>,
 }
 
@@ -36,9 +36,9 @@ struct Ranked {
 
 struct CorpusIndex {
     docs: Vec<PatternDoc>,
-    document_frequency: HashMap<String, usize>,
-    inverse_document_frequency: HashMap<String, f64>,
-    tfidf_vectors: Vec<HashMap<String, f64>>,
+    document_frequency: BTreeMap<String, usize>,
+    inverse_document_frequency: BTreeMap<String, f64>,
+    tfidf_vectors: Vec<BTreeMap<String, f64>>,
     tfidf_norms: Vec<f64>,
     average_document_length: f64,
 }
@@ -99,8 +99,8 @@ fn pattern_text(pattern: &Value) -> (String, String) {
     (title, fields.join("\n"))
 }
 
-fn term_frequency(tokens: &[String]) -> HashMap<String, usize> {
-    let mut counts = HashMap::new();
+fn term_frequency(tokens: &[String]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
     for token in tokens {
         *counts.entry(token.clone()).or_insert(0) += 1;
     }
@@ -216,7 +216,7 @@ impl CorpusIndex {
             bail!("pattern corpus is empty");
         }
 
-        let mut document_frequency = HashMap::new();
+        let mut document_frequency = BTreeMap::new();
         for doc in &docs {
             for term in doc.term_frequency.keys() {
                 *document_frequency.entry(term.clone()).or_insert(0) += 1;
@@ -224,7 +224,7 @@ impl CorpusIndex {
         }
 
         let document_count = docs.len() as f64;
-        let inverse_document_frequency: HashMap<String, f64> = document_frequency
+        let inverse_document_frequency: BTreeMap<String, f64> = document_frequency
             .iter()
             .map(|(term, frequency)| {
                 let idf = (1.0 + document_count / (1.0 + *frequency as f64)).ln() + 1.0;
@@ -232,7 +232,7 @@ impl CorpusIndex {
             })
             .collect();
 
-        let tfidf_vectors: Vec<HashMap<String, f64>> = docs
+        let tfidf_vectors: Vec<BTreeMap<String, f64>> = docs
             .iter()
             .map(|doc| {
                 doc.term_frequency
@@ -322,7 +322,7 @@ impl CorpusIndex {
 
     fn score_tfidf(&self, query_tokens: &[String]) -> Vec<Ranked> {
         let query_frequency = term_frequency(query_tokens);
-        let query_vector: HashMap<String, f64> = query_frequency
+        let query_vector: BTreeMap<String, f64> = query_frequency
             .iter()
             .map(|(term, count)| {
                 let tf = 1.0 + (*count as f64).ln();
@@ -512,10 +512,13 @@ fn summarize(
             negative_top_scores.push(top.score);
         }
 
+        let mut expected_pattern_ids: Vec<&str> =
+            query.expected.iter().map(String::as_str).collect();
+        expected_pattern_ids.sort_unstable();
         details.push(json!({
             "query_id": query.id,
             "kind": if query.is_positive { "positive" } else { "hard_negative" },
-            "expected_pattern_ids": query.expected,
+            "expected_pattern_ids": expected_pattern_ids,
             "top_5": ranking.iter().take(5).map(|item| json!({
                 "pattern_id": item.id,
                 "score": item.score
