@@ -19,6 +19,7 @@ It reuses the existing generated-world source and broca-mace-policy qualificatio
 | conventional_retrieval | Pinned deterministic event-ID/key-value ordering, top-2 per action | Reproducible baseline only; not yet BM25, dense, or hybrid retrieval |
 | static_hdc | Existing HDC candidate index, top-2 per action | Tests the existing event-code/bucket index |
 | hdc_ltc | Same index with the existing zero-input LTC evolution profile | Tests temporal state evolution in the existing index; does not establish query-conditioned semantic retrieval |
+| typed_content_hdc | Typed Experience content index with a structured query for regime/objective/action and MACE qualification attributes | Query-conditioned structured-content HDC over the current Experience schema; not natural-language retrieval or input-driven LTC |
 | semantic_placebo | Candidate-visible episode from a different task in the same generated world cluster and matching query scope | Structural sibling-task placebo only; it is not yet embedding-matched or exact token/byte matched |
 
 The semantic_placebo arm is deliberately named to align with the v0.1 record schema, but the present fixture has no natural-language episode payload or semantic embedding with which to construct a genuine semantic placebo. Do not treat it as satisfying the final placebo design.
@@ -27,7 +28,8 @@ The semantic_placebo arm is deliberately named to align with the v0.1 record sch
 
 - Candidate records contain decisions, retrieved IDs, decision-support IDs, candidate/input digests and resource observations. They do not contain evaluator utilities, optimal actions, causal labels or task-success labels.
 - Evaluator outcomes are written to a separate JSONL stream.
-- HDC hits retain their index-time experience_view_digest. Before policy use, each hit is resolved against the canonical candidate-visible Experience record and its digest must match.
+- Event-ID HDC and typed-content HDC hits retain their index-time experience_view_digest. Before policy use, each hit is resolved against the canonical candidate-visible Experience record and its digest must match.
+- Typed-content HDC uses the candidate-visible scope/action query plus MACE policy-defined method and categorical qualification cues. Numeric propensity/balance constraints remain exact post-retrieval MACE gates; they are not misrepresented as RBF point targets. The typed encoder profile digest is included in the candidate trace and profile field.
 - Duplicate or unresolved event identities fail closed. A rejected lookup is recorded as an abstention; it is not counted as evidence use.
 - The existing MACE is_qualified policy remains the authority for whether a resolved experience can support a decision. Similarity does not override evidence qualification.
 - The candidate and evaluator are still compiled into one public executable and the fixture generator is public. The current runner is therefore **not an independent or hidden-evaluator challenge**.
@@ -46,18 +48,20 @@ The runner writes three JSONL files:
 
 The records follow data/schemas/mace_memory_decision_intervention_v0_1.schema.json.
 
-The summary contains four contrasts:
+The summary contains six contrasts:
 
 - memory_vs_none: hdc_ltc versus no_memory.
 - content_vs_placebo: hdc_ltc versus semantic_placebo.
 - hdc_ltc_vs_conventional: hdc_ltc versus the pinned key-value baseline.
 - hdc_ltc_vs_static_hdc: isolates the LTC-profile change from the static HDC profile.
+- typed_content_hdc_vs_conventional: typed-content HDC versus the pinned key-value baseline.
+- typed_content_hdc_vs_static_hdc: typed-content HDC versus the original event-ID HDC index.
 
 corrected_vs_stale is intentionally omitted. The runner does not yet replay a real correction/retraction between retrieval and consumption. That requires the existing canonical lifecycle/source-revalidation owners and must not be faked with a cached flag.
 
 ## 5. Statistical procedure
 
-The generated fixture currently produces 21 scenario families per world cluster. The default run uses 256 world clusters (5,376 pair blocks; 32,256 candidate/evaluator arm rows each).
+The generated fixture currently produces 21 scenario families per world cluster. The default run uses 256 world clusters (5,376 pair blocks; 37,632 candidate/evaluator arm rows each across seven arms).
 
 Arm execution order is pseudo-randomized within each pair block using a deterministic hash of the world-cluster/task identity. The permutation is replayable from the source revision and task identity; all arms still receive the same projected candidate task and no arm learns from another arm.
 
@@ -104,7 +108,8 @@ The evaluator crate promotes its HDC retrieval and SHA-256 dependencies to norma
 
 1. Compile and run the runner; validate every output record against the JSON Schema.
 2. Replace the structural sibling-task placebo with a genuinely irrelevant, same-scope, count/token/byte-matched placebo using task content that is safe for the same tenant.
-3. Add a competitive conventional retrieval ladder: deterministic KV/episodic, BM25, dense and hybrid under equal total memory, context, verification, latency and compute budgets.
+3. Connect richer candidate-visible DecisionNeed attributes (outcome, horizon and target estimand) before using the typed index's optional numeric/estimand query fields; never derive these from evaluator truth.
+4. Add a competitive conventional retrieval ladder: deterministic KV/episodic, BM25, dense and hybrid under equal total memory, context, verification, latency and compute budgets.
 4. Keep exact-scope full scan as an upper-bound diagnostic, not a practical baseline.
 5. Add full-history and salience-only arms only when their input and memory budgets are precisely matched.
 6. Add evidence knockout and placebo substitution on a preregistered audit sample.
