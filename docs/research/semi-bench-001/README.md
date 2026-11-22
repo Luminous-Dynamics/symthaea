@@ -682,3 +682,8 @@ Hosted run [#44990125209](https://github.com/Luminous-Dynamics/symthaea/actions/
 ## Latest current-PR-head verification
 
 Hosted run [#44990230782](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782) passed on the current branch head `056dfe2b2597212a13ebf8b3c8e280bb7452e131`: 43/43 Rust tests, 46/46 Python reference tests, rustfmt, Clippy with warnings denied, and all seven byte-for-byte output checks. This includes the new `semi-mf-acquire` CLI and its calibration-digest-bound known-answer fixture.
+
+
+## Latest exact-head verification
+
+Hosted run [#44990424342](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342) passed on commit `f5073aab67d8aaf987bfe42d74d0ebd43365cf6e`: **43/43 Rust tests**, **46/46 Python reference tests**, rustfmt, Clippy with warnings denied, and all seven byte-for-byte report checks. The four Rust CLI reports include the multi-fidelity acquisition selector and its calibration-digest-bound fixture.
