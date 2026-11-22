@@ -24,6 +24,8 @@ use crate::{CdpSession, PageObservation};
 
 const MAX_LAYOUT_ELEMENTS: usize = 256;
 const MAX_VIEWPORT_DIMENSION: u32 = 32_768;
+const MAX_SCREENSHOT_DIMENSION: u32 = 4_096;
+const MAX_SCREENSHOT_BYTES: usize = 32 * 1024 * 1024;
 const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 
 const LAYOUT_PROBE: &str = r#"(() => {
@@ -233,6 +235,37 @@ impl FrontendEvidenceContext {
     }
 }
 
+fn validate_png_header(bytes: &[u8]) -> Result<()> {
+    if bytes.len() > MAX_SCREENSHOT_BYTES {
+        bail!("frontend screenshot exceeds the compressed artifact size limit");
+    }
+    if bytes.len() < 24 || !bytes.starts_with(PNG_SIGNATURE) {
+        bail!("browser screenshot is truncated or does not have a PNG signature");
+    }
+    if bytes.get(12..16) != Some(&b"IHDR"[..]) {
+        bail!("browser screenshot does not begin with a PNG IHDR chunk");
+    }
+
+    let width = u32::from_be_bytes(
+        bytes[16..20]
+            .try_into()
+            .context("decode PNG width")?,
+    );
+    let height = u32::from_be_bytes(
+        bytes[20..24]
+            .try_into()
+            .context("decode PNG height")?,
+    );
+    if width == 0
+        || height == 0
+        || width > MAX_SCREENSHOT_DIMENSION
+        || height > MAX_SCREENSHOT_DIMENSION
+    {
+        bail!("frontend screenshot dimensions are outside the supported range");
+    }
+    Ok(())
+}
+
 /// Content-addressed description of one persisted artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FrontendArtifactDigest {
@@ -289,9 +322,7 @@ impl FrontendEvidenceBundle {
     ) -> Result<Self> {
         context.validate()?;
         layout.validate()?;
-        if !screenshot_png.starts_with(PNG_SIGNATURE) {
-            bail!("browser screenshot does not have a PNG signature");
-        }
+        validate_png_header(&screenshot_png)?;
 
         // Re-apply the observation boundary before serializing a durable
         // artifact: sensitive field values are redacted and page strings bounded.
@@ -498,9 +529,15 @@ mod tests {
     }
 
     fn png_fixture() -> Vec<u8> {
-        // Integrity-layer tests only need the PNG signature. Browser integration
-        // tests must use a real Chromium-produced PNG.
-        b"\x89PNG\r\n\x1a\nfixture".to_vec()
+        // Header-only fixture for metadata and integrity tests. Browser
+        // integration tests must use a real Chromium-produced PNG.
+        let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+        bytes.extend_from_slice(&13_u32.to_be_bytes());
+        bytes.extend_from_slice(b"IHDR");
+        bytes.extend_from_slice(&1_u32.to_be_bytes());
+        bytes.extend_from_slice(&1_u32.to_be_bytes());
+        bytes.extend_from_slice(&[8, 6, 0, 0, 0]);
+        bytes
     }
 
     #[test]
@@ -578,6 +615,26 @@ mod tests {
 
         bundle.screenshot_png.push(0);
         assert!(!bundle.verify_integrity());
+    }
+
+    #[test]
+    fn rejects_truncated_png_headers_and_invalid_ihdr() {
+        assert!(validate_png_header(b"\x89PNG\r\n\x1a\n").is_err());
+
+        let mut invalid = png_fixture();
+        invalid[12..16].copy_from_slice(b"IDAT");
+        assert!(validate_png_header(&invalid).is_err());
+    }
+
+    #[test]
+    fn rejects_zero_and_oversized_png_dimensions() {
+        let mut zero_width = png_fixture();
+        zero_width[16..20].copy_from_slice(&0_u32.to_be_bytes());
+        assert!(validate_png_header(&zero_width).is_err());
+
+        let mut oversized = png_fixture();
+        oversized[16..20].copy_from_slice(&(MAX_SCREENSHOT_DIMENSION + 1).to_be_bytes());
+        assert!(validate_png_header(&oversized).is_err());
     }
 
     #[test]
