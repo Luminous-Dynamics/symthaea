@@ -30,6 +30,8 @@ struct OpportunityUniverseV1 {
     canonical_time_map_kind: String,
     canonical_time_map_clock_domain_id: String,
     evaluator_clock_domain_id: String,
+    time_alignment_source_clock_domain_id: String,
+    time_alignment_target_clock_domain_id: String,
     time_alignment_receipt_sha256: String,
     time_alignment_valid_from_ns: u64,
     time_alignment_valid_until_ns: u64,
@@ -467,6 +469,20 @@ fn validate_header(panel: &EventUniversePanelV1) -> Result<(), String> {
     require_text(&universe.canonical_time_map_version, "canonical_time_map_version")?;
     require_text(&universe.canonical_time_map_clock_domain_id, "canonical_time_map_clock_domain_id")?;
     require_text(&universe.evaluator_clock_domain_id, "evaluator_clock_domain_id")?;
+    require_text(
+        &universe.time_alignment_source_clock_domain_id,
+        "time_alignment_source_clock_domain_id",
+    )?;
+    require_text(
+        &universe.time_alignment_target_clock_domain_id,
+        "time_alignment_target_clock_domain_id",
+    )?;
+    if universe.time_alignment_source_clock_domain_id
+        != universe.canonical_time_map_clock_domain_id
+        || universe.time_alignment_target_clock_domain_id != universe.evaluator_clock_domain_id
+    {
+        return Err("time alignment source/target domains do not match the canonical map and evaluator clock".to_owned());
+    }
     if universe.canonical_time_map_kind != "performance_time" {
         return Err("event-universe onset scoring requires canonical performance_time".to_owned());
     }
@@ -735,7 +751,7 @@ mod tests {
     #[test]
     fn time_alignment_domain_mismatch_is_rejected() {
         let mut value = panel();
-        value["universe"]["evaluator_clock_domain_id"] = serde_json::json!("wrong-clock");
+        value["universe"]["time_alignment_target_clock_domain_id"] = serde_json::json!("wrong-clock");
         let error = score(&value).expect_err("time domains cannot be mixed");
         assert!(error.contains("time alignment source/target"));
     }
