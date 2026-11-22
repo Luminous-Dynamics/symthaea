@@ -170,8 +170,12 @@ impl fmt::Display for HeldOutCalibrationError {
             Self::InvalidDirectionThreshold => {
                 write!(f, "minimum direction cosine must be finite and in [-1, 1]")
             }
-            Self::EmptyCalibrationSet => write!(f, "at least one calibration null replicate is required"),
-            Self::EmptyEvaluationSet => write!(f, "at least one held-out evaluation replicate is required"),
+            Self::EmptyCalibrationSet => {
+                write!(f, "at least one calibration null replicate is required")
+            }
+            Self::EmptyEvaluationSet => {
+                write!(f, "at least one held-out evaluation replicate is required")
+            }
             Self::InvalidSplitIdentifier(field) => {
                 write!(f, "{field} must be a non-empty stable ASCII identifier")
             }
@@ -179,16 +183,28 @@ impl fmt::Display for HeldOutCalibrationError {
                 write!(f, "replicate identifiers must be unique within {split}")
             }
             Self::CalibrationEvaluationOverlap => {
-                write!(f, "calibration and evaluation replicate identifiers must be disjoint")
+                write!(
+                    f,
+                    "calibration and evaluation replicate identifiers must be disjoint"
+                )
             }
             Self::InvalidStatistic { replicate_id } => {
-                write!(f, "replicate {replicate_id} contains a non-finite or negative statistic")
+                write!(
+                    f,
+                    "replicate {replicate_id} contains a non-finite or negative statistic"
+                )
             }
             Self::InvalidDirectionCosine { replicate_id } => {
-                write!(f, "replicate {replicate_id} has a direction cosine outside [-1, 1]")
+                write!(
+                    f,
+                    "replicate {replicate_id} has a direction cosine outside [-1, 1]"
+                )
             }
             Self::UndefinedSignalDirection { replicate_id } => {
-                write!(f, "replicate {replicate_id} has no defined signal direction")
+                write!(
+                    f,
+                    "replicate {replicate_id} has no defined signal direction"
+                )
             }
         }
     }
@@ -286,9 +302,7 @@ pub fn calibrate_and_evaluate_held_out_null(
     if !alpha.is_finite() || !(0.0..=0.5).contains(&alpha) || alpha == 0.0 {
         return Err(HeldOutCalibrationError::InvalidAlpha);
     }
-    if !minimum_direction_cosine.is_finite()
-        || !(-1.0..=1.0).contains(&minimum_direction_cosine)
-    {
+    if !minimum_direction_cosine.is_finite() || !(-1.0..=1.0).contains(&minimum_direction_cosine) {
         return Err(HeldOutCalibrationError::InvalidDirectionThreshold);
     }
     validate_split_id(calibration_split_id, "calibration_split_id")?;
@@ -306,7 +320,11 @@ pub fn calibrate_and_evaluate_held_out_null(
         if !calibration_ids.insert(replicate.replicate_id.as_str()) {
             return Err(HeldOutCalibrationError::DuplicateReplicateId("calibration"));
         }
-        if replicate.statistics.iter().any(|value| !value.is_finite() || *value < 0.0) {
+        if replicate
+            .statistics
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
             return Err(HeldOutCalibrationError::InvalidStatistic {
                 replicate_id: replicate.replicate_id.clone(),
             });
@@ -354,37 +372,27 @@ pub fn calibrate_and_evaluate_held_out_null(
         let held_out_false_positives = evaluation
             .iter()
             .filter(|replicate| {
-                is_rejected(
-                    replicate.null_statistics[estimator_index],
-                    critical_value,
-                )
+                is_rejected(replicate.null_statistics[estimator_index], critical_value)
             })
             .count();
         let signal_detections = evaluation
             .iter()
             .filter(|replicate| {
-                is_rejected(
-                    replicate.signal_statistics[estimator_index],
-                    critical_value,
-                )
+                is_rejected(replicate.signal_statistics[estimator_index], critical_value)
             })
             .count();
         let directionally_correct = evaluation
             .iter()
             .filter(|replicate| {
-                is_rejected(
-                    replicate.signal_statistics[estimator_index],
-                    critical_value,
-                ) && replicate.signal_directional_cosine >= minimum_direction_cosine
+                is_rejected(replicate.signal_statistics[estimator_index], critical_value)
+                    && replicate.signal_directional_cosine >= minimum_direction_cosine
             })
             .count();
         let wrong_direction = evaluation
             .iter()
             .filter(|replicate| {
-                is_rejected(
-                    replicate.signal_statistics[estimator_index],
-                    critical_value,
-                ) && replicate.signal_directional_cosine < minimum_direction_cosine
+                is_rejected(replicate.signal_statistics[estimator_index], critical_value)
+                    && replicate.signal_directional_cosine < minimum_direction_cosine
             })
             .count();
 
@@ -404,10 +412,7 @@ pub fn calibrate_and_evaluate_held_out_null(
                 directionally_correct,
                 evaluation.len(),
             ),
-            wrong_direction_acceptance_rate: wilson_interval(
-                wrong_direction,
-                evaluation.len(),
-            ),
+            wrong_direction_acceptance_rate: wilson_interval(wrong_direction, evaluation.len()),
         });
     }
 
@@ -446,9 +451,9 @@ fn validate_split_id(value: &str, field: &'static str) -> Result<(), HeldOutCali
 
 fn validate_id(value: &str, split: &'static str) -> Result<(), HeldOutCalibrationError> {
     if value.trim().is_empty()
-        || !value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
-        })
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
     {
         return Err(HeldOutCalibrationError::InvalidSplitIdentifier(split));
     }
@@ -477,8 +482,7 @@ fn wilson_interval(successes: usize, trials: usize) -> ProportionInterval {
     let z2 = z * z;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half_width =
-        z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+    let half_width = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
     ProportionInterval {
         successes,
         trials,
@@ -494,11 +498,7 @@ fn proportion_json(value: &ProportionInterval) -> String {
             "{{\"successes\": {}, \"trials\": {}, \"estimate\": {:.12}, ",
             "\"wilson_95_lower\": {:.12}, \"wilson_95_upper\": {:.12}}}"
         ),
-        value.successes,
-        value.trials,
-        value.estimate,
-        value.wilson_95_lower,
-        value.wilson_95_upper,
+        value.successes, value.trials, value.estimate, value.wilson_95_lower, value.wilson_95_upper,
     )
 }
 
@@ -588,16 +588,13 @@ mod tests {
             signal_statistics: [threshold; 3],
             signal_directional_cosine: 1.0,
         }];
-        let single = calibrate_and_evaluate_held_out_null(
-            &calibration(),
-            &eval,
-            "cal",
-            "one",
-            0.05,
-            0.0,
-        )
-        .unwrap();
-        assert_eq!(single.estimators[0].held_out_false_positive_rate.successes, 0);
+        let single =
+            calibrate_and_evaluate_held_out_null(&calibration(), &eval, "cal", "one", 0.05, 0.0)
+                .unwrap();
+        assert_eq!(
+            single.estimators[0].held_out_false_positive_rate.successes,
+            0
+        );
         assert_eq!(single.estimators[0].signal_detection_rate.successes, 0);
     }
 
@@ -614,7 +611,10 @@ mod tests {
             0.0,
         )
         .unwrap();
-        assert!(report.estimators.iter().all(|item| item.critical_value.is_none()));
+        assert!(report
+            .estimators
+            .iter()
+            .all(|item| item.critical_value.is_none()));
         assert!(report.estimators.iter().all(|item| {
             item.held_out_false_positive_rate.successes == 0
                 && item.signal_detection_rate.successes == 0
@@ -686,12 +686,8 @@ mod tests {
         ));
     }
 
-    fn estimator_response(
-        direction_cosine: Option<f64>,
-    ) -> FactorialEstimatorResponseReport {
-        use crate::estimator_response::{
-            ConnectivityDirectionReport, EstimatorResponseSummary,
-        };
+    fn estimator_response(direction_cosine: Option<f64>) -> FactorialEstimatorResponseReport {
+        use crate::estimator_response::{ConnectivityDirectionReport, EstimatorResponseSummary};
         FactorialEstimatorResponseReport {
             schema_version: "rcaf.factorial-estimator-response/0.1.0",
             experiment_id: "adapter-fixture".into(),
