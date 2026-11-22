@@ -1,103 +1,110 @@
 {
-  "schema_version":"mel-judge-grounding-probe-panel-v1",
-  "experiment_id":"mel-judge-grounding-demo-2026-11-22",
-  "frozen_at_utc":"2026-11-22T16:00:00Z",
-  "judge":{
-    "judge_id":"synthetic-grounded-judge",
-    "judge_version":"1.0",
-    "adapter_sha256":"1111111111111111111111111111111111111111111111111111111111111111",
-    "protocol_sha256":"2222222222222222222222222222222222222222222222222222222222222222",
-    "rubric_sha256":"3333333333333333333333333333333333333333333333333333333333333333"
+  "schema_version": "mel-judge-grounding-probe-panel-v1",
+  "experiment_id": "mel-judge-grounding-demo-2026-11-22",
+  "frozen_at_utc": "2026-11-22T16:00:00Z",
+  "judge": {
+    "judge_id": "synthetic-grounded-judge",
+    "judge_version": "1.0",
+    "adapter_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "rubric_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
   },
-  "policy":{
-    "minimum_baseline_margin":0.5,
-    "maximum_prompt_only_margin_ratio":0.1
+  "policy": {
+    "minimum_baseline_margin": 0.5,
+    "maximum_prompt_only_margin_ratio": 0.1
   },
-  "cases":[{
-    "case_id":"case-001",
-    "candidate_a_id":"candidate-a",
-    "candidate_b_id":"candidate-b",
-    "candidate_a_audio_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "candidate_b_audio_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "human_reference_winner":"a",
-    "human_reference_directional":true,
-    "baseline":{
-      "score_a":8.0,
-      "score_b":3.0,
-      "prompt_sha256":"4444444444444444444444444444444444444444444444444444444444444444",
-      "instruction_sha256":"5555555555555555555555555555555555555555555555555555555555555555",
-      "audio_a_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "audio_b_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    },
-    "probes":[
-      {
-        "probe_id":"prompt-only-1",
-        "kind":"prompt_only",
-        "score_a":5.0,
-        "score_b":5.1,
-        "prompt_sha256":"4444444444444444444444444444444444444444444444444444444444444444",
-        "instruction_sha256":"5555555555555555555555555555555555555555555555555555555555555555",
-        "audio_a_sha256":null,
-        "audio_b_sha256":null,
-        "expected_candidate":null,
-        "maximum_margin_shift":null,
-        "minimum_score_drop":null
+  "cases": [
+    {
+      "case_id": "case-001",
+      "candidate_a_id": "candidate-a",
+      "candidate_b_id": "candidate-b",
+      "candidate_a_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "candidate_b_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "human_reference_winner": "a",
+      "human_reference_directional": true,
+      "baseline": {
+        "score_a": 8,
+        "score_b": 3,
+        "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "instruction_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "audio_a_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audio_b_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
-      {
-        "probe_id":"audio-swap-1",
-        "kind":"audio_swap",
-        "score_a":3.0,
-        "score_b":8.0,
-        "prompt_sha256":"4444444444444444444444444444444444444444444444444444444444444444",
-        "instruction_sha256":"5555555555555555555555555555555555555555555555555555555555555555",
-        "audio_a_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "audio_b_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "expected_candidate":null,
-        "maximum_margin_shift":null,
-        "minimum_score_drop":null
-      },
-      {
-        "probe_id":"rubric-paraphrase-1",
-        "kind":"instruction_paraphrase",
-        "score_a":7.8,
-        "score_b":3.2,
-        "prompt_sha256":"4444444444444444444444444444444444444444444444444444444444444444",
-        "instruction_sha256":"6666666666666666666666666666666666666666666666666666666666666666",
-        "audio_a_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "audio_b_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "expected_candidate":null,
-        "maximum_margin_shift":null,
-        "minimum_score_drop":null
-      },
-      {
-        "probe_id":"nuisance-codec-1",
-        "kind":"nuisance_transform",
-        "score_a":7.95,
-        "score_b":2.95,
-        "prompt_sha256":"4444444444444444444444444444444444444444444444444444444444444444",
-        "instruction_sha256":"5555555555555555555555555555555555555555555555555555555555555555",
-        "audio_a_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "audio_b_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "expected_candidate":null,
-        "maximum_margin_shift":0.2,
-        "minimum_score_drop":null
-      },
-      {
-        "probe_id":"wrong-instrument-1",
-        "kind":"semantic_mismatch",
-        "score_a":4.0,
-        "score_b":3.0,
-        "prompt_sha256":"4444444444444444444444444444444444444444444444444444444444444444",
-        "instruction_sha256":"5555555555555555555555555555555555555555555555555555555555555555",
-        "audio_a_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "audio_b_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "expected_candidate":"a",
-        "maximum_margin_shift":null,
-        "minimum_score_drop":2.0
-      }
-    ]
-  }],
-  "claim_ceiling":[
+      "probes": [
+        {
+          "probe_id": "prompt-only-1",
+          "kind": "prompt_only",
+          "score_a": 5,
+          "score_b": 5.1,
+          "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "instruction_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "audio_a_sha256": null,
+          "audio_b_sha256": null,
+          "expected_candidate": null,
+          "maximum_margin_shift": null,
+          "minimum_score_drop": null,
+          "maximum_score_drift": null
+        },
+        {
+          "probe_id": "audio-swap-1",
+          "kind": "audio_swap",
+          "score_a": 3,
+          "score_b": 8,
+          "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "instruction_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "audio_a_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "audio_b_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_candidate": null,
+          "maximum_margin_shift": null,
+          "minimum_score_drop": null,
+          "maximum_score_drift": null
+        },
+        {
+          "probe_id": "rubric-paraphrase-1",
+          "kind": "instruction_paraphrase",
+          "score_a": 7.8,
+          "score_b": 3.2,
+          "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "instruction_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "audio_a_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "audio_b_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expected_candidate": null,
+          "maximum_margin_shift": null,
+          "minimum_score_drop": null,
+          "maximum_score_drift": null
+        },
+        {
+          "probe_id": "nuisance-codec-1",
+          "kind": "nuisance_transform",
+          "score_a": 7.95,
+          "score_b": 2.95,
+          "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "instruction_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "audio_a_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "audio_b_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "expected_candidate": null,
+          "maximum_margin_shift": 0.2,
+          "minimum_score_drop": null,
+          "maximum_score_drift": 0.2
+        },
+        {
+          "probe_id": "wrong-instrument-1",
+          "kind": "semantic_mismatch",
+          "score_a": 4,
+          "score_b": 3,
+          "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "instruction_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "audio_a_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "audio_b_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expected_candidate": "a",
+          "maximum_margin_shift": null,
+          "minimum_score_drop": 2,
+          "maximum_score_drift": null
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": [
     "synthetic judge probe fixture only",
     "human_reference_winner is a separately supplied post-judge label",
     "audio and instruction digests are references and their underlying bytes are not opened by this evaluator",
