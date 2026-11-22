@@ -61,8 +61,13 @@ pub struct RandomForestTrainingSampleV1 {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RandomForestInputSampleV1 {
     pub sample_id: String,
-    pub positive: bool,
     pub features: Vec<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RandomForestTruthSampleV1 {
+    pub sample_id: String,
+    pub positive: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -99,7 +104,6 @@ pub struct RandomForestModelV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RandomForestPredictionV1 {
     pub sample_id: String,
-    pub positive: bool,
     pub score: f64,
 }
 
@@ -592,13 +596,12 @@ pub fn predict_random_forest_v1(
         }
         predictions.push(RandomForestPredictionV1 {
             sample_id: sample.sample_id.clone(),
-            positive: sample.positive,
             score,
         });
     }
-    let digest_material: Vec<(&str, bool, f64)> = predictions
+    let digest_material: Vec<(&str, f64)> = predictions
         .iter()
-        .map(|row| (row.sample_id.as_str(), row.positive, row.score))
+        .map(|row| (row.sample_id.as_str(), row.score))
         .collect();
     let score_vector_sha256 =
         sha256_hex(&serde_json::to_vec(&digest_material).map_err(|error| {
@@ -615,6 +618,7 @@ pub fn predict_random_forest_v1(
 
 pub fn score_random_forest_predictions_v1(
     prediction_report: &RandomForestPredictionReportV1,
+    truth: &[RandomForestTruthSampleV1],
     decision_threshold: f64,
     calibration_bins: usize,
 ) -> Result<BinaryMetricReportV1, RandomForestError> {
@@ -623,6 +627,39 @@ pub fn score_random_forest_predictions_v1(
             "prediction report schema unsupported".into(),
         ));
     }
+    let mut ordered_truth = truth.to_vec();
+    ordered_truth.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
+    if ordered_truth.len() != prediction_report.predictions.len() {
+        return Err(RandomForestError(
+            "prediction/truth sample counts differ".into(),
+        ));
+    }
+    let mut seen_truth = BTreeSet::new();
+    let mut samples = Vec::with_capacity(ordered_truth.len());
+    for (index, (prediction, truth_row)) in prediction_report
+        .predictions
+        .iter()
+        .zip(&ordered_truth)
+        .enumerate()
+    {
+        if truth_row.sample_id.trim().is_empty()
+            || !seen_truth.insert(truth_row.sample_id.as_str())
+        {
+            return Err(RandomForestError(format!(
+                "truth[{index}].sample_id: empty or duplicate"
+            )));
+        }
+        if prediction.sample_id != truth_row.sample_id {
+            return Err(RandomForestError(format!(
+                "prediction/truth identity mismatch at sorted row {index}"
+            )));
+        }
+        samples.push(BinaryScoreSampleV1 {
+            sample_id: prediction.sample_id.clone(),
+            positive: truth_row.positive,
+            score: prediction.score,
+        });
+    }
     let subject = BinaryScoreSubjectV1 {
         schema: crate::benchmark::binary_metrics::INPUT_SCHEMA_V1.into(),
         case_id: Some(format!("random-forest:{}", prediction_report.model_sha256)),
@@ -630,15 +667,7 @@ pub fn score_random_forest_predictions_v1(
         calibration_bins,
         recall_target: 0.95,
         positive_class_semantics: Some("observed semiconductor defect label".into()),
-        samples: prediction_report
-            .predictions
-            .iter()
-            .map(|row| BinaryScoreSampleV1 {
-                sample_id: row.sample_id.clone(),
-                positive: row.positive,
-                score: row.score,
-            })
-            .collect(),
+        samples,
     };
     score_binary_subject_v1(&subject)
         .map_err(|error| RandomForestError(format!("binary metrics rejected predictions: {error}")))
@@ -687,7 +716,6 @@ mod tests {
             .iter()
             .map(|row| RandomForestInputSampleV1 {
                 sample_id: row.sample_id.clone(),
-                positive: row.positive,
                 features: row.features.clone(),
             })
             .collect();
@@ -729,7 +757,6 @@ mod tests {
             .iter()
             .map(|row| RandomForestInputSampleV1 {
                 sample_id: row.sample_id.clone(),
-                positive: row.positive,
                 features: row.features.clone(),
             })
             .collect();
@@ -761,7 +788,6 @@ mod tests {
         let model = fit_random_forest_v1(&samples(), &parameters()).unwrap();
         let invalid = vec![RandomForestInputSampleV1 {
             sample_id: "bad".into(),
-            positive: false,
             features: vec![1.0],
         }];
         assert!(predict_random_forest_v1(&model, &invalid).is_err());
@@ -775,12 +801,18 @@ mod tests {
             .iter()
             .map(|row| RandomForestInputSampleV1 {
                 sample_id: row.sample_id.clone(),
-                positive: row.positive,
                 features: row.features.clone(),
             })
             .collect();
         let predictions = predict_random_forest_v1(&model, &inputs).unwrap();
-        let metrics = score_random_forest_predictions_v1(&predictions, 0.5, 10).unwrap();
+        let truth: Vec<_> = training
+            .iter()
+            .map(|row| RandomForestTruthSampleV1 {
+                sample_id: row.sample_id.clone(),
+                positive: row.positive,
+            })
+            .collect();
+        let metrics = score_random_forest_predictions_v1(&predictions, &truth, 0.5, 10).unwrap();
         assert_eq!(metrics.sample_count, 80);
         assert_eq!(metrics.class_counts.positive, 20);
         assert_eq!(metrics.class_counts.negative, 60);
