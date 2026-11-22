@@ -128,8 +128,7 @@ impl ReconstructionCounts {
 
     pub fn f1(&self) -> Option<f64> {
         let denominator = 2 * self.true_positive + self.false_positive + self.false_negative;
-        (denominator > 0)
-            .then_some(2.0 * self.true_positive as f64 / denominator as f64)
+        (denominator > 0).then_some(2.0 * self.true_positive as f64 / denominator as f64)
     }
 }
 
@@ -233,7 +232,10 @@ pub enum MycelialReconstructionError {
     TooManySegments(usize),
     DuplicateJunctionId(String),
     DuplicateSegmentId(String),
-    MissingSegmentEndpoint { segment_id: String, junction_id: String },
+    MissingSegmentEndpoint {
+        segment_id: String,
+        junction_id: String,
+    },
     InvalidSegment(String),
     FrameMismatch,
     CoordinateFrameMismatch,
@@ -252,7 +254,12 @@ pub enum MycelialReconstructionError {
     DuplicateGroundTruthMatch(String),
     UnknownPredictionJunction(String),
     UnknownGroundTruthJunction(String),
-    JunctionMatchOutOfTolerance { predicted_id: String, ground_truth_id: String, distance: f64, limit: f64 },
+    JunctionMatchOutOfTolerance {
+        predicted_id: String,
+        ground_truth_id: String,
+        distance: f64,
+        limit: f64,
+    },
 }
 
 impl fmt::Display for MycelialReconstructionError {
@@ -263,15 +270,27 @@ impl fmt::Display for MycelialReconstructionError {
             }
             Self::InvalidGraph(reason) => write!(f, "invalid annotated skeleton: {reason}"),
             Self::TooManyJunctions(count) => {
-                write!(f, "junction count {count} exceeds {MAX_RECONSTRUCTION_JUNCTIONS}")
+                write!(
+                    f,
+                    "junction count {count} exceeds {MAX_RECONSTRUCTION_JUNCTIONS}"
+                )
             }
             Self::TooManySegments(count) => {
-                write!(f, "segment count {count} exceeds {MAX_RECONSTRUCTION_SEGMENTS}")
+                write!(
+                    f,
+                    "segment count {count} exceeds {MAX_RECONSTRUCTION_SEGMENTS}"
+                )
             }
             Self::DuplicateJunctionId(id) => write!(f, "duplicate junction ID {id}"),
             Self::DuplicateSegmentId(id) => write!(f, "duplicate segment ID {id}"),
-            Self::MissingSegmentEndpoint { segment_id, junction_id } => {
-                write!(f, "segment {segment_id} references missing junction {junction_id}")
+            Self::MissingSegmentEndpoint {
+                segment_id,
+                junction_id,
+            } => {
+                write!(
+                    f,
+                    "segment {segment_id} references missing junction {junction_id}"
+                )
             }
             Self::InvalidSegment(id) => write!(f, "segment {id} has invalid geometry or length"),
             Self::FrameMismatch => write!(f, "ground truth and prediction frame IDs differ"),
@@ -279,10 +298,16 @@ impl fmt::Display for MycelialReconstructionError {
                 write!(f, "ground truth and prediction coordinate-frame IDs differ")
             }
             Self::CalibrationMismatch => {
-                write!(f, "ground truth and prediction calibration manifests differ")
+                write!(
+                    f,
+                    "ground truth and prediction calibration manifests differ"
+                )
             }
             Self::SourceObservationMismatch => {
-                write!(f, "ground truth and prediction source-observation digests differ")
+                write!(
+                    f,
+                    "ground truth and prediction source-observation digests differ"
+                )
             }
             Self::DimensionalityMismatch => {
                 write!(f, "ground truth and prediction dimensionalities differ")
@@ -291,7 +316,9 @@ impl fmt::Display for MycelialReconstructionError {
                 write!(f, "ground truth and prediction length units differ")
             }
             Self::InvalidConfig => write!(f, "invalid reconstruction evaluation configuration"),
-            Self::InvalidMatchingPolicy => write!(f, "matching policy ID must be non-empty and bounded"),
+            Self::InvalidMatchingPolicy => {
+                write!(f, "matching policy ID must be non-empty and bounded")
+            }
             Self::AutomaticMatchingLimitExceeded {
                 prediction_count,
                 ground_truth_count,
@@ -307,10 +334,16 @@ impl fmt::Display for MycelialReconstructionError {
                 write!(f, "ground-truth junction {id} is matched more than once")
             }
             Self::UnknownPredictionJunction(id) => {
-                write!(f, "matching policy references unknown prediction junction {id}")
+                write!(
+                    f,
+                    "matching policy references unknown prediction junction {id}"
+                )
             }
             Self::UnknownGroundTruthJunction(id) => {
-                write!(f, "matching policy references unknown ground-truth junction {id}")
+                write!(
+                    f,
+                    "matching policy references unknown ground-truth junction {id}"
+                )
             }
             Self::JunctionMatchOutOfTolerance {
                 predicted_id,
@@ -499,11 +532,13 @@ pub fn match_junctions_hungarian(
     if prediction.junctions.len() > MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH
         || ground_truth.junctions.len() > MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH
     {
-        return Err(MycelialReconstructionError::AutomaticMatchingLimitExceeded {
-            prediction_count: prediction.junctions.len(),
-            ground_truth_count: ground_truth.junctions.len(),
-            limit_per_graph: MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
-        });
+        return Err(
+            MycelialReconstructionError::AutomaticMatchingLimitExceeded {
+                prediction_count: prediction.junctions.len(),
+                ground_truth_count: ground_truth.junctions.len(),
+                limit_per_graph: MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
+            },
+        );
     }
 
     let mut prediction_nodes: Vec<_> = prediction.junctions.iter().collect();
@@ -522,8 +557,7 @@ pub fn match_junctions_hungarian(
     // With k <= min(prediction_count, truth_count), k*D is the largest possible
     // distance penalty; 2*(min+1)*D is strictly larger. This makes match count
     // the primary objective and total distance secondary.
-    let unmatched_cost =
-        (prediction_count.min(truth_count) as f64 + 1.0) * maximum_distance;
+    let unmatched_cost = (prediction_count.min(truth_count) as f64 + 1.0) * maximum_distance;
     // A forbidden real edge must cost more than assigning every real endpoint
     // to its own unmatched dummy. Therefore it can never appear in an optimum.
     let forbidden_cost = (matrix_size as f64 + 1.0) * unmatched_cost;
@@ -572,7 +606,10 @@ pub fn match_junctions_hungarian(
     matches.sort_by(|left, right| {
         left.predicted_junction_id
             .cmp(&right.predicted_junction_id)
-            .then_with(|| left.ground_truth_junction_id.cmp(&right.ground_truth_junction_id))
+            .then_with(|| {
+                left.ground_truth_junction_id
+                    .cmp(&right.ground_truth_junction_id)
+            })
     });
     Ok(matches)
 }
@@ -628,8 +665,7 @@ fn hungarian_min_assignment(costs: &[Vec<f64>]) -> Vec<usize> {
         }
         loop {
             let previous_column = predecessor_column[current_column];
-            matched_row_for_column[current_column] =
-                matched_row_for_column[previous_column];
+            matched_row_for_column[current_column] = matched_row_for_column[previous_column];
             current_column = previous_column;
             if current_column == 0 {
                 break;
@@ -708,7 +744,10 @@ pub fn evaluate_mycelial_reconstruction(
     normalized_matches.sort_by(|left, right| {
         left.predicted_junction_id
             .cmp(&right.predicted_junction_id)
-            .then_with(|| left.ground_truth_junction_id.cmp(&right.ground_truth_junction_id))
+            .then_with(|| {
+                left.ground_truth_junction_id
+                    .cmp(&right.ground_truth_junction_id)
+            })
     });
     let mut localization_errors = Vec::with_capacity(matches.len());
 
@@ -732,15 +771,19 @@ pub fn evaluate_mycelial_reconstruction(
         let predicted = prediction_nodes
             .get(matched.predicted_junction_id.as_str())
             .copied()
-            .ok_or_else(|| MycelialReconstructionError::UnknownPredictionJunction(
-                matched.predicted_junction_id.clone(),
-            ))?;
+            .ok_or_else(|| {
+                MycelialReconstructionError::UnknownPredictionJunction(
+                    matched.predicted_junction_id.clone(),
+                )
+            })?;
         let truth = ground_truth_nodes
             .get(matched.ground_truth_junction_id.as_str())
             .copied()
-            .ok_or_else(|| MycelialReconstructionError::UnknownGroundTruthJunction(
-                matched.ground_truth_junction_id.clone(),
-            ))?;
+            .ok_or_else(|| {
+                MycelialReconstructionError::UnknownGroundTruthJunction(
+                    matched.ground_truth_junction_id.clone(),
+                )
+            })?;
         let distance = point_distance(
             predicted.position,
             truth.position,
@@ -759,7 +802,10 @@ pub fn evaluate_mycelial_reconstruction(
 
     let junction_detection = ReconstructionCounts {
         true_positive: normalized_matches.len(),
-        false_positive: prediction.junctions.len().saturating_sub(normalized_matches.len()),
+        false_positive: prediction
+            .junctions
+            .len()
+            .saturating_sub(normalized_matches.len()),
         false_negative: ground_truth
             .junctions
             .len()
@@ -798,13 +844,12 @@ pub fn evaluate_mycelial_reconstruction(
         junction_kind_scores.push(JunctionKindScore { kind, counts, f1 });
     }
 
-    let (edge_topology, unmatched_prediction_edge_count, length_error) =
-        evaluate_edges(
-            ground_truth,
-            prediction,
-            &prediction_to_truth,
-            config.length_relative_epsilon,
-        );
+    let (edge_topology, unmatched_prediction_edge_count, length_error) = evaluate_edges(
+        ground_truth,
+        prediction,
+        &prediction_to_truth,
+        config.length_relative_epsilon,
+    );
     let ground_truth_topology = topology_summary(ground_truth);
     let prediction_topology = topology_summary(prediction);
     let topology_delta = ReconstructionTopologyDelta {
@@ -960,9 +1005,10 @@ impl MycelialReconstructionScore {
             || !(1.0e-15..=1.0e-3).contains(&self.length_relative_epsilon)
             || !valid_digest(&self.ground_truth_digest)
             || !valid_digest(&self.prediction_digest)
-            || self.identity_matches.windows(2).any(|pair| {
-                pair[0].predicted_junction_id >= pair[1].predicted_junction_id
-            })
+            || self
+                .identity_matches
+                .windows(2)
+                .any(|pair| pair[0].predicted_junction_id >= pair[1].predicted_junction_id)
             || self.junction_kind_scores.len() != ANNOTATED_JUNCTION_KINDS.len()
             || self
                 .junction_kind_scores
@@ -970,8 +1016,7 @@ impl MycelialReconstructionScore {
                 .zip(ANNOTATED_JUNCTION_KINDS)
                 .any(|(score, expected)| score.kind != expected || score.f1 != score.counts.f1())
             || self.junction_kind_macro_f1 != expected_macro_f1
-            || class_true_positive + class_false_positive
-                != self.prediction_topology.junction_count
+            || class_true_positive + class_false_positive != self.prediction_topology.junction_count
             || class_true_positive + class_false_negative
                 != self.ground_truth_topology.junction_count
             || self.false_anastomosis_junction_count
@@ -982,15 +1027,12 @@ impl MycelialReconstructionScore {
                     .map(|score| score.counts.false_positive)
                     .unwrap_or(0)
             || self.junction_detection.true_positive != self.identity_matches.len()
-            || self.junction_detection.false_positive
-                + self.junction_detection.true_positive
+            || self.junction_detection.false_positive + self.junction_detection.true_positive
                 != self.prediction_topology.junction_count
-            || self.junction_detection.false_negative
-                + self.junction_detection.true_positive
+            || self.junction_detection.false_negative + self.junction_detection.true_positive
                 != self.ground_truth_topology.junction_count
             || self.localization_error.matched_junction_count != self.identity_matches.len()
-            || (localization_is_empty
-                != self.localization_error.mean_error.is_none()
+            || (localization_is_empty != self.localization_error.mean_error.is_none()
                 || localization_is_empty != self.localization_error.median_error.is_none()
                 || localization_is_empty != self.localization_error.p95_error.is_none()
                 || localization_is_empty != self.localization_error.maximum_error.is_none())
@@ -1000,12 +1042,13 @@ impl MycelialReconstructionScore {
             || self.edge_topology.true_positive + self.edge_topology.false_negative
                 != self.ground_truth_topology.segment_count
             || self.unmatched_prediction_edge_count > self.edge_topology.false_positive
-            || self.segment_length_error.matched_segment_count
-                != self.edge_topology.true_positive
-            || (length_is_empty
-                != self.segment_length_error.mean_absolute_error.is_none()
+            || self.segment_length_error.matched_segment_count != self.edge_topology.true_positive
+            || (length_is_empty != self.segment_length_error.mean_absolute_error.is_none()
                 || length_is_empty
-                    != self.segment_length_error.mean_absolute_relative_error.is_none()
+                    != self
+                        .segment_length_error
+                        .mean_absolute_relative_error
+                        .is_none()
                 || length_is_empty != self.segment_length_error.p95_absolute_error.is_none())
             || !length_values_valid
             || self.topology_delta != expected_topology_delta
@@ -1076,10 +1119,7 @@ fn evaluate_edges(
 ) -> (ReconstructionCounts, usize, ReconstructionLengthError) {
     let mut truth_edges = BTreeMap::<(String, String), Vec<f64>>::new();
     for segment in &ground_truth.segments {
-        let key = canonical_edge(
-            &segment.start_junction_id,
-            &segment.end_junction_id,
-        );
+        let key = canonical_edge(&segment.start_junction_id, &segment.end_junction_id);
         truth_edges.entry(key).or_default().push(segment.length);
     }
     let mut prediction_edges = BTreeMap::<(String, String), Vec<f64>>::new();
@@ -1098,7 +1138,10 @@ fn evaluate_edges(
             continue;
         }
         let key = canonical_edge(start, end);
-        prediction_edges.entry(key).or_default().push(segment.length);
+        prediction_edges
+            .entry(key)
+            .or_default()
+            .push(segment.length);
     }
 
     for values in truth_edges.values_mut() {
@@ -1129,8 +1172,10 @@ fn evaluate_edges(
         true_positive += matched;
         false_positive += predicted_lengths.len().saturating_sub(matched);
         false_negative += truth_lengths.len().saturating_sub(matched);
-        for (truth_length, predicted_length) in
-            truth_lengths.iter().zip(predicted_lengths.iter()).take(matched)
+        for (truth_length, predicted_length) in truth_lengths
+            .iter()
+            .zip(predicted_lengths.iter())
+            .take(matched)
         {
             let absolute = (truth_length - predicted_length).abs();
             absolute_errors.push(absolute);
@@ -1154,9 +1199,7 @@ fn evaluate_edges(
     )
 }
 
-fn topology_summary(
-    graph: &AnnotatedMycelialSkeleton,
-) -> ReconstructionTopologySummary {
+fn topology_summary(graph: &AnnotatedMycelialSkeleton) -> ReconstructionTopologySummary {
     let mut adjacency = BTreeMap::<&str, Vec<&str>>::new();
     for junction in &graph.junctions {
         adjacency.insert(junction.id.as_str(), Vec::new());
@@ -1330,7 +1373,11 @@ mod tests {
         "a".repeat(64)
     }
 
-    fn graph(producer: &str, nodes: Vec<AnnotatedJunction>, edges: Vec<AnnotatedHyphaSegment>) -> AnnotatedMycelialSkeleton {
+    fn graph(
+        producer: &str,
+        nodes: Vec<AnnotatedJunction>,
+        edges: Vec<AnnotatedHyphaSegment>,
+    ) -> AnnotatedMycelialSkeleton {
         AnnotatedMycelialSkeleton {
             schema_version: MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
             frame_id: "frame:001".to_string(),
@@ -1383,8 +1430,7 @@ mod tests {
         );
         // A greedy nearest-neighbour pass taking p1->A first leaves p2
         // unmatched. A global assignment must choose p1->B and p2->A.
-        let matches =
-            match_junctions_hungarian(&truth, &prediction, 2.0).unwrap();
+        let matches = match_junctions_hungarian(&truth, &prediction, 2.0).unwrap();
         assert_eq!(matches.len(), 2);
         assert_eq!(
             matches,
@@ -1594,9 +1640,18 @@ mod tests {
             ],
         );
         let matches = vec![
-            JunctionIdentityMatch { predicted_junction_id: "pA".to_string(), ground_truth_junction_id: "A".to_string() },
-            JunctionIdentityMatch { predicted_junction_id: "pB".to_string(), ground_truth_junction_id: "B".to_string() },
-            JunctionIdentityMatch { predicted_junction_id: "pC".to_string(), ground_truth_junction_id: "C".to_string() },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pB".to_string(),
+                ground_truth_junction_id: "B".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pC".to_string(),
+                ground_truth_junction_id: "C".to_string(),
+            },
         ];
         let score = evaluate_mycelial_reconstruction(
             &truth,
@@ -1622,7 +1677,13 @@ mod tests {
         );
         let prediction = graph(
             "candidate",
-            vec![node("pA", AnnotatedJunctionKind::Anastomosis, 0.0, 0.0, 0.0)],
+            vec![node(
+                "pA",
+                AnnotatedJunctionKind::Anastomosis,
+                0.0,
+                0.0,
+                0.0,
+            )],
             Vec::new(),
         );
         let score = evaluate_mycelial_reconstruction(
@@ -1700,8 +1761,14 @@ mod tests {
             Vec::new(),
         );
         let duplicate = vec![
-            JunctionIdentityMatch { predicted_junction_id: "pA".to_string(), ground_truth_junction_id: "A".to_string() },
-            JunctionIdentityMatch { predicted_junction_id: "pB".to_string(), ground_truth_junction_id: "A".to_string() },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pB".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            },
         ];
         assert!(matches!(
             evaluate_mycelial_reconstruction(
