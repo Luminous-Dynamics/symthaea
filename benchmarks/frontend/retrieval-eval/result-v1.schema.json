@@ -100,7 +100,9 @@
         "hard_negative_top_score_distribution",
         "positive_top_score_distribution",
         "latency_ms_per_query",
-        "per_query"
+        "per_query",
+        "hit_rate_at_1",
+        "hit_rate_at_3"
       ],
       "properties": {
         "method": {
@@ -165,6 +167,16 @@
         },
         "per_query": {
           "type": "array"
+        },
+        "hit_rate_at_1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "hit_rate_at_3": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }
