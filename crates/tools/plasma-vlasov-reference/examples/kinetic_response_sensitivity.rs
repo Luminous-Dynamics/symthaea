@@ -1,9 +1,7 @@
 use std::error::Error;
 use std::f64::consts::TAU;
 
-use plasma_vlasov_reference::{
-    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
-};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 const DT: f64 = 0.025;
 const FIRST_PERTURBATION: f64 = 1.0e-2;
@@ -36,10 +34,7 @@ fn config() -> VlasovPoissonConfig {
     }
 }
 
-fn solve_three_by_three(
-    gram: [[f64; 3]; 3],
-    rhs: [f64; 3],
-) -> Result<[f64; 3], Box<dyn Error>> {
+fn solve_three_by_three(gram: [[f64; 3]; 3], rhs: [f64; 3]) -> Result<[f64; 3], Box<dyn Error>> {
     let mut matrix = [[0.0; 4]; 3];
     for row in 0..3 {
         for column in 0..3 {
@@ -101,8 +96,7 @@ fn moment_neutral_direction(
 
     let mut direction = vec![0.0; base.len()];
     let mut maximum_moment_residual = 0.0_f64;
-    let spatial_wave_number =
-        TAU * spatial_mode as f64 / config.domain_length;
+    let spatial_wave_number = TAU * spatial_mode as f64 / config.domain_length;
     let velocity_length = config.velocity_max - config.velocity_min;
 
     for ix in 0..config.nx {
@@ -115,9 +109,7 @@ fn moment_neutral_direction(
         for iv in 0..config.nv {
             let velocity = config.velocity(iv);
             let angle = TAU * (velocity - config.velocity_min) / velocity_length;
-            let value = base[start + iv]
-                * x_factor
-                * (velocity_mode as f64 * angle).cos();
+            let value = base[start + iv] * x_factor * (velocity_mode as f64 * angle).cos();
             raw[iv] = value;
             let weighted = value * config.dv();
             moments[0] += weighted;
@@ -151,9 +143,7 @@ fn moment_neutral_direction(
     let mut maximum_epsilon = f64::INFINITY;
     for (value, delta) in base.iter().zip(&direction) {
         if delta.abs() > f64::MIN_POSITIVE {
-            maximum_epsilon = maximum_epsilon.min(
-                (value - POSITIVITY_FLOOR) / delta.abs(),
-            );
+            maximum_epsilon = maximum_epsilon.min((value - POSITIVITY_FLOOR) / delta.abs());
         }
     }
     let epsilon = REQUESTED_EPSILON.min(0.25 * maximum_epsilon);
@@ -168,9 +158,7 @@ fn peak(samples: &[(f64, f64, f64)]) -> ResponsePeak {
     let (time, real, imaginary) = samples
         .iter()
         .copied()
-        .max_by(|left, right| {
-            left.1.hypot(left.2).total_cmp(&right.1.hypot(right.2))
-        })
+        .max_by(|left, right| left.1.hypot(left.2).total_cmp(&right.1.hypot(right.2)))
         .unwrap_or((0.0, 0.0, 0.0));
     ResponsePeak {
         time,
@@ -198,9 +186,11 @@ fn central_difference_trace(
         .map(|(value, delta)| value - epsilon * delta)
         .collect();
 
-    if plus_distribution.iter().chain(&minus_distribution).any(|value| {
-        !value.is_finite() || *value < POSITIVITY_FLOOR
-    }) {
+    if plus_distribution
+        .iter()
+        .chain(&minus_distribution)
+        .any(|value| !value.is_finite() || *value < POSITIVITY_FLOOR)
+    {
         return Err("symmetric perturbation violates positivity floor".into());
     }
 
@@ -237,10 +227,7 @@ fn central_difference_trace(
     Ok((target_sensitivity, off_target_sensitivity))
 }
 
-fn sensitivity_at_time(
-    samples: &[(f64, f64, f64)],
-    target_time: f64,
-) -> (f64, f64, f64) {
+fn sensitivity_at_time(samples: &[(f64, f64, f64)], target_time: f64) -> (f64, f64, f64) {
     samples
         .iter()
         .copied()
@@ -254,12 +241,7 @@ fn sensitivity_at_time(
 
 fn main() -> Result<(), Box<dyn Error>> {
     let config = config();
-    let initial = maxwellian_perturbation(
-        config,
-        FIRST_PERTURBATION,
-        FIRST_MODE,
-        1.0,
-    )?;
+    let initial = maxwellian_perturbation(config, FIRST_PERTURBATION, FIRST_MODE, 1.0)?;
     let mut checkpoint_solver = VlasovPoisson1d1v::new(config, initial)?;
     let pulse_steps = (SECOND_PULSE_TIME / DT).round() as usize;
     let future_steps = (FUTURE_HORIZON / DT).round() as usize;
@@ -287,12 +269,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     for velocity_mode in VELOCITY_MODES {
-        let (direction, epsilon, moment_residual) = moment_neutral_direction(
-            &checkpoint,
-            config,
-            FIRST_MODE,
-            velocity_mode,
-        )?;
+        let (direction, epsilon, moment_residual) =
+            moment_neutral_direction(&checkpoint, config, FIRST_MODE, velocity_mode)?;
         let plus_minimum = checkpoint
             .iter()
             .zip(&direction)
@@ -304,14 +282,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|(value, delta)| value - epsilon * delta)
             .fold(f64::INFINITY, f64::min);
 
-        let (target_trace, off_target_trace) = central_difference_trace(
-            config,
-            &checkpoint,
-            &direction,
-            epsilon,
-            future_steps,
-            2,
-        )?;
+        let (target_trace, off_target_trace) =
+            central_difference_trace(config, &checkpoint, &direction, epsilon, future_steps, 2)?;
         let target_peak = peak(&target_trace);
         let off_target_peak = peak(&off_target_trace);
         let rephase = sensitivity_at_time(&target_trace, 2.0);
