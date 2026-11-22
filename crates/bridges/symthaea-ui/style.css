@@ -244,3 +244,58 @@ body {
     opacity: 0.5;
     cursor: default;
 }
+
+/* Visible keyboard focus is part of the component contract. */
+.gateway-row input:focus-visible,
+.composer input:focus-visible,
+.composer button:focus-visible {
+    outline: 2px solid #a69bff;
+    outline-offset: 2px;
+}
+
+/* Do not animate the telemetry orb for users who request reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+    .orb {
+        animation: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .shell {
+        padding: 1.25rem 1rem 3rem;
+        gap: 1.5rem;
+    }
+
+    .shell-header {
+        align-items: flex-start;
+    }
+
+    .gateway-row {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .gateway-row input {
+        flex: 1 1 12rem;
+        width: auto;
+        min-width: 0;
+    }
+
+    .vitals {
+        padding: 1.25rem 0.5rem;
+    }
+
+    .turn {
+        max-width: min(100%, 32rem);
+    }
+
+    .composer input {
+        min-width: 0;
+    }
+
+    .composer button {
+        min-height: 44px;
+        padding-inline: 1rem;
+    }
+}
+
