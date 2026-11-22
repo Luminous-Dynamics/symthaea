@@ -449,7 +449,10 @@ mod tests {
         value["equivalence"]["listener_count"] = serde_json::json!(8);
         let report = qualify(&value.to_string());
         assert!(!report.eligible_for_declared_task_dimension);
-        assert!(report.ineligibility_reasons.iter().any(|reason| reason.contains("underpowered listener")));
+        assert!(report
+            .ineligibility_reasons
+            .iter()
+            .any(|reason| reason.contains("underpowered listener")));
     }
 
     #[test]
@@ -458,7 +461,10 @@ mod tests {
         value["equivalence"]["confidence_interval_upper"] = serde_json::json!(0.31);
         let report = qualify(&value.to_string());
         assert!(!report.eligible_for_declared_task_dimension);
-        assert!(report.ineligibility_reasons.iter().any(|reason| reason.contains("confidence interval")));
+        assert!(report
+            .ineligibility_reasons
+            .iter()
+            .any(|reason| reason.contains("confidence interval")));
     }
 
     #[test]
@@ -472,7 +478,8 @@ mod tests {
     #[test]
     fn task_dimension_cannot_be_marked_as_altered() {
         let mut value = panel();
-        value["transformation"]["may_alter_dimensions"] = serde_json::json!(["arrangement_preference"]);
+        value["transformation"]["may_alter_dimensions"] =
+            serde_json::json!(["arrangement_preference"]);
         let (source, variant) = fixture_paths();
         let error = parse_and_qualify(&value.to_string(), &source, &variant)
             .expect_err("task-relevant transform must not be admitted as nuisance");
