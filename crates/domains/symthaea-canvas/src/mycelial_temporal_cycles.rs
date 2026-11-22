@@ -397,7 +397,7 @@ impl TemporalMycelialSequence {
                         edge.id.clone(),
                     ));
                 }
-                edge_identity.insert(edge.id.as_str(), endpoints);
+                edge_identity.entry(edge.id.as_str()).or_insert(endpoints);
             }
         }
         Ok(())
@@ -858,7 +858,7 @@ impl TemporalMycelialCycleProfile {
             || self.node_metrics.windows(2).any(|pair| pair[0].node_id >= pair[1].node_id)
             || self.node_metrics.len() != self.source_node_ids.len()
             || self.node_metrics.iter().zip(&self.source_node_ids).any(|(metric, id)| {
-                metric.node_id != *id
+                metric.node_id.as_str() != id.as_str()
             })
             || self.persistent_cycle_hyperedges.windows(2).any(|pair| {
                 pair[0].cycle_id >= pair[1].cycle_id
