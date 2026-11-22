@@ -636,6 +636,8 @@ pub fn build_information_cutoff_snapshot_v1(
     for event in &graph.events {
         if event.availability_clock_domain_id != cutoff.clock_domain_id
             || event.availability_clock_basis != cutoff.clock_basis
+            || event.event_clock_domain_id != cutoff.clock_domain_id
+            || event.event_clock_basis != cutoff.clock_basis
         {
             unaligned_event_ids.push(event.event_id.clone());
             continue;
@@ -649,18 +651,14 @@ pub fn build_information_cutoff_snapshot_v1(
             unavailable_event_ids.push(event.event_id.clone());
             continue;
         }
-        if event.event_clock_domain_id == cutoff.clock_domain_id
-            && event.event_clock_basis == cutoff.clock_basis
-        {
-            let event_time = timestamp_micros(
-                &event.event_time,
-                &event.event_clock_basis,
-                "event.event_time",
-            )?;
-            if event_time > cutoff_micros {
-                future_event_ids.push(event.event_id.clone());
-                continue;
-            }
+        let event_time = timestamp_micros(
+            &event.event_time,
+            &event.event_clock_basis,
+            "event.event_time",
+        )?;
+        if event_time > cutoff_micros {
+            future_event_ids.push(event.event_id.clone());
+            continue;
         }
         available_event_ids.push(event.event_id.clone());
     }
@@ -672,6 +670,8 @@ pub fn build_information_cutoff_snapshot_v1(
     for label in &graph.metrology_labels {
         if label.availability_clock_domain_id != cutoff.clock_domain_id
             || label.availability_clock_basis != cutoff.clock_basis
+            || label.measurement_clock_domain_id != cutoff.clock_domain_id
+            || label.measurement_clock_basis != cutoff.clock_basis
         {
             unaligned_label_ids.push(label.label_id.clone());
             continue;
@@ -927,6 +927,24 @@ mod tests {
                 .unaligned_label_ids
                 .contains(&"label-validated".into())
         );
+    }
+
+    #[test]
+    fn event_time_and_measurement_time_clocks_must_align_with_cutoff() {
+        let mut input = graph();
+        input.events[0].event_clock_domain_id = "tool-clock".into();
+        input.metrology_labels[0].measurement_clock_domain_id = "lims-instrument-clock".into();
+        let cutoff = PredictionInformationCutoffV1 {
+            cutoff_id: "cutoff-aligned-fab".into(),
+            cutoff_time: "2026-11-22T11:00:00".into(),
+            clock_domain_id: "fab-local".into(),
+            clock_basis: ClockBasisV1::SourceLocalNaive,
+        };
+        let snapshot = build_information_cutoff_snapshot_v1(&input, &cutoff).unwrap();
+        assert!(snapshot.unaligned_event_ids.contains(&"process-17".into()));
+        assert!(snapshot.unaligned_label_ids.contains(&"label-validated".into()));
+        assert!(!snapshot.available_event_ids.contains(&"process-17".into()));
+        assert!(!snapshot.matured_validated_label_ids.contains(&"label-validated".into()));
     }
 
     #[test]
