@@ -306,7 +306,7 @@ impl KineticMemoryPacket {
         }
 
         let eta_spacing = TAU / (config.nv as f64 * config.dv());
-        let eta_min = -(config.nv / 2) as f64 * eta_spacing;
+        let eta_min = -(config.nv as f64 / 2.0) * eta_spacing;
         let maximum_restore_eta = std::f64::consts::PI / config.dv();
         let captured_casimir = packet_casimir(
             config.nx,
