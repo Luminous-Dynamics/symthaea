@@ -1,0 +1,180 @@
+{
+  "schema": "symthaea.temporal_decision_preservation_benchmark",
+  "version": "0.1.0",
+  "tracking_issue": 13255,
+  "single_epoch_representation_pr": 13239,
+  "decision_observability_pr": 13152,
+  "selected_action_horizon_issue": 11646,
+  "selected_action_horizon_pr": 11650,
+  "simultaneous_episode_calibration_issue": 11655,
+  "simultaneous_episode_calibration_pr": 11659,
+  "joint_resource_issue": 9666,
+  "joint_resource_convergence_issue": 9882,
+  "interaction_attribution_pr": 13176,
+  "memory_consolidation_issue": 9139,
+  "evaluator_isolation_issue": 9437,
+  "status": "source_and_fixture_authored_rust_1_96_gate_pending",
+  "temporal_contract": {
+    "index_unit": "decision_epoch",
+    "epoch_sequence": "contiguous_integer",
+    "hidden_world_cohort": "identical_ids_and_digests_at_every_epoch",
+    "model_configuration": "frozen_across_temporal_profile",
+    "policy_seed": "frozen_across_temporal_profile",
+    "observation_history": "may_evolve",
+    "recurrent_state": "may_evolve",
+    "compressed_state_digest": "may_evolve",
+    "per_epoch_regret_authority": "reuse_13239_which_reuses_13152",
+    "selected_action_horizon": "reuse_11650",
+    "calibration": "reuse_11659",
+    "profile_aggregation": "representation_preservation_only_not_action_sufficiency"
+  },
+  "candidate_visible_fields": [
+    "epoch_index",
+    "observation_history_digest",
+    "candidate_recurrent_state_digest",
+    "candidate_compressed_state_digest",
+    "model_configuration_digest",
+    "policy_seed",
+    "candidate_action",
+    "candidate_native_work",
+    "candidate_memory_footprint"
+  ],
+  "evaluator_only_fields": [
+    "hidden_world_id",
+    "hidden_world_digest",
+    "future_trajectory",
+    "counterfactual_action_losses",
+    "future_observation_outcomes",
+    "regret_oracle",
+    "support_completeness_evidence",
+    "candidate_future_correctness"
+  ],
+  "candidate_profiles": [
+    "full_hdc_ltc_state",
+    "identity_compression",
+    "pca",
+    "random_projection",
+    "fixed_quantization",
+    "value_aligned_world_model",
+    "online_policy_wise_state_abstraction",
+    "candidate_decision_aware_compression",
+    "evaluator_full_information_reference"
+  ],
+  "metrics": [
+    "per_epoch_added_minimax_regret_ppm",
+    "maximum_added_regret_ppm",
+    "epsilon_sufficient_epoch_fraction",
+    "representation_preservation_prefix_epochs",
+    "first_representation_failure_epoch",
+    "candidate_action_regret_ppm",
+    "selected_action_decision_sufficiency_horizon",
+    "calibration_coverage",
+    "wrong_belief_exposure_us",
+    "abstention_exposure_us",
+    "missing_output_exposure_us",
+    "reconstruction_error",
+    "cosine_similarity",
+    "representation_dimensions",
+    "persistent_bytes",
+    "retained_byte_us",
+    "read_write_bytes",
+    "compute_wall_time_us",
+    "measured_energy_nj",
+    "refresh_cost",
+    "information_recovery_success",
+    "task_success",
+    "verified_partial_progress",
+    "recovery_cost",
+    "deadline_misses",
+    "adverse_outcomes"
+  ],
+  "scenario_families": [
+    "current_action_preserved_later_observation_changes_best_action",
+    "current_action_preserved_later_contact_or_phase_transition",
+    "early_compression_collision_delayed_consequence",
+    "reversible_refresh_recovers_distinction_before_deadline",
+    "irreversible_information_loss",
+    "stable_world_long_horizon_sufficiency",
+    "low_confidence_epsilon_sufficient",
+    "high_cosine_similarity_high_decision_regret",
+    "low_reconstruction_similarity_same_decision_envelope",
+    "future_event_and_nuisance_metadata_leakage",
+    "irregular_missing_delayed_and_revised_observations",
+    "early_merge_repeated_later_decision_failures",
+    "duplicate_hidden_world_digest_identity_aliasing",
+    "recovery_after_failed_epoch_does_not_extend_contiguous_prefix",
+    "hidden_world_digest_change_under_stable_world_id"
+  ],
+  "known_answer_cases": [
+    {
+      "id": "identity_three_epochs",
+      "epoch_indices": [
+        5,
+        6,
+        7
+      ],
+      "full_state_partition": "two_singleton_classes_each_epoch",
+      "compressed_state_partition": "identical_to_full_state",
+      "epsilon_regret_tolerance_ppm": 0,
+      "maximum_added_regret_ppm": 0,
+      "expected": {
+        "representation_preservation_prefix_epochs": 3,
+        "first_representation_failure_epoch": null,
+        "all_epochs_representation_preserved": true,
+        "all_candidate_actions_within_epsilon": true
+      }
+    },
+    {
+      "id": "current_safe_future_collision",
+      "epoch_indices": [
+        5,
+        6,
+        7
+      ],
+      "epoch_5": "worlds_share_the_same_optimal_action_and_compression_collision_is_harmless",
+      "epoch_6": "same_compressed_class_contains_worlds_with_opposed_optimal_actions",
+      "epsilon_regret_tolerance_ppm": 100000,
+      "maximum_added_regret_ppm": 100000,
+      "expected": {
+        "representation_preservation_prefix_epochs": 1,
+        "first_representation_failure_epoch": 6,
+        "first_compressed_insufficiency_epoch": 6,
+        "first_candidate_action_failure_epoch": 6,
+        "maximum_added_regret_ppm": 1000000
+      }
+    },
+    {
+      "id": "candidate_action_failure_not_representation_failure",
+      "epoch_indices": [
+        0
+      ],
+      "compressed_partition": "preserves_full_state_classes",
+      "candidate_actions": "same_suboptimal_action_in_both_singleton_classes",
+      "expected": {
+        "all_epochs_representation_preserved": true,
+        "all_candidate_actions_within_epsilon": false,
+        "first_representation_failure_epoch": null,
+        "first_candidate_action_failure_epoch": 0
+      }
+    }
+  ],
+  "authored_rust_tests": 11,
+  "executed_rust_tests": 0,
+  "benchmark_runs": 0,
+  "hardware_energy_measurements": 0,
+  "claims": {
+    "sota_improvement": false,
+    "production_compressor": false,
+    "memory_savings": false,
+    "energy_advantage": false,
+    "safety_or_actuation_authority": false,
+    "deployment_qualification": false
+  },
+  "claim_limits": [
+    "finite declared hidden-world/action/loss support only",
+    "deterministic candidate policy only",
+    "temporal profile aggregation is not the selected-action horizon",
+    "support completeness and calibration assumptions require independent qualification",
+    "resource improvements require actual candidate execution and measured receipts"
+  ]
+}
