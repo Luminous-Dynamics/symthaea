@@ -16,8 +16,7 @@
 
 use crate::decision_observability::{
     CandidateViewIdentity, CounterfactualWorld, DecisionObservabilityCertificate,
-    DecisionObservabilityError, ObservationalEquivalenceClass,
-    evaluate_decision_observability,
+    DecisionObservabilityError, ObservationalEquivalenceClass, evaluate_decision_observability,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -91,15 +90,23 @@ pub struct RepresentationCompressionCertificate {
 pub enum RepresentationCompressionError {
     EmptyAlternatives,
     TooManyAlternatives,
-    EmptyCompressedStateDigest { world_id: u64 },
-    DuplicateWorldId { world_id: u64 },
+    EmptyCompressedStateDigest {
+        world_id: u64,
+    },
+    DuplicateWorldId {
+        world_id: u64,
+    },
     InconsistentCompressionMapping {
         full_recurrent_state_sha256: [u8; 32],
         first_compressed_state_sha256: [u8; 32],
         conflicting_compressed_state_sha256: [u8; 32],
     },
-    RegretToleranceOutOfRange { tolerance_ppm: u32 },
-    AddedRegretBudgetOutOfRange { budget_ppm: u32 },
+    RegretToleranceOutOfRange {
+        tolerance_ppm: u32,
+    },
+    AddedRegretBudgetOutOfRange {
+        budget_ppm: u32,
+    },
     CompressedRegretFloorBelowSourceFloor {
         compressed_floor_ppm: u32,
         source_floor_ppm: u32,
@@ -111,16 +118,48 @@ pub enum RepresentationCompressionError {
 impl fmt::Display for RepresentationCompressionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyAlternatives => write!(formatter, "representation qualification requires at least one alternative"),
-            Self::TooManyAlternatives => write!(formatter, "representation alternatives exceed the bounded evaluator limit"),
-            Self::EmptyCompressedStateDigest { world_id } => write!(formatter, "world {world_id} has an empty compressed-state digest"),
-            Self::DuplicateWorldId { world_id } => write!(formatter, "duplicate evaluator world ID {world_id}"),
-            Self::InconsistentCompressionMapping { .. } => write!(formatter, "one full recurrent state maps to multiple compressed-state digests"),
-            Self::RegretToleranceOutOfRange { tolerance_ppm } => write!(formatter, "epsilon-regret tolerance {tolerance_ppm} exceeds the one-million PPM scale"),
-            Self::AddedRegretBudgetOutOfRange { budget_ppm } => write!(formatter, "added-regret budget {budget_ppm} exceeds the one-million PPM scale"),
-            Self::CompressedRegretFloorBelowSourceFloor { compressed_floor_ppm, source_floor_ppm } => write!(formatter, "compressed regret floor {compressed_floor_ppm} is below source floor {source_floor_ppm}; the compression partition is not a coarsening or the evaluator contract is inconsistent"),
-            Self::ArithmeticOverflow => write!(formatter, "representation-compression arithmetic overflowed"),
-            Self::DecisionObservability(error) => write!(formatter, "base decision-observability qualification failed: {error}"),
+            Self::EmptyAlternatives => write!(
+                formatter,
+                "representation qualification requires at least one alternative"
+            ),
+            Self::TooManyAlternatives => write!(
+                formatter,
+                "representation alternatives exceed the bounded evaluator limit"
+            ),
+            Self::EmptyCompressedStateDigest { world_id } => write!(
+                formatter,
+                "world {world_id} has an empty compressed-state digest"
+            ),
+            Self::DuplicateWorldId { world_id } => {
+                write!(formatter, "duplicate evaluator world ID {world_id}")
+            }
+            Self::InconsistentCompressionMapping { .. } => write!(
+                formatter,
+                "one full recurrent state maps to multiple compressed-state digests"
+            ),
+            Self::RegretToleranceOutOfRange { tolerance_ppm } => write!(
+                formatter,
+                "epsilon-regret tolerance {tolerance_ppm} exceeds the one-million PPM scale"
+            ),
+            Self::AddedRegretBudgetOutOfRange { budget_ppm } => write!(
+                formatter,
+                "added-regret budget {budget_ppm} exceeds the one-million PPM scale"
+            ),
+            Self::CompressedRegretFloorBelowSourceFloor {
+                compressed_floor_ppm,
+                source_floor_ppm,
+            } => write!(
+                formatter,
+                "compressed regret floor {compressed_floor_ppm} is below source floor {source_floor_ppm}; the compression partition is not a coarsening or the evaluator contract is inconsistent"
+            ),
+            Self::ArithmeticOverflow => write!(
+                formatter,
+                "representation-compression arithmetic overflowed"
+            ),
+            Self::DecisionObservability(error) => write!(
+                formatter,
+                "base decision-observability qualification failed: {error}"
+            ),
         }
     }
 }
@@ -194,20 +233,20 @@ pub fn qualify_representation_compression(
         });
     }
     if config.maximum_added_regret_ppm > MAX_REGRET_PPM {
-        return Err(RepresentationCompressionError::AddedRegretBudgetOutOfRange {
-            budget_ppm: config.maximum_added_regret_ppm,
-        });
+        return Err(
+            RepresentationCompressionError::AddedRegretBudgetOutOfRange {
+                budget_ppm: config.maximum_added_regret_ppm,
+            },
+        );
     }
 
     let mut world_ids = BTreeSet::new();
-    let mut full_groups: BTreeMap<CandidateViewKey, Vec<CounterfactualWorld>> =
-        BTreeMap::new();
+    let mut full_groups: BTreeMap<CandidateViewKey, Vec<CounterfactualWorld>> = BTreeMap::new();
     let mut compressed_groups: BTreeMap<CandidateViewKey, Vec<CounterfactualWorld>> =
         BTreeMap::new();
     let mut compressed_to_full: BTreeMap<CandidateViewKey, BTreeSet<CandidateViewKey>> =
         BTreeMap::new();
-    let mut compressed_by_full: BTreeMap<CandidateViewKey, [u8; 32]> =
-        BTreeMap::new();
+    let mut compressed_by_full: BTreeMap<CandidateViewKey, [u8; 32]> = BTreeMap::new();
 
     for alternative in alternatives {
         let world_id = alternative.world.evaluator_world_id;
@@ -215,17 +254,14 @@ pub fn qualify_representation_compression(
             return Err(RepresentationCompressionError::DuplicateWorldId { world_id });
         }
         if is_zero_digest(&alternative.compressed_recurrent_state_sha256) {
-            return Err(RepresentationCompressionError::EmptyCompressedStateDigest {
-                world_id,
-            });
+            return Err(RepresentationCompressionError::EmptyCompressedStateDigest { world_id });
         }
 
         let full_key = CandidateViewKey::from(&alternative.world.candidate_view);
         let mut compressed_world = alternative.world.clone();
         compressed_world.candidate_view.recurrent_state_sha256 =
             alternative.compressed_recurrent_state_sha256;
-        let compressed_key =
-            CandidateViewKey::from(&compressed_world.candidate_view);
+        let compressed_key = CandidateViewKey::from(&compressed_world.candidate_view);
 
         if let Some(first_digest) = compressed_by_full.get(&full_key) {
             if first_digest != &alternative.compressed_recurrent_state_sha256 {
@@ -297,8 +333,7 @@ pub fn qualify_representation_compression(
             baseline_worst_case_regret_ppm =
                 baseline_worst_case_regret_ppm.max(source.unavoidable_worst_case_regret_ppm);
             all_source_classes_epsilon_sufficient &=
-                source.unavoidable_worst_case_regret_ppm
-                    <= config.epsilon_regret_tolerance_ppm;
+                source.unavoidable_worst_case_regret_ppm <= config.epsilon_regret_tolerance_ppm;
         }
 
         let added_worst_case_regret_ppm = compressed
@@ -311,20 +346,15 @@ pub fn qualify_representation_compression(
                 },
             )?;
         let compressed_information_set_epsilon_sufficient =
-            compressed.unavoidable_worst_case_regret_ppm
-                <= config.epsilon_regret_tolerance_ppm;
+            compressed.unavoidable_worst_case_regret_ppm <= config.epsilon_regret_tolerance_ppm;
         let candidate_action_within_epsilon =
-            compressed.candidate_worst_case_regret_ppm
-                <= config.epsilon_regret_tolerance_ppm;
-        let representation_decision_preserved =
-            all_source_classes_epsilon_sufficient
-                && compressed_information_set_epsilon_sufficient
-                && added_worst_case_regret_ppm <= config.maximum_added_regret_ppm;
+            compressed.candidate_worst_case_regret_ppm <= config.epsilon_regret_tolerance_ppm;
+        let representation_decision_preserved = all_source_classes_epsilon_sufficient
+            && compressed_information_set_epsilon_sufficient
+            && added_worst_case_regret_ppm <= config.maximum_added_regret_ppm;
 
-        worst_added_regret_ppm =
-            worst_added_regret_ppm.max(added_worst_case_regret_ppm);
-        all_compressed_classes_decision_preserving &=
-            representation_decision_preserved;
+        worst_added_regret_ppm = worst_added_regret_ppm.max(added_worst_case_regret_ppm);
+        all_compressed_classes_decision_preserving &= representation_decision_preserved;
         all_candidate_actions_within_epsilon &= candidate_action_within_epsilon;
 
         certificates.push(CompressedRepresentationClassCertificate {
@@ -334,8 +364,7 @@ pub fn qualify_representation_compression(
             source_full_state_class_count: u64::try_from(source_keys.len())
                 .map_err(|_| RepresentationCompressionError::ArithmeticOverflow)?,
             baseline_worst_case_regret_ppm,
-            compressed_worst_case_regret_ppm:
-                compressed.unavoidable_worst_case_regret_ppm,
+            compressed_worst_case_regret_ppm: compressed.unavoidable_worst_case_regret_ppm,
             added_worst_case_regret_ppm,
             all_source_classes_epsilon_sufficient,
             compressed_information_set_epsilon_sufficient,
@@ -460,8 +489,8 @@ mod tests {
             alternative(1, 11, 11, "left", 0, 1_000_000),
             alternative(2, 12, 12, "right", 1_000_000, 0),
         ];
-        let result = qualify_representation_compression(&rows, config(0, 0))
-            .expect("identity mapping");
+        let result =
+            qualify_representation_compression(&rows, config(0, 0)).expect("identity mapping");
         assert_eq!(result.full_state_class_count, 2);
         assert_eq!(result.compressed_state_class_count, 2);
         assert_eq!(result.worst_added_regret_ppm, 0);
