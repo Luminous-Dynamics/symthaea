@@ -114,3 +114,4 @@ jobs:
           grep -F "No human study has been run" docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md >/dev/null
           grep -F "Scores and budgets are not directly comparable" docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md >/dev/null
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
+          echo "FINITE_TRANSLATION_CASES=67067; ROW_CHECKS=134134"
