@@ -30,7 +30,6 @@ pub const DECISION_REGRET_VOI_PPM: u32 = 1_000_000;
 const PPM_U128: u128 = 1_000_000;
 const EXPECTED_REGRET_DENOMINATOR: u128 = PPM_U128 * PPM_U128;
 const MAX_OUTCOME_ROWS: usize = 65_536;
-const NO_RESULT_LABEL: &str = "no_result_by_decision_deadline";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorldPrior {
