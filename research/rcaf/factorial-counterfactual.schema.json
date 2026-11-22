@@ -16,11 +16,21 @@
     "claim_limits"
   ],
   "properties": {
-    "schema_version": { "const": "rcaf.factorial-counterfactual-suite/0.1.0" },
-    "source_status": { "const": "synthetic_fixture" },
-    "time_points": { "const": 96 },
-    "roi_count": { "const": 8 },
-    "experiment_count": { "const": 4 },
+    "schema_version": {
+      "const": "rcaf.factorial-counterfactual-suite/0.1.0"
+    },
+    "source_status": {
+      "const": "synthetic_fixture"
+    },
+    "time_points": {
+      "const": 96
+    },
+    "roi_count": {
+      "const": 8
+    },
+    "experiment_count": {
+      "const": 4
+    },
     "nuisance_families": {
       "const": [
         "common_mode",
@@ -31,8 +41,8 @@
     },
     "experiments": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "minItems": 4,
+      "maxItems": 4,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -57,9 +67,17 @@
           "invariants"
         ],
         "properties": {
-          "schema_version": { "const": "rcaf.factorial-counterfactual/0.1.0" },
-          "experiment_id": { "type": "string", "minLength": 1 },
-          "signal_id": { "type": "string", "minLength": 1 },
+          "schema_version": {
+            "const": "rcaf.factorial-counterfactual/0.1.0"
+          },
+          "experiment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "signal_id": {
+            "type": "string",
+            "minLength": 1
+          },
           "nuisance_family_id": {
             "enum": [
               "common_mode",
@@ -68,10 +86,19 @@
               "motion_transient"
             ]
           },
-          "nuisance_instance_id": { "type": "string", "minLength": 1 },
-          "time_points": { "const": 96 },
-          "roi_count": { "const": 8 },
-          "compared_values": { "const": 768 },
+          "nuisance_instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "time_points": {
+            "const": 96
+          },
+          "roi_count": {
+            "const": 8
+          },
+          "compared_values": {
+            "const": 768
+          },
           "target_component_variance_fraction": {
             "type": "number",
             "minimum": 0,
@@ -82,12 +109,29 @@
             "minimum": 0,
             "maximum": 1
           },
-          "clean_component_variance": { "type": "number", "minimum": 0 },
-          "nuisance_component_variance": { "type": "number", "minimum": 0 },
-          "clean_nuisance_covariance": { "type": "number" },
-          "combined_observed_variance": { "type": "number", "minimum": 0 },
-          "signal_component_rms": { "type": "number", "minimum": 0 },
-          "nuisance_component_rms": { "type": "number", "minimum": 0 },
+          "clean_component_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "nuisance_component_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "clean_nuisance_covariance": {
+            "type": "number"
+          },
+          "combined_observed_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "signal_component_rms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "nuisance_component_rms": {
+            "type": "number",
+            "minimum": 0
+          },
           "cells": {
             "type": "array",
             "minItems": 4,
@@ -110,8 +154,14 @@
                     "signal_plus_nuisance"
                   ]
                 },
-                "rms": { "type": "number", "minimum": 0 },
-                "max_absolute_value": { "type": "number", "minimum": 0 },
+                "rms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max_absolute_value": {
+                  "type": "number",
+                  "minimum": 0
+                },
                 "fnv1a64_fingerprint": {
                   "type": "string",
                   "pattern": "^[0-9a-f]{16}$"
@@ -130,11 +180,25 @@
               "all_invariants_within_tolerance"
             ],
             "properties": {
-              "matched_nuisance_delta_max_abs": { "type": "number", "minimum": 0 },
-              "matched_signal_delta_max_abs": { "type": "number", "minimum": 0 },
-              "additive_interaction_max_abs": { "type": "number", "minimum": 0 },
-              "numerical_tolerance": { "type": "number", "exclusiveMinimum": 0 },
-              "all_invariants_within_tolerance": { "const": true }
+              "matched_nuisance_delta_max_abs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "matched_signal_delta_max_abs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "additive_interaction_max_abs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "numerical_tolerance": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "all_invariants_within_tolerance": {
+                "const": true
+              }
             }
           }
         }
@@ -143,7 +207,10 @@
     "claim_limits": {
       "type": "array",
       "minItems": 5,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   }
 }
