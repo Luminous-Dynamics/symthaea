@@ -128,3 +128,12 @@ It does not demonstrate actual scanner-shift robustness, empirical covariate-rat
 ## Claim limits
 
 This v1 is an importance-weighted threshold and diagnostic primitive. It consumes externally supplied weights and does not estimate them. Only caller-attested known ratios plus support and conditional-score assumptions are marked as exact-guarantee-applicable; estimated ratios are explicitly diagnostic only. The synthetic fixture does not establish real covariate-shift validity, clinical performance or superiority over current neuroimaging pipelines.
+
+
+## 9. Direct estimator-response adapters
+
+The weighted module exposes adapters from the existing `FactorialEstimatorResponseReport`:
+- `null_observation_from_estimator_response` takes the three nuisance-only connectivity displacements in the pinned estimator order;
+- `evaluation_observation_from_estimator_response` takes the same nuisance-only null scores, clean-to-signal-plus-nuisance connectivity displacements, and the connectivity-space directional cosine.
+
+The adapters reject missing or reordered estimator summaries and reject a signal-evaluation record when no target direction is defined. This keeps the score definition shared with the earlier estimator-response layer rather than relying on callers to reconstruct arrays by hand.
