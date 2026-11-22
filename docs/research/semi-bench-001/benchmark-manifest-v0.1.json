@@ -902,6 +902,46 @@
         "no-test-set-threshold-or-quantization-selection"
       ],
       "claim_ceiling": "paper results are not directly rankable until task, split, source identity, hardware and metric are matched; no fab yield/process qualification claim"
+    },
+    {
+      "id": "multi-fidelity-device-to-routed-ppa-chiplet-dtco",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13172",
+      "composes": [
+        "device-analytical-tcad-spice-measurement",
+        "openroad-rtl-to-gds-ppa",
+        "chip-placement-end-to-end-routed-ppa",
+        "chiplet-package-testability"
+      ],
+      "frontier_sources": [
+        "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell",
+        "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell-2",
+        "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf"
+      ],
+      "fidelity_ladder": [
+        "analytical-or-reduced-order",
+        "compact-model",
+        "tcad-if-lawful-model-and-data-available",
+        "spice",
+        "synthesis-and-standard-cell-mapping",
+        "placement-and-global-route",
+        "detailed-route",
+        "package-si-pi-thermal",
+        "physical-measurement"
+      ],
+      "metrics": [
+        "device-model-residual-by-operating-regime",
+        "compact-model-to-circuit-residual",
+        "detailed-route-wns-tns-area-power",
+        "hard-constraint-violations",
+        "pareto-hypervolume",
+        "multi-fidelity-expensive-evaluation-count",
+        "package-useful-bandwidth",
+        "system-energy-per-useful-bit",
+        "link-health-detection-latency-and-false-alarm",
+        "test-coverage-and-diagnostic-resolution"
+      ],
+      "research_target": "5-10-percent preregistered primary Pareto-objective improvement on held-out designs with hard-constraint and uncertainty guardrails; research target only",
+      "claim_ceiling": "open-PDK/compact-model experiments do not establish CFET fabrication, fabricated-silicon PPA, UCIe compliance, chiplet reliability or yield"
     }
   ],
   "cross_cutting_protocol": {
@@ -1071,6 +1111,88 @@
         "class-balanced-focal-loss"
       ],
       "caveat": "64,967 trainable parameters exclude offline generator and deterministic handcrafted features; exact split and full lifecycle resource costs need reproduction"
+    },
+    "imec_cfet_backside_contact_2026": {
+      "part1": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell",
+      "part2": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell-2",
+      "reported_part1": {
+        "bottom_pfET_access_resistance_ohm_um": {
+          "before": 1753,
+          "after": 378
+        },
+        "bottom_pfET_survival_yield": {
+          "before": 0.45,
+          "after": 0.85
+        },
+        "drive_current_relative": 5
+      },
+      "reported_part2": {
+        "layout_efficiency": 0.98,
+        "sram_5t1_area_reduction_vs_6t_cfet": 0.125,
+        "sram_write_speed_improvement_percent": [
+          7,
+          15
+        ],
+        "cpp_m1_gear_ratio_study": "2:1"
+      },
+      "evidence_class": "imec-reported-2026-CFET-test-vehicle-and-DTCO-study; not open raw data or Luminous reproduction"
+    },
+    "ucie_4_0_2026": {
+      "release_date": "2026-11-12",
+      "release_pdf": "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf",
+      "normative_specification": "https://www.uciexpress.org/specifications",
+      "reported": {
+        "ucie_mem_data_efficiency_max": 0.9375,
+        "die_edge_bandwidth_density_tb_s_mm": 2.5,
+        "optional_energy_efficiency_improvement_at_64_gt_s_percent": [
+          30,
+          80
+        ],
+        "shoreline_bandwidth_density_increase_percent": 20,
+        "area_bandwidth_density_increase_percent": 10
+      },
+      "features": [
+        "trusted-reporting-of-chiplet-state",
+        "integrity-protected-management-channels",
+        "reset-management",
+        "error-notification",
+        "link-health-monitoring"
+      ],
+      "access_note": "normative specification available by request; press release alone cannot ground conformance claims",
+      "evidence_class": "consortium-reported-standard-release-headlines; not independently benchmarked Luminous package results"
+    },
+    "nist_physics_ai_overlay_metrology_2026": {
+      "url": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
+      "created": "2026-09-03",
+      "updated": "2026-09-18",
+      "scope": [
+        "SEM-overlay",
+        "critical-dimension",
+        "defect-inspection",
+        "physics-based-image-simulation",
+        "physics-based-3d-reconstruction",
+        "measurement-limits"
+      ],
+      "evidence_class": "current-NIST-research-programme; raw dataset rights/access not assumed"
+    },
+    "nvidia_tsmc_fab_ai_2026": {
+      "url": "https://nvidianews.nvidia.com/news/nvidia-and-tsmc-bring-ai-into-fabs-to-advance-semiconductor-design-and-manufacturing",
+      "publication_date": "2026-05-31",
+      "vendor_reported_claims": {
+        "cuLitho_cost_effectiveness_or_cycle_time_improvement_percent": [
+          20,
+          50
+        ],
+        "cuEST_chemistry_simulation_average_speedup": 50,
+        "application_areas": [
+          "computational-lithography",
+          "transistor-and-process-simulation",
+          "advanced-process-control",
+          "fab-operations",
+          "defect-inspection"
+        ]
+      },
+      "evidence_class": "vendor-partnership-press-release-reported-results; not independent benchmark"
     }
   },
   "reference_evaluator": {
@@ -1349,7 +1471,8 @@
     "frozen_lmm_rule_ordered_zero_shot": "https://github.com/Luminous-Dynamics/symthaea/issues/13146",
     "fab_closed_loop_decision_support": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
     "cross_dataset_wafer_pseudolabel_alignment": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
-    "deployable_model_pareto": "https://github.com/Luminous-Dynamics/symthaea/issues/13149"
+    "deployable_model_pareto": "https://github.com/Luminous-Dynamics/symthaea/issues/13149",
+    "multi_fidelity_dtco_device_to_package": "https://github.com/Luminous-Dynamics/symthaea/issues/13172"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
@@ -1377,11 +1500,20 @@
     "cross_dataset_wafer_pseudolabel_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
     "vit_tiny_mixed_defect_2026": "https://doi.org/10.1038/s41598-026-63752-0",
     "hybrid_deep_handcrafted_2026": "https://doi.org/10.1038/s41598-026-68884-x",
-    "deployable_model_pareto_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149"
+    "deployable_model_pareto_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149",
+    "dtco_cfet_ucie40_frontier": "docs/research/semi-bench-001/2026-dtco-ucie40-frontier.md",
+    "semi_dtco_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13172",
+    "imec_cfet_part1": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell",
+    "imec_cfet_part2": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell-2",
+    "ucie_4_0_release": "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf",
+    "ucie_4_0_specification_access": "https://www.uciexpress.org/specifications",
+    "nist_overlay_metrology_project": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
+    "nvidia_tsmc_fab_ai_announcement": "https://nvidianews.nvidia.com/news/nvidia-and-tsmc-bring-ai-into-fabs-to-advance-semiconductor-design-and-manufacturing"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
-    "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md"
+    "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md",
+    "docs/research/semi-bench-001/2026-dtco-ucie40-frontier.md"
   ],
   "source_integrity_audits": [
     "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
