@@ -1213,7 +1213,7 @@ mod tests {
             .collect();
         ProcessEventGraphV1 {
             schema: crate::benchmark::process_event_graph::GRAPH_SCHEMA_V1.into(),
-            graph_id: "online-calibration-graph".into(),
+            graph_id: "online-graph-100".into(),
             source_artifact_sha256: SOURCE_SHA.into(),
             transform_sha256: TRANSFORM_SHA.into(),
             events,
