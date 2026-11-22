@@ -16,6 +16,7 @@
     "filter_design_rank",
     "joint_design_rank",
     "dependent_columns_dropped",
+    "projection_operator_commutator_ratio",
     "nuisance_then_filter_nuisance_leakage",
     "filter_then_nuisance_nuisance_leakage",
     "nuisance_then_filter_filter_leakage",
@@ -57,6 +58,10 @@
     },
     "dependent_columns_dropped": {
       "const": 0
+    },
+    "projection_operator_commutator_ratio": {
+      "type": "number",
+      "minimum": 0
     },
     "nuisance_then_filter_nuisance_leakage": {
       "type": "number",
