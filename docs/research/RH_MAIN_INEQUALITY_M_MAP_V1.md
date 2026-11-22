@@ -322,3 +322,20 @@ The uniform-to-global bridge has three separate pieces:
 - **Cutoff shift:** (|a_t/b-x|\leq1), so the smoothed sum and centering terms vary by (O(1+\log x)).
 
 Only after these three pieces are combined with exact centering (5.3) and translation (5.5) does the guide derive (5.7) and transfer (M) to Estimate A. The source map keeps these analytic obligations separate from the finite-group translation identity. Exact declaration names for Estimate C and the full dependency chain are still unresolved.
+
+
+## 13. Broader finite-group translation control: products of cyclic groups
+
+The translation oracle now includes every nonempty subset of six small finite abelian product groups:
+
+[
+C_2\times C_2, C_2\times C_3, C_2\times C_4, C_3\times C_3, C_2\times C_5, C_3\times C_4.
+]
+
+For each subset and each target column, it enumerates all translations and verifies that exactly (|T_2|) translations select the target. It also checks the row-indicator identity for both (chi_q=+1) and (chi_q=-1).
+
+<text> <escape>Group-target cases: 66,447. Row-indicator cases: 132,894.</escape> </text>
+
+Combined with the cyclic (C_n), (2\le n\le6), test, the oracle now contains 67,067 group/subset/target cases and 134,134 row-indicator checks.
+
+The test function is `translation_average_holds_for_small_product_cyclic_groups`. This tests non-cyclic abelian structures such as (C_2\times C_2) and (C_3\times C_3), but is still a finite oracle—not a Lean proof of the particular (H) in the RH construction and not a proof for arbitrary finite groups.
