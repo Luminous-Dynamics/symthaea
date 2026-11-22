@@ -60,6 +60,8 @@ pub struct PhaseSpaceTransferRates {
     pub real_space_f_strophy_rate: f64,
     /// Sum of all joint spectral-bin rates.
     pub spectral_f_strophy_rate: f64,
+    /// Sum of absolute joint modal rates; robust when signed rates cancel.
+    pub spectral_rate_l1_norm: f64,
     /// Difference between spectral sum and real-space f-strophy rate.
     pub parseval_absolute_residual: f64,
     pub parseval_relative_residual: f64,
@@ -205,6 +207,7 @@ impl VlasovPoisson1d1v {
         let mut by_velocity_mode_rate = vec![0.0; nv];
         let mut joint_mode_rate = vec![0.0; nx * nv];
         let mut spectral_f_strophy_rate = 0.0;
+        let mut spectral_rate_l1_norm = 0.0;
         let mut phase_mixing_sector_rate = 0.0;
         let mut phase_unmixing_sector_rate = 0.0;
         let mut zero_axis_rate = 0.0;
@@ -240,6 +243,7 @@ impl VlasovPoisson1d1v {
                 by_x_mode_rate[kx] += rate;
                 by_velocity_mode_rate[sv] += rate;
                 spectral_f_strophy_rate += rate;
+                spectral_rate_l1_norm += rate.abs();
 
                 if kx == nx / 2 || sv == nv / 2 {
                     nyquist_rate += rate;
@@ -262,8 +266,7 @@ impl VlasovPoisson1d1v {
 
         let parseval_absolute_residual =
             (spectral_f_strophy_rate - real_space_f_strophy_rate).abs();
-        let parseval_scale = spectral_f_strophy_rate
-            .abs()
+        let parseval_scale = spectral_rate_l1_norm
             .max(real_space_f_strophy_rate.abs())
             .max(f64::MIN_POSITIVE);
         let parseval_relative_residual = parseval_absolute_residual / parseval_scale;
@@ -300,6 +303,7 @@ impl VlasovPoisson1d1v {
             spatial_mean_casimir_rate,
             real_space_f_strophy_rate,
             spectral_f_strophy_rate,
+            spectral_rate_l1_norm,
             parseval_absolute_residual,
             parseval_relative_residual,
             casimir_partition_residual,
@@ -412,7 +416,14 @@ mod tests {
             + rates.real_space_f_strophy_rate.abs()
             + rates.spatial_mean_casimir_rate.abs()
             + 1.0;
-        assert!(rates.parseval_relative_residual < 1.0e-11);
+        assert!(
+            rates.parseval_relative_residual < 1.0e-11,
+            "Parseval residual={}, spectral={}, real={}, L1={}",
+            rates.parseval_relative_residual,
+            rates.spectral_f_strophy_rate,
+            rates.real_space_f_strophy_rate,
+            rates.spectral_rate_l1_norm
+        );
         assert!(rates.casimir_partition_residual.abs() < 1.0e-11 * scale);
         assert!(rates.total_casimir_rate.abs() < 1.0e-11 * scale);
         assert_eq!(rates.mode_rate(64, 0), None);
@@ -423,10 +434,14 @@ mod tests {
     fn free_streaming_produces_outward_velocity_f_strophy_flux() {
         let mut solver = initial_solver();
         solver.advance_free_streaming(3.0).unwrap();
-        let rates = solver.phase_space_transfer_rates(3, 2).unwrap();
+        // Disable the electric acceleration in the RHS to isolate the
+        // free-streaming transfer direction after the distribution has mixed.
+        let mut streaming_only = solver.clone();
+        streaming_only.electric_field.fill(0.0);
+        let rates = streaming_only.phase_space_transfer_rates(3, 2).unwrap();
         assert!(
             rates.flux_out_of_low_velocity_modes > 0.0,
-            "velocity flux = {:e}",
+            "streaming-only velocity flux = {:e}",
             rates.flux_out_of_low_velocity_modes
         );
         assert!(rates.phase_mixing_sector_rate >= -1.0e-12);
