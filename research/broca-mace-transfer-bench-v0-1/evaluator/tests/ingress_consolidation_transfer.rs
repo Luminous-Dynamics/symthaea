@@ -26,6 +26,11 @@ use broca_mace_consolidation::memory_budget::{
     select_for_qualified_model_budget, MemoryDoseTrialReceiptV1,
     MemoryDoseTrialVerifierV1, MemoryDoseTrialV1, ModelBudgetSurfacingReject,
 };
+use broca_mace_consolidation::reobservation::{
+    plan_memory_representation, verify_reobservation_profile, MemoryObjectKindV1,
+    ReobservationAvailabilityV1, ReobservationPolicyV1, ReobservationProposalV1,
+    ReobservationReceiptV1, ReobservationVerifierV1, ReobservationDispositionV1,
+};
 use broca_mace_consolidation::salience::{
     future_use_prediction_evidence_digest, verify_future_use_prediction,
     FutureUsePredictionV1, MemoryAccessTelemetryV1, MemorySurfacingCandidateV1,
@@ -336,6 +341,27 @@ fn memory_dose_rows(
     rows
 }
 
+struct FixtureReobservationVerifier;
+
+impl ReobservationVerifierV1 for FixtureReobservationVerifier {
+    fn verify_profile(
+        &self,
+        proposal: &ReobservationProposalV1,
+        _: Scope,
+        as_known: AsKnownQuery,
+    ) -> Option<ReobservationReceiptV1> {
+        let mut receipt = ReobservationReceiptV1 {
+            proposal_sha256: proposal.canonical_digest(),
+            verified_at_ms: as_known.known_at_ms,
+            valid_until_ms: as_known.known_at_ms + 2_000,
+            verifier_id: "fixture-reobservation-verifier".into(),
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = receipt.canonical_digest();
+        Some(receipt)
+    }
+}
+
 struct FixtureSalienceVerifier;
 
 impl SaliencePredictionVerifierV1 for FixtureSalienceVerifier {
@@ -563,6 +589,118 @@ fn qualified_memory_dose_and_salience_compose_over_verified_session_a_evidence()
         ),
         Err(ModelBudgetSurfacingReject::SalienceTargetModelMismatch)
     ));
+}
+
+#[test]
+fn receipt_qualified_session_a_evidence_selects_reobservation_aware_memory() {
+    let events = vec![
+        raw_event(81, Action::A, 0.91),
+        raw_event(82, Action::A, 0.89),
+        raw_event(83, Action::A, 0.90),
+        raw_event(84, Action::B, 0.42),
+        raw_event(85, Action::B, 0.40),
+        raw_event(86, Action::B, 0.41),
+    ];
+    let verifier = FixtureVerifier {
+        outcomes: BTreeMap::from([
+            (81, 0.91),
+            (82, 0.89),
+            (83, 0.90),
+            (84, 0.42),
+            (85, 0.40),
+            (86, 0.41),
+        ]),
+        retracted_events: BTreeSet::new(),
+        retracted_at_ms: 800,
+    };
+    let known = as_known(300);
+    let batch = ingest_batch_as_known(&events, known, &verifier)
+        .expect("Session-A evidence must pass independent ingress receipts");
+    let pack = build_consolidation_evidence_pack(&batch, &[81, 82, 83, 84, 85, 86])
+        .expect("evidence pack must preserve source lineage");
+    let evidence = pack
+        .events()
+        .iter()
+        .find(|item| item.event_id() == 81)
+        .expect("source evidence exists");
+
+    let target_model = hex_digest(510_001);
+    let evidence_digest = future_use_prediction_evidence_digest(evidence);
+    let prediction = FutureUsePredictionV1::new(
+        evidence.event_id(),
+        target_model,
+        scope(),
+        290,
+        1_000,
+        9_000,
+        50_000,
+        1_000,
+        "future-use-model",
+        "v1",
+        hex_digest(510_002),
+        hex_digest(510_003),
+        evidence_digest.clone(),
+    );
+    let policy_as_known = PolicyAsKnownQuery {
+        valid_at_ms: known.valid_at_ms,
+        known_at_ms: known.known_at_ms,
+    };
+    let verified_prediction = verify_future_use_prediction(
+        prediction,
+        scope(),
+        policy_as_known,
+        &FixtureSalienceVerifier,
+    )
+    .expect("future-use prediction requires independent calibration");
+
+    let proposal = ReobservationProposalV1 {
+        event_id: evidence.event_id(),
+        evidence_sha256: evidence_digest,
+        scope: evidence.scope(),
+        as_known: known,
+        object_kind: MemoryObjectKindV1::CurrentState,
+        availability: ReobservationAvailabilityV1::Available {
+            available_at_ms: 300,
+            locator_sha256: hex_digest(510_004),
+        },
+        availability_success_probability_bps: 9_900,
+        reobservation_failure_penalty_micros: 20_000,
+        reobservation_latency_ms: 20,
+        reobservation_cost_micros: 5_000,
+        snapshot_context_tokens: 100,
+        snapshot_valid_until_ms: Some(1_200),
+        source_profile_sha256: hex_digest(510_005),
+    };
+    let verified_profile = verify_reobservation_profile(
+        proposal,
+        scope(),
+        known,
+        &FixtureReobservationVerifier,
+    )
+    .expect("source profile must be independently verified");
+
+    let plan = plan_memory_representation(
+        &verified_prediction,
+        &verified_profile,
+        ReobservationPolicyV1 {
+            as_known: known,
+            decision_at_ms: known.known_at_ms,
+            decision_deadline_ms: 800,
+            context_budget_tokens: 512,
+            context_cost_per_token_micros: 100,
+            locator_context_tokens: 8,
+            latency_cost_per_ms_micros: 10,
+            maximum_reobservation_cost_micros: 20_000,
+            minimum_net_value_micros: 0,
+        },
+    )
+    .expect("verified evidence and profile should produce a representation plan");
+
+    assert_eq!(plan.event_id, 81);
+    assert_eq!(plan.disposition, ReobservationDispositionV1::StoreLocator);
+    assert_eq!(plan.context_tokens_reserved, 8);
+    assert!(plan.expected_failure_loss_micros > 0);
+    assert!(plan.locator_sha256.is_some());
 }
 
 #[test]
