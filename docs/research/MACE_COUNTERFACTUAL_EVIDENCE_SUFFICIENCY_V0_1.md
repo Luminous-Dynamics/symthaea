@@ -764,3 +764,45 @@ The research opportunity is to combine active reconstruction, learned consolidat
 
 Five frontier unit tests and four EVSI unit tests are authored. They have not been run. No Cargo, rustc, rustfmt or Nix toolchain is available in the authoring environment. JSON Schema files parse as JSON, but independent schema validation, build, test, formatting and deterministic execution remain pending. All results remain unexecuted source work; no SOTA, benchmark, safety or empirical utility claim is made.
 
+
+
+## 17. Cluster-paired frontier aggregation (2026-11-23)
+
+### Reducer
+
+A separate Rust binary \`mace_sufficiency_aggregate\` now consumes the evaluator-only JSONL stream from \`mace_sufficiency_frontier\`:
+
+\`\`\`text
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml --bin mace_sufficiency_aggregate -- evaluator.jsonl summary.jsonl 1234
+\`\`\`
+
+It performs the comparison in the correct hierarchy:
+1. require exact run/source/schema provenance across every evaluator record;
+2. reject duplicate \`(world_cluster, scenario_family, method, per_action_top_k)\` rows;
+3. require every method/budget to cover the same independent world clusters and the same scenario-family set within each cluster;
+4. average scenario-family outcomes with equal weight inside each world cluster;
+5. calculate paired method-minus-no-memory utility and absolute-regret deltas within each same world cluster;
+6. bootstrap 2,000 replicates by resampling independent world-cluster deltas, not individual scenario rows or budget points;
+7. calculate the aggregate mean-cost/mean-regret Pareto frontier across arm/budget points.
+
+Output includes mean utility/regret, epsilon-sufficiency rate by regret alone, oracle-optimal and full-scope-agreement rates, lower-bound resource metrics, paired mean utility/regret deltas vs no-memory, cluster-bootstrap 95% percentile intervals, resampling unit, provenance hashes and frontier membership.
+
+The reducer labels fewer-than-10-cluster results descriptive-only. It also labels the comparisons exploratory because no multiplicity correction or preregistered primary arm has yet been applied. The confidence intervals are not presented as confirmatory significance claims.
+
+### Inferential boundary
+
+Scenario families within a generated world are not independent samples. The reducer gives each family equal weight within its cluster and treats only distinct world clusters as resampling units. It also requires complete, identical family/cluster coverage across arms before calculating paired contrasts, preventing a method with missing difficult cases from looking artificially better.
+
+This is still a synthetic diagnostic benchmark:
+- 21 generated scenario families per cluster; 18 arm/budget points per family;
+- default 64 clusters imply 24,192 evaluator rows and 18 aggregate rows (code-derived expected counts, not executed results);
+- no authenticated source-lineage sidecars, so evidence-qualified sufficiency remains false;
+- resource estimates remain Experience-struct and HDC index-payload lower bounds;
+- no multiplicity correction, external evaluator custody or raw-session competitor adapters yet.
+
+The aggregate schema is \`mace_sufficiency_aggregate_v0_1\`. The reducer binds the exact evaluator JSONL bytes, its own source and output schema, input run/source/schema provenance, bootstrap seed and replicate count.
+
+### Tests authored
+
+Five reducer tests cover equal-weight within-cluster aggregation, deterministic cluster bootstrap, paired world-cluster matching/regret-delta direction, multi-dimensional Pareto dominance and canonical source revision validation. They have not been run in this environment.
+
