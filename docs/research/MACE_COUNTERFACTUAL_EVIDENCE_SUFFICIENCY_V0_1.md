@@ -526,3 +526,95 @@ These are method comparators, not scores to average together. Reproduce the publ
 Cycle 2 is closed. Its official results were published November 19, 2026. For a future cycle, repository publication is not enough: every entrant must host stable participant-operated Add and Search endpoints; the platform does not deploy a repository-only or Docker-only system. Open-source Methods also have declared embedding/LLM component restrictions, with rerankers treated separately in the current guide. Therefore, preserve an AML-compliant hosted adapter as a distinct integration profile rather than silently substituting the MACE HDC encoder into a component slot constrained by the next official rules. Re-check the next cycle's exact API/model rules when it opens.
 
 Sources: MRAgent (https://proceedings.mlr.press/v306/ji26d.html); MemoPilot (https://proceedings.mlr.press/v306/cai26b.html); Darwinian Memory (https://proceedings.mlr.press/v306/mi26b.html); WorldMemArena (https://worldmemarena-mem.github.io/); AML Cycle 2 results (https://agentmemoryleaderboard.ai/results/cycle-2/); AML participation/API rules (https://agentmemories.ai/rules).
+
+
+## 14. Agent Memory Challenge Cycle 2: capability-level gap analysis and next frontier (2026-11-22)
+
+### Official current open-method reference
+
+The official Agent Memory Challenge Cycle 2 results were published on 19 November 2026. They report nine separate leaderboards and 289 track entries across textual, multimodal and coding evaluation, with divisions for commercial products, open-source methods and closed-source methods. These divisions and task tracks must remain separate.
+
+| Track / division | Cycle 2 leader | Primary result | Capability-level signal |
+|---|---|---:|---|
+| Textual / open-source | Resurface | 61.22 overall | Fact 62.98; relational 58.94; temporal 57.76; governance 76.55; personalization/care 38.82; workflow 59.67; epistemic safety/privacy 68.59; streaming 49.65 |
+| Multimodal / open-source | Khipu | 43.26 overall | Retrieval 50.28; relational 45.82; temporal 34.23; continual learning 38.45; personalization 11.04; evidence governance 31.29 |
+| Coding / open-source | InsightMem | 63.33% resolved | New-feature resolution 74.51%; bug-fix resolution 57.58%; medium input/output tokens; verbose return; fast search; medium total time |
+| Textual / commercial products | MemoraX | 69.26 overall | Separate division; not an open-source baseline |
+| Multimodal / commercial products | MemoraX | 53.68 overall | Separate division; not an open-source baseline |
+| Coding / commercial products | MemoraX | 68.00% resolved | Separate division; not an open-source baseline |
+
+The official result page also lists MemoraX in the closed-source standings. Its commercial, closed-source and open-source values must not be merged into a single SOTA number. Cycle 2 is a retrieval/governance/task-performance reference, not a measure of causal decision sufficiency. MACE has not entered this competition and its synthetic utility/regret results are not comparable to these scores.
+
+Primary reference: https://agentmemoryleaderboard.ai/results/cycle-2/ (published 2026-11-19). The leaderboard's evaluation notes say that ranks are reported separately by track and division. Always cite the system name, track, division, version and metric when using a result.
+
+### What these scores tell us
+
+The open textual leader is strongest in governance (76.55) but has a material personalization/care gap (38.82) and streaming gap (49.65). The multimodal open leader has a still larger personalization (11.04) and evidence-governance (31.29) gap, while temporal reasoning is 34.23. The coding leader resolves 63.33% overall, with a visible new-feature/bug-fix split (74.51% vs 57.58%). Those differences argue against optimizing only a pooled recall score.
+
+MACE's differentiated contribution should be evidence-valid, decision-changing memory:
+- a retrieved item is not sufficient unless its scope, provenance, lifecycle and estimand match the current decision;
+- unknown or partial ancestry is not independence;
+- an obsolete/retracted/superseded item must not be reactivated by a summary or derived skill;
+- evidence gaps should cause targeted acquisition, clarification or abstention rather than confident guessing;
+- improvements must survive multi-session transfer under held-out source roots, regimes and objectives.
+
+### New paradigm: active evidence reconstruction and value-of-information memory
+
+Move beyond a one-shot \`retrieve → reason → answer\` pipeline. MACE should test a closed-loop process:
+
+\`\`\`text
+task contract
+  → retrieve a provisional evidence set
+  → detect missing / conflicting / stale / weakly identified evidence
+  → choose the highest-value evidence action
+  → acquire (retrieve another lineage path, inspect source, ask, measure, or intervene)
+  → verify and append the receipt
+  → revise the evidence set and decision
+  → stop, act, or abstain under a declared risk budget
+\`\`\`
+
+The evidence action is a first-class policy choice, not an untracked tool call. Each action records its cost, expected information gain, authority/scope, receipt, latency and resulting belief/decision change. A candidate value-of-information score can be operationalized as expected reduction in downstream decision regret minus acquisition cost and risk, subject to hard source, privacy and authorization constraints. It must not be trained or evaluated against oracle labels visible to the candidate.
+
+Required comparator arms:
+1. passive top-k retrieval;
+2. retrieve-then-rerank;
+3. MRAgent-style active memory reconstruction;
+4. active evidence acquisition with fixed heuristic value-of-information;
+5. learned acquisition policy over a frozen answer agent;
+6. full receipt-governed MACE policy;
+7. oracle evidence-acquisition policy (evaluator-only upper bound).
+
+The primary question is not “did retrieval find the right passage?” It is “did the agent acquire enough valid evidence to choose a better action, and did it stop when further search was not worth its cost?”
+
+### Proposed qualification targets (future targets, not measured results)
+
+For a future AML open-method entry, use Cycle 2 leaders only as versioned reference points; verify the next official rules and datasets before submission. Stretch targets against the current open-source leaders are:
+
+| Track | Cycle 2 open leader | Target for a matched future protocol |
+|---|---:|---:|
+| Textual overall | 61.22 | ≥64.22 (+3.00 points) |
+| Multimodal overall | 43.26 | ≥46.26 (+3.00 points) |
+| Coding resolved | 63.33% | ≥66.33% (+3.00 points) |
+
+Do not count these as achieved or directly infer them from MACE synthetic results. Per-capability targets should address the observed bottlenecks: textual personalization/care ≥45, streaming ≥55, governance ≥80 and epistemic safety/privacy ≥75; multimodal personalization ≥20, evidence governance ≥40 and temporal reasoning ≥40; coding bug-fix resolution ≥62% without losing new-feature performance. These thresholds are project targets, not official challenge thresholds.
+
+For the MACE-specific benchmark, maintain separate scorecards and preregister:
+- paired lower 95% confidence bound of memory-vs-no-memory decision utility greater than zero;
+- upper 95% confidence bound on added regret no greater than a preregistered epsilon;
+- zero accepted false-independence cases on deterministic shared-root and declared-ancestor attacks;
+- zero unauthorized activation of known revoked, wrong-scope, stale or unknown-trust evidence in the deterministic safety panel;
+- value-of-information policy improves task utility over passive retrieval at matched model/tool/observation budgets, with net acquisition cost reported;
+- under equal all-in memory cost, ≥5 percentage-point final-chain success improvement over the strongest reproduced non-oracle baseline as a stretch target;
+- compression target ≥50% lower all-in steady-state and maintenance cost with ≤1 percentage-point task-success loss on a preregistered lane.
+
+For rare integrity failures, report exact one-sided confidence bounds and independent scenario/root counts. Zero observed failures are not proof of zero risk: under independent trials the rough 95% upper bound is about 3/n, and correlated interventions must be clustered by source root/scenario rather than counted as independent samples.
+
+### Implementation sequence
+
+1. Finish the receipt-sidecar reader and exact candidate-pool binding; distinguish integrity hashing from issuer authentication.
+2. Add a genuine ingress-produced fixture to the evaluator path; the current CLI sidecar hook still runs the public generated-world corpus and is not a live Mycelix import.
+3. Add typed lifecycle history edges (\`supersedes\`, \`retracts\`, privacy erase) with issuer/receipt identity, valid-time, known-time and descendant propagation; do not infer history from status labels or timestamps.
+4. Add a value-of-information action schema and sealed evidence-acquisition scenarios, with acquisition receipts and a candidate-visible stop rule.
+5. Reproduce the public AML, TimlMemBench, FAMA, StateMemBench, MemoryArena, WorldMemArena and AMA-Bench protocols separately, then run matched-budget MACE extensions.
+6. Move hidden labels, seeds and primary evaluator custody outside the candidate implementation before confirmatory claims.
+
