@@ -512,4 +512,11 @@ Candidate hits also carry a SHA-256 fingerprint of the candidate-visible `Experi
 
 MACE now has a proposal-only representation selector alongside future-use salience: persist learned rules/procedures/preferences, retain a compact stable fact or verified locator, cache mutable state only through a verified freshness interval, or discard non-positive-value items. Locator value is risk-adjusted by a verifier-calibrated success probability and failure consequence; availability and calibration receipts must remain valid strictly beyond the decision deadline. The selector is bound to the exact bitemporal `(valid_at, known_at)` query and refuses to reuse a profile from an earlier knowledge snapshot.
 
-This adds a new benchmark axis: **memory versus perception**. It is not enough to ask which memories to inject; the agent should decide which information must be learned, which can be looked up at use time, and which snapshots are worth caching. The prototype includes 22 authored module tests and a raw Session-A ingress → future-use prediction → source-profile verification → representation-plan evaluator integration fixture. Fixture verification only; no runner or SOTA claim.
+This adds a new benchmark axis: **memory versus perception**. It is not enough to ask which memories to inject; the agent should decide which information must be learned, which can be looked up at use time, and which snapshots are worth caching. The prototype includes 23 authored module tests and a raw Session-A ingress → future-use prediction → source-profile verification → representation-plan evaluator integration fixture. Fixture verification only; no runner or SOTA claim.
+
+
+### Authority-scoped memory representation (2026-11-22)
+
+The re-observation representation contract now binds principal, capability, audience, resource/tenant, purpose and policy revision using opaque digests. Both the independent source verifier and the decision policy must match the expected authority scope exactly. This follows Mycelix's principal/capability, destination/audience and purpose binding pattern. The injected verifier is a test seam only; production still requires live Mycelix capability and revocation checks at use.
+
+The module now contains **23 authored unit tests**, including wrong-principal, wrong-audience and wrong-purpose controls; the raw Session-A integration fixture binds an `EnvironmentState` authority scope. These are source counts only, not executed passes.

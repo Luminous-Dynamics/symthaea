@@ -36,6 +36,20 @@ The broca-mace-consolidation reobservation module:
 
 The source-availability verifier is an interface. The checked-in tests use fixture receipts; production must bind calibrated availability probability, failure consequence, latency, cost, locator scope and validity to Mycelix source profiles or Symtropy environment observations, with independent issuer verification.
 
+### Principal, audience and purpose binding
+
+Every re-observation proposal and plan now carries a typed `MemoryAuthorityScopeV1` containing opaque digests for:
+- principal identity;
+- capability/authority receipt;
+- audience/recipient set;
+- exact resource or tenant/project boundary;
+- policy revision;
+- memory purpose (`PersonalPreference`, `PrivateProjectKnowledge`, `SharedTeamKnowledge`, `PublicKnowledge`, or `EnvironmentState`).
+
+The proposal digest and plan digest bind this scope. The injected independent source verifier receives the expected scope and must reject a mismatch; the planning policy repeats exact-scope equality before emitting a plan. This prevents a personal preference, private project note, shared team rule and public fact from being treated as interchangeable because their content or task regime matches.
+
+This follows the principal/capability, resource, audience and purpose separation used in Mycelix's effectuation contracts. It does **not** implement a new policy engine or grant authority: production must resolve the capability and current policy revision through Mycelix, bind the resource/audience and recheck revocation at use. The fixture verifier only tests the contract's shape and equality behavior.
+
 ## Decision rule
 
 For a predicted future-use value V:
@@ -86,7 +100,7 @@ Do not combine governance failures with utility into one weighted score.
 
 ## Initial qualification targets
 
-- Zero locator use when the locator receipt is wrong-scope, expired at or before the decision deadline, source-retracted or bound to an older knowledge snapshot.
+- Zero locator use when the locator receipt is wrong-scope, expired at or before the decision deadline, source-retracted, bound to an older knowledge snapshot, or bound to a different principal/capability/audience/resource/purpose/policy revision.
 - Zero snapshot activation after its verified expiry.
 - At least 95% of high-value, non-reconstructible held-out rules retained under the declared budget.
 - At least 90% fewer snapshot tokens for a fixture where state is cheaply re-observable, without a downstream utility regression.
@@ -152,7 +166,7 @@ Keep original screenshots, frames, spatial state and tool feedback as the eviden
 - The current selector makes per-item representation choices; a joint token/call/latency optimizer remains future work.
 - The current module does not store or mutate persistent memory. It returns a plan for a governed consumer.
 - The benchmark must include live state and learned strategy in the same dependent-session task, otherwise re-observe can win trivially by repeatedly querying an oracle.
-- The raw Session-A ingress → future-use calibration → source-profile receipt → representation-plan path has an authored evaluator integration test; it remains fixture-backed and unexecuted until a Rust runner is available.
+- The raw Session-A ingress → future-use calibration → source-profile receipt → authority-scoped representation-plan path has an authored evaluator integration test; it remains fixture-backed and unexecuted until a Rust runner is available.
 
 Next: connect the plan to receipt-qualified consolidation proposals, add environment-backed locators, and benchmark integrated Session-A learning → Session-B retrieval/re-observation → Session-C correction.
 

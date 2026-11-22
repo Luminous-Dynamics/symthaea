@@ -545,3 +545,5 @@ See [MACE Re-observation-Aware Memory Benchmark v0.1](../../docs/research/MACE_R
 The industry comparison distinguishes Microsoft Research's Memora memory-representation system (reported 86.3% LoCoMo / 87.4% LongMemEval in its own setup) from ACL 2026 Memora/FAMA. Any MACE comparison must reproduce the same backbone, judge, task split, memory interface and token accounting; no direct score comparison is claimed.
 
 The re-observation benchmark now includes a WorldMemArena crosswalk: representation choices are evaluated separately at write/maintain/retrieve/use. External reference baselines also distinguish Microsoft Research Memora from the separate ACL Memora/FAMA work and from Mem0's vendor-maintained benchmark results; no cross-protocol score comparison is claimed.
+
+Re-observation plans are now authority-scoped: a typed Mycelix-aligned scope binds principal, capability, audience, resource/tenant, purpose and policy revision. Source verification and decision planning must match that scope exactly; this is an injected verifier contract, not a replacement authorization system or a live capability/revocation check.
