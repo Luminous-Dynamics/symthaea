@@ -86,5 +86,10 @@
     }
   ],
   "reference_time_map_clock_domain_id": "muse-performance-time-v1",
-  "time_alignment_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  "time_alignment_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "time_alignment_source_clock_domain_id": "muse-performance-time-v1",
+  "time_alignment_target_clock_domain_id": "synthetic-runner-monotonic-v1",
+  "time_alignment_valid_from_ns": 0,
+  "time_alignment_valid_until_ns": 2000000000,
+  "time_alignment_max_uncertainty_ns": 5000000
 }
