@@ -1,0 +1,94 @@
+{
+  "schema": "sfeb-leptos-compatibility-v1",
+  "version": "1.0.0",
+  "id": "LEPTOS-COMPAT-0820-0823",
+  "status": "specification_only",
+  "purpose": "Test the repository's Leptos applications against the newest published stable 0.8 patch release without changing the pinned benchmark baseline or conflating framework migration with frontend-agent quality.",
+  "baseline": {
+    "leptos_version": "0.8.20",
+    "source": "Cargo.lock",
+    "cargo_lock_blob_sha1": "1d5b6c3dffb474fabef0f8237c6741b4f252bc62",
+    "baseline_surfaces": [
+      "crates/bridges/symthaea-ui",
+      "crates/bridges/symthaea-web",
+      "crates/domains/symthaea-muse-ui"
+    ]
+  },
+  "candidate": {
+    "leptos_version": "0.8.23",
+    "release_date": "2026-10-31",
+    "release_type": "published_stable_patch",
+    "upstream_release_note": "HydrationScripts defer option and backport of PR #4964.",
+    "primary_reference": "https://docs.rs/crate/leptos/0.8.23"
+  },
+  "excluded_experiments": [
+    {
+      "version": "0.9.0-rc1",
+      "release_type": "prerelease",
+      "reason": "Do not combine prerelease compatibility experiments with the stable patch-upgrade gate."
+    }
+  ],
+  "constraints": [
+    "Do not alter the pinned 0.8.20 benchmark baseline.",
+    "Use a separate branch or isolated worktree for the 0.8.23 lockfile update.",
+    "Do not change frontend source code during the dependency-only compatibility pass unless a concrete API or build defect is reproduced.",
+    "Record the exact Rust toolchain, Cargo.lock diff and resolved Leptos subcrate versions.",
+    "Keep CSR, SSR and hydration requirements separate; the initial bridge baselines are CSR."
+  ],
+  "verification_sequence": [
+    {
+      "id": "compat.lock-resolution",
+      "command": "cargo update -p leptos --precise 0.8.23",
+      "oracle": "cargo tree -i leptos shows 0.8.23 for each selected bridge surface; no unexpected Leptos 0.9 prerelease is resolved.",
+      "status": "pending"
+    },
+    {
+      "id": "compat.manifest-diff",
+      "command": "git diff -- Cargo.lock",
+      "oracle": "Only expected dependency resolution changes are present; capture exact diff and lockfile digest.",
+      "status": "pending"
+    },
+    {
+      "id": "compat.rust-quality",
+      "command": "cargo fmt --check -p symthaea-ui -p symthaea-web -p symthaea-muse-ui && cargo clippy -p symthaea-ui -p symthaea-web -p symthaea-muse-ui --all-targets --all-features -- -D warnings",
+      "oracle": "Formatting and Clippy pass without lint suppression or changed project gates.",
+      "status": "pending"
+    },
+    {
+      "id": "compat.native-tests",
+      "command": "cargo test -p symthaea-ui && cargo test -p symthaea-web && cargo test -p symthaea-muse-ui",
+      "oracle": "All package tests pass on the exact 0.8.23 candidate lockfile.",
+      "status": "pending"
+    },
+    {
+      "id": "compat.wasm-builds",
+      "command": "trunk build --release (from each selected CSR app directory)",
+      "oracle": "All selected CSR applications build with the pinned toolchain and no unexpected WASM size or dependency regression.",
+      "status": "pending"
+    },
+    {
+      "id": "compat.browser-smoke",
+      "command": "cargo test -p symthaea-browser --test frontend_capture_smoke -- --ignored --nocapture; then capture fixed viewport fixtures in all three apps",
+      "oracle": "Browser capture, routing, chat, Muse playback persistence and telemetry state transitions behave as before.",
+      "status": "pending"
+    },
+    {
+      "id": "compat.performance",
+      "command": "Compare pinned browser captures and WASM artefacts against 0.8.20 baseline.",
+      "oracle": "No critical visual/functional regression; report cold-load, interaction latency, compressed WASM size and Core Web Vitals as separate measures.",
+      "status": "pending"
+    }
+  ],
+  "acceptance_gates": [
+    "All compiler, Clippy, test and WASM build gates pass on the exact candidate head.",
+    "No existing required browser journey regresses.",
+    "The source-observed contract and SFEB task manifests remain valid.",
+    "No accessibility or security hard gate regresses.",
+    "All measurements identify the resolved framework and lockfile version."
+  ],
+  "notes": [
+    "The 0.8.23 release note primarily concerns HydrationScripts and a backport; its direct effect on the current CSR bridge applications may be limited. This is a testable expectation, not an assumption.",
+    "No 0.8.23 build or compatibility result has been measured yet.",
+    "The benchmark baseline remains Leptos 0.8.20 until this experiment is independently qualified and a deliberate baseline version bump is reviewed."
+  ]
+}
