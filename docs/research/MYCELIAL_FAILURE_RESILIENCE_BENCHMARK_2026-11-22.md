@@ -154,6 +154,7 @@ For each scenario and trial, each attempted segment/junction removal is independ
 The profile validator:
 - checks every scenario has the configured number of trials;
 - recomputes the exact realized failed-ID lists from the PRNG and declared seed;
+- re-runs the weighted graph evaluator for **every trial** from those realized failed IDs and compares reachability, directness, path length, component count and cycle rank;
 - checks the trial ordering and uniqueness;
 - recomputes all distribution summaries from the stored trials;
 - binds source graph, demand inventory, attack-plan digest and probability/seed configuration.
