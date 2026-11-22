@@ -19,10 +19,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::mycelial_model::{MycelialModel, MycelialFilament, SpatialPoint3};
+use crate::mycelial_model::{MycelialFilament, MycelialModel, SpatialPoint3};
 use crate::mycelial_network::{
-    AnastomosisKind, MycelialAnastomosis, MycelialAnastomosisCandidate,
-    MycelialNetworkConfig, build_mycelial_network_graph,
+    AnastomosisKind, MycelialAnastomosis, MycelialAnastomosisCandidate, MycelialNetworkConfig,
+    build_mycelial_network_graph,
 };
 
 pub const MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION: u16 = 1;
@@ -272,18 +272,12 @@ pub fn build_mycelial_contact_filtration(
                 fusion.id,
             ));
         }
-        let source = filaments
-            .get(&fusion.source_filament_id)
-            .copied()
-            .ok_or(MycelialContactFiltrationError::UnknownFilament(
-                fusion.source_filament_id,
-            ))?;
-        let target = filaments
-            .get(&fusion.target_filament_id)
-            .copied()
-            .ok_or(MycelialContactFiltrationError::UnknownFilament(
-                fusion.target_filament_id,
-            ))?;
+        let source = filaments.get(&fusion.source_filament_id).copied().ok_or(
+            MycelialContactFiltrationError::UnknownFilament(fusion.source_filament_id),
+        )?;
+        let target = filaments.get(&fusion.target_filament_id).copied().ok_or(
+            MycelialContactFiltrationError::UnknownFilament(fusion.target_filament_id),
+        )?;
         let source_point = bezier_point(source, fusion.source_t);
         let target_point = bezier_point(target, fusion.target_t);
         if !source_point.is_finite() || !target_point.is_finite() {
@@ -296,17 +290,10 @@ pub fn build_mycelial_contact_filtration(
         let anchor_error = point_distance(expected_anchor, fusion.junction_position);
         let allowed_error = CONTACT_DISTANCE_ABSOLUTE_EPSILON
             .max(measured_distance * CONTACT_DISTANCE_RELATIVE_EPSILON);
-        let parameter_micros = |value: f32| {
-            (f64::from(value.clamp(0.0, 1.0)) * 1_000_000.0).round() as u32
-        };
-        let source_contact = (
-            fusion.source_filament_id,
-            parameter_micros(fusion.source_t),
-        );
-        let target_contact = (
-            fusion.target_filament_id,
-            parameter_micros(fusion.target_t),
-        );
+        let parameter_micros =
+            |value: f32| (f64::from(value.clamp(0.0, 1.0)) * 1_000_000.0).round() as u32;
+        let source_contact = (fusion.source_filament_id, parameter_micros(fusion.source_t));
+        let target_contact = (fusion.target_filament_id, parameter_micros(fusion.target_t));
         let (left_contact, right_contact) = if source_contact <= target_contact {
             (source_contact, target_contact)
         } else {
@@ -331,8 +318,8 @@ pub fn build_mycelial_contact_filtration(
             });
         }
         validated_fusions.push(fusion.clone());
-        let admitted = quantize(measured_distance)
-            <= quantize(config.maximum_contact_tolerance_model_units);
+        let admitted =
+            quantize(measured_distance) <= quantize(config.maximum_contact_tolerance_model_units);
         candidate_observations.push(MycelialContactCandidateObservation {
             fusion_candidate_id: fusion.id,
             source_filament_id: fusion.source_filament_id,
@@ -362,8 +349,18 @@ pub fn build_mycelial_contact_filtration(
     measured_candidates.sort_by(|left, right| {
         quantize(left.1)
             .cmp(&quantize(right.1))
-            .then_with(|| left.0.fusion.source_filament_id.cmp(&right.0.fusion.source_filament_id))
-            .then_with(|| left.0.fusion.target_filament_id.cmp(&right.0.fusion.target_filament_id))
+            .then_with(|| {
+                left.0
+                    .fusion
+                    .source_filament_id
+                    .cmp(&right.0.fusion.source_filament_id)
+            })
+            .then_with(|| {
+                left.0
+                    .fusion
+                    .target_filament_id
+                    .cmp(&right.0.fusion.target_filament_id)
+            })
             .then_with(|| left.0.fusion.kind.cmp(&right.0.fusion.kind))
             .then_with(|| {
                 let left_target = (f64::from(left.0.fusion.target_t) * 1_000_000.0).round() as u32;
@@ -380,9 +377,11 @@ pub fn build_mycelial_contact_filtration(
         if quantize(*measured_distance) <= maximum_tolerance_microunits {
             let index = candidate_observations
                 .binary_search_by_key(&candidate.fusion.id, |value| value.fusion_candidate_id)
-                .map_err(|_| MycelialContactFiltrationError::InvalidFiltration(
-                    "candidate inventory lost an admitted candidate",
-                ))?;
+                .map_err(|_| {
+                    MycelialContactFiltrationError::InvalidFiltration(
+                        "candidate inventory lost an admitted candidate",
+                    )
+                })?;
             candidate_observations[index].admission_order = Some(next_admission_order);
             next_admission_order = next_admission_order.saturating_add(1);
         }
@@ -400,10 +399,7 @@ pub fn build_mycelial_contact_filtration(
             connection.target_filament_id,
             None,
         );
-        let _ = disjoint.union(
-            connection.source_filament_id,
-            connection.target_filament_id,
-        );
+        let _ = disjoint.union(connection.source_filament_id, connection.target_filament_id);
     }
     let baseline_components = disjoint.component_count();
     let baseline_parent_edges = baseline.connections.len();
@@ -441,10 +437,11 @@ pub fn build_mycelial_contact_filtration(
                     connected_components_after_merge: disjoint.component_count(),
                 });
             } else {
-                let witness_path = find_path(&adjacency, source_id, target_id)
-                    .ok_or(MycelialContactFiltrationError::InvalidFiltration(
+                let witness_path = find_path(&adjacency, source_id, target_id).ok_or(
+                    MycelialContactFiltrationError::InvalidFiltration(
                         "union-find reports connected vertices but no witness path exists",
-                    ))?;
+                    ),
+                )?;
                 cycles_at_threshold += 1;
                 cycle_births.push(MycelialContactCycleBirth {
                     fusion_candidate_id: candidate.fusion.id,
@@ -592,59 +589,68 @@ impl MycelialContactFiltration {
             ));
         }
         if self.source_filament_ids.len() != self.metrics.baseline_filament_count
-            || self.source_filament_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || self
+                .source_filament_ids
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
             || self.baseline_parent_edges.len() != self.metrics.baseline_parent_edge_count
             || self.metrics.baseline_parent_edge_count > self.metrics.baseline_filament_count
             || self.metrics.baseline_connected_components
-                != self.metrics.baseline_filament_count
-                    - self.metrics.baseline_parent_edge_count
+                != self.metrics.baseline_filament_count - self.metrics.baseline_parent_edge_count
             || self.baseline_parent_edges.windows(2).any(|pair| {
                 (pair[0].source_filament_id, pair[0].target_filament_id)
                     >= (pair[1].source_filament_id, pair[1].target_filament_id)
             })
             || self.baseline_parent_edges.iter().any(|edge| {
                 edge.source_filament_id == edge.target_filament_id
-                    || self.source_filament_ids.binary_search(&edge.source_filament_id).is_err()
-                    || self.source_filament_ids.binary_search(&edge.target_filament_id).is_err()
+                    || self
+                        .source_filament_ids
+                        .binary_search(&edge.source_filament_id)
+                        .is_err()
+                    || self
+                        .source_filament_ids
+                        .binary_search(&edge.target_filament_id)
+                        .is_err()
             })
             || self.candidate_observations.len() != self.metrics.candidate_count_total
-            || self.candidate_observations.windows(2).any(|pair| {
-                pair[0].fusion_candidate_id >= pair[1].fusion_candidate_id
-            })
+            || self
+                .candidate_observations
+                .windows(2)
+                .any(|pair| pair[0].fusion_candidate_id >= pair[1].fusion_candidate_id)
         {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
                 "candidate observation inventory is not complete, unique and sorted",
             ));
         }
         let source_ids: BTreeSet<_> = self.source_filament_ids.iter().copied().collect();
-        let terminal_ids: BTreeSet<_> = self
+        let terminal_ids: BTreeSet<_> = self.source_terminal_filament_ids.iter().copied().collect();
+        if self
             .source_terminal_filament_ids
-            .iter()
-            .copied()
-            .collect();
-        if self.source_terminal_filament_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
             || self
                 .source_terminal_filament_ids
                 .iter()
                 .any(|id| !source_ids.contains(id))
             || self.candidate_observations.iter().any(|candidate| {
-            candidate.source_filament_id == candidate.target_filament_id
-                || !source_ids.contains(&candidate.source_filament_id)
-                || !source_ids.contains(&candidate.target_filament_id)
-                || !terminal_ids.contains(&candidate.source_filament_id)
-                || (candidate.kind == AnastomosisKind::TipToTip
-                    && !terminal_ids.contains(&candidate.target_filament_id))
-                || candidate.contact_distance_microunits > 100_000_000
-                || candidate.source_parameter_micros != 1_000_000
-                || candidate.target_parameter_micros > 1_000_000
-                || match candidate.kind {
-                    AnastomosisKind::TipToTip => candidate.target_parameter_micros != 1_000_000,
-                    AnastomosisKind::TipToSide => {
-                        candidate.target_parameter_micros <= 50_000
-                            || candidate.target_parameter_micros >= 950_000
+                candidate.source_filament_id == candidate.target_filament_id
+                    || !source_ids.contains(&candidate.source_filament_id)
+                    || !source_ids.contains(&candidate.target_filament_id)
+                    || !terminal_ids.contains(&candidate.source_filament_id)
+                    || (candidate.kind == AnastomosisKind::TipToTip
+                        && !terminal_ids.contains(&candidate.target_filament_id))
+                    || candidate.contact_distance_microunits > 100_000_000
+                    || candidate.source_parameter_micros != 1_000_000
+                    || candidate.target_parameter_micros > 1_000_000
+                    || match candidate.kind {
+                        AnastomosisKind::TipToTip => candidate.target_parameter_micros != 1_000_000,
+                        AnastomosisKind::TipToSide => {
+                            candidate.target_parameter_micros <= 50_000
+                                || candidate.target_parameter_micros >= 950_000
+                        }
                     }
-                }
-        }) {
+            })
+        {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
                 "candidate observations contain invalid endpoint or contact parameters",
             ));
@@ -685,25 +691,27 @@ impl MycelialContactFiltration {
                 .then_with(|| left.source_filament_id.cmp(&right.source_filament_id))
                 .then_with(|| left.target_filament_id.cmp(&right.target_filament_id))
                 .then_with(|| left.kind.cmp(&right.kind))
-                .then_with(|| left.target_parameter_micros.cmp(&right.target_parameter_micros))
+                .then_with(|| {
+                    left.target_parameter_micros
+                        .cmp(&right.target_parameter_micros)
+                })
                 .then_with(|| left.fusion_candidate_id.cmp(&right.fusion_candidate_id))
         });
-        if expected_admission_order.iter().enumerate().any(|(index, candidate)| {
-            candidate.admission_order != Some(index as u32)
-        }) {
+        if expected_admission_order
+            .iter()
+            .enumerate()
+            .any(|(index, candidate)| candidate.admission_order != Some(index as u32))
+        {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
                 "candidate admission order does not match deterministic threshold/tie ordering",
             ));
         }
         if observed_admitted != self.metrics.candidate_count_in_filtration
-            || self
-                .candidate_observations
-                .iter()
-                .any(|candidate| {
-                    candidate.admitted_within_maximum_tolerance
-                        != (candidate.contact_distance_microunits
-                            <= quantize(self.maximum_contact_tolerance_model_units))
-                })
+            || self.candidate_observations.iter().any(|candidate| {
+                candidate.admitted_within_maximum_tolerance
+                    != (candidate.contact_distance_microunits
+                        <= quantize(self.maximum_contact_tolerance_model_units))
+            })
         {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
                 "candidate admission flags do not match their threshold distances",
@@ -729,7 +737,9 @@ impl MycelialContactFiltration {
             || self.metrics.component_merge_count + self.metrics.cycle_birth_count
                 != self.metrics.candidate_count_in_filtration
             || self.metrics.final_connected_components
-                != self.metrics.baseline_connected_components
+                != self
+                    .metrics
+                    .baseline_connected_components
                     .saturating_sub(self.metrics.component_merge_count)
             || self.metrics.final_cycle_rank != self.metrics.cycle_birth_count
         {
@@ -756,11 +766,11 @@ impl MycelialContactFiltration {
         let mut event_ids = BTreeSet::new();
         let mut previous_merge_order = None;
         for (merge_index, event) in self.component_merges.iter().enumerate() {
-            let candidate = observation_by_id
-                .get(&event.fusion_candidate_id)
-                .ok_or(MycelialContactFiltrationError::InvalidFiltration(
+            let candidate = observation_by_id.get(&event.fusion_candidate_id).ok_or(
+                MycelialContactFiltrationError::InvalidFiltration(
                     "component merge has no candidate observation",
-                ))?;
+                ),
+            )?;
             let admission_order = candidate.admission_order.ok_or(
                 MycelialContactFiltrationError::InvalidFiltration(
                     "component merge candidate has no admission order",
@@ -771,7 +781,10 @@ impl MycelialContactFiltration {
                 || candidate.target_filament_id != event.target_filament_id
                 || candidate.contact_distance_microunits != event.contact_distance_microunits
                 || event.connected_components_after_merge
-                    != self.metrics.baseline_connected_components.saturating_sub(merge_index + 1)
+                    != self
+                        .metrics
+                        .baseline_connected_components
+                        .saturating_sub(merge_index + 1)
                 || previous_merge_order.is_some_and(|previous| admission_order <= previous)
                 || !event_ids.insert(event.fusion_candidate_id)
             {
@@ -783,11 +796,11 @@ impl MycelialContactFiltration {
         }
         let mut previous_cycle_order = None;
         for event in &self.cycle_births {
-            let candidate = observation_by_id
-                .get(&event.fusion_candidate_id)
-                .ok_or(MycelialContactFiltrationError::InvalidFiltration(
+            let candidate = observation_by_id.get(&event.fusion_candidate_id).ok_or(
+                MycelialContactFiltrationError::InvalidFiltration(
                     "cycle birth has no candidate observation",
-                ))?;
+                ),
+            )?;
             let admission_order = candidate.admission_order.ok_or(
                 MycelialContactFiltrationError::InvalidFiltration(
                     "cycle candidate has no admission order",
@@ -802,9 +815,10 @@ impl MycelialContactFiltration {
                     != Some(event.source_filament_id)
                 || event.witness_path.last().map(|step| step.to_filament_id)
                     != Some(event.target_filament_id)
-                || event.witness_path.windows(2).any(|pair| {
-                    pair[0].to_filament_id != pair[1].from_filament_id
-                })
+                || event
+                    .witness_path
+                    .windows(2)
+                    .any(|pair| pair[0].to_filament_id != pair[1].from_filament_id)
                 || event.witness_path.iter().any(|step| {
                     if step.from_filament_id == step.to_filament_id
                         || !source_ids.contains(&step.from_filament_id)
@@ -822,7 +836,9 @@ impl MycelialContactFiltration {
                         Some(prior_id) => observation_by_id.get(&prior_id).is_none_or(|prior| {
                             prior_id == event.fusion_candidate_id
                                 || !prior.admitted_within_maximum_tolerance
-                                || prior.admission_order.is_none_or(|prior_order| prior_order >= admission_order)
+                                || prior
+                                    .admission_order
+                                    .is_none_or(|prior_order| prior_order >= admission_order)
                                 || prior.contact_distance_microunits
                                     > event.contact_distance_microunits
                                 || !((prior.source_filament_id == pair.0
@@ -880,16 +896,16 @@ impl MycelialContactFiltration {
         let mut previous_components = self.metrics.baseline_connected_components;
         let mut previous_cycles = 0usize;
         for snapshot in &self.snapshots {
-            if previous_tolerance.is_some_and(|value| {
-                snapshot.contact_tolerance_microunits <= value
-            })
+            if previous_tolerance
+                .is_some_and(|value| snapshot.contact_tolerance_microunits <= value)
                 || snapshot.admitted_candidate_count <= previous_candidates
                 || snapshot.connected_components > previous_components
                 || snapshot.cycle_rank < previous_cycles
                 || snapshot.admitted_candidate_count
-                    != self.metrics.candidate_count_in_filtration.min(
-                        snapshot.admitted_candidate_count,
-                    )
+                    != self
+                        .metrics
+                        .candidate_count_in_filtration
+                        .min(snapshot.admitted_candidate_count)
             {
                 return Err(MycelialContactFiltrationError::InvalidFiltration(
                     "filtration snapshots are not monotone",
@@ -898,12 +914,16 @@ impl MycelialContactFiltration {
             let merge_total: usize = self
                 .component_merges
                 .iter()
-                .filter(|event| event.contact_distance_microunits <= snapshot.contact_tolerance_microunits)
+                .filter(|event| {
+                    event.contact_distance_microunits <= snapshot.contact_tolerance_microunits
+                })
                 .count();
             let cycle_total: usize = self
                 .cycle_births
                 .iter()
-                .filter(|event| event.contact_distance_microunits <= snapshot.contact_tolerance_microunits)
+                .filter(|event| {
+                    event.contact_distance_microunits <= snapshot.contact_tolerance_microunits
+                })
                 .count();
             let expected_admitted_count = self
                 .candidate_observations
@@ -915,7 +935,10 @@ impl MycelialContactFiltration {
                 })
                 .count();
             if snapshot.connected_components
-                != self.metrics.baseline_connected_components.saturating_sub(merge_total)
+                != self
+                    .metrics
+                    .baseline_connected_components
+                    .saturating_sub(merge_total)
                 || snapshot.cycle_rank != cycle_total
                 || snapshot.admitted_candidate_count != expected_admitted_count
                 || snapshot.admitted_candidate_count != merge_total + cycle_total
@@ -923,13 +946,19 @@ impl MycelialContactFiltration {
                     != self
                         .component_merges
                         .iter()
-                        .filter(|event| event.contact_distance_microunits == snapshot.contact_tolerance_microunits)
+                        .filter(|event| {
+                            event.contact_distance_microunits
+                                == snapshot.contact_tolerance_microunits
+                        })
                         .count()
                 || snapshot.cycle_births_at_threshold
                     != self
                         .cycle_births
                         .iter()
-                        .filter(|event| event.contact_distance_microunits == snapshot.contact_tolerance_microunits)
+                        .filter(|event| {
+                            event.contact_distance_microunits
+                                == snapshot.contact_tolerance_microunits
+                        })
                         .count()
             {
                 return Err(MycelialContactFiltrationError::InvalidFiltration(
@@ -951,8 +980,7 @@ impl MycelialContactFiltration {
                 ));
             }
         } else if self.metrics.candidate_count_in_filtration != 0
-            || self.metrics.final_connected_components
-                != self.metrics.baseline_connected_components
+            || self.metrics.final_connected_components != self.metrics.baseline_connected_components
             || self.metrics.final_cycle_rank != 0
         {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
@@ -980,7 +1008,12 @@ impl MycelialContactFiltration {
         hasher.update(&self.schema_version.to_le_bytes());
         hasher.update(self.length_unit.as_bytes());
         hasher.update(self.source_geometry_digest.as_bytes());
-        hasher.update(&self.maximum_contact_tolerance_model_units.to_bits().to_le_bytes());
+        hasher.update(
+            &self
+                .maximum_contact_tolerance_model_units
+                .to_bits()
+                .to_le_bytes(),
+        );
         for value in [
             self.metrics.baseline_filament_count,
             self.metrics.baseline_parent_edge_count,
@@ -1129,8 +1162,14 @@ fn add_adjacency(
     target: u32,
     candidate_id: Option<u32>,
 ) {
-    adjacency.entry(source).or_default().push((target, candidate_id));
-    adjacency.entry(target).or_default().push((source, candidate_id));
+    adjacency
+        .entry(source)
+        .or_default()
+        .push((target, candidate_id));
+    adjacency
+        .entry(target)
+        .or_default()
+        .push((source, candidate_id));
     for edges in adjacency.values_mut() {
         edges.sort_unstable();
     }
@@ -1224,7 +1263,7 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mycelial_model::{PresenceMode};
+    use crate::mycelial_model::PresenceMode;
     use crate::mycelial_network::AnastomosisKind;
 
     fn filament(
@@ -1395,9 +1434,12 @@ mod tests {
             1_000_000
         );
         assert_eq!(profile.cycle_births[0].witness_path.len(), 2);
-        assert!(profile.cycle_births[0].witness_path.iter().all(|step| {
-            step.prior_fusion_candidate_id.is_none()
-        }));
+        assert!(
+            profile.cycle_births[0]
+                .witness_path
+                .iter()
+                .all(|step| { step.prior_fusion_candidate_id.is_none() })
+        );
         profile.validate().unwrap();
         assert_eq!(
             profile.canonical_digest_hex().unwrap(),
@@ -1426,7 +1468,10 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(first.canonical_digest_hex().unwrap(), second.canonical_digest_hex().unwrap());
+        assert_eq!(
+            first.canonical_digest_hex().unwrap(),
+            second.canonical_digest_hex().unwrap()
+        );
         assert_eq!(first.snapshots.len(), 2);
         assert_eq!(first.snapshots[0].cycle_rank, 1);
         assert_eq!(first.snapshots[1].cycle_rank, 2);
@@ -1532,18 +1577,46 @@ mod tests {
                     None,
                     true,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
                 filament(
                     5,
                     None,
                     true,
-                    SpatialPoint3 { x: 1.0, y: 0.0, z: 0.0 },
-                    SpatialPoint3 { x: 1.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 1.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 1.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 1.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
             ],
             orbital_cells: Vec::new(),
@@ -1644,7 +1717,10 @@ mod tests {
         assert_eq!(profile.metrics.conflicting_candidate_count, 2);
         assert_eq!(profile.contact_conflict_groups.len(), 1);
         assert_eq!(profile.contact_conflict_groups[0].filament_id, 2);
-        assert_eq!(profile.contact_conflict_groups[0].candidate_ids, vec![17, 18]);
+        assert_eq!(
+            profile.contact_conflict_groups[0].candidate_ids,
+            vec![17, 18]
+        );
         assert_eq!(profile.candidate_observations.len(), 2);
         assert_eq!(
             profile.candidate_observations[0].source_filament_id,
