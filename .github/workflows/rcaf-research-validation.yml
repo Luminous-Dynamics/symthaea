@@ -371,9 +371,17 @@ jobs:
           for family, item in by_family.items():
               assert abs(item["target_component_variance_fraction"] - 0.10) <= 1e-12
               assert abs(item["realized_component_variance_fraction"] - 0.10) <= 1e-12
-              assert item["clean_component_variance"] > 0.0
-              assert item["nuisance_component_variance"] > 0.0
-          print("PASS: matched clean/signal/nuisance/combined factorial cells across four nuisance families")
+              clean = item["clean_component_variance"]
+              nuisance = item["nuisance_component_variance"]
+              covariance = item["clean_nuisance_covariance"]
+              denominator = clean + nuisance
+              assert clean > 0.0 and nuisance > 0.0
+              assert abs(nuisance / denominator - 0.10) <= 1e-12
+              assert abs(
+                  item["combined_observed_variance"] - (clean + nuisance + 2.0 * covariance)
+              ) <= 1e-10
+              print(f"PASS: {family} requested/realized component variance fraction")
+          print("PASS: matched four-cell counterfactuals with calibrated variance across four nuisance families")
           PY
 
       - name: Build content-addressed simulation execution receipt
