@@ -1,0 +1,246 @@
+{
+  "schema_version": "symthaea.representation-hyperedge-known-answers/v1",
+  "semantics_note": "Finite exhaustive expected values only. These fixtures validate small semantic aggregation identities; they are not proofs of scalable transformations or solver performance.",
+  "examples": [
+    {
+      "id": "branch-sum-sat-cofactor-v1",
+      "operator": "BranchSum",
+      "task": "#SAT",
+      "declared_variables": [
+        "x",
+        "y",
+        "z"
+      ],
+      "source_cnf": {
+        "clauses": [
+          [
+            [
+              "x",
+              true
+            ],
+            [
+              "y",
+              true
+            ]
+          ],
+          [
+            [
+              "x",
+              false
+            ],
+            [
+              "z",
+              true
+            ]
+          ]
+        ]
+      },
+      "partition": {
+        "variable": "x",
+        "branches": [
+          {
+            "literal": [
+              "x",
+              false
+            ],
+            "target_formula": "y",
+            "free_variables": [
+              "z"
+            ],
+            "expected_count": 2
+          },
+          {
+            "literal": [
+              "x",
+              true
+            ],
+            "target_formula": "z",
+            "free_variables": [
+              "y"
+            ],
+            "expected_count": 2
+          }
+        ]
+      },
+      "expected": {
+        "source_count": 4,
+        "aggregate_count": 4,
+        "identity": "2 + 2 = 4"
+      },
+      "required_checks": [
+        "branch conditions are exhaustive",
+        "branch conditions are disjoint",
+        "free variables remain in target universe",
+        "sum is performed only after partition proof"
+      ]
+    },
+    {
+      "id": "independent-product-free-variable-v1",
+      "operator": "IndependentProduct",
+      "task": "#SAT",
+      "declared_variables": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "components": [
+        {
+          "variables": [
+            "a",
+            "b"
+          ],
+          "clauses": [
+            [
+              [
+                "a",
+                true
+              ],
+              [
+                "b",
+                true
+              ]
+            ],
+            [
+              [
+                "a",
+                false
+              ],
+              [
+                "b",
+                true
+              ]
+            ]
+          ],
+          "expected_count": 2
+        },
+        {
+          "variables": [
+            "c",
+            "d"
+          ],
+          "clauses": [
+            [
+              [
+                "c",
+                true
+              ],
+              [
+                "d",
+                true
+              ]
+            ]
+          ],
+          "expected_count": 3
+        }
+      ],
+      "free_variables": [
+        "e"
+      ],
+      "expected": {
+        "component_counts": [
+          2,
+          3
+        ],
+        "free_variable_multiplier": 2,
+        "source_count": 12,
+        "aggregate_count": 12,
+        "identity": "2 * 3 * 2 = 12"
+      },
+      "required_checks": [
+        "component variable scopes are pairwise disjoint",
+        "components jointly cover all constrained variables",
+        "free-variable multiplier is explicit",
+        "no variable is omitted or double-counted"
+      ]
+    },
+    {
+      "id": "projected-hidden-witness-union-v1",
+      "operator": "ExistentialSupportUnion",
+      "task": "PMC",
+      "declared_variables": [
+        "v",
+        "h1",
+        "h2"
+      ],
+      "visible_variables": [
+        "v"
+      ],
+      "hidden_variables": [
+        "h1",
+        "h2"
+      ],
+      "source_formula": {
+        "op": "or",
+        "args": [
+          {
+            "op": "and",
+            "args": [
+              {
+                "var": "v"
+              },
+              {
+                "var": "h1"
+              }
+            ]
+          },
+          {
+            "op": "and",
+            "args": [
+              {
+                "var": "v"
+              },
+              {
+                "var": "h2"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "full_satisfying_assignments": 3,
+        "visible_support_count": 1,
+        "supported_visible_assignments": [
+          [
+            true
+          ]
+        ],
+        "identity": "3 full models project to one visible assignment"
+      },
+      "required_checks": [
+        "existential hidden-witness semantics",
+        "duplicate visible witnesses are collapsed by Boolean OR",
+        "arithmetic addition is not used to count overlapping supports",
+        "visible/hidden variable partition is complete and disjoint"
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "branch-missing-cofactor",
+      "mutation": "Delete x=0 or x=1 branch",
+      "expected": "reject: branch partition is incomplete"
+    },
+    {
+      "id": "branch-overlapping-cofactor",
+      "mutation": "Remove x polarity condition from one branch",
+      "expected": "reject: branch partition is not proven disjoint"
+    },
+    {
+      "id": "product-overlapping-scope",
+      "mutation": "Put c in both component scopes",
+      "expected": "reject: independent-product precondition fails"
+    },
+    {
+      "id": "product-free-variable-dropped",
+      "mutation": "Remove e from declared universe/multiplier",
+      "expected": "reject: count changes from 12 to 6"
+    },
+    {
+      "id": "projection-arithmetic-addition",
+      "mutation": "Sum branch witness counts instead of unioning visible support",
+      "expected": "reject: projected count would be 2 rather than 1"
+    }
+  ]
+}

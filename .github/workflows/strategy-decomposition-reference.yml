@@ -1,0 +1,58 @@
+name: Strategy Decomposition Reference
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-operations-research/**"
+      - ".github/workflows/strategy-decomposition-reference.yml"
+  push:
+    branches:
+      - research/sat-csp-algorithm-discovery-2026-11
+    paths:
+      - "crates/domains/symthaea-operations-research/**"
+      - ".github/workflows/strategy-decomposition-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: strategy-decomposition-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  finite-decomposition:
+    name: Bounded finite decomposition checker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting of the reference modules
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/decomposition.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_scope.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/qdimacs.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_proof.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_game_dag.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_game_values.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_strategy.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/qbf_strategy_count.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/maxqbf.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/strategy_bdd.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/strategy_aig.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/strategy_portfolio.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf_artifact.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf_construction.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/synqbf_pipeline.rs
+
+      - name: Compile the pure-std crate test harness
+        run: rustc --edition 2024 --test crates/domains/symthaea-operations-research/src/lib.rs -o /tmp/symthaea-operations-research-tests
+
+      - name: Run finite semantic and negative-control tests
+        run: /tmp/symthaea-operations-research-tests --nocapture
