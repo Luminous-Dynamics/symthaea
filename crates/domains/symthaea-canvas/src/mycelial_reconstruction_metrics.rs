@@ -1,0 +1,1242 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Ground-truth graph reconstruction scoring for annotated mycelial skeletons.
+//!
+//! This module scores graph reconstruction after an explicit one-to-one
+//! junction identity matching policy has aligned predicted and annotated
+//! junctions. It keeps object detection, junction classification, edge
+//! topology, coordinate localization, edge-length error and graph topology
+//! as separate metrics. It does not assume that renderer-local coordinates
+//! are biological measurements.
+
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::error::Error;
+use std::fmt;
+
+use serde::{Deserialize, Serialize};
+
+pub const MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION: u16 = 1;
+pub const MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION: u16 = 1;
+pub const MAX_RECONSTRUCTION_JUNCTIONS: usize = 8_192;
+pub const MAX_RECONSTRUCTION_SEGMENTS: usize = 16_384;
+pub const MAX_RECONSTRUCTION_ID_BYTES: usize = 128;
+const MAX_RECONSTRUCTION_COORDINATE: f64 = 1.0e9;
+const MAX_SEGMENT_LENGTH: f64 = 1.0e12;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReconstructionDimensionality {
+    TwoD,
+    ThreeD,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReconstructionLengthUnit {
+    Pixel,
+    Micrometer,
+    Millimeter,
+    OrganismLocalModelUnit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnnotatedJunctionKind {
+    Origin,
+    Branch,
+    Tip,
+    Anastomosis,
+    ProjectedCrossing,
+    Uncertain,
+}
+
+const ANNOTATED_JUNCTION_KINDS: [AnnotatedJunctionKind; 6] = [
+    AnnotatedJunctionKind::Origin,
+    AnnotatedJunctionKind::Branch,
+    AnnotatedJunctionKind::Tip,
+    AnnotatedJunctionKind::Anastomosis,
+    AnnotatedJunctionKind::ProjectedCrossing,
+    AnnotatedJunctionKind::Uncertain,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ReconstructionPoint3 {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+impl ReconstructionPoint3 {
+    pub fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite() && self.z.is_finite()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AnnotatedJunction {
+    pub id: String,
+    pub kind: AnnotatedJunctionKind,
+    pub position: ReconstructionPoint3,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AnnotatedHyphaSegment {
+    pub id: String,
+    pub start_junction_id: String,
+    pub end_junction_id: String,
+    pub length: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AnnotatedMycelialSkeleton {
+    pub schema_version: u16,
+    pub frame_id: String,
+    /// Digest of the acquired image, volume or immutable source observation.
+    pub source_observation_digest: String,
+    pub dimensionality: ReconstructionDimensionality,
+    pub length_unit: ReconstructionLengthUnit,
+    pub producer_id: String,
+    pub producer_version: String,
+    pub junctions: Vec<AnnotatedJunction>,
+    pub segments: Vec<AnnotatedHyphaSegment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReconstructionCounts {
+    pub true_positive: usize,
+    pub false_positive: usize,
+    pub false_negative: usize,
+}
+
+impl ReconstructionCounts {
+    pub fn precision(&self) -> Option<f64> {
+        let denominator = self.true_positive + self.false_positive;
+        (denominator > 0).then_some(self.true_positive as f64 / denominator as f64)
+    }
+
+    pub fn recall(&self) -> Option<f64> {
+        let denominator = self.true_positive + self.false_negative;
+        (denominator > 0).then_some(self.true_positive as f64 / denominator as f64)
+    }
+
+    pub fn f1(&self) -> Option<f64> {
+        let denominator = 2 * self.true_positive + self.false_positive + self.false_negative;
+        (denominator > 0)
+            .then_some(2.0 * self.true_positive as f64 / denominator as f64)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct JunctionKindScore {
+    pub kind: AnnotatedJunctionKind,
+    pub counts: ReconstructionCounts,
+    pub f1: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReconstructionTopologySummary {
+    pub junction_count: usize,
+    pub segment_count: usize,
+    pub connected_components: usize,
+    pub cycle_rank: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReconstructionTopologyDelta {
+    pub junction_count: i64,
+    pub segment_count: i64,
+    pub connected_components: i64,
+    pub cycle_rank: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReconstructionLocalizationError {
+    pub matched_junction_count: usize,
+    pub mean_error: Option<f64>,
+    pub median_error: Option<f64>,
+    pub p95_error: Option<f64>,
+    pub maximum_error: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReconstructionLengthError {
+    pub matched_segment_count: usize,
+    pub mean_absolute_error: Option<f64>,
+    pub mean_absolute_relative_error: Option<f64>,
+    pub p95_absolute_error: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct JunctionIdentityMatch {
+    pub predicted_junction_id: String,
+    pub ground_truth_junction_id: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ReconstructionEvaluationConfig {
+    /// Maximum allowed Euclidean separation for a supplied identity match,
+    /// expressed in the shared coordinate unit.
+    pub maximum_junction_match_distance: f64,
+    /// Lower bound used for relative segment-length error denominators.
+    pub length_relative_epsilon: f64,
+}
+
+impl Default for ReconstructionEvaluationConfig {
+    fn default() -> Self {
+        Self {
+            maximum_junction_match_distance: 2.0,
+            length_relative_epsilon: 1.0e-12,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialReconstructionScore {
+    pub schema_version: u16,
+    pub frame_id: String,
+    pub source_observation_digest: String,
+    pub dimensionality: ReconstructionDimensionality,
+    pub length_unit: ReconstructionLengthUnit,
+    pub matching_policy_id: String,
+    pub ground_truth_digest: String,
+    pub prediction_digest: String,
+    pub identity_matches: Vec<JunctionIdentityMatch>,
+    pub junction_detection: ReconstructionCounts,
+    pub junction_kind_scores: Vec<JunctionKindScore>,
+    pub junction_kind_macro_f1: Option<f64>,
+    pub false_anastomosis_junction_count: usize,
+    pub edge_topology: ReconstructionCounts,
+    pub unmatched_prediction_edge_count: usize,
+    pub ground_truth_topology: ReconstructionTopologySummary,
+    pub prediction_topology: ReconstructionTopologySummary,
+    pub topology_delta: ReconstructionTopologyDelta,
+    pub localization_error: ReconstructionLocalizationError,
+    pub segment_length_error: ReconstructionLengthError,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MycelialReconstructionError {
+    UnsupportedSchemaVersion(u16),
+    InvalidGraph(&'static str),
+    TooManyJunctions(usize),
+    TooManySegments(usize),
+    DuplicateJunctionId(String),
+    DuplicateSegmentId(String),
+    MissingSegmentEndpoint { segment_id: String, junction_id: String },
+    InvalidSegment(String),
+    FrameMismatch,
+    SourceObservationMismatch,
+    DimensionalityMismatch,
+    LengthUnitMismatch,
+    InvalidConfig,
+    InvalidMatchingPolicy,
+    DuplicatePredictionMatch(String),
+    DuplicateGroundTruthMatch(String),
+    UnknownPredictionJunction(String),
+    UnknownGroundTruthJunction(String),
+    JunctionMatchOutOfTolerance { predicted_id: String, ground_truth_id: String, distance: f64, limit: f64 },
+}
+
+impl fmt::Display for MycelialReconstructionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedSchemaVersion(version) => {
+                write!(f, "unsupported annotated skeleton schema version {version}")
+            }
+            Self::InvalidGraph(reason) => write!(f, "invalid annotated skeleton: {reason}"),
+            Self::TooManyJunctions(count) => {
+                write!(f, "junction count {count} exceeds {MAX_RECONSTRUCTION_JUNCTIONS}")
+            }
+            Self::TooManySegments(count) => {
+                write!(f, "segment count {count} exceeds {MAX_RECONSTRUCTION_SEGMENTS}")
+            }
+            Self::DuplicateJunctionId(id) => write!(f, "duplicate junction ID {id}"),
+            Self::DuplicateSegmentId(id) => write!(f, "duplicate segment ID {id}"),
+            Self::MissingSegmentEndpoint { segment_id, junction_id } => {
+                write!(f, "segment {segment_id} references missing junction {junction_id}")
+            }
+            Self::InvalidSegment(id) => write!(f, "segment {id} has invalid geometry or length"),
+            Self::FrameMismatch => write!(f, "ground truth and prediction frame IDs differ"),
+            Self::SourceObservationMismatch => {
+                write!(f, "ground truth and prediction source-observation digests differ")
+            }
+            Self::DimensionalityMismatch => {
+                write!(f, "ground truth and prediction dimensionalities differ")
+            }
+            Self::LengthUnitMismatch => {
+                write!(f, "ground truth and prediction length units differ")
+            }
+            Self::InvalidConfig => write!(f, "invalid reconstruction evaluation configuration"),
+            Self::InvalidMatchingPolicy => write!(f, "matching policy ID must be non-empty and bounded"),
+            Self::DuplicatePredictionMatch(id) => {
+                write!(f, "prediction junction {id} is matched more than once")
+            }
+            Self::DuplicateGroundTruthMatch(id) => {
+                write!(f, "ground-truth junction {id} is matched more than once")
+            }
+            Self::UnknownPredictionJunction(id) => {
+                write!(f, "matching policy references unknown prediction junction {id}")
+            }
+            Self::UnknownGroundTruthJunction(id) => {
+                write!(f, "matching policy references unknown ground-truth junction {id}")
+            }
+            Self::JunctionMatchOutOfTolerance {
+                predicted_id,
+                ground_truth_id,
+                distance,
+                limit,
+            } => write!(
+                f,
+                "junction match {predicted_id}->{ground_truth_id} distance {distance:.6} exceeds limit {limit:.6}"
+            ),
+        }
+    }
+}
+
+impl Error for MycelialReconstructionError {}
+
+/// Validate an annotated skeleton before it is scored or serialized.
+impl AnnotatedMycelialSkeleton {
+    pub fn validate(&self) -> Result<(), MycelialReconstructionError> {
+        if self.schema_version != MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION {
+            return Err(MycelialReconstructionError::UnsupportedSchemaVersion(
+                self.schema_version,
+            ));
+        }
+        if self.frame_id.is_empty()
+            || self.frame_id.len() > MAX_RECONSTRUCTION_ID_BYTES
+            || self.frame_id.chars().any(char::is_control)
+            || self.producer_id.is_empty()
+            || self.producer_id.len() > MAX_RECONSTRUCTION_ID_BYTES
+            || self.producer_id.chars().any(char::is_control)
+            || self.producer_version.is_empty()
+            || self.producer_version.len() > MAX_RECONSTRUCTION_ID_BYTES
+            || self.producer_version.chars().any(char::is_control)
+            || !valid_digest(&self.source_observation_digest)
+        {
+            return Err(MycelialReconstructionError::InvalidGraph(
+                "invalid frame, source digest or producer metadata",
+            ));
+        }
+        if self.junctions.len() > MAX_RECONSTRUCTION_JUNCTIONS {
+            return Err(MycelialReconstructionError::TooManyJunctions(
+                self.junctions.len(),
+            ));
+        }
+        if self.segments.len() > MAX_RECONSTRUCTION_SEGMENTS {
+            return Err(MycelialReconstructionError::TooManySegments(
+                self.segments.len(),
+            ));
+        }
+        let mut junctions = BTreeSet::new();
+        for junction in &self.junctions {
+            let position = junction.position;
+            if !valid_id(&junction.id)
+                || !junctions.insert(junction.id.as_str())
+                || !position.is_finite()
+                || position.x.abs() > MAX_RECONSTRUCTION_COORDINATE
+                || position.y.abs() > MAX_RECONSTRUCTION_COORDINATE
+                || position.z.abs() > MAX_RECONSTRUCTION_COORDINATE
+                || (self.dimensionality == ReconstructionDimensionality::TwoD
+                    && position.z.abs() > 1.0e-9)
+            {
+                return Err(MycelialReconstructionError::InvalidGraph(
+                    "duplicate/invalid junction ID or out-of-range coordinate",
+                ));
+            }
+        }
+        let mut segment_ids = BTreeSet::new();
+        for segment in &self.segments {
+            if !valid_id(&segment.id) || !segment_ids.insert(segment.id.as_str()) {
+                return Err(MycelialReconstructionError::DuplicateSegmentId(
+                    segment.id.clone(),
+                ));
+            }
+            if segment.start_junction_id == segment.end_junction_id
+                || !segment.length.is_finite()
+                || segment.length <= 0.0
+                || segment.length > MAX_SEGMENT_LENGTH
+            {
+                return Err(MycelialReconstructionError::InvalidSegment(
+                    segment.id.clone(),
+                ));
+            }
+            for junction_id in [&segment.start_junction_id, &segment.end_junction_id] {
+                if !junctions.contains(junction_id.as_str()) {
+                    return Err(MycelialReconstructionError::MissingSegmentEndpoint {
+                        segment_id: segment.id.clone(),
+                        junction_id: junction_id.clone(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialReconstructionError> {
+        self.validate()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-annotated-mycelial-skeleton-v1");
+        hasher.update(&self.schema_version.to_le_bytes());
+        hash_string(&mut hasher, &self.frame_id);
+        hasher.update(self.source_observation_digest.as_bytes());
+        hasher.update(&[match self.dimensionality {
+            ReconstructionDimensionality::TwoD => 0,
+            ReconstructionDimensionality::ThreeD => 1,
+        }]);
+        hasher.update(&[match self.length_unit {
+            ReconstructionLengthUnit::Pixel => 0,
+            ReconstructionLengthUnit::Micrometer => 1,
+            ReconstructionLengthUnit::Millimeter => 2,
+            ReconstructionLengthUnit::OrganismLocalModelUnit => 3,
+        }]);
+        hash_string(&mut hasher, &self.producer_id);
+        hash_string(&mut hasher, &self.producer_version);
+        let mut junctions: Vec<_> = self.junctions.iter().collect();
+        junctions.sort_by(|left, right| left.id.cmp(&right.id));
+        hasher.update(&(junctions.len() as u64).to_le_bytes());
+        for junction in junctions {
+            hash_string(&mut hasher, &junction.id);
+            hasher.update(&[junction_kind_index(junction.kind) as u8]);
+            for coordinate in [
+                junction.position.x,
+                junction.position.y,
+                junction.position.z,
+            ] {
+                hasher.update(&coordinate.to_bits().to_le_bytes());
+            }
+        }
+        let mut segments: Vec<_> = self.segments.iter().collect();
+        segments.sort_by(|left, right| left.id.cmp(&right.id));
+        hasher.update(&(segments.len() as u64).to_le_bytes());
+        for segment in segments {
+            hash_string(&mut hasher, &segment.id);
+            hash_string(&mut hasher, &segment.start_junction_id);
+            hash_string(&mut hasher, &segment.end_junction_id);
+            hasher.update(&segment.length.to_bits().to_le_bytes());
+        }
+        Ok(hex_digest(hasher.finalize().as_bytes()))
+    }
+}
+
+/// Evaluate prediction fidelity after an explicit one-to-one junction matching
+/// procedure has aligned predicted junction IDs with ground-truth junction IDs.
+///
+/// The evaluator never invents identity matches. The matching-policy ID and
+/// the complete mapping are retained in the score receipt. A caller may use
+/// annotation-ID matching, a geometric assignment, or a tracked identity map,
+/// but must name and freeze that policy for fair comparisons.
+pub fn evaluate_mycelial_reconstruction(
+    ground_truth: &AnnotatedMycelialSkeleton,
+    prediction: &AnnotatedMycelialSkeleton,
+    matching_policy_id: &str,
+    matches: &[JunctionIdentityMatch],
+    config: ReconstructionEvaluationConfig,
+) -> Result<MycelialReconstructionScore, MycelialReconstructionError> {
+    ground_truth.validate()?;
+    prediction.validate()?;
+    if ground_truth.frame_id != prediction.frame_id {
+        return Err(MycelialReconstructionError::FrameMismatch);
+    }
+    if ground_truth.source_observation_digest != prediction.source_observation_digest {
+        return Err(MycelialReconstructionError::SourceObservationMismatch);
+    }
+    if ground_truth.dimensionality != prediction.dimensionality {
+        return Err(MycelialReconstructionError::DimensionalityMismatch);
+    }
+    if ground_truth.length_unit != prediction.length_unit {
+        return Err(MycelialReconstructionError::LengthUnitMismatch);
+    }
+    if !valid_id(matching_policy_id)
+        || !config.maximum_junction_match_distance.is_finite()
+        || !(0.0..=MAX_RECONSTRUCTION_COORDINATE).contains(&config.maximum_junction_match_distance)
+        || config.maximum_junction_match_distance == 0.0
+        || !config.length_relative_epsilon.is_finite()
+        || !(1.0e-15..=1.0e-3).contains(&config.length_relative_epsilon)
+    {
+        return Err(MycelialReconstructionError::InvalidConfig);
+    }
+
+    let ground_truth_nodes: BTreeMap<_, _> = ground_truth
+        .junctions
+        .iter()
+        .map(|junction| (junction.id.as_str(), junction))
+        .collect();
+    let prediction_nodes: BTreeMap<_, _> = prediction
+        .junctions
+        .iter()
+        .map(|junction| (junction.id.as_str(), junction))
+        .collect();
+    let mut prediction_to_truth = BTreeMap::new();
+    let mut matched_truth = BTreeSet::new();
+    let mut normalized_matches = matches.to_vec();
+    normalized_matches.sort_by(|left, right| {
+        left.predicted_junction_id
+            .cmp(&right.predicted_junction_id)
+            .then_with(|| left.ground_truth_junction_id.cmp(&right.ground_truth_junction_id))
+    });
+    let mut localization_errors = Vec::with_capacity(matches.len());
+
+    for matched in &normalized_matches {
+        if prediction_to_truth
+            .insert(
+                matched.predicted_junction_id.as_str(),
+                matched.ground_truth_junction_id.as_str(),
+            )
+            .is_some()
+        {
+            return Err(MycelialReconstructionError::DuplicatePredictionMatch(
+                matched.predicted_junction_id.clone(),
+            ));
+        }
+        if !matched_truth.insert(matched.ground_truth_junction_id.as_str()) {
+            return Err(MycelialReconstructionError::DuplicateGroundTruthMatch(
+                matched.ground_truth_junction_id.clone(),
+            ));
+        }
+        let predicted = prediction_nodes
+            .get(matched.predicted_junction_id.as_str())
+            .copied()
+            .ok_or_else(|| MycelialReconstructionError::UnknownPredictionJunction(
+                matched.predicted_junction_id.clone(),
+            ))?;
+        let truth = ground_truth_nodes
+            .get(matched.ground_truth_junction_id.as_str())
+            .copied()
+            .ok_or_else(|| MycelialReconstructionError::UnknownGroundTruthJunction(
+                matched.ground_truth_junction_id.clone(),
+            ))?;
+        let distance = point_distance(
+            predicted.position,
+            truth.position,
+            ground_truth.dimensionality,
+        );
+        if !distance.is_finite() || distance > config.maximum_junction_match_distance {
+            return Err(MycelialReconstructionError::JunctionMatchOutOfTolerance {
+                predicted_id: matched.predicted_junction_id.clone(),
+                ground_truth_id: matched.ground_truth_junction_id.clone(),
+                distance,
+                limit: config.maximum_junction_match_distance,
+            });
+        }
+        localization_errors.push(distance);
+    }
+
+    let junction_detection = ReconstructionCounts {
+        true_positive: normalized_matches.len(),
+        false_positive: prediction.junctions.len().saturating_sub(normalized_matches.len()),
+        false_negative: ground_truth
+            .junctions
+            .len()
+            .saturating_sub(normalized_matches.len()),
+    };
+
+    let mut junction_kind_scores = Vec::with_capacity(ANNOTATED_JUNCTION_KINDS.len());
+    let mut macro_f1_values = Vec::new();
+    for kind in ANNOTATED_JUNCTION_KINDS {
+        let true_positive = normalized_matches
+            .iter()
+            .filter(|matched| {
+                prediction_nodes[matched.predicted_junction_id.as_str()].kind == kind
+                    && ground_truth_nodes[matched.ground_truth_junction_id.as_str()].kind == kind
+            })
+            .count();
+        let predicted_count = prediction
+            .junctions
+            .iter()
+            .filter(|junction| junction.kind == kind)
+            .count();
+        let ground_truth_count = ground_truth
+            .junctions
+            .iter()
+            .filter(|junction| junction.kind == kind)
+            .count();
+        let counts = ReconstructionCounts {
+            true_positive,
+            false_positive: predicted_count.saturating_sub(true_positive),
+            false_negative: ground_truth_count.saturating_sub(true_positive),
+        };
+        let f1 = counts.f1();
+        if let Some(value) = f1 {
+            macro_f1_values.push(value);
+        }
+        junction_kind_scores.push(JunctionKindScore { kind, counts, f1 });
+    }
+
+    let (edge_topology, unmatched_prediction_edge_count, length_error) =
+        evaluate_edges(
+            ground_truth,
+            prediction,
+            &prediction_to_truth,
+            config.length_relative_epsilon,
+        );
+    let ground_truth_topology = topology_summary(ground_truth);
+    let prediction_topology = topology_summary(prediction);
+    let topology_delta = ReconstructionTopologyDelta {
+        junction_count: signed_difference(
+            prediction_topology.junction_count,
+            ground_truth_topology.junction_count,
+        ),
+        segment_count: signed_difference(
+            prediction_topology.segment_count,
+            ground_truth_topology.segment_count,
+        ),
+        connected_components: signed_difference(
+            prediction_topology.connected_components,
+            ground_truth_topology.connected_components,
+        ),
+        cycle_rank: signed_difference(
+            prediction_topology.cycle_rank,
+            ground_truth_topology.cycle_rank,
+        ),
+    };
+
+    let localization_error = summarize_errors(localization_errors);
+    let junction_kind_macro_f1 = if macro_f1_values.is_empty() {
+        None
+    } else {
+        Some(macro_f1_values.iter().sum::<f64>() / macro_f1_values.len() as f64)
+    };
+    let false_anastomosis_junction_count = junction_kind_scores
+        .iter()
+        .find(|score| score.kind == AnnotatedJunctionKind::Anastomosis)
+        .map(|score| score.counts.false_positive)
+        .unwrap_or(0);
+
+    let score = MycelialReconstructionScore {
+        schema_version: MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION,
+        frame_id: ground_truth.frame_id.clone(),
+        source_observation_digest: ground_truth.source_observation_digest.clone(),
+        dimensionality: ground_truth.dimensionality,
+        length_unit: ground_truth.length_unit,
+        matching_policy_id: matching_policy_id.to_string(),
+        ground_truth_digest: ground_truth.canonical_digest_hex()?,
+        prediction_digest: prediction.canonical_digest_hex()?,
+        identity_matches: normalized_matches,
+        junction_detection,
+        junction_kind_scores,
+        junction_kind_macro_f1,
+        false_anastomosis_junction_count,
+        edge_topology,
+        unmatched_prediction_edge_count,
+        ground_truth_topology,
+        prediction_topology,
+        topology_delta,
+        localization_error,
+        segment_length_error: length_error,
+    };
+    score.validate()?;
+    Ok(score)
+}
+
+impl MycelialReconstructionScore {
+    pub fn validate(&self) -> Result<(), MycelialReconstructionError> {
+        if self.schema_version != MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION
+            || !valid_id(&self.frame_id)
+            || !valid_digest(&self.source_observation_digest)
+            || !valid_id(&self.matching_policy_id)
+            || !valid_digest(&self.ground_truth_digest)
+            || !valid_digest(&self.prediction_digest)
+            || self.identity_matches.windows(2).any(|pair| {
+                pair[0].predicted_junction_id >= pair[1].predicted_junction_id
+            })
+            || self.junction_kind_scores.len() != ANNOTATED_JUNCTION_KINDS.len()
+            || self
+                .junction_kind_scores
+                .iter()
+                .zip(ANNOTATED_JUNCTION_KINDS)
+                .any(|(score, expected)| score.kind != expected || score.f1 != score.counts.f1())
+            || self.false_anastomosis_junction_count
+                != self
+                    .junction_kind_scores
+                    .iter()
+                    .find(|score| score.kind == AnnotatedJunctionKind::Anastomosis)
+                    .map(|score| score.counts.false_positive)
+                    .unwrap_or(0)
+            || self.junction_detection.true_positive != self.identity_matches.len()
+            || self.localization_error.matched_junction_count != self.identity_matches.len()
+            || self.edge_topology.true_positive
+                + self.edge_topology.false_negative
+                < self.ground_truth_topology.segment_count
+        {
+            return Err(MycelialReconstructionError::InvalidGraph(
+                "reconstruction score receipt is internally inconsistent",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialReconstructionError> {
+        self.validate()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-mycelial-reconstruction-score-v1");
+        hasher.update(&self.schema_version.to_le_bytes());
+        hash_string(&mut hasher, &self.frame_id);
+        hasher.update(self.source_observation_digest.as_bytes());
+        hasher.update(&[match self.dimensionality {
+            ReconstructionDimensionality::TwoD => 0,
+            ReconstructionDimensionality::ThreeD => 1,
+        }]);
+        hasher.update(&[match self.length_unit {
+            ReconstructionLengthUnit::Pixel => 0,
+            ReconstructionLengthUnit::Micrometer => 1,
+            ReconstructionLengthUnit::Millimeter => 2,
+            ReconstructionLengthUnit::OrganismLocalModelUnit => 3,
+        }]);
+        hash_string(&mut hasher, &self.matching_policy_id);
+        hasher.update(self.ground_truth_digest.as_bytes());
+        hasher.update(self.prediction_digest.as_bytes());
+        for matched in &self.identity_matches {
+            hash_string(&mut hasher, &matched.predicted_junction_id);
+            hash_string(&mut hasher, &matched.ground_truth_junction_id);
+        }
+        hash_counts(&mut hasher, &self.junction_detection);
+        for score in &self.junction_kind_scores {
+            hasher.update(&[junction_kind_index(score.kind) as u8]);
+            hash_counts(&mut hasher, &score.counts);
+        }
+        hash_option_f64(&mut hasher, self.junction_kind_macro_f1);
+        hasher.update(&(self.false_anastomosis_junction_count as u64).to_le_bytes());
+        hash_counts(&mut hasher, &self.edge_topology);
+        hasher.update(&(self.unmatched_prediction_edge_count as u64).to_le_bytes());
+        hash_topology(&mut hasher, &self.ground_truth_topology);
+        hash_topology(&mut hasher, &self.prediction_topology);
+        hash_error_summary(&mut hasher, &self.localization_error);
+        hash_option_f64(&mut hasher, self.segment_length_error.mean_absolute_error);
+        hash_option_f64(
+            &mut hasher,
+            self.segment_length_error.mean_absolute_relative_error,
+        );
+        hash_option_f64(&mut hasher, self.segment_length_error.p95_absolute_error);
+        hasher.update(&(self.segment_length_error.matched_segment_count as u64).to_le_bytes());
+        Ok(hex_digest(hasher.finalize().as_bytes()))
+    }
+}
+
+fn evaluate_edges(
+    ground_truth: &AnnotatedMycelialSkeleton,
+    prediction: &AnnotatedMycelialSkeleton,
+    prediction_to_truth: &BTreeMap<&str, &str>,
+    relative_epsilon: f64,
+) -> (ReconstructionCounts, usize, ReconstructionLengthError) {
+    let mut truth_edges = BTreeMap::<(String, String), Vec<f64>>::new();
+    for segment in &ground_truth.segments {
+        let key = canonical_edge(
+            &segment.start_junction_id,
+            &segment.end_junction_id,
+        );
+        truth_edges.entry(key).or_default().push(segment.length);
+    }
+    let mut prediction_edges = BTreeMap::<(String, String), Vec<f64>>::new();
+    let mut unmatched_prediction_edge_count = 0usize;
+    for segment in &prediction.segments {
+        let Some(start) = prediction_to_truth.get(segment.start_junction_id.as_str()) else {
+            unmatched_prediction_edge_count += 1;
+            continue;
+        };
+        let Some(end) = prediction_to_truth.get(segment.end_junction_id.as_str()) else {
+            unmatched_prediction_edge_count += 1;
+            continue;
+        };
+        if start == end {
+            unmatched_prediction_edge_count += 1;
+            continue;
+        }
+        let key = canonical_edge(start, end);
+        prediction_edges.entry(key).or_default().push(segment.length);
+    }
+
+    for values in truth_edges.values_mut() {
+        values.sort_by(f64::total_cmp);
+    }
+    for values in prediction_edges.values_mut() {
+        values.sort_by(f64::total_cmp);
+    }
+
+    let mut true_positive = 0usize;
+    let mut false_positive = unmatched_prediction_edge_count;
+    let mut false_negative = 0usize;
+    let mut absolute_errors = Vec::new();
+    let mut relative_errors = Vec::new();
+
+    let all_keys: BTreeSet<_> = truth_edges
+        .keys()
+        .chain(prediction_edges.keys())
+        .cloned()
+        .collect();
+    for key in all_keys {
+        let truth_lengths = truth_edges.get(&key).map(Vec::as_slice).unwrap_or_default();
+        let predicted_lengths = prediction_edges
+            .get(&key)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        let matched = truth_lengths.len().min(predicted_lengths.len());
+        true_positive += matched;
+        false_positive += predicted_lengths.len().saturating_sub(matched);
+        false_negative += truth_lengths.len().saturating_sub(matched);
+        for (truth_length, predicted_length) in
+            truth_lengths.iter().zip(predicted_lengths.iter()).take(matched)
+        {
+            let absolute = (truth_length - predicted_length).abs();
+            absolute_errors.push(absolute);
+            relative_errors.push(absolute / truth_length.abs().max(relative_epsilon));
+        }
+    }
+    let edge_counts = ReconstructionCounts {
+        true_positive,
+        false_positive,
+        false_negative,
+    };
+    (
+        edge_counts,
+        unmatched_prediction_edge_count,
+        ReconstructionLengthError {
+            matched_segment_count: absolute_errors.len(),
+            mean_absolute_error: mean(&absolute_errors),
+            mean_absolute_relative_error: mean(&relative_errors),
+            p95_absolute_error: percentile(&absolute_errors, 0.95),
+        },
+    )
+}
+
+fn topology_summary(
+    graph: &AnnotatedMycelialSkeleton,
+) -> ReconstructionTopologySummary {
+    let mut adjacency = BTreeMap::<&str, Vec<&str>>::new();
+    for junction in &graph.junctions {
+        adjacency.insert(junction.id.as_str(), Vec::new());
+    }
+    for segment in &graph.segments {
+        if let Some(neighbours) = adjacency.get_mut(segment.start_junction_id.as_str()) {
+            neighbours.push(segment.end_junction_id.as_str());
+        }
+        if let Some(neighbours) = adjacency.get_mut(segment.end_junction_id.as_str()) {
+            neighbours.push(segment.start_junction_id.as_str());
+        }
+    }
+    let mut visited = BTreeSet::new();
+    let mut components = 0usize;
+    for start in adjacency.keys().copied() {
+        if !visited.insert(start) {
+            continue;
+        }
+        components += 1;
+        let mut queue = VecDeque::from([start]);
+        while let Some(current) = queue.pop_front() {
+            if let Some(neighbours) = adjacency.get(current) {
+                for neighbour in neighbours {
+                    if visited.insert(*neighbour) {
+                        queue.push_back(*neighbour);
+                    }
+                }
+            }
+        }
+    }
+    let cycle_rank = graph
+        .segments
+        .len()
+        .saturating_add(components)
+        .saturating_sub(graph.junctions.len());
+    ReconstructionTopologySummary {
+        junction_count: graph.junctions.len(),
+        segment_count: graph.segments.len(),
+        connected_components: components,
+        cycle_rank,
+    }
+}
+
+fn point_distance(
+    left: ReconstructionPoint3,
+    right: ReconstructionPoint3,
+    dimensionality: ReconstructionDimensionality,
+) -> f64 {
+    let mut squared = (left.x - right.x).powi(2) + (left.y - right.y).powi(2);
+    if dimensionality == ReconstructionDimensionality::ThreeD {
+        squared += (left.z - right.z).powi(2);
+    }
+    squared.sqrt()
+}
+
+fn summarize_errors(mut errors: Vec<f64>) -> ReconstructionLocalizationError {
+    errors.sort_by(f64::total_cmp);
+    ReconstructionLocalizationError {
+        matched_junction_count: errors.len(),
+        mean_error: mean(&errors),
+        median_error: percentile(&errors, 0.5),
+        p95_error: percentile(&errors, 0.95),
+        maximum_error: errors.last().copied(),
+    }
+}
+
+fn mean(values: &[f64]) -> Option<f64> {
+    (!values.is_empty()).then_some(values.iter().sum::<f64>() / values.len() as f64)
+}
+
+fn percentile(sorted_values: &[f64], percentile: f64) -> Option<f64> {
+    if sorted_values.is_empty() {
+        return None;
+    }
+    let rank = ((sorted_values.len() - 1) as f64 * percentile).ceil() as usize;
+    sorted_values.get(rank).copied()
+}
+
+fn signed_difference(predicted: usize, truth: usize) -> i64 {
+    predicted as i64 - truth as i64
+}
+
+fn canonical_edge(left: &str, right: &str) -> (String, String) {
+    if left <= right {
+        (left.to_string(), right.to_string())
+    } else {
+        (right.to_string(), left.to_string())
+    }
+}
+
+fn valid_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_RECONSTRUCTION_ID_BYTES
+        && !value.chars().any(char::is_control)
+}
+
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn junction_kind_index(kind: AnnotatedJunctionKind) -> usize {
+    match kind {
+        AnnotatedJunctionKind::Origin => 0,
+        AnnotatedJunctionKind::Branch => 1,
+        AnnotatedJunctionKind::Tip => 2,
+        AnnotatedJunctionKind::Anastomosis => 3,
+        AnnotatedJunctionKind::ProjectedCrossing => 4,
+        AnnotatedJunctionKind::Uncertain => 5,
+    }
+}
+
+fn hash_string(hasher: &mut blake3::Hasher, value: &str) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn hash_counts(hasher: &mut blake3::Hasher, counts: &ReconstructionCounts) {
+    hasher.update(&(counts.true_positive as u64).to_le_bytes());
+    hasher.update(&(counts.false_positive as u64).to_le_bytes());
+    hasher.update(&(counts.false_negative as u64).to_le_bytes());
+}
+
+fn hash_topology(hasher: &mut blake3::Hasher, summary: &ReconstructionTopologySummary) {
+    for value in [
+        summary.junction_count,
+        summary.segment_count,
+        summary.connected_components,
+        summary.cycle_rank,
+    ] {
+        hasher.update(&(value as u64).to_le_bytes());
+    }
+}
+
+fn hash_error_summary(hasher: &mut blake3::Hasher, summary: &ReconstructionLocalizationError) {
+    hasher.update(&(summary.matched_junction_count as u64).to_le_bytes());
+    hash_option_f64(hasher, summary.mean_error);
+    hash_option_f64(hasher, summary.median_error);
+    hash_option_f64(hasher, summary.p95_error);
+    hash_option_f64(hasher, summary.maximum_error);
+}
+
+fn hash_option_f64(hasher: &mut blake3::Hasher, value: Option<f64>) {
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            hasher.update(&value.to_bits().to_le_bytes());
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+}
+
+fn hex_digest(bytes: &[u8; 32]) -> String {
+    let mut output = String::with_capacity(64);
+    for byte in bytes {
+        use fmt::Write as _;
+        write!(&mut output, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn source_digest() -> String {
+        "a".repeat(64)
+    }
+
+    fn graph(producer: &str, nodes: Vec<AnnotatedJunction>, edges: Vec<AnnotatedHyphaSegment>) -> AnnotatedMycelialSkeleton {
+        AnnotatedMycelialSkeleton {
+            schema_version: MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
+            frame_id: "frame:001".to_string(),
+            source_observation_digest: source_digest(),
+            dimensionality: ReconstructionDimensionality::ThreeD,
+            length_unit: ReconstructionLengthUnit::Micrometer,
+            producer_id: producer.to_string(),
+            producer_version: "v1".to_string(),
+            junctions: nodes,
+            segments: edges,
+        }
+    }
+
+    fn node(id: &str, kind: AnnotatedJunctionKind, x: f64, y: f64, z: f64) -> AnnotatedJunction {
+        AnnotatedJunction {
+            id: id.to_string(),
+            kind,
+            position: ReconstructionPoint3 { x, y, z },
+        }
+    }
+
+    fn edge(id: &str, start: &str, end: &str, length: f64) -> AnnotatedHyphaSegment {
+        AnnotatedHyphaSegment {
+            id: id.to_string(),
+            start_junction_id: start.to_string(),
+            end_junction_id: end.to_string(),
+            length,
+        }
+    }
+
+    #[test]
+    fn perfect_reconstruction_scores_all_graph_layers_as_exact() {
+        let truth = graph(
+            "human_annotation",
+            vec![
+                node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+                node("C", AnnotatedJunctionKind::Tip, 0.0, 1.0, 0.0),
+            ],
+            vec![edge("e1", "A", "B", 1.0), edge("e2", "A", "C", 1.0)],
+        );
+        let prediction = graph(
+            "symthaea-candidate",
+            vec![
+                node("pA", AnnotatedJunctionKind::Branch, 0.01, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 1.01, 0.0, 0.0),
+                node("pC", AnnotatedJunctionKind::Tip, 0.0, 1.01, 0.0),
+            ],
+            vec![edge("s1", "pA", "pB", 1.0), edge("s2", "pA", "pC", 1.0)],
+        );
+        let matches = vec![
+            JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pB".to_string(),
+                ground_truth_junction_id: "B".to_string(),
+            },
+            JunctionIdentityMatch {
+                predicted_junction_id: "pC".to_string(),
+                ground_truth_junction_id: "C".to_string(),
+            },
+        ];
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "synthetic-explicit-match-v1",
+            &matches,
+            ReconstructionEvaluationConfig {
+                maximum_junction_match_distance: 0.05,
+                ..ReconstructionEvaluationConfig::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(score.junction_detection.f1(), Some(1.0));
+        assert_eq!(score.edge_topology.f1(), Some(1.0));
+        assert_eq!(score.junction_kind_macro_f1, Some(1.0));
+        assert_eq!(score.false_anastomosis_junction_count, 0);
+        assert_eq!(score.topology_delta.cycle_rank, 0);
+        assert!(score.localization_error.mean_error.unwrap() <= 0.01);
+        assert_eq!(
+            score.canonical_digest_hex().unwrap(),
+            score.canonical_digest_hex().unwrap()
+        );
+    }
+
+    #[test]
+    fn false_crossing_fusion_is_counted_as_edge_and_anastomosis_false_positive() {
+        let truth = graph(
+            "human_annotation",
+            vec![
+                node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+                node("C", AnnotatedJunctionKind::Tip, 0.0, 1.0, 0.0),
+            ],
+            vec![edge("e1", "A", "B", 1.0), edge("e2", "A", "C", 1.0)],
+        );
+        let prediction = graph(
+            "symthaea-candidate",
+            vec![
+                node("pA", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+                node("pC", AnnotatedJunctionKind::Anastomosis, 0.0, 1.0, 0.0),
+            ],
+            vec![
+                edge("s1", "pA", "pB", 1.0),
+                edge("s2", "pA", "pC", 1.0),
+                edge("false-fusion", "pB", "pC", 1.414),
+            ],
+        );
+        let matches = vec![
+            JunctionIdentityMatch { predicted_junction_id: "pA".to_string(), ground_truth_junction_id: "A".to_string() },
+            JunctionIdentityMatch { predicted_junction_id: "pB".to_string(), ground_truth_junction_id: "B".to_string() },
+            JunctionIdentityMatch { predicted_junction_id: "pC".to_string(), ground_truth_junction_id: "C".to_string() },
+        ];
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "explicit-match-v1",
+            &matches,
+            ReconstructionEvaluationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(score.edge_topology.true_positive, 2);
+        assert_eq!(score.edge_topology.false_positive, 1);
+        assert_eq!(score.edge_topology.false_negative, 0);
+        assert_eq!(score.false_anastomosis_junction_count, 1);
+        assert_eq!(score.topology_delta.cycle_rank, 1);
+    }
+
+    #[test]
+    fn mismatched_junction_class_is_separate_from_detection_success() {
+        let truth = graph(
+            "human_annotation",
+            vec![node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "candidate",
+            vec![node("pA", AnnotatedJunctionKind::Anastomosis, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "explicit-match-v1",
+            &[JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            }],
+            ReconstructionEvaluationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(score.junction_detection.f1(), Some(1.0));
+        assert_eq!(score.false_anastomosis_junction_count, 1);
+        assert_eq!(
+            score
+                .junction_kind_scores
+                .iter()
+                .find(|metric| metric.kind == AnnotatedJunctionKind::Tip)
+                .unwrap()
+                .counts
+                .false_negative,
+            1
+        );
+    }
+
+    #[test]
+    fn unmatched_nodes_and_edges_are_false_positives_or_false_negatives() {
+        let truth = graph(
+            "human",
+            vec![node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("pA", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 2.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "explicit-match-v1",
+            &[JunctionIdentityMatch {
+                predicted_junction_id: "pA".to_string(),
+                ground_truth_junction_id: "A".to_string(),
+            }],
+            ReconstructionEvaluationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(score.junction_detection.true_positive, 1);
+        assert_eq!(score.junction_detection.false_positive, 1);
+        assert_eq!(score.junction_detection.false_negative, 0);
+    }
+
+    #[test]
+    fn invalid_duplicate_match_and_mismatched_source_frame_fail_closed() {
+        let truth = graph(
+            "human",
+            vec![
+                node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("pA", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0),
+                node("pB", AnnotatedJunctionKind::Tip, 1.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let duplicate = vec![
+            JunctionIdentityMatch { predicted_junction_id: "pA".to_string(), ground_truth_junction_id: "A".to_string() },
+            JunctionIdentityMatch { predicted_junction_id: "pB".to_string(), ground_truth_junction_id: "A".to_string() },
+        ];
+        assert!(matches!(
+            evaluate_mycelial_reconstruction(
+                &truth,
+                &prediction,
+                "explicit-match-v1",
+                &duplicate,
+                ReconstructionEvaluationConfig::default()
+            ),
+            Err(MycelialReconstructionError::DuplicateGroundTruthMatch(_))
+        ));
+
+        let mut wrong_frame = prediction;
+        wrong_frame.frame_id = "frame:002".to_string();
+        assert!(matches!(
+            evaluate_mycelial_reconstruction(
+                &truth,
+                &wrong_frame,
+                "explicit-match-v1",
+                &[],
+                ReconstructionEvaluationConfig::default()
+            ),
+            Err(MycelialReconstructionError::FrameMismatch)
+        ));
+    }
+
+    #[test]
+    fn unit_and_dimensionality_are_part_of_the_benchmark_contract() {
+        let truth = graph("human", vec![], vec![]);
+        let mut prediction = graph("model", vec![], vec![]);
+        prediction.length_unit = ReconstructionLengthUnit::Pixel;
+        assert_eq!(
+            evaluate_mycelial_reconstruction(
+                &truth,
+                &prediction,
+                "explicit-match-v1",
+                &[],
+                ReconstructionEvaluationConfig::default()
+            ),
+            Err(MycelialReconstructionError::LengthUnitMismatch)
+        );
+    }
+}
