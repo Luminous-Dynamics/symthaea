@@ -230,6 +230,32 @@ Every run must record at least:
 
 Changing any of these creates a distinct benchmark environment. Do not pool results from different environments without an explicit compatibility analysis.
 
+## Runnable retrieval evaluator
+
+The public Leptos retrieval pilot now has an offline Rust evaluator at
+`retrieval-eval/`. It implements keyword overlap, BM25, TF-IDF,
+deterministic 16,384D bipolar HDC, and reciprocal-rank fusion over BM25,
+TF-IDF and HDC. It reports recall@1/3, MRR, nDCG@3, precision@3, per-query
+rankings, top-score distributions for hard negatives, and p50/p95 latency.
+
+Run it from the repository root:
+
+```bash
+cargo test --manifest-path benchmarks/frontend/retrieval-eval/Cargo.toml
+cargo run --release --manifest-path benchmarks/frontend/retrieval-eval/Cargo.toml
+```
+
+The result should be retained and validated against
+`retrieval-eval/result-v1.schema.json`, together with exact source commit,
+Cargo.lock, Rust toolchain and hardware metadata. The HDC encoder is a
+transparent research baseline—not Symthaea's full learned HDC subsystem.
+Dense embeddings still require an explicitly pinned model adapter. The tool
+does not select an abstention threshold; score distributions are emitted so
+threshold calibration can occur on a separate development set.
+
+The runner source and tests are authored but have not been compiled or run in
+this environment.
+
 ## Fixture exposure and benchmark integrity
 
 Every task declares `fixture_exposure`:
