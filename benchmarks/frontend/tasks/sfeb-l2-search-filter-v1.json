@@ -398,6 +398,7 @@
     "Synthetic public asset records only.",
     "HTML/CSS supplies visual reference; it is not proof candidate passes.",
     "Rust model can be checked offline; browser/keyboard/accessibility qualification still requires runner.",
-    "Public pilot only, not hidden holdout."
+    "Public pilot only, not hidden holdout.",
+    "Responsive stress preflight: sweep every integer CSS width from 320 through 1440 to detect breakpoint cliffs; the named five-width matrix remains mandatory, and the candidate must pass the same sweep before promotion."
   ]
 }
