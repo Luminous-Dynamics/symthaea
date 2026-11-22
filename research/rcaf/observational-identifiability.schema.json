@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/observational-identifiability.schema.json",
+  "title": "RCAF observational identifiability reference report",
+  "description": "Synthetic observational-equivalence and abstention control; not empirical causal identification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "equivalence_case",
+    "distinct_control",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.observational-identifiability/0.1.0"
+    },
+    "source_status": {
+      "const": "synthetic_equivalence_fixture"
+    },
+    "equivalence_case": {
+      "$ref": "#/$defs/case"
+    },
+    "distinct_control": {
+      "$ref": "#/$defs/case"
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolution_tolerance",
+        "max_absolute_difference",
+        "root_mean_square_difference",
+        "compared_values",
+        "observationally_equivalent_at_resolution",
+        "disposition"
+      ],
+      "properties": {
+        "resolution_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_absolute_difference": {
+          "type": "number",
+          "minimum": 0
+        },
+        "root_mean_square_difference": {
+          "type": "number",
+          "minimum": 0
+        },
+        "compared_values": {
+          "const": 48
+        },
+        "observationally_equivalent_at_resolution": {
+          "type": "boolean"
+        },
+        "disposition": {
+          "enum": [
+            "not_identifiable_abstain",
+            "observationally_distinct_at_declared_resolution"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@
 //! within-/between-condition similarities. Participant-level inference is performed only
 //! after repeated segment measurements have been reduced within participant.
 
+pub mod observational_identifiability;
 pub mod simulation;
 pub mod spatial_nuisance;
 
