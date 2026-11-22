@@ -1,0 +1,52 @@
+name: MEL judge grounding audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_JUDGE_GROUNDING_PROBE_QUALIFICATION_V1_2026-11-22.md"
+      - ".github/workflows/mel-judge-grounding-audit.yml"
+  push:
+    branches:
+      - research/mel-judge-grounding-audit-v1-20261122
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_JUDGE_GROUNDING_PROBE_QUALIFICATION_V1_2026-11-22.md"
+      - ".github/workflows/mel-judge-grounding-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  grounding-audit:
+    name: Judge grounding reference qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Resolve isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Run deterministic tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schema and replay fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-judge-grounding-probe-panel-v1.schema.json > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml -- \
+            audit tools/mel-judge-grounding-audit/fixtures/valid-probe-panel-v1.json \
+            "$RUNNER_TEMP/mel-judge-grounding-report.json"
+          jq -e '.case_count == 1 and .total_probe_count == 5 and .baseline_human_reference_accuracy == 1 and .prompt_only.pass_rate == 1 and .audio_swap.pass_rate == 1 and .instruction_paraphrase.pass_rate == 1 and .nuisance_transform.pass_rate == 1 and .semantic_mismatch.pass_rate == 1' \
+            "$RUNNER_TEMP/mel-judge-grounding-report.json" > /dev/null
