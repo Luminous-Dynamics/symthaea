@@ -11,9 +11,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use thiserror::Error;
 
-use crate::benchmark::process_event_graph::{
-    InformationCutoffSnapshotV1, SNAPSHOT_SCHEMA_V1,
-};
+use crate::benchmark::process_event_graph::{InformationCutoffSnapshotV1, SNAPSHOT_SCHEMA_V1};
 
 pub const SUBJECT_SCHEMA_V1: &str = "luminous.semi-bench.mondrian-conformal-subject.v1";
 pub const REPORT_SCHEMA_V1: &str = "luminous.semi-bench.mondrian-conformal-report.v1";
