@@ -487,8 +487,7 @@ fn wilson_interval(successes: usize, trials: usize) -> ProportionInterval {
     } else {
         let denominator = 1.0 + z2 / n;
         let center = (p + z2 / (2.0 * n)) / denominator;
-        let half_width =
-            z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+        let half_width = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
         (
             (center - half_width).clamp(0.0, 1.0),
             (center + half_width).clamp(0.0, 1.0),
