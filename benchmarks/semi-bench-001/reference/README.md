@@ -371,3 +371,32 @@ A second fixed arm is now added:
 - **B6-strong-balanced:** class-weighted FTRL with L1=1.0, L2=1.0 and the same training-prior correction.
 
 Both arms report nonzero count and SHA-256 over the binary coefficient-support mask. The exact-head workflow evaluates both on the same chronological split and archives model support and metrics. The stronger setting is preregistered, not selected by test performance. If it produces severe sparsity, predictive collapse or calibration failure, that is a negative result to preserve.
+
+
+## Repeated stratified SECOM 80/20 manifests
+
+The Rust CLI \`semi-secom-stratified-splits\` creates five two-way stratified train/test manifests for the published-comparability track in issue #13234. It first audits the pinned raw feature/label files against the exact expectations digests and binds the existing dataset snapshot digest.
+
+The split algorithm:
+- canonicalizes sample identity by sorting sample IDs before randomization;
+- stratifies pass and fail rows independently;
+- uses SplitMix64 plus Fisher–Yates with separate deterministic class salts;
+- rounds each class's test count independently (for the 1,567-row mirror this yields 21/104 fails and 293/1,463 passes in test);
+- emits train/test assignment manifests sorted by sample ID;
+- binds each manifest's seed, PRNG identifier, dataset snapshot and assignments with SHA-256.
+
+The current reconstruction uses seeds 42–46 and test fraction 0.2. The 2026 article reports five repeated stratified 80/20 splits but does not state the original five SECOM seeds. These are therefore Luminous reconstruction seeds, not claimed to be the authors' seeds. No exact-reproduction claim is possible until all unpublished model/preprocessing details are resolved.
+
+Run on the pinned source:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-stratified-splits -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+Each report records per-repeat train/test sample counts and positive/negative support, plus independent manifest digests. Input ordering does not change manifests. The published-comparability split has no validation partition; thresholds must not be selected on its test split. Any hyperparameter selection requires nested CV or a separately declared inner split within the training partition.
+
+These stratified repeats measure interpolation across historical samples, not time-forward generalization, and the five repeats are not five independent lots or fabs. Continue to report the original chronological track separately.
