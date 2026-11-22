@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn rejects_reordered_events() {
         let mut events = valid_events();
-        events.swap(0, 1);
+        events.swap(1, 2);
         assert!(verify(&events).unwrap_err().contains("sequence"));
     }
 
