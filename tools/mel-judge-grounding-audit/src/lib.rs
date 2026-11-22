@@ -364,7 +364,8 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                     let candidate_a_drift = (case.baseline.score_a - probe.score_a).abs();
                     let candidate_b_drift = (case.baseline.score_b - probe.score_b).abs();
                     let maximum_score_drift = candidate_a_drift.max(candidate_b_drift);
-                    let passed = shift <= margin_tolerance && maximum_score_drift <= score_tolerance;
+                    let passed =
+                        shift <= margin_tolerance && maximum_score_drift <= score_tolerance;
                     nuisance.add(passed, Some(shift), MetricKind::MarginShift);
                     nuisance.add_maximum_absolute_score_drift(maximum_score_drift);
                     let mut probe_finding = finding(
@@ -929,7 +930,10 @@ mod tests {
         panel["cases"][0]["probes"][3]["score_b"] = serde_json::json!(3.8);
         let report = parse_and_audit(&panel.to_string()).expect("probe structure is valid");
         assert_eq!(report.nuisance_transform.pass_rate, Some(0.0));
-        assert!((report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.8).abs() < 1e-9);
+        assert!(
+            (report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.8).abs()
+                < 1e-9
+        );
         let nuisance_finding = report
             .findings
             .iter()
@@ -950,7 +954,10 @@ mod tests {
             .expect("nuisance finding is present");
         assert!((nuisance_finding.candidate_a_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
         assert!((nuisance_finding.candidate_b_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
-        assert!((report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
+        assert!(
+            (report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.05).abs()
+                < 1e-9
+        );
     }
 
     #[test]
