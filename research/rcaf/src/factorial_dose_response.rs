@@ -532,15 +532,20 @@ mod tests {
         let report =
             run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
         assert_eq!(report.points.len(), 16);
-        for signal_index in 0..4 {
-            for nuisance_index in 0..4 {
+        let grid = config();
+        for (signal_index, &signal_scale) in grid.signal_scales.iter().enumerate() {
+            for (nuisance_index, &nuisance_fraction) in grid
+                .nuisance_component_variance_fractions
+                .iter()
+                .enumerate()
+            {
                 let point = &report.points[signal_index * 4 + nuisance_index];
                 assert_eq!(point.signal_scale_index, signal_index);
                 assert_eq!(point.nuisance_fraction_index, nuisance_index);
-                assert_eq!(point.signal_scale, config().signal_scales[signal_index]);
+                assert_eq!(point.signal_scale, signal_scale);
                 assert_eq!(
                     point.requested_nuisance_component_variance_fraction,
-                    config().nuisance_component_variance_fractions[nuisance_index]
+                    nuisance_fraction
                 );
                 assert!(point.invariants.all_invariants_within_tolerance);
             }
@@ -551,8 +556,7 @@ mod tests {
     fn requested_and_realized_nuisance_fraction_follow_the_dose_axis() {
         let report =
             run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
-        for signal_index in 0..4 {
-            let row = &report.points[(signal_index * 4)..(signal_index * 4 + 4)];
+        for row in report.points.chunks_exact(4) {
             for point in row {
                 assert!(
                     (point.realized_nuisance_component_variance_fraction
@@ -572,12 +576,12 @@ mod tests {
         let report =
             run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
         for nuisance_index in 0..4 {
-            let first = &report.points[nuisance_index].cells[2].fnv1a64_fingerprint;
-            for signal_index in 1..4 {
-                let other =
-                    &report.points[signal_index * 4 + nuisance_index].cells[2].fnv1a64_fingerprint;
-                assert_eq!(first, other);
-            }
+            let fingerprints = report
+                .points
+                .chunks_exact(4)
+                .map(|row| row[nuisance_index].cells[2].fnv1a64_fingerprint.as_str())
+                .collect::<Vec<_>>();
+            assert!(fingerprints.windows(2).all(|pair| pair[0] == pair[1]));
         }
         assert_eq!(
             report.raw_signal_fingerprint,
@@ -593,13 +597,29 @@ mod tests {
     fn zero_signal_and_zero_nuisance_are_exact_factorial_controls() {
         let report =
             run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
-        let no_signal_no_nuisance = &report.points[0];
-        assert_eq!(no_signal_no_nuisance.signal_component_rms, 0.0);
-        assert_eq!(no_signal_no_nuisance.nuisance_component_variance, 0.0);
-
-        let no_signal_with_nuisance = &report.points[3];
-        assert_eq!(no_signal_with_nuisance.signal_component_rms, 0.0);
-        assert!(no_signal_with_nuisance.nuisance_component_variance > 0.0);
+        for row in report.points.chunks_exact(4) {
+            let zero_nuisance = &row[0];
+            assert_eq!(zero_nuisance.nuisance_component_variance, 0.0);
+            assert_eq!(
+                zero_nuisance.cells[0].fnv1a64_fingerprint,
+                zero_nuisance.cells[2].fnv1a64_fingerprint
+            );
+            assert_eq!(
+                zero_nuisance.cells[1].fnv1a64_fingerprint,
+                zero_nuisance.cells[3].fnv1a64_fingerprint
+            );
+        }
+        for point in &report.points[..4] {
+            assert_eq!(point.signal_component_rms, 0.0);
+            assert_eq!(
+                point.cells[0].fnv1a64_fingerprint,
+                point.cells[1].fnv1a64_fingerprint
+            );
+            assert_eq!(
+                point.cells[2].fnv1a64_fingerprint,
+                point.cells[3].fnv1a64_fingerprint
+            );
+        }
     }
 
     #[test]
