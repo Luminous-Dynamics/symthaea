@@ -177,7 +177,10 @@ fn main() {
         std::process::exit(1);
     }
 
-    println!("  Loaded {} compatible raw-frame phonemes", prototypes.len());
+    println!(
+        "  Loaded {} compatible raw-frame phonemes",
+        prototypes.len()
+    );
 
     // Load dictionary
     let dictionary = if cli.dictionary.exists() {
@@ -342,8 +345,7 @@ fn main() {
         if let Err(error) = projector.validate_input_sample_rate(sample_rate) {
             eprintln!(
                 "Refusing evaluation input {:?}: {}",
-                utterance.audio_path,
-                error
+                utterance.audio_path, error
             );
             std::process::exit(1);
         }
