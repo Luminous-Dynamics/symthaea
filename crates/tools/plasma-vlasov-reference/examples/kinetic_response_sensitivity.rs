@@ -370,7 +370,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let pulse_checkpoint = checkpoint_solver.distribution().to_vec();
 
     println!(
-        "spatial_mode,velocity_mode,velocity_phase,epsilon,minimum_pulse_plus,minimum_pulse_minus,minimum_control_plus,minimum_control_minus,max_relative_moment_residual,ballistic_rephase_elapsed,target_pulse_dE_rephase_magnitude,target_pulse_dE_rephase_phase,target_control_dE_rephase_magnitude,intervention_susceptibility_peak_time,intervention_susceptibility_peak,intervention_susceptibility_phase,intervention_susceptibility_fwhm,intervention_mode_peak_sensitivity,intervention_to_echo_sensitivity_ratio,epsilon_half_peak_relative_delta"
+        "spatial_mode,velocity_mode,velocity_phase,epsilon,minimum_pulse_plus,minimum_pulse_minus,minimum_control_plus,minimum_control_minus,max_relative_moment_residual,ballistic_rephase_elapsed,target_pulse_dE_rephase_magnitude,target_pulse_dE_rephase_phase,target_control_dE_rephase_magnitude,target_intervention_dE_rephase_magnitude,target_intervention_dE_rephase_phase,intervention_susceptibility_peak_time,intervention_susceptibility_peak,intervention_susceptibility_phase,intervention_susceptibility_fwhm,intervention_mode_peak_sensitivity,intervention_to_echo_sensitivity_ratio,epsilon_half_peak_relative_delta"
     );
 
     for velocity_mode in VELOCITY_MODES {
@@ -396,7 +396,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 future_steps,
                 2,
             )?;
-            let (control_trace, _) = central_difference_trace(
+            let (control_trace, control_off_trace) = central_difference_trace(
                 config,
                 &control_checkpoint,
                 &direction,
@@ -405,10 +405,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 2,
             )?;
             let intervention_trace = subtract_traces(&pulse_trace, &control_trace);
+            let intervention_off_trace =
+                subtract_traces(&pulse_off_trace, &control_off_trace);
             let intervention_peak = peak(&intervention_trace);
-            let intervention_mode_peak = peak(&pulse_off_trace);
+            let intervention_mode_peak = peak(&intervention_off_trace);
             let pulse_rephase = sensitivity_at_time(&pulse_trace, 2.0);
             let control_rephase = sensitivity_at_time(&control_trace, 2.0);
+            let intervention_rephase = sensitivity_at_time(&intervention_trace, 2.0);
 
             let half_epsilon = 0.5 * epsilon;
             let (half_pulse_trace, _) = central_difference_trace(
@@ -461,7 +464,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             ];
 
             println!(
-                "{},{},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},4.0,{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e}",
+                "{},{},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},4.0,{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e}",
                 FIRST_MODE,
                 velocity_mode,
                 velocity_phase,
@@ -474,6 +477,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 pulse_rephase.1.hypot(pulse_rephase.2),
                 pulse_rephase.2.atan2(pulse_rephase.1),
                 control_rephase.1.hypot(control_rephase.2),
+                intervention_rephase.1.hypot(intervention_rephase.2),
+                intervention_rephase.2.atan2(intervention_rephase.1),
                 intervention_peak.time,
                 intervention_peak.magnitude,
                 intervention_peak.phase,
