@@ -165,3 +165,18 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisan
 ```
 
 The output contract is `spatial-nuisance-field.schema.json`. It records the exact ROI labels, weighted edges, per-family rank/diffusion parameters, target coupling, deterministic RNG algorithm/seed, realised field RMS and realised temporal autocorrelation so the field can be reconstructed from the archived report. Its path-graph fixture is a toy topology, not an anatomical atlas. The current `dose` parameter is an additive loading, not a calibrated nuisance variance fraction. The module generates nuisance fields only; it does not perform preprocessing, estimate connectivity, determine causality, or qualify biological claims. The spatial simulator must still be crossed with the four matched counterfactual cells and calibrated against empirical acquisition data before any biological robustness claim is supported.
+
+
+## Observational identifiability and abstention
+
+The `observational_identifiability` module constructs two synthetic worlds from the same clean matrix and the same separable spatial × temporal contribution. In one world the contribution is labelled a latent target change; in the other it is labelled an observation artifact. Every observed value is identical by construction.
+
+The comparison function uses a predeclared maximum absolute difference tolerance. At or below that data-resolution tolerance, the disposition is `not_identifiable_abstain`. Above it, the report says only `observationally_distinct_at_declared_resolution`; it does not promote a difference into a biological or causal verdict.
+
+Run the synthetic control:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_observational_identifiability
+```
+
+The output contract is `observational-identifiability.schema.json`. A real analysis must determine its resolution tolerance from instrument precision and the measurement process before examining the target contrast. Do not choose that tolerance after seeing which conclusion it produces.
