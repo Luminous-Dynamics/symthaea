@@ -244,3 +244,23 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_dose
 ```
 
 The JSON report adds estimator summaries and connectivity-space direction metrics for every one of the 16 points. This closes the gap between merely constructing four matched cells and evaluating how the existing connectivity estimators respond to them. These are synthetic per-matrix scores, not participant-level power, false-positive rates or confidence coverage. See `docs/neuroscience/RCAF_ESTIMATOR_RESPONSE_SURFACE_V1.md` for the metric definitions and next confirmatory benchmark requirements.
+
+
+## Held-out null calibration and direction-aware power
+
+The `held_out_null_calibration` module separates null threshold fitting from held-out evaluation. It uses disjoint, uniquely identified calibration and evaluation replicate sets, a conservative finite-sample upper-tail rank threshold, and two-sided 95% Wilson intervals for held-out null false-positive rate, signal detection, directionally correct detection and wrong-direction acceptance.
+
+The estimator-response adapters make the statistic explicit:
+- Calibration and held-out null statistic: nuisance-only connectivity displacement.
+- Held-out signal statistic: clean-to-signal-plus-nuisance connectivity displacement.
+- Direction: the connectivity-space signal directional cosine.
+
+Run the deterministic 99-calibration / 100-evaluation smoke fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_held_out_null_calibration
+```
+
+The report contract is `held-out-null-calibration.schema.json`. The implementation refuses overlapping calibration/evaluation replicate identifiers, duplicate IDs, invalid statistics and undefined signal directions. If the requested alpha is below the finite calibration resolution, it returns no critical value and makes no rejections. See `docs/neuroscience/RCAF_HELD_OUT_NULL_CALIBRATION_V1.md`.
+
+These Wilson intervals describe Monte Carlo binomial uncertainty only. The current smoke fixture does not establish empirical FPR, power, participant/site independence or biological transportability. Calibration/evaluation splits in real data must be separated by independent participant/session/site clusters where dependence exists.
