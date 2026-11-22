@@ -252,3 +252,29 @@ cargo run -p symthaea-semiconductor --bin semi-secom-missingness -- \\
 The checked-in eight-row fixture is synthetic and exists only to verify scorer semantics and leakage controls. It is not a SECOM model result. B1 is a simple diagnostic comparator, not a competitive production classifier; Bernoulli conditional independence is unlikely to hold across correlated sensors. A high missingness-only score is evidence of an observation-pattern shortcut on the evaluated split, not evidence that missingness is a physical failure cause. A low score does not prove the mask is harmless under other acquisition regimes.
 
 The chronological test contains only 17 failures in the pinned mirror. Report uncertainty and avoid model ranking or threshold claims from that small support. This baseline does not replace the remaining B2/B3 imputation, shift, MAR/MNAR and independent-dataset comparisons in SEMI-SECOM-MISS-001.
+
+
+## SECOM observation-regime drift diagnostic
+
+The Rust CLI \`semi-secom-observation-drift\` compares the training observation mask with validation and test without fitting a predictive model. It reports:
+
+- pooled missing-cell fraction and signed train-to-held-out change;
+- mean and maximum per-sensor missing-rate differences;
+- mean and maximum per-sensor Bernoulli Jensen–Shannon divergence (normalized to bits in [0, 1]);
+- number of sensors whose missing rate changes by at least five percentage points;
+- change in mean missing features per row;
+- Jensen–Shannon divergence of the row-level missing-feature-count distribution.
+
+The five-percentage-point alert threshold is an explicit diagnostic setting, not a learned threshold or a process alarm. The JS metrics are marginal summaries; they do not capture the full joint dependence structure of the 590-dimensional missingness mask. A large drift statistic indicates that the observed measurement pattern changed. It does not identify whether the cause was sensor failure, measurement policy, process change, data handling or chance variation.
+
+Run against the same pinned raw-file and split-manifest identities:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-observation-drift -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+The synthetic fixture checks zero-drift reproduction, a one-sensor observation shift, label invariance, feature-permutation invariance and divergence bounds. It is not a real-SECOM drift result. The report is an unsupervised monitoring diagnostic and must not be used alone to trigger a production process change.
