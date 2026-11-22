@@ -3,6 +3,19 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub const MACE_TRANSFER_MIN_PROPENSITY_BPS: u16 = 500;
+pub const MACE_TRANSFER_MAX_PROPENSITY_BPS: u16 = 9_500;
+pub const MACE_TRANSFER_MAX_STANDARDIZED_MEAN_DIFFERENCE_MICROS: u32 = 100_000;
+
+pub const MACE_REQUIRE_INTERVENTION: bool = true;
+pub const MACE_REQUIRE_PRE_REGISTRATION: bool = true;
+pub const MACE_REQUIRE_RECONCILED_OUTCOME: bool = true;
+pub const MACE_REQUIRE_TRUSTED_SOURCE: bool = true;
+pub const MACE_FORBID_RETRACTED_SOURCE: bool = true;
+pub const MACE_REQUIRE_INTERFERENCE_CONTROL: bool = true;
+pub const MACE_REQUIRE_CONFOUNDER_CONTROL: bool = true;
+pub const MACE_REQUIRE_COMPLETED_DELAYED_HORIZON: bool = true;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Action {
     A,
@@ -303,11 +316,12 @@ impl CausalIdentificationV1 {
             && self.estimand_digest.is_known()
             && self.semantic_estimand.is_complete()
             && self.semantic_estimand.canonical_digest() == self.estimand_digest
-            && self.propensity_min_bps >= 500
+            && self.propensity_min_bps >= MACE_TRANSFER_MIN_PROPENSITY_BPS
             && self.propensity_min_bps <= self.propensity_max_bps
-            && self.propensity_max_bps <= 9_500
-            && self.max_standardized_mean_difference_micros <= 100_000
-            && self.interference_controlled
+            && self.propensity_max_bps <= MACE_TRANSFER_MAX_PROPENSITY_BPS
+            && self.max_standardized_mean_difference_micros
+                <= MACE_TRANSFER_MAX_STANDARDIZED_MEAN_DIFFERENCE_MICROS
+            && (!MACE_REQUIRE_INTERFERENCE_CONTROL || self.interference_controlled)
     }
 }
 
@@ -348,17 +362,17 @@ pub fn transfer_qualification_profile_digest() -> EvidenceDigest256 {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:transfer-qualification-profile:v1\0");
     hasher.update([1_u8]); // IdentificationMethodV1::RandomizedControlledTrial
-    hasher.update(500_u16.to_be_bytes()); // minimum propensity lower bound
-    hasher.update(9_500_u16.to_be_bytes()); // maximum propensity upper bound
-    hasher.update(100_000_u32.to_be_bytes()); // maximum standardized mean difference
-    hasher.update([1_u8]); // intervention required
-    hasher.update([1_u8]); // prediction pre-registered required
-    hasher.update([1_u8]); // outcome reconciled required
-    hasher.update([1_u8]); // source trusted required
-    hasher.update([1_u8]); // source retracted forbidden
-    hasher.update([1_u8]); // interference controlled required
-    hasher.update([1_u8]); // confounders controlled required
-    hasher.update([1_u8]); // delayed horizon complete required
+    hasher.update(MACE_TRANSFER_MIN_PROPENSITY_BPS.to_be_bytes());
+    hasher.update(MACE_TRANSFER_MAX_PROPENSITY_BPS.to_be_bytes());
+    hasher.update(MACE_TRANSFER_MAX_STANDARDIZED_MEAN_DIFFERENCE_MICROS.to_be_bytes());
+    hasher.update([u8::from(MACE_REQUIRE_INTERVENTION)]);
+    hasher.update([u8::from(MACE_REQUIRE_PRE_REGISTRATION)]);
+    hasher.update([u8::from(MACE_REQUIRE_RECONCILED_OUTCOME)]);
+    hasher.update([u8::from(MACE_REQUIRE_TRUSTED_SOURCE)]);
+    hasher.update([u8::from(MACE_FORBID_RETRACTED_SOURCE)]);
+    hasher.update([u8::from(MACE_REQUIRE_INTERFERENCE_CONTROL)]);
+    hasher.update([u8::from(MACE_REQUIRE_CONFOUNDER_CONTROL)]);
+    hasher.update([u8::from(MACE_REQUIRE_COMPLETED_DELAYED_HORIZON)]);
     hasher.update([0_u8, 1_u8]); // observed utility and measurement bound in [0, 1]
     let digest = hasher.finalize();
     let mut bytes = [0_u8; 32];
@@ -584,13 +598,13 @@ pub fn is_qualified(item: &Experience, query: Query) -> bool {
         && item.measurement_error_bound.is_finite()
         && (0.0..=1.0).contains(&item.measurement_error_bound)
         && item.causal_identification.qualifies_for_transfer()
-        && item.intervention
-        && item.prediction_pre_registered
-        && item.outcome_reconciled
-        && item.source_trusted
-        && !item.source_retracted
-        && item.confounders_controlled
-        && item.delayed_horizon_complete
+        && (!MACE_REQUIRE_INTERVENTION || item.intervention)
+        && (!MACE_REQUIRE_PRE_REGISTRATION || item.prediction_pre_registered)
+        && (!MACE_REQUIRE_RECONCILED_OUTCOME || item.outcome_reconciled)
+        && (!MACE_REQUIRE_TRUSTED_SOURCE || item.source_trusted)
+        && (!MACE_FORBID_RETRACTED_SOURCE || !item.source_retracted)
+        && (!MACE_REQUIRE_CONFOUNDER_CONTROL || item.confounders_controlled)
+        && (!MACE_REQUIRE_COMPLETED_DELAYED_HORIZON || item.delayed_horizon_complete)
 }
 
 #[derive(Clone, Debug, Default)]
