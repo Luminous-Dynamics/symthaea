@@ -84,3 +84,8 @@ This makes the 17-million-line RH proof an opportunity for a proof-comprehension
 ## 7. Claim boundary
 
 This file records an attributed external metadata baseline. It is not a Symthaea extraction result, not a human proof explanation, not an endorsement of every mathematical role attributed to declarations, and not a new RH proof.
+
+
+## Shared auxiliary / generator caveat
+
+The pinned `data/aux-only-decls.tsv` file (blob `6d5ab51bcc7c517f9fdbff294155c7953130fab3`) includes the declaration `Formalism.RankGapBounds.WeightedMeanData.Data.Tterm` at `MeanBoundSecondForm.lean:97–99`, with `n_shared_aux_in_cone=2`. The upstream method explains that a shared auxiliary lemma or matcher can be used in the kernel proof even when its generator declaration is not itself in the proof closure. This gives a useful negative control for the nearby averaged `MeanBoundSecondForm` declaration, but it does **not** mean the generated helpers are irrelevant. Keep declaration nodes and generated helper nodes distinct.
