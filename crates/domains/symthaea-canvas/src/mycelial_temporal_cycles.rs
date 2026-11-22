@@ -806,25 +806,49 @@ impl TemporalMycelialCycleProfile {
             || !valid_id(&self.coordinate_frame_id)
             || !valid_digest(&self.calibration_digest)
             || !valid_digest(&self.sequence_digest)
+            || self.config.minimum_present_windows == 0
+            || self.config.minimum_present_duration_ns == 0
             || !self.config.minimum_persistence_fraction.is_finite()
             || !(0.0..=1.0).contains(&self.config.minimum_persistence_fraction)
+            || self.config.minimum_persistence_fraction == 0.0
             || !self.config.minimum_known_duration_fraction.is_finite()
             || !(0.0..=1.0).contains(&self.config.minimum_known_duration_fraction)
+            || self.config.minimum_known_duration_fraction == 0.0
+            || !self.config.tcr_epsilon.is_finite()
+            || !(1.0e-15..=1.0e-3).contains(&self.config.tcr_epsilon)
             || self.observed_duration_ns
                 != self.complete_duration_ns + self.partial_duration_ns
             || self.snapshot_metrics.is_empty()
+            || self.snapshot_metrics.len() > MAX_TEMPORAL_MYCIELIAL_WINDOWS
+            || self.snapshot_metrics.iter().any(|snapshot| !valid_id(&snapshot.snapshot_id))
+            || self.snapshot_metrics.windows(2).any(|pair| {
+                pair[0].snapshot_id == pair[1].snapshot_id
+            })
             || self.cycles.windows(2).any(|pair| pair[0].cycle_id >= pair[1].cycle_id)
             || self.node_metrics.windows(2).any(|pair| pair[0].node_id >= pair[1].node_id)
+            || self.persistent_cycle_hyperedges.windows(2).any(|pair| {
+                pair[0].cycle_id >= pair[1].cycle_id
+            })
         {
             return Err(MycelialTemporalCycleError::InvalidProfile(
-                "invalid metadata, durations or non-canonical order",
+                "invalid metadata, config, durations or non-canonical order",
             ));
         }
+
+        let mut expected_tcn = BTreeMap::<String, u128>::new();
+        let mut expected_node_cycle_counts = BTreeMap::<String, usize>::new();
+        let mut expected_cycle_counts_per_snapshot =
+            vec![0usize; self.snapshot_metrics.len()];
+        let mut persistent_cycle_count = 0usize;
+
         for cycle in &self.cycles {
             if !valid_digest(&cycle.cycle_id)
+                || cycle.cycle_id != cycle_digest(&cycle.edge_ids)
                 || cycle.edge_ids.len() < 2
+                || cycle.edge_ids.iter().any(|id| !valid_id(id))
                 || cycle.edge_ids.windows(2).any(|pair| pair[0] >= pair[1])
                 || cycle.node_ids.len() < 2
+                || cycle.node_ids.iter().any(|id| !valid_id(id))
                 || cycle.node_ids.windows(2).any(|pair| pair[0] >= pair[1])
                 || cycle.observations.len() != self.snapshot_metrics.len()
                 || cycle.present_duration_ns
@@ -840,44 +864,127 @@ impl TemporalMycelialCycleProfile {
                     "cycle record has invalid identities or window totals",
                 ));
             }
-            let present_duration: u128 = cycle
-                .observations
-                .iter()
-                .filter(|observation| observation.state == TemporalCycleWindowState::Present)
-                .map(|observation| u128::from(observation.duration_ns))
-                .sum();
-            let absent_duration: u128 = cycle
-                .observations
-                .iter()
-                .filter(|observation| observation.state == TemporalCycleWindowState::Absent)
-                .map(|observation| u128::from(observation.duration_ns))
-                .sum();
-            let unknown_duration: u128 = cycle
-                .observations
-                .iter()
-                .filter(|observation| observation.state == TemporalCycleWindowState::Unknown)
-                .map(|observation| u128::from(observation.duration_ns))
-                .sum();
-            if present_duration != cycle.present_duration_ns
-                || absent_duration != cycle.known_absent_duration_ns
-                || unknown_duration != cycle.unknown_duration_ns
+
+            let mut present_window_count = 0usize;
+            let mut absent_window_count = 0usize;
+            let mut unknown_window_count = 0usize;
+            let mut present_duration_ns = 0u128;
+            let mut absent_duration_ns = 0u128;
+            let mut unknown_duration_ns = 0u128;
+            for (index, observation) in cycle.observations.iter().enumerate() {
+                if observation.snapshot_id != self.snapshot_metrics[index].snapshot_id
+                    || observation.duration_ns == 0
+                {
+                    return Err(MycelialTemporalCycleError::InvalidProfile(
+                        "cycle observations are not aligned with snapshot order",
+                    ));
+                }
+                match observation.state {
+                    TemporalCycleWindowState::Present => {
+                        present_window_count += 1;
+                        present_duration_ns += u128::from(observation.duration_ns);
+                        expected_cycle_counts_per_snapshot[index] += 1;
+                    }
+                    TemporalCycleWindowState::Absent => {
+                        absent_window_count += 1;
+                        absent_duration_ns += u128::from(observation.duration_ns);
+                    }
+                    TemporalCycleWindowState::Unknown => {
+                        unknown_window_count += 1;
+                        unknown_duration_ns += u128::from(observation.duration_ns);
+                    }
+                }
+            }
+            let known_duration_ns = present_duration_ns + absent_duration_ns;
+            let expected_persistence_fraction = (known_duration_ns > 0).then_some(
+                present_duration_ns as f64 / known_duration_ns as f64,
+            );
+            let expected_known_fraction = if self.observed_duration_ns > 0 {
+                known_duration_ns as f64 / self.observed_duration_ns as f64
+            } else {
+                0.0
+            };
+            let expected_persistent =
+                present_window_count >= usize::from(self.config.minimum_present_windows)
+                    && present_duration_ns
+                        >= u128::from(self.config.minimum_present_duration_ns)
+                    && expected_persistence_fraction.is_some_and(|fraction| {
+                        fraction >= self.config.minimum_persistence_fraction
+                    })
+                    && expected_known_fraction
+                        >= self.config.minimum_known_duration_fraction;
+
+            if cycle.present_window_count != present_window_count
+                || cycle.known_absent_window_count != absent_window_count
+                || cycle.unknown_window_count != unknown_window_count
+                || cycle.present_duration_ns != present_duration_ns
+                || cycle.known_absent_duration_ns != absent_duration_ns
+                || cycle.unknown_duration_ns != unknown_duration_ns
+                || cycle.persistence_fraction != expected_persistence_fraction
+                || (cycle.known_duration_fraction - expected_known_fraction).abs() > 1.0e-12
+                || cycle.persistent != expected_persistent
             {
                 return Err(MycelialTemporalCycleError::InvalidProfile(
-                    "cycle duration totals do not match window states",
+                    "cycle recurrence/persistence totals disagree with window observations",
                 ));
+            }
+            if cycle.persistent {
+                persistent_cycle_count += 1;
+                for node_id in &cycle.node_ids {
+                    *expected_tcn.entry(node_id.clone()).or_default() += present_duration_ns;
+                    *expected_node_cycle_counts.entry(node_id.clone()).or_default() += 1;
+                }
             }
         }
-        for hyperedge in &self.persistent_cycle_hyperedges {
-            if !self.cycles.iter().any(|cycle| {
-                cycle.persistent
-                    && cycle.cycle_id == hyperedge.cycle_id
-                    && cycle.edge_ids == hyperedge.edge_ids
-                    && cycle.node_ids == hyperedge.node_ids
-            }) {
-                return Err(MycelialTemporalCycleError::InvalidProfile(
-                    "persistent cycle hyperedge has no matching persistent cycle",
-                ));
-            }
+
+        if self.snapshot_metrics.iter().enumerate().any(|(index, snapshot)| {
+            snapshot.simple_cycle_count != expected_cycle_counts_per_snapshot[index]
+                || snapshot.cycle_rank > snapshot.simple_cycle_count
+        }) {
+            return Err(MycelialTemporalCycleError::InvalidProfile(
+                "snapshot cycle counts disagree with cycle observation records",
+            ));
+        }
+
+        if self.persistent_cycle_hyperedges.len() != persistent_cycle_count
+            || self.persistent_cycle_hyperedges.iter().any(|hyperedge| {
+                !self.cycles.iter().any(|cycle| {
+                    cycle.persistent
+                        && cycle.cycle_id == hyperedge.cycle_id
+                        && cycle.edge_ids == hyperedge.edge_ids
+                        && cycle.node_ids == hyperedge.node_ids
+                        && cycle.present_duration_ns == hyperedge.present_duration_ns
+                        && cycle.persistence_fraction
+                            == Some(hyperedge.persistence_fraction)
+                        && cycle.known_duration_fraction
+                            == hyperedge.known_duration_fraction
+                })
+            })
+        {
+            return Err(MycelialTemporalCycleError::InvalidProfile(
+                "persistent cycle hyperedges do not exactly represent persistent cycle records",
+            ));
+        }
+
+        if self.node_metrics.iter().any(|node| {
+            !valid_id(&node.node_id)
+                || node.tcn_duration_ns != expected_tcn.get(&node.node_id).copied().unwrap_or(0)
+                || node.persistent_cycle_count
+                    != expected_node_cycle_counts.get(&node.node_id).copied().unwrap_or(0)
+                || node.degree_exposure_complete != node.tcr.is_some()
+                || node.tcr.is_some_and(|value| {
+                    !value.is_finite()
+                        || value < 0.0
+                        || (value
+                            - node.tcn_duration_ns as f64
+                                / (node.degree_exposure_ns as f64 + self.config.tcr_epsilon))
+                            .abs()
+                            > 1.0e-12
+                })
+        }) {
+            return Err(MycelialTemporalCycleError::InvalidProfile(
+                "node TCN/TCR metrics disagree with persistent cycle hyperedges",
+            ));
         }
         Ok(())
     }
