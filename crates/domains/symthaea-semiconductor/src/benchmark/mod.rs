@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
+pub mod metrology_audit;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod secom_fold_preprocessor;
@@ -64,6 +65,13 @@ pub use secom_raw::{
 
 pub use dtco_manifest::{
     DtcoLineageError, DtcoLineageManifestV1, DtcoLineageReportV1, validate_dtco_lineage_v1,
+};
+
+pub use metrology_audit::{
+    MetrologyAuditCandidateV1, MetrologyAuditError, MetrologyAuditOutcomeV1,
+    MetrologyAuditPolicyV1, MetrologyAuditPopulationEstimateV1, MetrologyAuditSelectionReportV1,
+    MetrologyAuditSelectionRowV1, MetrologyAuditStratumEstimateV1, MetrologySelectionMethodV1,
+    estimate_metrology_population_v1, select_metrology_audit_v1,
 };
 
 pub use mf_acquisition::{
