@@ -130,6 +130,8 @@ The unit test compares a three-junction ring with a two-edge tree under removal 
 
 This is a deterministic structural conformance control, not a biological result. It demonstrates why cycle presence is only a hypothesis until the network is subjected to a defined failure.
 
+The synthetic example compares a three-junction ring with the corresponding two-edge tree under the same bridge-edge failure. The ring retains all declared demand-pair reachability by using the alternate route; the tree disconnects the pairs that depended on the removed edge.
+
 Run the synthetic benchmark:
 
 ```bash
