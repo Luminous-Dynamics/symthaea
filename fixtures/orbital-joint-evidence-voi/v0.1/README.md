@@ -2,7 +2,7 @@
 
 **Tracker:** [#13111](https://github.com/Luminous-Dynamics/symthaea/issues/13111)  
 **Specification:** [ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md](../../../docs/research/ORBITAL_JOINT_EVIDENCE_VOI_V0_1.md)  
-**Status:** 17 hand-authored one-step contract fixtures plus two finite-horizon sequential campaign variants, consumed by separate deterministic Rust auditors and independent Python reference oracles.
+**Status:** 17 hand-authored one-step contract fixtures, two frequency variants of a finite-horizon joint campaign, and one AER-01 calibration/load/NDE campaign; consumed by deterministic Rust auditors and independent Python reference oracles.
 
 ## Files
 
@@ -52,6 +52,28 @@ For SEQ-001, the adaptive policy runs the combined-load screen first, terminates
 
 The weights are synthetic and used only to calculate expected cost; the terminal structural decision remains distribution-free. These numbers are fixture calculations, not physical or industry results. The sequential oracle is a proof-of-concept, not a full held-out policy tournament.
 
+## AER-01 inspection and structural evidence campaign (SEQ-003)
+
+The third sequential scenario is an explicitly synthetic, article-bound AER-01 workflow with four latent states: healthy, delamination, joint-retention defect and common-cause instrument drift. All actions share the same physical-unit reference, configuration and ICD revision.
+
+The exact finite-horizon policy is:
+
+1. Run an independent calibration-chain audit. If invalid, stop at **HOLD**; downstream readings are not trusted.
+2. If valid, run a non-destructive combined-load proof screen on the identified coupon. A **FAIL** creates an outcome-specific rejection basis and stops at **REJECT**.
+3. If the load screen **PASSES**, run fixed-target ultrasonic inspection on the same coupon. **CLEAR** completes the calibration, load and NDE obligations required for **ACCEPT**; an **INDICATION** creates a rejection basis and leads to **REJECT**.
+
+No single test improves the baseline worst-case regret: HOLD and the myopic one-step stop rule both have regret 2. The full fixed campaign and the adaptive three-step policy both reach regret 0. The adaptive policy stops early on invalid calibration or a load failure and does not count the same physical coupon twice when the NDE is performed on the already-counted article.
+
+| Resource | Fixed campaign | Adaptive policy | Expected reduction |
+|---|---:|---:|---:|
+| Engineering hours | 1.40 | 1.25 | 10.7% |
+| Facility hours | 1.40 | 1.215 | 13.2% |
+| Specimen count | 1.00 | 0.95 | 5.0% |
+| Review hours | 0.270 | 0.235 | 13.0% |
+| External cost units | 0.600 | 0.5275 | 12.1% |
+
+The reductions are outputs of the frozen synthetic frequency model and resource plan, not measured savings, physical POD, proof-load results, production test evidence, qualification or a demonstrated advantage over industry workflows. The frequency weights affect expected resource consumption only; worst-case minimax regret remains distribution-free over the declared state set. The common-cause state deliberately terminates in HOLD rather than permitting a confident acceptance or unsupported rejection.
+
 ## Important interpretation
 
 These are small deterministic known-answer controls. They do not constitute a statistically representative aerospace qualification dataset, physical test plan, calibrated probability model, or benchmark result.
@@ -74,7 +96,7 @@ The Rust preflight and Python oracle audit the scenario catalogue's admissibilit
 
 ## Finite-horizon sequential campaign proof-of-concept
 
-- `sequential-campaign.schema.json` and `sequential-campaign.synthetic.json` define two frequency variants of the same four-state/two-action example.
+- `sequential-campaign.schema.json` and `sequential-campaign.synthetic.json` define two frequency variants of the original joint campaign plus an AER-01 four-state, three-action inspection/structural campaign.
 - `tools/orbital-joint-evidence-voi-bench/src/sequential.rs` implements exact finite-horizon minimax-regret planning with observation-contingent branches, stop decisions, exact profile/article/configuration/ICD binding and full path budgets.
 - `src/bin/sequential-campaign.rs` emits a deterministic receipt; `tests/sequential_reference_oracle.py` independently recomputes the policy.
 
