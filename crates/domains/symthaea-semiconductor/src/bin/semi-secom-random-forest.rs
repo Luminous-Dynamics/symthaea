@@ -229,14 +229,13 @@ fn run() -> Result<(), String> {
                 )
             })?;
             let prediction_milliseconds = prediction_start.elapsed().as_millis() as u64;
-            let metrics = score_random_forest_predictions_v1(&prediction_report, &truth, 0.5, 10).map_err(
-                |error| {
+            let metrics = score_random_forest_predictions_v1(&prediction_report, &truth, 0.5, 10)
+                .map_err(|error| {
                     format!(
                         "repeat {} {model_id} metrics failed: {error}",
                         manifest.repeat_index
                     )
-                },
-            )?;
+                })?;
 
             arms.push(RandomForestArmReportV1 {
                 model_id: model_id.into(),
