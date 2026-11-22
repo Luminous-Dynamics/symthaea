@@ -62,7 +62,7 @@ The runner writes three JSONL files:
 
 The records follow data/schemas/mace_memory_decision_intervention_v0_1.schema.json.
 
-The summary contains six contrasts:
+The summary contains seven contrasts:
 
 - memory_vs_none: hdc_ltc versus no_memory.
 - content_vs_placebo: hdc_ltc versus semantic_placebo.
@@ -70,6 +70,7 @@ The summary contains six contrasts:
 - hdc_ltc_vs_static_hdc: isolates the LTC-profile change from the static HDC profile.
 - typed_content_hdc_vs_conventional: typed-content HDC versus the pinned key-value baseline.
 - typed_content_hdc_vs_static_hdc: typed-content HDC versus the original event-ID HDC index.
+- typed_content_hdc_vs_exact_scope_scan: typed-content top-k versus all candidate-visible exact-scope evidence. This is the decision-sufficiency gap against an evidence-complete reference, not an equal-cost practical baseline; interpret utility/regret loss together with saved bytes and latency.
 
 corrected_vs_stale is intentionally omitted. The runner does not yet replay a real correction/retraction between retrieval and consumption. That requires the existing canonical lifecycle/source-revalidation owners and must not be faked with a cached flag.
 
