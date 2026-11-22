@@ -14,9 +14,7 @@ use crate::benchmark::secom_raw::{
     SecomLabelRowV1, SecomRawDataError, SecomRawExpectationsV1, SecomSensorRowV1,
     audit_secom_raw_v1, parse_features, parse_labels,
 };
-use crate::benchmark::split_manifest::{
-    SplitManifestV1, validate_split_manifest_v1,
-};
+use crate::benchmark::split_manifest::{SplitManifestV1, validate_split_manifest_v1};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
