@@ -1367,6 +1367,106 @@ mod tests {
     }
 
     #[test]
+    fn pairwise_branch_and_bound_matches_exhaustive_subset_oracle() {
+        let options = vec![
+            option(1, 100),
+            option(2, 90),
+            option(3, 80),
+            option(4, 70),
+        ];
+        let mut candidate = proposal(&options, 0, 0);
+        for pair in &mut candidate.pairs {
+            let left = options
+                .iter()
+                .find(|option| option.option_sha256() == pair.left_option_sha256)
+                .unwrap();
+            let right = options
+                .iter()
+                .find(|option| option.option_sha256() == pair.right_option_sha256)
+                .unwrap();
+            let ids = (
+                left.event_id().min(right.event_id()),
+                left.event_id().max(right.event_id()),
+            );
+            pair.interaction_micros = match ids {
+                (1, 2) => -200,
+                (1, 3) => 20,
+                (1, 4) => -50,
+                (2, 3) => 300,
+                (2, 4) => 100,
+                (3, 4) => -100,
+                _ => panic!("unexpected option pair"),
+            };
+            pair.absolute_error_bound_micros = 10;
+        }
+        candidate.proposal_sha256 = candidate.canonical_digest();
+        let verifier = FixtureVerifier {
+            receipt: receipt(&candidate),
+        };
+        let verified = verify_portfolio_interactions(
+            candidate,
+            &options,
+            &context(),
+            &verifier,
+        )
+        .unwrap();
+        let plan = optimize_memory_portfolio_pairwise(&options, budget(), &verified).unwrap();
+
+        let mut oracle_value = i64::MIN;
+        let mut oracle_ids = Vec::new();
+        for mask in 0_u32..(1_u32 << options.len()) {
+            let selected: Vec<_> = options
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| (mask & (1_u32 << index)) != 0)
+                .map(|(_, option)| option)
+                .collect();
+            let mut value: i64 = selected
+                .iter()
+                .map(|option| option.net_value_micros())
+                .sum();
+            for left in 0..selected.len() {
+                for right in (left + 1)..selected.len() {
+                    let key = pair_key(
+                        selected[left].option_sha256(),
+                        selected[right].option_sha256(),
+                    );
+                    let estimate = verified
+                        .proposal
+                        .pairs
+                        .iter()
+                        .find(|pair| {
+                            pair.left_option_sha256 == key.0
+                                && pair.right_option_sha256 == key.1
+                        })
+                        .expect("oracle must have every pair estimate");
+                    value += estimate.conservative_value_micros().unwrap();
+                }
+            }
+            if value > oracle_value {
+                oracle_value = value;
+                oracle_ids = selected
+                    .iter()
+                    .map(|option| option.event_id())
+                    .collect();
+            }
+        }
+
+        let mut selected_ids: Vec<_> = plan
+            .selection
+            .selected
+            .iter()
+            .map(|item| item.event_id)
+            .collect();
+        selected_ids.sort();
+        oracle_ids.sort();
+        assert_eq!(selected_ids, oracle_ids);
+        assert_eq!(plan.total_conservative_value_micros, oracle_value);
+        assert_eq!(selected_ids, vec![2, 3, 4]);
+        assert!(plan.is_admissible_with(&verified));
+    }
+
+    #[test]
     fn option_order_permutation_does_not_change_interaction_plan() {
         let options = vec![option(1, 30), option(2, 20), option(3, 10)];
         let verified = verify(&options, -5, 2);
