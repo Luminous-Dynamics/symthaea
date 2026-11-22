@@ -351,34 +351,42 @@ mod tests {
     #[test]
     fn all_four_threshold_operators_have_explicit_boundary_semantics() {
         let input = graph(10.0, "nm", MetrologyLabelStatusV1::Validated);
-        assert!(!classify_validated_metrology_label_v1(
-            &input,
-            "label-17",
-            &semantics(PositiveConditionV1::GreaterThan, 10.0)
-        )
-        .unwrap()
-        .derived_positive);
-        assert!(classify_validated_metrology_label_v1(
-            &input,
-            "label-17",
-            &semantics(PositiveConditionV1::GreaterThanOrEqual, 10.0)
-        )
-        .unwrap()
-        .derived_positive);
-        assert!(!classify_validated_metrology_label_v1(
-            &input,
-            "label-17",
-            &semantics(PositiveConditionV1::LessThan, 10.0)
-        )
-        .unwrap()
-        .derived_positive);
-        assert!(classify_validated_metrology_label_v1(
-            &input,
-            "label-17",
-            &semantics(PositiveConditionV1::LessThanOrEqual, 10.0)
-        )
-        .unwrap()
-        .derived_positive);
+        assert!(
+            !classify_validated_metrology_label_v1(
+                &input,
+                "label-17",
+                &semantics(PositiveConditionV1::GreaterThan, 10.0)
+            )
+            .unwrap()
+            .derived_positive
+        );
+        assert!(
+            classify_validated_metrology_label_v1(
+                &input,
+                "label-17",
+                &semantics(PositiveConditionV1::GreaterThanOrEqual, 10.0)
+            )
+            .unwrap()
+            .derived_positive
+        );
+        assert!(
+            !classify_validated_metrology_label_v1(
+                &input,
+                "label-17",
+                &semantics(PositiveConditionV1::LessThan, 10.0)
+            )
+            .unwrap()
+            .derived_positive
+        );
+        assert!(
+            classify_validated_metrology_label_v1(
+                &input,
+                "label-17",
+                &semantics(PositiveConditionV1::LessThanOrEqual, 10.0)
+            )
+            .unwrap()
+            .derived_positive
+        );
     }
     #[test]
     fn classification_receipt_binds_value_graph_and_semantics_digest() {
