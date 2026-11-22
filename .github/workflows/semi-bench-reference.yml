@@ -248,6 +248,62 @@ jobs:
             | @tsv
           ' /tmp/secom-real/observation-drift-report.json
 
+
+      - name: Run Rust B2/B3/B4 tabular baselines on synthetic known answer
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-tabular-baselines -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-labels-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-expectations-v1.json \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-split-v1.json \
+            > /tmp/semi-secom-tabular-synthetic.json
+          jq -e '
+            .schema == "luminous.semi-bench.secom-tabular-baselines-report.v1" and
+            .feature_count == 2 and
+            .training_rows == 4 and
+            (.baselines | keys == ["B2","B3","B4"]) and
+            .baselines.B2.uses_missingness_indicators == false and
+            .baselines.B3.uses_missingness_indicators == true and
+            .baselines.B4.uses_missingness_indicators == true and
+            .claim_limits.medians_and_model_parameters_fit_on_train_only == true
+          ' /tmp/semi-secom-tabular-synthetic.json > /dev/null
+
+
+      - name: Run Rust B2/B3/B4 on the full pinned SECOM chronology
+        run: |
+          EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
+          SPLIT=/tmp/semi-rust-work/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-tabular-baselines -- \
+            /tmp/secom-real/secom.data \
+            /tmp/secom-real/secom_labels.data \
+            "$EXPECTATIONS" \
+            "$SPLIT" \
+            > /tmp/secom-real/tabular-baselines-report.json
+          jq -e '
+            .schema == "luminous.semi-bench.secom-tabular-baselines-report.v1" and
+            .feature_count == 590 and
+            .training_rows == 940 and
+            .training_failures == 76 and
+            .training_passes == 864 and
+            (.baselines | keys == ["B2","B3","B4"]) and
+            .baselines.B2.held_out.validation.rows == 313 and
+            .baselines.B2.held_out.test.rows == 314 and
+            .baselines.B3.held_out.test.failures == 17 and
+            .baselines.B4.held_out.test.failures == 17
+          ' /tmp/secom-real/tabular-baselines-report.json > /dev/null
+
+          echo "B2/B3/B4 held-out diagnostics (pinned public mirror):"
+          jq -r '
+            ["baseline","split","AUROC","average precision","Brier"],
+            (["B2","B3","B4"][] as $b |
+              ["validation","test"][] as $s |
+              [$b,$s,
+               (.baselines[$b].held_out[$s].metrics.ranking_metrics.auroc|tostring),
+               (.baselines[$b].held_out[$s].metrics.ranking_metrics.average_precision|tostring),
+               (.baselines[$b].held_out[$s].metrics.probability_metrics.brier_score|tostring)])
+            | @tsv
+          ' /tmp/secom-real/tabular-baselines-report.json
+
       - name: Archive real-source SECOM diagnostic reports
         uses: actions/upload-artifact@v4
         with:
@@ -255,4 +311,5 @@ jobs:
           path: |
             /tmp/secom-real/missingness-report.json
             /tmp/secom-real/observation-drift-report.json
+            /tmp/secom-real/tabular-baselines-report.json
           if-no-files-found: error

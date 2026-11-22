@@ -7,6 +7,7 @@ pub mod pair_manifest;
 pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
+pub mod secom_tabular_baselines;
 pub mod split_manifest;
 
 pub use binary_metrics::{
@@ -25,6 +26,10 @@ pub use secom_missingness::{
 };
 pub use secom_observation_drift::{
     SecomObservationDriftError, SecomObservationDriftReportV1, evaluate_secom_observation_drift_v1,
+};
+
+pub use secom_tabular_baselines::{
+    SecomTabularBaselineError, SecomTabularBaselinesReportV1, evaluate_secom_tabular_baselines_v1,
 };
 
 pub use secom_raw::{

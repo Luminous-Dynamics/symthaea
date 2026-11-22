@@ -278,3 +278,35 @@ cargo run -p symthaea-semiconductor --bin semi-secom-observation-drift -- \\
 \`\`\`
 
 The synthetic fixture checks zero-drift reproduction, a one-sensor observation shift, label invariance, feature-permutation invariance and divergence bounds. It is not a real-SECOM drift result. The report is an unsupervised monitoring diagnostic and must not be used alone to trigger a production process change.
+
+
+## SECOM train-only value baselines B2–B4
+
+The Rust CLI \`semi-secom-tabular-baselines\` evaluates three additional baselines on the same digest-bound raw files and frozen split:
+
+- **B2 — values-only:** per-feature median imputation fitted on training rows, train-only value normalization, and Gaussian naive Bayes. No missingness-indicator likelihood is used.
+- **B3 — values + mask:** same value path as B2 plus smoothed Bernoulli likelihoods for each sensor's missingness state.
+- **B4 — zero + mask:** zero-imputed values plus the same type of missingness-indicator likelihood.
+
+Each model has an explicit variance floor, train-fitted class priors and class-conditional statistics, a serialized model SHA-256, and held-out validation/test metrics from the existing binary scorer. A feature with no observed training values uses a deterministic zero fallback and is counted in the report. Non-finite standardized values or likelihoods are rejected rather than clipped.
+
+Run against the pinned mirror:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-tabular-baselines -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+B2–B4 use Gaussian/Bernoulli conditional-independence assumptions and are deliberately transparent statistical comparators, not production models or claims of SOTA. B3/B4's mask likelihood can be miscalibrated when sensor missingness is strongly correlated; judge calibration and transfer on held-out domains, not accuracy alone. The 17 failures in the current chronological test require support counts and uncertainty intervals before ranking. No feature has known physical semantics in the public SECOM mirror, and no association establishes root cause.
+
+
+### B2–B4 comparability and interpretation
+
+All three baselines share the exact same frozen rows and binary scoring contract. The Gaussian likelihoods operate on values standardized by training-only population mean/scale; per-class variance uses training-only MLE variance with an explicit floor of \`1e-6\`. B3/B4 add independent Bernoulli missingness likelihoods with symmetric Laplace smoothing \`alpha=1\`. These assumptions are exposed in the fitted-model digest/report so they can be reproduced or replaced by a new model schema.
+
+For comparison, report B0/B1/B2/B3/B4 side by side. The prevalence-only AP reference equals the positive prevalence on the scored split; a B1 AP below this reference is not useful ranking performance. A high B1 score with poor held-out calibration must be treated as a failure, not converted into a threshold recommendation.
+
+The B2/B3/B4 chronological test has only 17 failures. Before leaderboard claims, add lot/tool/time groups from a source that actually carries those identities, multiple independent time periods, confidence intervals and a second independent dataset. The anonymous SECOM mirror cannot establish fab transfer.
