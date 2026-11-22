@@ -83,6 +83,60 @@ pub struct MycelialFailureAttackPlan {
     pub scenarios: Vec<MycelialFailureScenario>,
 }
 
+/// Synthetic or calibrated attack-delivery uncertainty. The probability is
+/// the per-attempt chance that one requested entity removal is enacted. It is
+/// not a biological failure probability unless independently calibrated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MycelialFailureDeliveryConfig {
+    pub trials_per_scenario: usize,
+    /// Fixed-point probability in [0, 1_000_000].
+    pub removal_success_probability_micros: u32,
+    pub seed: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialFailureDeliveryTrial {
+    pub scenario_id: String,
+    pub trial_index: usize,
+    pub realized_failed_segment_ids: Vec<String>,
+    pub realized_failed_junction_ids: Vec<String>,
+    pub weighted_reachability: Option<f64>,
+    /// Demand-weighted directness among reachable demand pairs; None when no demand is reachable.
+    pub weighted_mean_directness: Option<f64>,
+    pub weighted_mean_network_path_length: Option<f64>,
+    pub connected_components: usize,
+    pub cycle_rank: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialFailureDeliveryScenarioSummary {
+    pub scenario_id: String,
+    pub attempted_entity_count: usize,
+    pub trial_count: usize,
+    pub mean_realized_failure_count: f64,
+    pub probability_at_least_one_failure: f64,
+    pub mean_weighted_reachability: Option<f64>,
+    pub weighted_reachability_p05: Option<f64>,
+    pub weighted_reachability_p50: Option<f64>,
+    pub weighted_reachability_p95: Option<f64>,
+    pub weighted_reachability_minimum: Option<f64>,
+    pub weighted_reachability_maximum: Option<f64>,
+    pub directness_defined_trial_count: usize,
+    pub mean_weighted_directness_among_reachable: Option<f64>,
+    pub mean_weighted_path_length_among_reachable: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialFailureDeliveryProfile {
+    pub schema_version: u16,
+    pub source_graph_digest: String,
+    pub demand_digest: String,
+    pub attack_plan_digest: String,
+    pub config: MycelialFailureDeliveryConfig,
+    pub trials: Vec<MycelialFailureDeliveryTrial>,
+    pub scenarios: Vec<MycelialFailureDeliveryScenarioSummary>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialFailureAttackEvaluation {
     pub attack_plan_digest: String,
@@ -178,6 +232,8 @@ pub enum MycelialFailureResilienceError {
     InvalidAttackConfig(&'static str),
     InvalidAttackPlan(&'static str),
     UnknownSpatialSeedJunction(String),
+    InvalidDeliveryConfig(&'static str),
+    InvalidDeliveryProfile(&'static str),
     PathShorterThanEuclideanDistance {
         demand_id: String,
         direct_distance: f64,
@@ -232,6 +288,8 @@ impl fmt::Display for MycelialFailureResilienceError {
             Self::InvalidAttackConfig(reason) => write!(f, "invalid failure attack configuration: {reason}"),
             Self::InvalidAttackPlan(reason) => write!(f, "invalid failure attack plan: {reason}"),
             Self::UnknownSpatialSeedJunction(id) => write!(f, "unknown spatial attack seed junction {id}"),
+            Self::InvalidDeliveryConfig(reason) => write!(f, "invalid attack-delivery uncertainty config: {reason}"),
+            Self::InvalidDeliveryProfile(reason) => write!(f, "invalid attack-delivery uncertainty profile: {reason}"),
             Self::PathShorterThanEuclideanDistance {
                 demand_id,
                 direct_distance,
