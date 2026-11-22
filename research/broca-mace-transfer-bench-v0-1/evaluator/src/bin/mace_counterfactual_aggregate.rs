@@ -144,6 +144,67 @@ fn parse_cluster(pair_block_id: &str) -> Result<u64, String> {
         .map_err(|error| format!("invalid world cluster ID: {error}"))
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct InputProvenance {
+    run_id: String,
+    source_code_sha256: String,
+    fixture_sha256: String,
+    schema_sha256: String,
+    source_revision: Option<String>,
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn parse_manifest(record: &Value) -> Result<(InputProvenance, String), String> {
+    if required_string(record, "schema_version")? != INPUT_SCHEMA {
+        return Err("unsupported intervention manifest schema version".to_string());
+    }
+    let provenance = InputProvenance {
+        run_id: required_string(record, "run_id")?.to_string(),
+        source_code_sha256: required_string(record, "source_code_sha256")?.to_string(),
+        fixture_sha256: required_string(record, "fixture_sha256")?.to_string(),
+        schema_sha256: required_string(record, "schema_sha256")?.to_string(),
+        source_revision: record
+            .get("source_revision")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    };
+    for (field, digest) in [
+        ("source_code_sha256", provenance.source_code_sha256.as_str()),
+        ("fixture_sha256", provenance.fixture_sha256.as_str()),
+        ("schema_sha256", provenance.schema_sha256.as_str()),
+    ] {
+        if !valid_sha256(digest) {
+            return Err(format!("invalid {field} in intervention manifest"));
+        }
+    }
+    if provenance.run_id.is_empty() {
+        return Err("intervention manifest run_id must not be empty".to_string());
+    }
+    if provenance
+        .source_revision
+        .as_deref()
+        .is_some_and(|revision| {
+            !matches!(revision.len(), 40 | 64)
+                || !revision
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
+    {
+        return Err("intervention manifest has invalid source_revision".to_string());
+    }
+    let manifest_sha256 = required_string(record, "manifest_sha256")?.to_string();
+    if !valid_sha256(&manifest_sha256) {
+        return Err("invalid manifest_sha256".to_string());
+    }
+    Ok((provenance, manifest_sha256))
+}
+
 fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String> {
     if required_string(record, "schema_version")? != INPUT_SCHEMA {
         return Err("unsupported input schema version".to_string());
@@ -172,6 +233,16 @@ fn parse_score(record: &Value) -> Result<(TaskKey, MethodKind, Metrics), String>
         (method, intervention_kind),
         metrics,
     ))
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[usize::from(byte >> 4)] as char);
+        output.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+    output
 }
 
 fn percentile(sorted: &[f64], probability: f64) -> f64 {
@@ -372,7 +443,9 @@ fn reduce(
 
     let mut block_rows: BTreeMap<TaskKey, BTreeMap<MethodKind, Accumulator>> = BTreeMap::new();
     let mut intervention_row_count = 0_usize;
-    let mut skipped_manifest_count = 0_usize;
+    let mut manifest_row_count = 0_usize;
+    let mut manifest_shas = BTreeSet::new();
+    let mut input_provenance: Option<InputProvenance> = None;
 
     for (line_index, line) in reader.lines().enumerate() {
         let line = line.map_err(|error| format!("read line {}: {error}", line_index + 1))?;
@@ -383,7 +456,17 @@ fn reduce(
             .map_err(|error| format!("parse JSONL line {}: {error}", line_index + 1))?;
         match record.get("record_type").and_then(Value::as_str) {
             Some("intervention_manifest") => {
-                skipped_manifest_count += 1;
+                let (provenance, manifest_sha) = parse_manifest(&record)
+                    .map_err(|error| format!("line {}: {error}", line_index + 1))?;
+                if let Some(existing) = &input_provenance {
+                    if existing != &provenance {
+                        return Err("evaluator stream mixes run IDs or source/schema revisions".to_string());
+                    }
+                } else {
+                    input_provenance = Some(provenance);
+                }
+                manifest_shas.insert(manifest_sha);
+                manifest_row_count += 1;
                 continue;
             }
             Some("evaluator_score") => {}
@@ -405,6 +488,17 @@ fn reduce(
     if intervention_row_count == 0 {
         return Err("no evaluator_score records found".to_string());
     }
+    if manifest_row_count == 0 || manifest_shas.is_empty() {
+        return Err("evaluator stream contains no intervention manifest receipts".to_string());
+    }
+    let provenance = input_provenance
+        .ok_or_else(|| "evaluator stream has no run provenance".to_string())?;
+    let manifest_set_payload = manifest_shas.iter().cloned().collect::<Vec<_>>().join("\\n");
+    let input_manifest_set_sha256 =
+        hex_digest(Sha256::digest(manifest_set_payload.as_bytes()).as_slice());
+    let aggregation_code_sha256 = hex_digest(
+        Sha256::digest(include_bytes!("mace_counterfactual_aggregate.rs")).as_slice(),
+    );
 
     let grouped = cluster_means(&block_rows);
     let mut output_records = Vec::new();
@@ -487,6 +581,18 @@ fn reduce(
         }
     }
 
+    for record in &mut output_records {
+        record["input_run_id"] = json!(provenance.run_id);
+        record["input_manifest_set_sha256"] = json!(input_manifest_set_sha256);
+        record["input_source_code_sha256"] = json!(provenance.source_code_sha256);
+        record["input_fixture_sha256"] = json!(provenance.fixture_sha256);
+        record["input_schema_sha256"] = json!(provenance.schema_sha256);
+        record["input_source_revision"] = json!(provenance.source_revision);
+        record["aggregation_code_sha256"] = json!(aggregation_code_sha256);
+        record["bootstrap_seed"] = json!(seed);
+        record["input_manifest_count"] = json!(manifest_row_count);
+    }
+
     let output = File::create(output_path)
         .map_err(|error| format!("create summary output {output_path}: {error}"))?;
     let mut writer = BufWriter::new(output);
@@ -502,9 +608,9 @@ fn reduce(
         .map_err(|error| format!("flush summary output: {error}"))?;
 
     eprintln!(
-        "diagnostic-only MACE cluster aggregation: evaluator_rows={}, skipped_manifest_rows={}, summary_records={}",
+        "diagnostic-only MACE cluster aggregation: evaluator_rows={}, manifest_rows={}, summary_records={}",
         intervention_row_count,
-        skipped_manifest_count,
+        manifest_row_count,
         output_records.len()
     );
     Ok((intervention_row_count, output_records.len()))
