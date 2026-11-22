@@ -20,8 +20,11 @@ An optional bootstrap count may be supplied after the report path for score and 
 
 ## Integrity guarantees
 
-- Joins only by wave_file_name, never row position.
-- Rejects duplicate, missing or extra sample IDs; no silent inner-join loss.
+- Joins by sample identifier, never row position.
+- Supports the organizer's published metadata fields `wave_file_name` and `average_semantic_alignement_score`, and the baseline's preprocessed metadata dialect `wav_file_name` and `average_score`.
+- Supports the baseline inference output field `wav_file_name` and the alternative `wave_file_name` prediction field.
+- Rejects files containing both aliases for the same logical field, as well as duplicate, missing or extra sample IDs; no silent inner-join loss.
+- Reports the exact identifier and score columns selected for each input.
 - Requires finite scores in the official 0–10 scale.
 - Requires exact one-to-one prediction coverage of the manifest.
 - Reports SHA-256 of the exact metadata and prediction CSV bytes.
@@ -35,6 +38,8 @@ An optional bootstrap count may be supplied after the report path for score and 
 The official XACLE 2027 task changes the generalization setting from seen generation systems to unseen generation systems. The organizer's public development README describes 7,500 training pairs, 3,000 validation pairs and a 3,000-pair labelled test split, with listener identities and generator model IDs/names. The separate blind evaluation dataset contains 4,000 audio-text pairs and is distributed by organizer email request.
 
 The official baseline uses frozen M2D-CLAP audio/text encoders and a trainable projector/regressor. Its README reports SRCC 0.5648, LCC 0.6142, Kendall tau-b 0.3997 and MSE 3.1847 on its inherited labelled test split. These are not results on the blind XACLE 2027 evaluation dataset.
+
+The organizer's 2027 development-dataset README names the metadata columns `wave_file_name` and `average_semantic_alignement_score` (including that spelling), while the official baseline's dataset loader/evaluator expects a preprocessed `wav_file_name` and `average_score` dialect. The baseline inference script emits `wav_file_name,pred_score`. The audit accepts each documented dialect explicitly, records which columns were selected, and rejects ambiguous files that contain both aliases. This avoids conflating the metadata schema with the baseline prediction-output schema.
 
 This tool closes a specific evaluation-integrity gap in the baseline's public evaluate.py: it performs an inner merge by sample name without explicitly rejecting duplicate IDs or reporting missing/extra coverage. It also does not calculate generator-stratified performance.
 
