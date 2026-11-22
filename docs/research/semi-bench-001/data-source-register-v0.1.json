@@ -649,8 +649,9 @@
       "test_result": "PASS-in-hosted-GitHub-Actions",
       "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917273962",
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
-      "hosted_ci_test_count": 46
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
+      "hosted_ci_test_count": 46,
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131"
     },
     "independent_inspection_decision_oracle": {
       "input_schema": "luminous.semi-bench.inspection-decision.v1",
@@ -665,8 +666,9 @@
       "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44890353550",
       "claim_ceiling": "synthetic expected-net-value only; not measured inspection savings or authorization",
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
-      "hosted_ci_test_count": 46
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
+      "hosted_ci_test_count": 46,
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131"
     },
     "contrastive_pair_manifest_validator": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_pair_manifest_reference.py",
@@ -682,8 +684,9 @@
         "result": "PASS",
         "cli_report_byte_for_byte": true
       },
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
-      "hosted_ci_test_count": 46
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
+      "hosted_ci_test_count": 46,
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131"
     },
     "rust_binary_metrics_scorer": {
       "package": "symthaea-semiconductor",
@@ -697,10 +700,10 @@
       "auroc_implementation": "O(n log n) descending tie-group rank accumulation; exact half-credit for ties",
       "large_tied_case_rows": 40000,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
-      "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
       "claim_ceiling": "frozen metric contract parity and evaluator implementation only; no predictive or manufacturing claim",
-      "total_rust_unit_tests": 35
+      "total_rust_unit_tests": 43
     },
     "rust_split_manifest_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs",
@@ -708,18 +711,22 @@
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/split-manifest-known-answer-v1.expected.json",
       "source_manifest": "docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json",
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
       "test_count": 6,
-      "claim_ceiling": "split integrity only; no predictive performance or generalization claim"
+      "claim_ceiling": "split integrity only; no predictive performance or generalization claim",
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
+      "total_rust_unit_tests": 43
     },
     "rust_contrastive_pair_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/pair_manifest.rs",
       "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.json",
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/contrastive-pair-manifest-known-answer-v1.expected.json",
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
       "test_count": 6,
-      "claim_ceiling": "pair integrity only; no model quality/causality claim"
+      "claim_ceiling": "pair integrity only; no model quality/causality claim",
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
+      "total_rust_unit_tests": 43
     },
     "rust_secom_raw_integrity_audit": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/secom_raw.rs",
@@ -732,9 +739,11 @@
       "synthetic_expectations": "benchmarks/semi-bench-001/reference/fixtures/secom-mini-expectations-v1.json",
       "synthetic_expected_report": "benchmarks/semi-bench-001/reference/fixtures/secom-mini-integrity-report-v1.expected.json",
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
       "tests": 5,
-      "claim_ceiling": "digest-bound raw-file integrity/shape/clock contract only; synthetic fixture used; no complete sensor-matrix result"
+      "claim_ceiling": "digest-bound raw-file integrity/shape/clock contract only; synthetic fixture used; no complete sensor-matrix result",
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
+      "total_rust_unit_tests": 43
     },
     "rust_dtco_lineage_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs",
@@ -756,8 +765,8 @@
       "cli_report_byte_for_byte": true,
       "hosted_ci_status": "success",
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
-      "tested_commit": "056dfe2b2597212a13ebf8f9b9867f9b9867f56",
-      "total_rust_unit_tests": 35,
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
+      "total_rust_unit_tests": 43,
       "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy"
     },
     "rust_mf_acquisition_oracle": {
@@ -794,7 +803,7 @@
       },
       "hosted_ci_status": "success",
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
-      "tested_commit": "056dfe2b2597212a13ebf8b3c3",
+      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
       "total_rust_unit_tests": 43,
       "claim_ceiling": "candidate scheduling only; no simulation execution, no verified Pareto gain, no design approval"
     }
