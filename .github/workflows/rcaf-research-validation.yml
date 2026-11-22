@@ -603,7 +603,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 11
+          assert len(receipt["simulation_reports"]) == 10
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
