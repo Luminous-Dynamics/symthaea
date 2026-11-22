@@ -1367,26 +1367,28 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403",
-      "run_id": 44988794403,
-      "tested_commit": "c02f4a2e1a6927c1e2f3a557086375614aa3171f",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
+      "run_id": 44989349728,
+      "tested_commit": "6d0e67c991525b8d4308cde03f99f5e4d97ec6d6",
       "conclusion": "success",
       "python_reference_tests": 46,
-      "rust_unit_tests": 32,
+      "rust_unit_tests": 35,
       "rust_checks": [
         "cargo fmt --check",
         "cargo clippy --all-targets -- -D warnings",
         "cargo test"
       ],
-      "byte_for_byte_reports": [
-        "Python binary-metrics",
-        "Python inspection-decision",
-        "Python contrastive-pair-validation",
-        "Rust binary-metrics",
-        "Rust SECOM raw-integrity-audit",
-        "Rust DTCO lineage"
+      "python_byte_for_byte_reports": [
+        "binary-metrics",
+        "inspection-decision",
+        "contrastive-pair-validation"
       ],
-      "note": "Hosted GitHub Actions verified 46 Python tests and 32 Rust tests on the tested clean-base executable head. Rust checks use a temporary isolated workspace due to an existing missing member in the root workspace on main."
+      "rust_byte_for_byte_reports": [
+        "binary-metrics",
+        "SECOM-raw-integrity-audit",
+        "DTCO-lineage"
+      ],
+      "note": "Hosted GitHub Actions verified the full Python reference suite and Rust crate suite on the current executable head. Rust checks are run in an isolated temporary Cargo workspace because the root Cargo workspace references a missing member on main."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -1560,30 +1562,33 @@
       "real_sensor_matrix_ingested": false,
       "claim_ceiling": "synthetic parser contract and raw-source digest/shape validation code; no full-matrix model result"
     },
-    "rust_unit_test_count": 32,
+    "rust_unit_test_count": 35,
     "rust_dtco_lineage": {
       "package": "symthaea-semiconductor",
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-dtco-lineage.rs",
       "tests": "inline-unit-tests",
-      "test_count": 8,
+      "test_count": 11,
       "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.json",
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json",
-      "validated_rules": [
+      "enforced_rules": [
         "unique-run-identities",
         "all-parent-runs-exist",
         "parent-output-digest-is-child-input",
         "acyclic-run-graph",
+        "parent-fidelity-stage-not-later-than-child",
+        "root-run-binds-exact-design-input-digest",
+        "constraints-digest-consumed-by-at-least-one-run",
         "model-prediction-requires-model-digest",
+        "model-prediction-requires-uncertainty-artifact",
         "physical-measurement-requires-instrument-calibration-and-uncertainty",
-        "simulations-cannot-assert-physical-measurement",
-        "sha256-artifact-identities"
+        "simulations-cannot-assert-physical-measurement"
       ],
+      "unique_artifact_count_in_fixture": 7,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403",
-      "tested_commit": "ab51ea5cc44076eb07cc863a3419b6940ef5fdee",
-      "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model accuracy, PDK qualification or fabricated silicon",
-      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-dtco-lineage.rs",
-      "cli_report_byte_for_byte": true
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
+      "tested_commit": "6d0e67c991525b8d4308cde03f99f5e4d97ec6d6",
+      "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model predictive accuracy, PDK qualification or fabricated silicon"
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
