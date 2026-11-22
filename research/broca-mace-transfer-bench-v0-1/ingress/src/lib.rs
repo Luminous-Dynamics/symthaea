@@ -1576,9 +1576,9 @@ mod tests {
                 },
                 source_artifact_digest: "e".repeat(64),
                 transformation_digest: "f".repeat(64),
-                derived_from_event_ids: Vec::new(),
-                dependency_lineage_status: DependencyLineageStatusV1::Unknown,
-                dependency_manifest_digest: None,
+                derived_from_event_ids: self.dependency_event_ids.clone(),
+                dependency_lineage_status: self.dependency_lineage_status,
+                dependency_manifest_digest: self.dependency_manifest_digest.clone(),
                 issuer_id: "did:key:source-ledger".into(),
                 receipt_digest: "d".repeat(64),
             })
@@ -2619,6 +2619,88 @@ mod tests {
         assert_eq!(summary.independently_observed_successes, 0);
         assert_eq!(summary.untrusted_source_count, 1);
         assert!(!summary.all_trusted_predictions_pre_registered);
+    }
+
+    #[test]
+    fn dependency_sidecar_preserves_receipt_lineage_and_unknown_state() {
+        let batch = ingest_batch_as_known(
+            &[raw()],
+            query(180, 250),
+            &TestVerifier::default(),
+        )
+        .expect("valid unknown-lineage event should remain ingestible");
+        let pack = build_consolidation_evidence_pack(&batch, &[42]).unwrap();
+        let sidecar = pack.dependency_sidecar();
+
+        assert!(sidecar.verify_integrity());
+        assert_eq!(sidecar.as_known(), query(180, 250));
+        assert_eq!(sidecar.records().len(), 1);
+        let record = &sidecar.records()[0];
+        assert_eq!(record.event_id, 42);
+        assert_eq!(record.source_root_digest, fixture_root_digest(700));
+        assert_eq!(
+            record.dependency_lineage_status,
+            DependencyLineageStatusV1::Unknown
+        );
+        assert!(record.derived_from_event_ids.is_empty());
+        assert_eq!(
+            record.lifecycle_status_as_known,
+            SourceLifecycleStatus::Active
+        );
+    }
+
+    #[test]
+    fn dependency_sidecar_preserves_attested_event_ancestry_without_inference() {
+        let verifier = TestVerifier {
+            dependency_event_ids: vec![40, 41],
+            dependency_lineage_status: DependencyLineageStatusV1::Partial,
+            dependency_manifest_digest: Some("9".repeat(64)),
+            ..TestVerifier::default()
+        };
+        let batch = ingest_batch_as_known(&[raw()], query(180, 250), &verifier)
+            .expect("verified partial dependency declaration should be preserved");
+        let pack = build_consolidation_evidence_pack(&batch, &[42]).unwrap();
+        let sidecar = pack.dependency_sidecar();
+
+        assert!(sidecar.verify_integrity());
+        assert_eq!(
+            sidecar.records()[0].derived_from_event_ids,
+            vec![40, 41]
+        );
+        assert_eq!(
+            sidecar.records()[0].dependency_lineage_status,
+            DependencyLineageStatusV1::Partial
+        );
+        assert_eq!(
+            sidecar.records()[0].dependency_manifest_digest.as_deref(),
+            Some("9".repeat(64).as_str())
+        );
+
+        let mut tampered = sidecar.clone();
+        tampered.records[0].derived_from_event_ids.push(99);
+        assert!(!tampered.verify_integrity());
+    }
+
+    #[test]
+    fn dependency_lineage_rejects_self_duplicate_unsorted_and_uncommitted_edges() {
+        for (ids, status, digest) in [
+            (vec![42], DependencyLineageStatusV1::Partial, Some("9".repeat(64))),
+            (vec![41, 40], DependencyLineageStatusV1::Complete, Some("9".repeat(64))),
+            (vec![40, 40], DependencyLineageStatusV1::Partial, Some("9".repeat(64))),
+            (vec![40], DependencyLineageStatusV1::Complete, None),
+            (vec![], DependencyLineageStatusV1::Unknown, Some("9".repeat(64))),
+        ] {
+            let verifier = TestVerifier {
+                dependency_event_ids: ids,
+                dependency_lineage_status: status,
+                dependency_manifest_digest: digest,
+                ..TestVerifier::default()
+            };
+            assert_eq!(
+                ingest_as_known(&raw(), query(180, 250), &verifier).err(),
+                Some(IngestReject::InvalidDependencyLineage)
+            );
+        }
     }
 
     #[test]
