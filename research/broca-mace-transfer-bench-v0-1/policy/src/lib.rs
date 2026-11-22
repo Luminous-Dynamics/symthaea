@@ -1504,3 +1504,71 @@ mod tests {
         assert!(!is_qualified(&item, Query { scope: query_scope }));
     }
 }
+
+
+#[cfg(test)]
+mod decision_need_contract_tests {
+    use super::*;
+
+    fn estimand(population: u8) -> SemanticEstimandV1 {
+        SemanticEstimandV1::new(
+            1,
+            EvidenceDigest256::from_bytes([population; 32]),
+            EvidenceDigest256::from_bytes([2; 32]),
+            EvidenceDigest256::from_bytes([3; 32]),
+            EvidenceDigest256::from_bytes([4; 32]),
+            EvidenceDigest256::from_bytes([5; 32]),
+            30_000,
+            EvidenceDigest256::from_bytes([6; 32]),
+            EvidenceDigest256::from_bytes([7; 32]),
+            EvidenceDigest256::from_bytes([8; 32]),
+        )
+    }
+
+    #[test]
+    fn decision_need_is_candidate_visible_and_canonical() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let first = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        let second = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        assert!(first.is_valid());
+        assert_eq!(first.canonical_digest(), second.canonical_digest());
+        assert_eq!(first.action_alternatives, [Action::A, Action::B]);
+    }
+
+    #[test]
+    fn decision_need_digest_changes_when_task_requirements_change() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let first = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        let population_changed = DecisionNeedV1::new(scope, estimand(9)).unwrap();
+        let objective_changed = DecisionNeedV1::new(
+            Scope { objective: Objective::Cost, ..scope },
+            estimand(1),
+        )
+        .unwrap();
+        assert_ne!(first.canonical_digest(), population_changed.canonical_digest());
+        assert_ne!(first.canonical_digest(), objective_changed.canonical_digest());
+    }
+
+    #[test]
+    fn decision_need_rejects_incomplete_estimand_and_tampered_profile() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        assert!(DecisionNeedV1::new(scope, SemanticEstimandV1::UNKNOWN).is_none());
+
+        let mut need = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        need.qualification_profile_digest = EvidenceDigest256::UNKNOWN;
+        assert!(!need.is_valid());
+        assert_ne!(
+            need.canonical_digest(),
+            DecisionNeedV1::new(scope, estimand(1)).unwrap().canonical_digest()
+        );
+    }
+}
