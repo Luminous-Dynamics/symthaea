@@ -813,7 +813,6 @@ fn run_seed(
     let mut differences = Vec::new();
     let mut interval_metrics = IntervalMetrics::default();
     let mut cases = 0_usize;
-    let mut unknown_abstentions = 0_usize;
 
     let stable_total = CONFORMAL_TEST_CLUSTERS + OOD_STABLE_TEST_CLUSTERS;
     let total_test_clusters = stable_total + SHIFTED_TEST_CLUSTERS;
@@ -852,7 +851,6 @@ fn run_seed(
             .clone()
             .unwrap_or_else(|| additive_selection.clone());
         if pairwise_prediction.is_none() {
-            unknown_abstentions += 1;
             pairwise.pairwise_abstentions += 1;
         }
 
@@ -884,7 +882,6 @@ fn run_seed(
         cases += 1;
     }
 
-    let _ = unknown_abstentions;
     Some((additive, pairwise, differences, cases, interval_metrics))
 }
 
@@ -995,7 +992,7 @@ fn report() {
         average_difference
     );
     if let Some((lower, upper)) = ci {
-        println!("paired_cluster_bootstrap_95pct_ci_micros={:.3},{:.3}", lower, upper);
+        println!("paired_hierarchical_seed_cluster_bootstrap_95pct_ci_micros={:.3},{:.3}", lower, upper);
     }
     println!("pairwise_mean_regret_vs_evaluator_oracle_micros={:.3}", oracle_regret);
     println!(
