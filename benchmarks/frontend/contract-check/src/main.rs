@@ -2095,4 +2095,46 @@ mod tests {
         );
     }
 
+    #[test]
+    fn judge_qualification_plan_matches_schema_and_has_six_unique_arms() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../judge-qualification-v1.schema.json"
+        )).expect("judge qualification schema JSON");
+        let plan: Value = serde_json::from_str(include_str!(
+            "../../judge-qualification-v1.json"
+        )).expect("judge qualification plan JSON");
+        let validator = validator_for(&schema).expect("judge qualification schema compiles");
+        let errors: Vec<String> = validator.iter_errors(&plan)
+            .map(|error| format!("{}: {error}", error.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "judge qualification errors: {errors:?}");
+
+        let arms = plan["evaluator_arms"].as_array().expect("evaluator arms");
+        let ids: BTreeSet<&str> = arms.iter()
+            .filter_map(|arm| arm["id"].as_str())
+            .collect();
+        assert_eq!(arms.len(), 6);
+        assert_eq!(ids, BTreeSet::from(["J0", "J1", "J2", "J3", "J4", "J5"]));
+        assert_eq!(
+            plan["authority_model"]["primary_authority"],
+            "independently verified deterministic contract and security oracles"
+        );
+    }
+
+    #[test]
+    fn comparative_evaluation_protocol_matches_its_schema() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../comparative-evaluation-v1.schema.json"
+        )).expect("comparative evaluation schema JSON");
+        let plan: Value = serde_json::from_str(include_str!(
+            "../../comparative-evaluation-v1.json"
+        )).expect("comparative evaluation plan JSON");
+        let validator = validator_for(&schema).expect("comparative evaluation schema compiles");
+        let errors: Vec<String> = validator.iter_errors(&plan)
+            .map(|error| format!("{}: {error}", error.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "comparative evaluation errors: {errors:?}");
+        assert!(plan["judging"]["interaction_as_a_judge"].is_object());
+    }
+
 }

@@ -370,7 +370,7 @@
       "id": "interaction-as-a-judge",
       "name": "Interaction-as-a-Judge",
       "scope": "Research method using computer-use agents to evaluate generated applications through interactions, alongside human preference and correctness labels.",
-      "task_count": 6579,
+      "task_count": null,
       "snapshot_status": "methodology_only",
       "observations": [
         {
