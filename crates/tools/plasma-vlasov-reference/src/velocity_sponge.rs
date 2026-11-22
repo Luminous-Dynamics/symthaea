@@ -855,12 +855,16 @@ mod tests {
         assert!(report.moment_correction_l2 > 0.0);
         assert!(report.maximum_pointwise_moment_correction > 0.0);
         assert!(report.minimum_distribution_after >= 0.0);
+        assert_eq!(report.negative_value_fraction_after, 0.0);
         assert!(
             report
                 .max_relative_moment_residuals
                 .iter()
-                .all(|value| *value < 1.0e-11)
+                .all(|value| *value <= MOMENT_PROJECTION_RELATIVE_TOLERANCE)
         );
+        assert!(report.high_s_casimir_before > report.high_s_casimir_after);
+        assert!(report.high_s_casimir_removed > 0.0);
+        assert!(report.low_s_casimir_before > 0.0);
         assert!(report.removed_total_casimir > 0.0);
         assert!(
             report.casimir_accounting_residual.abs()
@@ -879,6 +883,48 @@ mod tests {
                 .abs()
                 < 1.0e-10
         );
+    }
+
+    #[test]
+    fn moment_constrained_sponge_is_well_conditioned_on_expanded_velocity_support() {
+        let config = VlasovPoissonConfig {
+            nx: 64,
+            nv: 256,
+            domain_length: 4.0 * std::f64::consts::PI,
+            velocity_min: -60.0,
+            velocity_max: 60.0,
+            charge_to_mass: -1.0,
+            permittivity: 1.0,
+            background_density: 1.0,
+        };
+        let initial = crate::maxwellian_perturbation(config, 1.0e-3, 1, 1.0).unwrap();
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        let report = solver
+            .apply_moment_constrained_velocity_fourier_sponge(0.1, 0.5, 0.25, 2, 0.0)
+            .unwrap();
+        assert!(report.preserves_first_three_moments);
+        assert!(
+            report
+                .max_relative_moment_residuals
+                .iter()
+                .all(|value| *value <= MOMENT_PROJECTION_RELATIVE_TOLERANCE)
+        );
+        assert!(report.casimir_accounting_residual.abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn zero_strength_moment_constrained_sponge_is_exact_identity() {
+        let config = config();
+        let initial = distribution(true);
+        let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
+        let report = solver
+            .apply_moment_constrained_velocity_fourier_sponge(0.0, 0.5, 2.0, 2, 0.0)
+            .unwrap();
+        assert_eq!(solver.distribution(), initial.as_slice());
+        assert!(report.preserves_first_three_moments);
+        assert_eq!(report.moment_correction_l2, 0.0);
+        assert_eq!(report.removed_total_casimir, 0.0);
+        assert_eq!(report.high_s_casimir_removed, 0.0);
     }
 
     #[test]
