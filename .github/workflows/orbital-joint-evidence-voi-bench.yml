@@ -122,10 +122,11 @@ jobs:
             fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
             --source-commit "$GITHUB_SHA" > /tmp/sequential-campaign-b.json
           cmp /tmp/sequential-campaign-a.json /tmp/sequential-campaign-b.json
-          jq '{scenario_count, oracle_matches, oracle_mismatches, scenarios: [.scenarios[] | {scenario_id, baseline_terminal_disposition, adaptive_first_action: .adaptive_campaign.first_action_id, adaptive_worst_case_regret: .adaptive_campaign.worst_case_regret, expected_resources: .adaptive_campaign.expected_resources}]}' /tmp/sequential-campaign-a.json
+          jq '{scenario_count, oracle_matches, oracle_mismatches, scenarios: [.scenarios[] | {scenario_id, search_states_expanded, search_memo_hits, search_memo_entries, policy_tree_nodes, baseline_terminal_disposition, adaptive_first_action: .adaptive_campaign.first_action_id, adaptive_worst_case_regret: .adaptive_campaign.worst_case_regret, expected_resources: .adaptive_campaign.expected_resources}]}' /tmp/sequential-campaign-a.json
           jq -e '
             .scenario_count == 2 and .oracle_matches == 2 and
             .oracle_mismatches == 0 and .authority_granted == false and
+            (.scenarios | all(.search_states_expanded > 0 and .search_memo_entries == .search_states_expanded and .policy_tree_nodes > 0)) and
             .scenarios[0].baseline_terminal_disposition == "HOLD" and
             .scenarios[0].baseline_worst_case_regret == 2 and
             .scenarios[0].myopic.worst_case_regret == 2 and
