@@ -168,11 +168,7 @@ pub fn validate_binary_measurand_semantics_v1(
     Ok(())
 }
 
-fn derive_positive(
-    value: f64,
-    condition: PositiveConditionV1,
-    threshold: f64,
-) -> bool {
+fn derive_positive(value: f64, condition: PositiveConditionV1, threshold: f64) -> bool {
     match condition {
         PositiveConditionV1::GreaterThan => value > threshold,
         PositiveConditionV1::GreaterThanOrEqual => value >= threshold,
@@ -396,7 +392,6 @@ mod tests {
         .unwrap()
         .derived_positive);
     }
-
     #[test]
     fn classification_receipt_binds_value_graph_and_semantics_digest() {
         let input = graph(10.5, "nm", MetrologyLabelStatusV1::Validated);
