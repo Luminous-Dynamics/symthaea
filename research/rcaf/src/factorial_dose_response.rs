@@ -485,12 +485,12 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
         .map(|cell| {
             format!(
                 concat!(
-                    "        {\n",
+                    "        {{\n",
                     "          \"cell_id\": \"{}\",\n",
                     "          \"rms\": {:.12},\n",
                     "          \"max_absolute_value\": {:.12},\n",
                     "          \"fnv1a64_fingerprint\": \"{}\"\n",
-                    "        }"
+                    "        }}"
                 ),
                 cell.cell_id, cell.rms, cell.max_absolute_value, cell.fnv1a64_fingerprint
             )
