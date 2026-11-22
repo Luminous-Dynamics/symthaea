@@ -201,6 +201,10 @@ pub fn verify_events(
     if events.len() < 2 || events.len() > MAX_EVENTS {
         return Err(format!("trace must contain 2..={MAX_EVENTS} events"));
     }
+    let reparsed = parse_jsonl(raw_bundle)?;
+    if reparsed.as_slice() != events {
+        return Err("supplied trace events do not match the exact raw JSONL bundle".to_string());
+    }
     let first_run_id = required_string(&events[0], "run_id", 0)?;
     if let Some(expected) = expected_run_id {
         if first_run_id != expected {
@@ -308,8 +312,10 @@ mod tests {
     fn valid_events() -> Vec<Value> {
         let start = make_event("run-01", 0, 0, "run_started", ZERO_SHA256);
         let start_hash = start["event_sha256"].as_str().unwrap().to_owned();
-        let finish = make_event("run-01", 1, 10, "run_finished", &start_hash);
-        vec![start, finish]
+        let observe = make_event("run-01", 1, 10, "dom_observation", &start_hash);
+        let observe_hash = observe["event_sha256"].as_str().unwrap().to_owned();
+        let finish = make_event("run-01", 2, 20, "run_finished", &observe_hash);
+        vec![start, observe, finish]
     }
 
     fn to_jsonl(events: &[Value]) -> Vec<u8> {
@@ -359,7 +365,7 @@ mod tests {
     fn rejects_truncated_trace_without_terminal_event() {
         let mut events = valid_events();
         events.pop();
-        assert!(verify(&events).unwrap_err().contains("2..="));
+        assert!(verify(&events).unwrap_err().contains("lacks terminal run_finished"));
     }
 
     #[test]
@@ -379,12 +385,41 @@ mod tests {
     #[test]
     fn rejects_elapsed_time_regression() {
         let mut events = valid_events();
-        events[1]["elapsed_ns"] = Value::from(0);
-        let previous = events[0]["event_sha256"].as_str().unwrap().to_owned();
-        events[1]["previous_event_sha256"] = Value::String(previous);
+        events[2]["elapsed_ns"] = Value::from(5);
+        let previous = events[1]["event_sha256"].as_str().unwrap().to_owned();
+        events[2]["previous_event_sha256"] = Value::String(previous);
+        let hash = event_hash(&events[2]).unwrap();
+        events[2]["event_sha256"] = Value::String(hash);
+        assert!(verify(&events).unwrap_err().contains("elapsed_ns regressed"));
+    }
+
+    #[test]
+    fn rejects_event_hash_tampering() {
+        let mut events = valid_events();
+        events[1]["actor"] = Value::String("worker".to_string());
+        assert!(verify(&events).unwrap_err().contains("event_sha256 mismatch"));
+    }
+
+    #[test]
+    fn rejects_previous_hash_discontinuity() {
+        let mut events = valid_events();
+        events[1]["previous_event_sha256"] = Value::String("0".repeat(64));
         let hash = event_hash(&events[1]).unwrap();
         events[1]["event_sha256"] = Value::String(hash);
-        assert!(verify(&events).unwrap_err().contains("elapsed_ns regressed"));
+        assert!(verify(&events).unwrap_err().contains("previous_event_sha256 mismatch"));
+    }
+
+    #[test]
+    fn rejects_trace_values_that_do_not_match_supplied_raw_bytes() {
+        let events = valid_events();
+        let result = verify_events(&events, br#"{"not":"the trace"}"#, None);
+        assert!(result.unwrap_err().contains("supplied trace events do not match"));
+    }
+
+    #[test]
+    fn rejects_integers_outside_the_jcs_safe_range() {
+        let result = parse_strict_json_line(b"9007199254740992", 1);
+        assert!(result.unwrap_err().contains("safe range"));
     }
 
     #[test]
