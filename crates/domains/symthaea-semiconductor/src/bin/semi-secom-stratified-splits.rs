@@ -58,7 +58,7 @@ fn run() -> Result<(), String> {
     {
         return Err("dataset snapshot manifest does not bind the expected source-local chronology".into());
     }
-    validate_split_manifest_v1(&snapshot_manifest)
+    let snapshot_report = validate_split_manifest_v1(&snapshot_manifest)
         .map_err(|error| format!("dataset snapshot manifest rejected input: {error}"))?;
 
     let labels = parse_labels(&label_bytes)
@@ -98,6 +98,7 @@ fn run() -> Result<(), String> {
         schema: "luminous.semi-bench.stratified-repeat-subject.v1".into(),
         dataset_id: expectations.dataset_id,
         dataset_snapshot_sha256: snapshot_manifest.dataset_snapshot_sha256,
+        source_identity_manifest_sha256: snapshot_report.split_manifest_sha256,
         test_fraction: 0.2,
         seeds: vec![42, 43, 44, 45, 46],
         seed_provenance:
