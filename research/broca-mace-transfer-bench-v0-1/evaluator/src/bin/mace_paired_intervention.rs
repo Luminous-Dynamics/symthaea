@@ -76,6 +76,8 @@ struct CandidateRun {
     abstention_reason: Option<String>,
 }
 
+/// Deliberately excludes stress::Truth and all evaluator-only fields. Candidate
+/// adapters receive this projection, never the evaluator's full scenario type.
 #[derive(Clone, Copy, Debug)]
 struct CandidateTask<'a> {
     cluster: u64,
@@ -972,8 +974,23 @@ mod tests {
         for arm in randomized_arm_order(task) {
             let result = execute_arm(arm, task, &tasks);
             let record = candidate_record("test-run", task, arm, &result);
-            assert_eq!(record["candidate_input_sha256"], digest);
-            assert_eq!(record["initial_agent_state_sha256"], initial_state_digest(task));
+            assert_eq!(record["candidate_input_sha256"].as_str(), Some(digest.as_str()));
+            let expected_state = initial_state_digest(task);
+            assert_eq!(record["initial_agent_state_sha256"].as_str(), Some(expected_state.as_str()));
+        }
+    }
+
+    #[test]
+    fn arm_order_is_a_deterministic_permutation_for_each_pair_block() {
+        let cases = stress::generated_worlds(2);
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        for task in &tasks {
+            let first = randomized_arm_order(task);
+            let second = randomized_arm_order(task);
+            assert_eq!(first, second);
+            assert_eq!(first.len(), Arm::ALL.len());
+            let unique: BTreeSet<Arm> = first.into_iter().collect();
+            assert_eq!(unique.len(), Arm::ALL.len());
         }
     }
 
