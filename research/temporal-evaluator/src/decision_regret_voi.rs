@@ -310,11 +310,10 @@ fn validate_likelihoods(
     Ok(by_world)
 }
 
-fn expected_regret_numerator(
+fn baseline_expected_regret_numerator(
     class: &ObservationalEquivalenceClass,
     priors: &BTreeMap<u64, u32>,
-    likelihoods: &BTreeMap<u64, BTreeMap<CandidateVisibleOutcome, u32>>,
-) -> Result<(u128, BTreeMap<CandidateVisibleOutcome, (String, u128, u64)>), DecisionRegretVoiError> {
+) -> Result<u128, DecisionRegretVoiError> {
     let first = class
         .alternatives
         .first()
@@ -324,14 +323,8 @@ fn expected_regret_numerator(
         .iter()
         .map(|item| item.action_id.clone())
         .collect();
-
-    let mut before_by_action: BTreeMap<String, u128> =
+    let mut by_action: BTreeMap<String, u128> =
         actions.iter().map(|action| (action.clone(), 0)).collect();
-    let mut after_by_outcome: BTreeMap<
-        CandidateVisibleOutcome,
-        BTreeMap<String, u128>,
-    > = BTreeMap::new();
-    let mut mass_by_outcome: BTreeMap<CandidateVisibleOutcome, u128> = BTreeMap::new();
 
     for world in &class.alternatives {
         let prior = u128::from(
@@ -340,10 +333,6 @@ fn expected_regret_numerator(
                 .ok_or(DecisionRegretVoiError::PriorWorldSetMismatch)?,
         );
         let regrets = action_regrets(world)?;
-        let world_likelihoods = likelihoods
-            .get(&world.evaluator_world_id)
-            .ok_or(DecisionRegretVoiError::PriorWorldSetMismatch)?;
-
         for action in &actions {
             let regret = u128::from(
                 *regrets
@@ -351,66 +340,19 @@ fn expected_regret_numerator(
                     .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?,
             );
             let contribution = checked_mul(prior, regret)?;
-            let current = before_by_action.get(action).copied().unwrap_or(0);
-            before_by_action.insert(action.clone(), checked_add(current, contribution)?);
-        }
-
-        for (outcome, likelihood_ppm) in world_likelihoods {
-            if *likelihood_ppm == 0 {
-                continue;
-            }
-            let joint_mass = checked_mul(prior, u128::from(*likelihood_ppm))?;
-            let mass = mass_by_outcome.get(outcome).copied().unwrap_or(0);
-            mass_by_outcome.insert(outcome.clone(), checked_add(mass, joint_mass)?);
-
-            let outcome_actions = after_by_outcome.entry(outcome.clone()).or_insert_with(|| {
-                actions.iter().map(|action| (action.clone(), 0)).collect()
-            });
-            for action in &actions {
-                let regret = u128::from(
-                    *regrets
-                        .get(action)
-                        .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?,
-                );
-                let contribution = checked_mul(joint_mass, regret)?;
-                let current = outcome_actions.get(action).copied().unwrap_or(0);
-                outcome_actions.insert(action.clone(), checked_add(current, contribution)?);
-            }
+            let current = by_action.get(action).copied().unwrap_or(0);
+            by_action.insert(action.clone(), checked_add(current, contribution)?);
         }
     }
 
-    let best_before = before_by_action
+    let best_before = by_action
         .values()
         .copied()
         .min()
         .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
     // Convert the prior-weighted PPM numerator (denominator 1e6) to the common
     // prior-times-likelihood denominator (1e12).
-    let baseline_common_numerator = checked_mul(best_before, PPM_U128)?;
-
-    let mut after_numerator = 0_u128;
-    let mut per_outcome = BTreeMap::new();
-    for (outcome, action_sums) in after_by_outcome {
-        let (best_action, best_sum) = action_sums
-            .iter()
-            .min_by(|left, right| left.1.cmp(right.1).then_with(|| left.0.cmp(right.0)))
-            .map(|(action, sum)| (action.clone(), *sum))
-            .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-        after_numerator = checked_add(after_numerator, best_sum)?;
-        let mass = mass_by_outcome.get(&outcome).copied().unwrap_or(0);
-        let world_count = likelihoods
-            .values()
-            .filter(|world_outcomes| {
-                world_outcomes.get(&outcome).copied().unwrap_or(0) > 0
-            })
-            .count() as u64;
-        per_outcome.insert(outcome, (best_action, best_sum, world_count));
-        if mass == 0 {
-            return Err(DecisionRegretVoiError::ArithmeticOverflow);
-        }
-    }
-
-    Ok((baseline_common_numerator, per_outcome))
+    checked_mul(best_before, PPM_U128)
 }
 
 fn bayes_action_for_outcome(
@@ -430,7 +372,6 @@ fn bayes_action_for_outcome(
         .collect();
     let mut action_sums: BTreeMap<String, u128> =
         actions.iter().map(|action| (action.clone(), 0)).collect();
-    let mut mass = 0_u128;
     let mut possible_world_count = 0_u64;
 
     for world in &class.alternatives {
@@ -453,7 +394,6 @@ fn bayes_action_for_outcome(
             ),
             u128::from(likelihood),
         )?;
-        mass = checked_add(mass, joint_mass)?;
         let regrets = action_regrets(world)?;
         for action in &actions {
             let regret = u128::from(
@@ -477,7 +417,6 @@ fn bayes_action_for_outcome(
 
 fn robust_outcome_certificate(
     class: &ObservationalEquivalenceClass,
-    outcome: CandidateVisibleOutcome,
     possible_worlds: &BTreeSet<u64>,
 ) -> Result<(String, u32), DecisionRegretVoiError> {
     let reduced = ObservationalEquivalenceClass {
@@ -490,7 +429,6 @@ fn robust_outcome_certificate(
             .collect(),
     };
     let certificate = evaluate_decision_observability(&reduced)?;
-    let _ = outcome;
     Ok((
         certificate.minimax_regret_action_id,
         certificate.unavoidable_worst_case_regret_ppm,
@@ -517,8 +455,8 @@ pub fn evaluate_decision_regret_observation(
     let priors = validate_priors(class, &model.world_priors)?;
     let likelihoods = validate_likelihoods(class, model)?;
 
-    let (baseline_expected_numerator, expected_by_outcome) =
-        expected_regret_numerator(class, &priors, &likelihoods)?;
+    let baseline_common_numerator =
+        baseline_expected_regret_numerator(class, &priors)?;
     let mut after_expected_numerator = 0_u128;
 
     let mut worlds_by_outcome: BTreeMap<CandidateVisibleOutcome, BTreeSet<u64>> =
@@ -548,7 +486,7 @@ pub fn evaluate_decision_regret_observation(
     let mut outcome_certificates = Vec::with_capacity(worlds_by_outcome.len());
     for (outcome, possible_worlds) in worlds_by_outcome {
         let (minimax_action, worst_case_regret) =
-            robust_outcome_certificate(class, outcome, &possible_worlds)?;
+            robust_outcome_certificate(class, &possible_worlds)?;
         post_worst_case_regret = post_worst_case_regret.max(worst_case_regret);
 
         let (bayes_action, expected_numerator, expected_world_count) =
@@ -575,13 +513,6 @@ pub fn evaluate_decision_regret_observation(
         });
     }
 
-    let baseline_common_numerator =
-        checked_mul(baseline_expected_numerator, PPM_U128)?;
-    let (expected_numerator_from_helper, _) =
-        expected_regret_numerator(class, &priors, &likelihoods)?;
-    if expected_numerator_from_helper != baseline_common_numerator {
-        return Err(DecisionRegretVoiError::ArithmeticOverflow);
-    }
     if after_expected_numerator > baseline_common_numerator {
         return Err(DecisionRegretVoiError::ExpectedRegretIncreased);
     }
@@ -613,9 +544,7 @@ pub fn evaluate_decision_regret_observation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decision_observability::{
-        CandidateViewIdentity, CounterfactualWorld, ActionLoss,
-    };
+    use crate::decision_observability::{CandidateViewIdentity, CounterfactualWorld};
 
     fn digest(byte: u8) -> [u8; 32] {
         [byte; 32]
