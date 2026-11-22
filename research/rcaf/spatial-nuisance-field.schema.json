@@ -28,7 +28,9 @@
         "source",
         "interpretation_scope",
         "roi_count",
-        "edge_count"
+        "edge_count",
+        "roi_labels",
+        "weighted_edges"
       ],
       "properties": {
         "representation": {
@@ -45,6 +47,28 @@
         },
         "edge_count": {
           "const": 7
+        },
+        "roi_labels": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "weighted_edges": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "string" },
+              { "type": "string" },
+              { "type": "number", "exclusiveMinimum": 0 }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          }
         }
       }
     },
@@ -61,9 +85,13 @@
         "required": [
           "family_id",
           "spatial_rank",
+          "diffusion_time",
+          "seed_roi_indices",
           "dose",
           "temporal_ar1",
           "temporal_coherence",
+          "rng_seed",
+          "rng_algorithm",
           "realized_field_rms",
           "realized_temporal_ar1"
         ],
@@ -78,6 +106,16 @@
             "type": "integer",
             "minimum": 1
           },
+          "diffusion_time": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "seed_roi_indices": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 0, "maximum": 7 } }
+            ]
+          },
           "dose": {
             "type": "number",
             "minimum": 0
@@ -89,6 +127,13 @@
           },
           "temporal_coherence": {
             "const": 0
+          },
+          "rng_seed": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{16}$"
+          },
+          "rng_algorithm": {
+            "const": "xorshift64-boxmuller-v1"
           },
           "realized_field_rms": {
             "type": "number",
