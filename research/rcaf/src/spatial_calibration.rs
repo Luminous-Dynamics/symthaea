@@ -76,7 +76,7 @@ impl std::error::Error for SpatialVarianceCalibrationError {}
 /// For each ROI, the clean signal and nuisance series are centred separately; their temporal
 /// population variances/covariance are pooled equally across ROIs. The requested fraction is
 ///
-///     Var(A) / (Var(X) + Var(A))
+/// `Var(A) / (Var(X) + Var(A))`
 ///
 /// and deliberately excludes the covariance term. The report also records Cov(X,A) and the
 /// actual variance of X+A. Temporal coupling therefore cannot be hidden inside a nominal dose.
