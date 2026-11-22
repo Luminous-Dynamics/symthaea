@@ -594,3 +594,12 @@ New follow-up [SEMI-PARETO-001 #13149](https://github.com/Luminous-Dynamics/symt
 - GNN, FAD-Net, Symthaea HDC, deterministic geometry and frozen-LMM references.
 
 All are paper-reported and not directly rankable until source identity, labels, split, resolution, hardware and metric definitions are matched. The target is a Pareto advantage across worst-class recall, unknown rejection, p95 latency, memory, artifact bytes and measured energy—not an accuracy trophy.
+
+
+## 2026 DTCO, CFET and UCIe 4.0 frontier
+
+See [2026-dtco-ucie40-frontier.md](2026-dtco-ucie40-frontier.md). This update adds [SEMI-DTCO-001 #13172](https://github.com/Luminous-Dynamics/symthaea/issues/13172), connecting device/compact-model assumptions, SPICE, routed PPA and package/chiplet constraints.
+
+2026 imec CFET research reports important coupled device/layout results (backside-contact resistance and survival-yield changes, 5T+1 SRAM area/write tradeoffs, and BEOL routability). UCIe 4.0 was released on 12 November 2026 with on-package memory and system-level trusted-state/link-health features. The normative specification is available by request; public-release headline metrics are not standards compliance.
+
+NIST's current 2026 physics-backed overlay/CD metrology programme and NVIDIA/TSMC's May 2026 fab-AI announcement have been added as current comparison anchors. Vendor/consortium figures are explicitly labelled as reported results, not independently verified Luminous benchmarks.
