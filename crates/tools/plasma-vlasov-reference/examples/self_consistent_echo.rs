@@ -10,7 +10,7 @@ const FIRST_MODE: usize = 1;
 const SECOND_MODE: usize = 2;
 const FIRST_TIME: f64 = 0.0;
 const SECOND_TIME: f64 = 2.0;
-const FINAL_TIME: f64 = 5.0;
+const FINAL_TIME: f64 = 8.0;
 const INITIAL_AMPLITUDE: f64 = 1.0e-3;
 const THERMAL_SPEED: f64 = 1.0;
 const IMPULSE_AMPLITUDE: f64 = 5.0e-2;
@@ -52,8 +52,8 @@ fn run_resolution(
         return Err("pulse/final times must be represented exactly by the step grid".into());
     }
 
-    let echo_window_start = prediction.echo_time - 1.0;
-    let echo_window_end = prediction.echo_time + 1.0;
+    let echo_window_start = prediction.echo_time - 1.5;
+    let echo_window_end = prediction.echo_time + 3.5;
     let mut echo_trace = Vec::new();
 
     for step in 0..=total_steps {
@@ -175,8 +175,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         background_density: 1.0,
     };
 
-    // This is a two-level convergence probe, not by itself a convergence proof.
-    run_resolution("coarse", common(64, 256), 0.01, 4)?;
-    run_resolution("fine", common(128, 512), 0.005, 8)?;
+    // One-factor-at-a-time refinements isolate spatial grid, velocity grid and
+    // timestep effects. The combined fine case checks their interaction.
+    // All configurations emit at the same 0.02 physical-time cadence.
+    run_resolution("base", common(64, 256), 0.01, 2)?;
+    run_resolution("x_refined", common(128, 256), 0.01, 2)?;
+    run_resolution("v_refined", common(64, 512), 0.01, 2)?;
+    run_resolution("dt_refined", common(64, 256), 0.005, 4)?;
+    run_resolution("joint_refined", common(128, 512), 0.005, 4)?;
     Ok(())
 }
