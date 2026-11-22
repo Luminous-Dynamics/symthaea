@@ -743,9 +743,12 @@
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json",
       "test_count": 8,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403",
       "total_rust_unit_tests": 32,
-      "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy"
+      "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-dtco-lineage.rs",
+      "cli_report_byte_for_byte": true,
+      "rust_tests": 32
     }
   },
   "reproducibility_artifacts": [
