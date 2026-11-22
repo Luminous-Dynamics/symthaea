@@ -318,12 +318,22 @@ independent oracles and browser runs exist.
 
 The first Leptos implementation also received 17 stable `data-sfeb-id` anchors,
 semantic live/status/alert regions, responsive adjustments, visible focus and
-reduced-motion behavior. Its telemetry indicator now waits for the actual
-gloo-net 0.5 `WebSocket::state() == State::Open` state, has a bounded 10-second
-handshake wait and retries sequentially with capped backoff. The backoff is
-deterministic (1, 2, 4, 8, 16, then 30 seconds), making it testable. The current
-gateway URL is picked up on the next retry; an already-live connection is not
-forcibly replaced.
+reduced-motion behavior. The telemetry lifecycle is presented as four distinct
+states—disconnected, connecting, connected and reconnecting—with a polite live
+status label. The connected state is entered only after the actual gloo-net 0.5
+`WebSocket::state() == State::Open` state, has a bounded 10-second handshake
+wait and retries sequentially with capped backoff. The backoff is deterministic
+(1, 2, 4, 8, 16, then 30 seconds); a connection stable for at least 60 seconds
+clears accumulated failure backoff. The current gateway URL is picked up on
+the next retry; an already-live connection is not forcibly replaced.
+
+The evidence capture now uses a dedicated viewport-only screenshot operation
+rather than the existing full-page screenshot action. PNG IHDR dimensions are
+checked against the recorded CSS viewport multiplied by
+`window.devicePixelRatio`, and the compressed artifact is bounded to 32 MiB
+with a maximum 4096-pixel dimension. This prevents a full-page image or
+unexpected device-scale capture from being mislabeled as a fixed-viewport
+visual sample.
 
 ### Leptos 0.8 knowledge and provenance
 
