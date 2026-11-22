@@ -259,7 +259,7 @@ impl FrontendEvidenceReceipt {
 }
 
 /// Receipt plus the exact bytes to be persisted by the benchmark runner.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FrontendEvidenceBundle {
     pub receipt: FrontendEvidenceReceipt,
     pub screenshot_png: Vec<u8>,
