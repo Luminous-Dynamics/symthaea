@@ -22,7 +22,8 @@ use crate::mycelial_junction_graph::{
 use crate::mycelial_model::SpatialPoint3;
 
 pub const MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION: u16 = 1;
-pub const MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION: u16 = 1;
+pub const MYCELIAL_FAILURE_ATTACK_PLAN_SCHEMA_VERSION: u16 = 2;
+pub const MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION: u16 = 2;
 pub const MAX_FAILURE_JUNCTIONS: usize = 256;
 pub const MAX_FAILURE_SEGMENTS: usize = 512;
 pub const MAX_FAILURE_DEMAND_PAIRS: usize = 256;
@@ -951,9 +952,10 @@ fn unweighted_static_betweenness(indexed: &IndexedGraph) -> Vec<f64> {
         adjacency[source].push(target);
         adjacency[target].push(source);
     }
+    // Preserve parallel hypha-segment multiplicity: edge-distinct shortest
+    // paths count as separate geodesics in the multigraph Brandes measure.
     for neighbours in &mut adjacency {
         neighbours.sort_unstable();
-        neighbours.dedup();
     }
 
     let mut centrality = vec![0.0f64; node_count];
@@ -1966,7 +1968,7 @@ impl MycelialFailureDeliveryProfile {
     ) -> Result<String, MycelialFailureResilienceError> {
         self.validate()?;
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea-mycelial-failure-delivery-profile-v1");
+        hasher.update(b"symthaea-mycelial-failure-delivery-profile-v2");
         hasher.update(&self.schema_version.to_le_bytes());
         hasher.update(self.source_graph_digest.as_bytes());
         hasher.update(self.demand_digest.as_bytes());
