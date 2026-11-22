@@ -16,7 +16,6 @@ use crate::benchmark::binary_metrics::{
 };
 
 pub const MODEL_SCHEMA_V1: &str = "luminous.semi-bench.random-forest-model.v1";
-pub const TRAINING_SCHEMA_V1: &str = "luminous.semi-bench.random-forest-training.v1";
 pub const PREDICTION_SCHEMA_V1: &str = "luminous.semi-bench.random-forest-predictions.v1";
 const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
 const EPSILON: f64 = 1.0e-12;
@@ -276,14 +275,6 @@ struct TreeBuilder<'a> {
 }
 
 impl TreeBuilder<'_> {
-    fn class_weight(&self, positive: bool) -> f64 {
-        if positive {
-            self.positive_weight
-        } else {
-            self.negative_weight
-        }
-    }
-
     fn leaf_node(&self, row_indices: &[usize]) -> ForestNodeV1 {
         let positive_count = row_indices
             .iter()
@@ -771,6 +762,28 @@ mod tests {
             features: vec![1.0],
         }];
         assert!(predict_random_forest_v1(&model, &invalid).is_err());
+    }
+
+    #[test]
+    fn forest_scores_reuse_the_independent_binary_metric_contract() {
+        let training = samples();
+        let model = fit_random_forest_v1(&training, &parameters()).unwrap();
+        let inputs: Vec<_> = training
+            .iter()
+            .map(|row| RandomForestInputSampleV1 {
+                sample_id: row.sample_id.clone(),
+                positive: row.positive,
+                features: row.features.clone(),
+            })
+            .collect();
+        let predictions = predict_random_forest_v1(&model, &inputs).unwrap();
+        let metrics = score_random_forest_predictions_v1(&predictions, 0.5, 10).unwrap();
+        assert_eq!(metrics.sample_count, 80);
+        assert_eq!(metrics.class_counts.positive, 20);
+        assert_eq!(metrics.class_counts.negative, 60);
+        assert!((0.0..=1.0).contains(&metrics.ranking_metrics.average_precision));
+        assert!((0.0..=1.0).contains(&metrics.ranking_metrics.auroc));
+        assert!((0.0..=1.0).contains(&metrics.probability_metrics.brier_score));
     }
 
     #[test]
