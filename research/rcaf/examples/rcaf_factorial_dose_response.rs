@@ -36,9 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let target_signal = (0..time_points)
         .map(|time| {
             (0..roi_count)
-                .map(|roi| {
-                    0.06 * ((time as f64 + 2.0) * (roi as f64 + 1.0) * 0.043).sin()
-                })
+                .map(|roi| 0.06 * ((time as f64 + 2.0) * (roi as f64 + 1.0) * 0.043).sin())
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
@@ -83,12 +81,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         signal_scales: vec![0.0, 0.5, 1.0, 2.0],
         nuisance_component_variance_fractions: vec![0.0, 0.05, 0.10, 0.20],
     };
-    let report = run_factorial_dose_response_sweep(
-        &clean,
-        &target_signal,
-        &nuisance.values,
-        &config,
-    )?;
+    let report =
+        run_factorial_dose_response_sweep(&clean, &target_signal, &nuisance.values, &config)?;
     if report.points.len() != 16 {
         return Err("factorial sweep did not generate the expected 4 x 4 grid".into());
     }
