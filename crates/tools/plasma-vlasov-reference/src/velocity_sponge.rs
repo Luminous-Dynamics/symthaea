@@ -26,7 +26,10 @@ pub enum VelocityFourierSpongeError {
         relative_residual: f64,
         tolerance: f64,
     },
-    PositivityFloorViolation { minimum: f64, floor: f64 },
+    PositivityFloorViolation {
+        minimum: f64,
+        floor: f64,
+    },
     Solver(SolverError),
 }
 
@@ -518,11 +521,7 @@ impl VlasovPoisson1d1v {
             // this is algebraically equivalent to {1,v,v^2}.
             let mut target_scaled_moments = [0.0; 3];
             let mut filtered_scaled_moments = [0.0; 3];
-            for (iv, (target, filtered)) in target_row
-                .iter()
-                .zip(candidate_row.iter())
-                .enumerate()
-            {
+            for (iv, (target, filtered)) in target_row.iter().zip(candidate_row.iter()).enumerate() {
                 let u = config.velocity(iv) / velocity_scale;
                 let weight = config.dv();
                 target_scaled_moments[0] += target * weight;
@@ -644,8 +643,7 @@ impl VlasovPoisson1d1v {
                 );
                 spectral_removed_casimir += (before_power - after_power) * spectral_weight;
                 let normalized_mode =
-                    signed_mode(mode, config.nv).unsigned_abs() as f64
-                        / nyquist_mode as f64;
+                    signed_mode(mode, config.nv).unsigned_abs() as f64 / nyquist_mode as f64;
                 if normalized_mode > report.start_fraction_of_nyquist {
                     high_s_casimir_before += before_power * spectral_weight;
                     high_s_casimir_after += after_power * spectral_weight;
@@ -698,8 +696,7 @@ impl VlasovPoisson1d1v {
         report.max_absolute_moment_residuals = max_absolute_moment_residuals;
         report.max_relative_moment_residuals = max_relative_moment_residuals;
         report.minimum_distribution_after = minimum_distribution_after;
-        report.negative_value_fraction_before =
-            negative_value_fraction(&original_distribution);
+        report.negative_value_fraction_before = negative_value_fraction(&original_distribution);
         report.negative_value_fraction_after =
             negative_value_fraction(&candidate_solver.distribution);
         report.high_s_casimir_before = high_s_casimir_before;
