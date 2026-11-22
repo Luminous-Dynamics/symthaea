@@ -158,7 +158,7 @@ jobs:
             (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"] and
             .scenarios[1].adaptive_campaign.policy.branches.CLEAR.action_id == "A-COMBINED-LOAD-SCREEN" and
             .scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.decision == "ACCEPT" and
-            (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"]
+            (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"] and
             .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
             .scenarios[2].baseline_terminal_disposition == "HOLD" and
             .scenarios[2].baseline_worst_case_regret == 2 and
@@ -197,7 +197,7 @@ jobs:
             .scenarios[1].adaptive_first_action == "B-THERMAL-INSPECTION" and
             .scenarios[1].adaptive_worst_case_regret == 0 and
             ((.scenarios[1].adaptive_expected_resources.engineering_hours - 1.15) | fabs) < 0.000000001 and
-            ((.scenarios[1].adaptive_expected_resources.facility_hours - 1.65) | fabs) < 0.000000001
+            ((.scenarios[1].adaptive_expected_resources.facility_hours - 1.65) | fabs) < 0.000000001 and
             .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
             .scenarios[2].baseline_terminal_disposition == "HOLD" and
             .scenarios[2].myopic_worst_case_regret == 2 and
