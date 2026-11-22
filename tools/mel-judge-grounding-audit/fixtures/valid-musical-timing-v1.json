@@ -68,9 +68,9 @@
       "beat_index": 5,
       "subdivision_index": 1,
       "subdivision_count": 2,
-      "outcome": "missed",
-      "observed_onset_ns": null,
-      "capture_receipt_sha256": null
+      "outcome": "observed",
+      "observed_onset_ns": 2620000000,
+      "capture_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     }
   ],
   "tempo_estimates": [
@@ -165,14 +165,7 @@
       "evidence_window_end_ns": 2400000000
     }
   ],
-  "extra_onsets": [
-    {
-      "event_id": "extra-hihat-1",
-      "instrument_id": "hi_hat",
-      "observed_onset_ns": 2250000000,
-      "capture_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
-    }
-  ],
+  "extra_onsets": [],
   "claim_ceiling": [
     "synthetic conformance fixture only; timestamps, onset events and receipt digests are invented",
     "no music model, musician, MIDI device or audio loopback was measured",
