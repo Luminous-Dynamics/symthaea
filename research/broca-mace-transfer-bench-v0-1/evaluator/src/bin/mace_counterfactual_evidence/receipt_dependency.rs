@@ -31,6 +31,7 @@ pub(crate) struct ReceiptDependencyProjection {
     incomplete_event_ids: BTreeSet<u32>,
     unresolved_parent_reference_count: usize,
     sidecar_sha256: String,
+    ingress_receipts_verified: bool,
 }
 
 impl ReceiptDependencyProjection {
@@ -61,6 +62,7 @@ impl ReceiptDependencyProjection {
             event_ids.iter().map(|id| (*id, BTreeSet::new())).collect();
         let mut indegree: BTreeMap<u32, usize> =
             event_ids.iter().map(|id| (*id, 0_usize)).collect();
+        let ingress_receipts_verified = sidecar.has_verified_ingress_provenance();
         let mut incomplete_event_ids = BTreeSet::new();
         let mut unresolved_parent_reference_count = 0_usize;
 
@@ -76,7 +78,12 @@ impl ReceiptDependencyProjection {
                 return Err(SidecarIndexError::EvidenceBindingMismatch(record.event_id));
             }
 
-            if record.dependency_lineage_status != DependencyLineageStatusV1::Complete {
+            if record.dependency_lineage_status != DependencyLineageStatusV1::Complete
+                || !ingress_receipts_verified
+            {
+                // A self-consistent JSON digest does not authenticate a receipt
+                // issuer. Keep dependency edges for diagnostic knockouts, but
+                // never qualify deserialized sidecars as complete lineage.
                 incomplete_event_ids.insert(record.event_id);
             }
 
@@ -139,6 +146,7 @@ impl ReceiptDependencyProjection {
             incomplete_event_ids,
             unresolved_parent_reference_count,
             sidecar_sha256: sidecar.canonical_digest().to_owned(),
+            ingress_receipts_verified,
         })
     }
 
@@ -211,5 +219,9 @@ impl ReceiptDependencyProjection {
 
     pub(crate) fn sidecar_sha256(&self) -> &str {
         &self.sidecar_sha256
+    }
+
+    pub(crate) fn ingress_receipts_verified(&self) -> bool {
+        self.ingress_receipts_verified
     }
 }
