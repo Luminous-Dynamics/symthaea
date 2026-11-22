@@ -4,6 +4,10 @@
 //! the sweep. Signal scales and nuisance component-variance fractions are varied without redrawing
 //! either matrix. This is a common-random-numbers construction that isolates declared dose changes.
 
+use crate::estimator_response::{
+    evaluate_factorial_estimator_response, ConnectivityDirectionReport, EstimatorResponseError,
+    EstimatorResponseSummary,
+};
 use crate::factorial_counterfactual::{
     run_factorial_counterfactual_experiment, FactorialCellSummary, FactorialExperimentError,
     FactorialExperimentMetadata, FactorialInvariantReport,
@@ -38,6 +42,8 @@ pub struct FactorialDoseResponsePoint {
     pub combined_observed_variance: f64,
     pub signal_component_rms: f64,
     pub nuisance_component_rms: f64,
+    pub estimators: Vec<EstimatorResponseSummary>,
+    pub connectivity_direction: ConnectivityDirectionReport,
     pub cells: Vec<FactorialCellSummary>,
     pub invariants: FactorialInvariantReport,
 }
@@ -129,6 +135,7 @@ pub enum FactorialDoseResponseError {
     FactorialInvariantFailure,
     Factorial(FactorialExperimentError),
     Calibration(SpatialVarianceCalibrationError),
+    EstimatorResponse(EstimatorResponseError),
 }
 
 impl fmt::Display for FactorialDoseResponseError {
@@ -167,6 +174,7 @@ impl fmt::Display for FactorialDoseResponseError {
             }
             Self::Factorial(error) => write!(f, "factorial cell construction failed: {error}"),
             Self::Calibration(error) => write!(f, "nuisance calibration failed: {error}"),
+            Self::EstimatorResponse(error) => write!(f, "estimator response failed: {error}"),
         }
     }
 }
@@ -182,6 +190,12 @@ impl From<FactorialExperimentError> for FactorialDoseResponseError {
 impl From<SpatialVarianceCalibrationError> for FactorialDoseResponseError {
     fn from(value: SpatialVarianceCalibrationError) -> Self {
         Self::Calibration(value)
+    }
+}
+
+impl From<EstimatorResponseError> for FactorialDoseResponseError {
+    fn from(value: EstimatorResponseError) -> Self {
+        Self::EstimatorResponse(value)
     }
 }
 
@@ -266,6 +280,7 @@ pub fn run_factorial_dose_response_sweep(
             if !experiment.report.invariants.all_invariants_within_tolerance {
                 return Err(FactorialDoseResponseError::FactorialInvariantFailure);
             }
+            let estimator_response = evaluate_factorial_estimator_response(&experiment)?;
             let calibration = &calibration_reports[fraction_index];
             points.push(FactorialDoseResponsePoint {
                 signal_scale_index: signal_index,
@@ -282,6 +297,8 @@ pub fn run_factorial_dose_response_sweep(
                 combined_observed_variance: experiment.report.combined_observed_variance,
                 signal_component_rms: experiment.report.signal_component_rms,
                 nuisance_component_rms: experiment.report.nuisance_component_rms,
+                estimators: estimator_response.estimators,
+                connectivity_direction: estimator_response.connectivity_direction,
                 cells: experiment.report.cells,
                 invariants: experiment.report.invariants,
             });
