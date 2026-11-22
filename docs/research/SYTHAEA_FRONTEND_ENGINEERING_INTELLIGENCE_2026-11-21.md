@@ -107,6 +107,49 @@ Store patterns as versioned, provenance-carrying knowledge records:
 
 HDC may be useful for associative retrieval across design intent, component role and failure signatures. CfC may be useful for modelling event sequences and temporal interaction patterns. These are experimental retrieval/modeling backends: compare them with sparse keyword search, embeddings and conventional typed indexes on retrieval precision, latency, memory and downstream task success. Do not grant architectural novelty as evidence of performance.
 
+### 2.7 Counterfactual design tournament
+
+Do not force the system to commit to its first plausible layout. For tasks where
+the brief allows multiple valid experiences, ask Symthaea to produce three
+structurally distinct candidates under one shared interface contract:
+
+- a conservative/low-risk design;
+- an information-density-optimized design;
+- a task-flow-optimized design.
+
+Run all candidates through the same independent functional, responsive,
+accessibility and performance gates. Collect blinded human pairwise
+preferences, then maintain a Pareto frontier rather than selecting the
+highest single aggregate. The system should explain which requirements each
+candidate optimizes and what each trade-off costs.
+
+**Research hypothesis:** candidate generation plus independent multi-objective
+selection will improve human preference and requirement satisfaction relative
+to one-shot generation, without increasing accepted-task cost beyond a defined
+budget. Measure preference win rate, Pareto dominance, constraint violations,
+repair cycles and cost per accepted candidate.
+
+### 2.8 Design-intent graph and causal traceability
+
+Treat the interface as a graph with typed edges:
+
+- requirement `requires` semantic region;
+- region `composed_of` component;
+- component `renders` DOM anchor;
+- interaction `transitions` state;
+- state `depends_on` data source;
+- acceptance oracle `observes` rendered or behavioral output.
+
+The graph should support impact analysis: when a requirement changes, find
+affected components, routes, tests and acceptance receipts. When a browser
+observation fails, walk backwards from the violated region or state transition
+to the implementation and its originating requirement.
+
+**Research hypothesis:** an explicit design-intent graph will reduce
+change-impact omissions and shorten defect-localization time on multi-page
+applications. Compare it with ordinary code search and static dependency
+graphs on seeded changes.
+
 ### 2.6 Human-governed engineering
 
 Symthaea may propose, implement and test changes in an isolated branch/worktree. She must not silently deploy, alter production data, change credentials, introduce dependencies, weaken gates, or commit destructive behavior. A user-visible review boundary remains before merge or deployment. Unknown execution outcomes must be reconciled before retrying mutations.
