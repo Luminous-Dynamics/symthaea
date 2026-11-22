@@ -356,7 +356,10 @@ mod tests {
                 < 1.0e-12
         );
         assert!(report.diagnostics_after.minimum_distribution > 0.0);
-        assert_eq!(report.diagnostics_after.time, report.diagnostics_before.time);
+        assert_eq!(
+            report.diagnostics_after.time,
+            report.diagnostics_before.time
+        );
         assert_eq!(solver.time(), time_before);
         assert!((report.nyquist_attenuation - (-1.0_f64).exp()).abs() < 1.0e-14);
         assert!(report.removed_total_casimir > 0.0);
