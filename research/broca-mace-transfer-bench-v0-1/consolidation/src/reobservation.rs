@@ -1263,6 +1263,47 @@ mod tests {
     }
 
     #[test]
+    fn sub_micro_failure_risk_cannot_flip_stable_fact_to_locator() {
+        let mut item = proposal(
+            MemoryObjectKindV1::StableFact,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("fractional-risk-source"),
+            },
+            None,
+        );
+        item.availability_success_probability_bps = 9_999;
+        item.reobservation_failure_penalty_micros = 1;
+        item.reobservation_latency_ms = 0;
+        item.reobservation_cost_micros = 0;
+        item.snapshot_context_tokens = 3;
+        let profile = verified(item);
+
+        let mut constrained = policy();
+        constrained.context_cost_per_token_micros = 1;
+        constrained.locator_context_tokens = 1;
+        constrained.latency_cost_per_ms_micros = 0;
+        constrained.maximum_reobservation_cost_micros = 0;
+
+        let plan = plan_memory_representation(
+            &prediction(10_000, 0),
+            &profile,
+            constrained,
+        )
+        .unwrap();
+
+        // Both options have the same conservatively quantized net value:
+        // retain the stable knowledge rather than selecting the locator.
+        assert_eq!(plan.expected_value_micros, 9_000);
+        assert_eq!(plan.net_value_micros, 8_997);
+        assert_eq!(plan.disposition, ReobservationDispositionV1::PersistKnowledge);
+        assert_eq!(
+            plan.reason,
+            ReobservationReasonV1::StableKnowledgeCheaperToRetain
+        );
+    }
+
+    #[test]
     fn low_reobservation_reliability_can_make_a_fresh_snapshot_better() {
         let mut item = proposal(
             MemoryObjectKindV1::CurrentState,
