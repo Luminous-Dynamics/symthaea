@@ -793,8 +793,9 @@
         "synthetic": true
       },
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104",
-      "tested_commit": "66ed78d31b858a383f5eaa90036e7226f8a7cc93",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990125209",
+      "tested_commit": "f284539fe89f7b067814e3167f97b25bcc0e2d1b",
+      "total_rust_unit_tests": 43,
       "claim_ceiling": "candidate scheduling only; no simulation execution, no verified Pareto gain, no design approval"
     }
   },
