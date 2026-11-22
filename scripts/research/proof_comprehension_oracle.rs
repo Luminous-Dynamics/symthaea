@@ -111,6 +111,7 @@ fn or_iff_right_without_hypothesis(a: bool, b: bool) -> bool {
     (a || b) == b
 }
 
+#[cfg(not(test))]
 fn main_report() {
     let counts = evaluate_tseitin_toy();
     println!("source_models={}", counts.source_models);
@@ -153,7 +154,7 @@ mod tests {
         let result = evaluate_tseitin_toy();
         assert!(result.mutated_decision_equivalent);
         assert_eq!(result.mutated_models, 6);
-        assert!(!result.correct_models.eq(&result.mutated_models));
+        assert_ne!(result.correct_models, result.mutated_models);
     }
 
     #[test]
