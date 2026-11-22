@@ -450,8 +450,10 @@ pub fn evaluate_mycelial_reconstruction(
     if ground_truth.length_unit != prediction.length_unit {
         return Err(MycelialReconstructionError::LengthUnitMismatch);
     }
-    if !valid_id(matching_policy_id)
-        || !config.maximum_junction_match_distance.is_finite()
+    if !valid_id(matching_policy_id) {
+        return Err(MycelialReconstructionError::InvalidMatchingPolicy);
+    }
+    if !config.maximum_junction_match_distance.is_finite()
         || !(0.0..=MAX_RECONSTRUCTION_COORDINATE).contains(&config.maximum_junction_match_distance)
         || config.maximum_junction_match_distance == 0.0
         || !config.length_relative_epsilon.is_finite()
