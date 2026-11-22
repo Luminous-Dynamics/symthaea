@@ -199,10 +199,61 @@ mod telemetry_retry_tests {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TelemetryState {
+    Disconnected,
+    Connecting,
+    Connected,
+    Reconnecting,
+}
+
+impl TelemetryState {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Disconnected => "telemetry disconnected",
+            Self::Connecting => "telemetry connecting",
+            Self::Connected => "telemetry connected",
+            Self::Reconnecting => "telemetry reconnecting",
+        }
+    }
+
+    fn dot_class(self) -> &'static str {
+        match self {
+            Self::Disconnected => "dot dot-dark",
+            Self::Connecting => "dot dot-connecting",
+            Self::Connected => "dot dot-live",
+            Self::Reconnecting => "dot dot-retrying",
+        }
+    }
+}
+
+#[cfg(test)]
+mod telemetry_state_tests {
+    use super::TelemetryState;
+
+    #[test]
+    fn telemetry_states_have_distinct_accessible_labels_and_visual_classes() {
+        let states = [
+            TelemetryState::Disconnected,
+            TelemetryState::Connecting,
+            TelemetryState::Connected,
+            TelemetryState::Reconnecting,
+        ];
+        let labels: std::collections::BTreeSet<_> =
+            states.iter().map(|state| state.label()).collect();
+        let classes: std::collections::BTreeSet<_> =
+            states.iter().map(|state| state.dot_class()).collect();
+
+        assert_eq!(labels.len(), states.len());
+        assert_eq!(classes.len(), states.len());
+        assert_eq!(TelemetryState::Connected.label(), "telemetry connected");
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let gateway = RwSignal::new(DEFAULT_GATEWAY.to_string());
-    let ws_connected = RwSignal::new(false);
+    let telemetry_state = RwSignal::new(TelemetryState::Disconnected);
     let vitals = RwSignal::new(Vitals::default());
     let telemetry_count = RwSignal::new(0_u64);
 
@@ -225,7 +276,7 @@ pub fn App() -> impl IntoView {
     // capped exponential backoff; a connection stable for at least one minute
     // resets the backoff. Gateway changes are picked up on the next attempt.
     Effect::new(move |_| {
-        ws_connected.set(false);
+        telemetry_state.set(TelemetryState::Disconnected);
         spawn_local(async move {
             let retry_attempt = std::rc::Rc::new(std::cell::Cell::new(0_u32));
             let connected_since =
@@ -262,11 +313,12 @@ pub fn App() -> impl IntoView {
                 )
                 .await;
 
-                ws_connected.set(false);
+                telemetry_state.set(TelemetryState::Reconnecting);
                 let attempt = retry_attempt.get();
                 let delay_ms = telemetry_retry_delay_ms(attempt);
                 retry_attempt.set(attempt.saturating_add(1));
                 gloo_timers::future::TimeoutFuture::new(delay_ms).await;
+                telemetry_state.set(TelemetryState::Connecting);
             }
         });
     });
@@ -380,9 +432,19 @@ pub fn App() -> impl IntoView {
                         prop:value=move || gateway.get()
                         on:change=move |ev| gateway.set(event_target_value(&ev))
                     />
-                    <span class=move || if ws_connected.get() { "dot dot-live" } else { "dot dot-dark" }
-                        title=move || if ws_connected.get() { "telemetry connected" } else { "telemetry disconnected" }
+                    <span
+                        class=move || telemetry_state.get().dot_class()
+                        title=move || telemetry_state.get().label()
+                        aria-hidden="true"
                     ></span>
+                    <span
+                        class="telemetry-state"
+                        role="status"
+                        aria-live="polite"
+                        data-sfeb-id="gateway.telemetry-state"
+                    >
+                        {move || telemetry_state.get().label()}
+                    </span>
                 </div>
                 <div class="daemon-status" role="status" aria-live="polite" data-sfeb-id="gateway.status">
                     {move || match daemon_status.get() {
