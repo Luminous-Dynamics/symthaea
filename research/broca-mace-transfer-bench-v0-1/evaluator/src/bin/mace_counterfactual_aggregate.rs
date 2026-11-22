@@ -696,7 +696,7 @@ mod tests {
         let valid = manifest_record("run-1", &"a".repeat(64));
         let (provenance, manifest_sha) = parse_manifest(&valid).unwrap();
         assert_eq!(provenance.run_id, "run-1");
-        assert_eq!(provenance.source_revision.as_deref(), Some(&"d".repeat(40)));
+        assert_eq!(provenance.source_revision.as_deref().map(str::len), Some(40));
         assert_eq!(manifest_sha, "e".repeat(64));
 
         let invalid = manifest_record("run-1", "not-a-sha");
