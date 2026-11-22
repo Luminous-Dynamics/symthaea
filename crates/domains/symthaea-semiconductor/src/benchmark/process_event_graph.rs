@@ -942,9 +942,17 @@ mod tests {
         };
         let snapshot = build_information_cutoff_snapshot_v1(&input, &cutoff).unwrap();
         assert!(snapshot.unaligned_event_ids.contains(&"process-17".into()));
-        assert!(snapshot.unaligned_label_ids.contains(&"label-validated".into()));
+        assert!(
+            snapshot
+                .unaligned_label_ids
+                .contains(&"label-validated".into())
+        );
         assert!(!snapshot.available_event_ids.contains(&"process-17".into()));
-        assert!(!snapshot.matured_validated_label_ids.contains(&"label-validated".into()));
+        assert!(
+            !snapshot
+                .matured_validated_label_ids
+                .contains(&"label-validated".into())
+        );
     }
 
     #[test]
