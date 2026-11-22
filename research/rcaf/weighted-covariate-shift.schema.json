@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/weighted-covariate-shift.schema.json",
+  "title": "RCAF weighted continuous covariate-shift calibration",
+  "description": "Synthetic test-point-weighted conformal diagnostics with ESS and test-mass abstention. Estimated ratios are diagnostic only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "calibration_split_id",
+    "evaluation_split_id",
+    "ratio_provenance",
+    "ratio_estimator_id",
+    "ratio_estimation_split_id",
+    "cross_fitted_ratio_estimator",
+    "finite_sample_guarantee_applicable",
+    "validity_status",
+    "alpha",
+    "minimum_direction_cosine",
+    "minimum_effective_sample_size",
+    "source_support_attested",
+    "conditional_score_invariance_attested",
+    "calibration_replicates",
+    "evaluation_replicates",
+    "calibration_replicate_ids_fingerprint",
+    "evaluation_replicate_ids_fingerprint",
+    "diagnostics",
+    "estimators",
+    "abstentions",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": { "const": "rcaf.weighted-covariate-shift/0.1.0" },
+    "source_status": { "const": "synthetic_weighted_covariate_shift_diagnostics" },
+    "calibration_split_id": { "const": "known-ratio-calibration-v1" },
+    "evaluation_split_id": { "const": "known-ratio-evaluation-v1" },
+    "ratio_provenance": { "const": "known_density_ratio" },
+    "ratio_estimator_id": { "type": "null" },
+    "ratio_estimation_split_id": { "type": "null" },
+    "cross_fitted_ratio_estimator": { "type": "null" },
+    "finite_sample_guarantee_applicable": { "const": true },
+    "validity_status": { "const": "known_ratio_under_attested_covariate_shift" },
+    "alpha": { "const": 0.05 },
+    "minimum_direction_cosine": { "const": 0.0 },
+    "minimum_effective_sample_size": { "const": 50.0 },
+    "source_support_attested": { "const": true },
+    "conditional_score_invariance_attested": { "const": true },
+    "calibration_replicates": { "const": 99 },
+    "evaluation_replicates": { "const": 100 },
+    "calibration_replicate_ids_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "evaluation_replicate_ids_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calibration_weight_sum",
+        "calibration_weight_square_sum",
+        "effective_sample_size",
+        "effective_sample_fraction",
+        "chi_square_divergence_proxy",
+        "maximum_normalized_calibration_weight",
+        "maximum_to_mean_weight_ratio",
+        "minimum_test_weight_share",
+        "maximum_test_weight_share"
+      ],
+      "properties": {
+        "calibration_weight_sum": { "type": "number", "exclusiveMinimum": 0 },
+        "calibration_weight_square_sum": { "type": "number", "exclusiveMinimum": 0 },
+        "effective_sample_size": { "type": "number", "minimum": 50, "maximum": 99 },
+        "effective_sample_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "chi_square_divergence_proxy": { "type": "number", "minimum": 0 },
+        "maximum_normalized_calibration_weight": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "maximum_to_mean_weight_ratio": { "type": "number", "minimum": 1 },
+        "minimum_test_weight_share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maximum_test_weight_share": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "estimators": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "estimator_id",
+          "finite_threshold_count",
+          "abstained_evaluation_count",
+          "minimum_finite_threshold",
+          "maximum_finite_threshold",
+          "held_out_false_positive_rate",
+          "signal_detection_rate",
+          "directionally_correct_signal_rate",
+          "wrong_direction_acceptance_rate"
+        ],
+        "properties": {
+          "estimator_id": {
+            "enum": [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error"
+            ]
+          },
+          "finite_threshold_count": { "const": 99 },
+          "abstained_evaluation_count": { "const": 1 },
+          "minimum_finite_threshold": { "type": "number", "minimum": 0 },
+          "maximum_finite_threshold": { "type": "number", "minimum": 0 },
+          "held_out_false_positive_rate": { "$ref": "#/$defs/proportion" },
+          "signal_detection_rate": { "$ref": "#/$defs/proportion" },
+          "directionally_correct_signal_rate": { "$ref": "#/$defs/proportion" },
+          "wrong_direction_acceptance_rate": { "$ref": "#/$defs/proportion" }
+        }
+      }
+    },
+    "abstentions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["replicate_id", "reason", "test_weight_share"],
+        "properties": {
+          "replicate_id": { "const": "eval-099" },
+          "reason": { "const": "test_point_mass_exceeds_alpha" },
+          "test_weight_share": { "type": "number", "minimum": 0.05, "maximum": 1 }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "proportion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successes",
+        "trials",
+        "estimate",
+        "wilson_95_lower",
+        "wilson_95_upper"
+      ],
+      "properties": {
+        "successes": { "type": "integer", "minimum": 0, "maximum": 99 },
+        "trials": { "const": 99 },
+        "estimate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wilson_95_lower": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wilson_95_upper": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

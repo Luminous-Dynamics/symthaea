@@ -15,6 +15,7 @@ pub mod motion_transient;
 pub mod simulation;
 pub mod spatial_calibration;
 pub mod spatial_nuisance;
+pub mod weighted_covariate_shift;
 
 use std::fmt;
 
