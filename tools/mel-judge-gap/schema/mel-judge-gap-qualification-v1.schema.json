@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-judge-gap-qualification-v1.schema.json",
+  "title": "Melothaea Rank-Gap-Aware Judge Qualification v1",
+  "description": "Qualifies a machine preference judge using paired presentation-order swaps and an independent human-derived Bradley-Terry reference.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "assay_id", "frozen_at", "assignment_algorithm",
+    "assignment_seed_commitment_sha256", "assignment_seed_revealed",
+    "judge", "reference", "items", "difficulty_bins", "pairs", "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": { "const": "mel-judge-gap-qualification-v1" },
+    "assay_id": { "type": "string", "minLength": 3, "maxLength": 120 },
+    "frozen_at": { "type": "string", "format": "date-time" },
+    "assignment_algorithm": { "const": "sha256-pair-order-v1" },
+    "assignment_seed_commitment_sha256": { "$ref": "#/$defs/sha256" },
+    "assignment_seed_revealed": { "$ref": "#/$defs/sha256" },
+    "judge": { "$ref": "#/$defs/judge" },
+    "reference": { "$ref": "#/$defs/reference" },
+    "items": {
+      "type": "array", "minItems": 3,
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "difficulty_bins": {
+      "type": "array", "minItems": 1,
+      "items": { "$ref": "#/$defs/difficulty_bin" }
+    },
+    "pairs": {
+      "type": "array", "minItems": 1,
+      "items": { "$ref": "#/$defs/pair" }
+    },
+    "claim_ceiling": {
+      "type": "array", "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "judge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["judge_id", "judge_version", "adapter_sha256", "protocol_sha256"],
+      "properties": {
+        "judge_id": { "type": "string", "minLength": 1 },
+        "judge_version": { "type": "string", "minLength": 1 },
+        "adapter_sha256": { "$ref": "#/$defs/sha256" },
+        "protocol_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "reference": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "reference_id", "source_kind", "cohort_sha256", "estimator_sha256",
+        "minimum_directional_gap", "confidence_z"
+      ],
+      "properties": {
+        "reference_id": { "type": "string", "minLength": 1 },
+        "source_kind": { "const": "human_bradley_terry_mle" },
+        "cohort_sha256": { "$ref": "#/$defs/sha256" },
+        "estimator_sha256": { "$ref": "#/$defs/sha256" },
+        "minimum_directional_gap": { "type": "number", "minimum": 0 },
+        "confidence_z": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "item": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "reference_strength_logit", "standard_error_logit"],
+      "properties": {
+        "item_id": { "type": "string", "minLength": 1 },
+        "reference_strength_logit": { "type": "number" },
+        "standard_error_logit": { "type": "number", "minimum": 0 }
+      }
+    },
+    "difficulty_bin": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "min_gap", "max_gap_exclusive"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "min_gap": { "type": "number", "minimum": 0 },
+        "max_gap_exclusive": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      }
+    },
+    "pair": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pair_id", "item_a_id", "item_b_id", "presentations"],
+      "properties": {
+        "pair_id": { "type": "string", "minLength": 1 },
+        "item_a_id": { "type": "string", "minLength": 1 },
+        "item_b_id": { "type": "string", "minLength": 1 },
+        "presentations": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "items": { "$ref": "#/$defs/presentation" }
+        }
+      }
+    },
+    "presentation": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "presentation_id", "ordinal", "left_item_id", "choice",
+        "prompt_sha256", "response_sha256"
+      ],
+      "properties": {
+        "presentation_id": { "type": "string", "minLength": 1 },
+        "ordinal": { "enum": [1, 2] },
+        "left_item_id": { "type": "string", "minLength": 1 },
+        "choice": { "enum": ["left", "right", "tie", "abstain", "invalid"] },
+        "prompt_sha256": { "$ref": "#/$defs/sha256" },
+        "response_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}
