@@ -209,9 +209,15 @@ impl fmt::Display for GroupwiseCalibrationError {
                 write!(f, "minimum direction cosine must be finite and in [-1, 1]")
             }
             Self::EmptyExpectedStrata => write!(f, "at least one expected stratum is required"),
-            Self::EmptyCalibrationSet => write!(f, "at least one calibration observation is required"),
-            Self::EmptyEvaluationSet => write!(f, "at least one evaluation observation is required"),
-            Self::DuplicateExpectedStratum => write!(f, "expected stratum identifiers must be unique"),
+            Self::EmptyCalibrationSet => {
+                write!(f, "at least one calibration observation is required")
+            }
+            Self::EmptyEvaluationSet => {
+                write!(f, "at least one evaluation observation is required")
+            }
+            Self::DuplicateExpectedStratum => {
+                write!(f, "expected stratum identifiers must be unique")
+            }
             Self::InvalidIdentifier(field) => {
                 write!(f, "{field} must be a non-empty stable ASCII identifier")
             }
@@ -219,19 +225,31 @@ impl fmt::Display for GroupwiseCalibrationError {
                 write!(f, "invalid stratum identifier: {stratum_id}")
             }
             Self::UnexpectedCalibrationStratum { stratum_id } => {
-                write!(f, "calibration observation belongs to undeclared stratum {stratum_id}")
+                write!(
+                    f,
+                    "calibration observation belongs to undeclared stratum {stratum_id}"
+                )
             }
             Self::DuplicateReplicateId(split) => {
                 write!(f, "replicate identifiers must be unique within {split}")
             }
             Self::CalibrationEvaluationOverlap => {
-                write!(f, "calibration and evaluation replicate identifiers must be disjoint")
+                write!(
+                    f,
+                    "calibration and evaluation replicate identifiers must be disjoint"
+                )
             }
             Self::InvalidStatistic { replicate_id } => {
-                write!(f, "replicate {replicate_id} contains a non-finite or negative statistic")
+                write!(
+                    f,
+                    "replicate {replicate_id} contains a non-finite or negative statistic"
+                )
             }
             Self::InvalidDirectionCosine { replicate_id } => {
-                write!(f, "replicate {replicate_id} has a direction cosine outside [-1, 1]")
+                write!(
+                    f,
+                    "replicate {replicate_id} has a direction cosine outside [-1, 1]"
+                )
             }
         }
     }
@@ -266,17 +284,20 @@ pub fn calibrate_groupwise_null(
     let mut calibration_by_stratum = BTreeMap::<String, Vec<&NullCalibrationObservation>>::new();
     for item in calibration {
         validate_id(&item.observation.replicate_id, "calibration")?;
-        validate_id(&item.stratum_id, "stratum")
-            .map_err(|_| GroupwiseCalibrationError::InvalidStratumIdentifier {
+        validate_id(&item.stratum_id, "stratum").map_err(|_| {
+            GroupwiseCalibrationError::InvalidStratumIdentifier {
                 stratum_id: item.stratum_id.clone(),
-            })?;
+            }
+        })?;
         if !expected_set.contains(item.stratum_id.as_str()) {
             return Err(GroupwiseCalibrationError::UnexpectedCalibrationStratum {
                 stratum_id: item.stratum_id.clone(),
             });
         }
         if !calibration_ids.insert(item.observation.replicate_id.as_str()) {
-            return Err(GroupwiseCalibrationError::DuplicateReplicateId("calibration"));
+            return Err(GroupwiseCalibrationError::DuplicateReplicateId(
+                "calibration",
+            ));
         }
         if item
             .observation
@@ -295,16 +316,18 @@ pub fn calibrate_groupwise_null(
     }
 
     let mut evaluation_ids = HashSet::with_capacity(evaluation.len());
-    let mut evaluation_by_stratum =
-        BTreeMap::<String, Vec<&HeldOutEvaluationObservation>>::new();
+    let mut evaluation_by_stratum = BTreeMap::<String, Vec<&HeldOutEvaluationObservation>>::new();
     for item in evaluation {
         validate_id(&item.observation.replicate_id, "evaluation")?;
-        validate_id(&item.stratum_id, "stratum")
-            .map_err(|_| GroupwiseCalibrationError::InvalidStratumIdentifier {
+        validate_id(&item.stratum_id, "stratum").map_err(|_| {
+            GroupwiseCalibrationError::InvalidStratumIdentifier {
                 stratum_id: item.stratum_id.clone(),
-            })?;
+            }
+        })?;
         if !evaluation_ids.insert(item.observation.replicate_id.as_str()) {
-            return Err(GroupwiseCalibrationError::DuplicateReplicateId("evaluation"));
+            return Err(GroupwiseCalibrationError::DuplicateReplicateId(
+                "evaluation",
+            ));
         }
         if calibration_ids.contains(item.observation.replicate_id.as_str()) {
             return Err(GroupwiseCalibrationError::CalibrationEvaluationOverlap);
@@ -386,9 +409,7 @@ pub fn calibrate_groupwise_null(
                 let guard_critical = thresholds_by_estimator[estimator_index];
                 GroupwiseStratumEstimatorSummary {
                     estimator_id,
-                    calibration_replicates: calibration_by_stratum
-                        .get(stratum)
-                        .map_or(0, Vec::len),
+                    calibration_replicates: calibration_by_stratum.get(stratum).map_or(0, Vec::len),
                     evaluation_replicates: eval.len(),
                     minimum_resolvable_alpha: minimum_resolvable[stratum_index],
                     stratum_critical_value: critical,
@@ -430,16 +451,8 @@ pub fn calibrate_groupwise_null(
                 estimator_id,
                 all_strata_resolvable,
                 all_strata_evaluated,
-                worst_observed_adaptive_fpr: worst_observed_rate(
-                    &strata,
-                    estimator_index,
-                    false,
-                ),
-                worst_observed_guard_fpr: worst_observed_rate(
-                    &strata,
-                    estimator_index,
-                    true,
-                ),
+                worst_observed_adaptive_fpr: worst_observed_rate(&strata, estimator_index, false),
+                worst_observed_guard_fpr: worst_observed_rate(&strata, estimator_index, true),
             }
         })
         .collect();
@@ -478,10 +491,11 @@ fn validate_config(config: &GroupwiseCalibrationConfig) -> Result<(), GroupwiseC
     }
     let mut seen = HashSet::with_capacity(config.expected_strata.len());
     for stratum in &config.expected_strata {
-        validate_id(stratum, "expected_strata")
-            .map_err(|_| GroupwiseCalibrationError::InvalidStratumIdentifier {
+        validate_id(stratum, "expected_strata").map_err(|_| {
+            GroupwiseCalibrationError::InvalidStratumIdentifier {
                 stratum_id: stratum.clone(),
-            })?;
+            }
+        })?;
         if !seen.insert(stratum.as_str()) {
             return Err(GroupwiseCalibrationError::DuplicateExpectedStratum);
         }
@@ -491,9 +505,9 @@ fn validate_config(config: &GroupwiseCalibrationConfig) -> Result<(), GroupwiseC
 
 fn validate_id(value: &str, field: &'static str) -> Result<(), GroupwiseCalibrationError> {
     if value.trim().is_empty()
-        || !value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
-        })
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
     {
         return Err(GroupwiseCalibrationError::InvalidIdentifier(field));
     }
@@ -548,10 +562,7 @@ fn rates_if_resolved(
     Some(GroupwiseRateSet {
         held_out_false_positive_rate: wilson_interval(false_positives, evaluation.len()),
         signal_detection_rate: wilson_interval(detections, evaluation.len()),
-        directionally_correct_signal_rate: wilson_interval(
-            directionally_correct,
-            evaluation.len(),
-        ),
+        directionally_correct_signal_rate: wilson_interval(directionally_correct, evaluation.len()),
         wrong_direction_acceptance_rate: wilson_interval(wrong_direction, evaluation.len()),
     })
 }
@@ -607,7 +618,9 @@ fn proportion_json(value: &ProportionInterval) -> String {
 }
 
 fn optional_rate_json(value: Option<&ProportionInterval>) -> String {
-    value.map(proportion_json).unwrap_or_else(|| "null".to_string())
+    value
+        .map(proportion_json)
+        .unwrap_or_else(|| "null".to_string())
 }
 
 fn worst_rate_json(value: Option<&WorstStratumRate>) -> String {
@@ -665,8 +678,7 @@ fn render_stratum(stratum: &GroupwiseStratumSummary) -> String {
             "      \"estimators\": [\n{}\n      ]\n",
             "    }}"
         ),
-        stratum.stratum_id,
-        estimators
+        stratum.stratum_id, estimators
     )
 }
 
@@ -864,7 +876,9 @@ mod tests {
             .collect::<Vec<_>>();
         let report = calibrate_groupwise_null(&calibration(), &eval, &config()).unwrap();
         assert!(!report.estimators[0].all_strata_evaluated);
-        assert!(report.strata[2].estimators[0].stratum_threshold_rates.is_none());
+        assert!(report.strata[2].estimators[0]
+            .stratum_threshold_rates
+            .is_none());
     }
 
     #[test]
@@ -873,7 +887,9 @@ mod tests {
         duplicate[1].observation.replicate_id = duplicate[0].observation.replicate_id.clone();
         assert!(matches!(
             calibrate_groupwise_null(&duplicate, &evaluation(), &config()),
-            Err(GroupwiseCalibrationError::DuplicateReplicateId("calibration"))
+            Err(GroupwiseCalibrationError::DuplicateReplicateId(
+                "calibration"
+            ))
         ));
         let mut overlap = evaluation();
         overlap[0].observation.replicate_id = calibration()[0].observation.replicate_id.clone();
