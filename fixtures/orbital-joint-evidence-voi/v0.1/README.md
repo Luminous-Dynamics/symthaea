@@ -92,3 +92,12 @@ These are calculated outcomes of two synthetic fixtures, not empirical aerospace
 
 
 **Terminal disposition rule:** no evidence defaults to HOLD. A terminal ACCEPT requires both affirmative obligations to be accumulated along the exact action path. A terminal REJECT requires an outcome-specific rejection-basis obligation. HOLD/INDETERMINATE remains distinct from a proven-defect rejection. Missing or undeclared action obligations are rejected by both the Rust evaluator and its independent Python oracle.
+
+
+### Sequential search implementation boundary
+
+The exact finite-horizon planner memoizes by canonical residual belief, exact remaining resource vector, remaining action depth, used-action set and accumulated evidence obligations. Its receipt reports expanded states, memo hits, memo entries and output policy-tree node count. A regression test verifies replay of an identical subproblem returns the same policy without expanding it again.
+
+Nested unresolved resource comparisons are propagated to the parent policy's human-review frontier. A parent may not silently discard a tied child policy with unknown expected cost and select another tied plan with a known cost. Resource frequency is fixture-only and used for expected resource accounting; the terminal decision objective remains distribution-free worst-case regret.
+
+This is a small-instance exact reference. No asymptotic or industrial campaign-scale performance claim is made. The next scaling study must measure state expansions, memo hits, Pareto pruning, wall time, memory, policy-tree size and exact-oracle regret gap under a frozen generated action/state sweep.
