@@ -54,6 +54,7 @@ pub mod config;
 pub mod embodiment;
 pub mod encoder;
 pub mod executor;
+pub mod frontend;
 pub mod observation;
 pub mod safety;
 pub mod web_agent;
@@ -64,6 +65,11 @@ pub use config::BrowserAgentConfig;
 pub use embodiment::BrowserBridge;
 pub use encoder::BrowserHdcEncoder;
 pub use executor::{ActionOutcome, ActionOutput, ActionReceipt, BrowserExecutor};
+pub use frontend::{
+    FrontendArtifactDigest, FrontendDocumentMetrics, FrontendEvidenceBundle,
+    FrontendEvidenceContext, FrontendEvidenceReceipt, FrontendLayoutElement,
+    FrontendLayoutRect, FrontendLayoutSnapshot, FrontendViewport,
+};
 pub use observation::{
     AccessibleElement, MAX_OBSERVATION_TEXT_CHARS, PageObservation, UNTRUSTED_WEB_CONTENT_LABEL,
 };
