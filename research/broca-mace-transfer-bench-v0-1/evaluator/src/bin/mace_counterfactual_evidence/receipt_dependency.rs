@@ -26,6 +26,7 @@ pub(crate) enum SidecarIndexError {
 #[derive(Clone, Debug)]
 pub(crate) struct ReceiptDependencyProjection {
     children_by_parent: BTreeMap<u32, BTreeSet<u32>>,
+    parents_by_child: BTreeMap<u32, BTreeSet<u32>>,
     event_ids: BTreeSet<u32>,
     incomplete_event_ids: BTreeSet<u32>,
     unresolved_parent_reference_count: usize,
@@ -55,6 +56,8 @@ impl ReceiptDependencyProjection {
         }
         let event_ids: BTreeSet<u32> = candidate_by_id.keys().copied().collect();
         let mut children_by_parent: BTreeMap<u32, BTreeSet<u32>> =
+            event_ids.iter().map(|id| (*id, BTreeSet::new())).collect();
+        let mut parents_by_child: BTreeMap<u32, BTreeSet<u32>> =
             event_ids.iter().map(|id| (*id, BTreeSet::new())).collect();
         let mut indegree: BTreeMap<u32, usize> =
             event_ids.iter().map(|id| (*id, 0_usize)).collect();
@@ -86,6 +89,10 @@ impl ReceiptDependencyProjection {
                     incomplete_event_ids.insert(record.event_id);
                     continue;
                 }
+                parents_by_child
+                    .get_mut(&record.event_id)
+                    .expect("every candidate event has a parent set")
+                    .insert(*parent_id);
                 if children_by_parent
                     .get_mut(parent_id)
                     .expect("every candidate event has a child set")
@@ -124,6 +131,7 @@ impl ReceiptDependencyProjection {
 
         Ok(Self {
             children_by_parent,
+            parents_by_child,
             event_ids,
             incomplete_event_ids,
             unresolved_parent_reference_count,
@@ -153,6 +161,41 @@ impl ReceiptDependencyProjection {
             }
         }
         closure.into_iter().collect()
+    }
+
+    /// True only when every event has complete declared ancestry and no
+    /// parent reference outside the selected candidate pool.
+    pub(crate) fn all_lineage_complete(&self, event_ids: &[u32]) -> bool {
+        event_ids.iter().all(|id| {
+            self.event_ids.contains(id) && !self.incomplete_event_ids.contains(id)
+        })
+    }
+
+    /// Reject a control whose own declared ancestry intersects the target
+    /// knockout, even when provider/root display identities differ.
+    pub(crate) fn depends_on_any(
+        &self,
+        event_id: u32,
+        target_ids: &BTreeSet<u32>,
+    ) -> bool {
+        let mut visited = BTreeSet::new();
+        let mut stack = self
+            .parents_by_child
+            .get(&event_id)
+            .map(|parents| parents.iter().copied().collect::<Vec<_>>())
+            .unwrap_or_default();
+        while let Some(parent) = stack.pop() {
+            if !visited.insert(parent) {
+                continue;
+            }
+            if target_ids.contains(&parent) {
+                return true;
+            }
+            if let Some(ancestors) = self.parents_by_child.get(&parent) {
+                stack.extend(ancestors.iter().copied());
+            }
+        }
+        false
     }
 
     pub(crate) fn lineage_incomplete_event_count(&self) -> usize {
