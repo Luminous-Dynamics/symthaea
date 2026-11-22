@@ -15,6 +15,7 @@ use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_ingress::EvidenceDependencySidecarV1;
+use broca_mace_ingress::EvidenceDependencySidecarV1;
 use broca_mace_hdc_retrieval::{
     experience_view_digest,
     typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
@@ -28,6 +29,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 mod mace_generated_stress;
+mod receipt_dependency;
+
+use receipt_dependency::ReceiptDependencyProjection;
 mod receipt_dependency;
 
 use receipt_dependency::ReceiptDependencyProjection;
@@ -637,6 +641,9 @@ struct CandidateObservation {
     evidence_family_count: usize,
     unknown_root_event_count: usize,
     unknown_family_event_count: usize,
+    dependency_sidecar_sha256: Option<String>,
+    lineage_incomplete_event_count: usize,
+    unresolved_parent_reference_count: usize,
     latency_ns: u64,
 }
 
@@ -646,12 +653,25 @@ fn run_candidate(
     decision_need: DecisionNeedV1,
     memory: &[Experience],
 ) -> Result<CandidateObservation, IndexError> {
+    run_candidate_with_sidecar(mode, query, decision_need, memory, None)
+}
+
+fn run_candidate_with_sidecar(
+    mode: CandidateMode,
+    query: Query,
+    decision_need: DecisionNeedV1,
+    memory: &[Experience],
+    sidecar: Option<&EvidenceDependencySidecarV1>,
+) -> Result<CandidateObservation, IndexError> {
     let started = Instant::now();
     if !decision_need.is_valid() || decision_need.scope != query.scope {
         return Err(IndexError::InvalidDecisionNeed);
     }
 
-    let evidence_index = EvidenceDependencyIndex::build(memory)?;
+    let evidence_index = match sidecar {
+        Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(memory, sidecar)?,
+        None => EvidenceDependencyIndex::build(memory)?,
+    };
     let evidence_sha256 = evidence_index.baseline_evidence_digest();
     let input_sha256 = candidate_input_digest(decision_need, &evidence_sha256);
 
@@ -820,6 +840,9 @@ fn run_candidate(
         evidence_family_count: evidence_index.known_family_count(),
         unknown_root_event_count: evidence_index.unknown_root_event_count(),
         unknown_family_event_count: evidence_index.unknown_family_event_count(),
+        dependency_sidecar_sha256: evidence_index.dependency_sidecar_sha256().map(str::to_owned),
+        lineage_incomplete_event_count: evidence_index.lineage_incomplete_event_count,
+        unresolved_parent_reference_count: evidence_index.unresolved_parent_reference_count,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
     })
 }
