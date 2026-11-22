@@ -293,23 +293,75 @@ fn normalized_ids(mut ids: Vec<u32>) -> Vec<u32> {
 
 /// Select a disjoint dropout with the same per-action removal counts as the
 /// target. A control is omitted if the candidate-visible pool cannot match it.
-fn matched_random_ids(
+fn evidence_strata(
     index: &EvidenceDependencyIndex,
-    target_ids: &[u32],
-    seed: u64,
-) -> Option<Vec<u32>> {
-    let target: BTreeSet<u32> = target_ids.iter().copied().collect();
-    let mut required = BTreeMap::<(Regime, Objective, Action, String), usize>::new();
-    for event_id in target_ids {
+    ids: &[u32],
+) -> Option<BTreeMap<(Regime, Objective, Action, String), usize>> {
+    let mut counts = BTreeMap::new();
+    for event_id in ids {
         let item = index.records.get(event_id)?;
-        let stratum = (
+        let key = (
             item.scope.regime,
             item.scope.objective,
             item.action,
             item.causal_identification.estimand_digest.to_hex(),
         );
-        *required.entry(stratum).or_default() += 1;
+        *counts.entry(key).or_insert(0) += 1;
     }
+    Some(counts)
+}
+
+fn provenance_group_counts(
+    index: &EvidenceDependencyIndex,
+    ids: &[u32],
+) -> Option<(usize, usize, usize, usize)> {
+    let mut roots = BTreeSet::new();
+    let mut families = BTreeSet::new();
+    let mut unknown_roots = 0_usize;
+    let mut unknown_families = 0_usize;
+    for event_id in ids {
+        let item = index.records.get(event_id)?;
+        if item.source_root_digest.is_known() {
+            roots.insert(item.source_root_digest);
+        } else {
+            unknown_roots += 1;
+        }
+        if item.source_family != 0 {
+            families.insert(item.source_family);
+        } else {
+            unknown_families += 1;
+        }
+    }
+    Some((
+        roots.len(),
+        families.len(),
+        unknown_roots,
+        unknown_families,
+    ))
+}
+
+/// Select a disjoint dropout matched on scope, action and estimand. After
+/// dependency closure, the intervention must still match the target's
+/// statistical strata and provenance-group counts or it is omitted.
+fn matched_random_ids(
+    index: &EvidenceDependencyIndex,
+    target_ids: &[u32],
+    seed: u64,
+) -> Option<Vec<u32>> {
+    let target = normalized_ids(target_ids.to_vec());
+    let required = evidence_strata(index, &target)?;
+    let target_counts = provenance_group_counts(index, &target)?;
+    let target_roots: BTreeSet<SourceRootDigest> = target
+        .iter()
+        .filter_map(|id| index.records.get(id).map(|item| item.source_root_digest))
+        .filter(|root| root.is_known())
+        .collect();
+    let target_families: BTreeSet<u16> = target
+        .iter()
+        .filter_map(|id| index.records.get(id).map(|item| item.source_family))
+        .filter(|family| *family != 0)
+        .collect();
+    let target_set: BTreeSet<u32> = target.iter().copied().collect();
 
     let mut selected = Vec::new();
     for ((regime, objective, action, estimand), needed) in required {
@@ -321,7 +373,10 @@ fn matched_random_ids(
                     && item.scope.objective == objective
                     && item.action == action
                     && item.causal_identification.estimand_digest.to_hex() == estimand
-                    && !target.contains(&item.event_id)
+                    && !target_set.contains(&item.event_id)
+                    && (!item.source_root_digest.is_known()
+                        || !target_roots.contains(&item.source_root_digest))
+                    && (item.source_family == 0 || !target_families.contains(&item.source_family))
             })
             .collect();
         eligible.sort_by_key(|item| {
@@ -333,7 +388,18 @@ fn matched_random_ids(
         selected.extend(eligible.into_iter().take(needed).map(|item| item.event_id));
     }
 
-    Some(normalized_ids(selected))
+    let selected = normalized_ids(selected);
+    let expanded = index.dependent_closure(&selected);
+    if expanded.iter().any(|id| target_set.contains(id)) {
+        return None;
+    }
+    if evidence_strata(index, &expanded)? != evidence_strata(index, &target)? {
+        return None;
+    }
+    if provenance_group_counts(index, &expanded)? != target_counts {
+        return None;
+    }
+    Some(expanded)
 }
 
 fn push_intervention(
