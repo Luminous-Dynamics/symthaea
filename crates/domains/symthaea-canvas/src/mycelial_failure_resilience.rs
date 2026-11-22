@@ -1419,12 +1419,108 @@ pub fn build_mycelial_failure_delivery_profile(
 }
 
 impl MycelialFailureDeliveryProfile {
+    pub fn validate(&self) -> Result<(), MycelialFailureResilienceError> {
+        if self.schema_version != MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION
+            || !valid_digest(&self.source_graph_digest)
+            || !valid_digest(&self.demand_digest)
+            || !valid_digest(&self.attack_plan_digest)
+            || self.scenarios.is_empty()
+            || self.scenarios.len() > MAX_FAILURE_SCENARIOS
+            || self.scenarios.windows(2).any(|pair| {
+                pair[0].scenario_id >= pair[1].scenario_id
+            })
+        {
+            return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                "invalid schema, digest or scenario summary order",
+            ));
+        }
+        validate_delivery_config(self.config, self.scenarios.len())?;
+        if self.trials.len()
+            != self.scenarios.len().saturating_mul(self.config.trials_per_scenario)
+            || self.trials.windows(2).any(|pair| {
+                pair[0].scenario_id > pair[1].scenario_id
+                    || (pair[0].scenario_id == pair[1].scenario_id
+                        && pair[0].trial_index >= pair[1].trial_index)
+            })
+        {
+            return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                "trial inventory is incomplete, duplicated or unsorted",
+            ));
+        }
+        let mut cursor = 0usize;
+        for summary in &self.scenarios {
+            if !valid_id(&summary.scenario_id)
+                || summary.attempted_entity_count == 0
+                || summary.trial_count != self.config.trials_per_scenario
+            {
+                return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                    "scenario summary metadata is invalid",
+                ));
+            }
+            let start = cursor;
+            while cursor < self.trials.len()
+                && self.trials[cursor].scenario_id == summary.scenario_id
+            {
+                let trial = &self.trials[cursor];
+                if trial.trial_index != cursor - start
+                    || trial.realized_failed_segment_ids.len()
+                        + trial.realized_failed_junction_ids.len()
+                        > summary.attempted_entity_count
+                    || trial.realized_failed_segment_ids.iter().any(|id| !valid_id(id))
+                    || trial.realized_failed_junction_ids.iter().any(|id| !valid_id(id))
+                    || trial.realized_failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                    || trial.realized_failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                    || trial.weighted_reachability.is_some_and(|value| {
+                        !value.is_finite() || !(0.0..=1.0).contains(&value)
+                    })
+                    || trial.weighted_mean_directness.is_some_and(|value| {
+                        !value.is_finite() || !(0.0..=1.0 + 1.0e-5).contains(&value)
+                    })
+                    || trial.weighted_mean_network_path_length.is_some_and(|value| {
+                        !value.is_finite() || value <= 0.0
+                    })
+                    || trial.weighted_mean_directness.is_some()
+                        != trial.weighted_mean_network_path_length.is_some()
+                    || trial.connected_components > MAX_FAILURE_JUNCTIONS
+                    || trial.cycle_rank > MAX_FAILURE_SEGMENTS
+                {
+                    return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                        "trial identity, failed-entity inventory or metric value is invalid",
+                    ));
+                }
+                cursor += 1;
+            }
+            if cursor - start != self.config.trials_per_scenario {
+                return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                    "scenario summary does not have the configured number of trials",
+                ));
+            }
+            let expected = summarize_delivery_trials(
+                &summary.scenario_id,
+                summary.attempted_entity_count,
+                &self.trials[start..cursor],
+            )?;
+            if &expected != summary {
+                return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                    "scenario distribution summary does not match trial-level receipts",
+                ));
+            }
+        }
+        if cursor != self.trials.len() {
+            return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                "trial inventory includes an undeclared scenario",
+            ));
+        }
+        Ok(())
+    }
+
     pub fn validate_against(
         &self,
         graph: &MycelialJunctionHyphaGraph,
         demands: &[MycelialDemandPair],
         plan: &MycelialFailureAttackPlan,
     ) -> Result<(), MycelialFailureResilienceError> {
+        self.validate()?;
         plan.validate_against(graph, demands)?;
         validate_delivery_config(self.config, plan.scenarios.len())?;
         if self.schema_version != MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION
@@ -1496,21 +1592,7 @@ impl MycelialFailureDeliveryProfile {
     pub fn canonical_digest_hex(
         &self,
     ) -> Result<String, MycelialFailureResilienceError> {
-        if self.schema_version != MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION
-            || !valid_digest(&self.source_graph_digest)
-            || !valid_digest(&self.demand_digest)
-            || !valid_digest(&self.attack_plan_digest)
-            || self.scenarios.is_empty()
-            || self.trials.is_empty()
-            || self.scenarios.windows(2).any(|pair| {
-                pair[0].scenario_id >= pair[1].scenario_id
-            })
-        {
-            return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
-                "invalid schema, digest or empty/unsorted trial inventory",
-            ));
-        }
-        validate_delivery_config(self.config, self.scenarios.len())?;
+        self.validate()?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-mycelial-failure-delivery-profile-v1");
         hasher.update(&self.schema_version.to_le_bytes());
