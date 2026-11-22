@@ -776,7 +776,7 @@ mod tests {
         .expect("checked-in Leptos pattern corpus is valid JSON");
         let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
 
-        corpus["patterns"][1]["source"]["related_sources"][0]["blob_sha"] =
+        corpus["patterns"][9]["source"]["related_sources"][0]["blob_sha"] =
             Value::String("0".repeat(40));
         assert!(validate_pattern_corpus(&schema, &corpus, &repository_root).is_err());
     }
