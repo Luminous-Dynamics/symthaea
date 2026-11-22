@@ -34,7 +34,7 @@ The broader research thesis and qualification ladder are documented in [MACE Dec
 
 The follow-on branch adds a separate typed-content index to the existing HDC retrieval crate: candidate Experience fields are encoded using deterministic role/value binding, continuous values use deterministic random Fourier features, and SemanticExperienceQueryV1 creates a structured query in the same field space. Exact event IDs and provenance remain sidecar references; all MACE admission gates still execute after canonical resolution.
 
-This is a representation-level prototype only. The current MACE Query exposes scope, not the richer candidate-visible decision features required for end-to-end utility evaluation. Do not populate those richer query fields from evaluator truth. See [MACE Decision Sufficiency and Benchmark Frontier v0.2](../../docs/research/MACE_DECISION_SUFFICIENCY_AND_BENCHMARK_FRONTIER_V0_2.md) and [MACE typed-content HDC v0.1 protocol](../../docs/research/MACE_TYPED_CONTENT_HDC_V0_1.md).
+The typed-content arm is now integrated into the paired runner using a generated candidate-visible `DecisionNeedV1`; the candidate projection excludes evaluator `Truth`, and a hidden-outcome mutation test keeps the decision-need/input digests unchanged. The current contract is synthetic and fixed to the benchmark's normalized causal estimand; a general environment/task parser is still tracked in #13222. See [MACE Decision Sufficiency and Benchmark Frontier v0.2](../../docs/research/MACE_DECISION_SUFFICIENCY_AND_BENCHMARK_FRONTIER_V0_2.md) and [MACE typed-content HDC v0.1 protocol](../../docs/research/MACE_TYPED_CONTENT_HDC_V0_1.md).
 
 ## Paired memory-to-decision intervention runner
 
