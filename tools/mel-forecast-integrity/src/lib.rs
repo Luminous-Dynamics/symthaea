@@ -1111,6 +1111,21 @@ mod tests {
     }
 
     #[test]
+    fn vetoed_forecast_cannot_be_realized() {
+        let mut trace = valid_trace();
+        if let EventKindV1::PartnerDisposition(payload) = &mut trace.events[3].kind {
+            payload.disposition = PartnerDispositionV1::Vetoed;
+        }
+        seal_trace(&mut trace).unwrap();
+        let report = validate_trace(&trace);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.code == "realization_of_inactive_forecast"));
+        let forecast = &report.forecasts[0];
+        assert_eq!(forecast.lifecycle, "invalidated");
+        assert!(!forecast.human_visible_realization);
+    }
+
+    #[test]
     fn no_display_is_not_counted_as_human_visible() {
         let mut trace = valid_trace();
         trace.events.remove(2);
