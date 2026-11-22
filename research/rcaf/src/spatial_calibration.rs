@@ -75,18 +75,6 @@ impl std::error::Error for SpatialVarianceCalibrationError {}
 pub type SpatialVarianceCalibrationReport = NuisanceVarianceCalibrationReport;
 pub type NuisanceVarianceCalibrationError = SpatialVarianceCalibrationError;
 
-/// Calibrate a generated spatial nuisance field to a component-variance fraction.
-///
-/// For each ROI, the clean signal and nuisance series are centred separately; their temporal
-/// population variances/covariance are pooled equally across ROIs. The requested fraction is
-///
-/// `Var(A) / (Var(X) + Var(A))`
-///
-/// and deliberately excludes the covariance term. The report also records Cov(X,A) and the
-/// actual variance of X+A. Temporal coupling therefore cannot be hidden inside a nominal dose.
-///
-/// The returned field is a scaled clone; the original remains unchanged. Both values and factor
-/// series are scaled together so the returned metadata and realized field stay aligned.
 /// Calibrate any time x ROI nuisance matrix to a requested component-variance fraction.
 ///
 /// Clean and nuisance time series are centered separately within each ROI. Population
@@ -207,6 +195,10 @@ pub fn calibrate_nuisance_matrix_to_component_fraction(
 /// This compatibility wrapper delegates magnitude calibration to the family-agnostic matrix
 /// calibrator, then applies the same scale multiplier to the stored factor series. Its graph basis
 /// is unchanged.
+/// Calibrate a generated graph-spatial nuisance field while preserving factor metadata.
+///
+/// The generic matrix calibrator scales the stored time x ROI values. This wrapper applies the
+/// same multiplier to the latent factor series and retains the graph basis and ROI labels.
 pub fn calibrate_spatial_nuisance_to_component_fraction(
     clean_observations: &[Vec<f64>],
     nuisance_field: &SpatialNuisanceField,
