@@ -203,3 +203,10 @@ Hosted run [#44989349728](https://github.com/Luminous-Dynamics/symthaea/actions/
 ## Current exact-head verification
 
 Hosted run [#44989451987](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987) passed on the latest PR head: 46/46 Python reference tests, 35/35 Rust tests, rustfmt, Clippy and all six report comparisons. The DTCO lineage known answer covers design/constraint binding, model uncertainty, monotonic fidelity, acyclic parent graph and measurement provenance.
+
+
+## Budgeted multi-fidelity acquisition CLI
+
+The `semi-mf-acquire` CLI consumes a versioned subject with exact prediction packet, model, uncertainty-calibration and objective-specification digests and emits a canonical report for the exact budgeted subset oracle. The known-answer five-candidate example selects B/E under budget 13, with modeled utility 0.3115.
+
+Hosted run [#44989958104](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104) passed 43/43 Rust tests, 46/46 Python reference tests, fmt, Clippy and the multi-fidelity acquisition report diff. Synthetic fixture only; it is not an actual SPICE/TCAD run or design approval.
