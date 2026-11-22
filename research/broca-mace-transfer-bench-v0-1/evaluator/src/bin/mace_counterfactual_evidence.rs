@@ -1334,7 +1334,9 @@ mod tests {
         }
     }
 
-    struct SidecarTestVerifier;
+    struct SidecarTestVerifier {
+        cycle: bool,
+    }
 
     impl broca_mace_ingress::EvidenceVerifier for SidecarTestVerifier {
         fn verify_raw_event(
@@ -1370,7 +1372,13 @@ mod tests {
             use broca_mace_ingress::{
                 DependencyLineageStatusV1, SourceTrustStatus, VerifiedLineage,
             };
-            let parents = if event_id == 43 { vec![42] } else { Vec::new() };
+            let parents = if self.cycle {
+                if event_id == 42 { vec![43] } else { vec![42] }
+            } else if event_id == 43 {
+                vec![42]
+            } else {
+                Vec::new()
+            };
             Some(VerifiedLineage {
                 source_family: u16::try_from(event_id).ok()?,
                 source_root_id: event_id,
@@ -1468,7 +1476,7 @@ mod tests {
         let batch = ingest_batch_as_known(
             &[sidecar_raw(42), sidecar_raw(43)],
             as_known,
-            &SidecarTestVerifier,
+            &SidecarTestVerifier { cycle: false },
         )
         .expect("receipt-backed two-event session should ingest");
         let pack = build_consolidation_evidence_pack(&batch, &[42, 43])
@@ -1818,6 +1826,56 @@ mod tests {
         .unwrap();
         assert_eq!(reduced.lineage_incomplete_event_count, 1);
         assert_eq!(reduced.unresolved_parent_reference_count, 1);
+    }
+
+    #[test]
+    fn receipt_dependency_projection_rejects_cycles_and_binding_mismatches() {
+        use broca_mace_ingress::{
+            build_consolidation_evidence_pack, ingest_batch_as_known, AsKnownQuery,
+        };
+        let as_known = AsKnownQuery {
+            valid_at_ms: 180,
+            known_at_ms: 250,
+        };
+        let cycle_batch = ingest_batch_as_known(
+            &[sidecar_raw(42), sidecar_raw(43)],
+            as_known,
+            &SidecarTestVerifier { cycle: true },
+        )
+        .expect("receipt verifier can attest a cyclic test fixture");
+        let cycle_pack = build_consolidation_evidence_pack(&cycle_batch, &[42, 43]).unwrap();
+        let cycle_sidecar = cycle_pack.dependency_sidecar();
+        let cycle_memory: Vec<Experience> = cycle_pack
+            .events()
+            .iter()
+            .map(|event| event.experience())
+            .collect();
+        assert_eq!(
+            EvidenceDependencyIndex::build_with_sidecar(&cycle_memory, &cycle_sidecar)
+                .unwrap_err(),
+            IndexError::InvalidDependencySidecar(
+                "DependencyCycle".to_string()
+            )
+        );
+
+        let valid_batch = ingest_batch_as_known(
+            &[sidecar_raw(42), sidecar_raw(43)],
+            as_known,
+            &SidecarTestVerifier { cycle: false },
+        )
+        .unwrap();
+        let valid_pack = build_consolidation_evidence_pack(&valid_batch, &[42, 43]).unwrap();
+        let valid_sidecar = valid_pack.dependency_sidecar();
+        let mut mismatched_memory: Vec<Experience> = valid_pack
+            .events()
+            .iter()
+            .map(|event| event.experience())
+            .collect();
+        mismatched_memory[0].source_family += 100;
+        assert!(matches!(
+            EvidenceDependencyIndex::build_with_sidecar(&mismatched_memory, &valid_sidecar),
+            Err(IndexError::InvalidDependencySidecar(_))
+        ));
     }
 
     #[test]
