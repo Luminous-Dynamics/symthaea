@@ -117,7 +117,8 @@ Implemented attack strategies:
 |---|---|---|---|
 | Random segments | Hypha segments | SplitMix64 shuffle of stable IDs | Unstructured segment disruption |
 | Random junctions | Junctions | SplitMix64 shuffle of stable IDs | Unstructured junction disruption |
-| Highest-degree junctions | Junctions | Descending incident-segment count; stable ID tie-break | Static degree-targeted attack |
+| Highest-degree junctions | Junctions | Descending incident-segment count; stable ID tie-break | Static hub-targeted attack |
+| Lowest-degree junctions | Junctions | Ascending incident-segment count; stable ID tie-break | Peripheral/leaf-targeted negative comparator |
 | Demand-path-load segments | Hypha segments | Descending declared-demand weight on deterministic shortest paths; stable ID tie-break | Demand-conditioned edge load, not generic all-pairs betweenness |
 | Demand-path-load junctions | Junctions | Weighted internal transit-node use on deterministic shortest paths | Demand-conditioned node load, not generic all-pairs betweenness |
 | Spatial-cluster junctions | Junctions | Ascending Euclidean distance to a declared seed junction; stable ID tie-break | Localized correlated structural-damage proxy |
@@ -181,7 +182,7 @@ The first source benchmark is the exact single-failure sweep. The broader progra
 7. Recovery/repair: minimum added cost to restore a declared target reachability or directness threshold.
 8. Temporal disruption: only after a time-respecting graph/flow model is measured.
 
-Compare against static cycle rank, edge/node connectivity, articulation counts, minimum cuts, global directness, MST and Delaunay reference structures where assumptions match.
+Compare against static cycle rank, edge/node connectivity, articulation counts, minimum cuts, global directness, MST and Delaunay reference structures where assumptions match. Add both hub-targeted and peripheral/leaf-targeted removals so resilience is not judged only by centrality attacks.
 
 All policies must use the same frozen source graph, demand pairs, failure events and failure seeds. Report baseline-to-failure deltas and full distributions, not one best-case robustness score.
 
