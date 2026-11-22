@@ -109,7 +109,10 @@
         "source_code_sha256",
         "fixture_sha256",
         "source_revision",
-        "schema_sha256"
+        "schema_sha256",
+        "dependency_sidecar_sha256",
+        "lineage_incomplete_event_count",
+        "unresolved_parent_reference_count"
       ],
       "properties": {
         "schema_version": {
@@ -182,6 +185,24 @@
         },
         "schema_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "dependency_sidecar_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lineage_incomplete_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_parent_reference_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -212,7 +233,10 @@
         "latency_ns",
         "method",
         "retrieved_event_ids",
-        "index_bytes"
+        "index_bytes",
+        "dependency_sidecar_sha256",
+        "lineage_incomplete_event_count",
+        "unresolved_parent_reference_count"
       ],
       "properties": {
         "schema_version": {
@@ -304,6 +328,24 @@
         },
         "retrieval_profile_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "dependency_sidecar_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lineage_incomplete_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_parent_reference_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -338,7 +380,10 @@
         "method",
         "retrieved_event_ids",
         "index_bytes",
-        "regret_gap_vs_full_method"
+        "regret_gap_vs_full_method",
+        "dependency_sidecar_sha256",
+        "lineage_incomplete_event_count",
+        "unresolved_parent_reference_count"
       ],
       "properties": {
         "schema_version": {
@@ -437,6 +482,24 @@
         },
         "retrieval_profile_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "dependency_sidecar_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lineage_incomplete_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_parent_reference_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
