@@ -89,10 +89,7 @@ pub fn calibrate_nuisance_matrix_to_component_fraction(
     clean_observations: &[Vec<f64>],
     nuisance_matrix: &[Vec<f64>],
     target_fraction: f64,
-) -> Result<
-    (Vec<Vec<f64>>, NuisanceVarianceCalibrationReport),
-    NuisanceVarianceCalibrationError,
-> {
+) -> Result<(Vec<Vec<f64>>, NuisanceVarianceCalibrationReport), NuisanceVarianceCalibrationError> {
     if !target_fraction.is_finite() || !(0.0..1.0).contains(&target_fraction) {
         return Err(SpatialVarianceCalibrationError::InvalidTargetFraction);
     }
@@ -132,8 +129,7 @@ pub fn calibrate_nuisance_matrix_to_component_fraction(
     let scale_multiplier = if target_fraction == 0.0 {
         0.0
     } else {
-        ((target_fraction / (1.0 - target_fraction)) * (clean_variance / nuisance_variance))
-            .sqrt()
+        ((target_fraction / (1.0 - target_fraction)) * (clean_variance / nuisance_variance)).sqrt()
     };
     if !scale_multiplier.is_finite() {
         return Err(SpatialVarianceCalibrationError::NonFiniteScale);
@@ -203,10 +199,8 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
     clean_observations: &[Vec<f64>],
     nuisance_field: &SpatialNuisanceField,
     target_fraction: f64,
-) -> Result<
-    (SpatialNuisanceField, SpatialVarianceCalibrationReport),
-    SpatialVarianceCalibrationError,
-> {
+) -> Result<(SpatialNuisanceField, SpatialVarianceCalibrationReport), SpatialVarianceCalibrationError>
+{
     let time_points = clean_observations.len();
     let roi_count = nuisance_field.roi_labels.len();
     let mode_count = nuisance_field.spatial_basis.first().map_or(0, Vec::len);
@@ -215,11 +209,20 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
         || mode_count == 0
         || nuisance_field.values.len() != time_points
         || clean_observations.iter().any(|row| row.len() != roi_count)
-        || nuisance_field.values.iter().any(|row| row.len() != roi_count)
+        || nuisance_field
+            .values
+            .iter()
+            .any(|row| row.len() != roi_count)
         || nuisance_field.spatial_basis.len() != roi_count
-        || nuisance_field.spatial_basis.iter().any(|row| row.len() != mode_count)
+        || nuisance_field
+            .spatial_basis
+            .iter()
+            .any(|row| row.len() != mode_count)
         || nuisance_field.factor_series.len() != mode_count
-        || nuisance_field.factor_series.iter().any(|series| series.len() != time_points)
+        || nuisance_field
+            .factor_series
+            .iter()
+            .any(|series| series.len() != time_points)
     {
         return Err(SpatialVarianceCalibrationError::DimensionMismatch);
     }
@@ -245,7 +248,12 @@ pub fn calibrate_spatial_nuisance_to_component_fraction(
     for value in calibrated.factor_series.iter_mut().flatten() {
         *value *= report.applied_scale_multiplier;
     }
-    if calibrated.factor_series.iter().flatten().any(|value| !value.is_finite()) {
+    if calibrated
+        .factor_series
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
         return Err(SpatialVarianceCalibrationError::NonFiniteScale);
     }
 
@@ -346,8 +354,7 @@ mod tests {
             .collect::<Vec<_>>();
         for nuisance in [&common_mode, &transient] {
             let (calibrated, report) =
-                calibrate_nuisance_matrix_to_component_fraction(&clean, nuisance, 0.10)
-                    .unwrap();
+                calibrate_nuisance_matrix_to_component_fraction(&clean, nuisance, 0.10).unwrap();
             assert!((report.realized_component_variance_fraction - 0.10).abs() < 1e-12);
             assert!(calibrated.iter().flatten().any(|value| *value != 0.0));
             assert!(report.clean_nuisance_covariance.is_finite());
