@@ -50,3 +50,35 @@ jobs:
             "$RUNNER_TEMP/mel-judge-grounding-report.json"
           jq -e '.case_count == 1 and .total_probe_count == 5 and .baseline_human_reference_accuracy == 1 and .prompt_only.pass_rate == 1 and .audio_swap.pass_rate == 1 and .instruction_paraphrase.pass_rate == 1 and .nuisance_transform.pass_rate == 1 and .semantic_mismatch.pass_rate == 1' \
             "$RUNNER_TEMP/mel-judge-grounding-report.json" > /dev/null
+      - name: Assemble reproducibility evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-judge-grounding-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/lib.rs > "$evidence/lib-blob.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/main.rs > "$evidence/main-blob.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-judge-grounding-audit/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-judge-grounding-audit/schema/mel-judge-grounding-probe-panel-v1.schema.json "$evidence/schema.json"
+          cp tools/mel-judge-grounding-audit/fixtures/valid-probe-panel-v1.json "$evidence/probe-panel.json"
+          cp tools/mel-judge-grounding-audit/src/lib.rs "$evidence/lib.rs"
+          cp tools/mel-judge-grounding-audit/src/main.rs "$evidence/main.rs"
+          if [[ -f tools/mel-judge-grounding-audit/Cargo.lock ]]; then
+            cp tools/mel-judge-grounding-audit/Cargo.lock "$evidence/Cargo.lock"
+          fi
+          if [[ -f "$RUNNER_TEMP/mel-judge-grounding-report.json" ]]; then
+            cp "$RUNNER_TEMP/mel-judge-grounding-report.json" "$evidence/report.json"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload reproducibility evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-judge-grounding-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-judge-grounding-evidence/
+          if-no-files-found: error
+          retention-days: 90
