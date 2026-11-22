@@ -111,7 +111,10 @@ impl fmt::Display for MycelialReferenceNetworkError {
                 write!(f, "unknown declared root junction {id}")
             }
             Self::NonPlanarJunction { junction_id, z } => {
-                write!(f, "junction {junction_id} has z={z}, but the Euclidean reference is explicitly 2D")
+                write!(
+                    f,
+                    "junction {junction_id} has z={z}, but the Euclidean reference is explicitly 2D"
+                )
             }
             Self::InvalidReferenceGraph(reason) => {
                 write!(f, "invalid minimum-spanning-forest reference: {reason}")
@@ -383,7 +386,10 @@ pub fn build_euclidean_minimum_spanning_tree(
         source_graph_digest,
         dimensionality,
         length_unit: graph.length_unit,
-        junction_ids: junctions.iter().map(|junction| junction.id.clone()).collect(),
+        junction_ids: junctions
+            .iter()
+            .map(|junction| junction.id.clone())
+            .collect(),
         declared_root_junction_ids,
         terminal_junction_ids,
         selected_edge_count: selected_edges.len(),
@@ -393,20 +399,18 @@ pub fn build_euclidean_minimum_spanning_tree(
         global_geometric_efficiency,
         root_directed_geometric_efficiency,
     };
-    report
-        .validate()
-        .map_err(|_| MycelialReferenceNetworkError::InvalidReferenceGraph(
+    report.validate().map_err(|_| {
+        MycelialReferenceNetworkError::InvalidReferenceGraph(
             "Euclidean MST receipt failed its internal validation",
-        ))?;
+        )
+    })?;
     Ok(report)
 }
 
 impl MycelialEuclideanMstReport {
     pub fn validate(&self) -> Result<(), MycelialReferenceNetworkError> {
         let valid_id = |value: &str| {
-            !value.is_empty()
-                && value.len() <= 128
-                && !value.chars().any(char::is_control)
+            !value.is_empty() && value.len() <= 128 && !value.chars().any(char::is_control)
         };
         let valid_digest = self.source_graph_digest.len() == 64
             && self
@@ -414,18 +418,22 @@ impl MycelialEuclideanMstReport {
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
         let junction_set: BTreeSet<_> = self.junction_ids.iter().map(String::as_str).collect();
-        let roots_valid = self.declared_root_junction_ids.windows(2).all(|pair| {
-            pair[0] < pair[1]
-        }) && self
+        let roots_valid = self
             .declared_root_junction_ids
-            .iter()
-            .all(|id| junction_set.contains(id.as_str()));
-        let terminals_valid = self.terminal_junction_ids.windows(2).all(|pair| {
-            pair[0] < pair[1]
-        }) && self
+            .windows(2)
+            .all(|pair| pair[0] < pair[1])
+            && self
+                .declared_root_junction_ids
+                .iter()
+                .all(|id| junction_set.contains(id.as_str()));
+        let terminals_valid = self
             .terminal_junction_ids
-            .iter()
-            .all(|id| junction_set.contains(id.as_str()));
+            .windows(2)
+            .all(|pair| pair[0] < pair[1])
+            && self
+                .terminal_junction_ids
+                .iter()
+                .all(|id| junction_set.contains(id.as_str()));
         let mut edge_set = BTreeSet::new();
         let edges_valid = self.selected_edges.iter().all(|edge| {
             valid_id(&edge.source_junction_id)
@@ -466,8 +474,7 @@ impl MycelialEuclideanMstReport {
         let global_valid = global.eligible_pairs == expected_global_pairs
             && global.reachable_pairs == expected_global_pairs
             && global.unreachable_pairs == 0
-            && global.scored_pairs + global.coincident_zero_path_pairs
-                == global.reachable_pairs
+            && global.scored_pairs + global.coincident_zero_path_pairs == global.reachable_pairs
             && valid_efficiency_values(global);
         let expected_root_reachable = if self.declared_root_junction_ids.is_empty() {
             0
@@ -501,9 +508,7 @@ impl MycelialEuclideanMstReport {
         Ok(())
     }
 
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialReferenceNetworkError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialReferenceNetworkError> {
         self.validate()?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-euclidean-mst-reference-v1");
@@ -526,7 +531,11 @@ impl MycelialEuclideanMstReport {
         }
         hasher.update(&(self.selected_edge_count as u64).to_le_bytes());
         hasher.update(&(self.connected_components as u64).to_le_bytes());
-        hasher.update(&self.total_euclidean_cost_model_units_microunits.to_le_bytes());
+        hasher.update(
+            &self
+                .total_euclidean_cost_model_units_microunits
+                .to_le_bytes(),
+        );
         hash_efficiency(&mut hasher, &self.global_geometric_efficiency);
         hash_efficiency(&mut hasher, &self.root_directed_geometric_efficiency);
         Ok(hex_digest(hasher.finalize().as_bytes()))
@@ -534,23 +543,20 @@ impl MycelialEuclideanMstReport {
 }
 
 fn valid_efficiency_values(report: &SpatialReferenceEfficiencyReport) -> bool {
-    let mean_values_valid = report.mean_directness.is_none_or(|value| {
-        value.is_finite() && (0.0..=1.0 + 1.0e-9).contains(&value)
-    }) && report
-        .mean_network_path_length_model_units
-        .is_none_or(|value| value.is_finite() && value > 0.0);
+    let mean_values_valid = report
+        .mean_directness
+        .is_none_or(|value| value.is_finite() && (0.0..=1.0 + 1.0e-9).contains(&value))
+        && report
+            .mean_network_path_length_model_units
+            .is_none_or(|value| value.is_finite() && value > 0.0);
     let scored_values_present = if report.scored_pairs == 0 {
-        report.mean_directness.is_none()
-            && report.mean_network_path_length_model_units.is_none()
+        report.mean_directness.is_none() && report.mean_network_path_length_model_units.is_none()
     } else {
-        report.mean_directness.is_some()
-            && report.mean_network_path_length_model_units.is_some()
+        report.mean_directness.is_some() && report.mean_network_path_length_model_units.is_some()
     };
     report.reachable_pairs <= report.eligible_pairs
-        && report.unreachable_pairs
-            == report.eligible_pairs.saturating_sub(report.reachable_pairs)
-        && report.scored_pairs + report.coincident_zero_path_pairs
-            == report.reachable_pairs
+        && report.unreachable_pairs == report.eligible_pairs.saturating_sub(report.reachable_pairs)
+        && report.scored_pairs + report.coincident_zero_path_pairs == report.reachable_pairs
         && mean_values_valid
         && scored_values_present
 }
@@ -684,9 +690,7 @@ fn euclidean_root_efficiency(
         let root = index_by_id
             .get(root_id.as_str())
             .copied()
-            .ok_or_else(|| MycelialReferenceNetworkError::UnknownRootJunction(
-                root_id.clone(),
-            ))?;
+            .ok_or_else(|| MycelialReferenceNetworkError::UnknownRootJunction(root_id.clone()))?;
         roots.insert(root);
     }
     let terminals: Vec<_> = junctions
@@ -1402,10 +1406,8 @@ mod tests {
             SpatialReferenceDimensionality::ThreeD,
         )
         .unwrap();
-        let expected = brute_force_euclidean_tree_cost(
-            &graph,
-            SpatialReferenceDimensionality::ThreeD,
-        );
+        let expected =
+            brute_force_euclidean_tree_cost(&graph, SpatialReferenceDimensionality::ThreeD);
         let actual = report.total_euclidean_cost_model_units_microunits as f64 / 1_000_000.0;
         assert_eq!(report.selected_edge_count, graph.junctions.len() - 1);
         assert_eq!(report.connected_components, 1);
@@ -1494,10 +1496,26 @@ mod tests {
                 99,
                 None,
                 true,
-                SpatialPoint3 { x: 0.0, y: 0.0, z: 0.5 },
-                SpatialPoint3 { x: 1.0, y: 1.0, z: 0.5 },
-                SpatialPoint3 { x: 2.0, y: 2.0, z: 0.5 },
-                SpatialPoint3 { x: 3.0, y: 3.0, z: 0.5 },
+                SpatialPoint3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.5,
+                },
+                SpatialPoint3 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.5,
+                },
+                SpatialPoint3 {
+                    x: 2.0,
+                    y: 2.0,
+                    z: 0.5,
+                },
+                SpatialPoint3 {
+                    x: 3.0,
+                    y: 3.0,
+                    z: 0.5,
+                },
             )],
             orbital_cells: Vec::new(),
         };
@@ -1533,18 +1551,42 @@ mod tests {
                     None,
                     true,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
                 filament(
                     5,
                     None,
                     true,
                     SpatialPoint3::ZERO,
-                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
-                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 2.0,
+                        z: 0.0,
+                    },
+                    SpatialPoint3 {
+                        x: 0.0,
+                        y: 3.0,
+                        z: 0.0,
+                    },
                 ),
             ],
             orbital_cells: Vec::new(),
@@ -1562,16 +1604,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.selected_edge_count, graph.junctions.len() - 1);
-        assert!(report.global_geometric_efficiency.coincident_zero_path_pairs > 0);
+        assert!(
+            report
+                .global_geometric_efficiency
+                .coincident_zero_path_pairs
+                > 0
+        );
         assert_eq!(
             report.global_geometric_efficiency.reachable_pairs,
             report.global_geometric_efficiency.eligible_pairs
         );
         assert_eq!(
             report.global_geometric_efficiency.scored_pairs
-                + report.global_geometric_efficiency.coincident_zero_path_pairs,
+                + report
+                    .global_geometric_efficiency
+                    .coincident_zero_path_pairs,
             report.global_geometric_efficiency.reachable_pairs
         );
     }
-
 }
