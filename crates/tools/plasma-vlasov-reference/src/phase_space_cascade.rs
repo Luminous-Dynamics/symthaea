@@ -157,8 +157,9 @@ impl VlasovPoisson1d1v {
         let mut x_line = vec![Complex::ZERO; nx];
         let mut x_spectrum = vec![Complex::ZERO; nx * nv];
         for iv in 0..nv {
-            for ix in 0..nx {
-                x_line[ix] = Complex::new(self.distribution[ix * nv + iv] - spatial_mean[iv], 0.0);
+            for (ix, coefficient) in x_line.iter_mut().enumerate() {
+                *coefficient =
+                    Complex::new(self.distribution[ix * nv + iv] - spatial_mean[iv], 0.0);
             }
             fft(&mut x_line, false);
             for (kx, coefficient) in x_line.iter().copied().enumerate() {
