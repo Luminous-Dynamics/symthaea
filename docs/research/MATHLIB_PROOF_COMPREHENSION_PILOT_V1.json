@@ -1,0 +1,310 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "SYTH-MATHLIB-PROOF-COMPREHENSION-SEED-V1",
+  "status": "source_pinned_seed_not_gold",
+  "created_at": "2026-11-22",
+  "description": "Four small Mathlib declarations selected for distinct mathematical proof mechanisms. The fixture records exact source pins and provisional source-expression dependency annotations. It is not an elaborated Lean dependency graph, kernel receipt, or expert-reviewed gold dataset.",
+  "source_snapshot": {
+    "repository": "leanprover-community/mathlib4",
+    "commit": "6ebcce37335bcb6bca64596e5d57bb3035648030",
+    "commit_url": "https://github.com/leanprover-community/mathlib4/commit/6ebcce37335bcb6bca64596e5d57bb3035648030",
+    "commit_date": "2026-11-22T12:53:55Z",
+    "lean_core_revision": "a9b5b8a25c4b932be8029426c2abd34685b078f0",
+    "files": [
+      {
+        "path": "Mathlib/Data/Nat/Choose/Basic.lean",
+        "blob_sha": "6a3c416983c34a77dc169ba1db21a1543bf793e8",
+        "url": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Nat/Choose/Basic.lean"
+      },
+      {
+        "path": "Mathlib/Data/Set/Countable.lean",
+        "blob_sha": "a7c1f764cf241df422807b7e6490e5552979e26d",
+        "url": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Set/Countable.lean"
+      },
+      {
+        "path": "Mathlib/Data/Multiset/MapFold.lean",
+        "blob_sha": "61a2e4aec65b05052f2b2dfa78e90de744766943",
+        "url": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Multiset/MapFold.lean"
+      },
+      {
+        "path": "Mathlib/Data/Finset/Card.lean",
+        "blob_sha": "3d75a047ffb84825e78e37b984c64dca90e5014c",
+        "url": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Finset/Card.lean"
+      }
+    ]
+  },
+  "task_count": 4,
+  "tasks": [
+    {
+      "id": "MATHLIB-NAT-CHOOSE-POS-001",
+      "declaration": "Nat.choose_pos",
+      "mechanism": "recursive_induction_and_order",
+      "source": {
+        "path": "Mathlib/Data/Nat/Choose/Basic.lean",
+        "blob_sha": "6a3c416983c34a77dc169ba1db21a1543bf793e8",
+        "line_start": 119,
+        "line_end": 122,
+        "permalink": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Nat/Choose/Basic.lean#L119-L122"
+      },
+      "statement": "∀ {n k : ℕ}, k ≤ n → 0 < Nat.choose n k",
+      "proof_expression": "theorem choose_pos : ∀ {n k}, k ≤ n → 0 < choose n k | 0, _, hk => by rw [Nat.eq_zero_of_le_zero hk]; decide | n + 1, 0, _ => by simp | _ + 1, _ + 1, hk => Nat.add_pos_left (choose_pos (le_of_succ_le_succ hk)) _",
+      "concept": "Positivity of binomial coefficients is established by recursive case analysis: the base cases are discharged directly, and the positive-index case reduces to positivity at a smaller pair plus a positivity-preserving addition rule.",
+      "graph_status": "source_expression_edges_only",
+      "provisional_edges": [
+        {
+          "source": "Nat.choose_pos",
+          "target": "Nat.eq_zero_of_le_zero",
+          "relation": "uses",
+          "evidence": "explicit base-case proof expression"
+        },
+        {
+          "source": "Nat.choose_pos",
+          "target": "Nat.add_pos_left",
+          "relation": "uses",
+          "evidence": "explicit recursive branch"
+        },
+        {
+          "source": "Nat.choose_pos",
+          "target": "Nat.choose_pos",
+          "relation": "recursive_call",
+          "evidence": "recursive branch decreases the successor indices"
+        },
+        {
+          "source": "Nat.choose_pos",
+          "target": "Nat.le_of_succ_le_succ",
+          "relation": "uses",
+          "evidence": "predecessor inequality in recursive call"
+        }
+      ],
+      "explanation_gaps": [
+        "The elaborated equation compiler expansion and exact recursor dependencies have not been extracted.",
+        "The `simp` and `decide` base-case elaborations need Lean trace or environment inspection."
+      ],
+      "questions": [
+        "Which parameters decrease in the recursive branch?",
+        "Why is k ≤ n required?",
+        "How does Nat.add_pos_left transfer strict positivity?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "CHOOSE-POS-NO-BOUND",
+          "mutation": "Remove the hypothesis k ≤ n.",
+          "expected": "False: take n=0 and k=1. Nat.choose 0 1 = 0, so the strict positivity conclusion fails.",
+          "witness": {
+            "n": 0,
+            "k": 1,
+            "choose": 0
+          }
+        }
+      ],
+      "annotation_status": "assistant-authored provisional; not expert-reviewed"
+    },
+    {
+      "id": "MATHLIB-SET-COUNTABLE-UNION-001",
+      "declaration": "Set.countable_union",
+      "mechanism": "countable_indexed_union_and_simp",
+      "source": {
+        "path": "Mathlib/Data/Set/Countable.lean",
+        "blob_sha": "a7c1f764cf241df422807b7e6490e5552979e26d",
+        "line_start": 235,
+        "line_end": 237,
+        "permalink": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Set/Countable.lean#L235-L237"
+      },
+      "statement": "∀ {s t : Set α}, (s ∪ t).Countable ↔ s.Countable ∧ t.Countable",
+      "proof_expression": "by simp [union_eq_iUnion, and_comm]",
+      "concept": "A union of two sets can be viewed as a union indexed by a two-element type. Countability of that union is equivalent to countability of each member. The file's neighboring lemma `countable_iUnion` supplies the general countable-indexed-union principle.",
+      "graph_status": "simp_trace_required",
+      "provisional_edges": [
+        {
+          "source": "Set.countable_union",
+          "target": "Set.union_eq_iUnion",
+          "relation": "uses",
+          "evidence": "explicit simp argument"
+        },
+        {
+          "source": "Set.countable_union",
+          "target": "and_comm",
+          "relation": "uses",
+          "evidence": "explicit simp argument"
+        }
+      ],
+      "known_related_declaration": {
+        "name": "Set.countable_iUnion",
+        "source_path": "Mathlib/Data/Set/Countable.lean",
+        "line_start": 205,
+        "line_end": 211
+      },
+      "explanation_gaps": [
+        "The exact simp theorem set and proof term expansion have not been extracted; do not claim that the two explicit simp arguments are the complete dependency closure.",
+        "The mathematical explanation is a conceptual summary pending reviewer confirmation."
+      ],
+      "questions": [
+        "How is a binary union encoded as a countable indexed union?",
+        "Which general theorem turns pointwise countability into countability of the union?",
+        "What does and_comm change in the final logical proposition?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "COUNTABLE-UNION-UNCOUNTABLE-INDEX",
+          "mutation": "Generalize from a binary union to an arbitrary union over an unrestricted uncountable index set, while assuming only that each component is countable.",
+          "expected": "False in general: the union of singleton subsets of an uncountable type is the entire uncountable type.",
+          "witness_sketch": "Take the index type α = ℝ and the family t(x) = {x}. Each singleton is countable, but ⋃ x, {x} = ℝ is uncountable."
+        }
+      ],
+      "annotation_status": "assistant-authored provisional; simp expansion and example require independent review"
+    },
+    {
+      "id": "MATHLIB-MULTISET-MAP-ID-001",
+      "declaration": "Multiset.map_id",
+      "mechanism": "quotient_induction_and_lift",
+      "source": {
+        "path": "Mathlib/Data/Multiset/MapFold.lean",
+        "blob_sha": "61a2e4aec65b05052f2b2dfa78e90de744766943",
+        "line_start": 152,
+        "line_end": 153,
+        "permalink": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Multiset/MapFold.lean#L152-L153"
+      },
+      "statement": "∀ {α : Type*} (s : Multiset α), Multiset.map id s = s",
+      "proof_expression": "Quot.inductionOn s fun _l => congr_arg _ <| List.map_id _",
+      "concept": "A multiset is represented as a quotient of lists by permutation. The proof reduces the goal to an arbitrary list representative, applies the list identity-map theorem, and transports the equality through the quotient construction.",
+      "graph_status": "source_expression_edges_only",
+      "provisional_edges": [
+        {
+          "source": "Multiset.map_id",
+          "target": "Quot.inductionOn",
+          "relation": "uses",
+          "evidence": "explicit proof expression"
+        },
+        {
+          "source": "Multiset.map_id",
+          "target": "List.map_id",
+          "relation": "uses",
+          "evidence": "explicit proof expression"
+        },
+        {
+          "source": "Multiset.map_id",
+          "target": "congr_arg",
+          "relation": "uses",
+          "evidence": "explicit proof expression"
+        }
+      ],
+      "explanation_gaps": [
+        "The exact quotient and recursor elaboration dependencies need Lean environment extraction.",
+        "The proof-role annotation should be reviewed by a Lean / quotient-types specialist."
+      ],
+      "questions": [
+        "Why can a multiset goal be reduced to an arbitrary list representative?",
+        "Why does equality of mapped lists descend to multiset equality?",
+        "What is the role of congr_arg?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "MULTISET-MAP-NONIDENTITY",
+          "mutation": "Replace id by an arbitrary function f.",
+          "expected": "False for non-identity f. With α=Bool, f=Bool.not and s={false}, the image is {true}, not {false}.",
+          "witness": {
+            "domain": "Bool",
+            "function": "Bool.not",
+            "multiset": [
+              "false"
+            ],
+            "mapped": [
+              "true"
+            ]
+          }
+        }
+      ],
+      "annotation_status": "assistant-authored provisional; not expert-reviewed"
+    },
+    {
+      "id": "MATHLIB-FINSET-CARD-MAP-001",
+      "declaration": "Finset.card_map",
+      "mechanism": "embedding_and_multiset_cardinality",
+      "source": {
+        "path": "Mathlib/Data/Finset/Card.lean",
+        "blob_sha": "3d75a047ffb84825e78e37b984c64dca90e5014c",
+        "line_start": 271,
+        "line_end": 272,
+        "permalink": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Finset/Card.lean#L271-L272"
+      },
+      "statement": "∀ {α β : Type*} {s : Finset α} (f : α ↪ β), (s.map f).card = s.card",
+      "proof_expression": "Multiset.card_map _ _",
+      "concept": "An embedding is injective, so mapping a finite set along it cannot merge distinct elements. The proof delegates to the fact that mapping a multiset preserves its cardinality; the embedding carries the distinctness requirement needed for the result to remain a Finset.",
+      "graph_status": "source_expression_edges_only",
+      "provisional_edges": [
+        {
+          "source": "Finset.card_map",
+          "target": "Multiset.card_map",
+          "relation": "uses",
+          "evidence": "explicit proof expression"
+        }
+      ],
+      "underlying_declaration": {
+        "name": "Multiset.card_map",
+        "path": "Mathlib/Data/Multiset/MapFold.lean",
+        "blob_sha": "61a2e4aec65b05052f2b2dfa78e90de744766943",
+        "line_start": 104,
+        "line_end": 105,
+        "permalink": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Multiset/MapFold.lean#L104-L105"
+      },
+      "questions": [
+        "Why does an embedding preserve the no-duplicate condition?",
+        "Why is the underlying cardinality theorem for multisets enough?",
+        "What would fail if the map were not injective?"
+      ],
+      "counterfactuals": [
+        {
+          "id": "FINSET-CARD-MAP-NONINJECTIVE",
+          "mutation": "Replace the embedding with an arbitrary non-injective function and use the image Finset.",
+          "expected": "Cardinality need not be preserved. Take α=Bool, β=Bool, the constant-false map, and s=univ: the image has cardinality 1 while s has cardinality 2.",
+          "witness": {
+            "domain": "Bool",
+            "codomain": "Bool",
+            "function": "constant false",
+            "source_cardinality": 2,
+            "image_cardinality": 1
+          }
+        }
+      ],
+      "annotation_status": "assistant-authored provisional; not expert-reviewed"
+    }
+  ],
+  "evaluation_plan": {
+    "baseline_arms": [
+      "raw source and proof expression",
+      "lexical retrieval",
+      "dense retrieval",
+      "Lean dependency graph only",
+      "source + dependency graph + type-directed explanation",
+      "hybrid plus HDC"
+    ],
+    "measures": [
+      "statement fidelity",
+      "dependency-edge precision/recall",
+      "mathematical mechanism identification",
+      "counterfactual diagnosis",
+      "explanation claim evidence coverage",
+      "near-transfer performance"
+    ],
+    "hard_gates": {
+      "wrong_statement_acceptance": 0,
+      "unsupported_formal_fact_claims": 0,
+      "unknown_allowed": true
+    },
+    "status": "not_run"
+  },
+  "limitations": [
+    "All dependency edges are provisional source-expression annotations, not a Lean elaborated-environment dependency closure.",
+    "The countable_union proof uses simp; the exact simp expansion and full dependency path are not supplied by this fixture.",
+    "No Lean compilation or kernel acceptance was run.",
+    "Annotations are not expert-reviewed and must not be treated as gold labels.",
+    "This dataset is a source-pinned pilot, not a SOTA benchmark result."
+  ],
+  "next_stage": [
+    "Run Lean-native declaration extraction against the pinned Mathlib commit.",
+    "Compare direct type/value dependencies with these provisional source-expression edges.",
+    "Trace the simp proof for Set.countable_union and record the actual theorem closure.",
+    "Obtain two independent annotations per task and adjudicate disagreements.",
+    "Freeze a held-out theorem-family split before HDC/CfC or retrieval tuning."
+  ]
+}
