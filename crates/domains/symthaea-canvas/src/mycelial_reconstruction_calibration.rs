@@ -741,7 +741,7 @@ impl MycelialReconstructionCalibrationReport {
                             != metric.brier_score.is_none()
                         || (self.counts.prediction_count == 0)
                             != metric.expected_calibration_error.is_none()
-                    || metric.brier_score.is_some_and(|value| !value.is_finite() || !(0.0..=2.0).contains(&value))
+                    || metric.brier_score.is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
                         || metric
                             .expected_calibration_error
                             .is_some_and(|value| !value.is_finite() || value < 0.0)
@@ -818,21 +818,36 @@ impl MycelialReconstructionCalibrationReport {
         }
         let mut previous_coverage = 0.0;
         let mut previous_threshold = f64::INFINITY;
+        let mut previous_errors = 0usize;
+        let mut previous_false_anastomosis = 0usize;
         for point in &self.selective_risk_curve {
+            let expected_coverage = (self.counts.prediction_count > 0).then_some(
+                point.retained_prediction_count as f64 / self.counts.prediction_count as f64,
+            );
+            let expected_risk = (point.retained_prediction_count > 0).then_some(
+                point.classification_error_count as f64
+                    / point.retained_prediction_count as f64,
+            );
+            let expected_false_anastomosis_rate = (point.predicted_anastomosis_count > 0)
+                .then_some(
+                    point.false_anastomosis_prediction_count as f64
+                        / point.predicted_anastomosis_count as f64,
+                );
             if !point.minimum_included_confidence.is_finite()
                 || !(0.0..=1.0).contains(&point.minimum_included_confidence)
                 || point.minimum_included_confidence >= previous_threshold
                 || point.retained_prediction_count == 0
                 || point.retained_prediction_count > self.counts.prediction_count
-                || point.retained_prediction_count as f64 / self.counts.prediction_count as f64
-                    <= previous_coverage
-                || !point.coverage.is_finite()
-                || !(0.0..=1.0).contains(&point.coverage)
+                || expected_coverage != Some(point.coverage)
+                || point.coverage <= previous_coverage
                 || !point.selective_risk.is_finite()
-                || !(0.0..=1.0).contains(&point.selective_risk)
+                || expected_risk != Some(point.selective_risk)
+                || point.classification_error_count < previous_errors
+                || point.classification_error_count > point.retained_prediction_count
+                || point.false_anastomosis_prediction_count < previous_false_anastomosis
                 || point.false_anastomosis_prediction_count
                     > point.predicted_anastomosis_count
-                || point.false_anastomosis_rate.is_some_and(|rate| !(0.0..=1.0).contains(&rate))
+                || point.false_anastomosis_rate != expected_false_anastomosis_rate
             {
                 return Err(MycelialReconstructionCalibrationError::InvalidReport(
                     "selective-risk curve is not monotone or has invalid rates",
@@ -840,6 +855,8 @@ impl MycelialReconstructionCalibrationReport {
             }
             previous_coverage = point.coverage;
             previous_threshold = point.minimum_included_confidence;
+            previous_errors = point.classification_error_count;
+            previous_false_anastomosis = point.false_anastomosis_prediction_count;
         }
         if self.counts.prediction_count == 0 && !self.selective_risk_curve.is_empty()
             || self.counts.prediction_count > 0
@@ -947,17 +964,28 @@ fn probability_inventory_digest(
 
 fn valid_calibration_bins(bins: &[ReconstructionCalibrationBin]) -> bool {
     bins.iter().enumerate().all(|(index, bin)| {
-        bin.bin_index == index
-            && (bin.sample_count == 0
-                && bin.mean_confidence.is_none()
+        if bin.bin_index != index {
+            return false;
+        }
+        if bin.sample_count == 0 {
+            return bin.mean_confidence.is_none()
                 && bin.empirical_frequency.is_none()
-                && bin.absolute_calibration_gap.is_none()
-                || bin.sample_count > 0
-                    && bin.mean_confidence.is_some_and(|value| (0.0..=1.0).contains(&value))
-                    && bin.empirical_frequency.is_some_and(|value| (0.0..=1.0).contains(&value))
-                    && bin.absolute_calibration_gap.is_some_and(|value| {
-                        value.is_finite() && (0.0..=1.0).contains(&value)
-                    }))
+                && bin.absolute_calibration_gap.is_none();
+        }
+        let (Some(confidence), Some(frequency), Some(gap)) = (
+            bin.mean_confidence,
+            bin.empirical_frequency,
+            bin.absolute_calibration_gap,
+        ) else {
+            return false;
+        };
+        confidence.is_finite()
+            && (0.0..=1.0).contains(&confidence)
+            && frequency.is_finite()
+            && (0.0..=1.0).contains(&frequency)
+            && gap.is_finite()
+            && (0.0..=1.0).contains(&gap)
+            && (gap - (confidence - frequency).abs()).abs() <= 1.0e-12
     })
 }
 
