@@ -1074,23 +1074,44 @@ mod tests {
         }
     }
 
-    fn tip_to_side_candidate(model: &MycelialModel, id: u32, distance: f32) -> MycelialAnastomosisCandidate {
-        let target = model.filaments.iter().find(|value| value.id == 3).unwrap();
-        let target_point = bezier_point(target, 0.5);
-        let source = model.filaments.iter().find(|value| value.id == 2).unwrap();
+    fn tip_to_side_candidate_between(
+        model: &MycelialModel,
+        id: u32,
+        source_id: u32,
+        target_id: u32,
+    ) -> MycelialAnastomosisCandidate {
+        let source = model
+            .filaments
+            .iter()
+            .find(|value| value.id == source_id)
+            .unwrap();
+        let target = model
+            .filaments
+            .iter()
+            .find(|value| value.id == target_id)
+            .unwrap();
         let source_point = source.end;
+        let target_point = bezier_point(target, 0.5);
         MycelialAnastomosisCandidate {
             fusion: MycelialAnastomosis {
                 id,
-                source_filament_id: 2,
+                source_filament_id: source_id,
                 source_t: 1.0,
-                target_filament_id: 3,
+                target_filament_id: target_id,
                 target_t: 0.5,
                 kind: AnastomosisKind::TipToSide,
                 junction_position: source_point.add(target_point).scale(0.5),
             },
-            contact_distance: distance,
+            contact_distance: point_distance(source_point, target_point),
         }
+    }
+
+    fn tip_to_side_candidate(
+        model: &MycelialModel,
+        id: u32,
+        _distance: f32,
+    ) -> MycelialAnastomosisCandidate {
+        tip_to_side_candidate_between(model, id, 2, 3)
     }
 
     #[test]
@@ -1125,6 +1146,117 @@ mod tests {
             profile.canonical_digest_hex().unwrap(),
             profile.canonical_digest_hex().unwrap()
         );
+    }
+
+    #[test]
+    fn filtration_is_candidate_order_independent_and_reports_each_cycle_birth() {
+        let model = fixture_model(0.25);
+        let near = tip_to_side_candidate_between(&model, 17, 2, 3);
+        let far = tip_to_side_candidate_between(&model, 18, 3, 2);
+        let first = build_mycelial_contact_filtration(
+            &model,
+            &[near.clone(), far.clone()],
+            MycelialContactFiltrationConfig {
+                maximum_contact_tolerance_model_units: 10.0,
+            },
+        )
+        .unwrap();
+        let second = build_mycelial_contact_filtration(
+            &model,
+            &[far, near],
+            MycelialContactFiltrationConfig {
+                maximum_contact_tolerance_model_units: 10.0,
+            },
+        )
+        .unwrap();
+        assert_eq!(first.canonical_digest_hex().unwrap(), second.canonical_digest_hex().unwrap());
+        assert_eq!(first.snapshots.len(), 2);
+        assert_eq!(first.snapshots[0].cycle_rank, 1);
+        assert_eq!(first.snapshots[1].cycle_rank, 2);
+        assert_eq!(first.metrics.final_cycle_rank, 2);
+        assert_eq!(first.metrics.component_merge_count, 0);
+    }
+
+    #[test]
+    fn cycle_filtration_matches_independent_breadth_first_component_oracle() {
+        let model = fixture_model(0.25);
+        let candidates = vec![
+            tip_to_side_candidate_between(&model, 17, 2, 3),
+            tip_to_side_candidate_between(&model, 18, 3, 2),
+        ];
+        let profile = build_mycelial_contact_filtration(
+            &model,
+            &candidates,
+            MycelialContactFiltrationConfig {
+                maximum_contact_tolerance_model_units: 10.0,
+            },
+        )
+        .unwrap();
+
+        for snapshot in &profile.snapshots {
+            let threshold = snapshot.contact_tolerance_microunits as f64 / 1_000_000.0;
+            let mut adjacency = BTreeMap::<u32, Vec<u32>>::new();
+            for filament in &model.filaments {
+                adjacency.insert(filament.id, Vec::new());
+            }
+            let mut edge_count = 0usize;
+            for filament in &model.filaments {
+                if let Some(parent) = filament.parent_id {
+                    adjacency.get_mut(&parent).unwrap().push(filament.id);
+                    adjacency.get_mut(&filament.id).unwrap().push(parent);
+                    edge_count += 1;
+                }
+            }
+            for candidate in &candidates {
+                if f64::from(candidate.contact_distance) <= threshold + 1.0e-6 {
+                    adjacency
+                        .get_mut(&candidate.fusion.source_filament_id)
+                        .unwrap()
+                        .push(candidate.fusion.target_filament_id);
+                    adjacency
+                        .get_mut(&candidate.fusion.target_filament_id)
+                        .unwrap()
+                        .push(candidate.fusion.source_filament_id);
+                    edge_count += 1;
+                }
+            }
+            let mut visited = BTreeSet::new();
+            let mut components = 0usize;
+            for start in adjacency.keys().copied() {
+                if !visited.insert(start) {
+                    continue;
+                }
+                components += 1;
+                let mut queue = VecDeque::from([start]);
+                while let Some(current) = queue.pop_front() {
+                    for neighbour in &adjacency[&current] {
+                        if visited.insert(*neighbour) {
+                            queue.push_back(*neighbour);
+                        }
+                    }
+                }
+            }
+            let reference_cycle_rank = edge_count + components - model.filaments.len();
+            assert_eq!(snapshot.connected_components, components);
+            assert_eq!(snapshot.cycle_rank, reference_cycle_rank);
+        }
+    }
+
+    #[test]
+    fn serialized_cycle_witness_cannot_be_tampered_without_validation_failure() {
+        let model = fixture_model(0.25);
+        let candidate = tip_to_side_candidate(&model, 17, 0.25);
+        let mut profile = build_mycelial_contact_filtration(
+            &model,
+            &[candidate],
+            MycelialContactFiltrationConfig {
+                maximum_contact_tolerance_model_units: 1.0,
+            },
+        )
+        .unwrap();
+        profile.cycle_births[0].witness_path[0].from_filament_id = 99;
+        assert!(profile.validate().is_err());
+        assert!(profile.canonical_digest_hex().is_err());
     }
 
     #[test]
