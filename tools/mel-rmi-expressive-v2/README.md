@@ -10,7 +10,7 @@ This isolated Rust crate is the first executable synthetic panel under issue #10
 
 ## V2 dimensions
 
-The schema carries five independent dimensions: velocity, articulation, rubato offset, register and phrase gesture. The initial deterministic positive fixture and tests cover velocity and rubato as ordered features, and phrase gesture/articulation as categorical features.
+The schema carries five independent dimensions: velocity, articulation, rubato offset, register and phrase gesture. The initial deterministic positive fixture and tests cover velocity, rubato and register as ordered features, and phrase gesture/articulation as categorical features.
 
 Every trial contains independent partner-to-agent and agent-to-partner paired arms. Each arm freezes control/treatment input and control/treatment response frames, a target feature, target event scope and expected response relation.
 
