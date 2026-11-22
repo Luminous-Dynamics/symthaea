@@ -15,9 +15,13 @@ This is the closest graph-theoretic analogue of the weighted minimum spanning tr
 
 ### Euclidean minimum spanning tree
 
-This is a different object: it creates new straight-line connections between measured junction locations, regardless of whether a hypha segment exists. It is a spatial lower-cost reference, not an observed biological network. It can connect components that were disconnected in the measured graph.
+Implemented in `mycelial_reference_networks.rs` as `build_euclidean_minimum_spanning_tree`.
 
-It is not implemented in this source slice.
+This is a different object: it creates new straight-line connections between all measured junction locations, regardless of whether a hypha segment exists. It is a spatial lower-cost reference, not an observed biological network. It can connect components that were disconnected in the measured graph.
+
+The implementation uses deterministic O(V²)-time Prim without materializing the O(V²) complete candidate-edge set. Junction IDs are sorted before traversal and tie-breaking is stable. The caller must explicitly choose 2D or 3D distance; a 2D call rejects any non-planar junction rather than silently flattening 3D geometry. The report retains source digest, complete sorted node/root/terminal identity sets, selected edges, cost, dimension, efficiency denominator counts, and a canonical receipt digest. Coincident node pairs with zero graph and Euclidean distance are counted separately and excluded from the undefined 0/0 directness ratio.
+
+This is a geometric complete-point-set reference only. It is not the same as the observed-edge MST, the Delaunay network, or a transport-conductance optimum.
 
 ### Delaunay reference
 
@@ -53,7 +57,19 @@ For an input with (V) junctions and (C) connected components, the forest must se
 
 The unit is inherited from the source graph and is currently `organism_local_model_unit`. It is not a physical measurement.
 
-## 3. Exact AMF comparator inspected
+## 3. Implemented spatial lower-bound reference
+
+The Euclidean MST is now computed in either explicit 2D or 3D mode. It adds straight-line edges to span the complete junction point set and reports:
+- selected straight-line edge identities and lengths;
+- total Euclidean construction cost;
+- global directness over all unordered point pairs;
+- caller-declared root-to-terminal directness;
+- pair denominators and zero-distance coincident pairs excluded from the directness ratio;
+- source-graph and reference-report digests.
+
+The current renderer benchmark calls the 3D version and labels its roots as renderer-origin anchors, not biological roots. These results remain in model-local units. No physical or biological comparison follows from them.
+
+## 4. Exact AMF comparator inspected
 
 The public repository `Cocopyth/AMFTravellingWave` includes:
 - `Figure_plots/Fig4/Efficiency/NetworkEfficiency.m`
@@ -77,7 +93,7 @@ https://doi.org/10.1038/s41586-025-08614-x
 
 The repository README identifies Figshare DOI 10.6084/m9.figshare.27889143 as the source-data package. The inspected code licence is MIT; the dataset licence and redistribution rights have not been independently verified. Do not copy or redistribute the dataset until the relevant licence has been checked.
 
-## 4. Fair-comparison requirements
+## 5. Fair-comparison requirements
 
 Before numerical comparison with the paper, the Symthaea data adapter must provide:
 
@@ -93,7 +109,7 @@ Before numerical comparison with the paper, the Symthaea data adapter must provi
 
 The current renderer-generated graph is not a substitute for this dataset. Its values are only useful for deterministic contract tests and performance scaling.
 
-## 5. Proposed comparative table
+## 6. Proposed comparative table
 
 For each time point and replicate, report:
 
@@ -107,7 +123,7 @@ For each time point and replicate, report:
 
 Keep the distinction between graph-theoretic directness and physical transport. The latter requires measured widths, calibrated conductance assumptions and flow validation.
 
-## 6. Proposed targets (not achieved)
+## 7. Proposed targets (not achieved)
 
 - Exact MST edge count (V-C) for every connected-component configuration.
 - Exact total-weight agreement with an independent Kruskal/Prim oracle on frozen small graphs.
@@ -118,10 +134,10 @@ Keep the distinction between graph-theoretic directness and physical transport. 
 - On matched AMF data, reproduce the reference's reported global/root directness and cost curves within a predeclared tolerance before making a comparative performance claim.
 - Only after replication, test whether the proposed growth policies improve the multi-objective Pareto frontier (directness, coverage, cost and resilience) on held-out time points/replicates.
 
-## 7. Next extensions
+## 8. Next extensions
 
 1. Independent small-graph Kruskal/Prim oracle.
-2. Euclidean MST, explicitly separate from observed-edge MST.
+2. Delaunay reference with robust duplicate/co-circular handling and a declared 2D-only track.
 3. 2D Delaunay reference with robust duplicate/co-circular handling and a declared 2D-only track.
 4. 3D Delaunay reference separately, with robust tetrahedral degeneracy handling.
 5. Physical radius/volume/conductance profiles only from measured widths and calibrated assumptions.
