@@ -362,7 +362,7 @@ fn summary_record(
         "record_type": "counterfactual_method_summary",
         "method": method,
         "intervention_kind": intervention_kind,
-        "independent_world_cluster_count": cluster_values.len(),
+        "world_cluster_count": cluster_values.len(),
         "task_block_count": task_block_count,
         "intervention_row_count": intervention_row_count,
         "mean_utility": means.utility,
@@ -412,7 +412,7 @@ fn paired_record(
         "baseline_method": EXACT_METHOD,
         "method": method,
         "intervention_kind": intervention_kind,
-        "independent_world_cluster_count": cluster_values.len(),
+        "world_cluster_count": cluster_values.len(),
         "paired_task_block_count": task_block_count,
         "mean_utility_delta_vs_exact_scope": means.utility,
         "mean_regret_delta_vs_exact_scope": means.regret,
@@ -438,6 +438,7 @@ fn reduce(
     let mut intervention_row_count = 0_usize;
     let mut manifest_row_count = 0_usize;
     let mut manifest_shas = BTreeSet::new();
+    let mut manifest_pair_blocks = BTreeSet::new();
     let mut input_provenance: Option<InputProvenance> = None;
 
     for (line_index, line) in reader.lines().enumerate() {
@@ -451,6 +452,11 @@ fn reduce(
             Some("intervention_manifest") => {
                 let (provenance, manifest_sha) = parse_manifest(&record)
                     .map_err(|error| format!("line {}: {error}", line_index + 1))?;
+                let manifest_pair_block =
+                    required_string(&record, "pair_block_id")?.to_string();
+                if !manifest_pair_blocks.insert(manifest_pair_block) {
+                    return Err("duplicate intervention manifest pair_block_id".to_string());
+                }
                 if let Some(existing) = &input_provenance {
                     if existing != &provenance {
                         return Err("evaluator stream mixes run IDs or source/schema revisions".to_string());
@@ -477,6 +483,9 @@ fn reduce(
         }
         let (task_key, method_kind, metrics) = parse_score(&record)
             .map_err(|error| format!("line {}: {error}", line_index + 1))?;
+        if !manifest_pair_blocks.contains(&task_key.1) {
+            return Err("evaluator_score has no matching intervention manifest".to_string());
+        }
         block_rows
             .entry(task_key)
             .or_default()
