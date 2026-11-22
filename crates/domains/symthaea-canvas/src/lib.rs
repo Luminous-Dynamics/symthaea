@@ -118,12 +118,14 @@ pub use mycelial_reconstruction_metrics::{
     evaluate_mycelial_reconstruction, match_junctions_hungarian,
 };
 pub use mycelial_temporal_cycles::{
+    MAX_TEMPORAL_CYCLE_RECORDS, MAX_TEMPORAL_CYCLE_WINDOW_OBSERVATIONS,
     MAX_TEMPORAL_CYCLES_PER_WINDOW, MAX_TEMPORAL_MYCELIAL_EDGES,
     MAX_TEMPORAL_MYCELIAL_NODES, MAX_TEMPORAL_MYCELIAL_WINDOWS,
     MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION, MYCELIAL_TEMPORAL_CYCLE_SCHEMA_VERSION,
     MycelialTemporalCycleConfig, MycelialTemporalCycleError, TemporalCycleWindowObservation,
     TemporalCycleWindowState, TemporalEdgeEvidence, TemporalMycelialCycleHyperedge,
     TemporalMycelialCycleProfile, TemporalMycelialCycleRecord, TemporalMycelialEdge,
+    TemporalMycelialEdgeEvidenceCounts, TemporalMycelialEdgeEvidenceRecord,
     TemporalMycelialNodeMetrics, TemporalMycelialSequence, TemporalMycelialSnapshot,
     TemporalMycelialSnapshotMetrics, TemporalWindowCoverage,
     build_temporal_mycelial_cycle_profile,
