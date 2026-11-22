@@ -465,3 +465,23 @@ A validated numeric target requires a finite point value, unit and standard unce
 **Critical invariant:** an old measurement event is not a usable training target until its result is available. Training and evaluation must never backfill a later lab result into an earlier model snapshot. Unaligned clock domains are excluded rather than guessed.
 
 Rust tests cover event/availability separation, delayed labels, late-arriving event exclusion, clock-domain mismatch, future timestamps, unresolved graph edges, label/subject consistency and immutable revision lineage. The graph validator establishes schema/time/identity integrity only; it does not prove sensor accuracy, physical causality, VM calibration, transfer or process-control authority.
+
+
+## Unit-aware, digest-bound binary metrology semantics
+
+The Rust module \`benchmark::metrology_semantics\` converts a validated physical measurement into a binary class using an immutable, versioned threshold rule. It replaces the unsafe pattern of accepting a raw \`positive: bool\` beside a measured value without proving that the Boolean follows the actual value, unit and declared process specification.
+
+A \`BinaryMeasurandSemanticsV1\` specifies:
+- semantics ID and revision;
+- exact measurand ID and unit;
+- positive and negative class names;
+- one of four explicit comparators (\`>\`, \`>=\`, \`<\`, \`<=\`);
+- finite numeric threshold;
+- authority/specification reference;
+- SHA-256 over all definition fields.
+
+\`classify_validated_metrology_label_v1\` validates the complete process-event graph, resolves the metrology label and its measurement event, requires validated status, exact subject/measurand/unit identity and finite value, then derives the class from the frozen rule. The classification receipt binds the physical value, unit, label/event/subject IDs, graph digest, semantics revision/digest, comparator, threshold, class names and authority reference.
+
+A unit or measurand mismatch, provisional/censored/invalid/unknown result, invalid threshold, tampered rule digest, or unresolved measurement event rejects. Changing a threshold or comparator changes the rule digest and the resulting classification receipt.
+
+**Claim ceiling:** the primitive guarantees only that the class follows the declared rule. It does not prove the threshold is scientifically correct, the source specification is authoritative, the instrument is calibrated, or the measurand-to-quality mapping is appropriate. Those remain separate qualification evidence.
