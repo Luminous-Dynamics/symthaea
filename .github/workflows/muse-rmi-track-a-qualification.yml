@@ -1,0 +1,72 @@
+name: MUSE RMI Track A Qualification
+
+on:
+  push:
+    branches:
+      - research/rmi-bench-track-a-runner-20261121
+    paths:
+      - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/rmi_track_a_runner.rs"
+      - "crates/domains/symthaea-muse/tests/rmi_track_a_replay.rs"
+      - "crates/domains/symthaea-muse/src/bin/rmi_track_a.rs"
+      - "scripts/mel_rmi_track_a_qualification.sh"
+      - ".github/workflows/muse-rmi-track-a-qualification.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-muse/src/rmi_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/bin/rmi_track_a.rs"
+      - "scripts/mel_rmi_track_a_qualification.sh"
+      - ".github/workflows/muse-rmi-track-a-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-rmi-track-a-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head RMI Track A
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact tested PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "exact source head: $actual"
+
+      - name: Verify pinned Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+          rustfmt --version
+
+      - name: Stage, test, lint, execute and replay isolated RMI harness
+        shell: bash
+        env:
+          MEL_RMI_TRIALS_PER_TARGET: "8"
+          MEL_RMI_SEED_ROOT: "42"
+          MEL_RMI_EVIDENCE_DIR: ${{ runner.temp }}/mel-rmi-track-a-evidence
+        run: |
+          bash scripts/mel_rmi_track_a_qualification.sh "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Upload exact-head RMI qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: melothaea-rmi-track-a-${{ github.sha }}
+          path: ${{ runner.temp }}/mel-rmi-track-a-evidence/
+          if-no-files-found: error
+          retention-days: 30
