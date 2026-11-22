@@ -407,6 +407,13 @@ fn action_utility(truth: stress::Truth, action: Option<Action>) -> f64 {
     truth.utility(action.unwrap_or(Action::B))
 }
 
+fn pair_block_id(cluster: u64, family: &str, query: Query) -> String {
+    format!(
+        "cluster-{cluster}:{family}:{:?}:{:?}",
+        query.scope.regime, query.scope.objective
+    )
+}
+
 fn candidate_input_digest(case: &CandidateTask<'_>) -> String {
     sha256(
         format!(
@@ -437,7 +444,7 @@ fn candidate_record(
     arm: Arm,
     result: &CandidateRun,
 ) -> Value {
-    let pair_block_id = format!("cluster-{}:{}", case.cluster, case.family);
+    let pair_block_id = pair_block_id(case.cluster, case.family, case.query);
     let query_id = format!("query-{}", sha256(pair_block_id.as_bytes())[..16].to_string());
     let decision_support_ids = result.decision.evidence_ids.clone();
     let trace_digest = json_sha256(&json!({
@@ -519,8 +526,11 @@ fn evaluate_arm(
     ScoredArm {
         arm,
         cluster: case.cluster,
-        family: case.family.to_string(),
-        pair_block_id: format!("cluster-{}:{}", case.cluster, case.family),
+        family: format!(
+            "{}:{:?}:{:?}",
+            case.family, case.query.scope.regime, case.query.scope.objective
+        ),
+        pair_block_id: pair_block_id(case.cluster, case.family, case.query),
         decision: action,
         utility_micros: utility,
         regret_micros: regret,
