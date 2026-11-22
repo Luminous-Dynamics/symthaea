@@ -352,9 +352,8 @@ mod tests {
             solver.step(0.01).unwrap();
         }
         let final_budget = solver.quadratic_casimir_budget().unwrap();
-        let relative_drift =
-            (final_budget.total_casimir - initial.total_casimir).abs()
-                / initial.total_casimir.max(f64::MIN_POSITIVE);
+        let relative_drift = (final_budget.total_casimir - initial.total_casimir).abs()
+            / initial.total_casimir.max(f64::MIN_POSITIVE);
         assert!(
             relative_drift < 1.0e-11,
             "full-step quadratic Casimir relative drift = {relative_drift:e}"
