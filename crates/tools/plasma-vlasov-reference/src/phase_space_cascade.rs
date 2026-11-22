@@ -305,6 +305,58 @@ mod tests {
     }
 
     #[test]
+    fn finite_velocity_grid_has_predicted_nyquist_encounter_and_recurrence() {
+        let config = config();
+        let mut solver = initial_solver();
+        let initial_distribution = solver.distribution().to_vec();
+        let initial_spectrum = solver.joint_phase_space_spectrum().unwrap();
+
+        let spatial_wave_number = std::f64::consts::TAU / config.domain_length;
+        let nyquist_time = std::f64::consts::PI / (spatial_wave_number * config.dv());
+        let recurrence_time = std::f64::consts::TAU / (spatial_wave_number * config.dv());
+        assert!((recurrence_time - 2.0 * nyquist_time).abs() < 1.0e-12);
+
+        solver.advance_free_streaming(nyquist_time).unwrap();
+        let nyquist_spectrum = solver.joint_phase_space_spectrum().unwrap();
+        let nyquist_fraction =
+            nyquist_spectrum.nyquist_f_strophy / nyquist_spectrum.spectral_f_strophy;
+        assert!(
+            nyquist_fraction > 0.10,
+            "Nyquist occupancy {nyquist_fraction:e} failed to rise above the declared threshold"
+        );
+        assert!(nyquist_spectrum.parseval_relative_residual < 1.0e-12);
+
+        solver
+            .advance_free_streaming(recurrence_time - nyquist_time)
+            .unwrap();
+        let recurrence_distribution = solver.distribution();
+        let maximum_error = recurrence_distribution
+            .iter()
+            .zip(initial_distribution.iter())
+            .map(|(observed, expected)| (observed - expected).abs())
+            .fold(0.0_f64, f64::max);
+        let distribution_scale = initial_distribution
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0_f64, f64::max)
+            .max(f64::MIN_POSITIVE);
+        let relative_recurrence_error = maximum_error / distribution_scale;
+        assert!(
+            relative_recurrence_error < 1.0e-10,
+            "discrete free-streaming recurrence error = {relative_recurrence_error:e}"
+        );
+
+        let recurrence_spectrum = solver.joint_phase_space_spectrum().unwrap();
+        let recurrence_nyquist_fraction =
+            recurrence_spectrum.nyquist_f_strophy / recurrence_spectrum.spectral_f_strophy;
+        assert!(
+            recurrence_nyquist_fraction
+                < initial_spectrum.nyquist_f_strophy / initial_spectrum.spectral_f_strophy + 1.0e-8,
+            "Nyquist occupancy did not return near its initial value: {recurrence_nyquist_fraction:e}"
+        );
+    }
+
+    #[test]
     fn free_streaming_moves_joint_spectrum_toward_phase_mixing_sector() {
         let mut solver = initial_solver();
         solver.advance_free_streaming(4.0).unwrap();
