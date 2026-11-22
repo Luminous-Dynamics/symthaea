@@ -131,7 +131,7 @@ fixture digest was independently confirmed with `sha256sum`.
 
 ## Leptos knowledge corpus
 
-The versioned starter corpus is in
+The expanded corpus is pinned to Leptos 0.8.20 (the Cargo.lock resolution). The latest stable 0.8.23 compatibility experiment is kept separate. The corpus is in
 `knowledge/leptos-0.8/patterns-v0.json`, with schema
 `knowledge/leptos-0.8/pattern-v1.schema.json`. It currently records seventeen
 source-grounded patterns for Leptos 0.8 CSR and exact Git blob SHA-1 provenance
@@ -194,6 +194,20 @@ The live status region reports the same state that colors the indicator.
 The connected state is entered only after the browser WebSocket reaches
 `State::Open`; a handshake timeout or closed stream returns to the
 bounded retry path.
+
+## Framework version compatibility
+
+The current checked-in `Cargo.lock` resolves Leptos to **0.8.20**. Upstream has
+published **0.8.23** as the latest stable 0.8 release (2026-10-31); **0.9.0-rc1**
+is a prerelease. The benchmark baseline remains pinned to the repository's
+0.8.20 lock resolution.
+
+A separate, machine-readable seven-gate compatibility experiment is defined in
+`compatibility/leptos-0.8.20-to-0.8.23-v1.json`. It covers dependency
+resolution, lockfile diff, fmt/Clippy, package tests, WASM builds, browser
+regression and performance. It must run in an isolated branch/worktree; do not
+change the baseline lockfile or mix a framework update into an agent-quality
+comparison.
 
 ## Task lifecycle
 
