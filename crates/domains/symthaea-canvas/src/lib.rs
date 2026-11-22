@@ -96,15 +96,19 @@ pub use mycelial_contact_persistence::{
     build_mycelial_contact_filtration,
 };
 pub use mycelial_failure_resilience::{
+    MAX_FAILURE_DELIVERY_EVALUATIONS, MAX_FAILURE_DELIVERY_TRIALS_PER_SCENARIO,
     MAX_FAILURE_DEMAND_PAIRS, MAX_FAILURE_DEMAND_SOURCES, MAX_FAILURE_ID_BYTES,
     MAX_FAILURE_JUNCTIONS, MAX_FAILURE_SCENARIOS, MAX_FAILURE_SEGMENTS,
     MAX_FAILURE_TOTAL_DEMAND_WEIGHT, MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION,
     MycelialDemandPair, MycelialDemandPairOutcome, MycelialDemandPathLoad,
     MycelialFailureAttackConfig, MycelialFailureAttackEvaluation, MycelialFailureAttackPlan,
-    MycelialFailureAttackStrategy, MycelialFailureMetrics, MycelialFailureResilienceError,
+    MycelialFailureAttackStrategy, MycelialFailureDeliveryConfig,
+    MycelialFailureDeliveryProfile, MycelialFailureDeliveryScenarioSummary,
+    MycelialFailureDeliveryTrial, MycelialFailureMetrics, MycelialFailureResilienceError,
     MycelialFailureResilienceProfile, MycelialFailureScenario,
-    build_mycelial_failure_attack_plan, build_mycelial_failure_resilience_profile,
-    build_single_failure_resilience_profile, evaluate_mycelial_failure_attack_plan,
+    build_mycelial_failure_attack_plan, build_mycelial_failure_delivery_profile,
+    build_mycelial_failure_resilience_profile, build_single_failure_resilience_profile,
+    evaluate_mycelial_failure_attack_plan,
 };
 pub use mycelial_junction_graph::{
     GeometricEfficiencyReport, JunctionKind, JunctionLengthUnit, MAX_JUNCTION_GRAPH_JUNCTIONS,
