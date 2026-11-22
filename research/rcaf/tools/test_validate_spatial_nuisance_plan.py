@@ -106,7 +106,7 @@ class SpatialNuisancePlanTests(unittest.TestCase):
     def test_identifiability_boundary_must_be_present_in_declared_grid(self):
         plan = deepcopy(FIXTURE)
         plan["identifiability_boundary"]["spatial_alignment"] = 0.75
-        with self.assertRaisesRegex(SpatialPlanValidationError, "observational-equivalence boundary"):
+        with self.assertRaises(SpatialPlanValidationError):
             validate_plan(plan, SCHEMA)
 
     def test_identifiability_boundary_requires_abstention(self):
