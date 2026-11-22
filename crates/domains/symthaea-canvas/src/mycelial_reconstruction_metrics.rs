@@ -199,6 +199,8 @@ pub struct MycelialReconstructionScore {
     pub dimensionality: ReconstructionDimensionality,
     pub length_unit: ReconstructionLengthUnit,
     pub matching_policy_id: String,
+    pub maximum_junction_match_distance: f64,
+    pub length_relative_epsilon: f64,
     pub ground_truth_digest: String,
     pub prediction_digest: String,
     pub identity_matches: Vec<JunctionIdentityMatch>,
@@ -611,6 +613,8 @@ pub fn evaluate_mycelial_reconstruction(
         dimensionality: ground_truth.dimensionality,
         length_unit: ground_truth.length_unit,
         matching_policy_id: matching_policy_id.to_string(),
+        maximum_junction_match_distance: config.maximum_junction_match_distance,
+        length_relative_epsilon: config.length_relative_epsilon,
         ground_truth_digest: ground_truth.canonical_digest_hex()?,
         prediction_digest: prediction.canonical_digest_hex()?,
         identity_matches: normalized_matches,
@@ -713,6 +717,11 @@ impl MycelialReconstructionScore {
             || !valid_id(&self.frame_id)
             || !valid_digest(&self.source_observation_digest)
             || !valid_id(&self.matching_policy_id)
+            || !self.maximum_junction_match_distance.is_finite()
+            || self.maximum_junction_match_distance <= 0.0
+            || self.maximum_junction_match_distance > MAX_RECONSTRUCTION_COORDINATE
+            || !self.length_relative_epsilon.is_finite()
+            || !(1.0e-15..=1.0e-3).contains(&self.length_relative_epsilon)
             || !valid_digest(&self.ground_truth_digest)
             || !valid_digest(&self.prediction_digest)
             || self.identity_matches.windows(2).any(|pair| {
@@ -790,6 +799,8 @@ impl MycelialReconstructionScore {
             ReconstructionLengthUnit::OrganismLocalModelUnit => 3,
         }]);
         hash_string(&mut hasher, &self.matching_policy_id);
+        hasher.update(&self.maximum_junction_match_distance.to_bits().to_le_bytes());
+        hasher.update(&self.length_relative_epsilon.to_bits().to_le_bytes());
         hasher.update(self.ground_truth_digest.as_bytes());
         hasher.update(self.prediction_digest.as_bytes());
         for matched in &self.identity_matches {
