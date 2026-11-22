@@ -16,6 +16,7 @@ pub mod simulation;
 pub mod spatial_calibration;
 pub mod spatial_nuisance;
 pub mod weighted_covariate_shift;
+pub mod sketch_sufficiency_audit;
 
 use std::fmt;
 
