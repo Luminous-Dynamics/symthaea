@@ -1052,7 +1052,8 @@ mod tests {
             "../../qualification/mutation-campaign-v1.json"
         ))
         .expect("checked-in mutation campaign is valid JSON");
-        campaign["mutations"][1]["id"] = campaign["mutations"][0]["id"].clone();
+        let duplicate_id = campaign["mutations"][0]["id"].clone();
+        campaign["mutations"][1]["id"] = duplicate_id;
 
         assert!(validate_mutation_campaign(&schema, &campaign).is_err());
     }
