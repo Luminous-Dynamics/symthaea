@@ -108,6 +108,11 @@ pub enum RobustObservationVoiError {
     OutcomeWorldUnknown { world_id: u64 },
     WorldHasNoPossibleOutcome { world_id: u64 },
     EmptyDeliveredOutcomeDigest { world_id: u64 },
+    OutcomeDigestAvailabilityMismatch {
+        candidate_visible_outcome_sha256: [u8; 32],
+        first_available_at_us: u64,
+        conflicting_available_at_us: u64,
+    },
     ArithmeticOverflow,
     DecisionObservability(DecisionObservabilityError),
 }
@@ -122,6 +127,11 @@ impl fmt::Display for RobustObservationVoiError {
             Self::OutcomeWorldUnknown { world_id } => write!(formatter, "sensor outcome references unknown world {world_id}"),
             Self::WorldHasNoPossibleOutcome { world_id } => write!(formatter, "world {world_id} has no declared possible sensor outcome"),
             Self::EmptyDeliveredOutcomeDigest { world_id } => write!(formatter, "delivered outcome for world {world_id} has an empty candidate-visible transcript digest"),
+            Self::OutcomeDigestAvailabilityMismatch {
+                candidate_visible_outcome_sha256,
+                first_available_at_us,
+                conflicting_available_at_us,
+            } => write!(formatter, "candidate-visible transcript digest {candidate_visible_outcome_sha256:02x?} binds conflicting availability times {first_available_at_us} and {conflicting_available_at_us}"),
             Self::ArithmeticOverflow => write!(formatter, "robust observation-regret arithmetic overflowed"),
             Self::DecisionObservability(error) => write!(formatter, "base decision-observability qualification failed: {error}"),
         }
@@ -178,6 +188,10 @@ fn validate_and_partition_support(
         .collect();
     let mut per_world: BTreeMap<u64, BTreeSet<CandidateVisibleOutcome>> =
         BTreeMap::new();
+    // The transcript digest includes availability time. A digest collision
+    // across different times is therefore malformed input, not a second
+    // candidate-visible outcome with the same transcript identity.
+    let mut availability_by_digest: BTreeMap<[u8; 32], u64> = BTreeMap::new();
 
     for row in &model.possible_outcomes {
         if !world_ids.contains(&row.evaluator_world_id) {
@@ -186,6 +200,25 @@ fn validate_and_partition_support(
             });
         }
         let outcome = normalize_visible_outcome(row, model.decision_deadline_us)?;
+        if let CandidateVisibleOutcome::Delivered {
+            transcript_sha256,
+            available_at_us,
+        } = outcome
+        {
+            if let Some(first_available_at_us) =
+                availability_by_digest.insert(transcript_sha256, available_at_us)
+            {
+                if first_available_at_us != available_at_us {
+                    return Err(
+                        RobustObservationVoiError::OutcomeDigestAvailabilityMismatch {
+                            candidate_visible_outcome_sha256: transcript_sha256,
+                            first_available_at_us,
+                            conflicting_available_at_us: available_at_us,
+                        },
+                    );
+                }
+            }
+        }
         per_world
             .entry(row.evaluator_world_id)
             .or_default()
@@ -495,19 +528,20 @@ mod tests {
     }
 
     #[test]
-    fn same_digest_with_distinct_available_times_remains_distinct() {
+    fn rejects_same_transcript_digest_with_conflicting_availability_times() {
         let class = opposed_worlds();
         let model = model(
             vec![row(1, 10, Some(40)), row(2, 10, Some(80))],
             100,
         );
-        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
-        assert_eq!(result.outcomes.len(), 2);
         assert_eq!(
-            result.outcomes.iter().map(|outcome| outcome.available_at_us).collect::<Vec<_>>(),
-            vec![Some(40), Some(80)]
+            evaluate_robust_decision_regret_observation(&class, &model),
+            Err(RobustObservationVoiError::OutcomeDigestAvailabilityMismatch {
+                candidate_visible_outcome_sha256: digest(10),
+                first_available_at_us: 40,
+                conflicting_available_at_us: 80,
+            })
         );
-        assert_eq!(result.guaranteed_regret_reduction_ppm, 1_000_000);
     }
 
     #[test]
