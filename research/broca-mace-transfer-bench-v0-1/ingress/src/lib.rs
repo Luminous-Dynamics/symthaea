@@ -1194,6 +1194,159 @@ impl EvidenceDependencySidecarV1 {
         })
     }
 
+    /// Decode the versioned sidecar interchange object and verify its canonical commitment.
+    ///
+    /// This is an integrity check only. It does not authenticate receipt issuers;
+    /// callers must obtain the JSON from the configured ingress/Mycelix verifier.
+    pub fn from_json_value(value: &serde_json::Value) -> Result<Self, String> {
+        fn object<'a>(
+            value: &'a serde_json::Value,
+            context: &str,
+        ) -> Result<&'a serde_json::Map<String, serde_json::Value>, String> {
+            value.as_object().ok_or_else(|| format!("{context} must be a JSON object"))
+        }
+        fn reject_unknown(value: &serde_json::Value, allowed: &[&str], context: &str) -> Result<(), String> {
+            let map = object(value, context)?;
+            if let Some(key) = map.keys().find(|key| !allowed.contains(&key.as_str())) {
+                return Err(format!("{context} contains unsupported field {key:?}"));
+            }
+            Ok(())
+        }
+        fn required<'a>(value: &'a serde_json::Value, key: &str, context: &str) -> Result<&'a serde_json::Value, String> {
+            value.get(key).ok_or_else(|| format!("{context}.{key} is required"))
+        }
+        fn str_field(value: &serde_json::Value, key: &str, context: &str) -> Result<String, String> {
+            required(value, key, context)?.as_str().map(str::to_owned)
+                .ok_or_else(|| format!("{context}.{key} must be a string"))
+        }
+        fn i64_field(value: &serde_json::Value, key: &str, context: &str) -> Result<i64, String> {
+            required(value, key, context)?.as_i64()
+                .ok_or_else(|| format!("{context}.{key} must be a signed integer"))
+        }
+        fn u32_field(value: &serde_json::Value, key: &str, context: &str) -> Result<u32, String> {
+            let number = required(value, key, context)?.as_u64()
+                .ok_or_else(|| format!("{context}.{key} must be an unsigned integer"))?;
+            u32::try_from(number).map_err(|_| format!("{context}.{key} exceeds the u32 range"))
+        }
+        fn u16_field(value: &serde_json::Value, key: &str, context: &str) -> Result<u16, String> {
+            let number = required(value, key, context)?.as_u64()
+                .ok_or_else(|| format!("{context}.{key} must be an unsigned integer"))?;
+            u16::try_from(number).map_err(|_| format!("{context}.{key} exceeds the u16 range"))
+        }
+
+        let context = "sidecar";
+        reject_unknown(value, &["schema_version", "valid_at_ms", "known_at_ms", "records", "canonical_sha256"], context)?;
+        if str_field(value, "schema_version", context)? != "mace_evidence_dependency_sidecar_v1" {
+            return Err("unsupported dependency sidecar schema_version".into());
+        }
+        let as_known = AsKnownQuery {
+            valid_at_ms: i64_field(value, "valid_at_ms", context)?,
+            known_at_ms: i64_field(value, "known_at_ms", context)?,
+        };
+        let entries = required(value, "records", context)?.as_array()
+            .ok_or_else(|| "sidecar.records must be an array".to_string())?;
+        let mut records = Vec::with_capacity(entries.len());
+
+        for (index, entry) in entries.iter().enumerate() {
+            let record_context = format!("sidecar.records[{index}]");
+            reject_unknown(entry, &[
+                "event_id", "action", "scope", "source_family", "source_root_digest",
+                "upstream_source_id", "source_artifact_digest", "transformation_digest",
+                "lineage_receipt_digest", "raw_event_receipt_digest", "dependency_manifest_digest",
+                "dependency_lineage_status", "derived_from_event_ids", "lifecycle_status_as_known"
+            ], &record_context)?;
+
+            let action = match str_field(entry, "action", &record_context)?.as_str() {
+                "A" => Action::A,
+                "B" => Action::B,
+                other => return Err(format!("{record_context}.action has unsupported value {other:?}")),
+            };
+            let scope_value = required(entry, "scope", &record_context)?;
+            let scope_context = format!("{record_context}.scope");
+            reject_unknown(scope_value, &["regime", "objective"], &scope_context)?;
+            let regime = match str_field(scope_value, "regime", &scope_context)?.as_str() {
+                "baseline" => broca_mace_policy::Regime::Baseline,
+                "shifted" => broca_mace_policy::Regime::Shifted,
+                other => return Err(format!("{scope_context}.regime has unsupported value {other:?}")),
+            };
+            let objective = match str_field(scope_value, "objective", &scope_context)?.as_str() {
+                "quality" => broca_mace_policy::Objective::Quality,
+                "cost" => broca_mace_policy::Objective::Cost,
+                "speed" => broca_mace_policy::Objective::Speed,
+                other => return Err(format!("{scope_context}.objective has unsupported value {other:?}")),
+            };
+            let source_root_hex = str_field(entry, "source_root_digest", &record_context)?;
+            let source_root_digest = SourceRootDigest::from_hex(&source_root_hex)
+                .map_err(|error| format!("{record_context}.source_root_digest: {error:?}"))?;
+
+            let dependency_lineage_status = match str_field(entry, "dependency_lineage_status", &record_context)?.as_str() {
+                "complete" => DependencyLineageStatusV1::Complete,
+                "partial" => DependencyLineageStatusV1::Partial,
+                "unknown" => DependencyLineageStatusV1::Unknown,
+                other => return Err(format!("{record_context}.dependency_lineage_status has unsupported value {other:?}")),
+            };
+            let manifest_value = required(entry, "dependency_manifest_digest", &record_context)?;
+            let dependency_manifest_digest = if manifest_value.is_null() {
+                None
+            } else {
+                Some(manifest_value.as_str()
+                    .ok_or_else(|| format!("{record_context}.dependency_manifest_digest must be a string or null"))?
+                    .to_owned())
+            };
+            let parent_values = required(entry, "derived_from_event_ids", &record_context)?.as_array()
+                .ok_or_else(|| format!("{record_context}.derived_from_event_ids must be an array".to_string()))?;
+            let mut derived_from_event_ids = Vec::with_capacity(parent_values.len());
+            for (parent_index, parent) in parent_values.iter().enumerate() {
+                let number = parent.as_u64().ok_or_else(|| format!(
+                    "{record_context}.derived_from_event_ids[{parent_index}] must be an unsigned integer"
+                ))?;
+                derived_from_event_ids.push(u32::try_from(number).map_err(|_| format!(
+                    "{record_context}.derived_from_event_ids[{parent_index}] exceeds the u32 range"
+                ))?);
+            }
+
+            let lifecycle_value = required(entry, "lifecycle_status_as_known", &record_context)?;
+            let lifecycle_context = format!("{record_context}.lifecycle_status_as_known");
+            let lifecycle_map = object(lifecycle_value, &lifecycle_context)?;
+            let status = lifecycle_map.get("status").and_then(serde_json::Value::as_str)
+                .ok_or_else(|| format!("{lifecycle_context}.status must be a string"))?;
+            let lifecycle_status_as_known = match status {
+                "active" => {
+                    reject_unknown(lifecycle_value, &["status"], &lifecycle_context)?;
+                    SourceLifecycleStatus::Active
+                }
+                "retracted" | "superseded" => return Err(format!(
+                    "{lifecycle_context} is {status}; v1 candidate pools admit active records only"
+                )),
+                other => return Err(format!("{lifecycle_context}.status has unsupported value {other:?}")),
+            };
+
+            records.push(EvidenceDependencyRecordV1 {
+                event_id: u32_field(entry, "event_id", &record_context)?,
+                action,
+                scope: broca_mace_policy::Scope { regime, objective },
+                source_family: u16_field(entry, "source_family", &record_context)?,
+                source_root_digest,
+                upstream_source_id: str_field(entry, "upstream_source_id", &record_context)?,
+                source_artifact_digest: str_field(entry, "source_artifact_digest", &record_context)?,
+                transformation_digest: str_field(entry, "transformation_digest", &record_context)?,
+                lineage_receipt_digest: str_field(entry, "lineage_receipt_digest", &record_context)?,
+                raw_event_receipt_digest: str_field(entry, "raw_event_receipt_digest", &record_context)?,
+                dependency_manifest_digest,
+                dependency_lineage_status,
+                derived_from_event_ids,
+                lifecycle_status_as_known,
+            });
+        }
+
+        let canonical_digest = str_field(value, "canonical_sha256", context)?;
+        let sidecar = Self { as_known, records, canonical_digest };
+        if !sidecar.verify_integrity() {
+            return Err("sidecar failed canonical digest, order, dependency, lifecycle, or field-integrity verification".into());
+        }
+        Ok(sidecar)
+    }
+
     /// Recheck ordering, event/dependency identity and the sidecar commitment.
     pub fn verify_integrity(&self) -> bool {
         let mut prior_event_id = None;
@@ -3024,5 +3177,44 @@ mod tests {
         let observed = ingest_as_known(&raw(), query(180, 250), &verifier).unwrap();
         assert!(!observed.experience.delayed_horizon_complete);
         assert!(!is_qualified(&observed.experience, Query { scope: scope() }));
+    }
+}
+
+
+#[cfg(test)]
+mod sidecar_json_roundtrip_tests {
+    use super::*;
+
+    #[test]
+    fn sidecar_json_roundtrip_checks_canonical_integrity() {
+        let sidecar = EvidenceDependencySidecarV1::new(
+            AsKnownQuery { valid_at_ms: 100, known_at_ms: 200 },
+            vec![EvidenceDependencyRecordV1 {
+                event_id: 7,
+                action: Action::A,
+                scope: broca_mace_policy::Scope {
+                    regime: broca_mace_policy::Regime::Baseline,
+                    objective: broca_mace_policy::Objective::Quality,
+                },
+                source_family: 3,
+                source_root_digest: SourceRootDigest::from_bytes([7; 32]),
+                upstream_source_id: "test-source".into(),
+                source_artifact_digest: "a".repeat(64),
+                transformation_digest: "b".repeat(64),
+                lineage_receipt_digest: "c".repeat(64),
+                raw_event_receipt_digest: "d".repeat(64),
+                dependency_manifest_digest: None,
+                dependency_lineage_status: DependencyLineageStatusV1::Unknown,
+                derived_from_event_ids: Vec::new(),
+                lifecycle_status_as_known: SourceLifecycleStatus::Active,
+            }],
+        );
+        let interchange = sidecar.to_json_value();
+        let decoded = EvidenceDependencySidecarV1::from_json_value(&interchange)
+            .expect("canonical sidecar interchange should decode");
+        assert_eq!(decoded, sidecar);
+        let mut tampered = interchange;
+        tampered["records"][0]["upstream_source_id"] = serde_json::json!("tampered");
+        assert!(EvidenceDependencySidecarV1::from_json_value(&tampered).is_err());
     }
 }
