@@ -704,6 +704,135 @@ mod tests {
     }
 
     #[test]
+    fn joint_time_and_roi_permutation_preserves_cell_and_moment_contracts() {
+        let clean = clean();
+        let signal = signal();
+        let nuisance = nuisance();
+        let original =
+            run_factorial_counterfactual_experiment(&clean, &signal, &nuisance, &metadata())
+                .unwrap();
+        let time_permutation = (0..clean.len())
+            .map(|index| (index * 7) % clean.len())
+            .collect::<Vec<_>>();
+        let roi_permutation = [2usize, 0, 3, 1];
+        let permute = |matrix: &[Vec<f64>]| {
+            time_permutation
+                .iter()
+                .map(|&time| {
+                    roi_permutation
+                        .iter()
+                        .map(|&roi| matrix[time][roi])
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        };
+        let permuted = run_factorial_counterfactual_experiment(
+            &permute(&clean),
+            &permute(&signal),
+            &permute(&nuisance),
+            &metadata(),
+        )
+        .unwrap();
+        assert_eq!(permuted.clean_null, permute(&original.clean_null));
+        assert_eq!(permuted.signal_only, permute(&original.signal_only));
+        assert_eq!(permuted.nuisance_only, permute(&original.nuisance_only));
+        assert_eq!(
+            permuted.signal_plus_nuisance,
+            permute(&original.signal_plus_nuisance)
+        );
+        assert!(
+            (permuted.report.clean_component_variance
+                - original.report.clean_component_variance)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (permuted.report.nuisance_component_variance
+                - original.report.nuisance_component_variance)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (permuted.report.clean_nuisance_covariance
+                - original.report.clean_nuisance_covariance)
+                .abs()
+                < 1e-12
+        );
+    }
+
+    #[test]
+    fn global_amplitude_scaling_scales_rms_linearly_and_variance_quadratically() {
+        let clean = clean();
+        let signal = signal();
+        let nuisance = nuisance();
+        let original =
+            run_factorial_counterfactual_experiment(&clean, &signal, &nuisance, &metadata())
+                .unwrap();
+        let factor = 2.5;
+        let scale = |matrix: &[Vec<f64>]| {
+            matrix
+                .iter()
+                .map(|row| row.iter().map(|value| value * factor).collect::<Vec<_>>())
+                .collect::<Vec<_>>()
+        };
+        let scaled = run_factorial_counterfactual_experiment(
+            &scale(&clean),
+            &scale(&signal),
+            &scale(&nuisance),
+            &metadata(),
+        )
+        .unwrap();
+        assert!(
+            (scaled.report.cells[0].rms - factor * original.report.cells[0].rms).abs()
+                < 1e-12
+        );
+        assert!(
+            (scaled.report.clean_component_variance
+                - factor * factor * original.report.clean_component_variance)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (scaled.report.nuisance_component_variance
+                - factor * factor * original.report.nuisance_component_variance)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (scaled.report.clean_nuisance_covariance
+                - factor * factor * original.report.clean_nuisance_covariance)
+                .abs()
+                < 1e-10
+        );
+    }
+
+    #[test]
+    fn zero_nuisance_collapses_nuisance_cells_to_clean_and_signal_cells() {
+        let clean = clean();
+        let signal = signal();
+        let zero = vec![vec![0.0; 4]; 32];
+        let experiment =
+            run_factorial_counterfactual_experiment(&clean, &signal, &zero, &metadata()).unwrap();
+        assert_eq!(experiment.nuisance_only, experiment.clean_null);
+        assert_eq!(experiment.signal_plus_nuisance, experiment.signal_only);
+        assert_eq!(experiment.report.nuisance_component_variance, 0.0);
+        assert_eq!(experiment.report.clean_nuisance_covariance, 0.0);
+    }
+
+    #[test]
+    fn zero_signal_collapses_signal_cells_to_clean_and_nuisance_cells() {
+        let clean = clean();
+        let zero = vec![vec![0.0; 4]; 32];
+        let nuisance = nuisance();
+        let experiment =
+            run_factorial_counterfactual_experiment(&clean, &zero, &nuisance, &metadata())
+                .unwrap();
+        assert_eq!(experiment.signal_only, experiment.clean_null);
+        assert_eq!(experiment.signal_plus_nuisance, experiment.nuisance_only);
+        assert_eq!(experiment.report.signal_component_rms, 0.0);
+    }
+
+    #[test]
     fn invalid_provenance_and_target_fraction_fail_closed() {
         let mut invalid = metadata();
         invalid.nuisance_instance_id = "field id with spaces".to_string();
