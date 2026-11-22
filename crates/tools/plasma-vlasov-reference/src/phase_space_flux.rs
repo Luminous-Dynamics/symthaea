@@ -470,7 +470,12 @@ mod tests {
     #[test]
     fn electric_acceleration_subflow_alone_preserves_quadratic_casimir() {
         let solver = initial_solver();
-        assert!(solver.electric_field.iter().any(|field| field.abs() > 1.0e-10));
+        assert!(
+            solver
+                .electric_field
+                .iter()
+                .any(|field| field.abs() > 1.0e-10)
+        );
 
         let derivative_v = spectral_derivative_v(&solver.distribution, solver.config);
         let config = solver.config;
@@ -484,8 +489,8 @@ mod tests {
                 let electric_rhs = -acceleration * derivative_v[index];
                 total_casimir_rate = (2.0 * value * electric_rhs)
                     .mul_add(config.dx() * config.dv(), total_casimir_rate);
-                total_casimir = (value * value)
-                    .mul_add(config.dx() * config.dv(), total_casimir);
+                total_casimir =
+                    (value * value).mul_add(config.dx() * config.dv(), total_casimir);
             }
         }
 
