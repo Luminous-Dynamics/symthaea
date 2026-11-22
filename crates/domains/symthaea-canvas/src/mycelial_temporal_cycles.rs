@@ -1588,6 +1588,42 @@ mod tests {
     }
 
     #[test]
+    fn aggregating_edges_across_time_cannot_create_a_simultaneous_cycle() {
+        let input = sequence(vec![
+            snapshot(
+                "w1",
+                0,
+                10,
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                vec![edge("e-ab", "A", "B"), edge("e-ac", "A", "C")],
+            ),
+            snapshot(
+                "w2",
+                10,
+                20,
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                vec![edge("e-bc", "B", "C")],
+            ),
+        ]);
+        let profile = build_temporal_mycelial_cycle_profile(
+            &input,
+            TemporalMycelialCycleConfig {
+                minimum_present_windows: 1,
+                minimum_present_duration_ns: 1,
+                minimum_persistence_fraction: 0.5,
+                minimum_known_duration_fraction: 0.5,
+                tcr_epsilon: 1.0e-12,
+                allow_synthetic_evidence: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(profile.snapshot_metrics[0].cycle_rank, 0);
+        assert_eq!(profile.snapshot_metrics[1].cycle_rank, 0);
+        assert!(profile.cycles.is_empty());
+        assert!(profile.persistent_cycle_hyperedges.is_empty());
+    }
+
+    #[test]
     fn cycle_identity_requires_exact_stable_edge_ids() {
         let first = vec![
             edge("e-ab", "A", "B"),
