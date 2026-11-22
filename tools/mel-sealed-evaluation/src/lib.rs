@@ -257,13 +257,13 @@ pub fn evaluate(
                 pair.pair_id
             ));
         }
-        if let Some(probability) = pair.probability_a {
-            if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
-                return Err(format!(
-                    "pair {} probability_a must be finite and in [0, 1]",
-                    pair.pair_id
-                ));
-            }
+        if let Some(probability) = pair.probability_a
+            && (!probability.is_finite() || !(0.0..=1.0).contains(&probability))
+        {
+            return Err(format!(
+                "pair {} probability_a must be finite and in [0, 1]",
+                pair.pair_id
+            ));
         }
         for presentation in &pair.presentations {
             if presentation.presentation_id.trim().is_empty()
