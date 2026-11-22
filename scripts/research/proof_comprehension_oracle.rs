@@ -109,6 +109,16 @@ fn or_iff_right_without_hypothesis(a: bool, b: bool) -> bool {
 }
 
 #[cfg(not(test))]
+
+fn translation_count_cyclic(n: usize, t2: &[usize], target_column: usize) -> usize {
+    (0..n)
+        .filter(|translate| {
+            t2.iter()
+                .any(|z| (translate + *z) % n == target_column)
+        })
+        .count()
+}
+
 fn main_report() {
     let counts = evaluate_tseitin_toy();
     println!("source_models={}", counts.source_models);
@@ -203,6 +213,32 @@ mod tests {
         let mapped: Vec<bool> = source.iter().map(|x| !*x).collect();
         assert_ne!(mapped, source);
         assert_eq!(mapped, vec![true]);
+    }
+
+
+    #[test]
+    fn translation_average_selects_each_column_exactly_cardinality_t2_times() {
+        // Exhaust all nonempty subsets of cyclic groups C_n for 2 <= n <= 6.
+        // For each target column s and each z in T2, exactly one translate
+        // u = s - z selects s. Distinct z yield distinct translates.
+        for n in 2usize..=6 {
+            for mask in 1usize..(1usize << n) {
+                let t2: Vec<usize> = (0..n).filter(|z| (mask & (1usize << z)) != 0).collect();
+                for target in 0..n {
+                    let selected_translates = translation_count_cyclic(n, &t2, target);
+                    assert_eq!(selected_translates, t2.len());
+
+                    // Add the row indicator v=1 iff chi_q=1.
+                    // 2 * count = |T2| * (1 + chi_q) for chi_q in {-1,+1}.
+                    for chi_q in [-1i32, 1i32] {
+                        let row_selected = chi_q == 1;
+                        let lhs = 2 * if row_selected { selected_translates } else { 0 };
+                        let rhs = t2.len() as i32 * (1 + chi_q);
+                        assert_eq!(lhs as i32, rhs);
+                    }
+                }
+            }
+        }
     }
 
     #[test]
