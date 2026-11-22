@@ -16,11 +16,10 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
-    AnnotatedMycelialSkeleton, JunctionIdentityMatch, MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
-    MycelialReconstructionError, ReconstructionDimensionality,
-    ReconstructionEvaluationConfig, ReconstructionLengthUnit, ReconstructionPoint3,
-    evaluate_mycelial_reconstruction, match_junctions_hungarian,
+    AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
+    JunctionIdentityMatch, MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH, MycelialReconstructionError,
+    ReconstructionDimensionality, ReconstructionEvaluationConfig, ReconstructionLengthUnit,
+    ReconstructionPoint3, evaluate_mycelial_reconstruction, match_junctions_hungarian,
 };
 
 const DEFAULT_SAMPLES: usize = 100;
@@ -28,12 +27,7 @@ const WARMUP_RUNS: usize = 5;
 const MAX_SAMPLES: usize = 10_000;
 const MATCH_DISTANCE: f64 = 0.1;
 
-fn junction(
-    id: &str,
-    kind: AnnotatedJunctionKind,
-    x: f64,
-    y: f64,
-) -> AnnotatedJunction {
+fn junction(id: &str, kind: AnnotatedJunctionKind, x: f64, y: f64) -> AnnotatedJunction {
     AnnotatedJunction {
         id: id.to_string(),
         kind,
@@ -70,7 +64,11 @@ fn skeleton(
     }
 }
 
-fn fixtures() -> (AnnotatedMycelialSkeleton, AnnotatedMycelialSkeleton, AnnotatedMycelialSkeleton) {
+fn fixtures() -> (
+    AnnotatedMycelialSkeleton,
+    AnnotatedMycelialSkeleton,
+    AnnotatedMycelialSkeleton,
+) {
     let truth = skeleton(
         "ground-truth-annotation",
         vec![
@@ -139,16 +137,25 @@ fn evaluate_case(
         "junction_detection_recall: {:?}",
         score.junction_detection.recall()
     );
+    println!("junction_detection_f1: {:?}", score.junction_detection.f1());
     println!(
-        "junction_detection_f1: {:?}",
-        score.junction_detection.f1()
+        "junction_class_macro_f1: {:?}",
+        score.junction_kind_macro_f1
     );
-    println!("junction_class_macro_f1: {:?}", score.junction_kind_macro_f1);
-    println!("false_anastomosis_junctions: {}", score.false_anastomosis_junction_count);
-    println!("edge_topology_precision: {:?}", score.edge_topology.precision());
+    println!(
+        "false_anastomosis_junctions: {}",
+        score.false_anastomosis_junction_count
+    );
+    println!(
+        "edge_topology_precision: {:?}",
+        score.edge_topology.precision()
+    );
     println!("edge_topology_recall: {:?}", score.edge_topology.recall());
     println!("edge_topology_f1: {:?}", score.edge_topology.f1());
-    println!("localization_error_p95: {:?}", score.localization_error.p95_error);
+    println!(
+        "localization_error_p95: {:?}",
+        score.localization_error.p95_error
+    );
     println!(
         "segment_length_mean_absolute_relative_error: {:?}",
         score.segment_length_error.mean_absolute_relative_error
@@ -182,7 +189,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("scope: synthetic-2d-annotation-conformance-only");
     println!("dimensionality: 2d");
     println!("length_unit: micrometer (synthetic declared unit; not physical measurement)");
-    println!("automatic_matcher_max_junctions_per_graph: {}", MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH);
+    println!(
+        "automatic_matcher_max_junctions_per_graph: {}",
+        MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH
+    );
     println!("maximum_match_distance: {MATCH_DISTANCE}");
     println!("case: clean-reconstruction");
     evaluate_case(&truth, &prediction)?;
