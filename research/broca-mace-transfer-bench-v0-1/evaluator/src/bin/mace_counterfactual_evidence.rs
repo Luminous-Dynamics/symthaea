@@ -1066,8 +1066,14 @@ fn run() -> Result<(), String> {
     }
     let sidecar_identity = dependency_sidecar
         .as_ref()
-        .map(EvidenceDependencySidecarV1::canonical_digest)
-        .unwrap_or("absent");
+        .map(|sidecar| {
+            format!(
+                "{}:ingress_verified={}",
+                sidecar.canonical_digest(),
+                sidecar.has_verified_ingress_provenance()
+            )
+        })
+        .unwrap_or_else(|| "absent".to_string());
     let run_identity = format!(
         "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{dependency_sidecar_schema_sha256}:{sidecar_identity}:{}",
         source_revision.as_deref().unwrap_or("unspecified")
