@@ -668,6 +668,156 @@ mod tests {
         }
     }
 
+    fn three_factor_interaction_input() -> ExactJointOracleInput {
+        let ids = [10_u64, 20, 30];
+        let alternatives = (0_u64..8)
+            .map(|mask| {
+                let a = u64::from(mask & 1 != 0);
+                let b = u64::from(mask & 2 != 0);
+                let c = u64::from(mask & 4 != 0);
+                let ab = a * b;
+                let abc = a * b * c;
+
+                let actions = ids
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| (mask & (1_u64 << *index)) != 0)
+                    .map(|(_, action_id)| JointAction {
+                        action_id: *action_id,
+                        kind: kind(*action_id),
+                    })
+                    .collect::<Vec<_>>();
+
+                // Known ground-truth response surface:
+                // main effects: A=10, B=20, C=30;
+                // pairwise synergy: AB=+7;
+                // three-way antagonism: ABC=-5.
+                let wrong_benefit = 10 * a + 20 * b + 30 * c + 7 * ab - 5 * abc;
+                let abstention_benefit = 2 * a + 3 * b + 4 * c;
+                let missing_benefit = a + 2 * b + 3 * c;
+
+                // Resource cost has a distinct AB cost interaction (+11)
+                // and a three-way resource-saving interaction (-3).
+                let measured_cost = ResourceVector {
+                    persistent_bytes: 4 + 2 * a + 3 * b + 4 * c + 5 * ab - 2 * abc,
+                    energy_nj: 100 + 10 * a + 20 * b + 30 * c + 11 * ab - 3 * abc,
+                    ..ResourceVector::default()
+                };
+                EvaluatedAlternative {
+                    run_id: mask + 1,
+                    context: context(),
+                    plan: JointPlan {
+                        plan_id: mask + 500,
+                        actions,
+                        predicted_reduction: PredictedExposureReduction::default(),
+                        estimated_cost: measured_cost,
+                        predicted_maximum_observation_gap_us: 1_000,
+                    },
+                    measured_cost,
+                    observed_maximum_gap_us: 1_000,
+                    realized_debt: ExposureDebt {
+                        wrong_belief_us: 500 - wrong_benefit,
+                        abstention_us: 300 - abstention_benefit,
+                        missing_output_us: 100 - missing_benefit,
+                    },
+                }
+            })
+            .collect();
+
+        ExactJointOracleInput {
+            factor_action_ids: ids.to_vec(),
+            candidate_plan_id: 507,
+            alternatives,
+        }
+    }
+
+    #[test]
+    fn factorial_decomposition_recovers_pairwise_synergy_and_three_way_antagonism() {
+        let report = decompose_exact_joint_interactions(&three_factor_interaction_input()).unwrap();
+
+        let term = |mask: u64| {
+            report
+                .interaction_terms
+                .iter()
+                .find(|item| item.subset_mask == mask)
+                .unwrap()
+        };
+
+        // First-order effects are measured independently.
+        assert_eq!(term(1).exposure_benefit_dividend_us[0], 10);
+        assert_eq!(term(2).exposure_benefit_dividend_us[0], 20);
+        assert_eq!(term(4).exposure_benefit_dividend_us[0], 30);
+
+        // AB works better together than the sum of its independent effects.
+        assert_eq!(term(3).interaction_order, 2);
+        assert_eq!(term(3).exposure_benefit_dividend_us[0], 7);
+
+        // Adding C changes the AB synergy: the three-way term is antagonistic.
+        assert_eq!(term(7).interaction_order, 3);
+        assert_eq!(term(7).exposure_benefit_dividend_us[0], -5);
+
+        // The same decomposition identifies resource cost and resource savings.
+        assert_eq!(term(3).resource_cost_dividend[9], 11);
+        assert_eq!(term(7).resource_cost_dividend[9], -3);
+
+        assert_eq!(report.total_exposure_benefit_us, [62, 9, 6]);
+        assert_eq!(report.total_resource_cost_delta[9], 68);
+        assert_eq!(report.factor_action_kinds, vec![
+            ActionKind::Observe,
+            ActionKind::Retain,
+            ActionKind::Compute,
+        ]);
+    }
+
+    #[test]
+    fn interaction_order_summaries_reconstruct_total_joint_effect() {
+        let report = decompose_exact_joint_interactions(&three_factor_interaction_input()).unwrap();
+        assert_eq!(report.interaction_order_summaries.len(), 3);
+
+        assert_eq!(report.interaction_order_summaries[0].term_count, 3);
+        assert_eq!(
+            report.interaction_order_summaries[0].exposure_benefit_dividend_us[0],
+            60
+        );
+        assert_eq!(report.interaction_order_summaries[1].term_count, 3);
+        assert_eq!(
+            report.interaction_order_summaries[1].exposure_benefit_dividend_us[0],
+            7
+        );
+        assert_eq!(report.interaction_order_summaries[2].term_count, 1);
+        assert_eq!(
+            report.interaction_order_summaries[2].exposure_benefit_dividend_us[0],
+            -5
+        );
+
+        let reconstructed: i128 = report
+            .interaction_order_summaries
+            .iter()
+            .map(|summary| summary.exposure_benefit_dividend_us[0])
+            .sum();
+        assert_eq!(reconstructed, report.total_exposure_benefit_us[0]);
+    }
+
+    #[test]
+    fn factorial_interaction_output_is_independent_of_input_row_order() {
+        let input = three_factor_interaction_input();
+        let forward = decompose_exact_joint_interactions(&input).unwrap();
+        let mut reversed = input;
+        reversed.alternatives.reverse();
+        let backward = decompose_exact_joint_interactions(&reversed).unwrap();
+        assert_eq!(forward, backward);
+    }
+
+    #[test]
+    fn factorial_interaction_rejects_incomplete_factorial_design() {
+        let mut input = three_factor_interaction_input();
+        input.alternatives.pop();
+        assert!(matches!(
+            decompose_exact_joint_interactions(&input),
+            Err(OracleError::MissingSubset { .. })
+        ));
+    }
+
     #[test]
     fn exact_oracle_captures_four_way_sensing_memory_compute_verification_interaction() {
         let result = qualify_exact_joint_oracle(&input()).unwrap();
