@@ -143,6 +143,7 @@ pub struct ForecastResultV1 {
     pub realized: bool,
     pub human_visible_realization: bool,
     pub input_to_issue_latency_ns: Option<u64>,
+    pub issue_to_display_latency_ns: Option<u64>,
     pub display_lead_time_ns: Option<u64>,
     pub input_to_realization_ns: Option<u64>,
     pub issue_to_realization_ns: Option<u64>,
@@ -840,6 +841,9 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                         .is_some_and(|realized_at| displayed_at < realized_at)
             });
             let issue_latency = state.issued_at_ns.checked_sub(state.input_time_ns);
+            let issue_to_display = state
+                .displayed_at_ns
+                .and_then(|displayed_at| displayed_at.checked_sub(state.issued_at_ns));
             let display_lead = state
                 .displayed_at_ns
                 .and_then(|displayed_at| state.issued.target_window.start_ns.checked_sub(displayed_at));
@@ -862,6 +866,7 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                 realized,
                 human_visible_realization: displayed && realized && display_preceded_realization,
                 input_to_issue_latency_ns: issue_latency,
+                issue_to_display_latency_ns: issue_to_display,
                 display_lead_time_ns: display_lead,
                 input_to_realization_ns: input_to_realization,
                 issue_to_realization_ns: issue_to_realization,
@@ -982,6 +987,7 @@ mod tests {
         let report = validate_trace(&valid_trace());
         let forecast = &report.forecasts[0];
         assert_eq!(forecast.input_to_issue_latency_ns, Some(1_000));
+        assert_eq!(forecast.issue_to_display_latency_ns, Some(1_000));
         assert_eq!(forecast.display_lead_time_ns, Some(2_000));
         assert_eq!(forecast.input_to_realization_ns, Some(5_000));
         assert_eq!(forecast.issue_to_realization_ns, Some(4_000));
