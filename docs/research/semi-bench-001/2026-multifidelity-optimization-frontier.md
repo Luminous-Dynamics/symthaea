@@ -137,3 +137,16 @@ It exactly enumerates feasible subsets for up to 18 candidates under an evaluati
 The synthetic known-answer fixture selects B/E under budget 13 with modeled utility 0.3115. This only verifies scheduler semantics; it does not run SPICE/TCAD/route or demonstrate a Pareto improvement. The next benchmark step is comparison against greedy gain/cost, random/DOE, uncertainty-only, diversity-only, constrained BO, and high-fidelity-only under matched simulation budgets.
 
 Hosted CI [#44989958104](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104): 43/43 Rust tests, 46/46 Python reference tests, fmt, Clippy and four Rust CLI report parity checks passed.
+
+
+## Verified budgeted multi-fidelity acquisition baseline
+
+The Rust crate now contains `mf_acquisition.rs` and CLI `semi-mf-acquire`. It exactly selects a candidate subset under a high-fidelity cost budget (up to 18 candidates) using:
+
+`expected_feasible_hv_gain + exploration_weight × epistemic_stddev × frontier_relevance`
+
+The acquisition subject binds the prediction packet, model, uncertainty-calibration artifact and objective specification by SHA-256. The output is a scheduling recommendation only; it does not execute a simulator or approve the design.
+
+On the frozen five-candidate synthetic fixture, budget 13 selects B/E (cost 13; modeled utility 0.3115). This is only a known-answer result.
+
+Hosted run [#44990125209](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990125209) passed **43/43 Rust tests**, **46/46 Python reference tests**, rustfmt, Clippy and all seven CLI/report comparisons (three Python and four Rust).
