@@ -159,3 +159,8 @@ Hosted run [#44935276557](https://github.com/Luminous-Dynamics/symthaea/actions/
 - The Python/reference lane passed **46/46 tests** and its three frozen report comparisons.
 
 The latest PR branch head includes later documentation/manifest/source-register updates; the verified Rust code, fixtures and workflow are unchanged from the tested code commit. The full 1,567×590 feature matrix was not retrieved in this runtime, so the parser was verified with synthetic bytes and the frozen real-source split manifest, not with a full real-file model run.
+
+
+## Current scale-aware Rust metric evaluator
+
+The Rust binary-metrics scorer uses tie-group rank accumulation for AUROC: O(n log n) sorting/aggregation and exact half-credit for tied positive-negative score pairs. A 40,000-row synthetic test with balanced tied score groups is included. Hosted run [#44988247262](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262) passed 24/24 Rust tests and 46/46 Python reference tests, along with fmt, Clippy and both Rust CLI report parity checks.
