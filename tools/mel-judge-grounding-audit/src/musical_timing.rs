@@ -2,25 +2,28 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-const SCHEMA_VERSION: &str = "mel-musical-timing-panel-v1";
+const SCHEMA_VERSION: &str = "mel-musical-timing-panel-v2";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct MusicalTimingPanelV1 {
+struct MusicalTimingPanelV2 {
     schema_version: String,
     session_id: String,
     case_id: String,
     track: TrackKind,
     clock_domain_id: String,
     instrument_scope: String,
-    reference_grid_receipt_sha256: String,
+    reference_time_map_id: String,
+    reference_time_map_version: String,
+    reference_time_map_kind: String,
+    reference_time_map_receipt_sha256: String,
     onset_capture_receipt_sha256: String,
     clock_calibration_receipt_sha256: String,
-    policy: TimingPolicyV1,
-    tempo_segments: Vec<TempoSegmentV1>,
-    target_events: Vec<TargetEventV1>,
-    tempo_estimates: Vec<TempoEstimateV1>,
-    extra_onsets: Vec<ExtraOnsetV1>,
+    policy: TimingPolicyV2,
+    target_events: Vec<TargetEventV2>,
+    tempo_changes: Vec<TempoChangeV2>,
+    tempo_estimates: Vec<TempoEstimateV2>,
+    extra_onsets: Vec<ExtraOnsetV2>,
     claim_ceiling: Vec<String>,
 }
 
@@ -33,7 +36,7 @@ pub enum TrackKind {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TimingPolicyV1 {
+struct TimingPolicyV2 {
     maximum_relative_period_error: f64,
     required_consecutive_stable_estimates: usize,
     minimum_estimate_spacing_ns: u64,
@@ -41,23 +44,14 @@ struct TimingPolicyV1 {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TempoSegmentV1 {
-    segment_id: String,
-    start_beat_index: u64,
-    phase_zero_ns: u64,
-    change_observed_ns: u64,
-    beat_period_ns: u64,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct TargetEventV1 {
+struct TargetEventV2 {
     event_id: String,
     instrument_id: String,
-    segment_id: String,
     beat_index: u64,
     subdivision_index: u32,
     subdivision_count: u32,
+    expected_onset_ns: u64,
+    local_beat_period_ns: u64,
     outcome: String,
     observed_onset_ns: Option<u64>,
     capture_receipt_sha256: Option<String>,
@@ -65,9 +59,17 @@ struct TargetEventV1 {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TempoEstimateV1 {
+struct TempoChangeV2 {
+    change_id: String,
+    change_observed_ns: u64,
+    reference_beat_period_ns: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TempoEstimateV2 {
     estimate_id: String,
-    segment_id: String,
+    change_id: String,
     observed_at_ns: u64,
     evidence_window_end_ns: u64,
     estimated_period_ns: u64,
@@ -77,7 +79,7 @@ struct TempoEstimateV1 {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ExtraOnsetV1 {
+struct ExtraOnsetV2 {
     event_id: String,
     instrument_id: String,
     observed_onset_ns: u64,
@@ -108,7 +110,7 @@ pub struct InstrumentTimingSummary {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TempoAdaptationSummary {
-    pub segment_id: String,
+    pub change_id: String,
     pub reference_beat_period_ns: u64,
     pub estimate_count: usize,
     pub stable_estimates_required: usize,
@@ -123,7 +125,7 @@ pub struct TempoAdaptationSummary {
 pub struct EventTimingFinding {
     pub event_id: String,
     pub instrument_id: String,
-    pub segment_id: String,
+    pub beat_index: u64,
     pub expected_onset_ns: u64,
     pub observed_onset_ns: Option<u64>,
     pub signed_error_ns: Option<i128>,
@@ -142,6 +144,9 @@ pub struct MusicalTimingReport {
     pub session_id: String,
     pub case_id: String,
     pub track: TrackKind,
+    pub reference_time_map_id: String,
+    pub reference_time_map_version: String,
+    pub reference_time_map_kind: String,
     pub target_count: usize,
     pub observed_count: usize,
     pub missed_count: usize,
@@ -176,16 +181,15 @@ struct ComputedEvent {
 }
 
 pub fn parse_and_score(input: &str) -> Result<MusicalTimingReport, String> {
-    let panel: MusicalTimingPanelV1 = serde_json::from_str(input)
+    let panel: MusicalTimingPanelV2 = serde_json::from_str(input)
         .map_err(|error| format!("invalid musical timing panel JSON: {error}"))?;
     score_panel(&panel)
 }
 
-fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, String> {
+fn score_panel(panel: &MusicalTimingPanelV2) -> Result<MusicalTimingReport, String> {
     validate_header(panel)?;
-
-    let segments = validate_segments(&panel.tempo_segments)?;
-    let estimates = validate_estimates(panel, &segments)?;
+    let changes = validate_tempo_changes(&panel.tempo_changes)?;
+    let estimates = validate_estimates(panel, &changes)?;
     let mut findings = Vec::new();
     let mut event_findings = Vec::new();
     let mut computed = Vec::new();
@@ -205,24 +209,12 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
                 target.event_id
             ));
         }
-        let segment = segments
-            .get(target.segment_id.as_str())
-            .ok_or_else(|| format!("event {} references unknown tempo segment", target.event_id))?;
-        if target.beat_index < segment.start_beat_index {
+        if target.local_beat_period_ns == 0 {
             return Err(format!(
-                "event {} precedes its declared tempo segment",
+                "event {} has zero canonical local beat period",
                 target.event_id
             ));
         }
-        if let Some(next_start) = next_segment_start(&panel.tempo_segments, segment) {
-            if target.beat_index >= next_start {
-                return Err(format!(
-                    "event {} crosses the next tempo segment boundary",
-                    target.event_id
-                ));
-            }
-        }
-        let expected = expected_onset_ns(segment, target)?;
         match target.outcome.as_str() {
             "observed" => {
                 let observed = target.observed_onset_ns.ok_or_else(|| {
@@ -232,22 +224,13 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
                     )
                 })?;
                 let receipt = target.capture_receipt_sha256.as_deref().ok_or_else(|| {
-                    format!(
-                        "observed event {} is missing capture receipt",
-                        target.event_id
-                    )
+                    format!("observed event {} is missing capture receipt", target.event_id)
                 })?;
                 require_digest(receipt, "target onset capture receipt")?;
-                if observed < segment.change_observed_ns {
-                    return Err(format!(
-                        "event {} onset predates the tempo change becoming observable",
-                        target.event_id
-                    ));
-                }
-                let signed_error_ns = i128::from(observed) - i128::from(expected);
-                let signed_phase = signed_error_ns as f64 / segment.beat_period_ns as f64;
+                let signed_error_ns = i128::from(observed) - i128::from(target.expected_onset_ns);
+                let signed_phase = signed_error_ns as f64 / target.local_beat_period_ns as f64;
                 let absolute_phase = signed_phase.abs();
-                let absolute_ms = (signed_error_ns.abs() as f64) / 1_000_000.0;
+                let absolute_ms = signed_error_ns.abs() as f64 / 1_000_000.0;
                 let within_005 = absolute_phase <= 0.05;
                 let within_010 = absolute_phase <= 0.10;
                 let within_025 = absolute_phase <= 0.25;
@@ -255,8 +238,8 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
                 event_findings.push(EventTimingFinding {
                     event_id: target.event_id.clone(),
                     instrument_id: target.instrument_id.clone(),
-                    segment_id: target.segment_id.clone(),
-                    expected_onset_ns: expected,
+                    beat_index: target.beat_index,
+                    expected_onset_ns: target.expected_onset_ns,
                     observed_onset_ns: Some(observed),
                     signed_error_ns: Some(signed_error_ns),
                     signed_phase_error_beats: Some(signed_phase),
@@ -286,8 +269,8 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
                 event_findings.push(EventTimingFinding {
                     event_id: target.event_id.clone(),
                     instrument_id: target.instrument_id.clone(),
-                    segment_id: target.segment_id.clone(),
-                    expected_onset_ns: expected,
+                    beat_index: target.beat_index,
+                    expected_onset_ns: target.expected_onset_ns,
                     observed_onset_ns: None,
                     signed_error_ns: None,
                     signed_phase_error_beats: None,
@@ -310,7 +293,8 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
         require_text(&extra.event_id, "extra onset event_id")?;
         require_text(&extra.instrument_id, "extra onset instrument_id")?;
         require_digest(&extra.capture_receipt_sha256, "extra onset capture receipt")?;
-        if !extra_ids.insert(extra.event_id.as_str()) || event_ids.contains(extra.event_id.as_str())
+        if !extra_ids.insert(extra.event_id.as_str())
+            || event_ids.contains(extra.event_id.as_str())
         {
             return Err(format!(
                 "duplicate or target-colliding extra onset ID: {}",
@@ -333,7 +317,10 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
         .iter()
         .map(|item| item.absolute_phase_error)
         .collect();
-    let absolute_ms: Vec<f64> = computed.iter().map(|item| item.absolute_error_ms).collect();
+    let absolute_ms: Vec<f64> = computed
+        .iter()
+        .map(|item| item.absolute_error_ms)
+        .collect();
     let signed_bias = mean(&signed);
     let drift = regression_slope(
         computed
@@ -382,16 +369,16 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
         });
     }
 
-    let tempo_adaptation = score_tempo_adaptation(panel, &estimates)?;
+    let tempo_adaptation = score_tempo_adaptation(panel, &estimates);
     for summary in &tempo_adaptation {
         if !summary.recovered {
             findings.push(format!(
-                "tempo segment {} did not reach {} consecutive stable estimates",
-                summary.segment_id, summary.stable_estimates_required
+                "tempo change {} did not reach {} consecutive stable estimates",
+                summary.change_id, summary.stable_estimates_required
             ));
         }
     }
-    let future_information_violations = 0usize;
+
     let total_targets = panel.target_events.len();
     let target_accounting_completeness = if total_targets == 0 {
         0.0
@@ -403,10 +390,13 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
     }
 
     Ok(MusicalTimingReport {
-        schema_version: "mel-musical-timing-report-v1".to_owned(),
+        schema_version: "mel-musical-timing-report-v2".to_owned(),
         session_id: panel.session_id.clone(),
         case_id: panel.case_id.clone(),
         track: panel.track,
+        reference_time_map_id: panel.reference_time_map_id.clone(),
+        reference_time_map_version: panel.reference_time_map_version.clone(),
+        reference_time_map_kind: panel.reference_time_map_kind.clone(),
         target_count: total_targets,
         observed_count,
         missed_count,
@@ -428,7 +418,7 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
         within_050_beat_rate: within_050,
         per_instrument,
         tempo_adaptation,
-        future_information_violations,
+        future_information_violations: 0,
         qualified_for_declared_timing_contract: findings.is_empty(),
         qualification_findings: findings,
         event_findings,
@@ -436,7 +426,7 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
     })
 }
 
-fn validate_header(panel: &MusicalTimingPanelV1) -> Result<(), String> {
+fn validate_header(panel: &MusicalTimingPanelV2) -> Result<(), String> {
     if panel.schema_version != SCHEMA_VERSION {
         return Err("unsupported musical timing schema_version".to_owned());
     }
@@ -444,9 +434,17 @@ fn validate_header(panel: &MusicalTimingPanelV1) -> Result<(), String> {
     require_text(&panel.case_id, "case_id")?;
     require_text(&panel.clock_domain_id, "clock_domain_id")?;
     require_text(&panel.instrument_scope, "instrument_scope")?;
+    require_text(&panel.reference_time_map_id, "reference_time_map_id")?;
+    require_text(&panel.reference_time_map_version, "reference_time_map_version")?;
+    if !matches!(
+        panel.reference_time_map_kind.as_str(),
+        "notation_tempo" | "performance_time"
+    ) {
+        return Err("unsupported canonical reference time-map kind".to_owned());
+    }
     require_digest(
-        &panel.reference_grid_receipt_sha256,
-        "reference grid receipt",
+        &panel.reference_time_map_receipt_sha256,
+        "canonical reference time-map receipt",
     )?;
     require_digest(&panel.onset_capture_receipt_sha256, "onset capture receipt")?;
     require_digest(
@@ -465,91 +463,43 @@ fn validate_header(panel: &MusicalTimingPanelV1) -> Result<(), String> {
     {
         return Err("invalid tempo adaptation policy".to_owned());
     }
-    if panel.tempo_segments.is_empty() {
-        return Err("tempo_segments must be non-empty".to_owned());
-    }
     if panel.target_events.is_empty() {
         return Err("target_events must be non-empty".to_owned());
     }
     Ok(())
 }
 
-fn validate_segments(
-    segments: &[TempoSegmentV1],
-) -> Result<BTreeMap<&str, &TempoSegmentV1>, String> {
+fn validate_tempo_changes(changes: &[TempoChangeV2]) -> Result<BTreeMap<&str, &TempoChangeV2>, String> {
     let mut result = BTreeMap::new();
-    let mut previous_beat = None;
-    let mut previous_phase = None;
-    let mut previous_observed = None;
-    for segment in segments {
-        require_text(&segment.segment_id, "tempo segment ID")?;
-        if segment.beat_period_ns == 0 {
+    let mut previous_time = None;
+    for change in changes {
+        require_text(&change.change_id, "tempo change ID")?;
+        if change.reference_beat_period_ns == 0 {
             return Err(format!(
-                "tempo segment {} has zero beat period",
-                segment.segment_id
+                "tempo change {} has zero reference beat period",
+                change.change_id
             ));
         }
-        if segment.change_observed_ns > segment.phase_zero_ns {
-            return Err(format!(
-                "tempo segment {} phase zero predates the change becoming observable",
-                segment.segment_id
-            ));
+        if previous_time.is_some_and(|time| change.change_observed_ns <= time) {
+            return Err("tempo changes must have strictly increasing observation times".to_owned());
         }
-        if previous_beat.is_some_and(|beat| segment.start_beat_index <= beat)
-            || previous_phase.is_some_and(|time| segment.phase_zero_ns <= time)
-            || previous_observed.is_some_and(|time| segment.change_observed_ns < time)
-        {
-            return Err("tempo segments must be ordered by beat and monotonic time".to_owned());
-        }
-        previous_beat = Some(segment.start_beat_index);
-        previous_phase = Some(segment.phase_zero_ns);
-        previous_observed = Some(segment.change_observed_ns);
-        if result
-            .insert(segment.segment_id.as_str(), segment)
-            .is_some()
-        {
-            return Err(format!(
-                "duplicate tempo segment ID: {}",
-                segment.segment_id
-            ));
+        previous_time = Some(change.change_observed_ns);
+        if result.insert(change.change_id.as_str(), change).is_some() {
+            return Err(format!("duplicate tempo change ID: {}", change.change_id));
         }
     }
     Ok(result)
 }
 
-fn next_segment_start(segments: &[TempoSegmentV1], current: &TempoSegmentV1) -> Option<u64> {
-    segments
-        .iter()
-        .filter(|segment| segment.start_beat_index > current.start_beat_index)
-        .map(|segment| segment.start_beat_index)
-        .min()
-}
-
-fn expected_onset_ns(segment: &TempoSegmentV1, target: &TargetEventV1) -> Result<u64, String> {
-    let beat_offset = u128::from(target.beat_index - segment.start_beat_index);
-    let period = u128::from(segment.beat_period_ns);
-    let whole_beats = beat_offset
-        .checked_mul(period)
-        .ok_or_else(|| "beat time overflow".to_owned())?;
-    let subdivision = period
-        .checked_mul(u128::from(target.subdivision_index))
-        .ok_or_else(|| "subdivision time overflow".to_owned())?
-        / u128::from(target.subdivision_count);
-    let expected = u128::from(segment.phase_zero_ns)
-        .checked_add(whole_beats)
-        .and_then(|value| value.checked_add(subdivision))
-        .ok_or_else(|| "expected onset timestamp overflow".to_owned())?;
-    u64::try_from(expected).map_err(|_| "expected onset timestamp exceeds u64".to_owned())
-}
-
 fn validate_estimates<'a>(
-    panel: &'a MusicalTimingPanelV1,
-    segments: &BTreeMap<&str, &'a TempoSegmentV1>,
-) -> Result<BTreeMap<&'a str, Vec<&'a TempoEstimateV1>>, String> {
-    let mut result = BTreeMap::<&str, Vec<&TempoEstimateV1>>::new();
+    panel: &'a MusicalTimingPanelV2,
+    changes: &BTreeMap<&str, &'a TempoChangeV2>,
+) -> Result<BTreeMap<&'a str, Vec<&'a TempoEstimateV2>>, String> {
+    let mut result = BTreeMap::<&str, Vec<&TempoEstimateV2>>::new();
     let mut ids = BTreeSet::new();
     let mut previous_time = None;
-    let mut previous_time_by_segment = BTreeMap::<&str, u64>::new();
+    let mut previous_time_by_change = BTreeMap::<&str, u64>::new();
+
     for estimate in &panel.tempo_estimates {
         require_text(&estimate.estimate_id, "tempo estimate ID")?;
         require_digest(&estimate.provenance_sha256, "tempo estimate provenance")?;
@@ -578,8 +528,18 @@ fn validate_estimates<'a>(
             return Err("tempo estimate observations must be strictly monotonic".to_owned());
         }
         previous_time = Some(estimate.observed_at_ns);
-        if previous_time_by_segment
-            .get(estimate.segment_id.as_str())
+
+        let change = changes
+            .get(estimate.change_id.as_str())
+            .ok_or_else(|| format!("estimate references unknown tempo change {}", estimate.change_id))?;
+        if estimate.observed_at_ns < change.change_observed_ns {
+            return Err(format!(
+                "tempo estimate {} was observed before the tempo change became available",
+                estimate.estimate_id
+            ));
+        }
+        if previous_time_by_change
+            .get(estimate.change_id.as_str())
             .is_some_and(|time| {
                 estimate.observed_at_ns - *time < panel.policy.minimum_estimate_spacing_ns
             })
@@ -589,21 +549,9 @@ fn validate_estimates<'a>(
                 estimate.estimate_id
             ));
         }
-        previous_time_by_segment.insert(estimate.segment_id.as_str(), estimate.observed_at_ns);
-        let segment = segments.get(estimate.segment_id.as_str()).ok_or_else(|| {
-            format!(
-                "estimate {} references unknown segment",
-                estimate.estimate_id
-            )
-        })?;
-        if estimate.observed_at_ns < segment.change_observed_ns {
-            return Err(format!(
-                "tempo estimate {} was observed before its segment became available",
-                estimate.estimate_id
-            ));
-        }
+        previous_time_by_change.insert(estimate.change_id.as_str(), estimate.observed_at_ns);
         result
-            .entry(estimate.segment_id.as_str())
+            .entry(estimate.change_id.as_str())
             .or_default()
             .push(estimate);
     }
@@ -611,24 +559,27 @@ fn validate_estimates<'a>(
 }
 
 fn score_tempo_adaptation<'a>(
-    panel: &MusicalTimingPanelV1,
-    estimates: &BTreeMap<&str, Vec<&'a TempoEstimateV1>>,
-) -> Result<Vec<TempoAdaptationSummary>, String> {
+    panel: &MusicalTimingPanelV2,
+    estimates: &BTreeMap<&str, Vec<&'a TempoEstimateV2>>,
+) -> Vec<TempoAdaptationSummary> {
     let required = panel.policy.required_consecutive_stable_estimates;
     let tolerance = panel.policy.maximum_relative_period_error;
     let mut output = Vec::new();
-    for segment in &panel.tempo_segments {
+
+    for change in &panel.tempo_changes {
         let values = estimates
-            .get(segment.segment_id.as_str())
+            .get(change.change_id.as_str())
             .cloned()
             .unwrap_or_default();
         let mut stable_run = 0usize;
         let mut stable_start = None;
         let mut recovered_at = None;
+
         for estimate in &values {
-            let relative_error =
-                (estimate.estimated_period_ns as f64 - segment.beat_period_ns as f64).abs()
-                    / segment.beat_period_ns as f64;
+            let relative_error = (estimate.estimated_period_ns as f64
+                - change.reference_beat_period_ns as f64)
+                .abs()
+                / change.reference_beat_period_ns as f64;
             if relative_error <= tolerance {
                 stable_run += 1;
                 if stable_run == 1 {
@@ -643,21 +594,22 @@ fn score_tempo_adaptation<'a>(
                 stable_start = None;
             }
         }
-        let adaptation_time_ns = recovered_at.map(|at| at - segment.change_observed_ns);
+
+        let adaptation_time_ns = recovered_at.map(|at| at - change.change_observed_ns);
         output.push(TempoAdaptationSummary {
-            segment_id: segment.segment_id.clone(),
-            reference_beat_period_ns: segment.beat_period_ns,
+            change_id: change.change_id.clone(),
+            reference_beat_period_ns: change.reference_beat_period_ns,
             estimate_count: values.len(),
             stable_estimates_required: required,
             recovered: recovered_at.is_some(),
             adaptation_time_ns,
             adaptation_time_beats: adaptation_time_ns
-                .map(|time| time as f64 / segment.beat_period_ns as f64),
+                .map(|time| time as f64 / change.reference_beat_period_ns as f64),
             stable_run_start_ns: stable_start,
             last_estimated_period_ns: values.last().map(|estimate| estimate.estimated_period_ns),
         });
     }
-    Ok(output)
+    output
 }
 
 fn distribution(values: &[f64]) -> Distribution {
@@ -693,7 +645,8 @@ fn threshold_rate(values: &[f64], threshold: f64) -> Option<f64> {
         None
     } else {
         Some(
-            values.iter().filter(|value| **value <= threshold).count() as f64 / values.len() as f64,
+            values.iter().filter(|value| **value <= threshold).count() as f64
+                / values.len() as f64,
         )
     }
 }
@@ -746,7 +699,7 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    const FIXTURE: &str = include_str!("../fixtures/valid-musical-timing-v1.json");
+    const FIXTURE: &str = include_str!("../fixtures/valid-musical-timing-v2.json");
 
     fn panel() -> Value {
         serde_json::from_str(FIXTURE).expect("known-answer timing fixture JSON")
@@ -757,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    fn known_answer_reports_phase_error_and_tempo_recovery() {
+    fn known_answer_reports_phase_error_and_tempo_recovery_from_canonical_map() {
         let report = parse_and_score(FIXTURE).expect("known-answer panel should score");
         assert_eq!(report.target_count, 4);
         assert_eq!(report.observed_count, 4);
@@ -765,23 +718,28 @@ mod tests {
         assert_eq!(report.extra_onset_count, 0);
         assert_eq!(report.within_025_beat_rate, Some(1.0));
         assert!(report.tempo_adaptation.iter().all(|item| item.recovered));
+        assert_eq!(report.reference_time_map_id, "shared-muse-time-map");
         assert!(report.qualified_for_declared_timing_contract);
-    }
-
-    #[test]
-    fn backdated_tempo_segment_is_rejected() {
-        let mut value = panel();
-        value["tempo_segments"][1]["change_observed_ns"] = serde_json::json!(2_100_000_000_u64);
-        let error = score(&value).expect_err("tempo event cannot be backdated");
-        assert!(error.contains("phase zero predates"));
     }
 
     #[test]
     fn estimate_before_tempo_change_is_rejected() {
         let mut value = panel();
-        value["tempo_estimates"][5]["observed_at_ns"] = serde_json::json!(1_999_999_999_u64);
+        value["tempo_estimates"][5]["observed_at_ns"] =
+            serde_json::json!(1_999_999_999_u64);
+        value["tempo_estimates"][5]["evidence_window_end_ns"] =
+            serde_json::json!(1_999_999_999_u64);
         let error = score(&value).expect_err("no estimate can precede change availability");
-        assert!(error.contains("observed before its segment became available"));
+        assert!(error.contains("observed before the tempo change became available"));
+    }
+
+    #[test]
+    fn tempo_estimate_cannot_use_future_audio_evidence() {
+        let mut value = panel();
+        value["tempo_estimates"][5]["evidence_window_end_ns"] =
+            serde_json::json!(2_200_000_000_u64);
+        let error = score(&value).expect_err("tempo estimate may not inspect future audio");
+        assert!(error.contains("future evidence"));
     }
 
     #[test]
@@ -796,28 +754,11 @@ mod tests {
     }
 
     #[test]
-    fn tempo_estimate_cannot_use_future_audio_evidence() {
-        let mut value = panel();
-        value["tempo_estimates"][5]["evidence_window_end_ns"] =
-            serde_json::json!(2_200_000_000_u64);
-        let error = score(&value).expect_err("tempo estimate may not inspect future audio");
-        assert!(error.contains("future evidence"));
-    }
-
-    #[test]
     fn invalid_subdivision_is_rejected() {
         let mut value = panel();
         value["target_events"][0]["subdivision_index"] = serde_json::json!(4);
         let error = score(&value).expect_err("subdivision numerator must be in range");
         assert!(error.contains("invalid rational subdivision"));
-    }
-
-    #[test]
-    fn beat_index_cannot_cross_segment_boundary() {
-        let mut value = panel();
-        value["target_events"][0]["beat_index"] = serde_json::json!(4);
-        let error = score(&value).expect_err("target beat belongs in next tempo segment");
-        assert!(error.contains("crosses the next tempo segment"));
     }
 
     #[test]
@@ -865,7 +806,7 @@ mod tests {
     fn unstable_tempo_estimates_never_qualify() {
         let mut value = panel();
         for estimate in value["tempo_estimates"].as_array_mut().unwrap() {
-            if estimate["segment_id"] == "tempo-2" {
+            if estimate["change_id"] == "change-2" {
                 estimate["estimated_period_ns"] = serde_json::json!(500_000_000_u64);
             }
         }
@@ -880,23 +821,25 @@ mod tests {
         value["tempo_estimates"]
             .as_array_mut()
             .unwrap()
-            .retain(|estimate| estimate["segment_id"] != "tempo-2");
+            .retain(|estimate| estimate["change_id"] != "change-2");
         let report = score(&value).expect("no recovery is a reportable result");
         assert!(!report.tempo_adaptation[1].recovered);
         assert!(!report.qualified_for_declared_timing_contract);
     }
 
     #[test]
-    fn segment_boundary_beat_zero_is_scored_on_the_new_period() {
+    fn expected_onset_is_consumed_from_the_canonical_map_not_recomputed() {
         let mut value = panel();
-        value["target_events"][2]["beat_index"] = serde_json::json!(4);
-        value["target_events"][2]["subdivision_index"] = serde_json::json!(0);
-        value["target_events"][2]["observed_onset_ns"] = serde_json::json!(2_000_000_000_u64);
-        let report = score(&value).expect("new segment boundary event should score");
-        assert_eq!(report.event_findings[2].expected_onset_ns, 2_000_000_000);
-        assert_eq!(
-            report.event_findings[2].absolute_phase_error_beats,
-            Some(0.0)
-        );
+        value["target_events"][0]["expected_onset_ns"] = serde_json::json!(5_000_000);
+        let report = score(&value).expect("canonical mapper output should be directly consumed");
+        assert_eq!(report.event_findings[0].expected_onset_ns, 5_000_000);
+    }
+
+    #[test]
+    fn unsupported_time_map_kind_is_rejected() {
+        let mut value = panel();
+        value["reference_time_map_kind"] = serde_json::json!("self_inferred_output_map");
+        let error = score(&value).expect_err("only canonical mapper outputs are admissible");
+        assert!(error.contains("unsupported canonical reference time-map kind"));
     }
 }
