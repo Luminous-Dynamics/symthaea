@@ -24,8 +24,7 @@ pub use secom_missingness::{
     SecomMissingnessError, SecomMissingnessReportV1, evaluate_secom_missingness_v1,
 };
 pub use secom_observation_drift::{
-    SecomObservationDriftError, SecomObservationDriftReportV1,
-    evaluate_secom_observation_drift_v1,
+    SecomObservationDriftError, SecomObservationDriftReportV1, evaluate_secom_observation_drift_v1,
 };
 
 pub use secom_raw::{
