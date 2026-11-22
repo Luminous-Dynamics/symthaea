@@ -55,7 +55,7 @@ jobs:
             --bin mel-musical-timing-audit -- score \
             tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json \
             "$RUNNER_TEMP/mel-musical-timing-report.json"
-          jq -e '.target_count == 4 and .observed_count == 4 and .missed_count == 0 and .extra_onset_count == 0 and .within_025_beat_rate == 1 and (.tempo_adaptation | length) == 2 and all(.tempo_adaptation[]; .recovered == true) and .qualified_for_declared_timing_contract == true' \
+          jq -e '.target_count == 4 and .observed_count == 4 and .missed_count == 0 and .extra_onset_count == 0 and .within_025_beat_rate == 1 and (.tempo_adaptation | length) == 2 and all(.tempo_adaptation[]; .recovered == true and .eligible_estimate_count >= 5) and .qualified_for_declared_timing_contract == true' \
             "$RUNNER_TEMP/mel-musical-timing-report.json" > /dev/null
       - name: Assemble exact-head reproducibility evidence
         if: always()
