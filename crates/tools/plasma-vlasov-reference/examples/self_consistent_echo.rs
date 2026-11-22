@@ -180,12 +180,9 @@ fn run_resolution(
     let wrong_prediction =
         plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(wrong_pulse_pair)?;
     let velocity_spacing = config.dv();
-    let fundamental_wave_number =
-        FIRST_MODE as f64 * TAU / config.domain_length;
-    let velocity_nyquist_time =
-        PI / (fundamental_wave_number * velocity_spacing);
-    let velocity_recurrence_time =
-        TAU / (fundamental_wave_number * velocity_spacing);
+    let fundamental_wave_number = FIRST_MODE as f64 * TAU / config.domain_length;
+    let velocity_nyquist_time = PI / (fundamental_wave_number * velocity_spacing);
+    let velocity_recurrence_time = TAU / (fundamental_wave_number * velocity_spacing);
 
     let initial = maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, THERMAL_SPEED)?;
     let mut pulsed = VlasovPoisson1d1v::new(config, initial.clone())?;
@@ -654,12 +651,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         "# flux_columns,run,step,time,x_cutoff,v_cutoff,pulse_phi_x,pulse_phi_v,pulse_cumulative_phi_x,pulse_cumulative_phi_v,pulse_direct_loss_x,pulse_direct_loss_v,pulse_closure_x,pulse_closure_v,control_phi_x,control_phi_v,control_cumulative_phi_x,control_cumulative_phi_v,control_direct_loss_x,control_direct_loss_v,control_closure_x,control_closure_v"
     );
 
-    let common = |nx, nv| VlasovPoissonConfig {
+    let common = |nx, nv, velocity_limit| VlasovPoissonConfig {
         nx,
         nv,
         domain_length: 4.0 * std::f64::consts::PI,
-        velocity_min: -6.0,
-        velocity_max: 6.0,
+        velocity_min: -velocity_limit,
+        velocity_max: velocity_limit,
         charge_to_mass: -1.0,
         permittivity: 1.0,
         background_density: 1.0,
@@ -668,12 +665,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     // One-factor-at-a-time refinements isolate spatial grid, velocity grid and
     // timestep effects. The combined fine case checks their interaction.
     // All configurations emit at the same 0.02 physical-time cadence.
-    run_resolution("base_amp_0p025", common(64, 256), 0.01, 2, 0.025)?;
-    run_resolution("base", common(64, 256), 0.01, 2, 0.05)?;
-    run_resolution("base_amp_0p10", common(64, 256), 0.01, 2, 0.10)?;
-    run_resolution("x_refined", common(128, 256), 0.01, 2, 0.05)?;
-    run_resolution("v_refined", common(64, 512), 0.01, 2, 0.05)?;
-    run_resolution("dt_refined", common(64, 256), 0.005, 4, 0.05)?;
-    run_resolution("joint_refined", common(128, 512), 0.005, 4, 0.05)?;
+    run_resolution("base_amp_0p025", common(64, 256, 6.0), 0.01, 2, 0.025)?;
+    run_resolution("base", common(64, 256, 6.0), 0.01, 2, 0.05)?;
+    run_resolution("base_amp_0p10", common(64, 256, 6.0), 0.01, 2, 0.10)?;
+    run_resolution("x_refined", common(128, 256, 6.0), 0.01, 2, 0.05)?;
+    run_resolution("v_refined", common(64, 512, 6.0), 0.01, 2, 0.05)?;
+    run_resolution("dt_refined", common(64, 256, 6.0), 0.005, 4, 0.05)?;
+    run_resolution("joint_refined", common(128, 512, 6.0), 0.005, 4, 0.05)?;
+    // Extend velocity support while holding velocity spacing fixed (Nv doubles too).
+    run_resolution("domain_expanded_fixed_dv", common(64, 512, 12.0), 0.01, 2, 0.05)?;
+    // Extend velocity support at fixed Nv; dv doubles and recurrence time halves.
+    run_resolution("domain_expanded_fixed_nv", common(64, 256, 12.0), 0.01, 2, 0.05)?;
     Ok(())
 }
