@@ -378,7 +378,8 @@ mod tests {
     #[test]
     fn malformed_factor_metadata_fails_closed() {
         let clean = clean_observations();
-        let mut field = generate_spatial_nuisance_field(&graph(), &config(2, 0.2, 25), None).unwrap();
+        let mut field =
+            generate_spatial_nuisance_field(&graph(), &config(2, 0.2, 25), None).unwrap();
         field.factor_series[0].pop();
         assert!(matches!(
             calibrate_spatial_nuisance_to_component_fraction(&clean, &field, 0.2),
