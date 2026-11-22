@@ -28,8 +28,10 @@ ZigzagNetVis (IEEE TVCG, October 2025), DOI https://doi.org/10.1109/TVCG.2025.35
 
 - session ID;
 - coordinate-frame ID and calibration-manifest digest;
+- one consistent observation-scope/ROI ID across all windows;
 - ordered, non-overlapping observation windows;
 - per-window source-observation digest;
+- stable observation-scope/ROI ID (the declared imaging/annotation region cannot silently change across windows);
 - stable node identities;
 - stable edge identities, endpoints and explicit evidence class;
 - coverage status for each window.
