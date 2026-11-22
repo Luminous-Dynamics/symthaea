@@ -10,7 +10,7 @@ An agent should not retain every useful observation as a fact to inject into fut
 Separate what must be learned from what can be re-observed:
 
 - **Current state:** often cheap to query again and dangerous to cache indefinitely.
-- **Stable facts:** sometimes cheaper to retain, sometimes cheaper to resolve through a source locator.
+- **Stable facts:** retain a compact fact or source locator, whichever has higher net value; unlike mutable current state, a stable fact need not have a short snapshot expiry.
 - **Learned rules and procedures:** knowledge acquired through experience that may not be directly visible in the next environment state.
 - **Preferences:** durable user- or principal-specific constraints, subject to scope and expiry.
 
@@ -43,7 +43,7 @@ For a predicted future-use value V:
 - Snapshot net value: V minus (snapshot tokens multiplied by token cost).
 - Locator net value: V minus re-observation cost, latency penalty and locator-token cost.
 
-A locator is eligible only when it can return before the declared decision deadline and its independent receipt remains valid. A snapshot is eligible only when its verified validity interval covers the decision deadline. Learned rules, procedures and preferences are not replaced with a live-state locator merely because some source can be queried.
+A locator is eligible only when it can return before the declared decision deadline and its independent receipt remains valid through that deadline. A current-state snapshot is eligible only when its verified validity interval covers the decision deadline. Stable facts may be retained as knowledge without a transient-state expiry, or represented by a cheaper verified locator. Learned rules, procedures and preferences are not replaced with a live-state locator merely because some source can be queried.
 
 This is a per-item representation decision. A future global optimizer should jointly allocate context tokens, re-observation calls, latency and privacy budgets across a candidate set; it must preserve the exact salience selector as a matched baseline.
 
@@ -97,7 +97,7 @@ These are target thresholds, not current results. They should be recalibrated af
 
 ## Limitations and next steps
 
-- The module uses declared normalized costs and a declared decision deadline; real deployments need measured tool latency, API availability, energy/cost and failure distributions.
+- The module uses declared normalized costs and a declared decision deadline; real deployments need measured tool latency, API availability, energy/cost and failure distributions. Stable-fact retention and mutable-state caching deliberately have different validity rules.
 - Receipt authenticity is delegated to an injected verifier; fixture receipts do not establish production trust.
 - The current selector makes per-item representation choices; a joint token/call/latency optimizer remains future work.
 - The current module does not store or mutate persistent memory. It returns a plan for a governed consumer.

@@ -278,6 +278,7 @@ pub enum ReobservationDispositionV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReobservationReasonV1 {
     KnowledgeIsNotReconstructible,
+    StableKnowledgeCheaperToRetain,
     CheaperToReobserveBeforeDeadline,
     ReobservationTooSlowOrExpensive,
     SnapshotRemainsValidThroughDeadline,
@@ -324,6 +325,42 @@ impl ReobservationPlanV1 {
         ];
         digest_fields(b"mycelix:mace:reobservation-plan:v1\0", &fields)
     }
+}
+
+fn usable_locator(
+    profile: &VerifiedReobservationProfileV1,
+    policy: ReobservationPolicyV1,
+) -> Option<(String, u64)> {
+    if profile.receipt().valid_until_ms < policy.decision_deadline_ms
+        || policy.locator_context_tokens > policy.context_budget_tokens
+    {
+        return None;
+    }
+    let ReobservationAvailabilityV1::Available {
+        available_at_ms,
+        locator_sha256,
+    } = &profile.proposal().availability
+    else {
+        return None;
+    };
+    let proposal = profile.proposal();
+    let complete_at = available_at_ms
+        .saturating_add(i64::from(proposal.reobservation_latency_ms));
+    let latency_cost = u64::from(proposal.reobservation_latency_ms)
+        .saturating_mul(u64::from(policy.latency_cost_per_ms_micros));
+    let total_reobservation_cost = latency_cost
+        .saturating_add(u64::from(proposal.reobservation_cost_micros));
+    if complete_at > policy.decision_deadline_ms
+        || total_reobservation_cost > u64::from(policy.maximum_reobservation_cost_micros)
+    {
+        return None;
+    }
+    let locator_storage_cost = u64::from(policy.locator_context_tokens)
+        .saturating_mul(u64::from(policy.context_cost_per_token_micros));
+    Some((
+        locator_sha256.clone(),
+        total_reobservation_cost.saturating_add(locator_storage_cost),
+    ))
 }
 
 pub fn plan_memory_representation(
@@ -384,6 +421,11 @@ pub fn plan_memory_representation(
     } else {
         i64::MIN
     };
+    let stable_knowledge_net = if snapshot_fits {
+        expected.saturating_sub(i64::try_from(snapshot_cost).unwrap_or(i64::MAX))
+    } else {
+        i64::MIN
+    };
 
     match proposal.object_kind {
         MemoryObjectKindV1::LearnedRule
@@ -391,45 +433,42 @@ pub fn plan_memory_representation(
         | MemoryObjectKindV1::Preference => {
             if !snapshot_fits {
                 reason = ReobservationReasonV1::ContextBudgetInsufficient;
-            } else if snapshot_net > policy.minimum_net_value_micros {
+            } else if stable_knowledge_net > policy.minimum_net_value_micros {
                 disposition = ReobservationDispositionV1::PersistKnowledge;
                 reason = ReobservationReasonV1::KnowledgeIsNotReconstructible;
                 context_tokens = proposal.snapshot_context_tokens;
                 estimated_cost = snapshot_cost;
-                net = snapshot_net;
-            } else if !snapshot_valid {
-                reason = ReobservationReasonV1::SnapshotExpiresBeforeDeadline;
+                net = stable_knowledge_net;
+            } else {
+                reason = ReobservationReasonV1::NoPositiveNetValue;
             }
         }
-        MemoryObjectKindV1::CurrentState | MemoryObjectKindV1::StableFact => {
-            let locator_option = match &proposal.availability {
-                ReobservationAvailabilityV1::Available {
-                    available_at_ms,
-                    locator_sha256,
-                } => {
-                    let complete_at = available_at_ms
-                        .saturating_add(i64::from(proposal.reobservation_latency_ms));
-                    let latency_cost = u64::from(proposal.reobservation_latency_ms)
-                        .saturating_mul(u64::from(policy.latency_cost_per_ms_micros));
-                    let total_reobservation_cost = latency_cost
-                        .saturating_add(u64::from(proposal.reobservation_cost_micros));
-                    let locator_storage_cost = u64::from(policy.locator_context_tokens)
-                        .saturating_mul(u64::from(policy.context_cost_per_token_micros));
-                    let total_cost = total_reobservation_cost
-                        .saturating_add(locator_storage_cost);
-                    if complete_at <= policy.decision_deadline_ms
-                        && total_reobservation_cost
-                            <= u64::from(policy.maximum_reobservation_cost_micros)
-                        && policy.locator_context_tokens <= policy.context_budget_tokens
-                    {
-                        Some((locator_sha256.clone(), total_cost))
-                    } else {
-                        None
-                    }
-                }
-                ReobservationAvailabilityV1::Unavailable => None,
-            };
-
+        MemoryObjectKindV1::StableFact => {
+            let locator_option = usable_locator(profile, policy);
+            let locator_net = locator_option.as_ref().map_or(i64::MIN, |(_, cost)| {
+                expected.saturating_sub(i64::try_from(*cost).unwrap_or(i64::MAX))
+            });
+            if locator_net > stable_knowledge_net
+                && locator_net > policy.minimum_net_value_micros
+            {
+                disposition = ReobservationDispositionV1::StoreLocator;
+                reason = ReobservationReasonV1::CheaperToReobserveBeforeDeadline;
+                context_tokens = policy.locator_context_tokens;
+                estimated_cost = locator_option.as_ref().map_or(0, |(_, cost)| *cost);
+                locator = locator_option.map(|(digest, _)| digest);
+                net = locator_net;
+            } else if stable_knowledge_net > policy.minimum_net_value_micros {
+                disposition = ReobservationDispositionV1::PersistKnowledge;
+                reason = ReobservationReasonV1::StableKnowledgeCheaperToRetain;
+                context_tokens = proposal.snapshot_context_tokens;
+                estimated_cost = snapshot_cost;
+                net = stable_knowledge_net;
+            } else if !snapshot_fits {
+                reason = ReobservationReasonV1::ContextBudgetInsufficient;
+            }
+        }
+        MemoryObjectKindV1::CurrentState => {
+            let locator_option = usable_locator(profile, policy);
             let locator_net = locator_option.as_ref().map_or(i64::MIN, |(_, cost)| {
                 expected.saturating_sub(i64::try_from(*cost).unwrap_or(i64::MAX))
             });
@@ -508,6 +547,9 @@ fn reason_code(value: ReobservationReasonV1) -> &'static str {
     match value {
         ReobservationReasonV1::KnowledgeIsNotReconstructible => {
             "knowledge_is_not_reconstructible"
+        }
+        ReobservationReasonV1::StableKnowledgeCheaperToRetain => {
+            "stable_knowledge_cheaper_to_retain"
         }
         ReobservationReasonV1::CheaperToReobserveBeforeDeadline => {
             "cheaper_to_reobserve_before_deadline"
@@ -590,6 +632,7 @@ mod tests {
 
     struct FixtureVerifier {
         corrupt_receipt: bool,
+        valid_for_ms: i64,
     }
 
     impl ReobservationVerifierV1 for FixtureVerifier {
@@ -602,7 +645,7 @@ mod tests {
             let mut receipt = ReobservationReceiptV1 {
                 proposal_sha256: proposal.canonical_digest(),
                 verified_at_ms: proposal.as_known.known_at_ms,
-                valid_until_ms: proposal.as_known.known_at_ms + 10_000,
+                valid_until_ms: proposal.as_known.known_at_ms + self.valid_for_ms,
                 verifier_id: "fixture-observer-v1".to_owned(),
                 receipt_sha256: String::new(),
             };
@@ -688,12 +731,14 @@ mod tests {
         }
     }
 
-    fn prediction(
+    fn prediction_for(
+        event_id: u32,
+        evidence_sha256: &str,
         expected_value_gain_micros: u32,
         uncertainty_penalty_micros: u32,
     ) -> VerifiedFutureUsePredictionV1 {
         let raw = FutureUsePredictionV1::new(
-            7,
+            event_id,
             digest("target-model"),
             scope(),
             150,
@@ -705,7 +750,7 @@ mod tests {
             "v1",
             digest("model-config"),
             digest("rationale"),
-            digest("evidence"),
+            evidence_sha256,
         );
         verify_future_use_prediction(
             raw,
@@ -714,6 +759,18 @@ mod tests {
             &FixtureSalienceVerifier,
         )
         .unwrap()
+    }
+
+    fn prediction(
+        expected_value_gain_micros: u32,
+        uncertainty_penalty_micros: u32,
+    ) -> VerifiedFutureUsePredictionV1 {
+        prediction_for(
+            7,
+            &digest("evidence"),
+            expected_value_gain_micros,
+            uncertainty_penalty_micros,
+        )
     }
 
     fn policy() -> ReobservationPolicyV1 {
@@ -738,6 +795,7 @@ mod tests {
             as_known(),
             &FixtureVerifier {
                 corrupt_receipt: false,
+                valid_for_ms: 10_000,
             },
         )
         .unwrap()
@@ -829,16 +887,22 @@ mod tests {
             ReobservationAvailabilityV1::Unavailable,
             Some(900),
         ));
-        let wrong_prediction = prediction(50_000, 1_000);
+        let wrong_prediction = prediction_for(
+            8,
+            &digest("evidence"),
+            50_000,
+            1_000,
+        );
         let wrong_proposal = proposal(
             MemoryObjectKindV1::CurrentState,
             ReobservationAvailabilityV1::Unavailable,
             Some(900),
         );
-        let wrong_proposal = ReobservationProposalV1 {
+        let mut wrong_proposal = ReobservationProposalV1 {
             event_id: 99,
             ..wrong_proposal
         };
+        wrong_proposal.event_id = 0;
         assert_eq!(
             verify_reobservation_profile(
                 wrong_proposal,
@@ -846,6 +910,7 @@ mod tests {
                 as_known(),
                 &FixtureVerifier {
                     corrupt_receipt: false,
+                    valid_for_ms: 10_000,
                 },
             ),
             Err(ReobservationReject::InvalidEventId)
@@ -853,6 +918,56 @@ mod tests {
         assert_eq!(
             plan_memory_representation(&wrong_prediction, &profile, policy()),
             Err(ReobservationReject::PredictionMismatch)
+        );
+    }
+
+    #[test]
+    fn locator_receipt_must_remain_valid_through_the_decision_deadline() {
+        let item = proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("live-source"),
+            },
+            Some(800),
+        );
+        let profile = verify_reobservation_profile(
+            item,
+            scope(),
+            as_known(),
+            &FixtureVerifier {
+                corrupt_receipt: false,
+                valid_for_ms: 200,
+            },
+        )
+        .unwrap();
+        let plan = plan_memory_representation(
+            &prediction(50_000, 1_000),
+            &profile,
+            policy(),
+        )
+        .unwrap();
+        assert_eq!(plan.disposition, ReobservationDispositionV1::CacheSnapshot);
+        assert_eq!(plan.snapshot_valid_until_ms, Some(800));
+    }
+
+    #[test]
+    fn stable_fact_can_be_retained_without_an_expiring_snapshot() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::StableFact,
+            ReobservationAvailabilityV1::Unavailable,
+            None,
+        ));
+        let plan = plan_memory_representation(
+            &prediction(50_000, 1_000),
+            &profile,
+            policy(),
+        )
+        .unwrap();
+        assert_eq!(plan.disposition, ReobservationDispositionV1::PersistKnowledge);
+        assert_eq!(
+            plan.reason,
+            ReobservationReasonV1::StableKnowledgeCheaperToRetain
         );
     }
 
@@ -870,6 +985,7 @@ mod tests {
                 as_known(),
                 &FixtureVerifier {
                     corrupt_receipt: true,
+                    valid_for_ms: 10_000,
                 },
             ),
             Err(ReobservationReject::InvalidVerifierReceipt)
