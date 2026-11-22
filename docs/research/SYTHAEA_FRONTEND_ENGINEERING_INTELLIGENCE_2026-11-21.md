@@ -622,13 +622,14 @@ The current public field has several distinct evaluation surfaces:
   full interactive, runtime, security and maintenance loop SFEB targets.
   Source: https://aclanthology.org/2025.naacl-long.199/
 - **WebdriverIO Browser Agent Benchmark** fixes the model, harness and prompt
-  while swapping browser tools, samples 100 tasks from Online-Mind2Web
-  (300 tasks across 136 live websites), and uses an independent judge with
-  Wilson confidence intervals. Its own methodology warns that 100 tasks and
-  one run per task produce intervals around ±10 percentage points and that
-  the judge disagrees with human reviewers on roughly one run in seven.
-  Live-site variability and its browser-tool focus make it a complementary
-  tool-use comparator, not a direct code-generation score.
+  while swapping browser tools. Its page was updated October 9, 2026 and
+  currently lists 7 tools, 100 live-web tasks, 2 models and 2,511 total agent
+  runs. The displayed WebdriverIO session v10.0.2 row reports 62% success
+  (103/165; displayed 95% interval 55–69%), $0.013 median cost per task and
+  156 seconds median time per task. The benchmark explicitly warns that a
+  competing tool whose 95% interval overlaps the leader is not reliably worse.
+  Treat this as a browser-tool comparison, not a website-code-generation
+  leaderboard or evidence that one tool is significantly superior.
   Source: https://benchmark.webdriver.io/
 
 Do not compare raw scores across these benchmarks. Their task distributions,
