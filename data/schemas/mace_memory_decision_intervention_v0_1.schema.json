@@ -464,7 +464,8 @@
             "hdc_ltc_vs_static_hdc",
             "corrected_vs_stale",
             "typed_content_hdc_vs_conventional",
-            "typed_content_hdc_vs_static_hdc"
+            "typed_content_hdc_vs_static_hdc",
+            "typed_content_hdc_vs_exact_scope_scan"
           ]
         },
         "baseline_arm": {
