@@ -133,6 +133,10 @@ pub struct PortfolioInteractionCalibrationReceiptV1 {
     pub source_roots_disjoint: bool,
     pub calibration_mae_micros: u64,
     pub base_rate_mae_micros: u64,
+    pub heldout_mae_micros: u64,
+    pub heldout_base_rate_mae_micros: u64,
+    /// Paired-cluster-bootstrap 95% lower bound for held-out MAE improvement.
+    pub heldout_mae_improvement_lower_95_micros: i64,
     pub verified_at_ms: u64,
     pub valid_until_ms: u64,
     pub verifier_id: String,
@@ -162,6 +166,9 @@ impl PortfolioInteractionCalibrationReceiptV1 {
                 self.source_roots_disjoint.to_string(),
                 self.calibration_mae_micros.to_string(),
                 self.base_rate_mae_micros.to_string(),
+                self.heldout_mae_micros.to_string(),
+                self.heldout_base_rate_mae_micros.to_string(),
+                self.heldout_mae_improvement_lower_95_micros.to_string(),
                 self.verified_at_ms.to_string(),
                 self.valid_until_ms.to_string(),
                 self.verifier_id.clone(),
@@ -374,7 +381,10 @@ pub fn verify_portfolio_interactions(
     {
         return Err(PortfolioInteractionReject::CalibrationEvidenceInsufficient);
     }
-    if calibration.calibration_mae_micros >= calibration.base_rate_mae_micros {
+    if calibration.calibration_mae_micros >= calibration.base_rate_mae_micros
+        || calibration.heldout_mae_micros >= calibration.heldout_base_rate_mae_micros
+        || calibration.heldout_mae_improvement_lower_95_micros <= 0
+    {
         return Err(PortfolioInteractionReject::CalibrationQualityInsufficient);
     }
     if calibration.verified_at_ms > context.as_known.known_at_ms
@@ -1057,6 +1067,9 @@ mod tests {
             source_roots_disjoint: true,
             calibration_mae_micros: 80,
             base_rate_mae_micros: 120,
+            heldout_mae_micros: 85,
+            heldout_base_rate_mae_micros: 120,
+            heldout_mae_improvement_lower_95_micros: 12,
             verified_at_ms: 250,
             valid_until_ms: 500,
             verifier_id: "fixture-only".to_owned(),
@@ -1157,9 +1170,32 @@ mod tests {
         let mut weak = receipt(&proposal);
         weak.calibration_mae_micros = weak.base_rate_mae_micros;
         weak.receipt_sha256 = weak.canonical_digest();
-        let verifier = FixtureVerifier { receipt: weak };
+        let verifier = FixtureVerifier {
+            receipt: weak.clone(),
+        };
         assert_eq!(
-            verify_portfolio_interactions(proposal, &options, &context(), &verifier),
+            verify_portfolio_interactions(
+                proposal.clone(),
+                &options,
+                &context(),
+                &verifier,
+            ),
+            Err(PortfolioInteractionReject::CalibrationQualityInsufficient)
+        );
+
+        let mut weak_heldout = receipt(&proposal);
+        weak_heldout.heldout_mae_improvement_lower_95_micros = 0;
+        weak_heldout.receipt_sha256 = weak_heldout.canonical_digest();
+        let verifier = FixtureVerifier {
+            receipt: weak_heldout,
+        };
+        assert_eq!(
+            verify_portfolio_interactions(
+                proposal,
+                &options,
+                &context(),
+                &verifier,
+            ),
             Err(PortfolioInteractionReject::CalibrationQualityInsufficient)
         );
     }
@@ -1177,6 +1213,24 @@ mod tests {
             ),
             Err(PortfolioInteractionReject::SearchLimitExceeded)
         );
+    }
+
+    #[test]
+    fn rehashed_plan_cannot_substitute_a_different_verified_interaction() {
+        let options = vec![option(1, 40), option(2, 30)];
+        let verified = verify(&options, 80, 5);
+        let mut plan =
+            optimize_memory_portfolio_pairwise(&options, budget(), &verified).unwrap();
+        assert!(plan.is_admissible_with(&verified));
+
+        plan.selected_interactions[0].predicted_interaction_micros += 1;
+        plan.selected_interactions[0].conservative_interaction_micros += 1;
+        plan.conservative_interaction_value_micros += 1;
+        plan.total_conservative_value_micros += 1;
+        plan.plan_sha256 = plan.canonical_digest();
+
+        assert!(plan.is_canonical());
+        assert!(!plan.is_admissible_with(&verified));
     }
 
     #[test]
