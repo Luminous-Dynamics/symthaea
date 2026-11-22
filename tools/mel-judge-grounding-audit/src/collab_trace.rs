@@ -220,7 +220,10 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
         match event.kind.as_str() {
             "input_chunk" => {
                 let chunk = event.input_chunk.as_ref().ok_or_else(|| {
-                    format!("event {} kind/payload mismatch for input_chunk", event.event_id)
+                    format!(
+                        "event {} kind/payload mismatch for input_chunk",
+                        event.event_id
+                    )
                 })?;
                 validate_input_chunk(chunk, event.monotonic_ns)?;
                 if chunk.input_sequence != input_chunks.len() as u64 + 1 {
@@ -238,7 +241,10 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
             }
             "decision" => {
                 let decision = event.decision.as_ref().ok_or_else(|| {
-                    format!("event {} kind/payload mismatch for decision", event.event_id)
+                    format!(
+                        "event {} kind/payload mismatch for decision",
+                        event.event_id
+                    )
                 })?;
                 validate_decision(decision, event.monotonic_ns, &input_chunks)?;
                 if decisions.contains_key(&event.event_id) {
@@ -261,8 +267,10 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
                     },
                 );
                 decision_count += 1;
-                if matches!(decision.state, DecisionState::Respond | DecisionState::Continue)
-                    && is_inside_rest(event.monotonic_ns, &trace.rest_windows)
+                if matches!(
+                    decision.state,
+                    DecisionState::Respond | DecisionState::Continue
+                ) && is_inside_rest(event.monotonic_ns, &trace.rest_windows)
                 {
                     active_decision_during_rest_count += 1;
                     qualification_findings.push(format!(
@@ -324,7 +332,9 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
 
     for (decision_id, decision) in &decisions {
         match decision.state {
-            Some(DecisionState::Respond | DecisionState::Continue) if decision.output_count == 0 => {
+            Some(DecisionState::Respond | DecisionState::Continue)
+                if decision.output_count == 0 =>
+            {
                 qualification_findings.push(format!(
                     "response decision {decision_id} has no corresponding output"
                 ));
@@ -341,8 +351,10 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
     let response_decisions_without_output = decisions
         .values()
         .filter(|decision| {
-            matches!(decision.state, Some(DecisionState::Respond | DecisionState::Continue))
-                && decision.output_count == 0
+            matches!(
+                decision.state,
+                Some(DecisionState::Respond | DecisionState::Continue)
+            ) && decision.output_count == 0
         })
         .count();
 
@@ -353,7 +365,10 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
                 return false;
             }
             decisions.get(&event.event_id).is_some_and(|decision| {
-                matches!(decision.state, Some(DecisionState::Wait | DecisionState::Yield))
+                matches!(
+                    decision.state,
+                    Some(DecisionState::Wait | DecisionState::Yield)
+                )
             })
         });
         if !has_rest_decision {
@@ -365,9 +380,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
         }
     }
 
-    if trace.track == TrackKind::RenderedAudio
-        && audible_latencies.len() != output_count
-    {
+    if trace.track == TrackKind::RenderedAudio && audible_latencies.len() != output_count {
         qualification_findings.push(format!(
             "rendered-audio trace has {} of {} outputs with independent loopback audible-onset timestamps",
             audible_latencies.len(),
@@ -423,7 +436,10 @@ fn validate_header(trace: &InteractionTraceV1) -> Result<(), String> {
         return Err("events must be non-empty".to_owned());
     }
     if trace.claim_ceiling.is_empty()
-        || trace.claim_ceiling.iter().any(|claim| claim.trim().is_empty())
+        || trace
+            .claim_ceiling
+            .iter()
+            .any(|claim| claim.trim().is_empty())
     {
         return Err("claim_ceiling must contain non-empty limits".to_owned());
     }
@@ -436,7 +452,9 @@ fn validate_header(trace: &InteractionTraceV1) -> Result<(), String> {
             return Err(format!("duplicate rest window_id: {}", window.window_id));
         }
         if window.start_ns >= window.end_ns || window.start_ns < previous_end {
-            return Err("rest windows must be positive-duration and ordered without overlap".to_owned());
+            return Err(
+                "rest windows must be positive-duration and ordered without overlap".to_owned(),
+            );
         }
         previous_end = window.end_ns;
     }
@@ -456,7 +474,9 @@ fn validate_header(trace: &InteractionTraceV1) -> Result<(), String> {
                     .as_ref()
                     .is_some_and(|output| output.first_audible_onset_ns.is_some())
             }) {
-                return Err("audible onset timestamps require a loopback measurement receipt".to_owned());
+                return Err(
+                    "audible onset timestamps require a loopback measurement receipt".to_owned(),
+                );
             }
         }
     }
@@ -468,7 +488,9 @@ fn validate_input_chunk(chunk: &InputChunkV1, event_time_ns: u64) -> Result<(), 
         || chunk.context_end_ns > chunk.available_at_ns
         || chunk.available_at_ns > event_time_ns
     {
-        return Err("input chunk context/availability timestamps violate causal ordering".to_owned());
+        return Err(
+            "input chunk context/availability timestamps violate causal ordering".to_owned(),
+        );
     }
     require_digest(&chunk.media_sha256, "input media digest")
 }
@@ -529,7 +551,10 @@ fn validate_output(
     let decision = decisions
         .get(&output.decision_event_id)
         .ok_or_else(|| "output references a decision that does not precede it".to_owned())?;
-    if !matches!(decision.state, Some(DecisionState::Respond | DecisionState::Continue)) {
+    if !matches!(
+        decision.state,
+        Some(DecisionState::Respond | DecisionState::Continue)
+    ) {
         return Err("output may only follow RESPOND or CONTINUE".to_owned());
     }
     if decision.input_sequence != output.input_sequence {
@@ -550,7 +575,9 @@ fn validate_output(
             "audible onset timestamp has no independent loopback receipt".to_owned()
         })?;
         if measurement.clock_domain_id != clock_domain_id {
-            return Err("audible onset and trace clocks are not in the same clock domain".to_owned());
+            return Err(
+                "audible onset and trace clocks are not in the same clock domain".to_owned(),
+            );
         }
         if audible_ns < output.first_emitted_ns || audible_ns > event_time_ns {
             return Err("audible onset timestamp violates output ordering".to_owned());
@@ -599,7 +626,9 @@ fn require_digest(value: &str, name: &str) -> Result<(), String> {
     {
         Ok(())
     } else {
-        Err(format!("{name} must be a 64-character lowercase SHA-256 digest"))
+        Err(format!(
+            "{name} must be a 64-character lowercase SHA-256 digest"
+        ))
     }
 }
 
@@ -627,7 +656,10 @@ mod tests {
         assert_eq!(report.wait_count, 1);
         assert_eq!(report.respond_count, 1);
         assert_eq!(report.output_count, 1);
-        assert_eq!(report.emission_latency_from_input_available.p50_ns, Some(40));
+        assert_eq!(
+            report.emission_latency_from_input_available.p50_ns,
+            Some(40)
+        );
         assert_eq!(report.false_interruption_count, 0);
     }
 
