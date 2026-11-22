@@ -34,7 +34,19 @@ jobs:
         with:
           components: rustfmt, clippy
       - name: Format isolated reference crate
+        run: cargo +1.96.0 fmt --manifest-path tools/mel-agency-trace/Cargo.toml
+      - name: Verify normalized formatting
         run: cargo +1.96.0 fmt --check --manifest-path tools/mel-agency-trace/Cargo.toml
+      - name: Snapshot rustfmt-normalized sources
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-agency-rustfmt-snapshot
+          path: |
+            tools/mel-agency-trace/src/lib.rs
+            tools/mel-agency-trace/src/main.rs
+          if-no-files-found: error
+          retention-days: 7
       - name: Generate isolated dependency lock
         run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-agency-trace/Cargo.toml
       - name: Run lifecycle and adversarial tests
