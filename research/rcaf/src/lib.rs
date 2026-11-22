@@ -7,6 +7,7 @@
 
 pub mod simulation;
 pub mod spatial_calibration;
+pub mod factorial_counterfactual;
 pub mod spatial_nuisance;
 
 use std::fmt;
