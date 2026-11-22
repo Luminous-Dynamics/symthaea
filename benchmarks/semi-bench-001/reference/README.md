@@ -356,3 +356,37 @@ The \`semi-secom-logistic\` CLI also evaluates:
 B5 retains L1=0 and L2=1.0. B6 reports the number of nonzero coefficients (absolute weight > 1e-12), so sparsity is measured rather than assumed from the algorithm name. The synthetic and full pinned-source workflow checks assert the two B6 variants and their fixed L1 configuration.
 
 B6 is a preregistered research comparator, not a validation-selected hyperparameter winner. No tuning on the final chronological test is permitted. Zero coefficients do not establish physical sensor importance because the anonymous public SECOM mirror does not provide sensor semantics.
+
+
+## Rust inspection-decision oracle
+
+The Rust CLI \`semi-inspection-decision\` independently ports the finite-candidate expected-net-value policy in \`python/semi_inspection_decision_reference.py\`. It consumes the same versioned JSON subject and reproduces the frozen expected output after canonical, sorted-key JSON serialization.
+
+For candidate \(i\), the expected net value is:
+
+\[
+p_i s_i a_i N_i L_i
+-
+(1-p_i)(1-c_i)N_i H_i
+-
+C_i
+-
+D_i R_i
+\]
+
+where \(p\) is defect risk, \(s\) test sensitivity, \(a\) downstream actionability, \(N\) exposed units, \(L\) avoidable loss per defect, \(c\) test specificity, \(H\) false-hold cost per unit, \(C\) inspection cost, \(D\) delay hours and \(R\) delay cost per hour.
+
+The policy enumerates every candidate subset (maximum 18), enforcing total cash, inspection minutes and per-group capacity. Tie-breaking is deterministic: higher net value, lower cash cost, lower inspection time, then lexicographic candidate IDs. A matched-budget risk-only greedy comparator is emitted separately.
+
+Run:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-inspection-decision -- \\
+  benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.json
+\`\`\`
+
+For the synthetic fixture, the exact policy selects A/C/F with modeled net value 1,286.16 at 16 cost units and 45 minutes. Risk-only selects A/B/D/F with modeled net value 607.05 at 13 cost units and 34 minutes. These values are frozen policy-oracle outputs, not observed factory savings.
+
+Rust tests cover exact known-answer reproduction, input-order invariance, duplicate identities, invalid probabilities, negative costs, zero-time handling and the 18-candidate exact-oracle ceiling. The hosted workflow runs the CLI and diffs its canonical output against the independent Python known answer.
+
+**Claim limit:** the optimizer is exact only over the finite supplied candidates and the declared point-estimate utility model. It does not calibrate defect probabilities, test sensitivity, actionability, exposed volume, cost or delay. It must not control a metrology queue, hold/release wafers, write recipes or issue APC commands. Uninspected units remain unknown.

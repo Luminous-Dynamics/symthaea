@@ -361,6 +361,24 @@ jobs:
             | @tsv
           ' /tmp/secom-real/logistic-report.json
 
+
+      - name: Reproduce Rust inspection-decision report byte-for-byte
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-inspection-decision -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.json \
+            > /tmp/semi-inspection-decision-rust.json
+          diff -u \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/inspection-decision-known-answer-v1.expected.json \
+            /tmp/semi-inspection-decision-rust.json
+          jq -e '
+            .schema == "luminous.semi-bench.inspection-decision-report.v1" and
+            .selected_candidate_ids == ["A","C","F"] and
+            .selected_expected_net_value == 1286.16 and
+            .risk_only_comparator.selected_candidate_ids == ["A","B","D","F"] and
+            .risk_only_comparator.expected_net_value == 607.05 and
+            .claim_limits.uninspected_units_remain_unknown == true
+          ' /tmp/semi-inspection-decision-rust.json > /dev/null
+
       - name: Archive real-source SECOM diagnostic reports
         uses: actions/upload-artifact@v4
         with:
