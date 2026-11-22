@@ -516,3 +516,12 @@ Every state mutation updates a digest over the serialized state. Prediction rece
 ### Guarantees and limitations
 
 The rolling-window update is an engineering adaptation and coverage-degradation sentinel, not a distribution-free guarantee under arbitrary drift. A detected coverage gap causes abstention; a non-detected gap does not prove calibration. Delayed-feedback behavior must be benchmarked against fixed-window, exponential weighting, change-point detection and update-on-every-label under matched synthetic streams and later fab shadow data. No hold/release, APC or recipe authority is created.
+
+
+### Frozen, numeric metrology class semantics (online epoch)
+
+Online calibration now pins a validated \`BinaryMeasurandSemanticsV1\` rule: the target measurand, exact unit, comparator, numeric threshold, class names, specification authority and rule digest. Initial calibration and delayed feedback both re-run classification against the physical value in the validated process-event graph. A caller can no longer assert \`positive=true\` or \`positive=false\` independently of the measured value.
+
+The epoch also retains its model/training/calibration identities and target measurand. New graph snapshots are checked against the previously consumed feedback ledger; an existing validated label cannot disappear or silently change subject, measurand, revision or derived class. A superseding revision may replace one prior residual/coverage observation, but does not duplicate the physical outcome.
+
+Coverage monitoring distinguishes \`monitoring_insufficient\`, \`monitoring_within_tolerance\` and \`coverage_degraded\`. Insufficient support is not presented as a successful coverage qualification. A detected violation latches the epoch into full abstention; a non-triggered sentinel still does not prove coverage under arbitrary fab drift.
