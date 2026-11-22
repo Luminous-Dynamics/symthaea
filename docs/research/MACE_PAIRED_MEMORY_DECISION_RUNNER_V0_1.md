@@ -106,9 +106,9 @@ The evaluator crate promotes its HDC retrieval and SHA-256 dependencies to norma
 
 ## 8. Known limitations and next gates
 
-1. Compile and run the runner; validate every output record against the JSON Schema.
+1. Compile and run the runner; validate every output record against the JSON Schema, including the required decision_need_sha256 field.
 2. Replace the structural sibling-task placebo with a genuinely irrelevant, same-scope, count/token/byte-matched placebo using task content that is safe for the same tenant.
-3. Connect richer candidate-visible DecisionNeed attributes (outcome, horizon and target estimand) before using the typed index's optional numeric/estimand query fields; never derive these from evaluator truth.
+3. Extend the current DecisionNeed contract only through task/environment-declared attributes and explicit versioned policy profiles; never derive target estimands/outcomes/horizons from evaluator truth.
 4. Add a competitive conventional retrieval ladder: deterministic KV/episodic, BM25, dense and hybrid under equal total memory, context, verification, latency and compute budgets.
 5. Keep exact-scope full scan as an upper-bound diagnostic, not a practical baseline.
 6. Add full-history and salience-only arms only when their input and memory budgets are precisely matched.
