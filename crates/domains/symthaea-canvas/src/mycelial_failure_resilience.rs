@@ -715,6 +715,418 @@ pub fn build_single_failure_resilience_profile(
     build_mycelial_failure_resilience_profile(graph, demands, &scenarios)
 }
 
+fn attack_strategy_targets_segments(strategy: MycelialFailureAttackStrategy) -> bool {
+    matches!(
+        strategy,
+        MycelialFailureAttackStrategy::RandomSegments
+            | MycelialFailureAttackStrategy::DemandPathLoadSegments
+    )
+}
+
+fn splitmix64_next(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut value = *state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
+fn deterministic_shuffle<T>(values: &mut [T], seed: u64) {
+    let mut state = seed;
+    for index in (1..values.len()).rev() {
+        let selected = (splitmix64_next(&mut state) % (index as u64 + 1)) as usize;
+        values.swap(index, selected);
+    }
+}
+
+fn demand_weighted_path_load(
+    indexed: &IndexedGraph,
+    demands: &[MycelialDemandPair],
+) -> (Vec<u128>, Vec<u128>) {
+    let mut adjacency = vec![Vec::<(usize, f64, usize)>::new(); indexed.node_ids.len()];
+    for (edge_index, &(source, target, weight)) in indexed.edge_endpoints.iter().enumerate() {
+        adjacency[source].push((target, weight, edge_index));
+        adjacency[target].push((source, weight, edge_index));
+    }
+    for neighbours in &mut adjacency {
+        neighbours.sort_by(|left, right| {
+            left.0.cmp(&right.0).then_with(|| left.2.cmp(&right.2))
+        });
+    }
+
+    let mut segment_load = vec![0u128; indexed.edge_ids.len()];
+    let mut junction_load = vec![0u128; indexed.node_ids.len()];
+    let mut cache = HashMap::<usize, (Vec<f64>, Vec<Option<usize>>, Vec<Option<usize>>)>::new();
+
+    for demand in demands {
+        let source = indexed.node_index[&demand.source_junction_id];
+        let target = indexed.node_index[&demand.target_junction_id];
+        let (_, predecessor_node, predecessor_edge) = cache.entry(source).or_insert_with(|| {
+            let mut distances = vec![f64::INFINITY; indexed.node_ids.len()];
+            let mut predecessor_node = vec![None; indexed.node_ids.len()];
+            let mut predecessor_edge = vec![None; indexed.node_ids.len()];
+            let mut queue = BinaryHeap::new();
+            distances[source] = 0.0;
+            queue.push(QueueEntry {
+                node: source,
+                distance: 0.0,
+            });
+            while let Some(current) = queue.pop() {
+                if current.distance > distances[current.node] {
+                    continue;
+                }
+                for &(next, weight, edge_index) in &adjacency[current.node] {
+                    let candidate = current.distance + weight;
+                    if candidate < distances[next] {
+                        distances[next] = candidate;
+                        predecessor_node[next] = Some(current.node);
+                        predecessor_edge[next] = Some(edge_index);
+                        queue.push(QueueEntry {
+                            node: next,
+                            distance: candidate,
+                        });
+                    }
+                }
+            }
+            (distances, predecessor_node, predecessor_edge)
+        });
+        // Unreachable demand pairs contribute no path load.
+        if !cache[&source].0[target].is_finite() {
+            continue;
+        }
+
+        let mut cursor = target;
+        let mut reversed_nodes = vec![target];
+        let mut steps = 0usize;
+        while cursor != source {
+            let (Some(previous), Some(edge_index)) = (
+                predecessor_node[cursor],
+                predecessor_edge[cursor],
+            ) else {
+                // A positive-weight reachable path must have a complete predecessor chain.
+                reversed_nodes.clear();
+                break;
+            };
+            segment_load[edge_index] =
+                segment_load[edge_index].saturating_add(u128::from(demand.weight));
+            cursor = previous;
+            reversed_nodes.push(cursor);
+            steps += 1;
+            if steps > indexed.node_ids.len() {
+                reversed_nodes.clear();
+                break;
+            }
+        }
+        if reversed_nodes.is_empty() {
+            continue;
+        }
+        // Demand-path junction load counts internal transit junctions, not
+        // the originating or terminating demand endpoints.
+        for node_index in reversed_nodes.iter().skip(1).take(reversed_nodes.len().saturating_sub(2)) {
+            junction_load[*node_index] =
+                junction_load[*node_index].saturating_add(u128::from(demand.weight));
+        }
+    }
+    (segment_load, junction_load)
+}
+
+fn rank_failure_entities(
+    indexed: &IndexedGraph,
+    demands: &[MycelialDemandPair],
+    config: &MycelialFailureAttackConfig,
+) -> Result<Vec<String>, MycelialFailureResilienceError> {
+    let targets_segments = attack_strategy_targets_segments(config.strategy);
+    let mut ranked = if targets_segments {
+        indexed.edge_ids.clone()
+    } else {
+        indexed.node_ids.clone()
+    };
+
+    match config.strategy {
+        MycelialFailureAttackStrategy::RandomSegments
+        | MycelialFailureAttackStrategy::RandomJunctions => {
+            deterministic_shuffle(&mut ranked, config.seed);
+        }
+        MycelialFailureAttackStrategy::HighestDegreeJunctions => {
+            let mut degree = vec![0usize; indexed.node_ids.len()];
+            for &(source, target, _) in &indexed.edge_endpoints {
+                degree[source] = degree[source].saturating_add(1);
+                degree[target] = degree[target].saturating_add(1);
+            }
+            ranked.sort_by(|left, right| {
+                let left_index = indexed.node_index[left];
+                let right_index = indexed.node_index[right];
+                degree[right_index]
+                    .cmp(&degree[left_index])
+                    .then_with(|| left.cmp(right))
+            });
+        }
+        MycelialFailureAttackStrategy::DemandPathLoadSegments
+        | MycelialFailureAttackStrategy::DemandPathLoadJunctions => {
+            let (segment_load, junction_load) = demand_weighted_path_load(indexed, demands);
+            ranked.sort_by(|left, right| {
+                let left_load = if targets_segments {
+                    segment_load[indexed.edge_index[left]]
+                } else {
+                    junction_load[indexed.node_index[left]]
+                };
+                let right_load = if targets_segments {
+                    segment_load[indexed.edge_index[right]]
+                } else {
+                    junction_load[indexed.node_index[right]]
+                };
+                right_load.cmp(&left_load).then_with(|| left.cmp(right))
+            });
+        }
+        MycelialFailureAttackStrategy::SpatialClusterJunctions => {
+            let seed_id = config.spatial_seed_junction_id.as_deref().ok_or(
+                MycelialFailureResilienceError::InvalidAttackConfig(
+                    "spatial-cluster strategy requires a seed junction ID",
+                ),
+            )?;
+            let seed_index = indexed
+                .node_index
+                .get(seed_id)
+                .copied()
+                .ok_or_else(|| {
+                    MycelialFailureResilienceError::UnknownSpatialSeedJunction(
+                        seed_id.to_string(),
+                    )
+                })?;
+            let seed_position = indexed.positions[seed_index];
+            ranked.sort_by(|left, right| {
+                let left_distance = indexed.positions[indexed.node_index[left]]
+                    .sub(seed_position)
+                    .length();
+                let right_distance = indexed.positions[indexed.node_index[right]]
+                    .sub(seed_position)
+                    .length();
+                left_distance
+                    .total_cmp(&right_distance)
+                    .then_with(|| left.cmp(right))
+            });
+        }
+    }
+    Ok(ranked)
+}
+
+pub fn build_mycelial_failure_attack_plan(
+    graph: &MycelialJunctionHyphaGraph,
+    demands: &[MycelialDemandPair],
+    config: MycelialFailureAttackConfig,
+) -> Result<MycelialFailureAttackPlan, MycelialFailureResilienceError> {
+    let indexed = index_source_graph(graph)?;
+    validate_demands(&indexed, demands)?;
+    if config.maximum_failure_budget == 0
+        || config.maximum_failure_budget > MAX_FAILURE_SCENARIOS
+    {
+        return Err(MycelialFailureResilienceError::InvalidAttackConfig(
+            "maximum failure budget must be within the scenario limit",
+        ));
+    }
+    match (
+        config.strategy,
+        config.spatial_seed_junction_id.as_deref(),
+    ) {
+        (MycelialFailureAttackStrategy::SpatialClusterJunctions, Some(id))
+            if valid_id(id) => {}
+        (MycelialFailureAttackStrategy::SpatialClusterJunctions, _) => {
+            return Err(MycelialFailureResilienceError::InvalidAttackConfig(
+                "spatial-cluster strategy requires a valid seed junction ID",
+            ));
+        }
+        (_, None) => {}
+        (_, Some(_)) => {
+            return Err(MycelialFailureResilienceError::InvalidAttackConfig(
+                "spatial seed junction is only valid for spatial-cluster strategy",
+            ));
+        }
+    }
+
+    let ranked_entity_ids = rank_failure_entities(&indexed, demands, &config)?;
+    if config.maximum_failure_budget > ranked_entity_ids.len() {
+        return Err(MycelialFailureResilienceError::InvalidAttackConfig(
+            "maximum failure budget exceeds the number of attackable entities",
+        ));
+    }
+    let strategy_id = config.strategy.stable_id();
+    let seed_id = config.seed;
+    let mut scenarios = Vec::with_capacity(config.maximum_failure_budget);
+    for budget in 1..=config.maximum_failure_budget {
+        let mut failed_ids = ranked_entity_ids[..budget].to_vec();
+        failed_ids.sort_unstable();
+        let scenario_id = format!(
+            "attack:{strategy_id}:seed:{seed_id:016x}:budget:{budget:04}"
+        );
+        scenarios.push(MycelialFailureScenario {
+            scenario_id,
+            failed_segment_ids: if attack_strategy_targets_segments(config.strategy) {
+                failed_ids
+            } else {
+                Vec::new()
+            },
+            failed_junction_ids: if attack_strategy_targets_segments(config.strategy) {
+                Vec::new()
+            } else {
+                failed_ids
+            },
+        });
+    }
+
+    let plan = MycelialFailureAttackPlan {
+        schema_version: MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION,
+        source_graph_digest: graph.canonical_digest_hex()?,
+        demand_digest: canonical_demand_digest(demands),
+        strategy: config.strategy,
+        seed: config.seed,
+        maximum_failure_budget: config.maximum_failure_budget,
+        spatial_seed_junction_id: config.spatial_seed_junction_id,
+        ranked_entity_ids,
+        scenarios,
+    };
+    plan.validate_against(graph, demands)?;
+    Ok(plan)
+}
+
+impl MycelialFailureAttackPlan {
+    pub fn validate_against(
+        &self,
+        graph: &MycelialJunctionHyphaGraph,
+        demands: &[MycelialDemandPair],
+    ) -> Result<(), MycelialFailureResilienceError> {
+        let config = MycelialFailureAttackConfig {
+            strategy: self.strategy,
+            seed: self.seed,
+            maximum_failure_budget: self.maximum_failure_budget,
+            spatial_seed_junction_id: self.spatial_seed_junction_id.clone(),
+        };
+        if self.schema_version != MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION
+            || self.source_graph_digest != graph.canonical_digest_hex()?
+            || self.demand_digest != canonical_demand_digest(demands)
+        {
+            return Err(MycelialFailureResilienceError::InvalidAttackPlan(
+                "attack plan source graph, demand inventory or schema mismatch",
+            ));
+        }
+        let indexed = index_source_graph(graph)?;
+        validate_demands(&indexed, demands)?;
+        let expected_rank = rank_failure_entities(&indexed, demands, &config)?;
+        if self.ranked_entity_ids != expected_rank
+            || self.maximum_failure_budget == 0
+            || self.maximum_failure_budget > expected_rank.len()
+            || self.scenarios.len() != self.maximum_failure_budget
+        {
+            return Err(MycelialFailureResilienceError::InvalidAttackPlan(
+                "attack ranking or budget inventory does not match its policy",
+            ));
+        }
+        let target_is_segment = attack_strategy_targets_segments(self.strategy);
+        for (index, scenario) in self.scenarios.iter().enumerate() {
+            let budget = index + 1;
+            let mut expected_ids = expected_rank[..budget].to_vec();
+            expected_ids.sort_unstable();
+            let expected_id = format!(
+                "attack:{}:seed:{:016x}:budget:{budget:04}",
+                self.strategy.stable_id(),
+                self.seed
+            );
+            if scenario.scenario_id != expected_id
+                || scenario.failed_segment_ids
+                    != if target_is_segment { expected_ids.clone() } else { Vec::new() }
+                || scenario.failed_junction_ids
+                    != if target_is_segment { Vec::new() } else { expected_ids }
+            {
+                return Err(MycelialFailureResilienceError::InvalidAttackPlan(
+                    "attack scenario is not the declared nested ranked prefix",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn canonical_digest_hex(
+        &self,
+    ) -> Result<String, MycelialFailureResilienceError> {
+        if self.scenarios.len() != self.maximum_failure_budget
+            || self.ranked_entity_ids.len() < self.maximum_failure_budget
+            || !valid_digest(&self.source_graph_digest)
+            || !valid_digest(&self.demand_digest)
+            || self.ranked_entity_ids.iter().any(|id| !valid_id(id))
+            || self.ranked_entity_ids.iter().collect::<BTreeSet<_>>().len()
+                != self.ranked_entity_ids.len()
+        {
+            return Err(MycelialFailureResilienceError::InvalidAttackPlan(
+                "attack plan fields are invalid",
+            ));
+        }
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-mycelial-failure-attack-plan-v1");
+        hasher.update(&self.schema_version.to_le_bytes());
+        hasher.update(self.source_graph_digest.as_bytes());
+        hasher.update(self.demand_digest.as_bytes());
+        hash_string(&mut hasher, self.strategy.stable_id());
+        hasher.update(&self.seed.to_le_bytes());
+        hasher.update(&(self.maximum_failure_budget as u64).to_le_bytes());
+        match &self.spatial_seed_junction_id {
+            Some(id) => {
+                hasher.update(&[1]);
+                hash_string(&mut hasher, id);
+            }
+            None => hasher.update(&[0]),
+        }
+        hasher.update(&(self.ranked_entity_ids.len() as u64).to_le_bytes());
+        for id in &self.ranked_entity_ids {
+            hash_string(&mut hasher, id);
+        }
+        hasher.update(&(self.scenarios.len() as u64).to_le_bytes());
+        for scenario in &self.scenarios {
+            hash_string(&mut hasher, &scenario.scenario_id);
+            hasher.update(&(scenario.failed_segment_ids.len() as u64).to_le_bytes());
+            for id in &scenario.failed_segment_ids {
+                hash_string(&mut hasher, id);
+            }
+            hasher.update(&(scenario.failed_junction_ids.len() as u64).to_le_bytes());
+            for id in &scenario.failed_junction_ids {
+                hash_string(&mut hasher, id);
+            }
+        }
+        Ok(hex_digest(hasher.finalize().as_bytes()))
+    }
+}
+
+impl MycelialFailureAttackEvaluation {
+    pub fn canonical_digest_hex(
+        &self,
+    ) -> Result<String, MycelialFailureResilienceError> {
+        if !valid_digest(&self.attack_plan_digest) {
+            return Err(MycelialFailureResilienceError::InvalidProfile(
+                "attack evaluation has an invalid plan digest",
+            ));
+        }
+        let profile_digest = self.resilience_profile.canonical_digest_hex()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-mycelial-failure-attack-evaluation-v1");
+        hasher.update(self.attack_plan_digest.as_bytes());
+        hasher.update(profile_digest.as_bytes());
+        Ok(hex_digest(hasher.finalize().as_bytes()))
+    }
+}
+
+pub fn evaluate_mycelial_failure_attack_plan(
+    graph: &MycelialJunctionHyphaGraph,
+    demands: &[MycelialDemandPair],
+    plan: &MycelialFailureAttackPlan,
+) -> Result<MycelialFailureAttackEvaluation, MycelialFailureResilienceError> {
+    plan.validate_against(graph, demands)?;
+    let attack_plan_digest = plan.canonical_digest_hex()?;
+    let resilience_profile =
+        build_mycelial_failure_resilience_profile(graph, demands, &plan.scenarios)?;
+    Ok(MycelialFailureAttackEvaluation {
+        attack_plan_digest,
+        resilience_profile,
+    })
+}
+
 impl MycelialFailureResilienceProfile {
     pub fn validate(&self) -> Result<(), MycelialFailureResilienceError> {
         if self.schema_version != MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION
