@@ -258,5 +258,9 @@ No official benchmark score, production readiness or SOTA superiority is claimed
 - MemoryArena (ICML 2026): https://proceedings.mlr.press/v306/he26am.html
 - WorldMemArena (2026): https://arxiv.org/abs/2605.29341
 - MemoryAgentBench (2025): https://arxiv.org/abs/2507.05257
+- StateMemBench (2026): https://arxiv.org/abs/2608.19652
+- TimlMemBench (Findings EMNLP 2026): https://aclanthology.org/2026.findings-emnlp.507/
+- FAMA / From Recall to Forgetting (Findings ACL 2026): https://aclanthology.org/2026.findings-acl.1337/
+- CL-Bench (2026): https://arxiv.org/abs/2606.05661
 - Memory–Clarification Boundary (2026): https://aclanthology.org/2026.nora-1.2/
 - Agentic Abstention (NeurIPS 2026): https://lhannnn.github.io/agentic-abstention/
