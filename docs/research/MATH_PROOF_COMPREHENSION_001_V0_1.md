@@ -405,3 +405,22 @@ The Mathlib task for `Set.countable_union` is explicitly marked as requiring a s
 ### Current execution status
 
 The JSON fixtures have been fetched back and structurally checked. The finite Tseitin and Boolean counterfactual results were evaluated by exhaustive enumeration in the research execution environment. The Rust oracle source has been committed but not compiled. No Lean extraction, Lean kernel replay, Rust compilation, CI pass, independent expert annotation or human-study result is claimed.
+
+
+## 14. Reuse the independent RH kernel dependency graph (2026-11-22)
+
+A substantial external resource makes an RH-scale local dependency extractor unnecessary as the first step: [james-shore/rh-proof-dependencies](https://github.com/james-shore/rh-proof-dependencies), pinned to CC0 dataset v0.2.1 at commit `70fbb2fc21fed8de3c02d9f6df0b6067bf22e879`.
+
+The upstream study derives proof references from Andrew Sutherland's `lean4export` kernel export of the five Alpöge RH/GRH theorem roots, then checks its closure and declaration ranges against three separately built compiled Lean environments. It reports 1,484,729 kernel constants in the five-proof closure, 804,912 project declarations used, 146,287 files with a used declaration and 10,737,728 source lines inside used declarations.
+
+This is an **external proof-dependency baseline**, not a Symthaea extraction or mathematical explanation. The upstream NOTICE makes the license boundary explicit: the dataset is CC0-1.0 with named Apache-2.0 exceptions; Alpöge's proof source is not included and is not covered by that license. Symthaea stores only a small, attributed metadata snapshot in `RH_PROOF_GRAPH_BASELINE_V1.json` and its explanatory companion.
+
+### Revised RH work sequence
+
+- Reuse the external proof graph and dominator spine as a reference map.
+- First run Symthaea's own Lean-native extractor on the four small Mathlib pilot declarations.
+- Differentially compare the local extractor's type/value/inductive/recursor edge conventions against a small sample of the upstream RH graph format.
+- Use the external spine to select a bounded RH subgraph; independently review its mathematical roles.
+- Map Rubinstein's inequality (M) to exact Lean declaration(s) only after source-level identification. The current fixture deliberately records this mapping as unresolved.
+
+A dominator or large subgraph is only a graph-theoretic prioritization signal. It is not proof that a declaration is mathematically essential or the conceptual crux. Similarly, the strict theorem-statement dependency cone is not the full proof dependency graph.
