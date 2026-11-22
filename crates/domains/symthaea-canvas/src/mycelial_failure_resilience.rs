@@ -2150,6 +2150,60 @@ mod tests {
         }
     }
 
+    fn adaptive_attack_graph() -> MycelialJunctionHyphaGraph {
+        let junction = |id: &str,
+                        kind: JunctionKind,
+                        x: f32,
+                        y: f32,
+                        incident_filament_ids: Vec<u32>,
+                        terminal_filament_ids: Vec<u32>| MycelialJunction {
+            id: id.to_string(),
+            kind,
+            position: SpatialPoint3 { x, y, z: 0.0 },
+            incident_filament_ids,
+            terminal_filament_ids,
+            anastomosis_ids: Vec::new(),
+        };
+        let segment =
+            |id: &str, filament_id, start: &str, end: &str, length: f64| MycelialHyphaSegment {
+                id: id.to_string(),
+                filament_id,
+                t_start_micros: 0,
+                t_end_micros: PARAMETER_SCALE,
+                start_junction_id: start.to_string(),
+                end_junction_id: end.to_string(),
+                arc_length_model_units: length,
+                start_junction_offset_model_units: 0.0,
+                end_junction_offset_model_units: 0.0,
+                radius_start_model_units: 1.0,
+                radius_end_model_units: 1.0,
+            };
+        MycelialJunctionHyphaGraph {
+            schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
+            source_model_version: 1,
+            length_unit: JunctionLengthUnit::OrganismLocalModelUnit,
+            source_model_digest: "c".repeat(64),
+            source_filament_ids: vec![1, 2, 3, 4, 5, 6],
+            maximum_junction_gap_model_units: 0.0,
+            junctions: vec![
+                junction("A", JunctionKind::Branch, 0.0, 0.0, vec![1, 2, 3], vec![]),
+                junction("B", JunctionKind::Branch, 1.0, 0.0, vec![1, 4], vec![]),
+                junction("C", JunctionKind::Branch, 0.0, 1.0, vec![2, 5], vec![]),
+                junction("D", JunctionKind::Branch, 0.0, -1.0, vec![3, 6], vec![]),
+                junction("E", JunctionKind::Branch, 0.0, 2.0, vec![5, 6], vec![]),
+                junction("F", JunctionKind::Tip, 2.0, 0.0, vec![4], vec![4]),
+            ],
+            segments: vec![
+                segment("edge-ab", 1, "A", "B", 1.0),
+                segment("edge-ac", 2, "A", "C", 1.0),
+                segment("edge-ad", 3, "A", "D", 1.0),
+                segment("edge-bf", 4, "B", "F", 1.0),
+                segment("edge-ce", 5, "C", "E", 1.0),
+                segment("edge-de", 6, "D", "E", 3.0),
+            ],
+        }
+    }
+
     fn demands() -> Vec<MycelialDemandPair> {
         vec![
             MycelialDemandPair {
@@ -2464,6 +2518,46 @@ mod tests {
             spatial.scenarios[1].failed_junction_ids,
             vec!["A".to_string(), "B".to_string()]
         );
+    }
+
+    #[test]
+    fn adaptive_degree_recomputes_ranking_after_each_prior_removal() {
+        let graph = adaptive_attack_graph();
+        graph.validate().unwrap();
+        let demand_pairs = demands();
+        let static_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::HighestDegreeJunctions,
+                seed: 0,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let adaptive_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions,
+                seed: 0,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(static_plan.ranked_entity_ids[0], "A");
+        assert_eq!(static_plan.ranked_entity_ids[1], "B");
+        assert_eq!(adaptive_plan.ranked_entity_ids[0], "A");
+        assert_eq!(adaptive_plan.ranked_entity_ids[1], "E");
+        assert_eq!(adaptive_plan.ranked_entity_ids_per_step[1][0], "E");
+        assert!(
+            adaptive_plan.ranked_entity_ids_per_step[1]
+                .iter()
+                .all(|id| id != "A")
+        );
+        adaptive_plan.validate_against(&graph, &demand_pairs).unwrap();
     }
 
     #[test]
