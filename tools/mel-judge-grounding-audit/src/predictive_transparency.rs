@@ -14,7 +14,9 @@ struct ForecastPanelV1 {
     reference_time_map_id: String,
     reference_time_map_version: String,
     reference_time_map_kind: String,
+    reference_time_map_clock_domain_id: String,
     reference_time_map_receipt_sha256: String,
+    time_alignment_receipt_sha256: String,
     input_snapshots: Vec<InputSnapshotV1>,
     policy: ForecastPolicyV1,
     forecasts: Vec<ForecastV1>,
@@ -143,6 +145,7 @@ pub struct ForecastAuditReport {
     pub reference_time_map_id: String,
     pub reference_time_map_version: String,
     pub reference_time_map_kind: String,
+    pub reference_time_map_clock_domain_id: String,
     pub forecast_count: usize,
     pub forecast_event_count: usize,
     pub display_count: usize,
@@ -591,6 +594,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         reference_time_map_id: panel.reference_time_map_id.clone(),
         reference_time_map_version: panel.reference_time_map_version.clone(),
         reference_time_map_kind: panel.reference_time_map_kind.clone(),
+        reference_time_map_clock_domain_id: panel.reference_time_map_clock_domain_id.clone(),
         forecast_count: panel.forecasts.len(),
         forecast_event_count: forecast_events.len(),
         display_count: panel.displays.len(),
@@ -636,9 +640,17 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
     ) {
         return Err("unsupported canonical time-map kind".to_owned());
     }
+    require_text(
+        &panel.reference_time_map_clock_domain_id,
+        "reference_time_map_clock_domain_id",
+    )?;
     require_digest(
         &panel.reference_time_map_receipt_sha256,
         "canonical time-map receipt digest",
+    )?;
+    require_digest(
+        &panel.time_alignment_receipt_sha256,
+        "time alignment receipt digest",
     )?;
     if panel.input_snapshots.is_empty() {
         return Err("input_snapshots must be non-empty".to_owned());
@@ -911,12 +923,21 @@ mod tests {
         let report = parse_and_audit(FIXTURE).expect("forecast fixture should validate");
         assert!(report.structurally_valid_anticipatory_trace);
         assert_eq!(report.forecast_count, 1);
+        assert_eq!(report.reference_time_map_clock_domain_id, "muse-performance-time-v1");
         assert_eq!(report.displayed_before_target_count, 1);
         assert_eq!(report.matched_forecast_event_count, 1);
         assert_eq!(report.role_match_rate, Some(1.0));
         assert_eq!(report.beat_index_match_rate, Some(1.0));
         assert!((report.conditional_presence_brier_score.unwrap() - 0.0025).abs() < 1e-9);
         assert!(report.within_onset_tolerance_rate.unwrap() >= 1.0);
+    }
+
+    #[test]
+    fn time_alignment_receipt_is_required_to_compare_score_time_with_runner_time() {
+        let mut value = panel();
+        value["time_alignment_receipt_sha256"] = serde_json::json!("invalid");
+        let error = audit(&value).expect_err("clock-domain alignment receipt is required");
+        assert!(error.contains("time alignment receipt digest"));
     }
 
     #[test]
