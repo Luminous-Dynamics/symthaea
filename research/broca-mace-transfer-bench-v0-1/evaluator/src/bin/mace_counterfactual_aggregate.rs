@@ -582,13 +582,13 @@ fn reduce(
     }
 
     for record in &mut output_records {
-        record["input_run_id"] = json!(provenance.run_id);
-        record["input_manifest_set_sha256"] = json!(input_manifest_set_sha256);
-        record["input_source_code_sha256"] = json!(provenance.source_code_sha256);
-        record["input_fixture_sha256"] = json!(provenance.fixture_sha256);
-        record["input_schema_sha256"] = json!(provenance.schema_sha256);
-        record["input_source_revision"] = json!(provenance.source_revision);
-        record["aggregation_code_sha256"] = json!(aggregation_code_sha256);
+        record["input_run_id"] = json!(provenance.run_id.as_str());
+        record["input_manifest_set_sha256"] = json!(input_manifest_set_sha256.as_str());
+        record["input_source_code_sha256"] = json!(provenance.source_code_sha256.as_str());
+        record["input_fixture_sha256"] = json!(provenance.fixture_sha256.as_str());
+        record["input_schema_sha256"] = json!(provenance.schema_sha256.as_str());
+        record["input_source_revision"] = json!(provenance.source_revision.as_deref());
+        record["aggregation_code_sha256"] = json!(aggregation_code_sha256.as_str());
         record["bootstrap_seed"] = json!(seed);
         record["input_manifest_count"] = json!(manifest_row_count);
     }
