@@ -1012,7 +1012,7 @@ fn selective_risk_summary(
         previous_risk = point.selective_risk;
     }
 
-    let mut correct_count = samples
+    let correct_count = samples
         .iter()
         .filter(|sample| sample.predicted_class == sample.target)
         .count();
@@ -1029,8 +1029,6 @@ fn selective_risk_summary(
         oracle_auc += width * (previous_oracle_risk + oracle_risk) * 0.5;
         previous_oracle_risk = oracle_risk;
     }
-    correct_count = 0;
-    let _ = correct_count;
     let excess = (observed_auc - oracle_auc).max(0.0);
     ReconstructionSelectiveRiskSummary {
         area_under_risk_coverage: Some(observed_auc),
@@ -1260,6 +1258,23 @@ mod tests {
         assert_eq!(report.counts.predicted_anastomosis_count, 1);
         assert!(report.top_label_calibration.negative_log_likelihood.unwrap() > 0.0);
         assert_eq!(report.selective_risk_curve.last().unwrap().coverage, 1.0);
+        assert!(
+            report
+                .selective_risk_summary
+                .area_under_risk_coverage
+                .unwrap()
+                >= report
+                    .selective_risk_summary
+                    .oracle_area_under_risk_coverage
+                    .unwrap()
+        );
+        assert!(
+            report
+                .selective_risk_summary
+                .excess_area_under_risk_coverage
+                .unwrap()
+                >= 0.0
+        );
         assert_eq!(
             report.canonical_digest_hex().unwrap(),
             report.canonical_digest_hex().unwrap()
@@ -1364,6 +1379,50 @@ mod tests {
             ),
             Err(MycelialReconstructionCalibrationError::PredictionInventoryMismatch)
         );
+    }
+
+    #[test]
+    fn report_validation_recomputes_aggregate_metrics_from_retained_observations() {
+        let (truth, prediction, score) = fixture();
+        let probabilities = vec![
+            probabilities("pA", ReconstructionCalibrationClass::Branch, 0.9),
+            probabilities("pB", ReconstructionCalibrationClass::Tip, 0.9),
+            probabilities("pC", ReconstructionCalibrationClass::ProjectedCrossing, 0.9),
+        ];
+        let mut report = evaluate_mycelial_reconstruction_calibration(
+            &truth,
+            &prediction,
+            &score,
+            "recompute-v1",
+            &probabilities,
+            ReconstructionCalibrationConfig::default(),
+        )
+        .unwrap();
+        report.top_label_calibration.accuracy = Some(0.0);
+        assert!(report.validate().is_err());
+        assert!(report.canonical_digest_hex().is_err());
+    }
+
+    #[test]
+    fn report_validation_rejects_observation_tampering() {
+        let (truth, prediction, score) = fixture();
+        let probabilities = vec![
+            probabilities("pA", ReconstructionCalibrationClass::Branch, 0.9),
+            probabilities("pB", ReconstructionCalibrationClass::Tip, 0.9),
+            probabilities("pC", ReconstructionCalibrationClass::ProjectedCrossing, 0.9),
+        ];
+        let mut report = evaluate_mycelial_reconstruction_calibration(
+            &truth,
+            &prediction,
+            &score,
+            "tamper-v1",
+            &probabilities,
+            ReconstructionCalibrationConfig::default(),
+        )
+        .unwrap();
+        report.observations[0].probabilities[0] = 0.01;
+        assert!(report.validate().is_err());
+        assert!(report.canonical_digest_hex().is_err());
     }
 
     #[test]
