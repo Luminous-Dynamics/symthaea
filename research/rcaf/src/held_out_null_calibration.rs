@@ -4,6 +4,7 @@
 //! a conservative finite-sample upper-tail conformal rank rule; ties do not reject. Signal power,
 //! held-out null false-positive rate and directionally qualified outcomes are reported separately.
 
+use crate::estimator_response::FactorialEstimatorResponseReport;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -152,6 +153,7 @@ pub enum HeldOutCalibrationError {
     CalibrationEvaluationOverlap,
     InvalidStatistic { replicate_id: String },
     InvalidDirectionCosine { replicate_id: String },
+    UndefinedSignalDirection { replicate_id: String },
 }
 
 impl fmt::Display for HeldOutCalibrationError {
@@ -178,11 +180,83 @@ impl fmt::Display for HeldOutCalibrationError {
             Self::InvalidDirectionCosine { replicate_id } => {
                 write!(f, "replicate {replicate_id} has a direction cosine outside [-1, 1]")
             }
+            Self::UndefinedSignalDirection { replicate_id } => {
+                write!(f, "replicate {replicate_id} has no defined signal direction")
+            }
         }
     }
 }
 
 impl std::error::Error for HeldOutCalibrationError {}
+
+/// Convert an RCAF nuisance-only estimator-response report into calibration statistics.
+///
+/// The three non-negative nuisance-only displacements are used in ESTIMATOR_IDS order. The
+/// response must contain all three expected estimators; an incomplete report fails closed.
+pub fn null_observation_from_estimator_response(
+    replicate_id: &str,
+    response: &FactorialEstimatorResponseReport,
+) -> Result<NullCalibrationObservation, HeldOutCalibrationError> {
+    if response.estimators.len() != ESTIMATOR_IDS.len()
+        || response
+            .estimators
+            .iter()
+            .zip(ESTIMATOR_IDS.iter())
+            .any(|(item, expected)| item.estimator_id != *expected)
+    {
+        return Err(HeldOutCalibrationError::InvalidStatistic {
+            replicate_id: replicate_id.to_string(),
+        });
+    }
+    let mut statistics = [0.0; 3];
+    for (index, item) in response.estimators.iter().enumerate() {
+        statistics[index] = item.nuisance_only_distance;
+    }
+    Ok(NullCalibrationObservation {
+        replicate_id: replicate_id.to_string(),
+        statistics,
+    })
+}
+
+/// Convert a signal-plus-nuisance RCAF response into a held-out evaluation observation.
+///
+/// Null statistics come from the matched nuisance-only cell. Signal statistics are the distance
+/// between clean and signal-plus-nuisance connectivity. The connectivity-space directional cosine
+/// must be defined; zero-signal reports belong in null-only controls, not this signal evaluation set.
+pub fn evaluation_observation_from_estimator_response(
+    replicate_id: &str,
+    response: &FactorialEstimatorResponseReport,
+) -> Result<HeldOutEvaluationObservation, HeldOutCalibrationError> {
+    if response.estimators.len() != ESTIMATOR_IDS.len()
+        || response
+            .estimators
+            .iter()
+            .zip(ESTIMATOR_IDS.iter())
+            .any(|(item, expected)| item.estimator_id != *expected)
+    {
+        return Err(HeldOutCalibrationError::InvalidStatistic {
+            replicate_id: replicate_id.to_string(),
+        });
+    }
+    let signal_directional_cosine = response
+        .connectivity_direction
+        .signal_directional_cosine
+        .ok_or_else(|| HeldOutCalibrationError::UndefinedSignalDirection {
+            replicate_id: replicate_id.to_string(),
+        })?;
+    let mut null_statistics = [0.0; 3];
+    let mut signal_statistics = [0.0; 3];
+    for (index, item) in response.estimators.iter().enumerate() {
+        null_statistics[index] = item.nuisance_only_distance;
+        signal_statistics[index] = 1.0 - item.clean_to_combined_similarity;
+    }
+    Ok(HeldOutEvaluationObservation {
+        replicate_id: replicate_id.to_string(),
+        null_statistics,
+        signal_statistics,
+        signal_directional_cosine,
+    })
+}
 
 /// Calibrate three estimator-specific null thresholds, then evaluate on disjoint held-out data.
 ///
