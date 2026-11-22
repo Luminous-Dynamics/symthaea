@@ -186,7 +186,7 @@ pub struct MycelialReconstructionCalibrationReport {
     pub ground_truth_graph_digest: String,
     pub prediction_graph_digest: String,
     pub reconstruction_score_digest: String,
-    /// Digest of sorted prediction IDs and exact probability-vector bit patterns.
+    /// Digest of sorted prediction IDs, target classes and exact probability-vector bit patterns.
     pub probability_inventory_digest: String,
     pub matching_policy_id: String,
     pub calibration_policy_id: String,
@@ -821,6 +821,26 @@ impl MycelialReconstructionCalibrationReport {
         let expected_selective_risk_curve = selective_risk_curve(&samples);
         let expected_selective_risk_summary =
             selective_risk_summary(&samples, &expected_selective_risk_curve);
+        let aurc_ordering_valid = match (
+            expected_selective_risk_summary.area_under_risk_coverage,
+            expected_selective_risk_summary.oracle_area_under_risk_coverage,
+            expected_selective_risk_summary.excess_area_under_risk_coverage,
+        ) {
+            (Some(observed), Some(oracle), Some(excess)) => {
+                observed.is_finite()
+                    && oracle.is_finite()
+                    && excess.is_finite()
+                    && observed + 1.0e-12 >= oracle
+                    && (observed - oracle - excess).abs() <= 1.0e-12
+            }
+            (None, None, None) => samples.is_empty(),
+            _ => false,
+        };
+        if !aurc_ordering_valid {
+            return Err(MycelialReconstructionCalibrationError::InvalidReport(
+                "observed risk-coverage area is below the oracle ranking bound",
+            ));
+        }
         if self.counts != expected_counts
             || self.class_prediction_counts != expected_class_prediction_counts
             || self.class_calibration != expected_class_calibration
@@ -1029,7 +1049,7 @@ fn selective_risk_summary(
         oracle_auc += width * (previous_oracle_risk + oracle_risk) * 0.5;
         previous_oracle_risk = oracle_risk;
     }
-    let excess = (observed_auc - oracle_auc).max(0.0);
+    let excess = observed_auc - oracle_auc;
     ReconstructionSelectiveRiskSummary {
         area_under_risk_coverage: Some(observed_auc),
         oracle_area_under_risk_coverage: Some(oracle_auc),
