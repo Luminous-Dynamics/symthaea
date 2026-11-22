@@ -223,3 +223,8 @@ The acquisition subject binds the prediction packet, model, uncertainty-calibrat
 On the frozen five-candidate synthetic fixture, budget 13 selects B/E (cost 13; modeled utility 0.3115). This is only a known-answer result.
 
 Hosted run [#44990125209](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990125209) passed **43/43 Rust tests**, **46/46 Python reference tests**, rustfmt, Clippy and all seven CLI/report comparisons (three Python and four Rust).
+
+
+## Latest exact-head verification
+
+Hosted run [#44990424342](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342) passed on commit `f5073aab67d8aaf987bfe42d74d0ebd43365cf6e`: **43/43 Rust tests**, **46/46 Python reference tests**, rustfmt, Clippy with warnings denied, and all seven byte-for-byte report checks. The four Rust CLI reports include the multi-fidelity acquisition selector and its calibration-digest-bound fixture.
