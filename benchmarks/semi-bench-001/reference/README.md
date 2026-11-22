@@ -223,3 +223,27 @@ The acquisition subject binds the prediction packet, model, uncertainty-calibrat
 On the frozen five-candidate synthetic fixture, budget 13 selects B/E (cost 13; modeled utility 0.3115). This is only a known-answer result.
 
 Hosted run [#44990125209](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990125209) passed **43/43 Rust tests**, **46/46 Python reference tests**, rustfmt, Clippy and all seven CLI/report comparisons (three Python and four Rust).
+
+
+## SECOM missingness-only shortcut baseline
+
+The Rust crate includes \`semi-secom-missingness\`, which verifies the digest-bound raw files and split manifest, then compares two held-out baselines:
+
+- **B0 prevalence-only:** a constant failure probability fitted from training labels.
+- **B1 missingness-only:** a smoothed Bernoulli naive-Bayes model fitted from the training partition's per-sensor missingness mask. It does not read numeric sensor values.
+
+The report includes validation/test PR-AUC, ROC-AUC, Brier/ECE, threshold metrics, risk-coverage, per-split missingness profiles, per-sensor missing fractions, and row-level scores. It also binds the raw feature/label digests, split-manifest digest and fitted-model digest. The held-out labels are used only for evaluation; changing them cannot change model parameters or row scores.
+
+Run against the pinned SECOM mirror after obtaining its raw files:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-missingness -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+The checked-in eight-row fixture is synthetic and exists only to verify scorer semantics and leakage controls. It is not a SECOM model result. B1 is a simple diagnostic comparator, not a competitive production classifier; Bernoulli conditional independence is unlikely to hold across correlated sensors. A high missingness-only score is evidence of an observation-pattern shortcut on the evaluated split, not evidence that missingness is a physical failure cause. A low score does not prove the mask is harmless under other acquisition regimes.
+
+The chronological test contains only 17 failures in the pinned mirror. Report uncertainty and avoid model ranking or threshold claims from that small support. This baseline does not replace the remaining B2/B3 imputation, shift, MAR/MNAR and independent-dataset comparisons in SEMI-SECOM-MISS-001.
