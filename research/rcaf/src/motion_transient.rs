@@ -70,7 +70,10 @@ impl fmt::Display for MotionTransientError {
                 write!(f, "invalid motion event {index}: {reason}")
             }
             Self::InvalidSeedRoi { index } => {
-                write!(f, "localized motion event seed ROI index {index} is outside graph")
+                write!(
+                    f,
+                    "localized motion event seed ROI index {index} is outside graph"
+                )
             }
             Self::NonFiniteGeneratedField => {
                 write!(f, "motion transient generation produced non-finite values")
@@ -137,11 +140,8 @@ pub fn generate_motion_transient_field(
         if train.iter().any(|value| !value.is_finite()) {
             return Err(MotionTransientError::NonFiniteGeneratedField);
         }
-        let spatial_loading = graph_distance_loading(
-            graph,
-            localized.seed_roi_index,
-            config.spatial_decay_length,
-        );
+        let spatial_loading =
+            graph_distance_loading(graph, localized.seed_roi_index, config.spatial_decay_length);
         if spatial_loading.iter().any(|value| !value.is_finite()) {
             return Err(MotionTransientError::NonFiniteGeneratedField);
         }
@@ -244,8 +244,7 @@ fn event_train(event: MotionEvent, time_points: usize) -> Vec<f64> {
             if time < event.onset {
                 0.0
             } else {
-                event.amplitude
-                    * (-((time - event.onset) as f64) / event.decay_samples).exp()
+                event.amplitude * (-((time - event.onset) as f64) / event.decay_samples).exp()
             }
         })
         .collect()
@@ -253,16 +252,11 @@ fn event_train(event: MotionEvent, time_points: usize) -> Vec<f64> {
 
 fn accumulate_event_train(train: &mut [f64], event: MotionEvent) {
     for (time, value) in train.iter_mut().enumerate().skip(event.onset) {
-        *value += event.amplitude
-            * (-((time - event.onset) as f64) / event.decay_samples).exp();
+        *value += event.amplitude * (-((time - event.onset) as f64) / event.decay_samples).exp();
     }
 }
 
-fn graph_distance_loading(
-    graph: &SpatialGraph,
-    seed: usize,
-    decay_length: f64,
-) -> Vec<f64> {
+fn graph_distance_loading(graph: &SpatialGraph, seed: usize, decay_length: f64) -> Vec<f64> {
     let n = graph.roi_labels.len();
     let mut distances = vec![f64::INFINITY; n];
     let mut visited = vec![false; n];
@@ -341,7 +335,9 @@ mod tests {
     #[test]
     fn broad_event_is_zero_before_onset_and_decays_after_onset() {
         let field = generate_motion_transient_field(&path_graph(), &config()).unwrap();
-        assert!(field.broad_event_train[..4].iter().all(|value| *value == 0.0));
+        assert!(field.broad_event_train[..4]
+            .iter()
+            .all(|value| *value == 0.0));
         assert_eq!(field.broad_event_train[4], 1.0);
         assert!(field.broad_event_train[5] < field.broad_event_train[4]);
         assert!(field.broad_event_train[6] < field.broad_event_train[5]);
@@ -360,11 +356,9 @@ mod tests {
     #[test]
     fn localized_event_is_exactly_zero_before_its_onset() {
         let field = generate_motion_transient_field(&path_graph(), &config()).unwrap();
-        assert!(
-            field.localized_event_trains[0][..8]
-                .iter()
-                .all(|value| *value == 0.0)
-        );
+        assert!(field.localized_event_trains[0][..8]
+            .iter()
+            .all(|value| *value == 0.0));
         assert_eq!(field.localized_event_trains[0][8], 0.7);
     }
 
