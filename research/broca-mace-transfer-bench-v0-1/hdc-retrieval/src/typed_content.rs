@@ -141,10 +141,12 @@ pub enum TypedContentError {
     EmptyMemory,
     DuplicateEventId { event_id: u32 },
     NonFiniteExperience { event_id: u32, field: &'static str },
+    InvalidObservedUtility { event_id: u32 },
     InvalidMeasurementError { event_id: u32 },
     InvalidPropensityBounds { event_id: u32 },
     NonFiniteQuery { field: &'static str },
     InvalidQueryPropensityBounds,
+    InvalidQueryUtility,
     InvalidQueryMeasurementError,
 }
 
@@ -163,8 +165,11 @@ impl fmt::Display for TypedContentError {
             Self::NonFiniteExperience { event_id, field } => {
                 write!(f, "event {event_id} has non-finite {field}")
             }
+            Self::InvalidObservedUtility { event_id } => {
+                write!(f, "event {event_id} has utility outside the normalized [0, 1] range")
+            }
             Self::InvalidMeasurementError { event_id } => {
-                write!(f, "event {event_id} has a negative measurement-error bound")
+                write!(f, "event {event_id} has measurement-error bound outside [0, 1]")
             }
             Self::InvalidPropensityBounds { event_id } => {
                 write!(f, "event {event_id} has invalid propensity bounds")
@@ -173,8 +178,11 @@ impl fmt::Display for TypedContentError {
             Self::InvalidQueryPropensityBounds => {
                 write!(f, "query has invalid propensity target bounds")
             }
+            Self::InvalidQueryUtility => {
+                write!(f, "query target utility is outside the normalized [0, 1] range")
+            }
             Self::InvalidQueryMeasurementError => {
-                write!(f, "query has a negative measurement-error target")
+                write!(f, "query target measurement-error bound is outside [0, 1]")
             }
         }
     }
@@ -376,7 +384,12 @@ fn validate_experience(item: &Experience) -> Result<(), TypedContentError> {
             });
         }
     }
-    if item.measurement_error_bound < 0.0 {
+    if !(0.0..=1.0).contains(&item.observed_utility) {
+        return Err(TypedContentError::InvalidObservedUtility {
+            event_id: item.event_id,
+        });
+    }
+    if !(0.0..=1.0).contains(&item.measurement_error_bound) {
         return Err(TypedContentError::InvalidMeasurementError {
             event_id: item.event_id,
         });
@@ -405,8 +418,14 @@ fn validate_query(query: SemanticExperienceQueryV1) -> Result<(), TypedContentEr
         }
     }
     if query
+        .target_utility
+        .is_some_and(|value| !(0.0..=1.0).contains(&value))
+    {
+        return Err(TypedContentError::InvalidQueryUtility);
+    }
+    if query
         .target_measurement_error_bound
-        .is_some_and(|value| value < 0.0)
+        .is_some_and(|value| !(0.0..=1.0).contains(&value))
     {
         return Err(TypedContentError::InvalidQueryMeasurementError);
     }
@@ -1040,6 +1059,33 @@ mod tests {
             TypedContentIndexV1::build(&[non_finite], TypedContentConfigV1::default()),
             Err(TypedContentError::NonFiniteExperience { field: "observed_utility", .. })
         ));
+    }
+
+    #[test]
+    fn normalized_utility_and_measurement_bounds_fail_closed() {
+        let target_scope = scope(Regime::Baseline, Objective::Quality);
+        let mut invalid_utility = fixture(51, Action::A, target_scope, 0.5, 0.01);
+        invalid_utility.observed_utility = 1.01;
+        assert_eq!(
+            TypedContentIndexV1::build(&[invalid_utility], TypedContentConfigV1::default())
+                .unwrap_err(),
+            TypedContentError::InvalidObservedUtility { event_id: 51 }
+        );
+
+        let mut invalid_error = fixture(52, Action::A, target_scope, 0.5, 0.01);
+        invalid_error.measurement_error_bound = 1.2;
+        assert_eq!(
+            TypedContentIndexV1::build(&[invalid_error], TypedContentConfigV1::default())
+                .unwrap_err(),
+            TypedContentError::InvalidMeasurementError { event_id: 52 }
+        );
+
+        let memory = vec![fixture(53, Action::A, target_scope, 0.5, 0.01)];
+        let index = TypedContentIndexV1::build(&memory, TypedContentConfigV1::default()).unwrap();
+        assert_eq!(
+            index.retrieve(query(target_scope, Action::A, Some(1.2)), 1).unwrap_err(),
+            TypedContentError::InvalidQueryUtility
+        );
     }
 
     #[test]
