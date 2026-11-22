@@ -231,6 +231,10 @@ impl VlasovPoisson1d1v {
 
         let nyquist_mode = config.nv / 2;
         let mut spectral_removed_casimir = 0.0;
+        let mut high_s_casimir_before = 0.0;
+        let mut high_s_casimir_after = 0.0;
+        let mut low_s_casimir_before = 0.0;
+        let mut low_s_casimir_after = 0.0;
         let spectral_weight = config.dx() * config.dv() / config.nv as f64;
 
         for ix in 0..config.nx {
@@ -255,8 +259,16 @@ impl VlasovPoisson1d1v {
                 let power = coefficient
                     .re
                     .mul_add(coefficient.re, coefficient.im * coefficient.im);
+                let attenuated_power = attenuation * attenuation * power;
                 spectral_removed_casimir +=
                     (1.0 - attenuation * attenuation) * power * spectral_weight;
+                if normalized > start_fraction_of_nyquist {
+                    high_s_casimir_before += power * spectral_weight;
+                    high_s_casimir_after += attenuated_power * spectral_weight;
+                } else {
+                    low_s_casimir_before += power * spectral_weight;
+                    low_s_casimir_after += attenuated_power * spectral_weight;
+                }
                 *coefficient = coefficient.scale(attenuation);
                 if !coefficient.re.is_finite()
                     || !coefficient.im.is_finite()
@@ -344,6 +356,14 @@ impl VlasovPoisson1d1v {
             max_absolute_moment_residuals: [0.0; 3],
             max_relative_moment_residuals: [0.0; 3],
             minimum_distribution_after: diagnostics_after.minimum_distribution,
+            negative_value_fraction_before: negative_value_fraction(&previous_distribution),
+            negative_value_fraction_after: negative_value_fraction(&self.distribution),
+            high_s_casimir_before,
+            high_s_casimir_after,
+            high_s_casimir_removed: high_s_casimir_before - high_s_casimir_after,
+            low_s_casimir_before,
+            low_s_casimir_after,
+            low_s_casimir_change: low_s_casimir_after - low_s_casimir_before,
             preserves_first_three_moments: false,
         })
     }
@@ -494,7 +514,6 @@ impl VlasovPoisson1d1v {
             let target_row = &original_distribution[start..end];
             let candidate_row = &mut candidate_solver.distribution[start..end];
             let target_moments = discrete_velocity_moments(target_row, config);
-            let filtered_moments = discrete_velocity_moments(candidate_row, config);
             // Constraints are solved in the scaled basis {1,u,u^2};
             // this is algebraically equivalent to {1,v,v^2}.
             let mut target_scaled_moments = [0.0; 3];
@@ -625,7 +644,7 @@ impl VlasovPoisson1d1v {
                 );
                 spectral_removed_casimir += (before_power - after_power) * spectral_weight;
                 let normalized_mode =
-                    crate::signed_mode(mode, config.nv).unsigned_abs() as f64
+                    signed_mode(mode, config.nv).unsigned_abs() as f64
                         / nyquist_mode as f64;
                 if normalized_mode > report.start_fraction_of_nyquist {
                     high_s_casimir_before += before_power * spectral_weight;
