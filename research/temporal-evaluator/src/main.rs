@@ -686,7 +686,7 @@ mod tests {
         let mut evicted = run(2, vec![], 0, ExposureOutcome::default());
         evicted.context.future_stream_sha256 = [9; 32];
         assert_eq!(
-            evaluate_paired_intervention(&registry(), &retained, &evicted, &[10]),
+            evaluate_paired_intervention(&registry(), &retained, &evicted, &[10], 123),
             Err(CounterfactualError::ContextMismatch)
         );
     }
@@ -696,7 +696,7 @@ mod tests {
         let retained = run(1, vec![10, 20], 5, ExposureOutcome::default());
         let evicted = run(2, vec![], 0, ExposureOutcome::default());
         assert_eq!(
-            evaluate_paired_intervention(&registry(), &retained, &evicted, &[10]),
+            evaluate_paired_intervention(&registry(), &retained, &evicted, &[10], 123),
             Err(CounterfactualError::TreatmentDiffersByUnexpectedItems)
         );
     }
