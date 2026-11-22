@@ -1407,6 +1407,10 @@ mod tests {
         value["realizations"][0]["started_at_ns"] = serde_json::json!(1_550_000_000_u64);
         value["realizations"][0]["completed_at_ns"] = serde_json::json!(1_560_000_000_u64);
         value["realizations"][0]["events"][0]["onset_ns"] = serde_json::json!(1_555_000_000_u64);
+        value["observation_closures"][0]["coverage_end_ns"] =
+            serde_json::json!(1_600_000_000_u64);
+        value["observation_closures"][0]["observed_through_ns"] =
+            serde_json::json!(1_600_000_000_u64);
         let report = audit(&value).expect("late realization remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
         assert!(
