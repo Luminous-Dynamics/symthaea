@@ -157,8 +157,7 @@ fn run_resolution(
     let mut no_second_pulse = VlasovPoisson1d1v::new(config, initial)?;
     let initial_casimir = pulsed.quadratic_casimir_budget()?.total_casimir;
     let initial_spectrum = pulsed.joint_phase_space_spectrum()?;
-    let mut pulse_flux_baseline_x =
-        low_x_f_strophy(&initial_spectrum, FLUX_X_MODE_CUTOFF);
+    let mut pulse_flux_baseline_x = low_x_f_strophy(&initial_spectrum, FLUX_X_MODE_CUTOFF);
     let mut pulse_flux_baseline_v =
         low_velocity_f_strophy(&initial_spectrum, FLUX_VELOCITY_MODE_CUTOFF);
     let mut control_flux_baseline_x = pulse_flux_baseline_x;
@@ -276,19 +275,13 @@ fn run_resolution(
                 .collect();
             let response_state = VlasovPoisson1d1v::new(config, response_distribution)?;
             let response_spectrum = response_state.joint_phase_space_spectrum()?;
-            let response_ridge =
-                echo_mode_ridge(&response_spectrum, prediction.echo_mode as isize);
-            let pulse_flux = pulsed.phase_space_transfer_rates(
-                FLUX_X_MODE_CUTOFF,
-                FLUX_VELOCITY_MODE_CUTOFF,
-            )?;
-            let control_flux = no_second_pulse.phase_space_transfer_rates(
-                FLUX_X_MODE_CUTOFF,
-                FLUX_VELOCITY_MODE_CUTOFF,
-            )?;
+            let response_ridge = echo_mode_ridge(&response_spectrum, prediction.echo_mode as isize);
+            let pulse_flux =
+                pulsed.phase_space_transfer_rates(FLUX_X_MODE_CUTOFF, FLUX_VELOCITY_MODE_CUTOFF)?;
+            let control_flux = no_second_pulse
+                .phase_space_transfer_rates(FLUX_X_MODE_CUTOFF, FLUX_VELOCITY_MODE_CUTOFF)?;
             let pulse_low_x = low_x_f_strophy(&pulse_spectrum, FLUX_X_MODE_CUTOFF);
-            let pulse_low_v =
-                low_velocity_f_strophy(&pulse_spectrum, FLUX_VELOCITY_MODE_CUTOFF);
+            let pulse_low_v = low_velocity_f_strophy(&pulse_spectrum, FLUX_VELOCITY_MODE_CUTOFF);
             let control_low_x = low_x_f_strophy(&control_spectrum, FLUX_X_MODE_CUTOFF);
             let control_low_v =
                 low_velocity_f_strophy(&control_spectrum, FLUX_VELOCITY_MODE_CUTOFF);
@@ -306,20 +299,26 @@ fn run_resolution(
                 pulse_cumulative_flux_v = 0.0;
                 control_cumulative_flux_x = 0.0;
                 control_cumulative_flux_v = 0.0;
-            } else if let Some((previous_time, previous_pulse_x, previous_pulse_v, previous_control_x, previous_control_v)) =
-                previous_flux_sample
+            } else if let Some((
+                previous_time,
+                previous_pulse_x,
+                previous_pulse_v,
+                previous_control_x,
+                previous_control_v,
+            )) = previous_flux_sample
             {
                 let elapsed = flux_time - previous_time;
                 if elapsed > 0.0 {
                     pulse_cumulative_flux_x +=
                         0.5 * (previous_pulse_x + pulse_flux.flux_out_of_low_x_modes) * elapsed;
-                    pulse_cumulative_flux_v +=
-                        0.5 * (previous_pulse_v + pulse_flux.flux_out_of_low_velocity_modes) * elapsed;
+                    pulse_cumulative_flux_v += 0.5
+                        * (previous_pulse_v + pulse_flux.flux_out_of_low_velocity_modes)
+                        * elapsed;
                     control_cumulative_flux_x +=
                         0.5 * (previous_control_x + control_flux.flux_out_of_low_x_modes) * elapsed;
-                    control_cumulative_flux_v +=
-                        0.5 * (previous_control_v + control_flux.flux_out_of_low_velocity_modes)
-                            * elapsed;
+                    control_cumulative_flux_v += 0.5
+                        * (previous_control_v + control_flux.flux_out_of_low_velocity_modes)
+                        * elapsed;
                 }
             }
             previous_flux_sample = Some((
