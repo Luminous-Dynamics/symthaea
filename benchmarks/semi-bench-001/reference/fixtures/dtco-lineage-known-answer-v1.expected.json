@@ -21,7 +21,7 @@
     "spice": 1
   },
   "schema": "luminous.semi-bench.dtco-lineage-validation.v1",
-  "unique_artifact_count": 7,
+  "unique_artifact_count": 6,
   "guarantees": {
     "all_parent_runs_exist": true,
     "each_parent_output_is_bound_to_child_input": true,
