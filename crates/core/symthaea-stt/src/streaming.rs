@@ -285,8 +285,7 @@ pub struct StreamProcessor {
 impl StreamProcessor {
     /// Create a new streaming processor
     pub fn new(config: StreamConfig) -> Self {
-        let buffer_samples =
-            ((config.sample_rate as f32 * config.buffer_duration) as usize).max(1);
+        let buffer_samples = ((config.sample_rate as f32 * config.buffer_duration) as usize).max(1);
         let buffer = AudioRingBuffer::new(buffer_samples);
 
         let ltc_config = LtcConfig {
@@ -306,8 +305,7 @@ impl StreamProcessor {
 
         let samples_per_frame =
             ((config.sample_rate as f32 * config.frame_duration) as usize).max(1);
-        let samples_per_hop =
-            ((config.sample_rate as f32 * config.hop_duration) as usize).max(1);
+        let samples_per_hop = ((config.sample_rate as f32 * config.hop_duration) as usize).max(1);
 
         Self {
             config,
@@ -346,9 +344,8 @@ impl StreamProcessor {
         &mut self,
         prototypes: &TrainedPrototypes,
     ) -> Result<(), String> {
-        let expected = PrototypeEncoderMetadata::direct_mel_frame_v1(
-            self.frontend.config().clone(),
-        );
+        let expected =
+            PrototypeEncoderMetadata::direct_mel_frame_v1(self.frontend.config().clone());
         prototypes.validate_encoder(&expected)?;
         self.load_prototypes(&prototypes.as_pairs());
         Ok(())
@@ -374,16 +371,13 @@ impl StreamProcessor {
             let lost_samples = lost_end_sample - lost_start_sample;
 
             self.segment_index = self.segment_index.saturating_add(1);
-            self.dropped_sample_count =
-                self.dropped_sample_count.saturating_add(lost_samples);
+            self.dropped_sample_count = self.dropped_sample_count.saturating_add(lost_samples);
             let hop_samples = u64::try_from(self.samples_per_hop)
                 .unwrap_or(u64::MAX)
                 .max(1);
-            let skipped_frames = lost_samples
-                .saturating_add(hop_samples.saturating_sub(1))
-                / hop_samples;
-            self.skipped_frame_count =
-                self.skipped_frame_count.saturating_add(skipped_frames);
+            let skipped_frames =
+                lost_samples.saturating_add(hop_samples.saturating_sub(1)) / hop_samples;
+            self.skipped_frame_count = self.skipped_frame_count.saturating_add(skipped_frames);
             self.last_discontinuity = Some(StreamDiscontinuity {
                 segment_index: self.segment_index,
                 lost_start_sample,
@@ -472,10 +466,7 @@ impl StreamProcessor {
         // same previous-frame delta encoding as offline training. LTC remains
         // an independent temporal/salience pathway, not a cryptographic hash
         // masquerading as a similarity embedding.
-        let hv = AudioProjector::direct_mel_hv(
-            &mel_features,
-            self.prev_mel_features.as_deref(),
-        );
+        let hv = AudioProjector::direct_mel_hv(&mel_features, self.prev_mel_features.as_deref());
 
         // Process log-mel features through LTC for temporal state/salience.
         let state = self
@@ -831,10 +822,7 @@ mod tests {
 
         assert_eq!(buffer.base_sample_pos(), 5);
         assert_eq!(buffer.total_written(), 9);
-        assert_eq!(
-            buffer.read_frame(5, 4).unwrap(),
-            vec![5.0, 6.0, 7.0, 8.0]
-        );
+        assert_eq!(buffer.read_frame(5, 4).unwrap(), vec![5.0, 6.0, 7.0, 8.0]);
         assert_eq!(buffer.read_frame(4, 4), None);
     }
 
@@ -889,7 +877,6 @@ mod tests {
             }
         }
     }
-
 
     fn small_stream_config() -> StreamConfig {
         StreamConfig {
@@ -1085,10 +1072,7 @@ mod tests {
         session.boundaries = vec![1, 3];
         session.segment_boundaries = vec![2];
 
-        assert_eq!(
-            session.get_transcription(),
-            "/a | b [audio gap] c | d/"
-        );
+        assert_eq!(session.get_transcription(), "/a | b [audio gap] c | d/");
     }
 
     #[test]
