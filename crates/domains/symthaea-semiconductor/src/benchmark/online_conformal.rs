@@ -17,6 +17,10 @@ use crate::benchmark::conformal_abstention::{
     ConformalCalibrationSampleV1, ConformalClassThresholdV1, ConformalPredictionSetV1,
     ConformalSubjectV1, SelectiveDecisionV1, SUBJECT_SCHEMA_V1,
 };
+use crate::benchmark::metrology_semantics::{
+    BinaryMeasurandSemanticsV1, classify_validated_metrology_label_v1,
+    validate_binary_measurand_semantics_v1,
+};
 use crate::benchmark::process_event_graph::{
     ClockBasisV1, MetrologyLabelStatusV1, PredictionInformationCutoffV1, ProcessEventGraphV1,
     SNAPSHOT_SCHEMA_V1, build_information_cutoff_snapshot_v1,
@@ -128,6 +132,9 @@ pub struct OnlineConformalStateV1 {
     pub schema: String,
     pub state_id: String,
     pub model_sha256: String,
+    pub binary_semantics: BinaryMeasurandSemanticsV1,
+    pub training_sample_ids: Vec<String>,
+    pub calibration_sample_ids: Vec<String>,
     pub graph_id: String,
     pub graph_sha256: String,
     pub cutoff_id: String,
@@ -145,6 +152,7 @@ pub struct OnlineConformalStateV1 {
     pub coverage_degraded_at_sequence: Option<u64>,
     pub update_sequence: u64,
     pub last_ingested_at: String,
+    pub last_prediction_at: Option<String>,
     /// Hash of the complete state with this field set to the empty string.
     pub state_sha256: String,
 }
@@ -181,12 +189,6 @@ pub struct OnlineMaturedFeedbackV1 {
     pub prediction_id: String,
     pub sample_id: String,
     pub subject_id: String,
-    pub positive: bool,
-    pub target_measurand_id: String,
-    /// Versioned interpretation that maps the physical measurement to the
-    /// benchmark's binary defect class.
-    pub class_semantics_ref: String,
-    pub class_semantics_sha256: String,
     pub revision: u64,
     pub supersedes_label_id: Option<String>,
 }
@@ -197,6 +199,9 @@ pub struct OnlineFeedbackReceiptV1 {
     pub state_sha256: String,
     pub label_id: String,
     pub prediction_id: String,
+    pub derived_positive: bool,
+    pub target_measurand_id: String,
+    pub class_semantics_sha256: String,
     pub replaced_label_id: Option<String>,
     pub residual_window_positive: usize,
     pub residual_window_negative: usize,
@@ -425,6 +430,7 @@ pub fn initialize_online_conformal_v1(
     subject: &ConformalSubjectV1,
     graph: &ProcessEventGraphV1,
     cutoff: &PredictionInformationCutoffV1,
+    semantics: &BinaryMeasurandSemanticsV1,
     config: OnlineConformalConfigV1,
 ) -> Result<OnlineConformalStateV1, OnlineConformalError> {
     validate_config(&config)?;
@@ -437,6 +443,9 @@ pub fn initialize_online_conformal_v1(
             "subject.model_sha256: expected lowercase SHA-256".into(),
         ));
     }
+    validate_binary_measurand_semantics_v1(semantics).map_err(|error| {
+        OnlineConformalError(format!("binary metrology semantics rejected: {error}"))
+    })?;
     if (subject.alpha - config.alpha).abs() > f64::EPSILON {
         return Err(OnlineConformalError(
             "subject/config alpha mismatch".into(),
@@ -497,6 +506,26 @@ pub fn initialize_online_conformal_v1(
                 "calibration[{index}]: label is not matured and validated at cutoff"
             )));
         }
+        let classification = classify_validated_metrology_label_v1(
+            graph,
+            &sample.label_id,
+            semantics,
+        )
+        .map_err(|error| {
+            OnlineConformalError(format!(
+                "calibration[{index}] physical class derivation rejected: {error}"
+            ))
+        })?;
+        if classification.subject_id != sample.sample_id {
+            return Err(OnlineConformalError(format!(
+                "calibration[{index}]: sample ID does not match graph subject identity"
+            )));
+        }
+        if classification.derived_positive != sample.positive {
+            return Err(OnlineConformalError(format!(
+                "calibration[{index}]: supplied calibration class disagrees with derived metrology class"
+            )));
+        }
     }
     let mut residuals: Vec<OnlineResidualV1> = calibration_samples
         .iter()
@@ -535,6 +564,12 @@ pub fn initialize_online_conformal_v1(
         schema: ONLINE_STATE_SCHEMA_V1.into(),
         state_id: subject.case_id.clone(),
         model_sha256: subject.model_sha256.clone(),
+        binary_semantics: semantics.clone(),
+        training_sample_ids: subject.training_sample_ids.clone(),
+        calibration_sample_ids: calibration_samples
+            .iter()
+            .map(|sample| sample.sample_id.clone())
+            .collect(),
         graph_id: graph.graph_id.clone(),
         graph_sha256: snapshot.graph_sha256,
         cutoff_id: cutoff.cutoff_id.clone(),
@@ -552,6 +587,7 @@ pub fn initialize_online_conformal_v1(
         coverage_degraded_at_sequence: None,
         update_sequence: 0,
         last_ingested_at: cutoff.cutoff_time.clone(),
+        last_prediction_at: None,
         state_sha256: String::new(),
     };
     let _ = thresholds(&state.residuals, &state.config)?;
@@ -574,6 +610,18 @@ pub fn predict_online_conformal_v1(
     if !input.score.is_finite() || !(0.0..=1.0).contains(&input.score) {
         return Err(OnlineConformalError(
             "prediction.score: expected finite value in [0, 1]".into(),
+        ));
+    }
+    if input.target_measurand_id != state.binary_semantics.target_measurand_id {
+        return Err(OnlineConformalError(
+            "prediction target measurand differs from calibration epoch".into(),
+        ));
+    }
+    if state.training_sample_ids.iter().any(|id| id == &input.sample_id)
+        || state.calibration_sample_ids.iter().any(|id| id == &input.sample_id)
+    {
+        return Err(OnlineConformalError(
+            "prediction sample ID overlaps training or calibration partition".into(),
         ));
     }
     if input.clock_domain_id != state.clock_domain_id || input.clock_basis != state.clock_basis {
@@ -600,6 +648,18 @@ pub fn predict_online_conformal_v1(
         return Err(OnlineConformalError(
             "prediction_id and sample_id must be unique within model epoch".into(),
         ));
+    }
+    if let Some(previous_prediction_at) = state.last_prediction_at.as_deref() {
+        let previous_micros = timestamp_micros(
+            previous_prediction_at,
+            &state.clock_basis,
+            "state.last_prediction_at",
+        )?;
+        if issued < previous_micros {
+            return Err(OnlineConformalError(
+                "prediction timestamps must be non-decreasing within a calibration epoch".into(),
+            ));
+        }
     }
     let calibration_state_sha256 = state.state_sha256.clone();
     let (negative_threshold, positive_threshold) = thresholds(&state.residuals, &state.config)?;
@@ -637,6 +697,7 @@ pub fn predict_online_conformal_v1(
         calibration_state_sha256: calibration_state_sha256.clone(),
         prediction_set: prediction_set.clone(),
     });
+    state.last_prediction_at = Some(input.issued_at.clone());
     update_state_digest(state)?;
     Ok(OnlinePredictionReceiptV1 {
         schema: ONLINE_PREDICTION_SCHEMA_V1.into(),
