@@ -45,7 +45,7 @@ The isolated Rust 2024 crate at tools/mel-rmi-expressive-v2 contains:
 - independent partner-to-agent and agent-to-partner pair evaluation;
 - a content-sealed JSON trial and report CLI;
 - one unsealed known-answer velocity/rubato positive fixture;
-- ten deterministic tests covering velocity, rubato, articulation/phrase gesture, fixed response, wrong-feature change, out-of-scope mutation, response relation, duplicate identity and digest tampering;
+- eleven deterministic tests covering velocity, rubato, articulation/phrase gesture, fixed response, wrong-feature change, out-of-scope mutation, response relation, duplicate identity and digest tampering;
 - a dedicated Rust 1.96 exact-head workflow.
 
 ## Benchmark targets (not achieved results)
