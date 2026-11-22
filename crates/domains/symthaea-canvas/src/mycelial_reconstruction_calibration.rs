@@ -170,6 +170,16 @@ pub struct ReconstructionCalibrationCounts {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReconstructionSelectiveRiskSummary {
+    /// Piecewise-linear area under the observed risk–coverage curve.
+    pub area_under_risk_coverage: Option<f64>,
+    /// Ideal ranking that places all correct predictions before all errors.
+    pub oracle_area_under_risk_coverage: Option<f64>,
+    /// Observed AURC minus oracle AURC; lower is better, zero is ideal.
+    pub excess_area_under_risk_coverage: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialReconstructionCalibrationReport {
     pub schema_version: u16,
     pub source_observation_digest: String,
@@ -190,6 +200,7 @@ pub struct MycelialReconstructionCalibrationReport {
     pub class_prediction_counts: Vec<(ReconstructionCalibrationClass, usize)>,
     pub class_calibration: Vec<ReconstructionClassCalibration>,
     pub top_label_calibration: ReconstructionTopLabelCalibration,
+    pub selective_risk_summary: ReconstructionSelectiveRiskSummary,
     /// One point per distinct confidence threshold; ties are never split.
     pub selective_risk_curve: Vec<ReconstructionSelectiveRiskPoint>,
 }
@@ -420,6 +431,7 @@ pub fn evaluate_mycelial_reconstruction_calibration(
         .collect();
     let top_label_calibration = top_label_calibration(&samples, config.bin_count, config.negative_log_likelihood_epsilon);
     let selective_risk_curve = selective_risk_curve(&samples);
+    let selective_risk_summary = selective_risk_summary(&samples, &selective_risk_curve);
 
     let observations: Vec<_> = samples
         .iter()
@@ -446,6 +458,7 @@ pub fn evaluate_mycelial_reconstruction_calibration(
         class_prediction_counts,
         class_calibration,
         top_label_calibration,
+        selective_risk_summary,
         selective_risk_curve,
     };
     report.validate()?;
@@ -806,11 +819,14 @@ impl MycelialReconstructionCalibrationReport {
             self.negative_log_likelihood_epsilon,
         );
         let expected_selective_risk_curve = selective_risk_curve(&samples);
+        let expected_selective_risk_summary =
+            selective_risk_summary(&samples, &expected_selective_risk_curve);
         if self.counts != expected_counts
             || self.class_prediction_counts != expected_class_prediction_counts
             || self.class_calibration != expected_class_calibration
             || self.top_label_calibration != expected_top_label_calibration
             || self.selective_risk_curve != expected_selective_risk_curve
+            || self.selective_risk_summary != expected_selective_risk_summary
         {
             return Err(MycelialReconstructionCalibrationError::InvalidReport(
                 "calibration aggregates cannot be reproduced from the retained observations",
@@ -932,6 +948,15 @@ impl MycelialReconstructionCalibrationReport {
         );
         hash_optional_f64(&mut hasher, self.top_label_calibration.accuracy);
         hash_bins(&mut hasher, &self.top_label_calibration.bins);
+        hash_optional_f64(&mut hasher, self.selective_risk_summary.area_under_risk_coverage);
+        hash_optional_f64(
+            &mut hasher,
+            self.selective_risk_summary.oracle_area_under_risk_coverage,
+        );
+        hash_optional_f64(
+            &mut hasher,
+            self.selective_risk_summary.excess_area_under_risk_coverage,
+        );
         for point in &self.selective_risk_curve {
             hasher.update(&point.minimum_included_confidence.to_bits().to_le_bytes());
             hasher.update(&(point.retained_prediction_count as u64).to_le_bytes());
@@ -960,6 +985,58 @@ fn probability_inventory_digest(
         }
     }
     hex_digest(hasher.finalize().as_bytes())
+}
+
+fn selective_risk_summary(
+    samples: &[CalibrationSample],
+    curve: &[ReconstructionSelectiveRiskPoint],
+) -> ReconstructionSelectiveRiskSummary {
+    if samples.is_empty() {
+        return ReconstructionSelectiveRiskSummary {
+            area_under_risk_coverage: None,
+            oracle_area_under_risk_coverage: None,
+            excess_area_under_risk_coverage: None,
+        };
+    }
+
+    // Piecewise-linear integration from (coverage=0, risk=0), with one point
+    // per distinct confidence threshold. Equal-confidence predictions enter
+    // the retained set together.
+    let mut observed_auc = 0.0;
+    let mut previous_coverage = 0.0;
+    let mut previous_risk = 0.0;
+    for point in curve {
+        let width = point.coverage - previous_coverage;
+        observed_auc += width * (previous_risk + point.selective_risk) * 0.5;
+        previous_coverage = point.coverage;
+        previous_risk = point.selective_risk;
+    }
+
+    let mut correct_count = samples
+        .iter()
+        .filter(|sample| sample.predicted_class == sample.target)
+        .count();
+    // With the ground truth available, the oracle can rank every correct
+    // prediction before every error. Its per-prefix risk is max(0,k-C)/k.
+    // This is a ranking lower bound, not a realizable inference policy.
+    let total = samples.len();
+    let mut oracle_auc = 0.0;
+    let mut previous_oracle_risk = 0.0;
+    for retained in 1..=total {
+        let oracle_errors = retained.saturating_sub(correct_count);
+        let oracle_risk = oracle_errors as f64 / retained as f64;
+        let width = 1.0 / total as f64;
+        oracle_auc += width * (previous_oracle_risk + oracle_risk) * 0.5;
+        previous_oracle_risk = oracle_risk;
+    }
+    correct_count = 0;
+    let _ = correct_count;
+    let excess = (observed_auc - oracle_auc).max(0.0);
+    ReconstructionSelectiveRiskSummary {
+        area_under_risk_coverage: Some(observed_auc),
+        oracle_area_under_risk_coverage: Some(oracle_auc),
+        excess_area_under_risk_coverage: Some(excess),
+    }
 }
 
 fn valid_calibration_bins(bins: &[ReconstructionCalibrationBin]) -> bool {
