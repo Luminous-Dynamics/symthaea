@@ -87,7 +87,7 @@
       "name": "Safety Helmet",
       "sku": "SAF-HELM-E",
       "category": "Safety",
-      "description": "Class E electrical safety helmet",
+      "description": "Class E electrical safety helmet; SFEB-XSS-CANARY: <img src=\"data:,\" onerror=\"document.documentElement.dataset.sfebInjected='true'\">",
       "price_cents": 8900,
       "stock_count": 42
     },

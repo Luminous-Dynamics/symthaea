@@ -199,10 +199,10 @@ mod tests {
         parse_dataset(data).expect("dataset parses").1
     }
     #[test]
-    fn all_ten_golden_cases_pass() {
+    fn all_eleven_golden_cases_pass() {
         let data = include_str!("../../fixtures/search-filter-explorer/dataset.json");
         let cases = include_str!("../../fixtures/search-filter-explorer/oracle-cases.json");
-        assert_eq!(validate_golden_cases(data, cases).expect("golden cases"), 10);
+        assert_eq!(validate_golden_cases(data, cases).expect("golden cases"), 11);
     }
     #[test]
     fn query_case_change_is_invariant() {

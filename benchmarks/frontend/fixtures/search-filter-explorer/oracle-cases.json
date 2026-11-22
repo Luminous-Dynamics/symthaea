@@ -86,8 +86,8 @@
         "q": "",
         "category": null,
         "available_only": false,
-        "min_price_cents": 50000,
-        "max_price_cents": 130000,
+        "min_price_cents": 54900,
+        "max_price_cents": 129900,
         "sort": "price_desc",
         "page": 1,
         "page_size": 10
@@ -239,6 +239,29 @@
           "AST-008"
         ],
         "total_matches": 2,
+        "page": 1,
+        "page_size": 5,
+        "page_count": 1
+      }
+    },
+    {
+      "case_id": "SFEB-SEARCH-011",
+      "kind": "positive",
+      "input": {
+        "q": "SFEB-XSS-CANARY",
+        "category": null,
+        "available_only": false,
+        "min_price_cents": null,
+        "max_price_cents": null,
+        "sort": "name_asc",
+        "page": 1,
+        "page_size": 5
+      },
+      "expected": {
+        "asset_ids": [
+          "AST-009"
+        ],
+        "total_matches": 1,
         "page": 1,
         "page_size": 5,
         "page_count": 1
