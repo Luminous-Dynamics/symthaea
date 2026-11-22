@@ -608,3 +608,16 @@ NIST's current 2026 physics-backed overlay/CD metrology programme and NVIDIA/TSM
 ## Current-head Rust scale check
 
 Hosted run [#44988247262](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262) passed on commit `061cc034d38afabe12cbe189f2ef2f0a31183786`: 46/46 independent Python reference tests, 24/24 Rust unit tests, Rust formatting and Clippy. The Rust suite includes a 40,000-observation tied-score AUROC case. AUROC now uses rank-group accumulation in O(n log n), preserving half-credit for ties rather than enumerating all positive/negative pairs. Both Rust CLI outputs (binary metrics and SECOM raw integrity) reproduced their frozen expected reports byte-for-byte. The Rust workspace is isolated in CI because root workspace resolution is independently blocked by a missing workspace member in main.
+
+
+## Rust DTCO evidence-lineage contract
+
+The new `crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs` validates a multi-fidelity DTCO evidence graph. It binds run identity, stage, evidence kind, tool/configuration/model digests, parent run IDs and exact artifact digests. Every parent output must be present among the child inputs; run graphs must be acyclic. Physical measurement nodes require instrument identity, calibration identity and an uncertainty artifact. Simulated/model evidence cannot claim to be a physical measurement.
+
+Frozen input/output:
+- `benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.json`
+- `benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json`
+
+Eight Rust tests cover the known answer and adversarial cases (missing parents, disconnected digest edges, cycles, missing calibration, evidence-kind mismatch, missing model digest and malformed SHA-256). Hosted run [#44988500047](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047) passed all **32/32 Rust tests**, the 46-test Python reference suite, rustfmt, Clippy and both Rust CLI report reproductions.
+
+This is a provenance/lineage contract only. It does not validate physics, the accuracy of any model, a PDK, a fab process or fabricated silicon.
