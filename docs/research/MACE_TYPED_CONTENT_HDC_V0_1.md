@@ -113,6 +113,8 @@ Optional numeric targets mean similarity to a declared reference value under the
 
 **Current integration boundary:** the paired MACE runner now includes `typed_content_hdc` as a seventh arm and receives a candidate-visible `DecisionNeedV1` from the generated task contract. The need binds exact scope/action alternatives, a complete semantic estimand (population, treatment/comparator, outcome definition/unit and follow-up horizon), identification method and the versioned MACE qualification-profile digest. The candidate projection excludes `Truth`; a negative control changes hidden utilities/optimal action while requiring the candidate `DecisionNeed` and input digests to remain unchanged. The typed query uses the need's exact semantic-estimand digest as a ranking cue. Never populate it from evaluator truth. The broader task/environment contract for non-synthetic domains remains tracked in #13222.
 
+The paired runner also reports `typed_content_hdc_vs_exact_scope_scan`: typed top-k versus all candidate-visible exact-scope evidence. This estimates the decision-sufficiency gap introduced by compression and must be read with paired utility/regret plus saved bytes/latency. Exact scan is an evidence-complete diagnostic ceiling, not an equal-cost practical competitor.
+
 ## 6. Retrieval and fail-closed behavior
 
 The index returns:
