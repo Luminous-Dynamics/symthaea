@@ -29,8 +29,7 @@ pub use secom_observation_drift::{
 };
 
 pub use secom_tabular_baselines::{
-    SecomTabularBaselineError, SecomTabularBaselinesReportV1,
-    evaluate_secom_tabular_baselines_v1,
+    SecomTabularBaselineError, SecomTabularBaselinesReportV1, evaluate_secom_tabular_baselines_v1,
 };
 
 pub use secom_raw::{
