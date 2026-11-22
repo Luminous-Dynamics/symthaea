@@ -1,0 +1,90 @@
+name: MEL musical timing qualification
+
+on:
+  pull_request:
+    branches:
+      - research/mel-collab-trace-audit-stack-v1-20261122
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V2_2026-11-22.md"
+      - ".github/workflows/mel-musical-timing-qualification.yml"
+  push:
+    branches:
+      - research/mel-tempo-phase-audit-v1-20261122
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V2_2026-11-22.md"
+      - ".github/workflows/mel-musical-timing-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  musical-timing:
+    name: Beat phase and tempo recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Verify committed dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch tools/mel-judge-grounding-audit/Cargo.lock > /dev/null
+          test -f tools/mel-judge-grounding-audit/Cargo.lock
+      - name: Run deterministic Rust tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schema and replay synthetic timing panel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-musical-timing-panel-v2.schema.json > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml \
+            --bin mel-musical-timing-audit -- score \
+            tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json \
+            "$RUNNER_TEMP/mel-musical-timing-report.json"
+          jq -e '.target_count == 4 and .observed_count == 4 and .missed_count == 0 and .extra_onset_count == 0 and .within_025_beat_rate == 1 and (.tempo_adaptation | length) == 2 and all(.tempo_adaptation[]; .recovered == true and .eligible_estimate_count >= 5) and .qualified_for_declared_timing_contract == true' \
+            "$RUNNER_TEMP/mel-musical-timing-report.json" > /dev/null
+      - name: Assemble exact-head reproducibility evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-musical-timing-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/musical_timing.rs > "$evidence/timing-lib-blob.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/bin/mel-musical-timing-audit.rs > "$evidence/timing-cli-blob.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-judge-grounding-audit/Cargo.toml "$evidence/"
+          cp tools/mel-judge-grounding-audit/Cargo.lock "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/musical_timing.rs "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/bin/mel-musical-timing-audit.rs "$evidence/"
+          cp tools/mel-judge-grounding-audit/schema/mel-musical-timing-panel-v2.schema.json "$evidence/"
+          cp tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json "$evidence/"
+          cp docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V2_2026-11-22.md "$evidence/"
+          if [[ -f "$RUNNER_TEMP/mel-musical-timing-report.json" ]]; then
+            cp "$RUNNER_TEMP/mel-musical-timing-report.json" "$evidence/"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-musical-timing-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-musical-timing-evidence/
+          if-no-files-found: error
+          retention-days: 90

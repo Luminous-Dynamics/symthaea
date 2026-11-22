@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-musical-timing-panel-v2.schema.json",
+  "title": "MEL Musical Timing Panel v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "case_id",
+    "track",
+    "clock_domain_id",
+    "instrument_scope",
+    "reference_time_map_id",
+    "reference_time_map_version",
+    "reference_time_map_kind",
+    "reference_time_map_receipt_sha256",
+    "onset_capture_receipt_sha256",
+    "clock_calibration_receipt_sha256",
+    "policy",
+    "target_events",
+    "tempo_changes",
+    "tempo_estimates",
+    "extra_onsets",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-timing-panel-v2"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "track": {
+      "enum": [
+        "midi",
+        "rendered_audio"
+      ]
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instrument_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_time_map_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_time_map_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_time_map_kind": {
+      "enum": [
+        "notation_tempo",
+        "performance_time"
+      ]
+    },
+    "reference_time_map_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "onset_capture_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "clock_calibration_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "target_events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    },
+    "tempo_changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "tempo_estimates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/estimate"
+      }
+    },
+    "extra_onsets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/extra"
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_relative_period_error",
+        "required_consecutive_stable_estimates",
+        "minimum_estimate_spacing_ns",
+        "minimum_estimate_confidence"
+      ],
+      "properties": {
+        "maximum_relative_period_error": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "required_consecutive_stable_estimates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_estimate_spacing_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_estimate_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "instrument_id",
+        "beat_index",
+        "subdivision_index",
+        "subdivision_count",
+        "expected_onset_ns",
+        "local_beat_period_ns",
+        "outcome",
+        "observed_onset_ns",
+        "capture_receipt_sha256"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beat_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subdivision_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subdivision_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_onset_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "local_beat_period_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "outcome": {
+          "enum": [
+            "observed",
+            "missed"
+          ]
+        },
+        "observed_onset_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "capture_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "change_id",
+        "change_observed_ns",
+        "reference_beat_period_ns"
+      ],
+      "properties": {
+        "change_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "change_observed_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference_beat_period_ns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimate_id",
+        "change_id",
+        "observed_at_ns",
+        "evidence_window_end_ns",
+        "estimated_period_ns",
+        "confidence",
+        "provenance_sha256"
+      ],
+      "properties": {
+        "estimate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "change_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_window_end_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_period_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "provenance_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "instrument_id",
+        "observed_onset_ns",
+        "capture_receipt_sha256"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_onset_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capture_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
