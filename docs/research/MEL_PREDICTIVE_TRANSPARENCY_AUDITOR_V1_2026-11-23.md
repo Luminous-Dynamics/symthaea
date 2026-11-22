@@ -20,9 +20,9 @@ Each forecast is append-only and binds:
 - target start/end window and expiry;
 - predicted symbolic event commitments, role, beat index, expected onset, local beat period and presence probability;
 - canonical time-map ID/version/kind, source clock-domain ID and receipt digest;
-- a separate time-alignment receipt that binds the canonical performance-time domain to the evaluator clock domain.
+- a time-alignment receipt that explicitly names source and target clock domains, a validity interval and a maximum declared uncertainty bound.
 
-All lifecycle timestamps and expected event times scored by this evaluator must be normalized to the declared evaluator clock domain. The canonical mapper's source clock domain is recorded separately, and the adapter must supply a time-alignment receipt before expected-onset values are compared with commit/display/realization timestamps. Notation beats, performance seconds, runner monotonic time and CPAL stream time are distinct domains; this evaluator does not derive a conversion between them.
+All lifecycle timestamps and expected event times scored by this evaluator must be normalized to the declared evaluator clock domain. The canonical mapper's source clock domain is recorded separately. A time-alignment receipt must explicitly bind source to target domain, declare its validity interval and maximum uncertainty, and cover the forecast target window. The scorer adds that uncertainty to the absolute onset error before applying its tolerance gate. Notation beats, performance seconds, runner monotonic time and CPAL stream time are distinct domains; this evaluator does not derive a conversion between them.
 
 A revision may use a newer input snapshot, but that snapshot must have become available before the new forecast was committed. The revision chain must be contiguous and explicitly supersede exactly the previous version. A changed policy requires a new series rather than silently changing the meaning of an existing forecast.
 
