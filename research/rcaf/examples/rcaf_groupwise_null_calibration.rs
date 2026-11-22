@@ -1,6 +1,6 @@
 use cetb_rcaf::groupwise_null_calibration::{
-    calibrate_groupwise_null, GroupwiseCalibrationConfig,
-    StratifiedHeldOutEvaluationObservation, StratifiedNullCalibrationObservation,
+    calibrate_groupwise_null, GroupwiseCalibrationConfig, StratifiedHeldOutEvaluationObservation,
+    StratifiedNullCalibrationObservation,
 };
 use cetb_rcaf::held_out_null_calibration::{
     HeldOutEvaluationObservation, NullCalibrationObservation,
