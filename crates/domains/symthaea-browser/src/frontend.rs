@@ -4,7 +4,7 @@
 //! Frontend-specific browser evidence capture.
 //!
 //! This module joins three independent browser observations: an accessibility
-//! snapshot, a bounded layout snapshot, and a PNG screenshot. Artifacts are
+//! snapshot, a bounded layout snapshot, and a viewport PNG screenshot. Artifacts are
 //! content-addressed so a benchmark runner can persist them separately and
 //! verify that the receipt still refers to the exact captured bytes.
 //!
@@ -403,7 +403,7 @@ impl FrontendEvidenceBundle {
 }
 
 impl CdpSession {
-    /// Capture accessibility, layout and full-page screenshot evidence.
+    /// Capture accessibility, layout and viewport screenshot evidence.
     ///
     /// These are sequential read-only observations, not an atomic browser
     /// transaction. Use deterministic fixtures with animations and external
@@ -415,7 +415,7 @@ impl CdpSession {
         context.validate()?;
         let layout = self.frontend_layout_snapshot().await?;
         let observation = self.observe().await?;
-        let screenshot = self.screenshot().await?;
+        let screenshot = self.screenshot_viewport().await?;
         FrontendEvidenceBundle::new(context, observation, layout, screenshot)
     }
 
