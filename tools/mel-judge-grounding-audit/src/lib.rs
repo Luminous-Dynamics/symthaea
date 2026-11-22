@@ -275,8 +275,9 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                             passed: None,
                             observed_value: None,
                             threshold: None,
-                            reason: "baseline pair margin is below the configured evaluability floor"
-                                .to_owned(),
+                            reason:
+                                "baseline pair margin is below the configured evaluability floor"
+                                    .to_owned(),
                         });
                     } else {
                         let passed = baseline_margin.signum() != probe_margin.signum()
@@ -304,8 +305,9 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                             passed: None,
                             observed_value: None,
                             threshold: None,
-                            reason: "baseline pair margin is below the configured evaluability floor"
-                                .to_owned(),
+                            reason:
+                                "baseline pair margin is below the configured evaluability floor"
+                                    .to_owned(),
                         });
                     } else {
                         let passed = baseline_margin.signum() == probe_margin.signum();
