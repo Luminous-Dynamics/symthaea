@@ -281,3 +281,19 @@ Then (M) yields (R_{q,d}leq E/B+O_arepsilon(1+log x)), the one-sided Estimate A
 gives the RH criterion.
 
 **The source derivation is now mapped, but the exact formal Lean declarations for the cell-centering, translation identity and all uniformity steps still need extraction and review.** This is a conceptual reconstruction from Rubinstein's working guide, not a new Lean proof.
+
+
+## 10. Finite translation-invariance control
+
+A dependency-free Rust test now exhausts the finite translate-count identity on every nonempty subset (T_2) of cyclic groups (C_n) for (2\le n\le6).
+
+For each target column (s) and each (z\in T_2), there is exactly one translate (u=s-z). Distinct (z)'s produce distinct (u)'s, so the number of translates selecting (s) is exactly (|T_2|). The test also checks the row indicator for (chi_q\in\{-1,+1\}):
+
+[
+2\,\#\{u:v=1,\ s\in u+T_2\}
+=|T_2|(1+\chi_q).
+]
+
+The frozen test space contains 620 group/subset/target cases and 1,240 row-indicator checks. The test function is `translation_average_selects_each_column_exactly_cardinality_t2_times` in `scripts/research/proof_comprehension_oracle.rs`.
+
+This is a finite sanity / mutation-resistant reference test for the combinatorial averaging identity. It is not a Lean proof of the general finite-group statement and does not validate the prime-density, analytic or theta-lift parts of the RH argument. Its exact-head execution is required before status is promoted.
