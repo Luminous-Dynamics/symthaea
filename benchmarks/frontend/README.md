@@ -370,3 +370,10 @@ in-toto run statements, hash-chained browser observation traces, isolated
 execution requirements, independent oracle derivation and evidence-linked
 causal repair. These are authored schemas and design protocols, not an
 implemented executor or measured benchmark result.
+
+
+## External comparator ledger and independent oracle replay
+
+- [External comparator ledger](external-comparator-ledger-v1.json) records benchmark scope, dated snapshots and non-comparability constraints.
+- [Independent oracle verification predicate](attestation/sfeb-oracle-verification-predicate-v1.schema.json) defines the separately signed verifier result; it is a contract, not an implemented replay engine.
+- See [the oracle replay and benchmark frontier note](../../docs/research/SFEB_INDEPENDENT_ORACLE_REPLAY_AND_BENCHMARK_FRONTIER_2026-11-22.md).

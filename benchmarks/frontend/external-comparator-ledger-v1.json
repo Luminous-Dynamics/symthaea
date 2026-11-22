@@ -1,0 +1,157 @@
+{
+  "schema": "sfeb-external-comparator-ledger-v1",
+  "as_of": "2026-11-22",
+  "comparison_policy": [
+    "Never pool raw scores across benchmarks with different task sets, models, harnesses, judges, metrics or execution environments.",
+    "Store the observation date, model/harness context, task denominator, uncertainty interval and live-versus-historical page state for every result.",
+    "Treat browser-tool benchmarks as tool-operation evidence, not frontend code-generation evidence.",
+    "Reproduce native task splits and scorers before making superiority claims; preserve failed, blocked and unparseable runs in denominators."
+  ],
+  "comparators": [
+    {
+      "id": "vision2web",
+      "name": "Vision2Web",
+      "scope": "Visual website development across static responsive pages, interactive multi-page frontends and full-stack applications; GUI workflow verification plus VLM visual judging.",
+      "task_count": 193,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "categories": 16,
+          "prototype_images": 918,
+          "test_cases": 1255
+        },
+        {
+          "kind": "historical_leader_row",
+          "season": "S4-2026",
+          "model_and_framework": "Claude-Fable-5 + Claude Code",
+          "submission_date": "2026-08-28",
+          "overall": 82.3,
+          "static_average": 87.4,
+          "interactive_average": 83.2,
+          "full_stack_average": 76.3
+        },
+        {
+          "kind": "live_page_state",
+          "observed_date": "2026-11-22",
+          "selected_season": "S4-2026",
+          "display": "No results yet for this season"
+        }
+      ],
+      "limitations": [
+        "The 82.3 row is a historical snapshot, not a verified current-season leader.",
+        "Visual and functional level components are not directly comparable to SFEB's internal scorecard.",
+        "Official evaluation uses its own task set, submission format and current-season VLM/GUI judge."
+      ],
+      "sources": [
+        "https://vision2web-bench.github.io/",
+        "https://arxiv.org/abs/2603.26648"
+      ]
+    },
+    {
+      "id": "design2code",
+      "name": "Design2Code",
+      "scope": "Screenshot-conditioned frontend reconstruction of real-world webpages, with automatic rendering metrics and human evaluation.",
+      "task_count": 484,
+      "snapshot_status": "methodology_only",
+      "observations": [
+        {
+          "kind": "dataset",
+          "real_world_webpages": 484
+        },
+        {
+          "kind": "evaluation",
+          "metrics": "automatic rendering metrics validated with human evaluation"
+        }
+      ],
+      "limitations": [
+        "Primarily measures screenshot-to-code visual reconstruction, not the complete functional, security, causal repair or maintenance loop.",
+        "Fixture and asset reuse requires a separate license and provenance review."
+      ],
+      "sources": [
+        "https://aclanthology.org/2025.naacl-long.199/"
+      ]
+    },
+    {
+      "id": "webdriverio-browser-agent",
+      "name": "WebdriverIO Browser Agent Benchmark",
+      "scope": "Browser-tool comparison: same model, harness and prompt while swapping browser tools; live website tasks judged by WebJudge.",
+      "task_count": 100,
+      "snapshot_status": "historical_published_snapshot",
+      "observations": [
+        {
+          "kind": "benchmark_scale",
+          "sampled_tasks": 100,
+          "source_dataset_tasks": 300,
+          "source_dataset_sites": 136,
+          "models_listed": 2,
+          "tools_listed": 7,
+          "total_agent_runs": 2511,
+          "latest_published_run_date": "2026-10-09"
+        },
+        {
+          "kind": "one_tool_row",
+          "tool": "WebdriverIO session",
+          "tool_version": "@wdio/cli 10.0.2",
+          "reported_success_percent": 62,
+          "successes": 103,
+          "observations": 165,
+          "wilson_95_lower_percent": 55,
+          "wilson_95_upper_percent": 69,
+          "median_cost_usd": 0.013,
+          "median_tokens": 174000,
+          "median_seconds": 156,
+          "median_tool_calls": 26,
+          "model_context": "page lists two model contexts; the indexed aggregate row is not a model-independent result"
+        },
+        {
+          "kind": "separate_model_run",
+          "model": "DeepSeek V4.1 Flash",
+          "run_date": "2026-10-09",
+          "tasks": 100,
+          "example_results": {
+            "stagehand_percent": 56,
+            "webdriverio_session_percent": 58,
+            "playwright_mcp_percent": 48
+          }
+        }
+      ],
+      "limitations": [
+        "The benchmark page's indexed October data shows published rows, while a direct page render on 2026-11-22 displayed an empty run-log state; retain this as an October historical snapshot, not a live leaderboard claim.",
+        "The 62% row aggregates 165 task observations; it must not be described as a clean 62/100 single-run result.",
+        "The benchmark reports roughly ±10 percentage-point intervals for 100 tasks and warns that overlapping intervals are not reliable rankings.",
+        "Live sites, bot blocks and CAPTCHAs reduce repeatability; WebJudge disagrees with human reviewers on about one run in seven.",
+        "This measures browser-tool effectiveness, not generated frontend quality."
+      ],
+      "sources": [
+        "https://benchmark.webdriver.io/",
+        "https://github.com/webdriverio/benchmark",
+        "https://github.com/webdriverio/benchmark/blob/main/results/2026-10-09-run-37883072636/report.md"
+      ]
+    },
+    {
+      "id": "swe-bench-pro-audit",
+      "name": "SWE-Bench Pro task-quality audit",
+      "scope": "Meta-evaluation of benchmark task validity: strictness, underspecification, test coverage and prompt correctness.",
+      "task_count": 731,
+      "snapshot_status": "audit_reference",
+      "observations": [
+        {
+          "kind": "audit",
+          "automated_flags": 200,
+          "automated_flag_percent": 27.4,
+          "human_identified_problematic": 249,
+          "human_percent": 34.1,
+          "publication_date": "2026-07-08"
+        }
+      ],
+      "limitations": [
+        "This is a task-quality audit, not an agent performance leaderboard.",
+        "The reported problem fraction applies to the audited SWE-Bench Pro public split, not to SFEB or Vision2Web."
+      ],
+      "sources": [
+        "https://openai.com/index/separating-signal-from-noise-coding-evaluations/"
+      ]
+    }
+  ]
+}
