@@ -680,3 +680,29 @@ Execution state: source changes and this research plan are authored. Rust
 compilation, unit tests, retrieval measurements, browser smoke tests and
 mutation-campaign execution remain pending; no performance improvement or
 SOTA superiority is claimed.
+
+
+## 12. Retrieval evaluator correctness follow-up
+
+A source review found that the original evaluator fields named `recall_at_1`
+and `recall_at_3` were actually query-level hit rates when more than one gold
+pattern was associated with a query. This was corrected before treating any
+future measurements as comparable:
+
+- `recall_at_k` now counts the fraction of all gold relevant patterns retrieved
+  in the top (k), averaged across positive queries.
+- `hit_rate_at_k` separately counts the fraction of positive queries with at
+  least one relevant pattern in the top (k).
+- The result schema requires both metric families.
+- A regression test uses a two-answer query where only one answer is retrieved:
+  recall remains 0.5 while hit rate is 1.0.
+
+The corpus loader also rejects duplicate pattern IDs, entries with no
+indexable text, corpora above 10,000 entries, and HDC dimensions outside the
+documented 256–65,536 range. The standalone qualification validator now
+requires critical security and evidence-integrity mutants, retains hard 100%
+targets for those classes, enforces at least 95% high-severity and 90% overall
+kill-rate targets, and prohibits positive-control false rejections.
+
+All of these are source-level fixes and authored tests. Rust compilation and
+test execution remain pending; there are no retrieval results yet.
