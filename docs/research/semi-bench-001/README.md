@@ -621,3 +621,12 @@ Frozen input/output:
 Eight Rust tests cover the known answer and adversarial cases (missing parents, disconnected digest edges, cycles, missing calibration, evidence-kind mismatch, missing model digest and malformed SHA-256). Hosted run [#44988500047](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047) passed all **32/32 Rust tests**, the 46-test Python reference suite, rustfmt, Clippy and both Rust CLI report reproductions.
 
 This is a provenance/lineage contract only. It does not validate physics, the accuracy of any model, a PDK, a fab process or fabricated silicon.
+
+
+## Multi-fidelity optimization: benchmark simulator-call reduction against verified Pareto quality
+
+See [2026-multifidelity-optimization-frontier.md](2026-multifidelity-optimization-frontier.md) and [SEMI-MF-OPT-001 #13175](https://github.com/Luminous-Dynamics/symthaea/issues/13175).
+
+2026 literature provides concrete method comparators: an analog circuit study reports ~96.5% fewer SPICE calls and ~20× simulation time reduction for surrogate-guided optimization, with ~90% fewer calls for adaptive MFO; an ASP-DAC DTCO paper reports 5× sampling efficiency with CFET/multi-row cell support. These are paper-specific results, not Luminous results.
+
+The new benchmark's primary objective is verified Pareto improvement per expensive evaluation. It compares DOE, high-fidelity-only, surrogate-only, uncertainty-triggered, trust-region / multi-fidelity BO, MOEAs, trust-aware LLM proposals and Symthaea selection. Its research target is ≥90% fewer SPICE calls at ≥99% normalized high-fidelity Pareto hypervolume, with no increase in false-safe hard-constraint predictions. These are targets only.
