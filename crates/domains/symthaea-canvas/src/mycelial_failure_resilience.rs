@@ -17,7 +17,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::mycelial_junction_graph::{
-    JunctionLengthUnit, MycelialJunctionHyphaGraph, MycelialJunctionGraphError,
+    JunctionLengthUnit, MycelialJunctionGraphError, MycelialJunctionHyphaGraph,
 };
 use crate::mycelial_model::SpatialPoint3;
 
@@ -132,16 +132,28 @@ impl fmt::Display for MycelialFailureResilienceError {
                 write!(f, "segment count {count} exceeds {MAX_FAILURE_SEGMENTS}")
             }
             Self::TooManyDemandPairs(count) => {
-                write!(f, "demand-pair count {count} exceeds {MAX_FAILURE_DEMAND_PAIRS}")
+                write!(
+                    f,
+                    "demand-pair count {count} exceeds {MAX_FAILURE_DEMAND_PAIRS}"
+                )
             }
             Self::TooManyDemandSources(count) => {
-                write!(f, "distinct demand-source count {count} exceeds {MAX_FAILURE_DEMAND_SOURCES}")
+                write!(
+                    f,
+                    "distinct demand-source count {count} exceeds {MAX_FAILURE_DEMAND_SOURCES}"
+                )
             }
             Self::DemandWeightLimitExceeded(total) => {
-                write!(f, "total demand weight {total} exceeds exact f64 integer bound {MAX_FAILURE_TOTAL_DEMAND_WEIGHT}")
+                write!(
+                    f,
+                    "total demand weight {total} exceeds exact f64 integer bound {MAX_FAILURE_TOTAL_DEMAND_WEIGHT}"
+                )
             }
             Self::TooManyScenarios(count) => {
-                write!(f, "failure-scenario count {count} exceeds {MAX_FAILURE_SCENARIOS}")
+                write!(
+                    f,
+                    "failure-scenario count {count} exceeds {MAX_FAILURE_SCENARIOS}"
+                )
             }
             Self::InvalidDemand(id) => write!(f, "invalid demand pair {id}"),
             Self::DuplicateDemandId(id) => write!(f, "duplicate demand-pair ID {id}"),
@@ -159,8 +171,12 @@ impl fmt::Display for MycelialFailureResilienceError {
                 "demand {demand_id} has network path length {network_path_length:.6} below Euclidean distance {direct_distance:.6}"
             ),
             Self::UnknownFailedSegment(id) => write!(f, "failure references unknown segment {id}"),
-            Self::UnknownFailedJunction(id) => write!(f, "failure references unknown junction {id}"),
-            Self::InvalidProfile(reason) => write!(f, "invalid failure-resilience profile: {reason}"),
+            Self::UnknownFailedJunction(id) => {
+                write!(f, "failure references unknown junction {id}")
+            }
+            Self::InvalidProfile(reason) => {
+                write!(f, "invalid failure-resilience profile: {reason}")
+            }
         }
     }
 }
@@ -227,21 +243,15 @@ fn index_source_graph(
         .collect();
     let mut edge_endpoints = Vec::with_capacity(sorted_segments.len());
     for segment in sorted_segments {
-        let source = *node_index
-            .get(&segment.start_junction_id)
-            .ok_or(MycelialFailureResilienceError::UnknownDemandJunction(
+        let source = *node_index.get(&segment.start_junction_id).ok_or(
+            MycelialFailureResilienceError::UnknownDemandJunction(
                 segment.start_junction_id.clone(),
-            ))?;
-        let target = *node_index
-            .get(&segment.end_junction_id)
-            .ok_or(MycelialFailureResilienceError::UnknownDemandJunction(
-                segment.end_junction_id.clone(),
-            ))?;
-        edge_endpoints.push((
-            source,
-            target,
-            segment.traversal_length_model_units(),
-        ));
+            ),
+        )?;
+        let target = *node_index.get(&segment.end_junction_id).ok_or(
+            MycelialFailureResilienceError::UnknownDemandJunction(segment.end_junction_id.clone()),
+        )?;
+        edge_endpoints.push((source, target, segment.traversal_length_model_units()));
     }
 
     Ok(IndexedGraph {
@@ -320,8 +330,14 @@ fn validate_scenarios(
             || scenario.scenario_id == "baseline"
             || (scenario.failed_segment_ids.is_empty() && scenario.failed_junction_ids.is_empty())
             || !scenario_ids.insert(scenario.scenario_id.as_str())
-            || scenario.failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
-            || scenario.failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || scenario
+                .failed_segment_ids
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+            || scenario
+                .failed_junction_ids
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
         {
             return Err(MycelialFailureResilienceError::InvalidScenario(
                 scenario.scenario_id.clone(),
@@ -450,7 +466,9 @@ fn evaluate_one(
     }
     for neighbours in &mut adjacency {
         neighbours.sort_by(|left, right| {
-            left.0.cmp(&right.0).then_with(|| left.1.total_cmp(&right.1))
+            left.0
+                .cmp(&right.0)
+                .then_with(|| left.1.total_cmp(&right.1))
         });
     }
 
@@ -492,8 +510,11 @@ fn evaluate_one(
             });
             continue;
         }
-        let direct_distance =
-            f64::from(indexed.positions[source].sub(indexed.positions[target]).length());
+        let direct_distance = f64::from(
+            indexed.positions[source]
+                .sub(indexed.positions[target])
+                .length(),
+        );
         if path_length <= 0.0 || direct_distance > path_length + 1.0e-5 {
             return Err(
                 MycelialFailureResilienceError::PathShorterThanEuclideanDistance {
@@ -561,14 +582,7 @@ pub fn build_mycelial_failure_resilience_profile(
     validate_scenarios(&indexed, scenarios)?;
     let source_graph_digest = graph.canonical_digest_hex()?;
     let demand_digest = canonical_demand_digest(demands);
-    let baseline = evaluate_one(
-        &indexed,
-        demands,
-        "baseline",
-        &[],
-        &[],
-        graph.length_unit,
-    )?;
+    let baseline = evaluate_one(&indexed, demands, "baseline", &[], &[], graph.length_unit)?;
     let mut ordered_scenarios: Vec<_> = scenarios.iter().collect();
     ordered_scenarios.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
     let metrics = ordered_scenarios
@@ -639,7 +653,11 @@ impl MycelialFailureResilienceProfile {
             || !valid_digest(&self.source_graph_digest)
             || !valid_digest(&self.demand_digest)
             || self.demands.len() > MAX_FAILURE_DEMAND_PAIRS
-            || self.demands.iter().map(|demand| u128::from(demand.weight)).sum::<u128>()
+            || self
+                .demands
+                .iter()
+                .map(|demand| u128::from(demand.weight))
+                .sum::<u128>()
                 > MAX_FAILURE_TOTAL_DEMAND_WEIGHT
             || self.demands.windows(2).any(|pair| pair[0].id >= pair[1].id)
             || self.demands.iter().any(|demand| {
@@ -656,9 +674,10 @@ impl MycelialFailureResilienceProfile {
             || self.baseline.failed_segment_count != 0
             || self.baseline.failed_junction_count != 0
             || self.scenarios.len() > MAX_FAILURE_SCENARIOS
-            || self.scenarios.windows(2).any(|pair| {
-                pair[0].scenario_id >= pair[1].scenario_id
-            })
+            || self
+                .scenarios
+                .windows(2)
+                .any(|pair| pair[0].scenario_id >= pair[1].scenario_id)
             || self.scenarios.iter().any(|metric| {
                 metric.failed_segment_ids.is_empty() && metric.failed_junction_ids.is_empty()
             })
@@ -682,21 +701,31 @@ impl MycelialFailureResilienceProfile {
             if !valid_id(&metric.scenario_id)
                 || metric.demand_pair_count != self.demands.len()
                 || metric.demand_pair_outcomes.len() != self.demands.len()
-                || metric.demand_pair_outcomes.iter().zip(&self.demands).any(
-                    |(outcome, demand)| outcome.demand_id != demand.id,
-                )
+                || metric
+                    .demand_pair_outcomes
+                    .iter()
+                    .zip(&self.demands)
+                    .any(|(outcome, demand)| outcome.demand_id != demand.id)
                 || metric.failed_segment_ids.iter().any(|id| !valid_id(id))
                 || metric.failed_junction_ids.iter().any(|id| !valid_id(id))
-                || metric.failed_segment_ids.iter().any(|id| {
-                    self.baseline.failed_segment_ids.contains(id)
-                })
-                || metric.failed_junction_ids.iter().any(|id| {
-                    self.baseline.failed_junction_ids.contains(id)
-                })
+                || metric
+                    .failed_segment_ids
+                    .iter()
+                    .any(|id| self.baseline.failed_segment_ids.contains(id))
+                || metric
+                    .failed_junction_ids
+                    .iter()
+                    .any(|id| self.baseline.failed_junction_ids.contains(id))
                 || metric.remaining_junction_count > self.baseline.remaining_junction_count
                 || metric.remaining_segment_count > self.baseline.remaining_segment_count
-                || metric.failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
-                || metric.failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                || metric
+                    .failed_segment_ids
+                    .windows(2)
+                    .any(|pair| pair[0] >= pair[1])
+                || metric
+                    .failed_junction_ids
+                    .windows(2)
+                    .any(|pair| pair[0] >= pair[1])
                 || metric.failed_segment_count != metric.failed_segment_ids.len()
                 || metric.failed_junction_count != metric.failed_junction_ids.len()
                 || metric.reachable_demand_pair_count + metric.unreachable_demand_pair_count
@@ -704,11 +733,16 @@ impl MycelialFailureResilienceProfile {
                 || metric.reachable_demand_weight + metric.unreachable_demand_weight
                     != metric.total_demand_weight
                 || metric.total_demand_weight
-                    != self.demands.iter().map(|demand| u128::from(demand.weight)).sum::<u128>()
+                    != self
+                        .demands
+                        .iter()
+                        .map(|demand| u128::from(demand.weight))
+                        .sum::<u128>()
                 || metric.remaining_junction_count > MAX_FAILURE_JUNCTIONS
                 || metric.remaining_segment_count > MAX_FAILURE_SEGMENTS
                 || metric.cycle_rank
-                    != metric.remaining_segment_count
+                    != metric
+                        .remaining_segment_count
                         .saturating_add(metric.connected_components)
                         .saturating_sub(metric.remaining_junction_count)
                 || metric.length_unit != self.baseline.length_unit
@@ -742,8 +776,7 @@ impl MycelialFailureResilienceProfile {
                         reachable_weight += u128::from(demand.weight);
                         weighted_directness_sum +=
                             (direct_distance / path_length) * f64::from(demand.weight);
-                        weighted_path_length_sum +=
-                            path_length * f64::from(demand.weight);
+                        weighted_path_length_sum += path_length * f64::from(demand.weight);
                     }
                     (None, None) => {}
                     _ => {
@@ -757,8 +790,8 @@ impl MycelialFailureResilienceProfile {
             let unreachable_weight = metric.total_demand_weight - reachable_weight;
             let expected_reachability = (metric.total_demand_weight > 0)
                 .then_some(reachable_weight as f64 / metric.total_demand_weight as f64);
-            let expected_directness = (reachable_weight > 0)
-                .then_some(weighted_directness_sum / reachable_weight as f64);
+            let expected_directness =
+                (reachable_weight > 0).then_some(weighted_directness_sum / reachable_weight as f64);
             let expected_path_length = (reachable_weight > 0)
                 .then_some(weighted_path_length_sum / reachable_weight as f64);
             if metric.reachable_demand_pair_count != reachable_count
@@ -882,9 +915,7 @@ fn hash_option(hasher: &mut blake3::Hasher, value: Option<f64>) {
 }
 
 fn valid_id(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= MAX_FAILURE_ID_BYTES
-        && !value.chars().any(char::is_control)
+    !value.is_empty() && value.len() <= MAX_FAILURE_ID_BYTES && !value.chars().any(char::is_control)
 }
 
 fn valid_digest(value: &str) -> bool {
@@ -912,15 +943,19 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 mod tests {
     use super::*;
     use crate::mycelial_junction_graph::{
-        JunctionKind, MycelialHyphaSegment, MycelialJunction, MycelialJunctionHyphaGraph,
-        MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, PARAMETER_SCALE,
+        JunctionKind, MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MycelialHyphaSegment,
+        MycelialJunction, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
     };
 
     fn triangle_graph() -> MycelialJunctionHyphaGraph {
         let mut a = MycelialJunction {
             id: "A".to_string(),
             kind: JunctionKind::Branch,
-            position: SpatialPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+            position: SpatialPoint3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
             incident_filament_ids: vec![1, 3],
             terminal_filament_ids: Vec::new(),
             anastomosis_ids: Vec::new(),
@@ -928,7 +963,11 @@ mod tests {
         let mut b = MycelialJunction {
             id: "B".to_string(),
             kind: JunctionKind::Tip,
-            position: SpatialPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+            position: SpatialPoint3 {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
             incident_filament_ids: vec![1, 2],
             terminal_filament_ids: vec![1],
             anastomosis_ids: Vec::new(),
@@ -936,7 +975,11 @@ mod tests {
         let mut c = MycelialJunction {
             id: "C".to_string(),
             kind: JunctionKind::Anastomosis,
-            position: SpatialPoint3 { x: 0.5, y: 1.0, z: 0.0 },
+            position: SpatialPoint3 {
+                x: 0.5,
+                y: 1.0,
+                z: 0.0,
+            },
             incident_filament_ids: vec![2, 3],
             terminal_filament_ids: vec![2],
             anastomosis_ids: vec![7],
@@ -945,19 +988,20 @@ mod tests {
         a.incident_filament_ids.sort_unstable();
         b.incident_filament_ids.sort_unstable();
         c.incident_filament_ids.sort_unstable();
-        let segment = |id: &str, filament_id, start: &str, end: &str, length: f64| MycelialHyphaSegment {
-            id: id.to_string(),
-            filament_id,
-            t_start_micros: 0,
-            t_end_micros: PARAMETER_SCALE,
-            start_junction_id: start.to_string(),
-            end_junction_id: end.to_string(),
-            arc_length_model_units: length,
-            start_junction_offset_model_units: 0.0,
-            end_junction_offset_model_units: 0.0,
-            radius_start_model_units: 1.0,
-            radius_end_model_units: 1.0,
-        };
+        let segment =
+            |id: &str, filament_id, start: &str, end: &str, length: f64| MycelialHyphaSegment {
+                id: id.to_string(),
+                filament_id,
+                t_start_micros: 0,
+                t_end_micros: PARAMETER_SCALE,
+                start_junction_id: start.to_string(),
+                end_junction_id: end.to_string(),
+                arc_length_model_units: length,
+                start_junction_offset_model_units: 0.0,
+                end_junction_offset_model_units: 0.0,
+                radius_start_model_units: 1.0,
+                radius_end_model_units: 1.0,
+            };
         MycelialJunctionHyphaGraph {
             schema_version: MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION,
             source_model_version: 1,
@@ -1011,8 +1055,12 @@ mod tests {
         assert_eq!(profile.scenarios[0].weighted_reachability, Some(1.0));
         assert_eq!(profile.scenarios[0].connected_components, 1);
         assert_eq!(profile.scenarios[0].cycle_rank, 0);
-        assert!(profile.scenarios[0].weighted_mean_network_path_length.unwrap()
-            > profile.baseline.weighted_mean_network_path_length.unwrap());
+        assert!(
+            profile.scenarios[0]
+                .weighted_mean_network_path_length
+                .unwrap()
+                > profile.baseline.weighted_mean_network_path_length.unwrap()
+        );
         assert_ne!(
             profile.canonical_digest_hex().unwrap(),
             graph.canonical_digest_hex().unwrap()
@@ -1073,10 +1121,8 @@ mod tests {
         failed_segments: &[String],
         failed_junctions: &[String],
     ) -> bool {
-        let failed_segments: BTreeSet<_> =
-            failed_segments.iter().map(String::as_str).collect();
-        let failed_junctions: BTreeSet<_> =
-            failed_junctions.iter().map(String::as_str).collect();
+        let failed_segments: BTreeSet<_> = failed_segments.iter().map(String::as_str).collect();
+        let failed_junctions: BTreeSet<_> = failed_junctions.iter().map(String::as_str).collect();
         if failed_junctions.contains(demand.source_junction_id.as_str())
             || failed_junctions.contains(demand.target_junction_id.as_str())
         {
@@ -1145,10 +1191,23 @@ mod tests {
         let graph = triangle_graph();
         let first = build_single_failure_resilience_profile(&graph, &demands()).unwrap();
         let second = build_single_failure_resilience_profile(&graph, &demands()).unwrap();
-        assert_eq!(first.canonical_digest_hex().unwrap(), second.canonical_digest_hex().unwrap());
+        assert_eq!(
+            first.canonical_digest_hex().unwrap(),
+            second.canonical_digest_hex().unwrap()
+        );
         assert_eq!(first.scenarios.len(), 6);
-        assert!(first.scenarios.iter().any(|scenario| scenario.scenario_id == "edge:edge-ab"));
-        assert!(first.scenarios.iter().any(|scenario| scenario.scenario_id == "junction:A"));
+        assert!(
+            first
+                .scenarios
+                .iter()
+                .any(|scenario| scenario.scenario_id == "edge:edge-ab")
+        );
+        assert!(
+            first
+                .scenarios
+                .iter()
+                .any(|scenario| scenario.scenario_id == "junction:A")
+        );
     }
 
     #[test]
