@@ -14,7 +14,9 @@ use symthaea_semiconductor::benchmark::{
 use symthaea_semiconductor::benchmark::secom_raw::{
     SecomRawExpectationsV1, audit_secom_raw_v1, parse_labels,
 };
-use symthaea_semiconductor::benchmark::split_manifest::SplitManifestV1;
+use symthaea_semiconductor::benchmark::split_manifest::{
+    SplitManifestV1, validate_split_manifest_v1,
+};
 
 fn run() -> Result<(), String> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
@@ -49,17 +51,48 @@ fn run() -> Result<(), String> {
     if snapshot_manifest.dataset_id != expectations.dataset_id {
         return Err("dataset snapshot manifest dataset_id does not match raw expectations".into());
     }
+    if snapshot_manifest.split_scheme != "forward_time"
+        || snapshot_manifest.time_basis.as_deref() != Some("source_local_naive")
+        || snapshot_manifest.clock_domain_id.as_deref()
+            != Some(expectations.clock_domain_id.as_str())
+    {
+        return Err("dataset snapshot manifest does not bind the expected source-local chronology".into());
+    }
+    validate_split_manifest_v1(&snapshot_manifest)
+        .map_err(|error| format!("dataset snapshot manifest rejected input: {error}"))?;
 
     let labels = parse_labels(&label_bytes)
         .map_err(|error| format!("SECOM label parsing failed: {error}"))?;
-    let samples = labels
+    if snapshot_manifest.assignments.len() != labels.len() {
+        return Err(format!(
+            "snapshot manifest row support mismatch: expected {}, observed {}",
+            labels.len(),
+            snapshot_manifest.assignments.len()
+        ));
+    }
+    let mut samples = Vec::with_capacity(labels.len());
+    for (index, (assignment, label)) in snapshot_manifest
+        .assignments
         .iter()
+        .zip(&labels)
         .enumerate()
-        .map(|(index, label)| StratifiedSampleV1 {
-            sample_id: format!("secom-mirror-row-{index:04}"),
+    {
+        if assignment.positive != (label.label == 1) {
+            return Err(format!(
+                "snapshot manifest assignment {index} class does not match source label"
+            ));
+        }
+        let source_timestamp = label.observed_at.format("%Y-%m-%dT%H:%M:%S").to_string();
+        if assignment.observed_at.as_deref() != Some(source_timestamp.as_str()) {
+            return Err(format!(
+                "snapshot manifest assignment {index} timestamp does not match source label"
+            ));
+        }
+        samples.push(StratifiedSampleV1 {
+            sample_id: assignment.sample_id.clone(),
             positive: label.label == 1,
-        })
-        .collect();
+        });
+    }
 
     let subject = StratifiedSplitSubjectV1 {
         schema: "luminous.semi-bench.stratified-repeat-subject.v1".into(),
