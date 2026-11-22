@@ -18,7 +18,7 @@ use crate::benchmark::conformal_abstention::{
     ConformalSubjectV1, SelectiveDecisionV1, SUBJECT_SCHEMA_V1,
 };
 use crate::benchmark::metrology_semantics::{
-    BinaryMeasurandSemanticsV1, classify_validated_metrology_label_v1,
+    BinaryMeasurandSemanticsV1, PositiveConditionV1, classify_validated_metrology_label_v1,
     validate_binary_measurand_semantics_v1,
 };
 use crate::benchmark::process_event_graph::{
@@ -291,6 +291,9 @@ fn verify_state(state: &OnlineConformalStateV1) -> Result<(), OnlineConformalErr
             "state model/graph digest is invalid".into(),
         ));
     }
+    validate_binary_measurand_semantics_v1(&state.binary_semantics).map_err(|error| {
+        OnlineConformalError(format!("state binary metrology semantics invalid: {error}"))
+    })?;
     if state_digest(state)? != state.state_sha256 {
         return Err(OnlineConformalError(
             "state_sha256: state payload integrity mismatch".into(),
@@ -878,7 +881,7 @@ pub fn ingest_online_metrology_feedback_v1(
         })?;
     if prediction.sample_id != feedback.sample_id
         || prediction.subject_id != feedback.subject_id
-        || prediction.target_measurand_id != feedback.target_measurand_id
+        || prediction.target_measurand_id != state.binary_semantics.target_measurand_id
         || prediction.model_sha256 != state.model_sha256
     {
         return Err(OnlineConformalError(
@@ -1090,7 +1093,7 @@ mod tests {
                 measurement_event_id: "met-event".into(),
                 subject_id: "wafer-100".into(),
                 measurand_id: "defect-rate".into(),
-                value: Some(0.25),
+                value: Some(if *revision >= 2 { 0.2 } else { 0.8 }),
                 unit: "fraction".into(),
                 standard_uncertainty: Some(0.01),
                 censoring_lower_bound: None,
@@ -1137,7 +1140,7 @@ mod tests {
     fn subject() -> ConformalSubjectV1 {
         let calibration_samples: Vec<_> = (0..40)
             .map(|index| ConformalCalibrationSampleV1 {
-                sample_id: format!("cal-sample-{index:02}"),
+                sample_id: format!("wafer-{index:02}"),
                 label_id: format!("cal-label-{index:02}"),
                 positive: index < 20,
                 score: if index < 20 { 0.85 } else { 0.15 },
@@ -1155,14 +1158,39 @@ mod tests {
     }
 
     fn graph_with_initial_calibration() -> ProcessEventGraphV1 {
-        let mut input = graph(&[]);
-        input.metrology_labels = (0..40)
+        let events: Vec<_> = (0..40)
+            .map(|index| ProcessEventV1 {
+                event_id: format!("met-event-{index:02}"),
+                event_kind: ProcessEventKindV1::Metrology,
+                subject_id: Some(format!("wafer-{index:02}")),
+                wafer_id: Some(format!("wafer-{index:02}")),
+                lot_id: Some("lot-calibration".into()),
+                carrier_id: None,
+                tool_id: Some("metrology-1".into()),
+                chamber_id: None,
+                module_id: None,
+                process_step_id: None,
+                recipe_id: None,
+                recipe_revision: None,
+                event_time: "2026-11-22T08:00:00".into(),
+                event_clock_domain_id: "fab-local".into(),
+                event_clock_basis: ClockBasisV1::SourceLocalNaive,
+                available_at: "2026-11-22T08:00:01".into(),
+                availability_clock_domain_id: "fab-local".into(),
+                availability_clock_basis: ClockBasisV1::SourceLocalNaive,
+                source_sequence: Some(index + 1),
+                source_artifact_sha256: SOURCE_SHA.into(),
+                transform_sha256: TRANSFORM_SHA.into(),
+                authority_ref: "metrology-source".into(),
+            })
+            .collect();
+        let metrology_labels = (0..40)
             .map(|index| crate::benchmark::process_event_graph::MetrologyLabelV1 {
                 label_id: format!("cal-label-{index:02}"),
-                measurement_event_id: "met-event".into(),
-                subject_id: "wafer-100".into(),
+                measurement_event_id: format!("met-event-{index:02}"),
+                subject_id: format!("wafer-{index:02}"),
                 measurand_id: "defect-rate".into(),
-                value: Some(0.2),
+                value: Some(if index < 20 { 0.8 } else { 0.2 }),
                 unit: "fraction".into(),
                 standard_uncertainty: Some(0.01),
                 censoring_lower_bound: None,
@@ -1183,7 +1211,34 @@ mod tests {
                 authority_ref: "lims-validated".into(),
             })
             .collect();
-        input
+        ProcessEventGraphV1 {
+            schema: crate::benchmark::process_event_graph::GRAPH_SCHEMA_V1.into(),
+            graph_id: "online-calibration-graph".into(),
+            source_artifact_sha256: SOURCE_SHA.into(),
+            transform_sha256: TRANSFORM_SHA.into(),
+            events,
+            edges: Vec::new(),
+            metrology_labels,
+        }
+    }
+
+    fn semantics() -> BinaryMeasurandSemanticsV1 {
+        let mut rule = BinaryMeasurandSemanticsV1 {
+            schema: crate::benchmark::metrology_semantics::SEMANTICS_SCHEMA_V1.into(),
+            semantics_id: "defect-rate-out-of-spec-v1".into(),
+            revision: 1,
+            target_measurand_id: "defect-rate".into(),
+            unit: "fraction".into(),
+            positive_class_name: "defect".into(),
+            negative_class_name: "pass".into(),
+            positive_condition: PositiveConditionV1::GreaterThanOrEqual,
+            threshold: 0.5,
+            authority_ref: "quality-plan:defect-rate-threshold-v1".into(),
+            semantics_sha256: String::new(),
+        };
+        crate::benchmark::metrology_semantics::seal_binary_measurand_semantics_v1(&mut rule)
+            .unwrap();
+        rule
     }
 
     fn config() -> OnlineConformalConfigV1 {
@@ -1202,6 +1257,7 @@ mod tests {
             &subject(),
             &graph_with_initial_calibration(),
             &cutoff("calibration-cutoff", "2026-11-22T10:00:00"),
+            &semantics(),
             config(),
         )
         .unwrap()
@@ -1260,10 +1316,6 @@ mod tests {
                 prediction_id: "prediction-1".into(),
                 sample_id: "test-sample-1".into(),
                 subject_id: "wafer-100".into(),
-                positive: true,
-                target_measurand_id: "defect-rate".into(),
-                class_semantics_ref: "defect-threshold-v1".into(),
-                class_semantics_sha256: TRANSFORM_SHA.into(),
                 revision: 1,
                 supersedes_label_id: None,
             },
@@ -1363,10 +1415,6 @@ mod tests {
                 prediction_id: "prediction-1".into(),
                 sample_id: "wafer-100".into(),
                 subject_id: "wafer-100".into(),
-                positive: false,
-                target_measurand_id: "defect-rate".into(),
-                class_semantics_ref: "defect-threshold-v1".into(),
-                class_semantics_sha256: TRANSFORM_SHA.into(),
                 revision: 2,
                 supersedes_label_id: Some("label-v1".into()),
             },
@@ -1407,7 +1455,7 @@ mod tests {
                 measurement_event_id: "met-event".into(),
                 subject_id: format!("wafer-{index}"),
                 measurand_id: "defect-rate".into(),
-                value: Some(0.2),
+                value: Some(0.8),
                 unit: "fraction".into(),
                 standard_uncertainty: Some(0.01),
                 censoring_lower_bound: None,
@@ -1475,10 +1523,6 @@ mod tests {
                     prediction_id: format!("prediction-{index}"),
                     sample_id: format!("sample-{index}"),
                     subject_id: format!("wafer-{index}"),
-                    positive: true,
-                    target_measurand_id: "defect-rate".into(),
-                    class_semantics_ref: "defect-threshold-v1".into(),
-                    class_semantics_sha256: TRANSFORM_SHA.into(),
                     revision: 1,
                     supersedes_label_id: None,
                 },
