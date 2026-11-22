@@ -22,9 +22,7 @@ pub use split_manifest::{
     SplitManifestError, SplitManifestV1, SplitValidationReportV1, validate_split_manifest_v1,
 };
 
-pub use secom_logistic::{
-    SecomLogisticError, SecomLogisticReportV1, evaluate_secom_logistic_v1,
-};
+pub use secom_logistic::{SecomLogisticError, SecomLogisticReportV1, evaluate_secom_logistic_v1};
 
 pub use secom_missingness::{
     SecomMissingnessError, SecomMissingnessReportV1, evaluate_secom_missingness_v1,
