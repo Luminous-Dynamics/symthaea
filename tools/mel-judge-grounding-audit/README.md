@@ -68,7 +68,7 @@ Its MIDI-style fixture is synthetic. No real timing or performance claim follows
 
 ## Predictive transparency and musical forecasts
 
-The musical forecast auditor checks precommitted, input-snapshot-bound forecasts against later symbolic realization. It records delivery, actual display and collaborator disposition separately; verifies revision/supersession history; rejects post-hoc, yoked, future-input, stale and vetoed output; and reports conditional event-presence Brier, role and beat-index agreement, beat-phase error and preview lead time. Deliberate user deviation remains valid agency.
+The musical forecast auditor checks precommitted, input-snapshot-bound forecasts against later symbolic realization. It requires a source/target clock-alignment receipt, target-window validity and a declared uncertainty bound; that uncertainty is included in worst-case beat-phase error before tolerance qualification. It records delivery, actual display and collaborator disposition separately; verifies revision/supersession history; rejects post-hoc, yoked, future-input, stale and vetoed output; and reports conditional event-presence Brier, role and beat-index agreement, beat-phase error and preview lead time. Deliberate user deviation remains valid agency.
 
     cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-musical-forecast-audit -- audit \
       tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json report.json
