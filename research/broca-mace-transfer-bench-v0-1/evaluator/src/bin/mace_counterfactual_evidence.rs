@@ -578,9 +578,16 @@ fn run() -> Result<(), String> {
         let baseline = run_candidate(case.query, case.decision_need, &case.memory)
             .map_err(|error| format!("baseline candidate failed: {error:?}"))?;
         let baseline_regret = regret(case.truth, baseline.decision.action);
+        // Opaque pair identity: do not expose generated evaluator scenario
+        // family labels (for example, retraction or common-cause attack) to
+        // the candidate-facing stream. Bind only candidate-visible inputs.
         let pair_block_id = format!(
-            "world-{}:{}:{:?}:{:?}",
-            case.cluster, case.family, case.query.scope.regime, case.query.scope.objective
+            "world-{}:task-{}",
+            case.cluster,
+            &candidate_input_digest(
+                case.decision_need,
+                &manifest.baseline_evidence_sha256
+            )[..16]
         );
         let manifest_record = json!({
             "schema_version": SCHEMA_VERSION,
