@@ -74,3 +74,13 @@ The musical forecast auditor checks precommitted, input-snapshot-bound forecasts
       tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json report.json
 
 The fixture is synthetic. Its Brier score is conditional on predicted event slots, not a general recall/calibration result. See docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md.
+
+
+## Full event-universe forecast calibration
+
+The event-universe scorer freezes opportunity slots independently of the candidate, then scores every slot including omitted forecasts. Missing predictions are treated as zero presence, ambiguous references remain visible but are excluded from proper scoring, and each slot is scored across none plus every admissible alternative. It reports presence/categorical Brier, categorical log loss, ECE, omission, false-positive/negative and per-role outcomes.
+
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-event-universe-audit -- score \
+      tools/mel-judge-grounding-audit/fixtures/valid-event-universe-v1.json report.json
+
+The fixture is synthetic. ECE is descriptive and has no cluster-aware interval. See docs/research/MEL_EVENT_UNIVERSE_SCORER_V1_2026-11-23.md.
