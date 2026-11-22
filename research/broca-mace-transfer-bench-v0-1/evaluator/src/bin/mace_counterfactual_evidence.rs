@@ -178,6 +178,18 @@ impl EvidenceDependencyIndex {
             .map(ReceiptDependencyProjection::sidecar_sha256)
     }
 
+    fn receipt_lineage_complete(&self, ids: &[u32]) -> Option<bool> {
+        self.receipt_dependencies
+            .as_ref()
+            .map(|projection| projection.all_lineage_complete(ids))
+    }
+
+    fn has_ancestor_in(&self, event_id: u32, targets: &BTreeSet<u32>) -> bool {
+        self.receipt_dependencies
+            .as_ref()
+            .is_some_and(|projection| projection.depends_on_any(event_id, targets))
+    }
+
     fn event_count(&self) -> usize {
         self.records.len()
     }
@@ -349,6 +361,9 @@ fn matched_random_ids(
     seed: u64,
 ) -> Option<Vec<u32>> {
     let target = normalized_ids(target_ids.to_vec());
+    if index.receipt_lineage_complete(&target) == Some(false) {
+        return None;
+    }
     let required = evidence_strata(index, &target)?;
     let target_counts = provenance_group_counts(index, &target)?;
     let target_roots: BTreeSet<SourceRootDigest> = target
@@ -377,6 +392,8 @@ fn matched_random_ids(
                     && (!item.source_root_digest.is_known()
                         || !target_roots.contains(&item.source_root_digest))
                     && (item.source_family == 0 || !target_families.contains(&item.source_family))
+                    && index.receipt_lineage_complete(&[item.event_id]) != Some(false)
+                    && !index.has_ancestor_in(item.event_id, &target_set)
             })
             .collect();
         eligible.sort_by_key(|item| {
@@ -405,6 +422,12 @@ fn matched_random_ids(
         }
     }
     if evidence_strata(index, &expanded)? != evidence_strata(index, &target)? {
+        return None;
+    }
+    if index.receipt_lineage_complete(&expanded) == Some(false) {
+        return None;
+    }
+    if expanded.iter().any(|id| index.has_ancestor_in(*id, &target_set)) {
         return None;
     }
     if provenance_group_counts(index, &expanded)? != target_counts {
