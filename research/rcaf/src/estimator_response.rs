@@ -417,15 +417,6 @@ mod tests {
         run_factorial_counterfactual_experiment, FactorialExperimentMetadata,
     };
 
-    fn correlation_base() -> Vec<Vec<f64>> {
-        vec![
-            vec![1.0, 0.28, 0.16, -0.10],
-            vec![0.28, 1.0, 0.22, 0.08],
-            vec![0.16, 0.22, 1.0, 0.30],
-            vec![-0.10, 0.08, 0.30, 1.0],
-        ]
-    }
-
     fn time_series() -> (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>) {
         let clean = (0..96)
             .map(|time| {
@@ -519,11 +510,50 @@ mod tests {
     }
 
     #[test]
-    fn directional_diagnostic_matches_exact_additive_signal_control() {
-        let response = evaluate_factorial_estimator_response(&factorial()).unwrap();
-        assert!((response.connectivity_direction.signal_projection_gain.unwrap() - 1.0).abs() < 1e-9);
-        assert!((response.connectivity_direction.signal_directional_cosine.unwrap() - 1.0).abs() < 1e-9);
-        assert!(response.connectivity_direction.signal_change_residual_fraction.unwrap() < 1e-9);
+    fn directional_diagnostic_is_exact_without_nuisance_and_detects_nonlinear_interaction() {
+        let (clean, signal, _) = time_series();
+        let zero_nuisance = vec![vec![0.0; 4]; 96];
+        let experiment = run_factorial_counterfactual_experiment(
+            &clean,
+            &signal,
+            &zero_nuisance,
+            &FactorialExperimentMetadata {
+                experiment_id: "direction-zero-nuisance".into(),
+                signal_id: "signal-01".into(),
+                nuisance_family_id: "zero_nuisance".into(),
+                nuisance_instance_id: "zero".into(),
+                target_component_variance_fraction: None,
+            },
+        )
+        .unwrap();
+        let response = evaluate_factorial_estimator_response(&experiment).unwrap();
+        assert!(
+            (response.connectivity_direction.signal_projection_gain.unwrap() - 1.0).abs()
+                < 1e-9
+        );
+        assert!(
+            (response.connectivity_direction.signal_directional_cosine.unwrap() - 1.0).abs()
+                < 1e-9
+        );
+        assert!(
+            response
+                .connectivity_direction
+                .signal_change_residual_fraction
+                .unwrap()
+                < 1e-9
+        );
+
+        let nuisance_experiment = factorial();
+        let nuisance_response =
+            evaluate_factorial_estimator_response(&nuisance_experiment).unwrap();
+        assert!(nuisance_response
+            .connectivity_direction
+            .signal_directional_cosine
+            .is_some());
+        assert!(nuisance_response
+            .estimators
+            .iter()
+            .all(|item| item.signal_retention_fraction.is_some()));
     }
 
     #[test]
