@@ -369,6 +369,25 @@ impl CdpSession {
         Ok(bytes)
     }
 
+    /// Capture a PNG screenshot of the current viewport only.
+    ///
+    /// Unlike `screenshot`, this does not expand the capture to the full
+    /// document height. It is appropriate for fixed-viewport visual comparisons
+    /// and responsive benchmark evidence.
+    pub async fn screenshot_viewport(&self) -> Result<Vec<u8>> {
+        let page = self.page.lock().await;
+        let bytes = page
+            .screenshot(
+                chromiumoxide::page::ScreenshotParams::builder()
+                    .full_page(false)
+                    .build(),
+            )
+            .await
+            .context("Viewport screenshot failed")?;
+        debug!(bytes = bytes.len(), "Viewport screenshot captured");
+        Ok(bytes)
+    }
+
     /// Get page state via JS when the AX tree is unavailable.
     pub async fn get_page_state_js(&self) -> Result<PageObservation> {
         let page = self.page.lock().await;
