@@ -179,10 +179,13 @@ fn run_resolution(
     };
     let wrong_prediction =
         plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(wrong_pulse_pair)?;
-    let velocity_spacing = config.dv();
-    let fundamental_wave_number = FIRST_MODE as f64 * TAU / config.domain_length;
-    let velocity_nyquist_time = PI / (fundamental_wave_number * velocity_spacing);
-    let velocity_recurrence_time = TAU / (fundamental_wave_number * velocity_spacing);
+    let echo_horizon =
+        config.velocity_sampling_horizon(prediction.echo_mode as usize)?;
+    let wrong_echo_horizon =
+        config.velocity_sampling_horizon(wrong_prediction.echo_mode as usize)?;
+    let velocity_spacing = echo_horizon.velocity_spacing;
+    let velocity_nyquist_time = echo_horizon.nyquist_encounter_time;
+    let velocity_recurrence_time = echo_horizon.discrete_recurrence_time;
 
     let initial = maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, THERMAL_SPEED)?;
     let mut pulsed = VlasovPoisson1d1v::new(config, initial.clone())?;
@@ -567,10 +570,12 @@ fn run_resolution(
         wall_clock_start.elapsed().as_secs_f64(),
     );
     println!(
-        "# negative_summary,{label},{impulse_amplitude:.8},wrong_pulse_mode={},predicted_echo_mode={},predicted_rephasing_time={:.8},sampled_wrong_mode_peak_time={:.8},wrong_mode_peak_amplitude={:.12e},wrong_mode_peak_phase={:.12e},wrong_mode_detected={},off_target_original_mode_peak={:.12e},off_target_peak_time={:.8}",
+        "# negative_summary,{label},{impulse_amplitude:.8},wrong_pulse_mode={},predicted_echo_mode={},predicted_rephasing_time={:.8},wrong_mode_nyquist_time={:.8},wrong_mode_recurrence_time={:.8},sampled_wrong_mode_peak_time={:.8},wrong_mode_peak_amplitude={:.12e},wrong_mode_peak_phase={:.12e},wrong_mode_detected={},off_target_original_mode_peak={:.12e},off_target_peak_time={:.8}",
         WRONG_SECOND_MODE,
         wrong_prediction.echo_mode,
         wrong_prediction.echo_time,
+        wrong_echo_horizon.nyquist_encounter_time,
+        wrong_echo_horizon.discrete_recurrence_time,
         wrong_measurement.sampled_peak_time,
         wrong_measurement.peak_amplitude,
         wrong_measurement.peak_phase_radians,
@@ -636,7 +641,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     println!(
-        "# negative_summary_columns,run,impulse_amplitude,wrong_pulse_mode,predicted_echo_mode,predicted_rephasing_time,sampled_peak_time,peak_amplitude,peak_phase,detected,off_target_peak,off_target_peak_time"
+        "# negative_summary_columns,run,impulse_amplitude,wrong_pulse_mode,predicted_echo_mode,predicted_rephasing_time,wrong_mode_nyquist_time,wrong_mode_recurrence_time,sampled_peak_time,peak_amplitude,peak_phase,detected,off_target_peak,off_target_peak_time"
     );
 
     println!(
