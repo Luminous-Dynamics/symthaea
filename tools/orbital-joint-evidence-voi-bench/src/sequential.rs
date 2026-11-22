@@ -1426,7 +1426,8 @@ mod tests {
         let crate::sequential::PolicyNode::Test {
             action_id: load_action,
             branches: valid_branches,
-        } = branches.get("VALID").unwrap() else {
+        } = branches.get("VALID").unwrap()
+        else {
             panic!("valid calibration must continue to combined-load screening");
         };
         assert_eq!(load_action, "B-LOAD-CAPACITY");
@@ -1441,7 +1442,8 @@ mod tests {
         let crate::sequential::PolicyNode::Test {
             action_id: nde_action,
             branches: nde_branches,
-        } = valid_branches.get("PASS").unwrap() else {
+        } = valid_branches.get("PASS").unwrap()
+        else {
             panic!("load pass must continue to ultrasonic inspection");
         };
         assert_eq!(nde_action, "C-ULTRASONIC-NDE");
