@@ -1,0 +1,90 @@
+name: MEL predictive transparency qualification
+
+on:
+  pull_request:
+    branches:
+      - research/mel-tempo-phase-audit-v1-20261122
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md"
+      - ".github/workflows/mel-predictive-transparency-qualification.yml"
+  push:
+    branches:
+      - research/mel-predictive-transparency-audit-v1-20261123
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md"
+      - ".github/workflows/mel-predictive-transparency-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  predictive-transparency:
+    name: Precommitted musical forecast integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Verify committed dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch tools/mel-judge-grounding-audit/Cargo.lock > /dev/null
+          test -f tools/mel-judge-grounding-audit/Cargo.lock
+      - name: Run deterministic Rust tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schema and replay synthetic forecast panel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-musical-forecast-panel-v1.schema.json > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml \
+            --bin mel-musical-forecast-audit -- audit \
+            tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json \
+            "$RUNNER_TEMP/mel-musical-forecast-report.json"
+          jq -e '.forecast_count == 1 and .reference_time_map_clock_domain_id == "muse-performance-time-v1" and .time_alignment_target_clock_domain_id == "synthetic-runner-monotonic-v1" and .time_alignment_max_uncertainty_ns == 5000000 and .displayed_before_target_count == 1 and .matched_forecast_event_count == 1 and .role_match_rate == 1 and .beat_index_match_rate == 1 and .conditional_presence_brier_score <= 0.003 and .within_onset_tolerance_rate == 1 and .event_findings[0].worst_case_absolute_onset_error_beats <= 0.1 and .structurally_valid_anticipatory_trace == true' \
+            "$RUNNER_TEMP/mel-musical-forecast-report.json" > /dev/null
+      - name: Assemble exact-head reproducibility evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-predictive-transparency-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/predictive_transparency.rs > "$evidence/forecast-lib-blob.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/bin/mel-musical-forecast-audit.rs > "$evidence/forecast-cli-blob.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-judge-grounding-audit/Cargo.toml "$evidence/"
+          cp tools/mel-judge-grounding-audit/Cargo.lock "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/predictive_transparency.rs "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/bin/mel-musical-forecast-audit.rs "$evidence/"
+          cp tools/mel-judge-grounding-audit/schema/mel-musical-forecast-panel-v1.schema.json "$evidence/"
+          cp tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json "$evidence/"
+          cp docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md "$evidence/"
+          if [[ -f "$RUNNER_TEMP/mel-musical-forecast-report.json" ]]; then
+            cp "$RUNNER_TEMP/mel-musical-forecast-report.json" "$evidence/"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-predictive-transparency-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-predictive-transparency-evidence/
+          if-no-files-found: error
+          retention-days: 90

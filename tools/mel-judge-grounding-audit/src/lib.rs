@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod collab_trace;
 pub mod musical_timing;
+pub mod predictive_transparency;
 pub mod transform_qualification;
 
 const SCHEMA_VERSION: &str = "mel-judge-grounding-probe-panel-v1";
