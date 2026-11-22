@@ -141,7 +141,7 @@ impl FtrlLogisticModelV1 {
             transformed.push(standardized);
         }
         for (index, value) in row.values.iter().enumerate() {
-            let missing = f64::from(value.is_none());
+            let missing = if value.is_none() { 1.0 } else { 0.0 };
             let standardized = (missing - self.means[self.medians.len() + index])
                 / self.scales[self.medians.len() + index];
             if !standardized.is_finite() {
@@ -618,10 +618,16 @@ pub fn evaluate_secom_logistic_v1(
             }
         }
     }
-    let train_indices: Vec<usize> = split_manifest.assignments.iter()
-        .filter(|assignment| assignment.split == "train").count();
-    let training_failures = split_manifest.assignments.iter()
-        .filter(|assignment| assignment.split == "train" && assignment.positive).count();
+    let training_rows = split_manifest
+        .assignments
+        .iter()
+        .filter(|assignment| assignment.split == "train")
+        .count();
+    let training_failures = split_manifest
+        .assignments
+        .iter()
+        .filter(|assignment| assignment.split == "train" && assignment.positive)
+        .count();
     let training_passes = training_rows - training_failures;
     let mut models = BTreeMap::new();
     models.insert(
