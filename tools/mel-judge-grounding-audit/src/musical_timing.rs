@@ -40,6 +40,7 @@ struct TimingPolicyV2 {
     maximum_relative_period_error: f64,
     required_consecutive_stable_estimates: usize,
     minimum_estimate_spacing_ns: u64,
+    minimum_estimate_confidence: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -113,6 +114,7 @@ pub struct TempoAdaptationSummary {
     pub change_id: String,
     pub reference_beat_period_ns: u64,
     pub estimate_count: usize,
+    pub eligible_estimate_count: usize,
     pub stable_estimates_required: usize,
     pub recovered: bool,
     pub adaptation_time_ns: Option<u64>,
@@ -480,6 +482,8 @@ fn validate_header(panel: &MusicalTimingPanelV2) -> Result<(), String> {
         || policy.maximum_relative_period_error > 1.0
         || policy.required_consecutive_stable_estimates == 0
         || policy.minimum_estimate_spacing_ns == 0
+        || !policy.minimum_estimate_confidence.is_finite()
+        || !(0.0..=1.0).contains(&policy.minimum_estimate_confidence)
     {
         return Err("invalid tempo adaptation policy".to_owned());
     }
@@ -589,6 +593,7 @@ fn score_tempo_adaptation(
 ) -> Vec<TempoAdaptationSummary> {
     let required = panel.policy.required_consecutive_stable_estimates;
     let tolerance = panel.policy.maximum_relative_period_error;
+    let minimum_confidence = panel.policy.minimum_estimate_confidence;
     let mut output = Vec::new();
 
     for change in &panel.tempo_changes {
@@ -599,13 +604,17 @@ fn score_tempo_adaptation(
         let mut stable_run = 0usize;
         let mut stable_start = None;
         let mut recovered_at = None;
+        let eligible_estimate_count = values
+            .iter()
+            .filter(|estimate| estimate.confidence >= minimum_confidence)
+            .count();
 
         for estimate in &values {
             let relative_error = (estimate.estimated_period_ns as f64
                 - change.reference_beat_period_ns as f64)
                 .abs()
                 / change.reference_beat_period_ns as f64;
-            if relative_error <= tolerance {
+            if estimate.confidence >= minimum_confidence && relative_error <= tolerance {
                 stable_run += 1;
                 if stable_run == 1 {
                     stable_start = Some(estimate.observed_at_ns);
@@ -625,6 +634,7 @@ fn score_tempo_adaptation(
             change_id: change.change_id.clone(),
             reference_beat_period_ns: change.reference_beat_period_ns,
             estimate_count: values.len(),
+            eligible_estimate_count,
             stable_estimates_required: required,
             recovered: recovered_at.is_some(),
             adaptation_time_ns,
@@ -824,6 +834,20 @@ mod tests {
         assert_eq!(report.extra_onsets[0].observed_onset_ns, 2_650_000_000);
         assert_eq!(report.target_accounting_completeness, 1.0);
         assert_eq!(report.observed_target_coverage_rate, 0.75);
+        assert!(!report.qualified_for_declared_timing_contract);
+    }
+
+    #[test]
+    fn low_confidence_period_estimates_cannot_fake_tempo_recovery() {
+        let mut value = panel();
+        for estimate in value["tempo_estimates"].as_array_mut().unwrap() {
+            if estimate["change_id"] == "change-2" {
+                estimate["confidence"] = serde_json::json!(0.79);
+            }
+        }
+        let report = score(&value).expect("low-confidence estimates remain reportable");
+        assert!(!report.tempo_adaptation[1].recovered);
+        assert_eq!(report.tempo_adaptation[1].eligible_estimate_count, 0);
         assert!(!report.qualified_for_declared_timing_contract);
     }
 
