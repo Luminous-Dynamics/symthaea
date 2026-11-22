@@ -587,7 +587,11 @@ fn evaluate_model(
     Ok(SecomLogisticModelResultV1 {
         model_id: model_id.into(),
         config: model.config.clone(),
-        nonzero_coefficient_count: model.weights.iter().filter(|weight| weight.abs() > 1.0e-12).count(),
+        nonzero_coefficient_count: model
+            .weights
+            .iter()
+            .filter(|weight| weight.abs() > 1.0e-12)
+            .count(),
         missing_features_without_observed_training_values: model
             .missing_features_without_observed_training_values,
         model_sha256,
@@ -768,10 +772,7 @@ mod tests {
         assert!(report.models.contains_key("B6-balanced"));
         assert_eq!(report.models["B5"].config.l1, 0.0);
         assert_eq!(report.models["B6"].config.l1, FTRL_L1_SPARSE);
-        assert_eq!(
-            report.models["B6-balanced"].config.l1,
-            FTRL_L1_SPARSE
-        );
+        assert_eq!(report.models["B6-balanced"].config.l1, FTRL_L1_SPARSE);
         for model in report.models.values() {
             for split in ["validation", "test"] {
                 assert_eq!(model.held_out[split].rows, 2);
