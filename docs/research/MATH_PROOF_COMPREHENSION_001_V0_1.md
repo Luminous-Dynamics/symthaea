@@ -373,3 +373,35 @@ In addition to the existing goals, evaluate:
 - **Efficiency-1:** publish quality–compute–human-time Pareto curves, not a single aggregate score.
 
 All thresholds are prospective. First measure reproducible baselines and confirm task difficulty. A hard gate failure cannot be averaged away.
+
+
+## 13. Existing-repository integration and new implementation owner (2026-11-22)
+
+### Reuse existing Lean work
+
+A source audit found related infrastructure already described in the repository:
+
+1. `docs/phase2-algebraic-reasoning-plan.md` proposes a Lean/Lake project and explicitly rejects a bespoke Rust recursive-descent parser for Lean syntax. Its future ingestion path uses Lean's own parser and exports syntax for the Rust side. MATH-COMPREHENSION-001 should reuse that parser direction if needed, but it adds a separate elaborated-environment extraction stage after parsing/elaboration.
+2. `tools/pitb-daps-graph-import` imports an external declaration graph. The associated workflow explicitly labels it `external_candidate_snapshot`, requires candidate edges to remain scoreless, and denies scheduler admission. That is a useful untrusted comparison source, not measured local Lean dependency evidence.
+3. `crates/domains/symthaea-prime-gap-lab/src/lean_bridge.rs` currently emits an admissibility stub with a `sorry` placeholder. It must not be treated as proof generation or kernel-accepted evidence.
+4. The existing SAT / Z3 proof memory and `ProofResult` types are not Lean kernel results. The #10810 SAT decision / theorem proof distinction remains necessary.
+
+### New implementation owner
+
+The Lean-native extractor is now tracked separately in [#13295 — MATH-LEAN-EXTRACT-001](https://github.com/Luminous-Dynamics/symthaea/issues/13295). It owns the standalone Lean/Lake executable, pinned source/toolchain, type/value dependency extraction, inductive/recursor closure, provenance serialization, and adversarial tests.
+
+The current #13294 PR provides the specification and pilot tasks; #13295 owns the implementation. This avoids turning the documentation PR into an uncompiled extractor implementation.
+
+### Expanded pilot set
+
+The branch now contains:
+- six source-pinned Lean-core examples;
+- four source-pinned Mathlib examples spanning recursive combinatorial positivity, countable-union simplification, quotient induction and cardinality preservation under embeddings;
+- a finite Tseitin mutation fixture separating decision equivalence from unique-extension / parsimonious counting;
+- a dependency-free Rust finite-oracle source file under `scripts/research/proof_comprehension_oracle.rs`.
+
+The Mathlib task for `Set.countable_union` is explicitly marked as requiring a simp trace. The source's two explicit simp arguments are not misreported as the complete dependency closure.
+
+### Current execution status
+
+The JSON fixtures have been fetched back and structurally checked. The finite Tseitin and Boolean counterfactual results were evaluated by exhaustive enumeration in the research execution environment. The Rust oracle source has been committed but not compiled. No Lean extraction, Lean kernel replay, Rust compilation, CI pass, independent expert annotation or human-study result is claimed.
