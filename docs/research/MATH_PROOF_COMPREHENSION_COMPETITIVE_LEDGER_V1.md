@@ -166,3 +166,83 @@ A human-readable explanation is only explanation evidence when reviewed.
 A human transfer improvement is a learning/utility result.
 
 Do not merge these into a single "mathematical intelligence score" until the component metrics are independently reliable, and even then keep the hard trust gates separate.
+## 6. Newly identified adjacent state of the art (2026-11-22)
+
+The first version of the ledger understated three directly relevant developments. They must become explicit baselines / interoperability targets.
+
+### HumanLean — faithful paper-to-Lean formalization
+
+**Paper:** Yuhao et al., *Faithful Lean Formalization for Human Proof Review*, under review (2026). Public paper PDF: https://files.sri.inf.ethz.ch/website/papers/yuhao2026humanlean.pdf
+
+HumanLean's key contribution is a structured formalization contract with staged source / definition / scaffold / proof review. It separates accepted goals, excluded goals, external dependencies and proof routes; external facts not formalized in Mathlib can be declared as axioms in the scaffold, with that boundary made explicit. It also constrains the Lean layout so one main theorem per goal and helper lemmas are isolated for review.
+
+On nine theoretical papers:
+- GPT-6-Astra baseline: 56/150 accepted goals, 56 formalized, 55 judged faithful; HumanLean: 60/150 accepted, 60 formalized, 60 judged faithful.
+- Aggregate faithfulness: 98.2% baseline vs 100% HumanLean for GPT-6-Astra.
+- Two independent human reviewers with Lean/math expertise confirmed the 100% faithfulness claim for HumanLean/GPT-6-Astra. They spent 5–20 minutes per goal, mostly recovering relevant paper context.
+- HumanLean reports reducing axiom exposure from 0.20 to 0.07 per formalization with GPT-6-Astra, and custom-definition verbosity from 11.80 to 1.13 per formalization.
+- Cost increased: $6.7 to $8.7 per formalized goal for GPT-6-Astra. This is a real quality/review-burden trade-off, not a free improvement.
+
+**Implication:** We should reuse HumanLean's claim/goal contract, source audit discipline and independent review protocol where possible. Do not build a competing paper-to-Lean formalization pipeline. Our work begins from already formalized artifacts and measures conceptual reconstruction, explanation faithfulness, counterfactual understanding and whether humans can use what they learned on a new problem. HumanLean's two-reviewer paper-faithfulness score is not a human-learning/transfer result.
+
+Important limitations: this is a paper-level result under review, with nine paper case studies; its faithfulness is bounded by the selected goals and explicit external-dependency policy. Axiomatized external facts must not be presented as internally proved. It does not establish that readers learn or transfer mathematical mechanisms after reading an explanation.
+
+### APE-Bench / APE-Harness — repository-scale proof engineering
+
+**Paper:** Xin et al., ICML 2026 / PMLR 306: https://proceedings.mlr.press/v306/xin26c.html  
+**Public implementation:** https://github.com/xinhjBrant/APE-Bench  
+**Code snapshot:** commit `20017343657a7ce77fc67467c3dc9e443c81c075`, MIT license.
+
+APE-Bench introduces dual verification: a task must satisfy both syntactic compilation and semantic requirement checks in a pinned library environment. The public implementation documents:
+- 100 proof-engineering tasks;
+- 64 semantic-judge validation tasks;
+- theorem proving, proof engineering, judgment, instruction synthesis and library-annotation task types;
+- multi-version execution and version-scoped retrieval;
+- task contracts, isolated runtimes, and reference scaffolds for APE-Agent, Claude Code and Codex.
+
+**Implication:** Adopt dual verification and the task-contract abstraction for our machine evaluation. Use APE-Bench proof-engineering and semantic-judgment tasks as external regression lanes where licensing/data conditions allow. Do not duplicate its execution harness or call our prose-only pilot an APE benchmark.
+
+### LeanGraphSearch — strong dependency-aware retrieval baseline
+
+**Paper:** Xu et al., *Lean Graph Search for Formal Theorem Proving* (Oct 15, 2026): https://arxiv.org/abs/2610.22339
+
+It builds a Mathlib declaration graph using jixia static analysis and performs query-personalized PageRank from semantically retrieved seeds. Its reported results include:
+- MathlibQR Recall@100: 94.7%, versus 82.7% for LeanSearch v2 on the 810-query fair subset;
+- MathlibMPR complete-route coverage: 42.8% vs 39.1% at @20, and 44.2% vs 41.3% at @50;
+- downstream proof pass-rate gains up to 40% over a vanilla prover and up to 10% over LeanSearch v2 across the paper's evaluated benchmarks and budgets.
+
+**Implication:** A generic "dependency graph retrieval" arm is not enough. Explicitly reproduce LeanGraphSearch's seed retrieval + PPR + reranking baseline, or use its pinned implementation / reported results with compatible caveats. Compare our Lean-native extracted graph, jixia-style static graph and upstream kernel-export graph; measure edge differences rather than assuming these methods produce identical graphs.
+
+### Updated competitive positioning
+
+| Layer | Strong existing comparator | What Symthaea must add |
+|---|---|---|
+| Paper ↔ Lean fidelity | HumanLean | Explanation of an existing formal proof and measured reader understanding / transfer |
+| Repository proof engineering | APE-Bench / APE-Harness | Conceptual dependency map and proof mechanism reconstruction |
+| Dependency retrieval | LeanGraphSearch / LeanSearch v2 | Role-aware explanations, counterfactuals and human transfer; HDC only if an ablation beats graph retrieval |
+| Proof compression | LeanLean | Minimum-sufficient explanation at matched comprehension, not just shorter proof code |
+| Formal theorem proving | FormalMATH / EasyProver / Discover-and-Prove | Separate held-out mechanism transfer and human outcomes; do not imply it replaces these systems |
+
+## 7. Revised interoperation and claim policy
+
+1. **HumanLean compatibility:** treat its source/definition/scaffold/proof contract as an upstream input. Our claim classes should align with its source-supported facts, formalized goals, excluded goals, and explicitly axiomatized external dependencies. Preserve external-axiom status; never convert an axiom into a proved lemma.
+2. **APE-Harness compatibility:** shape tasks and receipts so an APE-style harness can check source identity, task contract, build, semantic requirements and exact output. The human explanation and learning outcomes remain separate outputs.
+3. **LeanGraphSearch compatibility:** include graph-based retrieval with PPR and reranking as a required baseline. Our own HDC/CfC variant must beat this strong graph-aware baseline on held-out tasks before we claim retrieval advantage.
+4. **Human evaluation is a distinct outcome:** reviewers confirming that a formalization matches a paper is not the same as readers learning the proof, restating its assumptions, or solving a near-transfer task. We must measure these directly.
+5. **No novelty inflation:** do not describe claim-to-Lean fidelity, dependency graph search, proof engineering dual verification or proof compression as new inventions of Symthaea. Our proposed contribution is a reproducible bridge among formal proof structure, faithful conceptual explanation, counterfactual diagnosis and measured human transfer.
+
+## 8. Revised baseline arms
+
+The next frozen experiment should include:
+- raw Lean/source;
+- generic LLM explanation;
+- HumanLean-style source/definition/scaffold/proof contract and staged faithfulness review;
+- APE-style dual-verification / task-contract baseline;
+- lexical / dense premise retrieval;
+- LeanGraphSearch-style dependency graph + personalized PageRank + reranker;
+- source/type/value Lean-native dependency extraction;
+- graph-aware explanation and concept reconstruction;
+- graph-aware explanation plus HDC;
+- graph-aware explanation plus HDC/CfC.
+
+Match context budget, model, tools, token budget and compute. Compare outputs using proof identity, dependency precision/recall, explanation fact support, reviewer burden, reader comprehension and near-transfer. If HDC/CfC fails against LeanGraphSearch, remove it from this pathway.
