@@ -4,7 +4,7 @@
 **Created:** 2026-11-22  
 **Tracking:** [#13284](https://github.com/Luminous-Dynamics/symthaea/issues/13284)  
 **Starting point:** [PR #13242](https://github.com/Luminous-Dynamics/symthaea/pull/13242), head `a763d73e40f118fcee02d466f3c3b7aea20295c4`  
-**Related:** #13221, #13241, #13242, #13261, #13264, #13265
+**Related:** #13221, #13241, #13242, #13261, #13264, #13265, #13287
 
 ## 1. Proposed contribution
 
@@ -60,7 +60,7 @@ A representation is epsilon-decision-sufficient only when both of the following 
 For a population of tasks, report at least:
 
 - Mean paired absolute regret and mean paired compression-regret gap.
-- Probability that the regret gap exceeds (epsilon).
+- Probability that the regret gap exceeds epsilon.
 - A tail-risk statistic such as CVaR at a preregistered level.
 - Worst task-family and regime outcomes.
 - Correct and incorrect abstention, unsupported action, and hard-gate failure rates.
@@ -96,7 +96,7 @@ If both policies choose the utility-maximizing action under their own value esti
 The naive formulation is:
 
 ```text
-minimize C(S) over S subseteq E(n), subject to G_y(S) <= epsilon.
+minimize C(S) over S is a subset of E(n), subject to G_y(S) <= epsilon.
 ```
 
 In practice, C(S) is not one natural scalar. Keep an explicit cost vector:
@@ -275,9 +275,24 @@ The operating point must be selected on training/calibration data and then locke
 
 ## 9. Preregistered statistical design
 
+### 9.1 Independent evaluator custody is a blocking gate
+
+The current public synthetic harness co-locates the candidate and evaluator. Its `Case` fixture contains both candidate-visible evidence and evaluator-only truth; the paired runner documents this co-location. A candidate projection and separate output streams reduce accidental data flow, but do not establish independent custody.
+
+Before any external qualification:
+- Compile candidate and evaluator as separate artifacts with separate dependency graphs.
+- Whitelist candidate input fields and reject unknown fields.
+- Keep hidden truth, scoring logic, held-out labels, private seeds and future observations outside candidate mounts, environment and process memory.
+- Execute the candidate in a hermetic, default-deny sandbox; record filesystem, network, environment and resource controls.
+- Use a one-way envelope/receipt protocol: evaluator sends candidate-visible data; candidate returns a bounded decision receipt; evaluator privately joins the receipt to hidden outcomes.
+- Sign the final result receipt over candidate artifact, task/evidence envelope, dataset split, evaluator, policy and score-schema digests.
+- Preserve public fixtures for development, but do not use them as the sole evidence for external claims.
+
+Negative controls must mutate evaluator truth without changing candidate input bytes, attempt forbidden filesystem/network/environment reads, reject receipt replay against a different evidence digest, and demonstrate independent score reproduction from sealed data. See [#13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287).
+
 Before evaluation:
 1. Name one primary endpoint and one primary contrast.
-2. Fix the (epsilon) regret margin and absolute-regret ceiling.
+2. Fix the epsilon regret margin and absolute-regret ceiling.
 3. Fix the eligible task families, worlds, source clusters, model, policy, and exclusions.
 4. Freeze intervention manifests without using evaluator outcomes.
 5. Lock all selectors, prompt/model settings, budgets, and acquisition policies.
@@ -349,3 +364,4 @@ The contribution becomes compelling only after MACE demonstrates, on independent
 - [MACE external baseline reproduction issue #13261](https://github.com/Luminous-Dynamics/symthaea/issues/13261).
 - [MACE transitive lineage issue #13264](https://github.com/Luminous-Dynamics/symthaea/issues/13264).
 - [MACE statistical qualification issue #13265](https://github.com/Luminous-Dynamics/symthaea/issues/13265).
+- [Independent evaluator custody issue #13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287).
