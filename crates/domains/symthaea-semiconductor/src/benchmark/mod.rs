@@ -4,6 +4,8 @@ pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
 pub mod pair_manifest;
+pub mod random_forest;
+pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
 pub mod secom_observation_drift;
@@ -16,6 +18,14 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use random_forest::{
+    ForestClassWeightingV1, ForestNodeV1, ForestTreeV1, RandomForestError,
+    RandomForestInputSampleV1, RandomForestModelV1, RandomForestParametersV1,
+    RandomForestPredictionReportV1, RandomForestPredictionV1, RandomForestTrainingSampleV1,
+    RandomForestTruthSampleV1, fit_random_forest_v1, predict_random_forest_v1,
+    score_random_forest_predictions_v1,
+};
+
 pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
@@ -40,6 +50,13 @@ pub use secom_observation_drift::{
 
 pub use secom_tabular_baselines::{
     SecomTabularBaselineError, SecomTabularBaselinesReportV1, evaluate_secom_tabular_baselines_v1,
+};
+
+pub use secom_fold_preprocessor::{
+    FittedSecomPreprocessorV1, PreparedSecomFoldV1, QuantileOutputV1, SecomFoldPreprocessorError,
+    SecomFoldPreprocessorReportV1, SecomPreprocessingRowV1, SecomPreprocessorConfigV1,
+    SecomTransformedSampleV1, fit_secom_preprocessor_v1, prepare_secom_stratified_fold_v1,
+    transform_secom_rows_v1,
 };
 
 pub use secom_raw::{

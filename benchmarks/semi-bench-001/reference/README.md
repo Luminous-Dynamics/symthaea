@@ -400,3 +400,88 @@ cargo run -p symthaea-semiconductor --bin semi-secom-stratified-splits -- \\
 Each report records per-repeat train/test sample counts and positive/negative support, plus independent manifest digests. Input ordering does not change manifests. The published-comparability split has no validation partition; thresholds must not be selected on its test split. Any hyperparameter selection requires nested CV or a separately declared inner split within the training partition.
 
 These stratified repeats measure interpolation across historical samples, not time-forward generalization, and the five repeats are not five independent lots or fabs. Continue to report the original chronological track separately.
+
+
+## Train-only preprocessing for the five-repeat stratified SECOM track
+
+The Rust CLI \`semi-secom-fold-preprocess\` consumes the digest-verified raw SECOM files, the five-repeat stratified report and the source-identity manifest. It validates the snapshot-manifest digest and every source row's sample ID, fail/pass label and naive source-local timestamp before creating per-repeat transforms.
+
+For each repeat, all preprocessing parameters are fitted on that repeat's 1,253 training rows only:
+- drop a feature when its training missing fraction is strictly greater than 0.50;
+- median-impute using observed training values only;
+- drop near-zero-variance features using the declared minimum population variance (1e-12) and minimum distinct-value count (2);
+- fit a complete empirical quantile reference over training-only median-imputed values;
+- apply the quantile map to training and held-out rows without refitting.
+
+The default output is an approximate normal-score empirical quantile transform using midranks and half-rank tail clipping. Uniform-rank output is also available through the typed configuration. The article does not disclose all quantile-transform defaults or exact variance thresholds, so these settings are Luminous reconstruction parameters, not claimed to be the authors' exact implementation.
+
+Two matrices are hashed independently:
+- **Feature Set A:** quantile-transformed retained numeric values; the paper-comparability path.
+- **Feature Set B:** Feature Set A plus retained-feature missingness indicators and one missing ratio over all original columns. This is a Luminous ablation, not attributed to Dong et al.'s exact pipeline.
+
+The fitted pipeline digest binds train sample IDs, config, retained feature identities, train medians, variances, distinct counts and full sorted quantile references. Reports bind source snapshot/identity-manifest digests, repeat index/seed and train/test matrix digests. Test values/labels do not affect the fitted pipeline digest.
+
+Run:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-fold-preprocess -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  stratified-80-20-repeats.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+This verifies fold-specific preprocessing and source binding; it does not train XGBoost or Random Forest. The 2026 paper's exact five seeds, full quantile-transform defaults and near-zero variance threshold are not fully disclosed in the accessible protocol, so direct numerical reproduction remains pending. Results from this stratified protocol must not be compared directly to the frozen chronological 940/313/314 results.
+
+
+## Native deterministic Random Forest on repeated stratified folds
+
+The Rust module \`benchmark::random_forest\` implements a deterministic bootstrap CART forest with a fresh \`mtry\` sample at each split. It exposes continuous scores from the unweighted positive-class frequency in each reached leaf, averaged over trees. It does not convert hard class labels into fabricated probabilities.
+
+The preregistered real-source runner uses:
+- 200 bootstrap trees per fold;
+- max depth 12;
+- minimum leaf size 4;
+- \`mtry = floor(sqrt(p))\` at every split;
+- fixed seed inherited from each reconstructed stratified repeat;
+- Gini split criterion;
+- two variants: unweighted split impurity and inverse-frequency class-balanced split impurity;
+- raw empirical leaf frequencies for scoring in both arms (therefore scores are not asserted to be calibrated).
+
+Class balancing modifies split selection only. The leaf score retains unweighted empirical positive frequency from bootstrap samples. Brier/ECE are evaluated rather than assumed to be valid posterior probabilities.
+
+Each fitted model binds training IDs, resolved mtry, parameters, bootstrap trees and their split structure into a model SHA-256. Each score report binds sorted sample IDs, source labels and scores into a score-vector SHA-256. Fit and inference milliseconds are recorded outside the model digest. The existing independent binary metric scorer computes AP, AUROC, threshold metrics, Brier, ECE, FPR at target recall and risk/coverage.
+
+Run on the digest-verified pinned source:
+
+\`\`\`sh
+cargo run --release -p symthaea-semiconductor --bin semi-secom-random-forest -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  stratified-80-20-repeats.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+The CLI reruns train-only preprocessing per repeat from #13238, then fits/evaluates both RF variants on Feature Set A. Feature Set B remains a separate Luminous missingness-indicator ablation. No hyperparameter or threshold is selected on test data.
+
+**Claim limit:** this is a native Rust Random Forest comparator, not an XGBoost substitute. It evaluates stratified interpolation on the historic SECOM mirror, not chronological or fab transfer. Leaf-frequency scores are not calibrated defect probabilities. The five seeds and preprocessing defaults are Luminous reconstructions because the cited article does not disclose every setting. For benchmark interpretation, keep these scores separate from the frozen source-clock chronological results.
+
+
+### First exact-head five-repeat Random Forest result (run #45062680083)
+
+The full 200-tree real-source experiment passed exact-head CI with 88/88 Rust tests, format, strict Clippy, raw source audit, split/preprocessor verification and all ten model runs (five folds × unweighted/balanced).
+
+| Variant | AP mean ± SD | AUROC mean ± SD | Brier mean ± SD | ECE mean ± SD |
+|---|---:|---:|---:|---:|
+| RF 200 unweighted | 0.1459 ± 0.0386 | 0.7004 ± 0.0865 | 0.06119 ± 0.00261 | 0.02066 ± 0.01657 |
+| RF 200 balanced splits | 0.1967 ± 0.0807 | 0.7030 ± 0.0939 | 0.05981 ± 0.00237 | 0.01384 ± 0.00719 |
+
+For every fold, the training prevalence was 83/1,253 = 0.06624 and outer-test prevalence was 21/314 = 0.06688. A constant predictor using the train-fold prevalence has Brier 0.06241 on this test support. Both RF arms are modestly better on average; the balanced arm's mean Brier improvement is approximately 0.00259. This is a descriptive difference only; paired confidence intervals and repeated-fab evidence are not yet available.
+
+The balanced model's AP spans 0.1179–0.3021 across the five repeats (sample SD 0.0807). The AP result is therefore substantially more variable than the unweighted arm (0.0816–0.1803). At the fixed diagnostic threshold 0.5, both arms have TP=0 / FN=21 in every repeat. This demonstrates that ranking/probability diagnostics and operational threshold utility are different questions.
+
+The paper-reported 2026 Dong et al. SECOM RF AP is 0.431 ± 0.041; the local reconstruction remains materially below that published number. The original paper split seeds and complete preprocessing defaults are not disclosed, so these are not matched partitions and no SOTA claim is made. Park & Baek's distinct 2026 RF result is also a different split/imputation protocol. Preserve these as external comparators, not directly reproducible equivalence claims.
+
+Artifact #14769912968 (SHA-256 \`6c0590e4725f1507e5aece893e46196ea31241dce9bf81ccb6d9525509b14f8d\`) contains the archived run reports, including fold-level prediction scores and model digests.
