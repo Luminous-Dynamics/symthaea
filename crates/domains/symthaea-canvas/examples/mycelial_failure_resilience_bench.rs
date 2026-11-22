@@ -282,6 +282,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     run_attack_family(
         &graph,
         &demands,
+        MycelialFailureAttackStrategy::LowestDegreeJunctions,
+        0,
+        None,
+    )?;
+    run_attack_family(
+        &graph,
+        &demands,
         MycelialFailureAttackStrategy::DemandPathLoadSegments,
         0,
         None,
