@@ -278,6 +278,10 @@ impl MemoryPortfolioOptionV1 {
         &self.option_sha256
     }
 
+    pub fn authority_scope_sha256(&self) -> &str {
+        &self.authority_scope_sha256
+    }
+
     fn canonical_digest(&self) -> String {
         digest_fields(
             b"mace:memory-portfolio-option:v1\0",

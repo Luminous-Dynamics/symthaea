@@ -65,6 +65,7 @@ pub struct PortfolioInteractionProposalV1 {
     pub scope: Scope,
     pub as_known: AsKnownQuery,
     pub budget: MemoryPortfolioBudgetV1,
+    pub authority_scope_sha256: String,
     pub target_model_sha256: String,
     pub baseline_policy_sha256: String,
     pub task_protocol_sha256: String,
@@ -90,6 +91,7 @@ impl PortfolioInteractionProposalV1 {
             self.budget.latency_work_ms.to_string(),
             self.budget.estimated_cost_micros.to_string(),
             self.budget.expected_failure_loss_micros.to_string(),
+            self.authority_scope_sha256.clone(),
             self.target_model_sha256.clone(),
             self.baseline_policy_sha256.clone(),
             self.task_protocol_sha256.clone(),
@@ -126,6 +128,7 @@ pub struct PortfolioInteractionCalibrationReceiptV1 {
     pub heldout_evaluation_sha256: String,
     pub task_family_split_sha256: String,
     pub source_root_split_sha256: String,
+    pub authority_scope_sha256: String,
     pub training_pair_count: u32,
     pub calibration_pair_count: u32,
     pub heldout_pair_count: u32,
@@ -162,6 +165,7 @@ impl PortfolioInteractionCalibrationReceiptV1 {
                 self.heldout_evaluation_sha256.clone(),
                 self.task_family_split_sha256.clone(),
                 self.source_root_split_sha256.clone(),
+                self.authority_scope_sha256.clone(),
                 self.training_pair_count.to_string(),
                 self.calibration_pair_count.to_string(),
                 self.heldout_pair_count.to_string(),
@@ -199,6 +203,7 @@ pub struct PortfolioInteractionContextV1 {
     pub scope: Scope,
     pub as_known: AsKnownQuery,
     pub budget: MemoryPortfolioBudgetV1,
+    pub authority_scope_sha256: String,
     pub target_model_sha256: String,
     pub baseline_policy_sha256: String,
     pub task_protocol_sha256: String,
@@ -208,6 +213,7 @@ pub struct PortfolioInteractionContextV1 {
 pub struct VerifiedPortfolioInteractionSetV1 {
     proposal: PortfolioInteractionProposalV1,
     calibration: PortfolioInteractionCalibrationReceiptV1,
+    verified_options: Vec<MemoryPortfolioOptionV1>,
 }
 
 impl VerifiedPortfolioInteractionSetV1 {
@@ -246,7 +252,13 @@ fn validate_interaction_proposal(
     options: &[MemoryPortfolioOptionV1],
     context: &PortfolioInteractionContextV1,
 ) -> Result<(), PortfolioInteractionReject> {
-    prepare_options(options, context.budget).map_err(PortfolioInteractionReject::Portfolio)?;
+    let prepared =
+        prepare_options(options, context.budget).map_err(PortfolioInteractionReject::Portfolio)?;
+    if prepared.authority_scope_sha256 != context.authority_scope_sha256
+        || !is_lower_sha256(&context.authority_scope_sha256)
+    {
+        return Err(PortfolioInteractionReject::ContextMismatch);
+    }
     if options.len() > MAX_INTERACTION_OPTIONS {
         return Err(PortfolioInteractionReject::TooManyPairs);
     }
@@ -256,6 +268,7 @@ fn validate_interaction_proposal(
     if proposal.scope != context.scope
         || proposal.as_known != context.as_known
         || proposal.budget != context.budget
+        || proposal.authority_scope_sha256 != context.authority_scope_sha256
         || proposal.target_model_sha256 != context.target_model_sha256
         || proposal.baseline_policy_sha256 != context.baseline_policy_sha256
         || proposal.task_protocol_sha256 != context.task_protocol_sha256
@@ -267,6 +280,7 @@ fn validate_interaction_proposal(
         &proposal.target_model_sha256,
         &proposal.baseline_policy_sha256,
         &proposal.task_protocol_sha256,
+        &proposal.authority_scope_sha256,
         &proposal.interaction_model_sha256,
         &proposal.option_set_sha256,
         &proposal.training_dataset_sha256,
@@ -369,6 +383,7 @@ pub fn verify_portfolio_interactions(
         || calibration.heldout_evaluation_sha256 != proposal.heldout_evaluation_sha256
         || calibration.task_family_split_sha256 != proposal.task_family_split_sha256
         || calibration.source_root_split_sha256 != proposal.source_root_split_sha256
+        || calibration.authority_scope_sha256 != proposal.authority_scope_sha256
     {
         return Err(PortfolioInteractionReject::CalibrationMismatch);
     }
@@ -419,6 +434,7 @@ pub fn verify_portfolio_interactions(
     Ok(VerifiedPortfolioInteractionSetV1 {
         proposal,
         calibration,
+        verified_options: options.to_vec(),
     })
 }
 
@@ -562,9 +578,38 @@ impl InteractionAwarePortfolioPlanV1 {
         if !self.is_canonical()
             || self.proposal_sha256 != verified.proposal.proposal_sha256
             || self.calibration_receipt_sha256 != verified.calibration.receipt_sha256
+            || self.selection.scope != verified.proposal.scope
+            || self.selection.as_known != verified.proposal.as_known
+            || self.selection.budget != verified.proposal.budget
+            || self.selection.authority_scope_sha256
+                != verified.proposal.authority_scope_sha256
         {
             return false;
         }
+
+        let option_by_digest: BTreeMap<_, _> = verified
+            .verified_options
+            .iter()
+            .map(|option| (option.option_sha256.as_str(), option))
+            .collect();
+        for selected in &self.selection.selected {
+            let Some(option) = option_by_digest.get(selected.option_sha256.as_str()) else {
+                return false;
+            };
+            if option.event_id != selected.event_id
+                || option.disposition != selected.disposition
+                || option.plan_sha256 != selected.representation_plan_sha256
+                || option.net_value_micros != selected.net_value_micros
+                || option.context_tokens != selected.context_tokens
+                || option.reobservation_calls != selected.reobservation_calls
+                || option.latency_work_ms != selected.latency_work_ms
+                || option.estimated_cost_micros != selected.estimated_cost_micros
+                || option.expected_failure_loss_micros != selected.expected_failure_loss_micros
+            {
+                return false;
+            }
+        }
+
         let estimates: BTreeMap<_, _> = verified
             .proposal
             .pairs
@@ -877,6 +922,7 @@ pub fn optimize_memory_portfolio_pairwise_with_limit(
     if option_set_digest(options) != verified.proposal.option_set_sha256
         || prepared.scope != verified.proposal.scope
         || prepared.as_known != verified.proposal.as_known
+        || prepared.authority_scope_sha256 != verified.proposal.authority_scope_sha256
         || budget != verified.proposal.budget
     {
         return Err(PortfolioInteractionReject::ContextMismatch);
@@ -1008,6 +1054,7 @@ mod tests {
                 known_at_ms: 300,
             },
             budget: budget(),
+            authority_scope_sha256: digest("authority"),
             target_model_sha256: digest("target-model"),
             baseline_policy_sha256: digest("no-memory-policy"),
             task_protocol_sha256: digest("task-protocol"),
@@ -1045,6 +1092,7 @@ mod tests {
             scope: ctx.scope,
             as_known: ctx.as_known,
             budget: ctx.budget,
+            authority_scope_sha256: ctx.authority_scope_sha256.clone(),
             target_model_sha256: ctx.target_model_sha256.clone(),
             baseline_policy_sha256: ctx.baseline_policy_sha256.clone(),
             task_protocol_sha256: ctx.task_protocol_sha256.clone(),
@@ -1076,6 +1124,7 @@ mod tests {
             heldout_evaluation_sha256: proposal.heldout_evaluation_sha256.clone(),
             task_family_split_sha256: proposal.task_family_split_sha256.clone(),
             source_root_split_sha256: proposal.source_root_split_sha256.clone(),
+            authority_scope_sha256: proposal.authority_scope_sha256.clone(),
             training_pair_count: 256,
             calibration_pair_count: 128,
             heldout_pair_count: 128,
@@ -1281,6 +1330,40 @@ mod tests {
 
         assert!(plan.is_canonical());
         assert!(!plan.is_admissible_with(&verified));
+    }
+
+    #[test]
+    fn rehashed_plan_cannot_change_scope_authority_or_selected_option_contents() {
+        let options = vec![option(1, 50), option(2, 40), option(3, 30)];
+        let verified = verify(&options, 20, 2);
+        let plan = optimize_memory_portfolio_pairwise(&options, budget(), &verified).unwrap();
+        assert!(plan.is_admissible_with(&verified));
+
+        let mut wrong_scope = plan.clone();
+        wrong_scope.selection.scope.regime = Regime::Shifted;
+        wrong_scope.selection.plan_sha256 = wrong_scope.selection.canonical_digest();
+        wrong_scope.plan_sha256 = wrong_scope.canonical_digest();
+        assert!(wrong_scope.is_canonical());
+        assert!(!wrong_scope.is_admissible_with(&verified));
+
+        let mut wrong_authority = plan.clone();
+        wrong_authority.selection.authority_scope_sha256 = digest("other-authority");
+        wrong_authority.selection.plan_sha256 =
+            wrong_authority.selection.canonical_digest();
+        wrong_authority.plan_sha256 = wrong_authority.canonical_digest();
+        assert!(wrong_authority.is_canonical());
+        assert!(!wrong_authority.is_admissible_with(&verified));
+
+        let mut changed_option = plan;
+        changed_option.selection.selected[0].net_value_micros += 1;
+        changed_option.selection.total_net_value_micros += 1;
+        changed_option.additive_value_micros += 1;
+        changed_option.total_conservative_value_micros += 1;
+        changed_option.selection.plan_sha256 =
+            changed_option.selection.canonical_digest();
+        changed_option.plan_sha256 = changed_option.canonical_digest();
+        assert!(changed_option.is_canonical());
+        assert!(!changed_option.is_admissible_with(&verified));
     }
 
     #[test]

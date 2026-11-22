@@ -650,6 +650,7 @@ fn fixture_interaction_calibration_receipt(
         heldout_evaluation_sha256: proposal.heldout_evaluation_sha256.clone(),
         task_family_split_sha256: proposal.task_family_split_sha256.clone(),
         source_root_split_sha256: proposal.source_root_split_sha256.clone(),
+        authority_scope_sha256: proposal.authority_scope_sha256.clone(),
         training_pair_count: 512,
         calibration_pair_count: 128,
         heldout_pair_count: 128,
@@ -1101,6 +1102,7 @@ fn interaction_aware_portfolio_beats_additive_selection_on_hidden_joint_utility(
         target_model_sha256: target_model.clone(),
         baseline_policy_sha256: hex_digest(840_002),
         task_protocol_sha256: hex_digest(840_003),
+        authority_scope_sha256: options[0].authority_scope_sha256().to_owned(),
     };
     let mut proposal = PortfolioInteractionProposalV1 {
         scope: context.scope,
