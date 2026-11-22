@@ -44,6 +44,12 @@ The edge evidence enum contains:
 
 There is no candidate-fusion edge type. Contact proposals from the tolerance filtration cannot enter this recurrence module without first crossing a separate acceptance/evidence boundary.
 
+### Annotated-reconstruction adapter
+
+`temporal_snapshot_from_annotated_skeleton` converts one `AnnotatedMycelialSkeleton` into a temporal snapshot. It retains the frame/source-observation digest, junction IDs and annotated segment IDs. Every segment must have exactly one explicit evidence record supplied by the caller. The adapter does **not** infer that a model-produced segment is directly observed, and does not invent a graph edge because a junction is labelled `ProjectedCrossing`. The caller must name whether each segment is directly observed, an accepted parent branch, or an accepted anastomosis. Candidate contacts cannot be supplied because the temporal evidence enum has no candidate value.
+
+This is the intended bridge from the reconstruction scorecard to recurrence analysis: same annotated source identity, stable junction/segment IDs, explicit evidence classification, and a caller-supplied fixed ROI scope.
+
 Edge IDs must retain the same undirected endpoints and evidence kind across all windows. A changing edge identity is a new edge, not silently the same biological structure. Node identity and edge identity therefore require a separately qualified tracking/annotation pipeline.
 
 The coordinate frame and calibration digest must remain identical across the sequence. Each window retains its own source image/observation digest.
