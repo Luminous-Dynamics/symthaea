@@ -428,6 +428,28 @@ jobs:
                   assert abs(realized - target) <= 1e-12
                   combined = max(0.0, clean + nuisance + 2.0 * covariance)
                   assert abs(point["combined_observed_variance"] - combined) <= 1e-10
+                  estimator_ids = [
+                      "absolute_weighted_jaccard",
+                      "signed_shift_weighted_jaccard",
+                      "normalized_mean_absolute_edge_error",
+                  ]
+                  assert [item["estimator_id"] for item in point["estimators"]] == estimator_ids
+                  for item in point["estimators"]:
+                      for key in [
+                          "clean_to_signal_similarity",
+                          "clean_to_nuisance_similarity",
+                          "signal_to_combined_similarity",
+                          "clean_to_combined_similarity",
+                      ]:
+                          assert 0.0 <= item[key] <= 1.0
+                      assert item["nuisance_to_signal_distance_ratio"] is None or item["nuisance_to_signal_distance_ratio"] >= 0.0
+                  direction = point["connectivity_direction"]
+                  assert direction["clean_signal_change_norm"] >= 0.0
+                  assert direction["combined_signal_change_norm"] >= 0.0
+                  if signal_scale == 0.0:
+                      assert all(item["signal_retention_fraction"] is None for item in point["estimators"])
+                      assert direction["signal_projection_gain"] is None
+                      assert direction["signal_directional_cosine"] is None
               assert all(
                   row[index]["nuisance_component_variance"] < row[index + 1]["nuisance_component_variance"]
                   for index in range(3)
