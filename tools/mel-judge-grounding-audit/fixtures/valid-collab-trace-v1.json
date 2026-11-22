@@ -1,0 +1,96 @@
+{
+  "schema_version": "mel-collab-interaction-trace-v1",
+  "session_id": "synthetic-live-session-001",
+  "case_id": "call-response-then-rest-001",
+  "track": "midi",
+  "clock_domain_id": "synthetic-monotonic-clock-001",
+  "hardware_profile_id": "synthetic-test-fixture-no-hardware",
+  "events": [
+    {
+      "event_id": "input-1",
+      "sequence": 1,
+      "monotonic_ns": 100,
+      "kind": "input_chunk",
+      "input_chunk": {
+        "input_sequence": 1,
+        "context_start_ns": 0,
+        "context_end_ns": 90,
+        "available_at_ns": 100,
+        "media_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "event_id": "decision-1",
+      "sequence": 2,
+      "monotonic_ns": 110,
+      "kind": "decision",
+      "decision": {
+        "input_sequence": 1,
+        "state": "respond",
+        "reason_code": "musician_phrase_detected",
+        "confidence": 0.91,
+        "deadline_ns": 170
+      }
+    },
+    {
+      "event_id": "output-1",
+      "sequence": 3,
+      "monotonic_ns": 150,
+      "kind": "output",
+      "output": {
+        "decision_event_id": "decision-1",
+        "input_sequence": 1,
+        "output_sequence": 1,
+        "output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "first_emitted_ns": 140,
+        "first_audible_onset_ns": null
+      }
+    },
+    {
+      "event_id": "input-2",
+      "sequence": 4,
+      "monotonic_ns": 200,
+      "kind": "input_chunk",
+      "input_chunk": {
+        "input_sequence": 2,
+        "context_start_ns": 150,
+        "context_end_ns": 190,
+        "available_at_ns": 200,
+        "media_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "event_id": "decision-rest",
+      "sequence": 5,
+      "monotonic_ns": 210,
+      "kind": "decision",
+      "decision": {
+        "input_sequence": 2,
+        "state": "wait",
+        "reason_code": "instructed_rest",
+        "confidence": 0.99,
+        "deadline_ns": null
+      }
+    }
+  ],
+  "rest_windows": [
+    {
+      "window_id": "rest-1",
+      "start_ns": 200,
+      "end_ns": 300
+    }
+  ],
+  "loopback_measurement": null,
+  "claim_ceiling": [
+    "synthetic fixture only; timestamps and digests are invented conformance values",
+    "no audio or MIDI hardware was measured",
+    "emission latency is arithmetic over supplied event times, not a wall-clock performance result",
+    "audible latency requires an independent loopback capture receipt in the same monotonic clock domain",
+    "receipt digests are structurally checked but not cryptographically authenticated"
+  ],
+  "musician_pseudonym": "listener-pseudonym-01",
+  "instrument_id": "keyboard",
+  "agent_role": "responsive-accompanist",
+  "task_family": "call_response",
+  "evaluation_consent_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+}

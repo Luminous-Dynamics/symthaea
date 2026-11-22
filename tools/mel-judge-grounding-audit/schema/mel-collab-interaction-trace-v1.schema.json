@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-collab-interaction-trace-v1.schema.json",
+  "title": "MEL Collaborative Interaction Trace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "case_id",
+    "musician_pseudonym",
+    "instrument_id",
+    "agent_role",
+    "task_family",
+    "evaluation_consent_receipt_sha256",
+    "track",
+    "clock_domain_id",
+    "hardware_profile_id",
+    "events",
+    "rest_windows",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-collab-interaction-trace-v1"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "track": {
+      "enum": [
+        "midi",
+        "rendered_audio"
+      ]
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hardware_profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/inputEvent"
+          },
+          {
+            "$ref": "#/$defs/decisionEvent"
+          },
+          {
+            "$ref": "#/$defs/outputEvent"
+          }
+        ]
+      }
+    },
+    "rest_windows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/restWindow"
+      }
+    },
+    "loopback_measurement": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/loopback"
+        }
+      ]
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "musician_pseudonym": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_family": {
+      "enum": [
+        "call_response",
+        "adaptive_accompaniment",
+        "phrase_continuation",
+        "structural_transition",
+        "silence_restraint",
+        "recovery"
+      ]
+    },
+    "evaluation_consent_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "eventBase": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "sequence",
+        "monotonic_ns",
+        "kind"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "inputChunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_sequence",
+        "context_start_ns",
+        "context_end_ns",
+        "available_at_ns",
+        "media_sha256"
+      ],
+      "properties": {
+        "input_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "context_start_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_end_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "media_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_sequence",
+        "state",
+        "reason_code",
+        "confidence",
+        "deadline_ns"
+      ],
+      "properties": {
+        "input_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "enum": [
+            "wait",
+            "respond",
+            "continue",
+            "yield"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "deadline_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_event_id",
+        "input_sequence",
+        "output_sequence",
+        "output_sha256",
+        "first_emitted_ns",
+        "first_audible_onset_ns"
+      ],
+      "properties": {
+        "decision_event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "output_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "first_emitted_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "first_audible_onset_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "inputEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "sequence",
+        "monotonic_ns",
+        "kind",
+        "input_chunk"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "const": "input_chunk"
+        },
+        "input_chunk": {
+          "$ref": "#/$defs/inputChunk"
+        }
+      }
+    },
+    "decisionEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "sequence",
+        "monotonic_ns",
+        "kind",
+        "decision"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "const": "decision"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        }
+      }
+    },
+    "outputEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "sequence",
+        "monotonic_ns",
+        "kind",
+        "output"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "const": "output"
+        },
+        "output": {
+          "$ref": "#/$defs/output"
+        }
+      }
+    },
+    "restWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "window_id",
+        "start_ns",
+        "end_ns"
+      ],
+      "properties": {
+        "window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_ns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "loopback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_id",
+        "clock_domain_id",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

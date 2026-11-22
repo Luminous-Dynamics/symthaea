@@ -4,7 +4,7 @@ A standalone Rust reference evaluator for causal and metamorphic probes of music
 
 ## Run
 
-    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml -- \
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-judge-grounding-audit -- \
       audit tools/mel-judge-grounding-audit/fixtures/valid-probe-panel-v1.json \
       report.json
 
@@ -44,3 +44,13 @@ Run it with:
       tools/mel-judge-grounding-audit/fixtures/variant-audio.bin report.json
 
 The CLI requires `sha256sum` on PATH. Its committed byte fixtures are not playable audio and its panel receipt is synthetic. It does not authenticate receipts or verify decoded audio metadata; see the separate transform-qualification research note.
+
+
+## Live collaboration trace audit
+
+The collaboration trace auditor validates causal input availability, event/decision/output order, WAIT/RESPOND/CONTINUE/YIELD semantics, protected rest windows, missed deadlines, response completeness, and optional independent audio loopback timestamps. It reports emission latency separately from audible latency; a generation request is never treated as proof that sound was heard.
+
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-collab-trace-audit -- audit \
+      tools/mel-judge-grounding-audit/fixtures/valid-collab-trace-v1.json report.json
+
+The fixture is synthetic and MIDI-style. It proves only deterministic evaluator behavior, not actual real-time performance. See docs/research/MEL_COLLAB_TRACE_AUDITOR_V1_2026-11-22.md for the contract and claim boundaries.

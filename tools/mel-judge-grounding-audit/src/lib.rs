@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
+pub mod collab_trace;
 pub mod transform_qualification;
 
 const SCHEMA_VERSION: &str = "mel-judge-grounding-probe-panel-v1";
