@@ -213,11 +213,7 @@ fn median(values: &mut [f64]) -> f64 {
     }
 }
 
-fn impute_value(
-    value: Option<f64>,
-    policy: SecomImputationPolicyV1,
-    median: f64,
-) -> f64 {
+fn impute_value(value: Option<f64>, policy: SecomImputationPolicyV1, median: f64) -> f64 {
     match (policy, value) {
         (_, Some(observed)) => observed,
         (SecomImputationPolicyV1::TrainingMedian, None) => median,
@@ -375,15 +371,14 @@ fn fit_model_v1(
     }
     for feature_index in 0..feature_count {
         for class_index in 0..2 {
-            let variance = class_variances[feature_index][class_index]
-                / class_counts[class_index] as f64;
+            let variance =
+                class_variances[feature_index][class_index] / class_counts[class_index] as f64;
             if !variance.is_finite() {
                 return Err(SecomTabularBaselineError(format!(
                     "feature {feature_index}: non-finite class variance"
                 )));
             }
-            class_variances[feature_index][class_index] =
-                variance.max(GAUSSIAN_VARIANCE_FLOOR);
+            class_variances[feature_index][class_index] = variance.max(GAUSSIAN_VARIANCE_FLOOR);
         }
     }
 
@@ -392,8 +387,7 @@ fn fit_model_v1(
         for feature_index in 0..feature_count {
             for class_index in 0..2 {
                 missing_probability_by_class[feature_index][class_index] =
-                    (missing_counts[feature_index][class_index] as f64
-                        + BERNOULLI_SMOOTHING_ALPHA)
+                    (missing_counts[feature_index][class_index] as f64 + BERNOULLI_SMOOTHING_ALPHA)
                         / (class_counts[class_index] as f64 + 2.0 * BERNOULLI_SMOOTHING_ALPHA);
             }
         }
@@ -513,16 +507,11 @@ fn evaluate_baseline(
         }
         let scores = indices
             .iter()
-            .map(|&index| model.predict_probability(&features[index], &assignments[index].sample_id))
+            .map(|&index| {
+                model.predict_probability(&features[index], &assignments[index].sample_id)
+            })
             .collect::<Result<Vec<_>, _>>()?;
-        let report = held_out_subject(
-            baseline_id,
-            split,
-            &indices,
-            assignments,
-            labels,
-            &scores,
-        )?;
+        let report = held_out_subject(baseline_id, split, &indices, assignments, labels, &scores)?;
         held_out.insert(split.into(), report);
     }
 
@@ -563,8 +552,7 @@ pub fn evaluate_secom_tabular_baselines_v1(
         )));
     }
     if split_manifest.split_scheme == "forward_time"
-        && split_manifest.clock_domain_id.as_deref()
-            != Some(expectations.clock_domain_id.as_str())
+        && split_manifest.clock_domain_id.as_deref() != Some(expectations.clock_domain_id.as_str())
     {
         return Err(SecomTabularBaselineError(
             "forward-time split clock_domain_id does not match raw expectations".into(),
@@ -691,19 +679,13 @@ mod tests {
             serde_json::from_str(EXPECTATIONS).expect("expectations fixture parses");
         expectations.expected_feature_sha256 = format!("{:x}", Sha256::digest(feature_bytes));
         expectations.expected_label_sha256 = format!("{:x}", Sha256::digest(label_bytes));
-        let mut split: SplitManifestV1 =
-            serde_json::from_str(SPLIT).expect("split fixture parses");
+        let mut split: SplitManifestV1 = serde_json::from_str(SPLIT).expect("split fixture parses");
         let parsed_labels = parse_labels(label_bytes).expect("fixture labels parse");
         for (assignment, label) in split.assignments.iter_mut().zip(&parsed_labels) {
             assignment.positive = label.label == 1;
         }
-        evaluate_secom_tabular_baselines_v1(
-            feature_bytes,
-            label_bytes,
-            &expectations,
-            &split,
-        )
-        .expect("synthetic fixture evaluates")
+        evaluate_secom_tabular_baselines_v1(feature_bytes, label_bytes, &expectations, &split)
+            .expect("synthetic fixture evaluates")
     }
 
     #[test]
@@ -783,7 +765,8 @@ mod tests {
 
     #[test]
     fn all_missing_training_feature_uses_explicit_zero_fallback() {
-        let all_missing = b"1.0 NaN\n1.1 NaN\nNaN NaN\nNaN NaN\n1.2 NaN\nNaN NaN\n1.3 NaN\nNaN NaN\n";
+        let all_missing =
+            b"1.0 NaN\n1.1 NaN\nNaN NaN\nNaN NaN\n1.2 NaN\nNaN NaN\n1.3 NaN\nNaN NaN\n";
         let report = evaluate(all_missing, LABELS);
         for baseline in ["B2", "B3", "B4"] {
             assert_eq!(
