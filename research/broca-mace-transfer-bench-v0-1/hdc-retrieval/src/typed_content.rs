@@ -1018,7 +1018,7 @@ mod tests {
             base_digest,
             profile_digest(TypedContentConfigV1 { utility_bandwidth: 0.2, ..base })
         );
-        assert!(PROFILE_DOMAIN.ends_with(b"v1.1\\0"));
+        assert!(PROFILE_DOMAIN.ends_with(b"v1.1\0"));
         assert!(!PARTITION_POLICY.is_empty());
     }
 
