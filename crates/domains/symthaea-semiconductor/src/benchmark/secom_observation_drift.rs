@@ -11,7 +11,6 @@ use crate::benchmark::secom_raw::{
 };
 use crate::benchmark::split_manifest::{SplitManifestV1, validate_split_manifest_v1};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
@@ -344,6 +343,7 @@ pub fn evaluate_secom_observation_drift_v1(
 mod tests {
     use super::*;
     use crate::benchmark::split_manifest::SplitManifestV1;
+    use sha2::{Digest, Sha256};
 
     const FEATURES: &[u8] = include_bytes!(
         "../../../../../benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data"
