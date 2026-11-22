@@ -27,6 +27,7 @@ pub struct StratifiedSplitSubjectV1 {
     pub schema: String,
     pub dataset_id: String,
     pub dataset_snapshot_sha256: String,
+    pub source_identity_manifest_sha256: String,
     pub test_fraction: f64,
     pub seeds: Vec<u64>,
     pub seed_provenance: String,
@@ -52,6 +53,7 @@ pub struct StratifiedRepeatManifestV1 {
     pub schema: String,
     pub dataset_id: String,
     pub dataset_snapshot_sha256: String,
+    pub source_identity_manifest_sha256: String,
     pub split_scheme: String,
     pub repeat_index: usize,
     pub seed: u64,
@@ -87,6 +89,7 @@ pub struct StratifiedRepeatReportV1 {
     pub schema: String,
     pub dataset_id: String,
     pub dataset_snapshot_sha256: String,
+    pub source_identity_manifest_sha256: String,
     pub prng: String,
     pub test_fraction: f64,
     pub repeat_count: usize,
@@ -163,6 +166,11 @@ fn validate_subject(subject: &StratifiedSplitSubjectV1) -> Result<(), Stratified
     if !valid_sha256(&subject.dataset_snapshot_sha256) {
         return Err(StratifiedSplitError(
             "dataset_snapshot_sha256: expected lowercase SHA-256 hex".into(),
+        ));
+    }
+    if !valid_sha256(&subject.source_identity_manifest_sha256) {
+        return Err(StratifiedSplitError(
+            "source_identity_manifest_sha256: expected lowercase SHA-256 hex".into(),
         ));
     }
     if !subject.test_fraction.is_finite()
@@ -301,6 +309,7 @@ fn build_repeat(
         schema: MANIFEST_SCHEMA_V1.into(),
         dataset_id: subject.dataset_id.clone(),
         dataset_snapshot_sha256: subject.dataset_snapshot_sha256.clone(),
+        source_identity_manifest_sha256: subject.source_identity_manifest_sha256.clone(),
         split_scheme: "stratified_sample_80_20".into(),
         repeat_index,
         seed,
@@ -361,6 +370,7 @@ pub fn generate_repeated_stratified_splits_v1(
         schema: REPORT_SCHEMA_V1.into(),
         dataset_id: subject.dataset_id.clone(),
         dataset_snapshot_sha256: subject.dataset_snapshot_sha256.clone(),
+        source_identity_manifest_sha256: subject.source_identity_manifest_sha256.clone(),
         prng: PRNG_ID_V1.into(),
         test_fraction: subject.test_fraction,
         repeat_count: repeats.len(),
@@ -391,6 +401,7 @@ mod tests {
             schema: INPUT_SCHEMA_V1.into(),
             dataset_id: "SECOM-test".into(),
             dataset_snapshot_sha256: SHA.into(),
+            source_identity_manifest_sha256: SHA.into(),
             test_fraction: 0.2,
             seeds: vec![42, 43, 44, 45, 46],
             seed_provenance: "Luminous reconstruction; not authors' original seeds".into(),
