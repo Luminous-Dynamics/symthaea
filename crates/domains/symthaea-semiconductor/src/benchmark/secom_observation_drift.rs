@@ -385,7 +385,11 @@ mod tests {
     }
 
     fn evaluate(feature_bytes: &[u8], label_bytes: &[u8]) -> SecomObservationDriftReportV1 {
-        let (expectations, split) = subject(feature_bytes, label_bytes);
+        let (expectations, mut split) = subject(feature_bytes, label_bytes);
+        let parsed_labels = parse_labels(label_bytes).expect("synthetic labels parse");
+        for (assignment, label) in split.assignments.iter_mut().zip(&parsed_labels) {
+            assignment.positive = label.label == 1;
+        }
         evaluate_secom_observation_drift_v1(
             feature_bytes,
             label_bytes,
