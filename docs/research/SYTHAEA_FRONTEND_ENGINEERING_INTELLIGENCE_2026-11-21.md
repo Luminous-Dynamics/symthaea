@@ -282,6 +282,38 @@ deterministic (1, 2, 4, 8, 16, then 30 seconds), making it testable. The current
 gateway URL is picked up on the next retry; an already-live connection is not
 forcibly replaced.
 
+### Leptos 0.8 knowledge and provenance
+
+A first versioned knowledge corpus now exists at
+`benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json`. It currently
+contains eight patterns extracted from the existing Leptos application sources:
+component composition, `RwSignal`, tracked versus untracked reads, Effects,
+`spawn_local`, keyed `For` rendering, typed `NodeRef`, and the HTTP/WebSocket
+service boundary.
+
+Each pattern records its source file and exact Git blob SHA-1. The corpus has
+an accompanying JSON Schema and a standalone Rust validator mode
+(`--patterns`) which:
+- validates the corpus against the versioned schema;
+- checks pattern ID uniqueness;
+- rejects absolute, parent-traversing and non-normalized source paths;
+- recomputes Git blob IDs from exact source bytes and rejects stale examples.
+
+The corpus distinguishes `source_observed_not_compiled`,
+`source_observed_reference_checked`, `compiled`, `unit_tested`, and
+`browser_verified`. It currently contains no compiled or browser-verified
+claims. The validator has tests for the known Git blob hash vector, the complete
+checked-in corpus and unsafe paths, but the Rust toolchain is not available here
+to execute them.
+
+A specific knowledge distinction is emphasized: tracked Leptos reads subscribe
+reactive observers, while `get_untracked()` does not. The telemetry retry loop
+intentionally samples the current gateway with an untracked read on each retry;
+it does not make an already-open socket a reactive dependency. Leptos 0.8 docs
+for Effects, RwSignal, Memo and Owner were used to ground these concepts, with
+versioned docs links retained in the corpus README. This is CSR guidance; SSR
+and hydration are separate curriculum tracks.
+
 ## 5. External comparison and state of the field
 
 As rechecked on 2026-11-22:
@@ -384,8 +416,10 @@ Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferr
 | External benchmark landscape researched | **Sources reviewed**; benchmark protocols differ |
 | Programme, task/oracle schemas and source-observed contract | **Authored** in this branch |
 | First static design fixture and task definition | **Authored**; canonical digest confirmed with `sha256sum` |
-| Standalone Rust contract/task validator | **Implemented in source with tests authored**; compilation/tests not run |
-| Runnable SFEB browser evaluator and screenshot baselines | **Not implemented**; Chromium capture timed out in this container |
+| Standalone Rust contract/task/provenance validator | **Implemented in source with tests authored**; compilation/tests not run |
+| Leptos 0.8 pattern corpus | **Eight source-grounded entries with exact Git blob provenance**; compilation pending |
+| Viewport-only browser capture | **Implemented in source**; Chromium capture timed out in this container |
+| Runnable SFEB browser evaluator and screenshot baselines | **Not implemented** |
 | Browser execution on SFEB fixtures | **Not run** |
 | Symthaea frontend competence baseline | **Not measured** |
 | SOTA superiority | **Not claimed** |
