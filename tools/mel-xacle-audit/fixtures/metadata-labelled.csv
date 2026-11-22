@@ -1,0 +1,13 @@
+wave_file_name,text,average_score,model_id,model_name
+a0.wav,soft piano,0,m1,Generator One
+a1.wav,slow strings,1,m1,Generator One
+a2.wav,ambient guitar,2,m1,Generator One
+a3.wav,quiet synth,3,m1,Generator One
+a4.wav,calm cello,4,m1,Generator One
+a5.wav,solo flute,5,m1,Generator One
+b0.wav,fast jazz,6,m2,Generator Two
+b1.wav,upbeat drums,7,m2,Generator Two
+b2.wav,bright funk,8,m2,Generator Two
+b3.wav,dense metal,9,m2,Generator Two
+b4.wav,orchestral climax,10,m2,Generator Two
+b5.wav,rock guitar,9,m2,Generator Two

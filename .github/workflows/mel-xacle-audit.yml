@@ -1,0 +1,62 @@
+name: MEL XACLE audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mel-xacle-audit/**"
+      - "docs/research/MEL_XACLE_2027_UNSEEN_GENERATOR_AUDIT_V1_2026-11-22.md"
+      - ".github/workflows/mel-xacle-audit.yml"
+  push:
+    branches:
+      - research/mel-xacle-2027-audit-v1-20261122
+    paths:
+      - "tools/mel-xacle-audit/**"
+      - "docs/research/MEL_XACLE_2027_UNSEEN_GENERATOR_AUDIT_V1_2026-11-22.md"
+      - ".github/workflows/mel-xacle-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  xacle-audit:
+    name: XACLE prediction integrity and metrics
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-xacle-audit/Cargo.toml
+      - name: Resolve dependency lock
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-xacle-audit/Cargo.toml
+      - name: Run tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-xacle-audit/Cargo.toml
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-xacle-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Validate schema and fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-xacle-audit/schema/mel-xacle-audit-report-v1.schema.json > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-xacle-audit/Cargo.toml -- \
+            compare \
+            tools/mel-xacle-audit/fixtures/metadata-labelled.csv \
+            tools/mel-xacle-audit/fixtures/baseline-predictions.csv \
+            tools/mel-xacle-audit/fixtures/candidate-predictions.csv \
+            "$RUNNER_TEMP/xacle-compare.json" 100
+          jq -e '.item_count == 12 and .candidate.metrics.srcc == 1 and .candidate.metrics.mse == 0 and .candidate_minus_baseline_srcc > 0' \
+            "$RUNNER_TEMP/xacle-compare.json" > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-xacle-audit/Cargo.toml -- \
+            validate-submission \
+            tools/mel-xacle-audit/fixtures/blind-evaluation.csv \
+            tools/mel-xacle-audit/fixtures/blind-predictions.csv \
+            "$RUNNER_TEMP/xacle-submission.json"
+          jq -e '.expected_item_count == 4 and .received_item_count == 4 and .exact_id_coverage == true' \
+            "$RUNNER_TEMP/xacle-submission.json" > /dev/null
