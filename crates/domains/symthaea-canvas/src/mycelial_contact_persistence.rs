@@ -536,6 +536,11 @@ impl MycelialContactFiltration {
         }
         if self.source_filament_ids.len() != self.metrics.baseline_filament_count
             || self.source_filament_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || self.baseline_parent_edges.len() != self.metrics.baseline_parent_edge_count
+            || self.metrics.baseline_parent_edge_count > self.metrics.baseline_filament_count
+            || self.metrics.baseline_connected_components
+                != self.metrics.baseline_filament_count
+                    - self.metrics.baseline_parent_edge_count
             || self.baseline_parent_edges.windows(2).any(|pair| {
                 (pair[0].source_filament_id, pair[0].target_filament_id)
                     >= (pair[1].source_filament_id, pair[1].target_filament_id)
@@ -773,6 +778,22 @@ impl MycelialContactFiltration {
                 "not every admitted candidate has exactly one topological event",
             ));
         }
+        let expected_thresholds: BTreeSet<_> = self
+            .candidate_observations
+            .iter()
+            .filter(|candidate| candidate.admitted_within_maximum_tolerance)
+            .map(|candidate| candidate.contact_distance_microunits)
+            .collect();
+        let observed_thresholds: BTreeSet<_> = self
+            .snapshots
+            .iter()
+            .map(|snapshot| snapshot.contact_tolerance_microunits)
+            .collect();
+        if expected_thresholds != observed_thresholds {
+            return Err(MycelialContactFiltrationError::InvalidFiltration(
+                "snapshots do not cover every distinct admitted contact threshold",
+            ));
+        }
         let mut previous_tolerance = None;
         let mut previous_candidates = 0usize;
         let mut previous_components = self.metrics.baseline_connected_components;
@@ -803,9 +824,19 @@ impl MycelialContactFiltration {
                 .iter()
                 .filter(|event| event.contact_distance_microunits <= snapshot.contact_tolerance_microunits)
                 .count();
+            let expected_admitted_count = self
+                .candidate_observations
+                .iter()
+                .filter(|candidate| {
+                    candidate.admitted_within_maximum_tolerance
+                        && candidate.contact_distance_microunits
+                            <= snapshot.contact_tolerance_microunits
+                })
+                .count();
             if snapshot.connected_components
                 != self.metrics.baseline_connected_components.saturating_sub(merge_total)
                 || snapshot.cycle_rank != cycle_total
+                || snapshot.admitted_candidate_count != expected_admitted_count
                 || snapshot.admitted_candidate_count != merge_total + cycle_total
                 || snapshot.component_merges_at_threshold
                     != self
