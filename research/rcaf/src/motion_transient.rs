@@ -115,7 +115,7 @@ pub fn generate_motion_transient_field(
     let mut broad_event_train = vec![0.0; config.time_points];
     for (event_index, event) in config.broad_events.iter().enumerate() {
         validate_event(event_index, event, config.time_points)?;
-        accumulate_event_train(&mut broad_event_train, event);
+        accumulate_event_train(&mut broad_event_train, *event);
     }
 
     if broad_event_train.iter().any(|value| !value.is_finite()) {
