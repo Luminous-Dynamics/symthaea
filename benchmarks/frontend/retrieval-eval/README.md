@@ -46,10 +46,13 @@ Rust toolchain, lockfile hash, CPU details and command line.
 
 ## Reported metrics
 
-For positive queries, each method reports recall@1/3, MRR, nDCG@3 and
-precision@3. For hard negatives, it reports the distribution of top-ranked
-scores. It also records per-query ranking details and p50/p95/mean scoring
-latency.
+For positive queries, each method reports **true recall@1/3** (fraction of all
+gold relevant patterns retrieved), **hit-rate@1/3** (fraction of queries with
+at least one relevant result in the top k), MRR, nDCG@3 and precision@3. These
+metrics are intentionally separate: hit rate must not be mislabeled as recall
+when a query has multiple valid answers. For hard negatives, it reports the
+distribution of top-ranked scores. It also records per-query ranking details
+and p50/p95/mean scoring latency.
 
 No default abstention threshold is baked in. Thresholds must be calibrated on
 a separate development split and then frozen before evaluating hidden queries.
