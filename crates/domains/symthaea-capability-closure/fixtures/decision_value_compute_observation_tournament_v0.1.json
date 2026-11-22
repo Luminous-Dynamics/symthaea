@@ -1,0 +1,282 @@
+{
+  "schema": "symthaea.decision_value_compute_observation_tournament",
+  "version": "0.1.0",
+  "tracking": {
+    "compute_benchmark_pr": 13216,
+    "realtime_cognition_issue": 11561,
+    "active_sensing_issue": 9563,
+    "information_channel_and_expected_voi_issue": 12567,
+    "expected_voi_pr": 12551,
+    "robust_observation_support_pr": 13202,
+    "joint_resource_issue": 9666,
+    "joint_resource_convergence_issue": 9882,
+    "exact_factorial_interaction_pr": 13176,
+    "deterministic_decision_regret_pr": 13152,
+    "mixed_strategy_decision_regret_pr": 13165,
+    "evaluator_isolation_issue": 9437
+  },
+  "status": "protocol_and_fixture_authored_not_executed",
+  "factors": [
+    {
+      "id": "additional_compute",
+      "levels": [
+        0,
+        1
+      ],
+      "treatment": "execute_one_frozen_additional_compute_block",
+      "resource_owner": "13216"
+    },
+    {
+      "id": "additional_observation",
+      "levels": [
+        0,
+        1
+      ],
+      "treatment": "acquire_one_frozen_candidate_permitted_observation",
+      "resource_owner": "9563"
+    }
+  ],
+  "factorial_arms": [
+    {
+      "id": "baseline",
+      "compute": 0,
+      "observation": 0
+    },
+    {
+      "id": "compute_only",
+      "compute": 1,
+      "observation": 0
+    },
+    {
+      "id": "observation_only",
+      "compute": 0,
+      "observation": 1
+    },
+    {
+      "id": "joint",
+      "compute": 1,
+      "observation": 1
+    }
+  ],
+  "interaction": {
+    "regret_symbol": "R_cs(w)",
+    "compute_benefit": "B_C(w) = R_00(w) - R_10(w)",
+    "observation_benefit": "B_S(w) = R_00(w) - R_01(w)",
+    "joint_benefit": "B_CS(w) = R_00(w) - R_11(w)",
+    "interaction": "I_CS(w) = B_CS(w) - B_C(w) - B_S(w) = R_10(w) + R_01(w) - R_00(w) - R_11(w)",
+    "positive": "complementarity",
+    "zero": "no interaction on the declared regret scale",
+    "negative": "redundancy_or_antagonism",
+    "sign_convention": "negative treatment benefit is retained; harmful escalation is never clipped to zero",
+    "evaluation_time": "actual_action_application_or_consumer_time"
+  },
+  "time_contract": [
+    "observation_event_time",
+    "observation_complete_available_time",
+    "compute_start_time",
+    "compute_finish_time",
+    "action_dispatch_time",
+    "actual_action_application_time"
+  ],
+  "timing_strata": [
+    "serial_observation_then_compute",
+    "overlapped_observation_and_compute",
+    "world_continues_during_all_work",
+    "declared_cpu_gpu_contention",
+    "delayed_or_revised_observation",
+    "hard_deadline_and_actuator_reserve"
+  ],
+  "fallback_contract": {
+    "remains_active_while_additional_work_is_pending": true,
+    "fallback_freshness_and_admissibility_remain_independently_qualified": true,
+    "charge_cumulative_wrong_belief_abstention_and_missing_output_exposure": true,
+    "late_action_cannot_retroactively_remove_fallback_exposure": true
+  },
+  "candidate_visible_fields": [
+    "initial_authorized_observation_prefix",
+    "candidate_owned_state_and_memory",
+    "candidate_predicted_decision_value",
+    "candidate_predicted_observation_value",
+    "candidate_compute_budget_remaining",
+    "candidate_sensor_permissions_and_budget",
+    "candidate_deadline_and_fallback_contract",
+    "candidate_native_work_counters",
+    "candidate_measured_resource_counters"
+  ],
+  "evaluator_only_fields": [
+    "hidden_world_id",
+    "hidden_world_digest",
+    "future_trajectory",
+    "future_observation_outcomes_and_support",
+    "counterfactual_action_losses",
+    "future_checkpoint_correctness",
+    "evaluator_regret_oracle",
+    "sealed_seeds_and_treatment_outcomes"
+  ],
+  "attribution": {
+    "factorial_exposure_and_resource_axes": "reuse_13176",
+    "factorial_axes_currently_supported": [
+      "wrong_belief_exposure_benefit_us",
+      "abstention_exposure_benefit_us",
+      "missing_output_exposure_benefit_us",
+      "twelve_measured_resource_cost_coordinates"
+    ],
+    "decision_regret_interaction": "separate_paired_per_world_contrast_using_13216_and_13152",
+    "do_not_claim_13176_already_attributes_decision_regret": true,
+    "resource_dimensions_9882": [
+      "persistent_bytes",
+      "retained_byte_microseconds",
+      "read_bytes",
+      "write_bytes",
+      "compute_microseconds",
+      "refresh_operations",
+      "observations",
+      "sensor_active_microseconds",
+      "end_to_end_latency_microseconds",
+      "measured_energy_nanojoules",
+      "verification_operations",
+      "receipt_bytes"
+    ]
+  },
+  "baselines": [
+    "direct_fast_no_additional_query",
+    "fixed_compute_and_observation_quotas",
+    "compute_only_adaptive_policies",
+    "observation_only_policies",
+    "expected_posterior_value_of_information",
+    "robust_outcome_support_regret",
+    "deep_style_cheap_to_expensive_perception_escalation",
+    "joint_complete_plan_multi_resource_policy",
+    "evaluator_only_exact_four_arm_factorial_oracle"
+  ],
+  "scenario_families": [
+    "complementary_ambiguous_observation_requires_compute",
+    "redundant_observation_does_not_change_epsilon_action",
+    "irrelevant_compute_only_refines_prediction",
+    "harmful_high_fidelity_perception_escalation",
+    "late_observation_after_decision_window",
+    "on_time_observation_compute_interpretation_bottleneck",
+    "fallback_exposure_exceeds_joint_treatment_value",
+    "dynamic_world_reversal_during_treatment",
+    "overlapped_vs_serial_compute_observation",
+    "contention_thermal_battery_or_hard_budget_limit",
+    "future_information_and_nuisance_metadata_leakage",
+    "negative_compute_observation_interaction"
+  ],
+  "known_answer_cases": [
+    {
+      "id": "positive_complementarity",
+      "regret_ppm": {
+        "r00": 400000,
+        "r10": 350000,
+        "r01": 380000,
+        "r11": 100000
+      },
+      "expected": {
+        "compute_benefit_ppm": 50000,
+        "observation_benefit_ppm": 20000,
+        "joint_benefit_ppm": 300000,
+        "interaction_ppm": 230000,
+        "interaction_sign": "positive_complementarity"
+      }
+    },
+    {
+      "id": "no_interaction_additive",
+      "regret_ppm": {
+        "r00": 400000,
+        "r10": 300000,
+        "r01": 250000,
+        "r11": 150000
+      },
+      "expected": {
+        "compute_benefit_ppm": 100000,
+        "observation_benefit_ppm": 150000,
+        "joint_benefit_ppm": 250000,
+        "interaction_ppm": 0,
+        "interaction_sign": "zero"
+      }
+    },
+    {
+      "id": "negative_antagonism",
+      "regret_ppm": {
+        "r00": 400000,
+        "r10": 250000,
+        "r01": 300000,
+        "r11": 320000
+      },
+      "expected": {
+        "compute_benefit_ppm": 150000,
+        "observation_benefit_ppm": 100000,
+        "joint_benefit_ppm": 80000,
+        "interaction_ppm": -170000,
+        "interaction_sign": "negative_antagonism"
+      }
+    },
+    {
+      "id": "harmful_compute_escalation",
+      "regret_ppm": {
+        "r00": 400000,
+        "r10": 550000,
+        "r01": 350000,
+        "r11": 600000
+      },
+      "expected": {
+        "compute_benefit_ppm": -150000,
+        "observation_benefit_ppm": 50000,
+        "joint_benefit_ppm": -200000,
+        "interaction_ppm": -100000,
+        "harmful_compute_escalation_preserved": true
+      }
+    },
+    {
+      "id": "late_observation_no_decision_value",
+      "regret_ppm": {
+        "r00": 400000,
+        "r10": 250000,
+        "r01": 400000,
+        "r11": 250000
+      },
+      "observation_available_us": 121,
+      "decision_deadline_us": 120,
+      "expected": {
+        "observation_benefit_ppm": 0,
+        "joint_benefit_equals_compute_only": true,
+        "interaction_ppm": 0,
+        "late_result_does_not_enter_candidate_prefix": true
+      }
+    }
+  ],
+  "outcome_dimensions": [
+    "realized_action_regret_at_application_ppm",
+    "compute_observation_interaction_ppm",
+    "fallback_wrong_belief_exposure_us",
+    "fallback_abstention_exposure_us",
+    "fallback_missing_output_exposure_us",
+    "deadline_misses",
+    "stale_action_rejections",
+    "resource_cost_vector"
+  ],
+  "metrics_are_not_composited": true,
+  "preregistered_targets": {
+    "exact_four_arm_fixture_agreement": "100%",
+    "future_information_leaks": 0,
+    "hidden_world_or_treatment_cohort_mismatches": 0,
+    "prediction_only_improvement_miscredited_as_decision_value": 0,
+    "stale_or_expired_applications_in_synthetic_deadline_controls": 0,
+    "hard_resource_overruns": 0,
+    "held_out_positive_interaction_workloads": "at_least_one",
+    "held_out_negative_or_zero_interaction_workloads": "at_least_one",
+    "lower_resource_cost_at_noninferior_regret": "20_percent_aspirational"
+  },
+  "authored_tests": 0,
+  "executed_tests": 0,
+  "benchmark_runs": 0,
+  "hardware_energy_measurements": 0,
+  "claims": {
+    "candidate_joint_scheduler_implemented": false,
+    "benchmark_executed": false,
+    "sota_improvement": false,
+    "physical_energy_advantage": false,
+    "deployment_qualification": false
+  }
+}
