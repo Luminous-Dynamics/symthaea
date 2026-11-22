@@ -349,6 +349,86 @@ mod tests {
     }
 
     #[test]
+    fn two_pulse_free_streaming_matches_characteristic_response_oracle() {
+        let config = VlasovPoissonConfig {
+            nx: 64,
+            nv: 512,
+            domain_length: 4.0 * std::f64::consts::PI,
+            velocity_min: -8.0,
+            velocity_max: 8.0,
+            charge_to_mass: -1.0,
+            permittivity: 1.0,
+            background_density: 1.0,
+        };
+        let alpha = 1.0e-2;
+        let thermal_speed = 1.0;
+        let first_mode = 1usize;
+        let second_mode = 2usize;
+        let first_time = 1.0;
+        let second_time = 1.0;
+        let final_time = 3.5;
+        let impulse_amplitude = 2.0e-2;
+
+        let initial =
+            maxwellian_perturbation(config, alpha, first_mode, thermal_speed).unwrap();
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        solver.advance_free_streaming(first_time).unwrap();
+
+        let second_wave_number =
+            std::f64::consts::TAU * second_mode as f64 / config.domain_length;
+        let impulses: Vec<f64> = (0..config.nx)
+            .map(|ix| impulse_amplitude * (second_wave_number * config.x(ix)).sin())
+            .collect();
+        solver.apply_velocity_impulse(&impulses).unwrap();
+        solver
+            .advance_free_streaming(final_time - second_time)
+            .unwrap();
+
+        let mut maxwellian: Vec<f64> = (0..config.nv)
+            .map(|iv| {
+                let velocity = config.velocity(iv);
+                (-0.5 * (velocity / thermal_speed).powi(2)).exp()
+                    / (std::f64::consts::TAU.sqrt() * thermal_speed)
+            })
+            .collect();
+        let normalization = maxwellian.iter().sum::<f64>() * config.dv();
+        for value in &mut maxwellian {
+            *value /= normalization;
+        }
+
+        let first_wave_number =
+            std::f64::consts::TAU * first_mode as f64 / config.domain_length;
+        let post_pulse_elapsed = final_time - second_time;
+        let mut maximum_error = 0.0_f64;
+        let mut reference_scale = 0.0_f64;
+
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let x_at_pulse =
+                    config.x(ix) - config.velocity(iv) * post_pulse_elapsed;
+                let kick = impulse_amplitude * (second_wave_number * x_at_pulse).sin();
+                let pre_pulse_velocity = config.velocity(iv) - kick;
+                let initial_phase =
+                    first_wave_number * (x_at_pulse - pre_pulse_velocity * first_time);
+                let velocity_density = (-0.5 * (pre_pulse_velocity / thermal_speed).powi(2))
+                    .exp()
+                    / (std::f64::consts::TAU.sqrt() * thermal_speed * normalization);
+                let expected =
+                    velocity_density * (1.0 + alpha * initial_phase.cos());
+                let observed = solver.distribution[ix * config.nv + iv];
+                maximum_error = maximum_error.max((observed - expected).abs());
+                reference_scale = reference_scale.max(expected.abs());
+            }
+        }
+
+        let relative_error = maximum_error / reference_scale.max(f64::MIN_POSITIVE);
+        assert!(
+            relative_error < 2.0e-8,
+            "two-pulse characteristic relative error = {relative_error:e}"
+        );
+    }
+
+    #[test]
     fn finite_velocity_grid_has_predicted_nyquist_encounter_and_recurrence() {
         let config = config();
         let mut solver = initial_solver();
