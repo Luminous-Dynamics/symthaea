@@ -13,6 +13,9 @@ use broca_mace_policy::{Action, Experience, Objective, Regime, Scope};
 use sha2::{Digest, Sha256};
 use symthaea_hdc_ltc::{Activation, ContinuousHV, HdcLtcUnifiedNeuron, NeuronConfig};
 
+pub mod typed_content;
+
+
 const MIN_DIMENSION: usize = 64;
 const MAX_DIMENSION: usize = 262_144;
 
