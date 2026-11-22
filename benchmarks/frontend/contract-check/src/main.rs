@@ -627,8 +627,11 @@ fn validate_mutation_campaign(
 
     let mut mutation_ids = BTreeSet::new();
     let mut critical_mutations = 0usize;
+    let mut critical_security_mutations = 0usize;
+    let mut critical_evidence_mutations = 0usize;
     let mut security_mutations = 0usize;
     let mut evidence_mutations = 0usize;
+    let mut high_mutations = 0usize;
     for mutation in mutations {
         let id = mutation
             .get("id")
@@ -650,6 +653,15 @@ fn validate_mutation_campaign(
             .ok_or_else(|| format!("mutation {id} is missing severity"))?;
         if severity == "critical" {
             critical_mutations += 1;
+            if category == "security" {
+                critical_security_mutations += 1;
+            }
+            if category == "evidence_integrity" {
+                critical_evidence_mutations += 1;
+            }
+        }
+        if severity == "high" {
+            high_mutations += 1;
         }
         if category == "security" {
             security_mutations += 1;
@@ -700,10 +712,35 @@ fn validate_mutation_campaign(
             return Err(format!("{key} must remain a hard 100% gate"));
         }
     }
+    for (key, minimum) in [
+        ("high_severity_mutation_kill_rate_min", 0.95),
+        ("overall_mutation_kill_rate_min", 0.90),
+    ] {
+        let value = targets
+            .get(key)
+            .and_then(Value::as_f64)
+            .ok_or_else(|| format!("acceptance target {key} must be numeric"))?;
+        if value + f64::EPSILON < minimum {
+            return Err(format!("{key} must be at least {minimum:.2}"));
+        }
+    }
+    let false_reject_limit = targets
+        .get("positive_control_false_reject_rate_max")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| "positive-control false-reject target must be numeric".to_string())?;
+    if false_reject_limit.abs() > f64::EPSILON {
+        return Err("positive-control false-reject rate must remain zero".to_string());
+    }
 
-    if critical_mutations == 0 || security_mutations == 0 || evidence_mutations == 0 {
+    if critical_mutations == 0
+        || critical_security_mutations == 0
+        || critical_evidence_mutations == 0
+        || security_mutations == 0
+        || evidence_mutations == 0
+        || high_mutations == 0
+    {
         return Err(
-            "qualification campaign must include critical, security and evidence-integrity mutants"
+            "qualification campaign must include critical, high-severity, security and critical evidence-integrity mutants"
                 .to_string(),
         );
     }
@@ -1055,6 +1092,28 @@ mod tests {
         let duplicate_id = campaign["mutations"][0]["id"].clone();
         campaign["mutations"][1]["id"] = duplicate_id;
 
+        assert!(validate_mutation_campaign(&schema, &campaign).is_err());
+    }
+
+    #[test]
+    fn mutation_campaign_cannot_lower_aggregate_or_positive_control_gates() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.schema.json"
+        ))
+        .expect("checked-in mutation campaign schema is valid JSON");
+        let mut campaign: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.json"
+        ))
+        .expect("checked-in mutation campaign is valid JSON");
+
+        campaign["acceptance_targets"]["overall_mutation_kill_rate_min"] =
+            Value::from(0.89);
+        assert!(validate_mutation_campaign(&schema, &campaign).is_err());
+
+        campaign["acceptance_targets"]["overall_mutation_kill_rate_min"] =
+            Value::from(0.90);
+        campaign["acceptance_targets"]["positive_control_false_reject_rate_max"] =
+            Value::from(0.01);
         assert!(validate_mutation_campaign(&schema, &campaign).is_err());
     }
 
