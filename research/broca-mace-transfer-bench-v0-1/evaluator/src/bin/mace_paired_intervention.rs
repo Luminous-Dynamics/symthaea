@@ -17,9 +17,13 @@ use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_hdc_retrieval::{
-    experience_view_digest, CandidateIndex, CandidateHit, IndexConfig, RepresentationProfile,
+    experience_view_digest,
+    typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
+    CandidateIndex, CandidateHit, IndexConfig, RepresentationProfile,
 };
-use broca_mace_policy::{decide, is_qualified, Action, Decision, Experience, Policy, Query};
+use broca_mace_policy::{
+    decide, is_qualified, Action, Decision, DecisionNeedV1, Experience, Policy, Query,
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -39,16 +43,18 @@ enum Arm {
     ConventionalRetrieval,
     StaticHdc,
     HdcLtc,
+    TypedContentHdc,
     SemanticPlacebo,
 }
 
 impl Arm {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::NoMemory,
         Self::ExactScopeScan,
         Self::ConventionalRetrieval,
         Self::StaticHdc,
         Self::HdcLtc,
+        Self::TypedContentHdc,
         Self::SemanticPlacebo,
     ];
 
@@ -59,6 +65,7 @@ impl Arm {
             Self::ConventionalRetrieval => "conventional_retrieval",
             Self::StaticHdc => "static_hdc",
             Self::HdcLtc => "hdc_ltc",
+            Self::TypedContentHdc => "typed_content_hdc",
             Self::SemanticPlacebo => "semantic_placebo",
         }
     }
@@ -73,6 +80,7 @@ struct CandidateRun {
     index_bytes: u64,
     sidecar_bytes: u64,
     memory_digest: String,
+    retrieval_profile_digest: Option<String>,
     abstention_reason: Option<String>,
 }
 
@@ -84,6 +92,7 @@ struct CandidateTask<'a> {
     family: &'a str,
     memory: &'a [Experience],
     query: Query,
+    decision_need: DecisionNeedV1,
 }
 
 fn candidate_task(case: &stress::Case) -> CandidateTask<'_> {
@@ -92,6 +101,7 @@ fn candidate_task(case: &stress::Case) -> CandidateTask<'_> {
         family: case.family,
         memory: &case.memory,
         query: case.query,
+        decision_need: case.decision_need,
     }
 }
 
@@ -246,6 +256,39 @@ fn hdc_hits(
     Ok((hits, index.index_payload_bytes()))
 }
 
+fn typed_content_hits(
+    memory: &[Experience],
+    decision_need: DecisionNeedV1,
+) -> Result<(Vec<CandidateHit>, u64, String), String> {
+    let config = TypedContentConfigV1 {
+        dimension: HDC_DIMENSION,
+        seed: HDC_CODEBOOK_SEED,
+        ..TypedContentConfigV1::default()
+    };
+    let index = TypedContentIndexV1::build(memory, config)
+        .map_err(|error| error.to_string())?;
+    let profile_digest = index.profile_digest().to_string();
+
+    let mut hits = Vec::new();
+    if !decision_need.is_valid() {
+        return Err("candidate-visible DecisionNeed failed canonical validation".to_string());
+    }
+    for action in decision_need.action_alternatives {
+        let candidate_query = SemanticExperienceQueryV1::from_decision_need(decision_need, action)
+            .map_err(|error| error.to_string())?;
+        let result = index
+            .retrieve(candidate_query, TOP_K)
+            .map_err(|error| error.to_string())?;
+        hits.extend(result.candidates);
+    }
+    hits.sort_by(|left, right| {
+        left.rank
+            .cmp(&right.rank)
+            .then_with(|| left.event_id.cmp(&right.event_id))
+    });
+    Ok((hits, index.index_payload_bytes(), profile_digest))
+}
+
 fn execute_arm(
     arm: Arm,
     case: &CandidateTask<'_>,
@@ -256,6 +299,7 @@ fn execute_arm(
     let mut index_bytes = 0_u64;
     let mut retrieved_ids = Vec::new();
     let mut expected_view_digests = BTreeMap::new();
+    let mut retrieval_profile_digest = None;
     let mut error = None;
 
     let ids_result: Result<Vec<u32>, String> = match arm {
@@ -301,6 +345,17 @@ fn execute_arm(
             }
             ids
         }),
+        Arm::TypedContentHdc => typed_content_hits(&memory, case.decision_need)
+            .map(|(hits, bytes, profile_digest)| {
+                index_bytes = bytes;
+                retrieval_profile_digest = Some(profile_digest);
+                let mut ids = Vec::with_capacity(hits.len());
+                for hit in hits {
+                    expected_view_digests.insert(hit.event_id, hit.view_digest);
+                    ids.push(hit.event_id);
+                }
+                ids
+            }),
         Arm::SemanticPlacebo => {
             index_bytes = u64::try_from(memory.len())
                 .unwrap_or(u64::MAX)
@@ -332,7 +387,12 @@ fn execute_arm(
 
     // HDC candidate IDs are only hints. The canonical Experience view is
     // independently compared with the index-time view digest before policy use.
-    if error.is_none() && matches!(arm, Arm::StaticHdc | Arm::HdcLtc) {
+    if error.is_none()
+        && matches!(
+            arm,
+            Arm::StaticHdc | Arm::HdcLtc | Arm::TypedContentHdc
+        )
+    {
         let mut verified = Vec::with_capacity(retrieved_ids.len());
         for (id, item) in retrieved_ids.iter().zip(resolved.iter()) {
             let expected = experience_view_digest(item);
@@ -378,6 +438,7 @@ fn execute_arm(
         decision,
         retrieved_ids,
         memory_digest: experience_list_digest(&memory),
+        retrieval_profile_digest,
         resolved,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
         index_bytes,
@@ -407,18 +468,29 @@ fn action_utility(truth: stress::Truth, action: Option<Action>) -> f64 {
     truth.utility(action.unwrap_or(Action::B))
 }
 
-fn pair_block_id(cluster: u64, family: &str, query: Query) -> String {
+fn pair_block_id(
+    cluster: u64,
+    family: &str,
+    query: Query,
+    decision_need: DecisionNeedV1,
+) -> String {
     format!(
-        "cluster-{cluster}:{family}:{:?}:{:?}",
-        query.scope.regime, query.scope.objective
+        "cluster-{cluster}:{family}:{:?}:{:?}:need-{}",
+        query.scope.regime,
+        query.scope.objective,
+        decision_need.canonical_digest().to_hex()
     )
 }
 
 fn candidate_input_digest(case: &CandidateTask<'_>) -> String {
     sha256(
         format!(
-            "mace-candidate-input-v1|cluster={}|family={}|regime={:?}|objective={:?}",
-            case.cluster, case.family, case.query.scope.regime, case.query.scope.objective
+            "mace-candidate-input-v2|cluster={}|family={}|regime={:?}|objective={:?}|decision_need={}",
+            case.cluster,
+            case.family,
+            case.query.scope.regime,
+            case.query.scope.objective,
+            case.decision_need.canonical_digest().to_hex()
         )
         .as_bytes(),
     )
@@ -429,10 +501,17 @@ fn initial_state_digest(case: &CandidateTask<'_>) -> String {
 }
 
 fn candidate_policy_digest(arm: Arm) -> String {
+    let typed_profile = TypedContentConfigV1 {
+        dimension: HDC_DIMENSION,
+        seed: HDC_CODEBOOK_SEED,
+        ..TypedContentConfigV1::default()
+    }
+    .profile_digest()
+    .unwrap_or_else(|_| "invalid-typed-profile".to_string());
     sha256(
         format!(
-            "mace-candidate-policy-v1|arm={}|top_k={}|dimension={}|codebook_seed={:016x}|neuron_seed={:016x}",
-            arm.name(), TOP_K, HDC_DIMENSION, HDC_CODEBOOK_SEED, HDC_NEURON_SEED
+            "mace-candidate-policy-v1|arm={}|top_k={}|dimension={}|codebook_seed={:016x}|neuron_seed={:016x}|typed_content_profile={}",
+            arm.name(), TOP_K, HDC_DIMENSION, HDC_CODEBOOK_SEED, HDC_NEURON_SEED, typed_profile
         )
         .as_bytes(),
     )
@@ -444,16 +523,19 @@ fn candidate_record(
     arm: Arm,
     result: &CandidateRun,
 ) -> Value {
-    let block_id = pair_block_id(case.cluster, case.family, case.query);
+    let decision_need_digest = case.decision_need.canonical_digest().to_hex();
+    let block_id = pair_block_id(case.cluster, case.family, case.query, case.decision_need);
     let query_id = format!("query-{}", sha256(block_id.as_bytes())[..16].to_string());
     let decision_support_ids = result.decision.evidence_ids.clone();
     let trace_digest = json_sha256(&json!({
         "pair_block_id": block_id,
+        "decision_need_sha256": decision_need_digest,
         "arm": arm.name(),
         "decision": action_name(result.decision.action),
         "retrieved_event_ids": result.retrieved_ids,
         "decision_support_event_ids": decision_support_ids,
         "memory_snapshot_sha256": result.memory_digest,
+        "retrieval_profile_sha256": result.retrieval_profile_digest,
         "latency_ns": result.latency_ns
     }))
     .unwrap_or_else(|_| sha256(b"candidate-trace-serialization-error"));
@@ -468,6 +550,7 @@ fn candidate_record(
         "arm": arm.name(),
         "initial_agent_state_sha256": initial_state_digest(case),
         "candidate_input_sha256": candidate_input_digest(case),
+        "decision_need_sha256": decision_need_digest,
         "candidate_policy_sha256": candidate_policy_digest(arm),
         "memory_snapshot_sha256": result.memory_digest,
         "decision": action_name(result.decision.action),
@@ -480,6 +563,9 @@ fn candidate_record(
         "index_bytes": result.index_bytes,
         "evidence_sidecar_bytes": result.sidecar_bytes
     });
+    if let Some(profile_digest) = &result.retrieval_profile_digest {
+        record["retrieval_profile_sha256"] = json!(profile_digest);
+    }
     if let Some(reason) = &result.abstention_reason {
         record["abstention_reason"] = json!(reason);
     }
@@ -530,7 +616,12 @@ fn evaluate_arm(
             "{}:{:?}:{:?}",
             case.family, case.query.scope.regime, case.query.scope.objective
         ),
-        pair_block_id: pair_block_id(case.cluster, case.family, case.query),
+        pair_block_id: pair_block_id(
+            case.cluster,
+            case.family,
+            case.query,
+            case.decision_need,
+        ),
         decision: action,
         utility_micros: utility,
         regret_micros: regret,
@@ -924,6 +1015,27 @@ fn run() -> Result<(), String> {
         contrast_record("content_vs_placebo", Arm::SemanticPlacebo, Arm::HdcLtc, &scores),
         contrast_record("hdc_ltc_vs_conventional", Arm::ConventionalRetrieval, Arm::HdcLtc, &scores),
         contrast_record("hdc_ltc_vs_static_hdc", Arm::StaticHdc, Arm::HdcLtc, &scores),
+        contrast_record(
+            "typed_content_hdc_vs_conventional",
+            Arm::ConventionalRetrieval,
+            Arm::TypedContentHdc,
+            &scores,
+        ),
+        contrast_record(
+            "typed_content_hdc_vs_static_hdc",
+            Arm::StaticHdc,
+            Arm::TypedContentHdc,
+            &scores,
+        ),
+        // Evidence-complete decision reference: exact-scope candidate-visible
+        // records versus the compressed top-k typed representation. This is a
+        // decision-sufficiency gap, not an equal-cost practical baseline.
+        contrast_record(
+            "typed_content_hdc_vs_exact_scope_scan",
+            Arm::ExactScopeScan,
+            Arm::TypedContentHdc,
+            &scores,
+        ),
     ];
     let summary = json!({
         "schema_version": SCHEMA_VERSION,
@@ -985,6 +1097,8 @@ mod tests {
             let result = execute_arm(arm, task, &tasks);
             let record = candidate_record("test-run", task, arm, &result);
             assert_eq!(record["candidate_input_sha256"].as_str(), Some(digest.as_str()));
+            let expected_need = task.decision_need.canonical_digest().to_hex();
+            assert_eq!(record["decision_need_sha256"].as_str(), Some(expected_need.as_str()));
             let expected_state = initial_state_digest(task);
             assert_eq!(record["initial_agent_state_sha256"].as_str(), Some(expected_state.as_str()));
         }
@@ -1005,6 +1119,28 @@ mod tests {
     }
 
     #[test]
+    fn hidden_outcome_mutation_does_not_change_candidate_decision_need_or_input_digest() {
+        let cases = stress::generated_worlds(1);
+        let original = &cases[0];
+        let mut changed_outcome = original.clone();
+        changed_outcome.truth.utility_a = 0.001;
+        changed_outcome.truth.utility_b = 0.999;
+        changed_outcome.truth.causal_action = Some(Action::B);
+        changed_outcome.truth.invalid_a = !changed_outcome.truth.invalid_a;
+
+        let original_task = candidate_task(original);
+        let changed_task = candidate_task(&changed_outcome);
+        assert_eq!(
+            original_task.decision_need.canonical_digest(),
+            changed_task.decision_need.canonical_digest()
+        );
+        assert_eq!(
+            candidate_input_digest(&original_task),
+            candidate_input_digest(&changed_task)
+        );
+    }
+
+    #[test]
     fn candidate_stream_never_contains_evaluator_truth_or_utility_fields() {
         let cases = stress::generated_worlds(1);
         let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
@@ -1020,6 +1156,10 @@ mod tests {
             "net_utility_micros",
             "regret_micros",
             "task_success",
+            "utility_a",
+            "utility_b",
+            "causal_action",
+            "optimal_action",
         ] {
             assert!(!serialized.contains(forbidden), "candidate leaked {forbidden}");
         }
@@ -1042,6 +1182,28 @@ mod tests {
                     && candidate.query.scope.objective == task.query.scope.objective
             });
         assert!(sibling.is_some());
+    }
+
+    #[test]
+    fn typed_content_arm_binds_profile_and_revalidates_exact_candidate_views() {
+        let cases = stress::generated_worlds(1);
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        let task = &tasks[0];
+        let result = execute_arm(Arm::TypedContentHdc, task, &tasks);
+        assert!(result.retrieval_profile_digest.is_some());
+        assert!(!result.retrieved_ids.is_empty());
+        assert!(result.retrieved_ids.iter().all(|id| {
+            result.resolved.iter().any(|item| item.event_id == *id)
+        }));
+        let record = candidate_record("typed-test", task, Arm::TypedContentHdc, &result);
+        assert_eq!(
+            record["retrieval_profile_sha256"].as_str(),
+            result.retrieval_profile_digest.as_deref()
+        );
+        assert_eq!(
+            record["memory_snapshot_sha256"].as_str(),
+            Some(experience_list_digest(task.memory).as_str())
+        );
     }
 
     #[test]

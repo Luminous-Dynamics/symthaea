@@ -3,6 +3,34 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub const MACE_TRANSFER_MIN_PROPENSITY_BPS: u16 = 500;
+pub const MACE_TRANSFER_MAX_PROPENSITY_BPS: u16 = 9_500;
+pub const MACE_TRANSFER_MAX_STANDARDIZED_MEAN_DIFFERENCE_MICROS: u32 = 100_000;
+
+pub const MACE_REQUIRE_INTERVENTION: bool = true;
+pub const MACE_REQUIRE_PRE_REGISTRATION: bool = true;
+pub const MACE_REQUIRE_RECONCILED_OUTCOME: bool = true;
+pub const MACE_REQUIRE_TRUSTED_SOURCE: bool = true;
+pub const MACE_FORBID_RETRACTED_SOURCE: bool = true;
+pub const MACE_REQUIRE_INTERFERENCE_CONTROL: bool = true;
+pub const MACE_REQUIRE_CONFOUNDER_CONTROL: bool = true;
+pub const MACE_REQUIRE_COMPLETED_DELAYED_HORIZON: bool = true;
+pub const MACE_REQUIRE_RCT_IDENTIFICATION: bool = true;
+pub const MACE_REQUIRE_KNOWN_DESIGN_RECEIPT: bool = true;
+pub const MACE_REQUIRE_KNOWN_ESTIMAND_DIGEST: bool = true;
+pub const MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND: bool = true;
+pub const MACE_REQUIRE_ESTIMAND_DIGEST_MATCH: bool = true;
+pub const MACE_REQUIRE_NONZERO_SOURCE_FAMILY: bool = true;
+pub const MACE_REQUIRE_KNOWN_SOURCE_ROOT: bool = true;
+pub const MACE_REQUIRE_UNIQUE_EVENT_IDS: bool = true;
+pub const MACE_MIN_INDEPENDENT_SOURCE_ROOTS: usize = 2;
+pub const MACE_MIN_INDEPENDENT_SOURCE_FAMILIES: usize = 2;
+pub const MACE_MIN_SOURCE_EVENTS_PER_ACTION: usize = 2;
+pub const MACE_MIN_TARGET_WITNESSES_PER_ACTION: usize = 1;
+pub const MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES: bool = true;
+pub const MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS: bool = true;
+pub const MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_REGIMES: bool = true;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Action {
     A,
@@ -298,16 +326,19 @@ impl CausalIdentificationV1 {
     /// Only randomized designs with a complete, digest-matched semantic
     /// estimand qualify in this tranche.
     pub fn qualifies_for_transfer(self) -> bool {
-        self.method == IdentificationMethodV1::RandomizedControlledTrial
-            && self.design_digest.is_known()
-            && self.estimand_digest.is_known()
-            && self.semantic_estimand.is_complete()
-            && self.semantic_estimand.canonical_digest() == self.estimand_digest
-            && self.propensity_min_bps >= 500
+        (!MACE_REQUIRE_RCT_IDENTIFICATION
+            || self.method == IdentificationMethodV1::RandomizedControlledTrial)
+            && (!MACE_REQUIRE_KNOWN_DESIGN_RECEIPT || self.design_digest.is_known())
+            && (!MACE_REQUIRE_KNOWN_ESTIMAND_DIGEST || self.estimand_digest.is_known())
+            && (!MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND || self.semantic_estimand.is_complete())
+            && (!MACE_REQUIRE_ESTIMAND_DIGEST_MATCH
+                || self.semantic_estimand.canonical_digest() == self.estimand_digest)
+            && self.propensity_min_bps >= MACE_TRANSFER_MIN_PROPENSITY_BPS
             && self.propensity_min_bps <= self.propensity_max_bps
-            && self.propensity_max_bps <= 9_500
-            && self.max_standardized_mean_difference_micros <= 100_000
-            && self.interference_controlled
+            && self.propensity_max_bps <= MACE_TRANSFER_MAX_PROPENSITY_BPS
+            && self.max_standardized_mean_difference_micros
+                <= MACE_TRANSFER_MAX_STANDARDIZED_MEAN_DIFFERENCE_MICROS
+            && (!MACE_REQUIRE_INTERFERENCE_CONTROL || self.interference_controlled)
     }
 }
 
@@ -338,6 +369,130 @@ pub struct Experience {
 #[derive(Clone, Copy, Debug)]
 pub struct Query {
     pub scope: Scope,
+}
+
+/// Canonical identity of the MACE causal-transfer qualification profile.
+/// Changing any predicate or threshold must increment the version/domain.
+pub fn transfer_qualification_profile_digest() -> EvidenceDigest256 {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous:mace:transfer-qualification-profile:v1\0");
+    hasher.update([1_u8]); // IdentificationMethodV1::RandomizedControlledTrial
+    hasher.update(MACE_TRANSFER_MIN_PROPENSITY_BPS.to_be_bytes());
+    hasher.update(MACE_TRANSFER_MAX_PROPENSITY_BPS.to_be_bytes());
+    hasher.update(MACE_TRANSFER_MAX_STANDARDIZED_MEAN_DIFFERENCE_MICROS.to_be_bytes());
+    hasher.update([u8::from(MACE_REQUIRE_INTERVENTION)]);
+    hasher.update([u8::from(MACE_REQUIRE_PRE_REGISTRATION)]);
+    hasher.update([u8::from(MACE_REQUIRE_RECONCILED_OUTCOME)]);
+    hasher.update([u8::from(MACE_REQUIRE_TRUSTED_SOURCE)]);
+    hasher.update([u8::from(MACE_FORBID_RETRACTED_SOURCE)]);
+    hasher.update([u8::from(MACE_REQUIRE_INTERFERENCE_CONTROL)]);
+    hasher.update([u8::from(MACE_REQUIRE_CONFOUNDER_CONTROL)]);
+    hasher.update([u8::from(MACE_REQUIRE_COMPLETED_DELAYED_HORIZON)]);
+    hasher.update([u8::from(MACE_REQUIRE_RCT_IDENTIFICATION)]);
+    hasher.update([u8::from(MACE_REQUIRE_KNOWN_DESIGN_RECEIPT)]);
+    hasher.update([u8::from(MACE_REQUIRE_KNOWN_ESTIMAND_DIGEST)]);
+    hasher.update([u8::from(MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND)]);
+    hasher.update([u8::from(MACE_REQUIRE_ESTIMAND_DIGEST_MATCH)]);
+    hasher.update([u8::from(MACE_REQUIRE_NONZERO_SOURCE_FAMILY)]);
+    hasher.update([u8::from(MACE_REQUIRE_KNOWN_SOURCE_ROOT)]);
+    hasher.update([u8::from(MACE_REQUIRE_UNIQUE_EVENT_IDS)]);
+    hasher.update((MACE_MIN_INDEPENDENT_SOURCE_ROOTS as u64).to_be_bytes());
+    hasher.update((MACE_MIN_INDEPENDENT_SOURCE_FAMILIES as u64).to_be_bytes());
+    hasher.update((MACE_MIN_SOURCE_EVENTS_PER_ACTION as u64).to_be_bytes());
+    hasher.update((MACE_MIN_TARGET_WITNESSES_PER_ACTION as u64).to_be_bytes());
+    hasher.update([u8::from(MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES)]);
+    hasher.update([u8::from(MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS)]);
+    hasher.update([u8::from(MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_REGIMES)]);
+    hasher.update([0_u8, 1_u8]); // observed utility and measurement bound in [0, 1]
+    let digest = hasher.finalize();
+    let mut bytes = [0_u8; 32];
+    bytes.copy_from_slice(&digest);
+    EvidenceDigest256::from_bytes(bytes)
+}
+
+/// Candidate-visible contract declaring what future decision is being made.
+/// It contains task requirements only: no realized utility, optimal action,
+/// hidden mechanism parameters, or evaluator outcome labels.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DecisionNeedV1 {
+    pub schema_version: u16,
+    pub scope: Scope,
+    pub action_alternatives: [Action; 2],
+    pub semantic_estimand: SemanticEstimandV1,
+    pub identification_method: IdentificationMethodV1,
+    pub qualification_profile_digest: EvidenceDigest256,
+}
+
+impl DecisionNeedV1 {
+    /// Build a task contract for the current MACE binary-action comparison.
+    /// None means the task did not supply a complete, canonical estimand.
+    pub fn new(scope: Scope, semantic_estimand: SemanticEstimandV1) -> Option<Self> {
+        if !semantic_estimand.is_complete()
+            || semantic_estimand.canonical_digest() == EvidenceDigest256::UNKNOWN
+        {
+            return None;
+        }
+        Some(Self {
+            schema_version: 1,
+            scope,
+            action_alternatives: [Action::A, Action::B],
+            semantic_estimand,
+            identification_method: IdentificationMethodV1::RandomizedControlledTrial,
+            qualification_profile_digest: transfer_qualification_profile_digest(),
+        })
+    }
+
+    pub fn is_valid(self) -> bool {
+        self.schema_version == 1
+            && self.action_alternatives == [Action::A, Action::B]
+            && (!MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND || self.semantic_estimand.is_complete())
+            && self.qualification_profile_digest == transfer_qualification_profile_digest()
+            && (!MACE_REQUIRE_RCT_IDENTIFICATION
+                || self.identification_method == IdentificationMethodV1::RandomizedControlledTrial)
+    }
+
+    /// Domain-separated digest of the candidate-visible task requirements.
+    /// It does not authenticate who supplied the task contract.
+    pub fn canonical_digest(self) -> EvidenceDigest256 {
+        use sha2::{Digest, Sha256};
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"luminous:mace:decision-need:v1\0");
+        hasher.update(self.schema_version.to_be_bytes());
+        hasher.update([
+            match self.scope.regime {
+                Regime::Baseline => 1,
+                Regime::Shifted => 2,
+            },
+            match self.scope.objective {
+                Objective::Quality => 1,
+                Objective::Cost => 2,
+                Objective::Speed => 3,
+            },
+            match self.action_alternatives[0] {
+                Action::A => 1,
+                Action::B => 2,
+            },
+            match self.action_alternatives[1] {
+                Action::A => 1,
+                Action::B => 2,
+            },
+            match self.identification_method {
+                IdentificationMethodV1::RandomizedControlledTrial => 1,
+                IdentificationMethodV1::QuasiExperimental => 2,
+                IdentificationMethodV1::Observational => 3,
+                IdentificationMethodV1::Unknown => 4,
+            },
+        ]);
+        hasher.update(self.semantic_estimand.canonical_digest().as_bytes());
+        hasher.update(self.qualification_profile_digest.as_bytes());
+        let digest = hasher.finalize();
+        let mut bytes = [0_u8; 32];
+        bytes.copy_from_slice(&digest);
+        EvidenceDigest256::from_bytes(bytes)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -475,20 +630,20 @@ fn scope_aware_policy(memory: &[Experience], query: Query) -> Decision {
 
 pub fn is_qualified(item: &Experience, query: Query) -> bool {
     item.scope == query.scope
-        && item.source_family != 0
-        && item.source_root_digest.is_known()
+        && (!MACE_REQUIRE_NONZERO_SOURCE_FAMILY || item.source_family != 0)
+        && (!MACE_REQUIRE_KNOWN_SOURCE_ROOT || item.source_root_digest.is_known())
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
         && (0.0..=1.0).contains(&item.measurement_error_bound)
         && item.causal_identification.qualifies_for_transfer()
-        && item.intervention
-        && item.prediction_pre_registered
-        && item.outcome_reconciled
-        && item.source_trusted
-        && !item.source_retracted
-        && item.confounders_controlled
-        && item.delayed_horizon_complete
+        && (!MACE_REQUIRE_INTERVENTION || item.intervention)
+        && (!MACE_REQUIRE_PRE_REGISTRATION || item.prediction_pre_registered)
+        && (!MACE_REQUIRE_RECONCILED_OUTCOME || item.outcome_reconciled)
+        && (!MACE_REQUIRE_TRUSTED_SOURCE || item.source_trusted)
+        && (!MACE_FORBID_RETRACTED_SOURCE || !item.source_retracted)
+        && (!MACE_REQUIRE_CONFOUNDER_CONTROL || item.confounders_controlled)
+        && (!MACE_REQUIRE_COMPLETED_DELAYED_HORIZON || item.delayed_horizon_complete)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -557,10 +712,10 @@ impl QualifiedGroup {
 
     fn is_qualified(&self) -> bool {
         self.has_single_estimand()
-            && self.independent_support() >= 2
-            && self.source_families.len() >= 2
-            && self.source_events.len() >= 2
-            && self.count >= 2
+            && self.independent_support() >= MACE_MIN_INDEPENDENT_SOURCE_ROOTS
+            && self.source_families.len() >= MACE_MIN_INDEPENDENT_SOURCE_FAMILIES
+            && self.source_events.len() >= MACE_MIN_SOURCE_EVENTS_PER_ACTION
+            && self.count >= MACE_MIN_SOURCE_EVENTS_PER_ACTION
     }
 }
 
@@ -572,7 +727,8 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
 
     let mut groups: BTreeMap<Action, QualifiedGroup> = BTreeMap::new();
     for item in memory.iter().filter(|item| {
-        event_frequency.get(&item.event_id) == Some(&1) && is_qualified(item, query)
+        (!MACE_REQUIRE_UNIQUE_EVENT_IDS || event_frequency.get(&item.event_id) == Some(&1))
+            && is_qualified(item, query)
     }) {
         groups.entry(item.action).or_default().add(item);
     }
@@ -581,7 +737,11 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
-    if a_ok
+    if MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES && !(a_ok && b_ok) {
+        return Decision::abstain();
+    }
+    if MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS
+        && a_ok
         && b_ok
         && (a.estimand_digest != b.estimand_digest
             || a.semantic_estimand != b.semantic_estimand)
@@ -614,20 +774,20 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
 /// separately by the invariant-transport policy.
 pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
     item.scope.objective == query.scope.objective
-        && item.source_family != 0
-        && item.source_root_digest.is_known()
+        && (!MACE_REQUIRE_NONZERO_SOURCE_FAMILY || item.source_family != 0)
+        && (!MACE_REQUIRE_KNOWN_SOURCE_ROOT || item.source_root_digest.is_known())
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
         && (0.0..=1.0).contains(&item.measurement_error_bound)
         && item.causal_identification.qualifies_for_transfer()
-        && item.intervention
-        && item.prediction_pre_registered
-        && item.outcome_reconciled
-        && item.source_trusted
-        && !item.source_retracted
-        && item.confounders_controlled
-        && item.delayed_horizon_complete
+        && (!MACE_REQUIRE_INTERVENTION || item.intervention)
+        && (!MACE_REQUIRE_PRE_REGISTRATION || item.prediction_pre_registered)
+        && (!MACE_REQUIRE_RECONCILED_OUTCOME || item.outcome_reconciled)
+        && (!MACE_REQUIRE_TRUSTED_SOURCE || item.source_trusted)
+        && (!MACE_FORBID_RETRACTED_SOURCE || !item.source_retracted)
+        && (!MACE_REQUIRE_CONFOUNDER_CONTROL || item.confounders_controlled)
+        && (!MACE_REQUIRE_COMPLETED_DELAYED_HORIZON || item.delayed_horizon_complete)
 }
 
 const INVARIANCE_EQUIVALENCE_MARGIN: f64 = 0.12;
@@ -640,7 +800,7 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
 
     let mut groups: BTreeMap<(Regime, Action), QualifiedGroup> = BTreeMap::new();
     for item in memory.iter().filter(|item| {
-        event_frequency.get(&item.event_id) == Some(&1)
+        (!MACE_REQUIRE_UNIQUE_EVENT_IDS || event_frequency.get(&item.event_id) == Some(&1))
             && is_transfer_qualified(item, query)
     }) {
         groups
@@ -658,7 +818,9 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
     let Some(target_b) = groups.get(&(query.scope.regime, Action::B)) else {
         return Decision::abstain();
     };
-    if target_a.count == 0 || target_b.count == 0 {
+    if target_a.count < MACE_MIN_TARGET_WITNESSES_PER_ACTION
+        || target_b.count < MACE_MIN_TARGET_WITNESSES_PER_ACTION
+    {
         return Decision::abstain();
     }
     let Some(target_estimand) = target_a.estimand_digest.filter(|_| {
@@ -666,9 +828,10 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
     }) else {
         return Decision::abstain();
     };
-    if target_b.estimand_digest != Some(target_estimand)
-        || target_b.semantic_estimand != target_a.semantic_estimand
-        || target_b.mixed_estimands
+    if MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS
+        && (target_b.estimand_digest != Some(target_estimand)
+            || target_b.semantic_estimand != target_a.semantic_estimand
+            || target_b.mixed_estimands)
     {
         return Decision::abstain();
     }
@@ -718,11 +881,14 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
             return Decision::abstain();
         };
         if source_a.mixed_estimands
-            || source_b.estimand_digest != Some(source_estimand)
-            || source_b.semantic_estimand != source_a.semantic_estimand
-            || source_a.semantic_estimand != target_a.semantic_estimand
-            || source_b.mixed_estimands
-            || source_estimand != target_estimand
+            || (MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS
+                && (source_b.estimand_digest != Some(source_estimand)
+                    || source_b.semantic_estimand != source_a.semantic_estimand
+                    || source_b.mixed_estimands))
+            || (MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_REGIMES
+                && (source_a.semantic_estimand != target_a.semantic_estimand
+                    || source_b.semantic_estimand != target_a.semantic_estimand
+                    || source_estimand != target_estimand))
         {
             return Decision::abstain();
         }
@@ -1386,5 +1552,80 @@ mod tests {
         };
         let item = sample(1, 10, Action::A, 0.9, source_scope);
         assert!(!is_qualified(&item, Query { scope: query_scope }));
+    }
+}
+
+
+#[cfg(test)]
+mod decision_need_contract_tests {
+    use super::*;
+
+    fn estimand(population: u8) -> SemanticEstimandV1 {
+        SemanticEstimandV1::new(
+            1,
+            EvidenceDigest256::from_bytes([population; 32]),
+            EvidenceDigest256::from_bytes([2; 32]),
+            EvidenceDigest256::from_bytes([3; 32]),
+            EvidenceDigest256::from_bytes([4; 32]),
+            EvidenceDigest256::from_bytes([5; 32]),
+            30_000,
+            EvidenceDigest256::from_bytes([6; 32]),
+            EvidenceDigest256::from_bytes([7; 32]),
+            EvidenceDigest256::from_bytes([8; 32]),
+        )
+    }
+
+    #[test]
+    fn decision_need_is_candidate_visible_and_canonical() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let first = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        let second = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        assert!(first.is_valid());
+        assert_eq!(first.canonical_digest(), second.canonical_digest());
+        assert_eq!(first.action_alternatives, [Action::A, Action::B]);
+    }
+
+    #[test]
+    fn decision_need_digest_changes_when_task_requirements_change() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let first = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        let population_changed = DecisionNeedV1::new(scope, estimand(9)).unwrap();
+        let objective_changed = DecisionNeedV1::new(
+            Scope { objective: Objective::Cost, ..scope },
+            estimand(1),
+        )
+        .unwrap();
+        assert_ne!(first.canonical_digest(), population_changed.canonical_digest());
+        assert_ne!(first.canonical_digest(), objective_changed.canonical_digest());
+    }
+
+    #[test]
+    fn decision_need_rejects_incomplete_estimand_and_tampered_profile() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        assert!(DecisionNeedV1::new(scope, SemanticEstimandV1::UNKNOWN).is_none());
+
+        let mut need = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        need.qualification_profile_digest = EvidenceDigest256::UNKNOWN;
+        assert!(!need.is_valid());
+        let mut changed_actions = DecisionNeedV1::new(scope, estimand(1)).unwrap();
+        changed_actions.action_alternatives = [Action::A, Action::A];
+        assert!(!changed_actions.is_valid());
+        assert_ne!(
+            changed_actions.canonical_digest(),
+            DecisionNeedV1::new(scope, estimand(1)).unwrap().canonical_digest()
+        );
+        assert_ne!(
+            need.canonical_digest(),
+            DecisionNeedV1::new(scope, estimand(1)).unwrap().canonical_digest()
+        );
     }
 }

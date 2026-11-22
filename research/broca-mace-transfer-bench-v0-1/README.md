@@ -30,9 +30,16 @@ No external service, GPU, database or model API is required. The current verifie
 
 The broader research thesis and qualification ladder are documented in [MACE Decision-Sufficient Memory Architecture v0.1](../../docs/research/MACE_DECISION_SUFFICIENT_MEMORY_ARCHITECTURE_V0_1.md). It defines decision capsules, representation choice (persist/locator/snapshot/discard), use-time evidence revalidation, the HDC semantic/query-conditioned follow-on, and the external benchmark/industry comparison lanes. It is an integration contract over existing owners, not a second memory store or authority.
 
+## Typed-content, query-conditioned HDC follow-on
+
+The follow-on branch adds a separate typed-content index to the existing HDC retrieval crate: candidate Experience fields are encoded using deterministic role/value binding, continuous values use deterministic random Fourier features, and SemanticExperienceQueryV1 creates a structured query in the same field space. Exact event IDs and provenance remain sidecar references; all MACE admission gates still execute after canonical resolution.
+
+The typed-content arm is now integrated into the paired runner using a generated candidate-visible `DecisionNeedV1`; the candidate projection excludes evaluator `Truth`, and a hidden-outcome mutation test keeps the decision-need/input digests unchanged. The current contract is synthetic and fixed to the benchmark's normalized causal estimand; a general environment/task parser is still tracked in #13222. See [MACE Decision Sufficiency and Benchmark Frontier v0.2](../../docs/research/MACE_DECISION_SUFFICIENCY_AND_BENCHMARK_FRONTIER_V0_2.md) and [MACE typed-content HDC v0.1 protocol](../../docs/research/MACE_TYPED_CONTENT_HDC_V0_1.md).
+
 ## Paired memory-to-decision intervention runner
 
-A separate executable now schedules the six initial intervention arms over the existing generated MACE worlds: true empty memory, exact-scope scan, deterministic key-value retrieval, static HDC, HDC-LTC, and a same-cluster sibling-task structural placebo. It writes candidate decisions, evaluator-only synthetic scores, and cluster-bootstrap summaries to separate JSONL streams.
+A separate executable now schedules seven paired intervention arms over the existing generated MACE worlds: true empty memory, exact-scope scan, deterministic key-value retrieval, static event-ID HDC, HDC-LTC, typed-content query-conditioned HDC, and a same-cluster sibling-task structural placebo. It writes candidate decisions, evaluator-only synthetic scores, and cluster-bootstrap summaries to separate JSONL streams.
+The typed-content arm builds vectors from candidate-visible Experience fields and queries with the task's candidate-visible DecisionNeedV1. That contract binds exact scope/action alternatives, the complete semantic estimand (population, treatment/comparator, outcome definition/unit and follow-up horizon), identification method and the versioned MACE qualification-profile digest. It is created independently of evaluator Truth; the runner includes a negative control that changes hidden utilities without changing the candidate query/input digest. Numeric overlap and balance limits remain exact post-retrieval MACE checks; they are not RBF point targets. DecisionNeed and typed-profile digests are emitted in candidate records. Broader real-world task contracts are still tracked in #13222.
 
 ~~~~bash
 MACE_SOURCE_REVISION="$(git rev-parse HEAD)" \

@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_policy::{
-    decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
-    Policy, ProbeRequest, Query, Regime, Scope, NORMALIZED_UTILITY_SCALE,
+    decide, is_qualified, is_transfer_qualified, Action, Decision, DecisionNeedV1, Experience,
+    Objective, Policy, ProbeRequest, Query, Regime, Scope, NORMALIZED_UTILITY_SCALE,
     IdentificationMethodV1,
 };
 
@@ -44,6 +44,8 @@ pub(crate) struct Case {
     pub(crate) family: &'static str,
     pub(crate) memory: Vec<Experience>,
     pub(crate) query: Query,
+    /// Candidate-visible task contract, created independently of Truth.
+    pub(crate) decision_need: DecisionNeedV1,
     pub(crate) truth: Truth,
 }
 
@@ -137,11 +139,14 @@ fn case(
     causal_action: Option<Action>,
     invalid_a: bool,
 ) -> Case {
+    let decision_need = DecisionNeedV1::new(scope, fixture_semantic_estimand())
+        .expect("generated task contract contains a complete target estimand");
     Case {
         cluster,
         family,
         memory,
         query: Query { scope },
+        decision_need,
         truth: Truth {
             utility_a,
             utility_b,

@@ -1,0 +1,572 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_memory_decision_intervention_v0_1.schema.json",
+  "title": "MACE Memory-to-Decision Intervention v0.1",
+  "description": "Separate candidate decision traces and evaluator-only scores for paired memory-access interventions. Evaluator labels and scores must never be candidate-visible.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/run_manifest"
+    },
+    {
+      "$ref": "#/$defs/candidate_decision"
+    },
+    {
+      "$ref": "#/$defs/evaluator_score"
+    },
+    {
+      "$ref": "#/$defs/paired_summary"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "arm": {
+      "type": "string",
+      "enum": [
+        "no_memory",
+        "exact_scope_scan",
+        "conventional_retrieval",
+        "static_hdc",
+        "hdc_ltc",
+        "semantic_placebo",
+        "pre_correction_snapshot",
+        "post_correction_snapshot",
+        "typed_content_hdc"
+      ]
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "action_a",
+        "action_b",
+        "abstain",
+        "probe"
+      ]
+    },
+    "event_ids": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "uniqueItems": true
+    },
+    "run_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "source_revision",
+        "mace_revision",
+        "evaluator_revision",
+        "split_manifest_sha256",
+        "scenario_manifest_sha256",
+        "candidate_policy_sha256",
+        "hidden_evaluator_digest",
+        "independent_world_cluster_count",
+        "pair_block_count",
+        "arms",
+        "randomization",
+        "common_random_numbers"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_memory_decision_intervention_v0_1"
+        },
+        "record_type": {
+          "const": "run_manifest"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "mace_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "evaluator_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scenario_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "hidden_evaluator_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "independent_world_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pair_block_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "arms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/arm"
+          },
+          "minItems": 2,
+          "uniqueItems": true
+        },
+        "randomization": {
+          "type": "string",
+          "enum": [
+            "within_pair_block_order",
+            "world_cluster_assignment",
+            "deterministic_replay"
+          ]
+        },
+        "common_random_numbers": {
+          "type": "boolean"
+        },
+        "model_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "hardware_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "candidate_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "pair_block_id",
+        "world_cluster_id",
+        "query_id",
+        "arm",
+        "initial_agent_state_sha256",
+        "candidate_input_sha256",
+        "decision_need_sha256",
+        "candidate_policy_sha256",
+        "decision",
+        "retrieved_event_ids",
+        "decision_support_event_ids",
+        "decision_trace_sha256",
+        "latency_ns",
+        "input_tokens",
+        "tool_calls",
+        "index_bytes",
+        "evidence_sidecar_bytes"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_memory_decision_intervention_v0_1"
+        },
+        "record_type": {
+          "const": "candidate_decision"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "pair_block_id": {
+          "$ref": "#/$defs/id"
+        },
+        "world_cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "arm": {
+          "$ref": "#/$defs/arm"
+        },
+        "initial_agent_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "memory_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "retrieved_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "decision_support_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "decision_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "abstention_reason": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "probe_request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_sidecar_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cpu_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gpu_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retrieval_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_need_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "abstain"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "required": [
+              "abstention_reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "probe"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "required": [
+              "probe_request_sha256"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "arm": {
+                "const": "no_memory"
+              }
+            },
+            "required": [
+              "arm"
+            ]
+          },
+          "then": {
+            "properties": {
+              "retrieved_event_ids": {
+                "maxItems": 0
+              },
+              "decision_support_event_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evaluator_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "pair_block_id",
+        "world_cluster_id",
+        "query_id",
+        "arm",
+        "net_utility_micros",
+        "regret_micros",
+        "task_success",
+        "invalid_evidence_use_count",
+        "stale_evidence_use_count",
+        "wrong_scope_evidence_use_count",
+        "false_causal_claim_count",
+        "decision_changed_vs_no_memory",
+        "decision_change_justified",
+        "harmful_memory_dependence",
+        "outcome_receipt_sha256",
+        "evaluation_validity"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_memory_decision_intervention_v0_1"
+        },
+        "record_type": {
+          "const": "evaluator_score"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "pair_block_id": {
+          "$ref": "#/$defs/id"
+        },
+        "world_cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "arm": {
+          "$ref": "#/$defs/arm"
+        },
+        "net_utility_micros": {
+          "type": "integer"
+        },
+        "regret_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "task_success": {
+          "type": "boolean"
+        },
+        "invalid_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wrong_scope_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_causal_claim_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_changed_vs_no_memory": {
+          "type": "boolean"
+        },
+        "decision_change_justified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "harmful_memory_dependence": {
+          "type": "boolean"
+        },
+        "placebo_changed_decision": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "correction_recovery_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluation_validity": {
+          "type": "string",
+          "enum": [
+            "valid",
+            "invalid",
+            "diagnostic_only"
+          ]
+        },
+        "invalidity_reason": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    "contrast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contrast_id",
+        "baseline_arm",
+        "treatment_arm",
+        "mean_utility_delta_micros",
+        "ci95_lower_micros",
+        "ci95_upper_micros",
+        "world_cluster_count",
+        "pair_block_count",
+        "mean_regret_delta_micros",
+        "harmful_dependence_rate",
+        "invalid_evidence_use_count",
+        "stale_evidence_use_count",
+        "worst_family_success_delta_pp",
+        "p95_latency_delta_ns",
+        "all_in_memory_bytes_delta"
+      ],
+      "properties": {
+        "contrast_id": {
+          "type": "string",
+          "enum": [
+            "memory_vs_none",
+            "content_vs_placebo",
+            "hdc_ltc_vs_conventional",
+            "hdc_ltc_vs_static_hdc",
+            "corrected_vs_stale",
+            "typed_content_hdc_vs_conventional",
+            "typed_content_hdc_vs_static_hdc",
+            "typed_content_hdc_vs_exact_scope_scan"
+          ]
+        },
+        "baseline_arm": {
+          "$ref": "#/$defs/arm"
+        },
+        "treatment_arm": {
+          "$ref": "#/$defs/arm"
+        },
+        "mean_utility_delta_micros": {
+          "type": "number"
+        },
+        "ci95_lower_micros": {
+          "type": "number"
+        },
+        "ci95_upper_micros": {
+          "type": "number"
+        },
+        "world_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pair_block_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mean_regret_delta_micros": {
+          "type": "number"
+        },
+        "harmful_dependence_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "invalid_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_evidence_use_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_family_success_delta_pp": {
+          "type": "number"
+        },
+        "p95_latency_delta_ns": {
+          "type": "integer"
+        },
+        "all_in_memory_bytes_delta": {
+          "type": "integer"
+        }
+      }
+    },
+    "paired_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "source_revision",
+        "split_manifest_sha256",
+        "primary_contrast_id",
+        "independent_world_cluster_count",
+        "pair_block_count",
+        "contrasts"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_memory_decision_intervention_v0_1"
+        },
+        "record_type": {
+          "const": "paired_summary"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "primary_contrast_id": {
+          "const": "memory_vs_none"
+        },
+        "independent_world_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pair_block_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "contrasts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contrast"
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}
