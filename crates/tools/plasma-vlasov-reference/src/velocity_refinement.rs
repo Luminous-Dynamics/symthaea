@@ -11,7 +11,7 @@ use super::{
     Complex, SolverError, VlasovPoisson1d1v, VlasovPoissonConfig, VlasovPoissonDiagnostics, fft,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SpectralRefinementError {
     InvalidFactor { factor: usize },
     GridSizeOverflow,
