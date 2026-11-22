@@ -16,6 +16,8 @@ const INITIAL_AMPLITUDE: f64 = 1.0e-3;
 const THERMAL_SPEED: f64 = 1.0;
 const IMPULSE_AMPLITUDE: f64 = 5.0e-2;
 const ECHO_SIGNAL_FLOOR: f64 = 1.0e-9;
+const FLUX_X_MODE_CUTOFF: usize = 3;
+const FLUX_VELOCITY_MODE_CUTOFF: usize = 2;
 
 #[derive(Debug, Clone, Copy)]
 struct EchoRidgeMetrics {
@@ -104,6 +106,38 @@ fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> 
     }
 }
 
+fn low_x_f_strophy(spectrum: &JointPhaseSpaceSpectrum, cutoff: usize) -> f64 {
+    spectrum
+        .by_x_mode
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| {
+            spectrum
+                .signed_x_mode(*index)
+                .unwrap_or_default()
+                .unsigned_abs()
+                <= cutoff
+        })
+        .map(|(_, value)| *value)
+        .sum()
+}
+
+fn low_velocity_f_strophy(spectrum: &JointPhaseSpaceSpectrum, cutoff: usize) -> f64 {
+    spectrum
+        .by_velocity_mode
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| {
+            spectrum
+                .signed_velocity_mode(*index)
+                .unwrap_or_default()
+                .unsigned_abs()
+                <= cutoff
+        })
+        .map(|(_, value)| *value)
+        .sum()
+}
+
 fn run_resolution(
     label: &str,
     config: VlasovPoissonConfig,
@@ -122,6 +156,18 @@ fn run_resolution(
     let mut pulsed = VlasovPoisson1d1v::new(config, initial.clone())?;
     let mut no_second_pulse = VlasovPoisson1d1v::new(config, initial)?;
     let initial_casimir = pulsed.quadratic_casimir_budget()?.total_casimir;
+    let initial_spectrum = pulsed.joint_phase_space_spectrum()?;
+    let mut pulse_flux_baseline_x =
+        low_x_f_strophy(&initial_spectrum, FLUX_X_MODE_CUTOFF);
+    let mut pulse_flux_baseline_v =
+        low_velocity_f_strophy(&initial_spectrum, FLUX_VELOCITY_MODE_CUTOFF);
+    let mut control_flux_baseline_x = pulse_flux_baseline_x;
+    let mut control_flux_baseline_v = pulse_flux_baseline_v;
+    let mut pulse_cumulative_flux_x = 0.0;
+    let mut pulse_cumulative_flux_v = 0.0;
+    let mut control_cumulative_flux_x = 0.0;
+    let mut control_cumulative_flux_v = 0.0;
+    let mut previous_flux_sample: Option<(f64, f64, f64, f64, f64)> = None;
 
     let second_kick: Vec<f64> = (0..config.nx)
         .map(|ix| {
@@ -232,6 +278,84 @@ fn run_resolution(
             let response_spectrum = response_state.joint_phase_space_spectrum()?;
             let response_ridge =
                 echo_mode_ridge(&response_spectrum, prediction.echo_mode as isize);
+            let pulse_flux = pulsed.phase_space_transfer_rates(
+                FLUX_X_MODE_CUTOFF,
+                FLUX_VELOCITY_MODE_CUTOFF,
+            )?;
+            let control_flux = no_second_pulse.phase_space_transfer_rates(
+                FLUX_X_MODE_CUTOFF,
+                FLUX_VELOCITY_MODE_CUTOFF,
+            )?;
+            let pulse_low_x = low_x_f_strophy(&pulse_spectrum, FLUX_X_MODE_CUTOFF);
+            let pulse_low_v =
+                low_velocity_f_strophy(&pulse_spectrum, FLUX_VELOCITY_MODE_CUTOFF);
+            let control_low_x = low_x_f_strophy(&control_spectrum, FLUX_X_MODE_CUTOFF);
+            let control_low_v =
+                low_velocity_f_strophy(&control_spectrum, FLUX_VELOCITY_MODE_CUTOFF);
+            let flux_time = pulsed.time();
+
+            // The instantaneous impulse at t2 is a discontinuous intervention,
+            // not a continuous Vlasov flux. Rebaseline both trajectories at t2+
+            // so the integrated flux closes the smooth post-intervention leg.
+            if step == pulse_step {
+                pulse_flux_baseline_x = pulse_low_x;
+                pulse_flux_baseline_v = pulse_low_v;
+                control_flux_baseline_x = control_low_x;
+                control_flux_baseline_v = control_low_v;
+                pulse_cumulative_flux_x = 0.0;
+                pulse_cumulative_flux_v = 0.0;
+                control_cumulative_flux_x = 0.0;
+                control_cumulative_flux_v = 0.0;
+            } else if let Some((previous_time, previous_pulse_x, previous_pulse_v, previous_control_x, previous_control_v)) =
+                previous_flux_sample
+            {
+                let elapsed = flux_time - previous_time;
+                if elapsed > 0.0 {
+                    pulse_cumulative_flux_x +=
+                        0.5 * (previous_pulse_x + pulse_flux.flux_out_of_low_x_modes) * elapsed;
+                    pulse_cumulative_flux_v +=
+                        0.5 * (previous_pulse_v + pulse_flux.flux_out_of_low_velocity_modes) * elapsed;
+                    control_cumulative_flux_x +=
+                        0.5 * (previous_control_x + control_flux.flux_out_of_low_x_modes) * elapsed;
+                    control_cumulative_flux_v +=
+                        0.5 * (previous_control_v + control_flux.flux_out_of_low_velocity_modes)
+                            * elapsed;
+                }
+            }
+            previous_flux_sample = Some((
+                flux_time,
+                pulse_flux.flux_out_of_low_x_modes,
+                pulse_flux.flux_out_of_low_velocity_modes,
+                control_flux.flux_out_of_low_x_modes,
+                control_flux.flux_out_of_low_velocity_modes,
+            ));
+            let pulse_direct_loss_x = pulse_flux_baseline_x - pulse_low_x;
+            let pulse_direct_loss_v = pulse_flux_baseline_v - pulse_low_v;
+            let control_direct_loss_x = control_flux_baseline_x - control_low_x;
+            let control_direct_loss_v = control_flux_baseline_v - control_low_v;
+
+            println!(
+                "# flux,{label},{step},{:.8},{},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+                flux_time,
+                FLUX_X_MODE_CUTOFF,
+                FLUX_VELOCITY_MODE_CUTOFF,
+                pulse_flux.flux_out_of_low_x_modes,
+                pulse_flux.flux_out_of_low_velocity_modes,
+                pulse_cumulative_flux_x,
+                pulse_cumulative_flux_v,
+                pulse_direct_loss_x,
+                pulse_direct_loss_v,
+                pulse_cumulative_flux_x - pulse_direct_loss_x,
+                pulse_cumulative_flux_v - pulse_direct_loss_v,
+                control_flux.flux_out_of_low_x_modes,
+                control_flux.flux_out_of_low_velocity_modes,
+                control_cumulative_flux_x,
+                control_cumulative_flux_v,
+                control_direct_loss_x,
+                control_direct_loss_v,
+                control_cumulative_flux_x - control_direct_loss_x,
+                control_cumulative_flux_v - control_direct_loss_v,
+            );
 
             println!(
                 "# ridge,{label},{step},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.8},{}",
@@ -335,6 +459,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!(
         "# ridge_columns,run,step,time,mode,pulse_k_mode_f_strophy,pulse_positive_s_fraction,pulse_negative_s_fraction,pulse_zero_s_fraction,pulse_nyquist_s_fraction,pulse_signed_s_centroid,pulse_dominant_signed_s,control_k_mode_f_strophy,control_positive_s_fraction,control_negative_s_fraction,control_zero_s_fraction,control_nyquist_s_fraction,control_signed_s_centroid,control_dominant_signed_s,response_k_mode_f_strophy,response_positive_s_fraction,response_negative_s_fraction,response_zero_s_fraction,response_nyquist_s_fraction,response_signed_s_centroid,response_dominant_signed_s"
+    );
+
+    println!(
+        "# flux_columns,run,step,time,x_cutoff,v_cutoff,pulse_phi_x,pulse_phi_v,pulse_cumulative_phi_x,pulse_cumulative_phi_v,pulse_direct_loss_x,pulse_direct_loss_v,pulse_closure_x,pulse_closure_v,control_phi_x,control_phi_v,control_cumulative_phi_x,control_cumulative_phi_v,control_direct_loss_x,control_direct_loss_v,control_closure_x,control_closure_v"
     );
 
     let common = |nx, nv| VlasovPoissonConfig {
