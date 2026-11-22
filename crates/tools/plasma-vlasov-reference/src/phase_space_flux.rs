@@ -468,6 +468,34 @@ mod tests {
     }
 
     #[test]
+    fn electric_acceleration_subflow_alone_preserves_quadratic_casimir() {
+        let solver = initial_solver();
+        assert!(solver.electric_field.iter().any(|field| field.abs() > 1.0e-10));
+
+        let derivative_v = spectral_derivative_v(&solver.distribution, solver.config);
+        let config = solver.config;
+        let mut total_casimir_rate = 0.0;
+        let mut total_casimir = 0.0;
+        for ix in 0..config.nx {
+            let acceleration = config.charge_to_mass * solver.electric_field[ix];
+            for iv in 0..config.nv {
+                let index = ix * config.nv + iv;
+                let value = solver.distribution[index];
+                let electric_rhs = -acceleration * derivative_v[index];
+                total_casimir_rate = (2.0 * value * electric_rhs)
+                    .mul_add(config.dx() * config.dv(), total_casimir_rate);
+                total_casimir = (value * value)
+                    .mul_add(config.dx() * config.dv(), total_casimir);
+            }
+        }
+
+        assert!(
+            total_casimir_rate.abs() < 1.0e-11 * total_casimir.max(1.0),
+            "electric-only C2 rate = {total_casimir_rate:e}"
+        );
+    }
+
+    #[test]
     fn invalid_flux_cutoffs_fail_closed() {
         let solver = initial_solver();
         assert_eq!(
