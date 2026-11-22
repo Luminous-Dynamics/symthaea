@@ -698,6 +698,12 @@ fn run() -> Result<(), String> {
         hex_digest(Sha256::digest(include_bytes!("mace_counterfactual_evidence.rs")).as_slice());
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
+    let schema_sha256 = hex_digest(
+        Sha256::digest(include_bytes!(
+            "../../../../../data/schemas/mace_counterfactual_evidence_v0_1.schema.json"
+        ))
+        .as_slice(),
+    );
     let source_revision = env::var("MACE_SOURCE_REVISION").ok();
     if source_revision
         .as_deref()
@@ -706,7 +712,7 @@ fn run() -> Result<(), String> {
         return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
     }
     let run_identity = format!(
-        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{}",
+        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{}",
         source_revision.as_deref().unwrap_or("unspecified")
     );
     let run_id = format!(
@@ -760,6 +766,7 @@ fn run() -> Result<(), String> {
             "unmatched_random_target_count": manifest.unmatched_random_target_count,
             "source_code_sha256": source_code_sha256,
             "fixture_sha256": fixture_sha256,
+            "schema_sha256": schema_sha256,
             "source_revision": source_revision,
             "known_root_count": EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
