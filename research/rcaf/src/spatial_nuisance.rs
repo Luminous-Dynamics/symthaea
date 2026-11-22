@@ -18,7 +18,10 @@ impl SpatialGraph {
         roi_labels: Vec<String>,
         adjacency: Vec<Vec<f64>>,
     ) -> Result<Self, SpatialNuisanceError> {
-        let graph = Self { roi_labels, adjacency };
+        let graph = Self {
+            roi_labels,
+            adjacency,
+        };
         graph.validate()?;
         Ok(graph)
     }
@@ -26,7 +29,9 @@ impl SpatialGraph {
     pub fn validate(&self) -> Result<(), SpatialNuisanceError> {
         let n = self.roi_labels.len();
         if n < 2 {
-            return Err(SpatialNuisanceError::InvalidGeometry("at least two ROI labels are required"));
+            return Err(SpatialNuisanceError::InvalidGeometry(
+                "at least two ROI labels are required",
+            ));
         }
         if self.adjacency.len() != n || self.adjacency.iter().any(|row| row.len() != n) {
             return Err(SpatialNuisanceError::InvalidGeometry(
@@ -36,10 +41,14 @@ impl SpatialGraph {
         let mut labels = std::collections::HashSet::with_capacity(n);
         for label in &self.roi_labels {
             if label.trim().is_empty() {
-                return Err(SpatialNuisanceError::InvalidGeometry("ROI labels must be non-empty"));
+                return Err(SpatialNuisanceError::InvalidGeometry(
+                    "ROI labels must be non-empty",
+                ));
             }
             if !labels.insert(label) {
-                return Err(SpatialNuisanceError::InvalidGeometry("ROI labels must be unique"));
+                return Err(SpatialNuisanceError::InvalidGeometry(
+                    "ROI labels must be unique",
+                ));
             }
         }
         for i in 0..n {
@@ -57,10 +66,14 @@ impl SpatialGraph {
                     ));
                 }
                 if i == j && weight.abs() > 1e-12 {
-                    return Err(SpatialNuisanceError::InvalidGeometry("self-loop weights must be zero"));
+                    return Err(SpatialNuisanceError::InvalidGeometry(
+                        "self-loop weights must be zero",
+                    ));
                 }
                 if (weight - self.adjacency[j][i]).abs() > 1e-10 {
-                    return Err(SpatialNuisanceError::InvalidGeometry("adjacency must be symmetric"));
+                    return Err(SpatialNuisanceError::InvalidGeometry(
+                        "adjacency must be symmetric",
+                    ));
                 }
             }
         }
@@ -88,7 +101,10 @@ pub enum SpatialNuisanceFamily {
     /// Low-frequency non-constant graph Laplacian modes.
     GraphSmoothLowRank { rank: usize, diffusion_time: f64 },
     /// Heat-kernel fields seeded at explicit ROI indices.
-    HeatKernelLocalized { seed_roi_indices: Vec<usize>, diffusion_time: f64 },
+    HeatKernelLocalized {
+        seed_roi_indices: Vec<usize>,
+        diffusion_time: f64,
+    },
 }
 
 /// Parameters for one deterministic spatial nuisance field.
@@ -133,7 +149,9 @@ impl SpatialNuisanceField {
             ));
         }
         if clean_observations.len() != self.values.len()
-            || clean_observations.iter().any(|row| row.len() != self.roi_labels.len())
+            || clean_observations
+                .iter()
+                .any(|row| row.len() != self.roi_labels.len())
         {
             return Err(SpatialNuisanceError::DimensionMismatch(
                 "clean observations must be time x ROI and match the nuisance field",
@@ -214,12 +232,14 @@ pub fn generate_spatial_nuisance_field(
     validate_config(config)?;
 
     let basis = match &config.family {
-        SpatialNuisanceFamily::GraphSmoothLowRank { rank, diffusion_time } => {
-            graph_smooth_basis(graph, *rank, *diffusion_time)?
-        }
-        SpatialNuisanceFamily::HeatKernelLocalized { seed_roi_indices, diffusion_time } => {
-            heat_kernel_basis(graph, seed_roi_indices, *diffusion_time)?
-        }
+        SpatialNuisanceFamily::GraphSmoothLowRank {
+            rank,
+            diffusion_time,
+        } => graph_smooth_basis(graph, *rank, *diffusion_time)?,
+        SpatialNuisanceFamily::HeatKernelLocalized {
+            seed_roi_indices,
+            diffusion_time,
+        } => heat_kernel_basis(graph, seed_roi_indices, *diffusion_time)?,
     };
     let roi_count = graph.roi_labels.len();
     let mode_count = basis.first().map_or(0, Vec::len);
@@ -231,7 +251,8 @@ pub fn generate_spatial_nuisance_field(
         let targets = target_processes.ok_or(SpatialNuisanceError::InvalidConfig(
             "positive temporal coherence requires target processes",
         ))?;
-        if targets.len() != mode_count || targets.iter().any(|row| row.len() != config.time_points) {
+        if targets.len() != mode_count || targets.iter().any(|row| row.len() != config.time_points)
+        {
             return Err(SpatialNuisanceError::DimensionMismatch(
                 "one target time series per spatial mode is required",
             ));
@@ -299,33 +320,45 @@ pub fn generate_spatial_nuisance_field(
 
 fn validate_config(config: &SpatialNuisanceConfig) -> Result<(), SpatialNuisanceError> {
     if config.time_points < 3 {
-        return Err(SpatialNuisanceError::InvalidConfig("at least three time points are required"));
+        return Err(SpatialNuisanceError::InvalidConfig(
+            "at least three time points are required",
+        ));
     }
     if !config.dose.is_finite() || config.dose < 0.0 {
-        return Err(SpatialNuisanceError::InvalidConfig("dose must be finite and non-negative"));
+        return Err(SpatialNuisanceError::InvalidConfig(
+            "dose must be finite and non-negative",
+        ));
     }
     if !config.temporal_ar1.is_finite() || config.temporal_ar1.abs() >= 1.0 {
         return Err(SpatialNuisanceError::InvalidConfig(
             "temporal AR(1) must be finite and strictly between -1 and 1",
         ));
     }
-    if !config.temporal_coherence.is_finite()
-        || !(0.0..=1.0).contains(&config.temporal_coherence)
-    {
+    if !config.temporal_coherence.is_finite() || !(0.0..=1.0).contains(&config.temporal_coherence) {
         return Err(SpatialNuisanceError::InvalidConfig(
             "temporal coherence must be finite and in [0, 1]",
         ));
     }
     match &config.family {
-        SpatialNuisanceFamily::GraphSmoothLowRank { rank, diffusion_time } => {
+        SpatialNuisanceFamily::GraphSmoothLowRank {
+            rank,
+            diffusion_time,
+        } => {
             if *rank == 0 {
-                return Err(SpatialNuisanceError::InvalidConfig("graph-smooth rank must be positive"));
+                return Err(SpatialNuisanceError::InvalidConfig(
+                    "graph-smooth rank must be positive",
+                ));
             }
             validate_diffusion_time(*diffusion_time)?;
         }
-        SpatialNuisanceFamily::HeatKernelLocalized { seed_roi_indices, diffusion_time } => {
+        SpatialNuisanceFamily::HeatKernelLocalized {
+            seed_roi_indices,
+            diffusion_time,
+        } => {
             if seed_roi_indices.is_empty() {
-                return Err(SpatialNuisanceError::InvalidConfig("at least one heat-kernel seed ROI is required"));
+                return Err(SpatialNuisanceError::InvalidConfig(
+                    "at least one heat-kernel seed ROI is required",
+                ));
             }
             validate_diffusion_time(*diffusion_time)?;
         }
@@ -352,9 +385,7 @@ struct EigenSystem {
 
 /// Jacobi eigensolver for a small symmetric Laplacian. Repeated eigenspaces are handled as
 /// projectors for heat-kernel fields; low-rank truncation may not split a repeated eigenvalue.
-fn symmetric_eigendecomposition(
-    matrix: &[Vec<f64>],
-) -> Result<EigenSystem, SpatialNuisanceError> {
+fn symmetric_eigendecomposition(matrix: &[Vec<f64>]) -> Result<EigenSystem, SpatialNuisanceError> {
     let n = matrix.len();
     let mut diagonalized = matrix.to_vec();
     let mut vectors = vec![vec![0.0; n]; n];
@@ -401,10 +432,8 @@ fn symmetric_eigendecomposition(
                 diagonalized[q][k] = new_kq;
             }
         }
-        diagonalized[p][p] =
-            cosine * cosine * app - 2.0 * sine * cosine * apq + sine * sine * aqq;
-        diagonalized[q][q] =
-            sine * sine * app + 2.0 * sine * cosine * apq + cosine * cosine * aqq;
+        diagonalized[p][p] = cosine * cosine * app - 2.0 * sine * cosine * apq + sine * sine * aqq;
+        diagonalized[q][q] = sine * sine * app + 2.0 * sine * cosine * apq + cosine * cosine * aqq;
         diagonalized[p][q] = 0.0;
         diagonalized[q][p] = 0.0;
 
@@ -420,9 +449,8 @@ fn symmetric_eigendecomposition(
     }
 
     let mut order: Vec<usize> = (0..n).collect();
-    order.sort_by(|left, right| {
-        diagonalized[*left][*left].total_cmp(&diagonalized[*right][*right])
-    });
+    order
+        .sort_by(|left, right| diagonalized[*left][*left].total_cmp(&diagonalized[*right][*right]));
     let raw_values: Vec<f64> = order.iter().map(|&i| diagonalized[i][i]).collect();
     let spectral_scale = raw_values
         .iter()
@@ -462,11 +490,18 @@ fn symmetric_eigendecomposition(
         }
     }
 
-    Ok(EigenSystem { values, vectors: sorted_vectors, tolerance })
+    Ok(EigenSystem {
+        values,
+        vectors: sorted_vectors,
+        tolerance,
+    })
 }
 
 fn non_constant_modes(eigen: &EigenSystem) -> Vec<usize> {
-    eigen.values.iter().enumerate()
+    eigen
+        .values
+        .iter()
+        .enumerate()
         .filter_map(|(index, value)| (*value > eigen.tolerance).then_some(index))
         .collect()
 }
@@ -488,8 +523,7 @@ fn graph_smooth_basis(
         });
     }
     if rank < modes.len()
-        && (eigen.values[modes[rank]] - eigen.values[modes[rank - 1]]).abs()
-            <= eigen.tolerance
+        && (eigen.values[modes[rank]] - eigen.values[modes[rank - 1]]).abs() <= eigen.tolerance
     {
         return Err(SpatialNuisanceError::RankSplitsDegenerateEigenvalue);
     }
@@ -525,10 +559,14 @@ fn heat_kernel_basis(
     let mut seen = std::collections::HashSet::with_capacity(seed_roi_indices.len());
     for &seed in seed_roi_indices {
         if seed >= n {
-            return Err(SpatialNuisanceError::InvalidConfig("heat-kernel seed is outside graph"));
+            return Err(SpatialNuisanceError::InvalidConfig(
+                "heat-kernel seed is outside graph",
+            ));
         }
         if !seen.insert(seed) {
-            return Err(SpatialNuisanceError::InvalidConfig("heat-kernel seeds must be unique"));
+            return Err(SpatialNuisanceError::InvalidConfig(
+                "heat-kernel seeds must be unique",
+            ));
         }
     }
     let eigen = symmetric_eigendecomposition(&graph.laplacian())?;
@@ -581,7 +619,9 @@ fn orthonormalize_columns(basis: &mut [Vec<f64>]) -> Result<(), SpatialNuisanceE
         }
         let pivot = (0..rows)
             .max_by(|left, right| {
-                basis[*left][column].abs().total_cmp(&basis[*right][column].abs())
+                basis[*left][column]
+                    .abs()
+                    .total_cmp(&basis[*right][column].abs())
             })
             .unwrap_or(0);
         if basis[pivot][column] < 0.0 {
@@ -600,10 +640,15 @@ fn standardize(values: &[f64]) -> Result<Vec<f64>, SpatialNuisanceError> {
         ));
     }
     let mean = values.iter().sum::<f64>() / values.len() as f64;
-    let variance = values.iter().map(|value| (value - mean).powi(2)).sum::<f64>()
+    let variance = values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
         / values.len() as f64;
     if !variance.is_finite() || variance <= 1e-20 {
-        return Err(SpatialNuisanceError::InvalidConfig("target processes must have non-zero variance"));
+        return Err(SpatialNuisanceError::InvalidConfig(
+            "target processes must have non-zero variance",
+        ));
     }
     let scale = variance.sqrt();
     Ok(values.iter().map(|value| (value - mean) / scale).collect())
@@ -661,7 +706,13 @@ struct XorShift64 {
 
 impl XorShift64 {
     fn new(seed: u64) -> Self {
-        Self { state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed } }
+        Self {
+            state: if seed == 0 {
+                0x9E37_79B9_7F4A_7C15
+            } else {
+                seed
+            },
+        }
     }
     fn next(&mut self) -> u64 {
         self.state ^= self.state << 13;
@@ -682,7 +733,10 @@ struct GaussianRng {
 
 impl GaussianRng {
     fn new(seed: u64) -> Self {
-        Self { uniform: XorShift64::new(seed), spare: None }
+        Self {
+            uniform: XorShift64::new(seed),
+            spare: None,
+        }
     }
     fn normal(&mut self) -> f64 {
         if let Some(value) = self.spare.take() {
@@ -713,7 +767,10 @@ mod tests {
 
     fn config() -> SpatialNuisanceConfig {
         SpatialNuisanceConfig {
-            family: SpatialNuisanceFamily::GraphSmoothLowRank { rank: 2, diffusion_time: 0.35 },
+            family: SpatialNuisanceFamily::GraphSmoothLowRank {
+                rank: 2,
+                diffusion_time: 0.35,
+            },
             time_points: 128,
             dose: 0.2,
             temporal_ar1: 0.4,
@@ -724,9 +781,11 @@ mod tests {
 
     fn targets(modes: usize, time_points: usize) -> Vec<Vec<f64>> {
         (0..modes)
-            .map(|mode| (0..time_points)
-                .map(|time| ((time as f64 + 1.0) * (mode as f64 + 1.0) * 0.071).sin())
-                .collect())
+            .map(|mode| {
+                (0..time_points)
+                    .map(|time| ((time as f64 + 1.0) * (mode as f64 + 1.0) * 0.071).sin())
+                    .collect()
+            })
             .collect()
     }
 
@@ -734,16 +793,25 @@ mod tests {
     fn graph_rejects_asymmetric_negative_and_duplicate_inputs() {
         let mut graph = path_graph();
         graph.adjacency[0][1] = 2.0;
-        assert!(matches!(graph.validate(), Err(SpatialNuisanceError::InvalidGeometry(_))));
+        assert!(matches!(
+            graph.validate(),
+            Err(SpatialNuisanceError::InvalidGeometry(_))
+        ));
 
         let mut graph = path_graph();
         graph.adjacency[0][1] = -1.0;
         graph.adjacency[1][0] = -1.0;
-        assert!(matches!(graph.validate(), Err(SpatialNuisanceError::InvalidGeometry(_))));
+        assert!(matches!(
+            graph.validate(),
+            Err(SpatialNuisanceError::InvalidGeometry(_))
+        ));
 
         let mut graph = path_graph();
         graph.roi_labels[1] = graph.roi_labels[0].clone();
-        assert!(matches!(graph.validate(), Err(SpatialNuisanceError::InvalidGeometry(_))));
+        assert!(matches!(
+            graph.validate(),
+            Err(SpatialNuisanceError::InvalidGeometry(_))
+        ));
     }
 
     #[test]
@@ -751,7 +819,10 @@ mod tests {
         let field = generate_spatial_nuisance_field(&path_graph(), &config(), None).unwrap();
         for mode in 0..field.spatial_basis[0].len() {
             let sum: f64 = field.spatial_basis.iter().map(|row| row[mode]).sum();
-            assert!(sum.abs() < 1e-9, "mode {mode} retained constant component {sum}");
+            assert!(
+                sum.abs() < 1e-9,
+                "mode {mode} retained constant component {sum}"
+            );
         }
     }
 
@@ -870,7 +941,10 @@ mod tests {
         }
         let graph = SpatialGraph::new(labels, adjacency).unwrap();
         let config = SpatialNuisanceConfig {
-            family: SpatialNuisanceFamily::GraphSmoothLowRank { rank: 1, diffusion_time: 0.3 },
+            family: SpatialNuisanceFamily::GraphSmoothLowRank {
+                rank: 1,
+                diffusion_time: 0.3,
+            },
             ..config()
         };
         assert!(matches!(
@@ -884,8 +958,12 @@ mod tests {
         let graph = path_graph();
         let original = generate_spatial_nuisance_field(&graph, &config(), None).unwrap();
         let permutation = [3usize, 0, 5, 1, 4, 2];
-        let labels = permutation.iter().map(|&i| graph.roi_labels[i].clone()).collect();
-        let adjacency = permutation.iter()
+        let labels = permutation
+            .iter()
+            .map(|&i| graph.roi_labels[i].clone())
+            .collect();
+        let adjacency = permutation
+            .iter()
             .map(|&i| permutation.iter().map(|&j| graph.adjacency[i][j]).collect())
             .collect();
         let permuted_graph = SpatialGraph::new(labels, adjacency).unwrap();
@@ -893,11 +971,15 @@ mod tests {
         for left in 0..6 {
             for right in 0..6 {
                 let original_projector: f64 = (0..2)
-                    .map(|mode| original.spatial_basis[permutation[left]][mode]
-                        * original.spatial_basis[permutation[right]][mode])
+                    .map(|mode| {
+                        original.spatial_basis[permutation[left]][mode]
+                            * original.spatial_basis[permutation[right]][mode]
+                    })
                     .sum();
                 let permuted_projector: f64 = (0..2)
-                    .map(|mode| permuted.spatial_basis[left][mode] * permuted.spatial_basis[right][mode])
+                    .map(|mode| {
+                        permuted.spatial_basis[left][mode] * permuted.spatial_basis[right][mode]
+                    })
                     .sum();
                 assert!((original_projector - permuted_projector).abs() < 1e-8);
             }
