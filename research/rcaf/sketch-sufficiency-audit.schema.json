@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/sketch-sufficiency-audit.schema.json",
+  "title": "RCAF conditional score sketch-sufficiency audit",
+  "description": "Synthetic per-sketch-cell two-sample KS and simultaneous DKW diagnostic; not the theoretical sketched-calibration leakage bound.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "source_split_id",
+    "target_split_id",
+    "confidence_delta",
+    "confidence_level",
+    "minimum_replicates_per_domain_cell",
+    "source_replicates",
+    "target_replicates",
+    "expected_sketch_cells",
+    "unseen_target_sketch_cells",
+    "cells",
+    "overall_estimators",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": { "const": "rcaf.sketch-sufficiency-audit/0.1.0" },
+    "source_status": { "const": "synthetic_sketch_sufficiency_audit" },
+    "source_split_id": { "const": "sketch-source-null-v1" },
+    "target_split_id": { "const": "sketch-target-null-v1" },
+    "confidence_delta": { "const": 0.05 },
+    "confidence_level": { "const": 0.95 },
+    "minimum_replicates_per_domain_cell": { "const": 30 },
+    "source_replicates": { "const": 297 },
+    "target_replicates": { "const": 307 },
+    "expected_sketch_cells": {
+      "const": ["low_motion", "medium_motion", "high_motion"]
+    },
+    "unseen_target_sketch_cells": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sketch_cell_id", "target_replicates", "disposition"],
+        "properties": {
+          "sketch_cell_id": { "const": "new_scanner" },
+          "target_replicates": { "const": 10 },
+          "disposition": { "const": "abstain_unseen_sketch_cell" }
+        }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/cell" }
+    },
+    "overall_estimators": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "estimator_id",
+          "all_expected_cells_audited",
+          "worst_cell_empirical_ks_distance",
+          "worst_cell_leakage_upper_bound"
+        ],
+        "properties": {
+          "estimator_id": {
+            "enum": [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error"
+            ]
+          },
+          "all_expected_cells_audited": { "const": true },
+          "worst_cell_empirical_ks_distance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "worst_cell_leakage_upper_bound": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "estimatorCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimator_id",
+        "empirical_ks_distance",
+        "source_dkw_radius",
+        "target_dkw_radius",
+        "conditional_score_leakage_upper_bound"
+      ],
+      "properties": {
+        "estimator_id": {
+          "enum": [
+            "absolute_weighted_jaccard",
+            "signed_shift_weighted_jaccard",
+            "normalized_mean_absolute_edge_error"
+          ]
+        },
+        "empirical_ks_distance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "source_dkw_radius": { "type": "number", "minimum": 0, "maximum": 1 },
+        "target_dkw_radius": { "type": "number", "minimum": 0, "maximum": 1 },
+        "conditional_score_leakage_upper_bound": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sketch_cell_id",
+        "source_replicates",
+        "target_replicates",
+        "minimum_replicates_per_domain_cell",
+        "disposition",
+        "estimators"
+      ],
+      "properties": {
+        "sketch_cell_id": {
+          "enum": ["low_motion", "medium_motion", "high_motion"]
+        },
+        "source_replicates": { "const": 99 },
+        "target_replicates": { "const": 99 },
+        "minimum_replicates_per_domain_cell": { "const": 30 },
+        "disposition": { "const": "audited" },
+        "estimators": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/estimatorCell" }
+        }
+      }
+    }
+  }
+}
