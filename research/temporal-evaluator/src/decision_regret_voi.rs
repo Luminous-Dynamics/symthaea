@@ -531,8 +531,6 @@ mod tests {
     }
 
     #[test]
-    
-    #[test]
     fn epsilon_regret_sufficiency_accepts_near_optimal_common_action() {
         let class = ObservationalEquivalenceClass {
             equivalence_class_id: 79,
