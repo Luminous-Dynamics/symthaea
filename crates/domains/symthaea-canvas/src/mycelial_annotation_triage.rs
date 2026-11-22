@@ -261,8 +261,12 @@ pub fn build_mycelial_annotation_triage(
     if prediction_digest != calibration.prediction_graph_digest {
         return Err(MycelialAnnotationTriageError::CalibrationGraphMismatch);
     }
-    if prediction.junctions.len() > MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS
-        || !config.uncertainty_confidence_threshold.is_finite()
+    if prediction.junctions.len() > MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS {
+        return Err(MycelialAnnotationTriageError::TooManyJunctions(
+            prediction.junctions.len(),
+        ));
+    }
+    if !config.uncertainty_confidence_threshold.is_finite()
         || !(0.0..=1.0).contains(&config.uncertainty_confidence_threshold)
         || config.articulation_component_delta_threshold == 0
         || config.articulation_component_delta_threshold > MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS
@@ -456,6 +460,11 @@ impl MycelialAnnotationTriageReport {
                     || !(0.0..=1.0).contains(&item.second_highest_probability)
                     || !item.top_two_margin.is_finite()
                     || !(0.0..=1.0).contains(&item.top_two_margin)
+                    || (item.top_label_confidence
+                        - item.second_highest_probability
+                        - item.top_two_margin)
+                        .abs()
+                        > 1.0e-12
                     || !item.predictive_entropy_nats.is_finite()
                     || item.predictive_entropy_nats < 0.0
                     || !item.anastomosis_probability.is_finite()
