@@ -1809,6 +1809,72 @@ mod tests {
     }
 
     #[test]
+    fn coordinate_frame_and_calibration_must_match_before_scoring() {
+        let truth = graph(
+            "human",
+            vec![node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        let mut wrong_coordinate_frame = graph(
+            "model",
+            vec![node("pA", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        wrong_coordinate_frame.coordinate_frame_id = "camera-frame:rotated".to_string();
+        assert_eq!(
+            evaluate_mycelial_reconstruction(
+                &truth,
+                &wrong_coordinate_frame,
+                "explicit-match-v1",
+                &[],
+                ReconstructionEvaluationConfig::default()
+            ),
+            Err(MycelialReconstructionError::CoordinateFrameMismatch)
+        );
+
+        let mut wrong_calibration = graph(
+            "model",
+            vec![node("pA", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        wrong_calibration.calibration_digest = "d".repeat(64);
+        assert_eq!(
+            evaluate_mycelial_reconstruction(
+                &truth,
+                &wrong_calibration,
+                "explicit-match-v1",
+                &[],
+                ReconstructionEvaluationConfig::default()
+            ),
+            Err(MycelialReconstructionError::CalibrationMismatch)
+        );
+    }
+
+    #[test]
+    fn calibration_digest_and_coordinate_frame_are_bound_to_graph_digest() {
+        let original = graph(
+            "human",
+            vec![node("A", AnnotatedJunctionKind::Tip, 0.0, 0.0, 0.0)],
+            Vec::new(),
+        );
+        let original_digest = original.canonical_digest_hex().unwrap();
+
+        let mut changed_calibration = original.clone();
+        changed_calibration.calibration_digest = "d".repeat(64);
+        assert_ne!(
+            original_digest,
+            changed_calibration.canonical_digest_hex().unwrap()
+        );
+
+        let mut changed_frame = original.clone();
+        changed_frame.coordinate_frame_id = "another-frame".to_string();
+        assert_ne!(
+            original_digest,
+            changed_frame.canonical_digest_hex().unwrap()
+        );
+    }
+
+    #[test]
     fn unit_and_dimensionality_are_part_of_the_benchmark_contract() {
         let truth = graph("human", vec![], vec![]);
         let mut prediction = graph("model", vec![], vec![]);
