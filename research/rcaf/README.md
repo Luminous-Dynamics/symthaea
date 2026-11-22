@@ -303,3 +303,16 @@ The module does not estimate density ratios or claim arbitrary shift validity. Z
 
 
 The weighted calibration module also exposes adapters from `FactorialEstimatorResponseReport`, pinning calibration/null scores to nuisance-only displacement and signal scores to clean-to-combined displacement, with the direction cosine carried through. Reordered/missing estimators and undefined signal directions fail closed.
+
+
+## Conditional-score sketch-sufficiency audit
+
+The `sketch_sufficiency_audit` module tests whether a predeclared compressed covariate representation preserves the conditional null-score distributions within its cells. For each of the three RCAF estimator scores and each expected sketch cell, it reports the two-sample empirical KS distance plus simultaneous source/target DKW radii. The union bound covers both domains, every expected cell and all three score channels.
+
+Run the deterministic three-cell smoke audit:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_sketch_sufficiency_audit
+```
+
+The report contract is `sketch-sufficiency-audit.schema.json`. Unknown target sketch cells, missing support and under-resolved cells receive explicit abstentions and do not acquire a borrowed leakage bound. This is an empirical scalar-score CDF diagnostic, **not** the theoretical sketched-calibration leakage `Delta_T` or a proof that the compressed representation preserves the full conditional response law. See `docs/neuroscience/RCAF_SKETCH_SUFFICIENCY_AUDIT_V1.md`.
