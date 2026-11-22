@@ -774,25 +774,19 @@ mod tests {
     #[test]
     fn each_stratum_controls_its_own_null_rate_and_direction_errors() {
         let report = calibrate_groupwise_null(&calibration(), &evaluation(), &config()).unwrap();
+        let expected_wrong_direction = [4, 10, 10];
         for stratum in &report.strata {
-            for estimator in &stratum.estimators {
+            for (index, estimator) in stratum.estimators.iter().enumerate() {
+                let rates = estimator.stratum_threshold_rates.as_ref().unwrap();
+                assert_eq!(rates.held_out_false_positive_rate.successes, 5);
                 assert_eq!(
-                    estimator
-                        .stratum_threshold_rates
-                        .as_ref()
-                        .unwrap()
-                        .held_out_false_positive_rate
-                        .successes,
-                    5
+                    rates.wrong_direction_acceptance_rate.successes,
+                    expected_wrong_direction[index]
                 );
                 assert_eq!(
-                    estimator
-                        .stratum_threshold_rates
-                        .as_ref()
-                        .unwrap()
-                        .wrong_direction_acceptance_rate
-                        .successes,
-                    10
+                    rates.directionally_correct_signal_rate.successes
+                        + rates.wrong_direction_acceptance_rate.successes,
+                    rates.signal_detection_rate.successes
                 );
             }
         }
