@@ -224,6 +224,7 @@ pub enum WeightedCovariateShiftError {
     RatioEstimationSplitOverlap,
     InvalidRatioEstimatorId,
     InvalidImportanceWeight { replicate_id: String },
+    NonPositiveEvaluationWeight { replicate_id: String },
     InvalidStatistic { replicate_id: String },
     InvalidDirectionCosine { replicate_id: String },
     NonFiniteWeightMoments,
@@ -256,6 +257,9 @@ impl fmt::Display for WeightedCovariateShiftError {
             Self::InvalidRatioEstimatorId => write!(f, "estimated density ratio requires a non-empty estimator id"),
             Self::InvalidImportanceWeight { replicate_id } => {
                 write!(f, "replicate {replicate_id} has a non-finite or negative importance weight")
+            }
+            Self::NonPositiveEvaluationWeight { replicate_id } => {
+                write!(f, "evaluation replicate {replicate_id} must have a strictly positive target density-ratio weight")
             }
             Self::InvalidStatistic { replicate_id } => {
                 write!(f, "replicate {replicate_id} contains a non-finite or negative statistic")
@@ -314,6 +318,11 @@ pub fn evaluate_weighted_covariate_shift(
         validate_statistics(&item.replicate_id, &item.null_statistics)?;
         validate_statistics(&item.replicate_id, &item.signal_statistics)?;
         validate_weight(&item.replicate_id, item.importance_weight)?;
+        if item.importance_weight <= 0.0 {
+            return Err(WeightedCovariateShiftError::NonPositiveEvaluationWeight {
+                replicate_id: item.replicate_id.clone(),
+            });
+        }
         if !item.signal_directional_cosine.is_finite()
             || !(-1.0..=1.0).contains(&item.signal_directional_cosine)
         {
@@ -600,6 +609,9 @@ pub fn weighted_upper_threshold(
         || test_weight <= 0.0
         || !alpha.is_finite()
         || !(0.0..1.0).contains(&alpha)
+        || calibration_scores_and_weights.iter().any(|(score, weight)| {
+            !score.is_finite() || !weight.is_finite() || *weight < 0.0
+        })
     {
         return None;
     }
