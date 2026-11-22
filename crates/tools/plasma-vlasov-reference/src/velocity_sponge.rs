@@ -9,7 +9,7 @@
 use std::fmt;
 
 use super::phase_space_cascade::QuadraticCasimirBudget;
-use super::{Complex, SolverError, VlasovPoisson1d1v, fft, signed_mode};
+use super::{Complex, SolverError, VlasovPoisson1d1v, VlasovPoissonDiagnostics, fft, signed_mode};
 
 /// Invalid parameters or solver failures during a velocity-Fourier sponge.
 #[derive(Debug, Clone, PartialEq)]
@@ -67,6 +67,8 @@ pub struct VelocityFourierSpongeReport {
     pub nyquist_attenuation: f64,
     pub casimir_before: QuadraticCasimirBudget,
     pub casimir_after: QuadraticCasimirBudget,
+    pub diagnostics_before: VlasovPoissonDiagnostics,
+    pub diagnostics_after: VlasovPoissonDiagnostics,
     /// Positive is removed C2; small negative roundoff is not clamped.
     pub removed_total_casimir: f64,
     pub removed_spatial_mean_casimir: f64,
@@ -118,6 +120,9 @@ impl VlasovPoisson1d1v {
         let before = self
             .quadratic_casimir_budget()
             .map_err(VelocityFourierSpongeError::Solver)?;
+        let diagnostics_before = self
+            .diagnostics()
+            .map_err(VelocityFourierSpongeError::Solver)?;
 
         // Preserve exact identity semantics and avoid an unnecessary FFT
         // round-trip when the requested operator has no effect.
@@ -130,6 +135,8 @@ impl VlasovPoisson1d1v {
                 nyquist_attenuation: 1.0,
                 casimir_before: before,
                 casimir_after: before,
+                diagnostics_before,
+                diagnostics_after: diagnostics_before,
                 removed_total_casimir: 0.0,
                 removed_spatial_mean_casimir: 0.0,
                 removed_fluctuation_f_strophy: 0.0,
@@ -227,6 +234,14 @@ impl VlasovPoisson1d1v {
                 return Err(VelocityFourierSpongeError::Solver(error));
             }
         };
+        let diagnostics_after = match self.diagnostics() {
+            Ok(diagnostics) => diagnostics,
+            Err(error) => {
+                self.distribution = previous_distribution;
+                self.electric_field = previous_field;
+                return Err(VelocityFourierSpongeError::Solver(error));
+            }
+        };
 
         let removed_total_casimir = before.total_casimir - after.total_casimir;
         let removed_spatial_mean_casimir = before.spatial_mean_casimir - after.spatial_mean_casimir;
@@ -255,6 +270,8 @@ impl VlasovPoisson1d1v {
             nyquist_attenuation,
             casimir_before: before,
             casimir_after: after,
+            diagnostics_before,
+            diagnostics_after,
             removed_total_casimir,
             removed_spatial_mean_casimir,
             removed_fluctuation_f_strophy,
@@ -334,6 +351,12 @@ mod tests {
         assert!((high_after - expected_high).abs() < 1.0e-10);
         assert!((low_after - low_before).abs() < 1.0e-10);
         assert!((density_mode_after.amplitude() - density_mode_before.amplitude()).abs() < 1.0e-12);
+        assert!(
+            (report.diagnostics_after.total_mass - report.diagnostics_before.total_mass).abs()
+                < 1.0e-12
+        );
+        assert!(report.diagnostics_after.minimum_distribution > 0.0);
+        assert_eq!(report.diagnostics_after.time, report.diagnostics_before.time);
         assert_eq!(solver.time(), time_before);
         assert!((report.nyquist_attenuation - (-1.0_f64).exp()).abs() < 1.0e-14);
         assert!(report.removed_total_casimir > 0.0);
