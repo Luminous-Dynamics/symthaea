@@ -353,3 +353,70 @@ The candidate/evaluator JSONL streams are deliberately separate, but the evaluat
 At authoring time, no cargo, rustc or rustfmt executable is available in the execution environment. The Rust tests are authored but not executed; no compile, formatting, runner or CI pass is claimed. The JSON Schema text was parsed as JSON at authoring time, but no external JSON-Schema validator has been run. No utility gain, causal sufficiency result, external benchmark score, physical intervention authority or SOTA advantage is claimed.
 
 The immediate next integration is a verifier-issued dependency sidecar from Mycelix/Symtropy/ingress, followed by schema validation, exact-head Cargo execution, hidden evaluator custody, and matched semantic/byte/token baselines.
+
+
+### Receipt-backed dependency sidecar follow-on (2026-11-22)
+
+The ingress boundary now carries an explicit dependency-lineage declaration in VerifiedLineage:
+
+- Complete: the verified lineage receipt attests that the supplied derived_from_event_ids list is complete;
+- Partial: the receipt attests the listed dependencies, but does not claim completeness;
+- Unknown: no dependency ancestry has been established. The event list must be empty and the manifest digest absent.
+
+Complete/Partial declarations require a SHA-256 dependency-manifest digest. Lists must be strictly sorted, unique, nonzero and non-self-referential. These fields are projected into the immutable EvidenceReceiptBundle; the caller cannot populate them after ingress.
+
+ConsolidationEvidencePackV1::dependency_sidecar() emits EvidenceDependencySidecarV1, binding:
+- exact (valid_at_ms, known_at_ms) snapshot;
+- event ID, action and scope;
+- verified source family/root;
+- upstream source, source artifact and transformation identities;
+- raw-event and lineage receipt digests;
+- dependency-manifest status/digest and exact declared parent event IDs;
+- lifecycle status verified at the same knowledge snapshot.
+
+The sidecar has a deterministic canonical SHA-256 and a versioned JSON representation validated against data/schemas/mace_evidence_dependency_sidecar_v1.schema.json. Its integrity check detects changes to records or ordering; it is not a signature or an independent authenticity proof. Production authenticity still depends on the Mycelix/ingress receipt verifier and trust policy.
+
+The evaluator now links the ingress and consolidation crates and includes MaceAuditDependencyIndex::from_receipt_sidecar. The adapter validates sidecar integrity, checks event/action/scope/root/family identity against the candidate pool, follows only declared in-pool derived edges, and marks unknown/partial lineage or out-of-pool parent references incomplete. It does not infer supersession edges from current lifecycle status. Re-ingestion at a later known_at must revalidate revocation/supersession; the current sidecar represents the state known at one snapshot.
+
+**Integration limitation:** the existing mace_evidence_dependency_audit CLI still runs the public generated-world corpus and does not yet load a live Mycelix-produced sidecar. The receipt-backed conversion method is an authored integration seam, not an end-to-end executed adapter. The generated-world adapter now explicitly marks every Experience record as lineage-incomplete because that type contains no dependency declaration. Its intervention results therefore cannot claim complete dependency closures.
+
+The ingress crate now has 47 authored unit tests, including receipt-sidecar preservation, explicit Unknown status, partial dependency lists, digest tampering, canonical ordering, and malformed/uncommitted dependency rejection. They have not been executed in this environment.
+
+### Industry benchmark update (official information available 2026-11-22)
+
+The Agent Memory Challenge Cycle 2 official results were published November 19, 2026. The separate open-method leaders were:
+- Textual: Resurface, 61.22 overall;
+- Coding: InsightMem, 63.33% overall resolved;
+- Multimodal: Khipu, 43.26 overall.
+
+The separate commercial/closed-source leader was MemoraX: 69.26 textual, 68.00% coding resolved, and 53.68 multimodal. The textual open-source leader's category scores included 76.55 memory governance, 68.59 epistemic safety/privacy, and 49.65 streaming. These are AML-specific track scores, not a unified memory capability or directly comparable to MACE utility. Cycle 2 evaluation is closed; participants must host public Add/Search APIs, and the platform does not deploy repository-only submissions. Do not claim MACE entered Cycle 2.
+
+Additional relevant reference points:
+- TimlMemBench (Findings EMNLP 2026) contains 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Its key distinction is canonical-pool QA versus raw-native ingestion and governed-use behavior.
+- FAMA (Findings ACL 2026) explicitly penalizes reuse of obsolete or invalidated memories; its evaluation reports frequent stale-memory reuse by existing systems.
+- StateMemBench contains 234 multi-session scenarios. Its authors report current-state accuracy rising 0.205→0.363 for one same-backbone DeepSeek-V4-Flash comparison and 0.149→0.233 in a Qwen-3.5-9B comparison against a memory system. These are setup-specific results; the important design principle is separating current-state tracking from ordinary recall.
+- WorldMemArena covers 400 multi-session multimodal tasks with separate write, maintain, retrieve and use stages. Its paper reports that stronger write/storage results do not guarantee downstream performance and identifies remaining multimodal, cross-domain and realistic-trajectory weaknesses.
+- AMA-Bench's AMA-Agent reports 57.22% average accuracy and an 11.16-point gain over the strongest baseline in that paper's protocol, using a causal graph and tool-augmented retrieval.
+- MemoryArena demonstrates a gap between long-context recall and interdependent multi-session action success.
+
+Sources: AML Cycle 2 results (https://agentmemoryleaderboard.ai/results/cycle-2/); AML participation rules (https://agentmemories.ai/rules); TimlMemBench (https://aclanthology.org/2026.findings-emnlp.507/); FAMA (https://aclanthology.org/2026.findings-acl.1337/); StateMemBench (https://arxiv.org/abs/2608.19652); WorldMemArena (https://arxiv.org/abs/2605.29341); AMA-Bench (https://proceedings.mlr.press/v306/zhao26bs.html); MemoryArena (https://proceedings.mlr.press/v306/he26am.html).
+
+### Updated qualification targets
+
+Targets below are proposed project gates, not SOTA results or published standards.
+
+| Capability | Next target |
+|---|---|
+| AML textual | Enter a future cycle only after a hosted Add/Search endpoint and pinned baseline; aim for at least +3 points over the strongest reproduced open-method result, and report every capability dimension |
+| AML coding | At least +3 points over the strongest reproduced open baseline under identical noisy/relevant split and model/tool budgets |
+| AML multimodal | At least +3 points over the strongest reproduced open baseline with visual evidence retained, not silently caption-only |
+| StateMemBench | At least 95% current-state accuracy on a declared subset, zero superseded-state answers in critical cases; publish full confusion matrix |
+| TimlMemBench | Zero unauthorized activation on known revoked/out-of-scope/unknown-trust controls; report raw-native separately from canonical-pool QA |
+| FAMA | Zero known-invalid reuse in the deterministic invalidation control; report FAMA independently from recall |
+| MemoryArena | At least +5 percentage points task success over strongest reproduced baseline under equal scaffold and model budget |
+| WorldMemArena | No regression in any write/maintain/retrieve/use stage; publish stage-level multimodal and action-grounding breakdown |
+| MACE sufficiency | Upper 95% bound on added regret within preregistered epsilon; lower 95% bound for memory-vs-no-memory utility above zero |
+| Dependency integrity | Zero false-independence admissions on seeded shared-root controls; unknown ancestry remains indeterminate |
+| Compression | At least 50% lower all-in storage/context cost with no more than 1 point task-success regression on a preregistered lane |
+
+For rare integrity failures, zero observed errors is not a proof of zero risk. At 100,000 independent negative trials, publish an exact one-sided upper confidence bound and state the independence assumptions; use cluster-aware inference when trials share generated roots or scenario templates. AML scores, StateMem accuracy, FAMA and MACE utility/regret must remain separate scorecards.
