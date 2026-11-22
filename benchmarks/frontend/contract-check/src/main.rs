@@ -215,13 +215,19 @@ fn validate_task_instance(
     let css_text = std::str::from_utf8(css)
         .map_err(|error| format!("reference CSS is not UTF-8: {error}"))?;
 
-    if html_text.contains("https://")
-        || html_text.contains("http://")
-        || css_text.contains("https://")
-        || css_text.contains("http://")
-        || html_text.contains("<script")
+    let normalized_html = html_text.to_ascii_lowercase();
+    let normalized_css = css_text.to_ascii_lowercase();
+    if normalized_html.contains("https://")
+        || normalized_html.contains("http://")
+        || normalized_css.contains("https://")
+        || normalized_css.contains("http://")
+        || normalized_html.contains("<script")
+        || normalized_html.contains("src=\"//")
+        || normalized_html.contains("href=\"//")
+        || normalized_css.contains("@import")
+        || normalized_css.contains("url(")
     {
-        return Err("reference fixture must not load remote resources or scripts".to_string());
+        return Err("reference fixture must not load remote resources, scripts or CSS imports".to_string());
     }
 
     let expected_digest = task
