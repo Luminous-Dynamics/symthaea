@@ -224,7 +224,6 @@ jobs:
           echo "Five-repeat stratified 80/20 split manifests created:"
           jq -r '.repeats[] | [.repeat_index,.seed,.split_manifest_sha256,.train.samples,.train.positive,.test.samples,.test.positive] | @tsv' \
             /tmp/secom-real/stratified-80-20-repeats.json
-            /tmp/secom-real/stratified-fold-preprocessing.json
 
 
       - name: Fit train-only preprocessing for all five stratified SECOM repeats
@@ -256,8 +255,8 @@ jobs:
               (.test_feature_set_a_sha256 | length == 64) and
               (.training_feature_set_b_sha256 | length == 64) and
               (.test_feature_set_b_sha256 | length == 64) and
-              .claim_limits.feature_filter_medians_variance_and_quantiles_fit_on_train_only == true and
-              .claim_limits.feature_set_b_is_luminous_ablation_not_claimed_as_dong_paper_pipeline == true
+              .claim_limits.fitting_is_train_only == true and
+              .claim_limits.feature_set_b_is_a_luminous_ablation == true
             )
           ' /tmp/secom-real/stratified-fold-preprocessing.json > /dev/null
 
@@ -452,4 +451,5 @@ jobs:
             /tmp/secom-real/tabular-baselines-report.json
             /tmp/secom-real/logistic-report.json
             /tmp/secom-real/stratified-80-20-repeats.json
+            /tmp/secom-real/stratified-fold-preprocessing.json
           if-no-files-found: error
