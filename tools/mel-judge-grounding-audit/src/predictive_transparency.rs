@@ -561,6 +561,8 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         .filter(|finding| finding.within_onset_tolerance == Some(true))
         .count();
     let onset_observed_count = matched_count;
+    let median_absolute_onset_error_beats = percentile(&absolute_sorted, 50);
+    let p95_absolute_onset_error_beats = percentile(&absolute_sorted, 95);
     let structurally_valid = findings.is_empty();
     Ok(ForecastAuditReport {
         schema_version: "mel-musical-forecast-report-v1".to_owned(),
@@ -583,8 +585,8 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         role_match_rate: rate(role_matches, matched_count),
         conditional_presence_brier_score: mean(brier_sum, brier_count),
         absolute_onset_error_beats: absolute_sorted,
-        median_absolute_onset_error_beats: percentile(&absolute_sorted, 50),
-        p95_absolute_onset_error_beats: percentile(&absolute_sorted, 95),
+        median_absolute_onset_error_beats,
+        p95_absolute_onset_error_beats,
         within_onset_tolerance_rate: rate(within_count, onset_observed_count),
         median_anticipation_lead_ns: percentile_u64(&mut lead_times, 50),
         series: series_summaries,
