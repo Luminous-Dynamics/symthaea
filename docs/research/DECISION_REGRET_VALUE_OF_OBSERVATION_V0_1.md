@@ -117,7 +117,7 @@ For the complete observation model, the evaluator reports:
 - exact expected-regret numerator before and after observation;
 - exact expected-regret improvement numerator and denominator;
 - conservative integer lower bound on expected improvement;
-- per-visible-outcome possible-world count;
+- per-visible-outcome possible-world count and candidate-visible availability time;
 - per-outcome robust minimax-regret action and floor;
 - per-outcome Bayes-regret-optimal action;
 - joint probability mass in PPM squared.
@@ -136,7 +136,7 @@ Eleven Rust unit tests are authored for:
 7. invalid prior mass;
 8. invalid per-world likelihood mass;
 9. aggregation of identical candidate-visible transcripts;
-10. unknown world rejection and missing provenance commitments.
+10. unknown world rejection;\n11. missing sensor-model and prior-provenance commitments.
 
 The fixture supplies hand-calculated golden values for perfect, noisy, irrelevant and late-observation cases.
 
