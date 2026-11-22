@@ -673,18 +673,13 @@ fn fixture_interaction_calibration_receipt(
     receipt
 }
 
-fn evaluator_hidden_portfolio_utility(
-    selected_event_ids: &[u32],
-    options: &[MemoryPortfolioOptionV1],
-) -> i64 {
+fn evaluator_hidden_portfolio_utility(selected_event_ids: &[u32]) -> i64 {
     let singleton_value: i64 = selected_event_ids
         .iter()
-        .map(|event_id| {
-            options
-                .iter()
-                .find(|option| option.event_id() == *event_id)
-                .expect("oracle selection must reference a known option")
-                .net_value_micros()
+        .map(|event_id| match event_id {
+            801 => 94_000,
+            802 | 803 => 74_000,
+            _ => panic!("hidden evaluator does not know this event"),
         })
         .sum();
     if selected_event_ids.contains(&802) && selected_event_ids.contains(&803) {
@@ -1143,9 +1138,9 @@ fn interaction_aware_portfolio_beats_additive_selection_on_hidden_joint_utility(
         .iter()
         .map(|item| item.event_id)
         .collect();
-    let additive_utility = evaluator_hidden_portfolio_utility(&additive_ids, &options);
-    let pairwise_utility = evaluator_hidden_portfolio_utility(&pairwise_ids, &options);
-    let oracle_utility = evaluator_hidden_portfolio_utility(&[802, 803], &options);
+    let additive_utility = evaluator_hidden_portfolio_utility(&additive_ids);
+    let pairwise_utility = evaluator_hidden_portfolio_utility(&pairwise_ids);
+    let oracle_utility = evaluator_hidden_portfolio_utility(&[802, 803]);
 
     assert!(additive_ids.contains(&801));
     assert!(pairwise_ids.contains(&802) && pairwise_ids.contains(&803));
