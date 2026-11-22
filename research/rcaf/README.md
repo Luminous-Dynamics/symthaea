@@ -300,3 +300,6 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_weighted_covar
 The report contract is `weighted-covariate-shift.schema.json`. It includes calibration ESS, an empirical chi-square divergence proxy, maximum normalized calibration weight, maximum/mean concentration and test-point mass shares. A known-ratio fixture can be marked exact-guarantee-applicable only with explicit source-support and conditional-score-invariance attestations. Estimated ratios always remain diagnostic-only, even when cross-fitted and trained on a disjoint ratio-estimation split.
 
 The module does not estimate density ratios or claim arbitrary shift validity. Zero target weights are rejected as outside-support points; low ESS, unverified assumptions and excessive test-point mass produce explicit abstentions. See `docs/neuroscience/RCAF_WEIGHTED_CONTINUOUS_SHIFT_V1.md` for the weighted conformal assumptions and research frontier on sketched calibration and score-conditional leakage.
+
+
+The weighted calibration module also exposes adapters from `FactorialEstimatorResponseReport`, pinning calibration/null scores to nuisance-only displacement and signal scores to clean-to-combined displacement, with the direction cosine carried through. Reordered/missing estimators and undefined signal directions fail closed.
