@@ -121,7 +121,11 @@ struct FtrlLogisticModelV1 {
 }
 
 impl FtrlLogisticModelV1 {
-    fn transform(&self, row: &SecomSensorRowV1, sample_id: &str) -> Result<Vec<f64>, SecomLogisticError> {
+    fn transform(
+        &self,
+        row: &SecomSensorRowV1,
+        sample_id: &str,
+    ) -> Result<Vec<f64>, SecomLogisticError> {
         if row.values.len() != self.medians.len() {
             return Err(SecomLogisticError(format!(
                 "sample {sample_id:?}: expected {} sensor features, observed {}",
@@ -321,7 +325,8 @@ fn fit_model_v1(
     labels: &[SecomLabelRowV1],
     assignments: &[crate::benchmark::split_manifest::SplitAssignmentV1],
 ) -> Result<FtrlLogisticModelV1, SecomLogisticError> {
-    if features.is_empty() || features.len() != labels.len() || features.len() != assignments.len() {
+    if features.is_empty() || features.len() != labels.len() || features.len() != assignments.len()
+    {
         return Err(SecomLogisticError(
             "features, labels and assignments must have equal non-zero row counts".into(),
         ));
@@ -505,7 +510,8 @@ fn held_out_report(
             Ok(BinaryScoreSampleV1 {
                 sample_id: assignments[index].sample_id.clone(),
                 positive: labels[index].label == 1,
-                score: model.predict_probability(&features[index], &assignments[index].sample_id)?,
+                score: model
+                    .predict_probability(&features[index], &assignments[index].sample_id)?,
             })
         })
         .collect::<Result<Vec<_>, SecomLogisticError>>()?;
@@ -522,13 +528,17 @@ fn held_out_report(
         ),
         samples,
     };
-    let metrics = score_binary_subject_v1(&subject)
-        .map_err(|error| SecomLogisticError(error.to_string()))?;
-    let scores = subject.samples.iter().map(|sample| SecomLogisticScoreV1 {
-        sample_id: sample.sample_id.clone(),
-        positive: sample.positive,
-        failure_probability: sample.score,
-    }).collect();
+    let metrics =
+        score_binary_subject_v1(&subject).map_err(|error| SecomLogisticError(error.to_string()))?;
+    let scores = subject
+        .samples
+        .iter()
+        .map(|sample| SecomLogisticScoreV1 {
+            sample_id: sample.sample_id.clone(),
+            positive: sample.positive,
+            failure_probability: sample.score,
+        })
+        .collect();
     Ok(SecomLogisticHeldOutV1 {
         rows: indices.len(),
         failures,
@@ -551,11 +561,15 @@ fn evaluate_model(
     let model_sha256 = sha256_hex(&model_bytes);
     let mut held_out = BTreeMap::new();
     for split in HELD_OUT_SPLITS {
-        let indices: Vec<usize> = assignments.iter().enumerate()
+        let indices: Vec<usize> = assignments
+            .iter()
+            .enumerate()
             .filter_map(|(index, assignment)| (assignment.split == split).then_some(index))
             .collect();
         if indices.is_empty() {
-            return Err(SecomLogisticError(format!("{split}: expected non-empty held-out rows")));
+            return Err(SecomLogisticError(format!(
+                "{split}: expected non-empty held-out rows"
+            )));
         }
         held_out.insert(
             split.into(),
@@ -565,7 +579,8 @@ fn evaluate_model(
     Ok(SecomLogisticModelResultV1 {
         model_id: model_id.into(),
         config: model.config.clone(),
-        missing_features_without_observed_training_values: model.missing_features_without_observed_training_values,
+        missing_features_without_observed_training_values: model
+            .missing_features_without_observed_training_values,
         model_sha256,
         held_out,
     })
@@ -632,11 +647,23 @@ pub fn evaluate_secom_logistic_v1(
     let mut models = BTreeMap::new();
     models.insert(
         "B5".into(),
-        evaluate_model("B5-ftrl-logistic-unweighted", false, &features, &labels, &split_manifest.assignments)?,
+        evaluate_model(
+            "B5-ftrl-logistic-unweighted",
+            false,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
     );
     models.insert(
         "B5-balanced".into(),
-        evaluate_model("B5-ftrl-logistic-class-balanced", true, &features, &labels, &split_manifest.assignments)?,
+        evaluate_model(
+            "B5-ftrl-logistic-class-balanced",
+            true,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
     );
     Ok(SecomLogisticReportV1 {
         schema: OUTPUT_SCHEMA_V1.into(),
@@ -725,7 +752,10 @@ mod tests {
         let original = evaluate(FEATURES, LABELS);
         let modified = evaluate(FEATURES, changed.as_bytes());
         for key in ["B5", "B5-balanced"] {
-            assert_eq!(original.models[key].model_sha256, modified.models[key].model_sha256);
+            assert_eq!(
+                original.models[key].model_sha256,
+                modified.models[key].model_sha256
+            );
         }
     }
 
@@ -746,7 +776,8 @@ mod tests {
 
     #[test]
     fn all_missing_training_sensor_uses_explicit_zero_median_fallback() {
-        let all_missing = b"1.0 NaN\n1.1 NaN\nNaN NaN\nNaN NaN\n1.2 NaN\nNaN NaN\n1.3 NaN\nNaN NaN\n";
+        let all_missing =
+            b"1.0 NaN\n1.1 NaN\nNaN NaN\nNaN NaN\n1.2 NaN\nNaN NaN\n1.3 NaN\nNaN NaN\n";
         let report = evaluate(all_missing, LABELS);
         for model in report.models.values() {
             assert_eq!(model.missing_features_without_observed_training_values, 1);
@@ -793,6 +824,9 @@ mod tests {
     fn stable_sigmoid_and_ftrl_weights_handle_extreme_values() {
         assert!(sigmoid(10_000.0) > 0.999);
         assert!(sigmoid(-10_000.0) < 0.001);
-        assert_eq!(ftrl_weight(0.0, 0.0, FTRL_ALPHA, FTRL_BETA, FTRL_L1, FTRL_L2), 0.0);
+        assert_eq!(
+            ftrl_weight(0.0, 0.0, FTRL_ALPHA, FTRL_BETA, FTRL_L1, FTRL_L2),
+            0.0
+        );
     }
 }
