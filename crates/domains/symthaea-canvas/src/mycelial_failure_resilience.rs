@@ -780,14 +780,14 @@ mod tests {
         a.incident_filament_ids.sort_unstable();
         b.incident_filament_ids.sort_unstable();
         c.incident_filament_ids.sort_unstable();
-        let segment = |id: &str, filament_id, start: &str, end: &str| MycelialHyphaSegment {
+        let segment = |id: &str, filament_id, start: &str, end: &str, length: f64| MycelialHyphaSegment {
             id: id.to_string(),
             filament_id,
             t_start_micros: 0,
             t_end_micros: PARAMETER_SCALE,
             start_junction_id: start.to_string(),
             end_junction_id: end.to_string(),
-            arc_length_model_units: 1.0,
+            arc_length_model_units: length,
             start_junction_offset_model_units: 0.0,
             end_junction_offset_model_units: 0.0,
             radius_start_model_units: 1.0,
@@ -802,9 +802,9 @@ mod tests {
             maximum_junction_gap_model_units: 0.0,
             junctions: vec![a, b, c],
             segments: vec![
-                segment("edge-ab", 1, "A", "B"),
-                segment("edge-bc", 2, "B", "C"),
-                segment("edge-ca", 3, "C", "A"),
+                segment("edge-ab", 1, "A", "B", 1.0),
+                segment("edge-bc", 2, "B", "C", 1.2),
+                segment("edge-ca", 3, "C", "A", 1.2),
             ],
         }
     }
