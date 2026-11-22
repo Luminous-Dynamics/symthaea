@@ -50,7 +50,6 @@ pub struct ReferenceV1 {
 pub struct ItemV1 {
     pub item_id: String,
     pub reference_strength_logit: f64,
-    pub standard_error_logit: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
