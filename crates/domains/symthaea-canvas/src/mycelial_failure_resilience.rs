@@ -31,6 +31,68 @@ pub const MAX_FAILURE_ID_BYTES: usize = 128;
 /// Largest total demand weight exactly representable as an IEEE-754 f64 integer.
 pub const MAX_FAILURE_TOTAL_DEMAND_WEIGHT: u128 = 9_007_199_254_740_992;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MycelialFailureAttackStrategy {
+    RandomSegments,
+    RandomJunctions,
+    HighestDegreeJunctions,
+    DemandPathLoadSegments,
+    DemandPathLoadJunctions,
+    SpatialClusterJunctions,
+}
+
+impl MycelialFailureAttackStrategy {
+    pub fn stable_id(self) -> &'static str {
+        match self {
+            Self::RandomSegments => "random-segments-v1",
+            Self::RandomJunctions => "random-junctions-v1",
+            Self::HighestDegreeJunctions => "highest-degree-junctions-v1",
+            Self::DemandPathLoadSegments => "demand-path-load-segments-v1",
+            Self::DemandPathLoadJunctions => "demand-path-load-junctions-v1",
+            Self::SpatialClusterJunctions => "spatial-cluster-junctions-v1",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MycelialFailureAttackConfig {
+    pub strategy: MycelialFailureAttackStrategy,
+    pub seed: u64,
+    /// Prefix budgets from one through this many failed entities.
+    pub maximum_failure_budget: usize,
+    /// Required only for SpatialClusterJunctions.
+    pub spatial_seed_junction_id: Option<String>,
+}
+
+/// A deterministic ranked attack sequence and its full nested budget sweep.
+/// Each scenario removes the first k IDs in ranked_entity_ids; thus the
+/// budget-k failed set is a subset of budget-(k+1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MycelialFailureAttackPlan {
+    pub schema_version: u16,
+    pub source_graph_digest: String,
+    pub demand_digest: String,
+    pub strategy: MycelialFailureAttackStrategy,
+    pub seed: u64,
+    pub maximum_failure_budget: usize,
+    pub spatial_seed_junction_id: Option<String>,
+    pub ranked_entity_ids: Vec<String>,
+    pub scenarios: Vec<MycelialFailureScenario>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialFailureAttackEvaluation {
+    pub attack_plan_digest: String,
+    pub resilience_profile: MycelialFailureResilienceProfile,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MycelialDemandPathLoad {
+    pub entity_id: String,
+    pub demand_weighted_path_load: u128,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MycelialDemandPair {
     pub id: String,
@@ -111,6 +173,9 @@ pub enum MycelialFailureResilienceError {
     UnknownDemandJunction(String),
     InvalidScenario(String),
     DuplicateScenarioId(String),
+    InvalidAttackConfig(&'static str),
+    InvalidAttackPlan(&'static str),
+    UnknownSpatialSeedJunction(String),
     PathShorterThanEuclideanDistance {
         demand_id: String,
         direct_distance: f64,
@@ -162,6 +227,9 @@ impl fmt::Display for MycelialFailureResilienceError {
             }
             Self::InvalidScenario(id) => write!(f, "invalid failure scenario {id}"),
             Self::DuplicateScenarioId(id) => write!(f, "duplicate failure scenario ID {id}"),
+            Self::InvalidAttackConfig(reason) => write!(f, "invalid failure attack configuration: {reason}"),
+            Self::InvalidAttackPlan(reason) => write!(f, "invalid failure attack plan: {reason}"),
+            Self::UnknownSpatialSeedJunction(id) => write!(f, "unknown spatial attack seed junction {id}"),
             Self::PathShorterThanEuclideanDistance {
                 demand_id,
                 direct_distance,
