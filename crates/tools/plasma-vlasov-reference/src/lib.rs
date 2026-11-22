@@ -13,8 +13,8 @@
 #![forbid(unsafe_code)]
 
 pub mod echo_analysis;
-pub mod phase_space_cascade;
 pub mod kinetic_memory;
+pub mod phase_space_cascade;
 pub mod phase_space_flux;
 
 use std::error::Error;
