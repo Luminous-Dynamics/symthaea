@@ -155,6 +155,29 @@ pub struct ReconstructionTopologyDelta {
     pub cycle_rank: i64,
 }
 
+/// One relationship in the graph-component attribution table. Component
+/// identity is the lexicographically smallest stable junction ID in that
+/// connected component. An absent side denotes a wholly unmatched component.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReconstructionComponentAttribution {
+    pub predicted_component_id: Option<String>,
+    pub ground_truth_component_id: Option<String>,
+    pub matched_junction_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReconstructionComponentErrorSummary {
+    pub matched_junction_count: usize,
+    pub matched_prediction_component_count: usize,
+    pub matched_ground_truth_component_count: usize,
+    /// Additional ground-truth components incorrectly joined per predicted component.
+    pub false_merge_count: usize,
+    /// Additional predicted components that fragment each ground-truth component.
+    pub false_split_count: usize,
+    pub unmatched_prediction_component_count: usize,
+    pub unmatched_ground_truth_component_count: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReconstructionLocalizationError {
     pub matched_junction_count: usize,
@@ -220,6 +243,8 @@ pub struct MycelialReconstructionScore {
     pub ground_truth_topology: ReconstructionTopologySummary,
     pub prediction_topology: ReconstructionTopologySummary,
     pub topology_delta: ReconstructionTopologyDelta,
+    pub component_attributions: Vec<ReconstructionComponentAttribution>,
+    pub component_error_summary: ReconstructionComponentErrorSummary,
     pub localization_error: ReconstructionLocalizationError,
     pub segment_length_error: ReconstructionLengthError,
 }
@@ -870,6 +895,11 @@ pub fn evaluate_mycelial_reconstruction(
             ground_truth_topology.cycle_rank,
         ),
     };
+    let (component_attributions, component_error_summary) = component_attribution(
+        ground_truth,
+        prediction,
+        &normalized_matches,
+    );
 
     let localization_error = summarize_errors(localization_errors);
     let junction_kind_macro_f1 = if macro_f1_values.is_empty() {
@@ -906,6 +936,8 @@ pub fn evaluate_mycelial_reconstruction(
         ground_truth_topology,
         prediction_topology,
         topology_delta,
+        component_attributions,
+        component_error_summary,
         localization_error,
         segment_length_error: length_error,
     };
@@ -1241,6 +1273,154 @@ fn topology_summary(graph: &AnnotatedMycelialSkeleton) -> ReconstructionTopology
         connected_components: components,
         cycle_rank,
     }
+}
+
+fn component_membership(
+    graph: &AnnotatedMycelialSkeleton,
+) -> BTreeMap<String, String> {
+    let mut adjacency = BTreeMap::<String, Vec<String>>::new();
+    for junction in &graph.junctions {
+        adjacency.insert(junction.id.clone(), Vec::new());
+    }
+    for segment in &graph.segments {
+        adjacency
+            .entry(segment.start_junction_id.clone())
+            .or_default()
+            .push(segment.end_junction_id.clone());
+        adjacency
+            .entry(segment.end_junction_id.clone())
+            .or_default()
+            .push(segment.start_junction_id.clone());
+    }
+    for neighbours in adjacency.values_mut() {
+        neighbours.sort();
+        neighbours.dedup();
+    }
+    let mut membership = BTreeMap::new();
+    let mut visited = BTreeSet::new();
+    for start in adjacency.keys() {
+        if !visited.insert(start.clone()) {
+            continue;
+        }
+        let mut queue = VecDeque::from([start.clone()]);
+        let mut members = Vec::new();
+        while let Some(current) = queue.pop_front() {
+            members.push(current.clone());
+            if let Some(neighbours) = adjacency.get(&current) {
+                for neighbour in neighbours {
+                    if visited.insert(neighbour.clone()) {
+                        queue.push_back(neighbour.clone());
+                    }
+                }
+            }
+        }
+        let representative = members.iter().min().cloned().unwrap_or_else(|| start.clone());
+        for member in members {
+            membership.insert(member, representative.clone());
+        }
+    }
+    membership
+}
+
+fn component_attribution(
+    ground_truth: &AnnotatedMycelialSkeleton,
+    prediction: &AnnotatedMycelialSkeleton,
+    matches: &[JunctionIdentityMatch],
+) -> (
+    Vec<ReconstructionComponentAttribution>,
+    ReconstructionComponentErrorSummary,
+) {
+    let prediction_membership = component_membership(prediction);
+    let truth_membership = component_membership(ground_truth);
+    let mut matched_pairs = BTreeMap::<(String, String), usize>::new();
+    for matched in matches {
+        if let (Some(predicted_component), Some(truth_component)) = (
+            prediction_membership.get(&matched.predicted_junction_id),
+            truth_membership.get(&matched.ground_truth_junction_id),
+        ) {
+            *matched_pairs
+                .entry((predicted_component.clone(), truth_component.clone()))
+                .or_default() += 1;
+        }
+    }
+
+    let all_prediction_components: BTreeSet<_> =
+        prediction_membership.values().cloned().collect();
+    let all_truth_components: BTreeSet<_> = truth_membership.values().cloned().collect();
+    let mut truth_by_prediction = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut prediction_by_truth = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut attributions = Vec::new();
+
+    for ((predicted_component, truth_component), matched_junction_count) in matched_pairs {
+        truth_by_prediction
+            .entry(predicted_component.clone())
+            .or_default()
+            .insert(truth_component.clone());
+        prediction_by_truth
+            .entry(truth_component.clone())
+            .or_default()
+            .insert(predicted_component.clone());
+        attributions.push(ReconstructionComponentAttribution {
+            predicted_component_id: Some(predicted_component),
+            ground_truth_component_id: Some(truth_component),
+            matched_junction_count,
+        });
+    }
+    for component_id in &all_prediction_components {
+        if !truth_by_prediction.contains_key(component_id) {
+            attributions.push(ReconstructionComponentAttribution {
+                predicted_component_id: Some(component_id.clone()),
+                ground_truth_component_id: None,
+                matched_junction_count: 0,
+            });
+        }
+    }
+    for component_id in &all_truth_components {
+        if !prediction_by_truth.contains_key(component_id) {
+            attributions.push(ReconstructionComponentAttribution {
+                predicted_component_id: None,
+                ground_truth_component_id: Some(component_id.clone()),
+                matched_junction_count: 0,
+            });
+        }
+    }
+    attributions.sort_by(|left, right| {
+        left.predicted_component_id
+            .cmp(&right.predicted_component_id)
+            .then_with(|| {
+                left.ground_truth_component_id
+                    .cmp(&right.ground_truth_component_id)
+            })
+    });
+
+    let matched_prediction_component_count = truth_by_prediction.len();
+    let matched_ground_truth_component_count = prediction_by_truth.len();
+    let false_merge_count = truth_by_prediction
+        .values()
+        .map(|components| components.len().saturating_sub(1))
+        .sum();
+    let false_split_count = prediction_by_truth
+        .values()
+        .map(|components| components.len().saturating_sub(1))
+        .sum();
+    let unmatched_prediction_component_count = all_prediction_components
+        .len()
+        .saturating_sub(matched_prediction_component_count);
+    let unmatched_ground_truth_component_count = all_truth_components
+        .len()
+        .saturating_sub(matched_ground_truth_component_count);
+    (
+        attributions,
+        ReconstructionComponentErrorSummary {
+            matched_junction_count: matches.len(),
+            matched_prediction_component_count,
+            matched_ground_truth_component_count,
+            false_merge_count,
+            false_split_count,
+            unmatched_prediction_component_count,
+            unmatched_ground_truth_component_count,
+        },
+    )
 }
 
 fn point_distance(
