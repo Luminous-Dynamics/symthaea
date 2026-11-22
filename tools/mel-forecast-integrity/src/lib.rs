@@ -750,6 +750,7 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                         Some(&payload.forecast_id),
                         "invalidated or already realized forecasts cannot start realization",
                     );
+                    continue;
                 }
                 if event.monotonic_time_ns < forecast.issued.target_window.start_ns
                     || event.monotonic_time_ns > forecast.issued.target_window.end_ns
@@ -818,6 +819,7 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                         Some(&payload.forecast_id),
                         "only a pending forecast can be completed",
                     );
+                    continue;
                 }
                 forecast.lifecycle = LifecycleV1::Realized;
             }
