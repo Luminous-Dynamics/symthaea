@@ -64,6 +64,24 @@ Aspirational qualification targets:
 
 Freeze thresholds before opening the held-out set. These are goals, not achieved results.
 
+## 7A. Cycle 2 capability-level gaps (official results, 2026-11-19)
+
+The official Cycle 2 leaderboard publishes more than one headline score. Its open-method leaders show where the next benchmark should discriminate:
+
+| Track / leader | Overall | Useful capability breakdown | Luminous opportunity |
+|---|---:|---|---|
+| Textual / Resurface | 61.22/100 | Explicit fact recall 62.98; relational reasoning 58.94; temporal reasoning 57.76; memory governance 76.55; personalization/care 38.82; context learning/workflow execution 59.67; epistemic safety/privacy 68.59; streaming 49.65 | Improve personalization, continual user correction and streaming without sacrificing governance or privacy. Keep preference memory scoped, revisable and user-controlled rather than over-personalizing. |
+| Coding / InsightMem | 63.33% resolved | Relevant new-feature 74.51%; relevant bug-fix 57.58%; noisy new-feature 74.51%; noisy bug-fix 57.58% | Prioritize regression/bug-fix experience, causal diagnosis and verified patch applicability. Report new-feature and bug-fix separately; an aggregate hides this asymmetry. |
+| Multimodal / Khipu | 43.26/100 | Retrieval 50.28; relational reasoning 45.82; temporal reasoning 34.23; continual learning 38.45; personalization 11.04; evidence governance 31.29 | Build rights-aware, provenance-preserving multimodal memory; retain spatial/time/creator/licence context and improve correction/forgetting behavior. Sol-Atlas and Mycelix are differentiators here. |
+
+These are official per-track values and must remain separate metrics. They are not comparable to MACE's synthetic pairwise-portfolio utility. The capability profiles motivate benchmark construction; they do not prove that any proposed design will outperform the leaders.
+
+### Provider memory patterns and their limits
+
+OpenAI's sandbox memory uses separate read and generate capabilities, progressive disclosure, isolated memory layouts, and a two-phase run-extraction then layout-consolidation pipeline. The documented extractor omits system, developer and reasoning content from conversation summaries; very long conversations can be truncated with only beginning/end preserved. This is useful for economical agent memory, but it demonstrates why a provider-generated summary cannot replace Luminous's authoritative event/provenance log. Keep tool requests, authorization decisions, verifier receipts and omitted harness events in Mycelix's append-only trace. Use separate extraction and consolidation roles, and allow read-only agents that cannot rewrite canonical memory.
+
+Anthropic's Managed Agents exposes an append-only session event log separately from its harness and sandbox. It reports that decoupling the reasoning process from execution reduced p50 TTFT by roughly 60% and p95 by more than 90% in its deployment. The transferable idea is stable interfaces across replaceable model and execution implementations—not a dependency on one provider. Mycelix should own durable events and authority; Symthaea owns evidence-qualified consolidation and retrieval; Symtropy owns isolated execution and outcome receipts; providers are replaceable brains/harnesses/hands.
+
 ## 7. Industry positioning
 
 Official Agent Memory Challenge Cycle 2 results (published November 19, 2026) report open-method leaders Resurface 61.22/100 (Textual), InsightMem 63.33% resolved (Coding), and Khipu 43.26/100 (Multimodal). Commercial leaders are MemoraX 69.26/100, 68.00% resolved and 53.68/100, respectively. Track metrics differ, so none is a direct MACE score comparison.
