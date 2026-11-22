@@ -36,7 +36,7 @@ struct SplitV1 {
     dataset_commitment_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct JudgeV1 {
     judge_id: String,
@@ -167,6 +167,7 @@ pub struct EvaluationReport {
     pub pair_count: usize,
     pub human_directional_pair_count: usize,
     pub judge_stable_directional_pair_count: usize,
+    pub judge_stable_directional_on_human_directional_pair_count: usize,
     pub judge_stable_tie_pair_count: usize,
     pub judge_order_inconsistent_pair_count: usize,
     pub judge_incomplete_pair_count: usize,
@@ -470,7 +471,8 @@ pub fn evaluate(
             .to_owned(),
         pair_count: manifest.pairs.len(),
         human_directional_pair_count,
-        judge_stable_directional_pair_count: judged_gold_directional,
+        judge_stable_directional_pair_count,
+        judge_stable_directional_on_human_directional_pair_count: judged_gold_directional,
         judge_stable_tie_pair_count,
         judge_order_inconsistent_pair_count,
         judge_incomplete_pair_count,
