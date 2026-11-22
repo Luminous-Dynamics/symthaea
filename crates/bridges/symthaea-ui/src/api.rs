@@ -13,7 +13,7 @@
 
 use futures::StreamExt;
 use gloo_net::http::Request;
-use gloo_net::websocket::Message;
+use gloo_net::websocket::{Message, State};
 use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
 
@@ -71,7 +71,28 @@ pub async fn stream_telemetry(
         }
     };
 
-    // Do not report a connection before the browser accepted the WebSocket.
+    // WebSocket::open constructs the browser socket but it may still be in
+    // CONNECTING state. Wait for the actual OPEN ready state before exposing
+    // a connected indicator. Bound the handshake wait so a broken endpoint
+    // returns to the caller's retry policy.
+    let mut opened = false;
+    for _ in 0..40 {
+        match ws.state() {
+            State::Open => {
+                opened = true;
+                break;
+            }
+            State::Closed => break,
+            State::Connecting | State::Closing => {
+                gloo_timers::future::TimeoutFuture::new(250).await;
+            }
+        }
+    }
+    if !opened {
+        leptos::logging::warn!("telemetry websocket did not reach OPEN within 10 seconds");
+        return;
+    }
+
     on_connection_change(true);
     let (_write, mut read) = ws.split();
     while let Some(msg) = read.next().await {
