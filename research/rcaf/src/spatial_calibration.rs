@@ -391,7 +391,11 @@ mod tests {
     fn mismatched_or_non_finite_inputs_fail_closed() {
         let field = generate_spatial_nuisance_field(&graph(), &config(2, 0.2, 23), None).unwrap();
         assert!(matches!(
-            calibrate_spatial_nuisance_to_component_fraction(&[vec![0.0; 6]; 128], &field, 0.2),
+            calibrate_spatial_nuisance_to_component_fraction(
+                &(0..128).map(|_| vec![0.0; 6]).collect::<Vec<_>>(),
+                &field,
+                0.2
+            ),
             Err(SpatialVarianceCalibrationError::ZeroCleanVariance)
         ));
         assert!(matches!(
