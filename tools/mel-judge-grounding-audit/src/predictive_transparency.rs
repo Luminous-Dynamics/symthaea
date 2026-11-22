@@ -193,7 +193,13 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             .push(forecast);
         for event in &forecast.events {
             if forecast_events
-                .insert((forecast.forecast_id.as_str(), event.forecast_event_id.as_str()), event)
+                .insert(
+                    (
+                        forecast.forecast_id.as_str(),
+                        event.forecast_event_id.as_str(),
+                    ),
+                    event,
+                )
                 .is_some()
             {
                 return Err(format!(
@@ -224,7 +230,12 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         let forecast = forecast_ids
             .get(display.forecast_id.as_str())
             .copied()
-            .ok_or_else(|| format!("display references unknown forecast {}", display.forecast_id))?;
+            .ok_or_else(|| {
+                format!(
+                    "display references unknown forecast {}",
+                    display.forecast_id
+                )
+            })?;
         require_digest(&display.display_receipt_sha256, "display receipt digest")?;
         if display.displayed_at_ns < display.delivered_at_ns
             || display.delivered_at_ns < forecast.committed_at_ns
@@ -235,7 +246,10 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             ));
         }
         if !display_ids.insert(display.forecast_id.as_str()) {
-            return Err(format!("duplicate display receipt for forecast {}", display.forecast_id));
+            return Err(format!(
+                "duplicate display receipt for forecast {}",
+                display.forecast_id
+            ));
         }
         let superseded_at = series_members
             .get(forecast.commitment_series_id.as_str())
@@ -315,7 +329,10 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             disposition.action.as_str(),
             "accept" | "steer" | "veto" | "branch" | "ignore" | "abstain"
         ) {
-            return Err(format!("unsupported forecast disposition {}", disposition.action));
+            return Err(format!(
+                "unsupported forecast disposition {}",
+                disposition.action
+            ));
         }
     }
 
@@ -348,7 +365,10 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
 
     for realization in &panel.realizations {
         if !realization_ids.insert(realization.realization_id.as_str()) {
-            return Err(format!("duplicate realization_id: {}", realization.realization_id));
+            return Err(format!(
+                "duplicate realization_id: {}",
+                realization.realization_id
+            ));
         }
         if !realized_forecast_ids.insert(realization.forecast_id.as_str()) {
             return Err(format!(
@@ -439,7 +459,9 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             realized_event_count += 1;
             match event.forecast_event_id.as_deref() {
                 Some(forecast_event_id) => {
-                    if !forecast_events.contains_key(&(forecast.forecast_id.as_str(), forecast_event_id)) {
+                    if !forecast_events
+                        .contains_key(&(forecast.forecast_id.as_str(), forecast_event_id))
+                    {
                         return Err(format!(
                             "realized event {} references unknown forecast event {}",
                             event.event_id, forecast_event_id
@@ -473,11 +495,14 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
 
     for forecast in &panel.forecasts {
         for predicted in &forecast.events {
-            let realized = realized_by_forecast_event
-                .get(&(forecast.forecast_id.as_str(), predicted.forecast_event_id.as_str()));
+            let realized = realized_by_forecast_event.get(&(
+                forecast.forecast_id.as_str(),
+                predicted.forecast_event_id.as_str(),
+            ));
             let (realized_event_id, realized_role, observed_onset_ns, signed_error_ns, phase_error) =
                 if let Some((_, actual)) = realized {
-                    let signed = i128::from(actual.onset_ns) - i128::from(predicted.expected_onset_ns);
+                    let signed =
+                        i128::from(actual.onset_ns) - i128::from(predicted.expected_onset_ns);
                     let phase = signed as f64 / predicted.local_beat_period_ns as f64;
                     role_matches += usize::from(actual.role == predicted.role);
                     matched_count += 1;
@@ -498,7 +523,8 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             let brier = (predicted.presence_probability - observed_probability).powi(2);
             brier_sum += brier;
             brier_count += 1;
-            let within = phase_error.map(|value| value.abs() <= panel.policy.maximum_onset_error_beats);
+            let within =
+                phase_error.map(|value| value.abs() <= panel.policy.maximum_onset_error_beats);
             event_findings.push(EventForecastFinding {
                 forecast_id: forecast.forecast_id.clone(),
                 forecast_event_id: predicted.forecast_event_id.clone(),
@@ -577,8 +603,14 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
     require_text(&panel.case_id, "case_id")?;
     require_text(&panel.clock_domain_id, "clock_domain_id")?;
     require_text(&panel.reference_time_map_id, "reference_time_map_id")?;
-    require_text(&panel.reference_time_map_version, "reference_time_map_version")?;
-    if !matches!(panel.reference_time_map_kind.as_str(), "notation_tempo" | "performance_time") {
+    require_text(
+        &panel.reference_time_map_version,
+        "reference_time_map_version",
+    )?;
+    if !matches!(
+        panel.reference_time_map_kind.as_str(),
+        "notation_tempo" | "performance_time"
+    ) {
         return Err("unsupported canonical time-map kind".to_owned());
     }
     require_digest(
@@ -611,7 +643,10 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
         return Err("invalid musical forecast policy".to_owned());
     }
     if panel.claim_ceiling.is_empty()
-        || panel.claim_ceiling.iter().any(|claim| claim.trim().is_empty())
+        || panel
+            .claim_ceiling
+            .iter()
+            .any(|claim| claim.trim().is_empty())
     {
         return Err("claim_ceiling must contain explicit non-empty limits".to_owned());
     }
@@ -622,12 +657,20 @@ fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(
     require_text(&forecast.forecast_id, "forecast_id")?;
     require_text(&forecast.commitment_series_id, "commitment_series_id")?;
     require_text(&forecast.input_snapshot_id, "input_snapshot_id")?;
-    require_digest(&forecast.input_history_sha256, "forecast input history digest")?;
+    require_digest(
+        &forecast.input_history_sha256,
+        "forecast input history digest",
+    )?;
     let input_snapshot = panel
         .input_snapshots
         .iter()
         .find(|snapshot| snapshot.input_snapshot_id == forecast.input_snapshot_id)
-        .ok_or_else(|| format!("forecast {} references unknown or yoked input snapshot", forecast.forecast_id))?;
+        .ok_or_else(|| {
+            format!(
+                "forecast {} references unknown or yoked input snapshot",
+                forecast.forecast_id
+            )
+        })?;
     if input_snapshot.input_history_sha256 != forecast.input_history_sha256 {
         return Err(format!(
             "forecast {} input-history digest does not match its snapshot",
@@ -642,10 +685,16 @@ fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(
     }
     require_digest(&forecast.policy_sha256, "forecast policy digest")?;
     if forecast.revision == 0 || forecast.target_start_ns >= forecast.target_end_ns {
-        return Err(format!("forecast {} has invalid revision or target window", forecast.forecast_id));
+        return Err(format!(
+            "forecast {} has invalid revision or target window",
+            forecast.forecast_id
+        ));
     }
     if forecast.expires_at_ns < forecast.target_end_ns {
-        return Err(format!("forecast {} expires before its target window ends", forecast.forecast_id));
+        return Err(format!(
+            "forecast {} expires before its target window ends",
+            forecast.forecast_id
+        ));
     }
     if forecast.committed_at_ns >= forecast.target_start_ns {
         return Err(format!(
@@ -653,7 +702,9 @@ fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(
             forecast.forecast_id
         ));
     }
-    if forecast.target_start_ns.saturating_sub(forecast.committed_at_ns)
+    if forecast
+        .target_start_ns
+        .saturating_sub(forecast.committed_at_ns)
         < panel.policy.minimum_anticipation_lead_ns
     {
         return Err(format!(
@@ -662,7 +713,10 @@ fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(
         ));
     }
     if forecast.events.is_empty() {
-        return Err(format!("forecast {} has no predicted events", forecast.forecast_id));
+        return Err(format!(
+            "forecast {} has no predicted events",
+            forecast.forecast_id
+        ));
     }
     let mut ids = BTreeSet::new();
     for event in &forecast.events {
@@ -734,7 +788,10 @@ fn validate_series(
             }
             if let Some(parent_id) = forecast.supersedes_forecast_id.as_deref() {
                 let parent = forecast_ids.get(parent_id).copied().ok_or_else(|| {
-                    format!("forecast {} supersedes unknown forecast {parent_id}", forecast.forecast_id)
+                    format!(
+                        "forecast {} supersedes unknown forecast {parent_id}",
+                        forecast.forecast_id
+                    )
                 })?;
                 if parent.commitment_series_id != forecast.commitment_series_id {
                     return Err(format!(
@@ -766,11 +823,15 @@ fn require_text(value: &str, name: &str) -> Result<(), String> {
 
 fn require_digest(value: &str, name: &str) -> Result<(), String> {
     if value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
         Ok(())
     } else {
-        Err(format!("{name} must be a lowercase 64-character SHA-256 digest"))
+        Err(format!(
+            "{name} must be a lowercase 64-character SHA-256 digest"
+        ))
     }
 }
 
@@ -866,14 +927,15 @@ mod tests {
         value["forecasts"][0]["target_end_ns"] = serde_json::json!(1_100_000_000_u64);
         value["realizations"][0]["started_at_ns"] = serde_json::json!(1_200_000_000_u64);
         value["realizations"][0]["completed_at_ns"] = serde_json::json!(1_230_000_000_u64);
-        value["realizations"][0]["events"][0]["onset_ns"] =
-            serde_json::json!(1_220_000_000_u64);
+        value["realizations"][0]["events"][0]["onset_ns"] = serde_json::json!(1_220_000_000_u64);
         let report = audit(&value).expect("stale output remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
-        assert!(report
-            .qualification_findings
-            .iter()
-            .any(|finding| finding.contains("stale forecast")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("stale forecast"))
+        );
     }
 
     #[test]
@@ -882,7 +944,12 @@ mod tests {
         value["displays"][0]["displayed_at_ns"] = serde_json::json!(1_000_000_001_u64);
         let report = audit(&value).expect("late display should produce an audit finding");
         assert!(!report.structurally_valid_anticipatory_trace);
-        assert!(report.qualification_findings.iter().any(|x| x.contains("displayed too late")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|x| x.contains("displayed too late"))
+        );
     }
 
     #[test]
@@ -893,9 +960,8 @@ mod tests {
         second["revision"] = serde_json::json!(2);
         second["supersedes_forecast_id"] = serde_json::json!("forecast-001");
         second["input_snapshot_id"] = serde_json::json!("snapshot-2");
-        second["input_history_sha256"] = serde_json::json!(
-            "9999999999999999999999999999999999999999999999999999999999999999"
-        );
+        second["input_history_sha256"] =
+            serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
         second["committed_at_ns"] = serde_json::json!(900_000_000_u64);
         value["input_snapshots"].as_array_mut().unwrap().push(serde_json::json!({
             "input_snapshot_id":"snapshot-2",
@@ -905,10 +971,12 @@ mod tests {
         value["forecasts"].as_array_mut().unwrap().push(second);
         let report = audit(&value).expect("superseded realization remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
-        assert!(report
-            .qualification_findings
-            .iter()
-            .any(|finding| finding.contains("superseded forecast")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("superseded forecast"))
+        );
     }
 
     #[test]
@@ -917,7 +985,12 @@ mod tests {
         value["dispositions"][0]["action"] = serde_json::json!("veto");
         let report = audit(&value).expect("veto violation is an audit finding");
         assert!(!report.structurally_valid_anticipatory_trace);
-        assert!(report.qualification_findings.iter().any(|x| x.contains("vetoed forecast")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|x| x.contains("vetoed forecast"))
+        );
     }
 
     #[test]
@@ -936,7 +1009,12 @@ mod tests {
         value["dispositions"][0]["action"] = serde_json::json!("steer");
         let report = audit(&value).expect("missing steer revision remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
-        assert!(report.qualification_findings.iter().any(|x| x.contains("steer disposition")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|x| x.contains("steer disposition"))
+        );
     }
 
     #[test]
