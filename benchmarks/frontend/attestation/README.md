@@ -1,6 +1,6 @@
 # SFEB trusted execution and causal repair
 
-This directory defines the next assurance layer for SFEB. These schemas are **design artifacts**; they are not yet wired into the Rust adjudicator, browser executor, GitHub Actions workflow or Sigstore verification.
+This directory defines the next assurance layer for SFEB. The trace-event schema is now consumed by an offline Rust trace verifier in the standalone contract checker. The execution-predicate and causal-repair schemas remain design artifacts; signed workflow verification, browser execution, isolation and causal-oracle replay are not yet integrated.
 
 ## Files
 
@@ -18,7 +18,7 @@ The Sigstore certificate identity and OIDC issuer must be checked against an out
 
 ## Trace rules
 
-Each JSONL event includes a run ID, zero-based sequence, monotonic elapsed time, event type, actor, redaction state, payload and predecessor hash. Hash the RFC 8785 JCS encoding of the event with `event_sha256` omitted. The first predecessor is 64 zeroes. Each later predecessor must equal the previous event hash. The verifier checks uniqueness, continuity, canonicalization, run binding and the final digest in the signed statement.
+Each JSONL event includes a run ID, zero-based sequence, monotonic elapsed time, event type, actor, redaction state, payload, the payload hash and predecessor hash. Hash the RFC 8785 JCS encoding of the payload object for `payload_sha256`; hash the complete event with `event_sha256` omitted for `event_sha256`. The first predecessor is 64 zeroes. Each later predecessor must equal the previous event hash. The verifier rejects duplicate JSON keys and non-I-JSON safe integers, binds parsed events back to the exact raw JSONL bytes, and checks sequence continuity, monotonic elapsed time, run identity and terminal completion. The signed execution statement must additionally bind the raw trace-bundle digest and final event hash.
 
 Preserve only the minimum information necessary to replay the declared oracles. Redact credentials, tokens, personal data and user content before writing artifacts. A digest-only payload is acceptable only when the underlying observation is not required for independent oracle replay. Screenshots and DOM/accessibility traces remain potentially sensitive and require access controls and retention limits.
 

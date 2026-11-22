@@ -333,6 +333,24 @@ mod tests {
     }
 
     #[test]
+    fn jcs_serialization_matches_rfc8785_object_key_order() {
+        let value = json!({"b": 2, "a": 1});
+        let bytes = serde_jcs::to_vec(&value).expect("JCS serialization");
+        assert_eq!(bytes, br#"{"a":1,"b":2}"#);
+    }
+
+    #[test]
+    fn checked_in_trace_schema_accepts_a_valid_event_triplet() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../attestation/sfeb-trace-event-v1.schema.json"
+        )).expect("trace schema JSON");
+        let validator = jsonschema::validator_for(&schema).expect("trace schema compiles");
+        for event in valid_events() {
+            assert!(validator.is_valid(&event), "generated trace event must satisfy schema");
+        }
+    }
+
+    #[test]
     fn accepts_a_valid_two_event_trace() {
         let events = valid_events();
         let summary = verify(&events).expect("valid trace");

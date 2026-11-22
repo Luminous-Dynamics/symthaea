@@ -198,3 +198,36 @@ This document and its schemas are design work. They have not been compiled, inte
 - WebdriverIO Browser Agent Benchmark: https://benchmark.webdriver.io/
 - OpenAI, "Separating signal from noise in coding evaluations" (2026-07-08): https://openai.com/index/separating-signal-from-noise-coding-evaluations/
 - WCAG 2.2: https://www.w3.org/TR/wcag/
+
+
+## 11. 2026-11-22 implementation increment — offline trace verification
+
+The standalone `benchmarks/frontend/contract-check` utility now contains a
+Rust source implementation for `--verify-trace TRACE_JSONL [EXPECTED_RUN_ID]`.
+It uses pinned `serde_jcs = 0.3.0` for RFC 8785 serialization rather than a
+handwritten canonicalizer.
+
+The verifier:
+- parses each JSONL line with a recursive visitor that rejects duplicate
+  object keys before conversion to `serde_json::Value`;
+- rejects integer values outside the RFC 8785 / I-JSON interoperable safe range;
+- checks the canonical payload digest and event digest for every event;
+- checks a zero predecessor on sequence zero, contiguous sequence numbers,
+  one run identity, monotonic elapsed time and an exact predecessor chain;
+- requires `run_started` as the first event and `run_finished` as the last;
+- reparses the exact raw JSONL bundle and ensures it equals the values being
+  verified, then reports both the raw-bundle SHA-256 and final event hash.
+
+Adversarial unit tests are authored for valid traces, RFC 8785 key ordering,
+JSON Schema acceptance, duplicate keys, payload and event tampering, previous
+hash discontinuity, raw-bundle mismatch, reordering, truncation, cross-run
+replay, sequence errors, elapsed-time regression, unsafe integers and expected
+run-ID mismatch.
+
+**Execution state:** Rust source and tests are committed. No Rust compiler or
+Cargo executable is available in the current environment, so no compile, test,
+format or Clippy result is claimed. The verifier establishes internal trace
+consistency only; it does not authenticate the executor, prove observations
+complete, or derive semantic oracle outcomes. Signed attestations, an isolated
+Chromium runner and independent oracle replay remain pending under issue
+[#13228](https://github.com/Luminous-Dynamics/symthaea/issues/13228).
