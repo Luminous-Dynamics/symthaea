@@ -400,3 +400,36 @@ cargo run -p symthaea-semiconductor --bin semi-secom-stratified-splits -- \\
 Each report records per-repeat train/test sample counts and positive/negative support, plus independent manifest digests. Input ordering does not change manifests. The published-comparability split has no validation partition; thresholds must not be selected on its test split. Any hyperparameter selection requires nested CV or a separately declared inner split within the training partition.
 
 These stratified repeats measure interpolation across historical samples, not time-forward generalization, and the five repeats are not five independent lots or fabs. Continue to report the original chronological track separately.
+
+
+## Train-only preprocessing for the five-repeat stratified SECOM track
+
+The Rust CLI \`semi-secom-fold-preprocess\` consumes the digest-verified raw SECOM files, the five-repeat stratified report and the source-identity manifest. It validates the snapshot-manifest digest and every source row's sample ID, fail/pass label and naive source-local timestamp before creating per-repeat transforms.
+
+For each repeat, all preprocessing parameters are fitted on that repeat's 1,253 training rows only:
+- drop a feature when its training missing fraction is strictly greater than 0.50;
+- median-impute using observed training values only;
+- drop near-zero-variance features using the declared minimum population variance (1e-12) and minimum distinct-value count (2);
+- fit a complete empirical quantile reference over training-only median-imputed values;
+- apply the quantile map to training and held-out rows without refitting.
+
+The default output is an approximate normal-score empirical quantile transform using midranks and half-rank tail clipping. Uniform-rank output is also available through the typed configuration. The article does not disclose all quantile-transform defaults or exact variance thresholds, so these settings are Luminous reconstruction parameters, not claimed to be the authors' exact implementation.
+
+Two matrices are hashed independently:
+- **Feature Set A:** quantile-transformed retained numeric values; the paper-comparability path.
+- **Feature Set B:** Feature Set A plus retained-feature missingness indicators and one missing ratio over all original columns. This is a Luminous ablation, not attributed to Dong et al.'s exact pipeline.
+
+The fitted pipeline digest binds train sample IDs, config, retained feature identities, train medians, variances, distinct counts and full sorted quantile references. Reports bind source snapshot/identity-manifest digests, repeat index/seed and train/test matrix digests. Test values/labels do not affect the fitted pipeline digest.
+
+Run:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-fold-preprocess -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  stratified-80-20-repeats.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+This verifies fold-specific preprocessing and source binding; it does not train XGBoost or Random Forest. The 2026 paper's exact five seeds, full quantile-transform defaults and near-zero variance threshold are not fully disclosed in the accessible protocol, so direct numerical reproduction remains pending. Results from this stratified protocol must not be compared directly to the frozen chronological 940/313/314 results.
