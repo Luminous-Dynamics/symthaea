@@ -356,3 +356,18 @@ The \`semi-secom-logistic\` CLI also evaluates:
 B5 retains L1=0 and L2=1.0. B6 reports the number of nonzero coefficients (absolute weight > 1e-12), so sparsity is measured rather than assumed from the algorithm name. The synthetic and full pinned-source workflow checks assert the two B6 variants and their fixed L1 configuration.
 
 B6 is a preregistered research comparator, not a validation-selected hyperparameter winner. No tuning on the final chronological test is permitted. Zero coefficients do not establish physical sensor importance because the anonymous public SECOM mirror does not provide sensor semantics.
+
+
+### B6 sparsity audit and stronger regularization arm
+
+The first B6 arm used L1=0.01 and L2=1.0. Its full pinned-source report showed 894 nonzero coefficients for all four B5/B6 variants and the identical coefficient-support SHA-256:
+
+\`d9d8dcd4e3d330408be5f34ffd79211090dd8f94e69126b63cd8e6cac9dfb460\`
+
+Therefore L1=0.01 did not change feature support; it is retained as a near-zero-penalty control, not evidence of meaningful sparsity.
+
+A second fixed arm is now added:
+- **B6-strong:** unweighted FTRL with L1=1.0, L2=1.0.
+- **B6-strong-balanced:** class-weighted FTRL with L1=1.0, L2=1.0 and the same training-prior correction.
+
+Both arms report nonzero count and SHA-256 over the binary coefficient-support mask. The exact-head workflow evaluates both on the same chronological split and archives model support and metrics. The stronger setting is preregistered, not selected by test performance. If it produces severe sparsity, predictive collapse or calibration failure, that is a negative result to preserve.
