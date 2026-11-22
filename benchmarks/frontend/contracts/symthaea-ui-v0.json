@@ -4,7 +4,7 @@
   "status": "source_observed",
   "source": {
     "repository": "Luminous-Dynamics/symthaea",
-    "commit": "fa4e726d542b40d7ec8cd22e8275c237f1de5915",
+    "commit": "808998bb903202e813b5bd275fe4a395bcff528e",
     "paths": [
       "crates/bridges/symthaea-ui/src/app.rs",
       "crates/bridges/symthaea-ui/src/api.rs",
@@ -187,6 +187,18 @@
       "semantic_role": "button",
       "accessible_name": "send",
       "conditional": false
+    },
+    {
+      "id": "gateway.telemetry-state",
+      "tag": "span",
+      "purpose": "Communicates disconnected, connecting, connected or reconnecting telemetry state.",
+      "source_anchor": "gateway.telemetry-state",
+      "semantic_role": "status",
+      "accessible_name": null,
+      "conditional": false,
+      "notes": [
+        "Polite live region; updates only when the telemetry lifecycle state changes."
+      ]
     }
   ],
   "state_machines": [
@@ -228,7 +240,7 @@
           "side_effect": "Retry the current gateway endpoint."
         }
       ],
-      "observability": "The UI dot is connected only while the browser WebSocket state is OPEN. Disconnected, connecting and retry_wait all render as not connected; the UI does not yet display a separate reconnecting label."
+      "observability": "The UI exposes four separate visible labels: telemetry disconnected, telemetry connecting, telemetry connected and telemetry reconnecting. Connected is shown only after the browser WebSocket state reaches OPEN."
     },
     {
       "id": "conversation_submission",
@@ -442,11 +454,13 @@
           "Start with a fixture gateway whose handshake is delayed.",
           "Observe disconnected state while readyState is CONNECTING.",
           "Allow handshake to complete.",
-          "Observe connected state."
+          "Observe connected state.",
+          "Observe the distinct connecting and connected labels."
         ],
         "oracle": [
           "Connected indicator remains false during CONNECTING.",
-          "Connected indicator becomes true only at readyState OPEN."
+          "Connected indicator becomes true only at readyState OPEN.",
+          "The live status label says telemetry connecting during CONNECTING and telemetry connected only after readyState OPEN."
         ],
         "status": "source_observed"
       },
@@ -463,7 +477,8 @@
           "Only one stream attempt is active at a time.",
           "Retry delays follow 1, 2, 4, 8, 16, then 30 seconds.",
           "The current gateway value is used on the next attempt.",
-          "A connection lasting at least 60 seconds resets accumulated retry backoff; shorter sessions preserve the failure sequence."
+          "A connection lasting at least 60 seconds resets accumulated retry backoff; shorter sessions preserve the failure sequence.",
+          "The status label changes to telemetry reconnecting while waiting for the next bounded retry."
         ],
         "status": "source_observed"
       },
@@ -506,6 +521,7 @@
     "Changing the gateway endpoint while a WebSocket is already open does not forcibly replace that live connection; the new value is read by the next retry attempt.",
     "No SFEB browser fixture, screenshot baseline or independent acceptance run is included in this contract.",
     "Telemetry retry backoff is reset only after a connection remains open for at least 60 seconds; this avoids resetting after a rapidly flapping socket.",
-    "The header element is nested inside the page's main landmark; it is a header section but does not create the document banner landmark implied by a top-level header."
+    "The header element is nested inside the page's main landmark; it is a header section but does not create the document banner landmark implied by a top-level header.",
+    "Telemetry lifecycle state is now exposed as a polite status region; the four states are visually and textually distinct."
   ]
 }
