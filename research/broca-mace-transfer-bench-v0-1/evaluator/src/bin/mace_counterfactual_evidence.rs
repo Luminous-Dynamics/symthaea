@@ -1050,8 +1050,12 @@ fn run() -> Result<(), String> {
     {
         return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
     }
+    let sidecar_identity = dependency_sidecar
+        .as_ref()
+        .map(EvidenceDependencySidecarV1::canonical_digest)
+        .unwrap_or("absent");
     let run_identity = format!(
-        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{dependency_sidecar_schema_sha256}:{}",
+        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{dependency_sidecar_schema_sha256}:{sidecar_identity}:{}",
         source_revision.as_deref().unwrap_or("unspecified")
     );
     let run_id = format!(
