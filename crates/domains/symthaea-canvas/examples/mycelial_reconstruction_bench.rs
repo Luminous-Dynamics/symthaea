@@ -171,11 +171,15 @@ fn evaluate_case(
     );
     println!(
         "unmatched_prediction_component_count: {}",
-        score.component_error_summary.unmatched_prediction_component_count
+        score
+            .component_error_summary
+            .unmatched_prediction_component_count
     );
     println!(
         "unmatched_ground_truth_component_count: {}",
-        score.component_error_summary.unmatched_ground_truth_component_count
+        score
+            .component_error_summary
+            .unmatched_ground_truth_component_count
     );
     println!(
         "component_identity_attributions: {}",
