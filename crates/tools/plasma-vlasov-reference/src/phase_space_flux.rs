@@ -101,7 +101,7 @@ impl VlasovPoisson1d1v {
     /// The RHS is evaluated from the same spectral derivative convention as
     /// the solver's infinitesimal advection generators:
     ///
-    ///     partial_t f = -v * D_x(f) - (q/m) * E(x) * D_v(f)
+    /// `partial_t f = -v * D_x(f) - (q/m) * E(x) * D_v(f)`
     ///
     /// D_x and D_v use the collocation Fourier derivative, with self-conjugate
     /// Nyquist derivatives set to zero. The spatial mean is removed from both
