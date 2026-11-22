@@ -95,6 +95,13 @@ pub struct JunctionClassProbabilityPrediction {
     pub probabilities: [f64; RECONSTRUCTION_CALIBRATION_CLASS_COUNT],
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct JunctionCalibrationObservation {
+    pub predicted_junction_id: String,
+    pub target_class: ReconstructionCalibrationClass,
+    pub probabilities: [f64; RECONSTRUCTION_CALIBRATION_CLASS_COUNT],
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ReconstructionCalibrationConfig {
     pub bin_count: usize,
@@ -177,6 +184,9 @@ pub struct MycelialReconstructionCalibrationReport {
     pub probability_sum_tolerance: f64,
     pub negative_log_likelihood_epsilon: f64,
     pub counts: ReconstructionCalibrationCounts,
+    /// Complete sorted probability-and-target inventory; all aggregate metrics
+    /// can be independently recomputed from this evidence.
+    pub observations: Vec<JunctionCalibrationObservation>,
     pub class_prediction_counts: Vec<(ReconstructionCalibrationClass, usize)>,
     pub class_calibration: Vec<ReconstructionClassCalibration>,
     pub top_label_calibration: ReconstructionTopLabelCalibration,
@@ -431,6 +441,14 @@ pub fn evaluate_mycelial_reconstruction_calibration(
         probability_sum_tolerance: config.probability_sum_tolerance,
         negative_log_likelihood_epsilon: config.negative_log_likelihood_epsilon,
         counts,
+        observations: samples
+            .iter()
+            .map(|sample| JunctionCalibrationObservation {
+                predicted_junction_id: sample.prediction_id.clone(),
+                target_class: sample.target,
+                probabilities: sample.probabilities,
+            })
+            .collect(),
         class_prediction_counts,
         class_calibration,
         top_label_calibration,
