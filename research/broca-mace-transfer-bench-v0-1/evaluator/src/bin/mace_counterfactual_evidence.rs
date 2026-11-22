@@ -540,8 +540,9 @@ fn run_candidate(
     let (policy_memory, retrieved_event_ids, retrieval_profile_sha256, index_bytes) =
         match mode {
             CandidateMode::ExactScopeScan => {
-                let eligible: Vec<Experience> = memory
-                    .iter()
+                let eligible: Vec<Experience> = evidence_index
+                    .records
+                    .values()
                     .filter(|item| {
                         item.scope == query.scope
                             && decision_need.action_alternatives.contains(&item.action)
