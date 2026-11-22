@@ -358,6 +358,9 @@
     "Fixture assets are original and contain no remote resources.",
     "The fixture source is the visual reference; screenshot-conditioned evaluations should provide screenshots and the product brief, not the fixture HTML/CSS.",
     "This task is not yet runnable: an isolated fixture server, exact browser pin, screenshot baseline and independent oracle implementation remain pending.",
-    "The reference fixture labels dashboard heading, activity and schedule regions with aria-labelledby, and labels the workspace complementary landmark. Three metric cards carry unique dashboard.metric-card.* source anchors for layout assertions."
-  ]
+    "The reference fixture labels dashboard heading, activity and schedule regions with aria-labelledby, and labels the workspace complementary landmark. Three metric cards carry unique dashboard.metric-card.* source anchors for layout assertions.",
+    "This task and its reference HTML/CSS are publicly visible in this public research branch. It is a public pilot/development task, not a hidden holdout. Do not count it toward blind generalization or anti-contamination claims.",
+    "For future controller_only or hidden_holdout tasks, the runner must mount only the brief and rendered screenshots into the agent workspace, keep source fixtures outside that workspace, and block external retrieval of fixture source."
+  ],
+  "fixture_exposure": "public_pilot"
 }
