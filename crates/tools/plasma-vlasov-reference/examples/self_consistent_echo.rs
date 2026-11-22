@@ -2,8 +2,11 @@ use std::error::Error;
 use std::f64::consts::TAU;
 
 use plasma_vlasov_reference::{
-    EchoMeasurementConfig, EchoModeTrace, EchoPulsePair, EchoTraceSample, VlasovPoisson1d1v,
-    VlasovPoissonConfig, echo_analysis::measure_echo_trace, maxwellian_perturbation,
+    VlasovPoisson1d1v, VlasovPoissonConfig, echo_analysis::measure_echo_trace,
+    maxwellian_perturbation,
+};
+use plasma_vlasov_reference::echo_analysis::{
+    EchoMeasurementConfig, EchoModeTrace, EchoPulsePair, EchoTraceSample,
 };
 
 const FIRST_MODE: usize = 1;
