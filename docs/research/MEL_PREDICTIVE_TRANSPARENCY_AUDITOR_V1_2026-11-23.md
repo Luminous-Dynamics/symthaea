@@ -42,7 +42,7 @@ Steer and branch require a superseding forecast. A vetoed forecast must not be r
 
 - Forecast integrity: precommitment, session-input binding, current revision, expiry, display lead, supersession continuity and disposition ordering.
 - Contingent availability: whether a preview was rendered before its target window, and the distribution of preview lead time.
-- Forecast realization: exact forecast-event links, role agreement, beat-phase/onset error and unfulfilled forecast commitments.
+- Forecast realization: exact forecast-event links, role agreement, beat-index agreement, beat-phase/onset error and unfulfilled forecast commitments. Beat-index agreement is separate from onset error: an event can sound close in time but land on the wrong declared beat.
 - Conditional presence calibration: Brier score over the declared forecast event slots, comparing predicted presence probability with whether that commitment was realized.
 - Agency: counts of accept/steer/veto/branch/ignore/abstain and explicit user departures from the preview.
 
