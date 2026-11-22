@@ -172,21 +172,23 @@ The output contract is `spatial-nuisance-field.schema.json`. It records the exac
 
 ## Spatial nuisance variance calibration
 
-The spatial generator's additive loading is useful for defining a deterministic field, but it is not comparable across different graph ranks, diffusion scales, seed sets, or ROI geometries. The separate `spatial_calibration` module calibrates an already generated field against clean observations to a requested component-variance fraction:
+Raw additive loadings are not comparable across graph ranks, diffusion scales, seed sets, event amplitudes, temporal patterns or ROI geometries. The `spatial_calibration` module therefore exposes a family-agnostic matrix calibrator, `calibrate_nuisance_matrix_to_component_fraction`, alongside a compatibility wrapper that preserves spatial field factor metadata.
+
+For any clean observation matrix X and already-generated nuisance matrix A, it scales A to a requested component-variance fraction:
 
 ```
 Var(A) / (Var(X) + Var(A))
 ```
 
-where X is the clean time-series data and A is the generated nuisance field. Variance is centred within each ROI before pooling across ROIs. The report separately records Cov(X,A), the covariance contribution to the total, and Var(X+A). This avoids hiding temporal alignment inside a nominal nuisance percentage.
+Variance and covariance are computed after centering each ROI's temporal series, then pooled equally across ROIs. The report separately records Cov(X,A), the covariance contribution to the total, and Var(X+A). The same calibrator can be applied to common-mode, graph-smooth, heat-kernel, transient, physiological or future empirical nuisance matrices. It calibrates magnitude only: it does not establish that a synthetic nuisance distribution represents a real scanner or biological artifact.
 
-Run the deterministic calibration fixture:
+The spatial calibration smoke example remains:
 
 ```sh
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_variance_calibration
 ```
 
-The report contract is `spatial-variance-calibration.schema.json`. This calibrates synthetic field magnitude; it does not establish an empirical artifact distribution, and it cannot identify a latent change from an observationally equivalent nuisance source.
+The report contract is `spatial-variance-calibration.schema.json`. The factorial suite now uses the matrix calibrator to match all four nuisance families at a requested 10% component-variance fraction and reports the realized fraction and covariance separately. The family-specific event/spatial generators and all nuisance fields remain unchanged apart from a scalar multiplier.
 
 
 ## Four-cell matched counterfactual experiment engine
@@ -210,4 +212,4 @@ Run the multi-family smoke fixture:
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_counterfactual
 ```
 
-The fixture applies the same target signal to three synthetic nuisance families: common-mode, graph-smooth low-rank and localized heat-kernel. The latter two are calibrated to a common component-variance target. This example is a software integration fixture, not a physical or biological simulation. The output contract is `factorial-counterfactual.schema.json`. The complete design, benchmark targets and industry comparison protocol are specified in `docs/neuroscience/RCAF_FACTORIAL_COUNTERFACTUAL_ENGINE_V1.md`.
+The fixture applies the same target signal to four synthetic nuisance families: common-mode, graph-smooth low-rank, localized heat-kernel and event-triggered motion-like transient. All four nuisance matrices are calibrated against the same clean observations to a requested 10% component-variance fraction using `calibrate_nuisance_matrix_to_component_fraction`; requested and realized fractions and clean–nuisance covariance remain separately visible. This example is a software integration fixture, not a physical or biological simulation. The output contract is `factorial-counterfactual.schema.json`. The complete design, benchmark targets and industry comparison protocol are specified in `docs/neuroscience/RCAF_FACTORIAL_COUNTERFACTUAL_ENGINE_V1.md`.
