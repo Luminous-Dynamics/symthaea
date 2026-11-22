@@ -607,7 +607,7 @@ mod tests {
         value["proposals"][0]["changed_event_ids"] = serde_json::json!(["protected-note-1"]);
         value["decision"]["action"] = serde_json::json!("apply");
         value["decision"]["selected_proposal_ids"] = serde_json::json!(["agent-proposal"]);
-        value["decision"]["committed"] = true;
+        value["decision"]["committed"] = serde_json::json!(true);
         value["decision"]["committed_at_ns"] = serde_json::json!(200);
         let report = audit(&value).expect("constraint violation should be a report finding");
         assert!(!report.structurally_valid_agency_trace);
@@ -620,7 +620,7 @@ mod tests {
         value["interventions"][0]["action"] = serde_json::json!("veto");
         value["decision"]["action"] = serde_json::json!("apply");
         value["decision"]["selected_proposal_ids"] = serde_json::json!(["agent-proposal"]);
-        value["decision"]["committed"] = true;
+        value["decision"]["committed"] = serde_json::json!(true);
         value["decision"]["committed_at_ns"] = serde_json::json!(300);
         let report = audit(&value).expect("veto race should be reported");
         assert!(!report.structurally_valid_agency_trace);
@@ -638,7 +638,7 @@ mod tests {
         value["interventions"][0]["action"] = serde_json::json!("ignore");
         value["decision"]["action"] = serde_json::json!("apply");
         value["decision"]["selected_proposal_ids"] = serde_json::json!(["agent-proposal"]);
-        value["decision"]["committed"] = true;
+        value["decision"]["committed"] = serde_json::json!(true);
         value["decision"]["committed_at_ns"] = serde_json::json!(300);
         let report = audit(&value).expect("ignored proposal must not be treated as accepted");
         assert!(!report.structurally_valid_agency_trace);
@@ -655,9 +655,9 @@ mod tests {
         let mut value = panel();
         value["decision"]["action"] = serde_json::json!("negotiate");
         value["decision"]["selected_proposal_ids"] = serde_json::json!([]);
-        value["decision"]["committed"] = false;
+        value["decision"]["committed"] = serde_json::json!(false);
         value["decision"]["committed_at_ns"] = serde_json::Value::Null;
-        value["decision"]["conflict_preserved"] = false;
+        value["decision"]["conflict_preserved"] = serde_json::json!(false);
         let report = audit(&value).expect("hidden conflict scalarization must be visible");
         assert!(!report.structurally_valid_agency_trace);
         assert!(
@@ -673,7 +673,7 @@ mod tests {
         let mut value = panel();
         value["decision"]["action"] = serde_json::json!("branch");
         value["decision"]["selected_proposal_ids"] = serde_json::json!(["agent-proposal"]);
-        value["decision"]["committed"] = false;
+        value["decision"]["committed"] = serde_json::json!(false);
         value["decision"]["committed_at_ns"] = serde_json::Value::Null;
         let report = audit(&value).expect("branch with one alternative is invalid");
         assert!(!report.structurally_valid_agency_trace);
@@ -683,7 +683,7 @@ mod tests {
     fn revoked_memory_update_cannot_be_committed() {
         let mut value = panel();
         value["persistent_updates"][0]["authorization_status"] = serde_json::json!("revoked");
-        value["persistent_updates"][0]["committed"] = true;
+        value["persistent_updates"][0]["committed"] = serde_json::json!(true);
         let report = audit(&value).expect("revoked write is reported");
         assert!(!report.structurally_valid_agency_trace);
         assert_eq!(report.unauthorized_persistent_update_count, 1);
@@ -694,7 +694,7 @@ mod tests {
         let mut value = panel();
         value["persistent_updates"][0]["owner_collaborator_id"] =
             serde_json::json!("collaborator-B");
-        value["persistent_updates"][0]["committed"] = true;
+        value["persistent_updates"][0]["committed"] = serde_json::json!(true);
         let report = audit(&value).expect("cross-collaborator write is reported");
         assert!(!report.structurally_valid_agency_trace);
         assert_eq!(report.unauthorized_persistent_update_count, 1);
@@ -704,7 +704,7 @@ mod tests {
     fn authorization_unavailable_fails_closed_for_persistent_commit() {
         let mut value = panel();
         value["persistent_updates"][0]["authorization_status"] = serde_json::json!("unavailable");
-        value["persistent_updates"][0]["committed"] = true;
+        value["persistent_updates"][0]["committed"] = serde_json::json!(true);
         let report = audit(&value).expect("unavailable verifier must not authorize a write");
         assert!(!report.structurally_valid_agency_trace);
         assert_eq!(report.unauthorized_persistent_update_count, 1);
@@ -717,7 +717,7 @@ mod tests {
         value["decision"]["action"] = serde_json::json!("branch");
         value["decision"]["selected_proposal_ids"] =
             serde_json::json!(["agent-proposal", "collaborator-proposal"]);
-        value["decision"]["committed"] = false;
+        value["decision"]["committed"] = serde_json::json!(false);
         value["decision"]["committed_at_ns"] = serde_json::Value::Null;
         let report =
             audit(&value).expect("branching keeps proposals distinct without overriding ignore");
@@ -732,7 +732,7 @@ mod tests {
         value["persistent_updates"][0]["purpose"] = serde_json::json!("personal_adaptation");
         value["persistent_updates"][0]["authorized_scope"] =
             serde_json::json!("personal_adaptation");
-        value["persistent_updates"][0]["committed"] = true;
+        value["persistent_updates"][0]["committed"] = serde_json::json!(true);
         let report = audit(&value).expect("personal grant cannot authorize global identity update");
         assert!(!report.structurally_valid_agency_trace);
         assert_eq!(report.unauthorized_persistent_update_count, 1);
@@ -757,7 +757,7 @@ mod tests {
         let mut value = panel();
         value["decision"]["action"] = serde_json::json!("apply");
         value["decision"]["selected_proposal_ids"] = serde_json::json!(["agent-proposal"]);
-        value["decision"]["committed"] = true;
+        value["decision"]["committed"] = serde_json::json!(true);
         value["decision"]["committed_at_ns"] = serde_json::json!(200);
         value["interventions"][0]["action"] = serde_json::json!("accept");
         value["interventions"][0]["acted_at_ns"] = serde_json::json!(250);
@@ -776,7 +776,7 @@ mod tests {
         let mut value = panel();
         value["decision"]["action"] = serde_json::json!("abstain");
         value["decision"]["selected_proposal_ids"] = serde_json::json!([]);
-        value["decision"]["committed"] = false;
+        value["decision"]["committed"] = serde_json::json!(false);
         value["decision"]["committed_at_ns"] = serde_json::Value::Null;
         let report = audit(&value).expect("abstention is a valid no-commit result");
         assert_eq!(report.hard_constraint_compliance, None);
@@ -787,9 +787,9 @@ mod tests {
         let mut value = panel();
         value["decision"]["action"] = serde_json::json!("abstain");
         value["decision"]["selected_proposal_ids"] = serde_json::json!([]);
-        value["decision"]["committed"] = false;
+        value["decision"]["committed"] = serde_json::json!(false);
         value["decision"]["committed_at_ns"] = serde_json::Value::Null;
-        value["decision"]["conflict_preserved"] = true;
+        value["decision"]["conflict_preserved"] = serde_json::json!(true);
         let report = audit(&value).expect("abstention is a valid non-commit outcome");
         assert!(report.structurally_valid_agency_trace);
     }
