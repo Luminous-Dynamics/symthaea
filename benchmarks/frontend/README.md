@@ -377,3 +377,8 @@ implemented executor or measured benchmark result.
 - [External comparator ledger](external-comparator-ledger-v1.json) records benchmark scope, dated snapshots and non-comparability constraints.
 - [Independent oracle verification predicate](attestation/sfeb-oracle-verification-predicate-v1.schema.json) defines the separately signed verifier result; it is a contract, not an implemented replay engine.
 - See [the oracle replay and benchmark frontier note](../../docs/research/SFEB_INDEPENDENT_ORACLE_REPLAY_AND_BENCHMARK_FRONTIER_2026-11-22.md).
+
+
+### New external comparisons (2026-11-22)
+
+The external comparator ledger now includes Arena Code Arena's WebDev, Image-to-WebDev and Fullstack preference boards, and Interaction-as-a-Judge research. These are distinct human-preference / interaction-judge dimensions and must not be blended with SFEB's deterministic oracle qualification or Vision2Web scores. See `external-comparator-ledger-v1.json` and the linked research note.

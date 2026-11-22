@@ -416,6 +416,9 @@ As rechecked on 2026-11-22:
 - **Vision2Web** is the closest external end-to-end comparator found in this research. Its official benchmark describes 193 tasks across 16 categories, 918 prototype images and 1,255 test cases, with static, interactive and full-stack levels and verification combining workflow-driven GUI testing with VLM visual judging. The search-indexed S4-2026 leaderboard snapshot (refreshed 2026-10-01) showed 82.3 overall for Claude-Fable-5 + Claude Code on 2026-08-28, with level averages 87.4 static, 83.2 interactive and 76.3 full-stack. The live page's selected season displayed no rows when rechecked on 2026-11-22. These are dated historical reference scores, not a verified current leader or directly transferable SFEB targets.
 - **Design2Code** (2024/NAACL 2025 publication track) contains 484 real-world webpages and evaluates screenshot-to-code rendering with high-level CLIP similarity, block matching, text, position and color metrics, complemented by human pairwise judgments. Its analysis identifies visual-element recall and layout correctness as recurring weaknesses. Use it as a visual-reconstruction reference, subject to task/data license and reproducibility conditions.
 - **WebdriverIO's browser-agent benchmark** is a controlled tool comparison on a fixed random sample of 100 Online-Mind2Web live-site tasks. Its indexed October 2026 snapshot includes an aggregated 62% WebdriverIO session row (103/165) for one of two model contexts; a separate DeepSeek V4.1 Flash run shows 58/100. A direct 2026-11-22 page render displayed an empty run log, so use the October results only as historical snapshots. This measures browser-operation performance, not frontend code generation. The methodology warns of roughly ±10-point intervals at 100 tasks, live-site instability and judge disagreement on about one in seven runs, so close results are ties rather than a definitive SOTA ranking.
+- **Arena Code Arena WebDev/Frontend** is the direct human-preference comparator for text-prompted frontend generation. Its November 20, 2026 model board reports 897,929 votes across 162 models; Claude Opus 5.5 (Max) leads at 1,864 rating. The cost frontier shows substantial quality/cost trade-offs, from $9.00 median task cost for the leader to $0.05 for MiMo-V2.6-Flash at 1,654. It is pairwise user preference over Arena traffic, not deterministic task success or a functional/security oracle.
+- **Arena Image-to-WebDev** separately measures image-conditioned web-app generation: November 20 snapshot, 218,511 votes, 70 models, leader 1,758 (Claude Opus 5.5). **Arena Fullstack** shows 133,241 votes, 95 models and leader 1,745. These are independent preference scales and must not be pooled with WebDev, Vision2Web or SFEB.
+- **Interaction-as-a-Judge** (Arena, November 12, 2026) is a particularly relevant emerging evaluation method: computer-use agents inspect generated applications through interaction. The paper reports requirement-defect detection 63.0% → 71.1% and iterative repair 55.4% → 75.5% under its own evaluation. It releases 6,390 application-pair preference traces and 189 game versions with 362 human-verified requirements. Use this as a secondary, calibrated judge—not as the verifier's trust root. The preference dataset is CC-BY-4.0 for user prompts, while generated model outputs remain subject to provider terms.
 - **Leptos upstream** is the API authority. Pin and record the actual lockfile version rather than treating a semver requirement as a resolved version.
 
 External benchmarks measure different capabilities. Do not collapse visual generation, browser operation, software engineering, full-stack completion and framework expertise into one cross-benchmark ranking.
@@ -788,32 +791,52 @@ acceptance remains anchored in executable oracles, not a VLM's confidence.
 
 ### Current external benchmark evidence — rechecked 2026-11-22
 
-- Vision2Web is an ICML 2026 benchmark with 193 tasks, 16 categories, 918
-  prototype images and 1,255 test cases spanning static responsive UI,
-  interactive multi-page frontend and long-horizon full-stack development.
-  It uses a GUI agent verifier and VLM judge. This remains the closest broad
-  external comparator for SFEB's end-to-end objective.
-  Source: https://proceedings.mlr.press/v306/he26n.html
-- Design2Code remains a visual reconstruction comparator: 484 real-world
-  webpage screenshot-to-code cases with automatic metrics and human
-  evaluation. It does not measure SFEB's full runtime/security/maintenance
-  loop.
-  Source: https://aclanthology.org/2025.naacl-long.199/
-- WebdriverIO's browser-agent benchmark fixes model, harness and prompt
-  while swapping browser tools. Its page was updated October 9, 2026 and
-  currently lists 7 tools, 100 live-web tasks, 2 models and 2,511 total agent
-  runs. The displayed WebdriverIO session v10.0.2 row reports 62% success
-  (103/165; displayed 95% interval 55–69%), $0.013 median cost per task and
-  156 seconds median time per task. The benchmark explicitly warns that a
-  competing tool whose 95% interval overlaps the leader is not reliably worse.
-  Treat this as a browser-tool comparison, not a website-code-generation
-  leaderboard or evidence that one tool is significantly superior.
-  Source: https://benchmark.webdriver.io/
+- Vision2Web remains the closest hierarchical website-development benchmark:
+  193 tasks, 16 categories, 918 prototype images and 1,255 test cases. The
+  visible S4-2026 row with overall 82.3 (static 87.4, interactive 83.2,
+  full-stack 76.3) is historical; the selected live season displayed no
+  results on the 2026-11-22 check.
+- Design2Code contributes the narrower visual reconstruction lane: 484
+  real-world webpage screenshots with automatic and human evaluation.
+- Arena Code Arena adds the most direct contemporary preference comparators:
+  WebDev/Frontend (897,929 votes, 162 models, top 1,864), Image-to-WebDev
+  (218,511 votes, 70 models, top 1,758) and Fullstack (133,241 votes,
+  95 models, top 1,745), all observed 2026-11-20. These are anonymous
+  pairwise human-preference ratings, not test pass rates. The exact model
+  configuration is part of each entry; costs are available only for some
+  submissions. Never pool the three Arena ratings or compare them numerically
+  with Vision2Web/SFEB scores.
+- WebdriverIO is a browser-tool comparison, not a code-generation benchmark.
+  Its indexed October 9 snapshot lists 2,511 runs across 7 tools and 2 model
+  contexts; one aggregated WebdriverIO session row is 62% (103/165; 55–69%),
+  while a separate DeepSeek V4.1 Flash run reports 58/100. A direct page
+  render on November 22 showed an empty run-log state, so these figures are
+  historical, model-context-dependent snapshots, not a live leaderboard.
+- Arena's Interaction-as-a-Judge work reports stronger broken-requirement
+  detection (63.0% → 71.1%) and iterative repair (55.4% → 75.5%) when
+  computer-use interaction is included in judging. This is a promising
+  secondary evaluator and repair signal, not an independent acceptance
+  authority. The released preference dataset's prompt license is CC-BY-4.0,
+  but model outputs remain governed by each provider's terms.
+- OpenAI's July 8, 2026 SWE-Bench Pro audit flagged 200/731 tasks automatically
+  and 249/731 through human annotation. These are task-quality findings on
+  that benchmark's public split, not a defect-rate estimate for SFEB.
 
-Raw scores across these benchmarks remain non-comparable. SFEB should reproduce
-each compatible public protocol separately, and use its own hidden tasks only
-for its own matched ablation claims.
+Sources:
+- Vision2Web: https://proceedings.mlr.press/v306/he26n.html and https://vision2web-bench.github.io/
+- Design2Code: https://aclanthology.org/2025.naacl-long.199/
+- Arena WebDev: https://arena.ai/leaderboard/code/webdev/frontend
+- Arena Image-to-WebDev: https://arena.ai/leaderboard/code/image-to-webdev
+- Arena Fullstack: https://arena.ai/leaderboard/code/webdev/fullstack
+- Interaction-as-a-Judge: https://arena.ai/blog/interaction-as-a-judge and https://arxiv.org/abs/2610.17895
+- ArenaWebdevPreferences: https://huggingface.co/datasets/lmarena-ai/arena-webdev-preferences
+- WebdriverIO: https://benchmark.webdriver.io/ and https://github.com/webdriverio/benchmark
+- SWE-Bench Pro quality audit: https://openai.com/index/separating-signal-from-noise-coding-evaluations/
 
+Raw scores remain non-comparable. Reproduce each comparator's own task set,
+model/prompt/harness, evaluator and uncertainty protocol. Use Arena ratings
+only as a separately reported human-preference dimension.
+ 
 ### New SOTA decision rule
 
 A credible SOTA advance must show more than a high static screenshot score:

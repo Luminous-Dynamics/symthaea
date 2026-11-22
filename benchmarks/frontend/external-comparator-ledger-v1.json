@@ -413,18 +413,27 @@
           "method": "interaction_only_reward_model",
           "base_model": "Qwen-3.5-9B",
           "reported_arena_rating_uplift_points": 50
+        },
+        {
+          "kind": "license_and_data_shape",
+          "preference_dataset_license": "CC-BY-4.0 for user prompts",
+          "model_output_terms": "outputs are governed by their respective model-provider terms",
+          "pii_note": "dataset card states PII de-identification was performed"
         }
       ],
       "limitations": [
         "These results belong to the authors' specific datasets, models, evaluators and protocols; they are not universal UI quality rates.",
         "A computer-use judge can miss states, be manipulated by page content or misinterpret task intent; deterministic and human-calibrated checks remain necessary.",
         "The human-preference dataset can train/calibrate a secondary judge, but cannot replace frozen executable acceptance oracles.",
-        "The correctness data focuses on game versions and human-verified requirements; transfer to enterprise websites requires validation."
+        "The correctness data focuses on game versions and human-verified requirements; transfer to enterprise websites requires validation.",
+        "Do not assume the generated model outputs are licensed for commercial redistribution or training; the preference dataset card says output terms remain with providers."
       ],
       "sources": [
         "https://arena.ai/blog/interaction-as-a-judge",
         "https://arxiv.org/abs/2610.17895",
-        "https://arena.ai/how-it-works"
+        "https://arena.ai/how-it-works",
+        "https://huggingface.co/datasets/lmarena-ai/arena-webdev-preferences",
+        "https://huggingface.co/datasets/lmarena-ai/arena-webdev-correctness"
       ]
     }
   ]
