@@ -45,7 +45,7 @@ pub use secom_tabular_baselines::{
 
 pub use secom_fold_preprocessor::{
     FittedSecomPreprocessorV1, PreparedSecomFoldV1, QuantileOutputV1,
-    SecomFoldPreprocessorConfigV1, SecomFoldPreprocessorError,
+    SecomFoldPreprocessorError,
     SecomFoldPreprocessorReportV1, SecomPreprocessingRowV1, SecomPreprocessorConfigV1,
     SecomTransformedSampleV1, fit_secom_preprocessor_v1,
     prepare_secom_stratified_fold_v1, transform_secom_rows_v1,
