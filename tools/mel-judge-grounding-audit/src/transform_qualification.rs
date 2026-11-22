@@ -151,9 +151,7 @@ pub fn parse_and_qualify(
         ));
     }
     let margin = panel.policy.equivalence_margin;
-    if receipt.confidence_interval_lower <= -margin
-        || receipt.confidence_interval_upper >= margin
-    {
+    if receipt.confidence_interval_lower <= -margin || receipt.confidence_interval_upper >= margin {
         reasons.push(
             "confidence interval is not wholly inside the preregistered equivalence bounds"
                 .to_owned(),
@@ -215,7 +213,10 @@ fn validate_panel(panel: &TransformPanelV1) -> Result<(), String> {
     let transform = &panel.transformation;
     require_text(&transform.family, "transform family")?;
     require_text(&transform.algorithm, "transform algorithm")?;
-    require_digest(&transform.implementation_sha256, "transform implementation digest")?;
+    require_digest(
+        &transform.implementation_sha256,
+        "transform implementation digest",
+    )?;
     require_digest(&transform.parameters_sha256, "transform parameter digest")?;
     validate_dimension_set(
         &transform.intended_preserved_dimensions,
@@ -239,7 +240,10 @@ fn validate_panel(panel: &TransformPanelV1) -> Result<(), String> {
     if altered.contains(panel.task.task_dimension.as_str()) {
         return Err("task_dimension is also declared as possibly altered".to_owned());
     }
-    if preserved.iter().any(|dimension| altered.contains(dimension)) {
+    if preserved
+        .iter()
+        .any(|dimension| altered.contains(dimension))
+    {
         return Err("a dimension cannot be both preserved and possibly altered".to_owned());
     }
 
@@ -247,7 +251,10 @@ fn validate_panel(panel: &TransformPanelV1) -> Result<(), String> {
         return Err("rights purpose must be music-judge-qualification".to_owned());
     }
     require_digest(&panel.rights.rights_receipt_sha256, "rights receipt digest")?;
-    require_digest(&panel.rights.consent_receipt_sha256, "consent receipt digest")?;
+    require_digest(
+        &panel.rights.consent_receipt_sha256,
+        "consent receipt digest",
+    )?;
 
     let receipt = &panel.equivalence;
     if !matches!(
@@ -275,8 +282,14 @@ fn validate_panel(panel: &TransformPanelV1) -> Result<(), String> {
     for (name, value) in [
         ("receipt confidence level", receipt.confidence_level),
         ("mean difference", receipt.mean_difference),
-        ("confidence interval lower", receipt.confidence_interval_lower),
-        ("confidence interval upper", receipt.confidence_interval_upper),
+        (
+            "confidence interval lower",
+            receipt.confidence_interval_lower,
+        ),
+        (
+            "confidence interval upper",
+            receipt.confidence_interval_upper,
+        ),
         ("receipt equivalence margin", receipt.equivalence_margin),
     ] {
         if !value.is_finite() {
@@ -296,7 +309,10 @@ fn validate_panel(panel: &TransformPanelV1) -> Result<(), String> {
     }
 
     if panel.claim_ceiling.is_empty()
-        || panel.claim_ceiling.iter().any(|claim| claim.trim().is_empty())
+        || panel
+            .claim_ceiling
+            .iter()
+            .any(|claim| claim.trim().is_empty())
     {
         return Err("claim_ceiling must contain non-empty limits".to_owned());
     }
@@ -357,7 +373,12 @@ fn sha256sum(path: &Path) -> Result<String, String> {
         .arg("--")
         .arg(path)
         .output()
-        .map_err(|error| format!("failed to execute sha256sum for {}: {error}", path.display()))?;
+        .map_err(|error| {
+            format!(
+                "failed to execute sha256sum for {}: {error}",
+                path.display()
+            )
+        })?;
     if !output.status.success() {
         return Err(format!(
             "sha256sum failed for {}: {}",
@@ -449,10 +470,12 @@ mod tests {
         value["equivalence"]["listener_count"] = serde_json::json!(8);
         let report = qualify(&value.to_string());
         assert!(!report.eligible_for_declared_task_dimension);
-        assert!(report
-            .ineligibility_reasons
-            .iter()
-            .any(|reason| reason.contains("underpowered listener")));
+        assert!(
+            report
+                .ineligibility_reasons
+                .iter()
+                .any(|reason| reason.contains("underpowered listener"))
+        );
     }
 
     #[test]
@@ -461,10 +484,12 @@ mod tests {
         value["equivalence"]["confidence_interval_upper"] = serde_json::json!(0.31);
         let report = qualify(&value.to_string());
         assert!(!report.eligible_for_declared_task_dimension);
-        assert!(report
-            .ineligibility_reasons
-            .iter()
-            .any(|reason| reason.contains("confidence interval")));
+        assert!(
+            report
+                .ineligibility_reasons
+                .iter()
+                .any(|reason| reason.contains("confidence interval"))
+        );
     }
 
     #[test]
