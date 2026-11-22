@@ -31,28 +31,28 @@ The intended research outputs are:
 
 Let:
 
-- (n) be a candidate-visible DecisionNeed, including scope, objective, allowed actions, estimand, deadline, and policy version.
-- (E(n)) be the full candidate-visible evidence universe after exact scope and authority partitioning.
-- (S) be a retained subset or a compressed, derived representation of that evidence.
-- (pi(n,S)) be the frozen decision policy applied to the evidence resolved from (S).
-- (y) be evaluator-only world truth.
-- (U_y(a)) be the declared utility of action (a) in world (y).
+- n be a candidate-visible DecisionNeed, including scope, objective, allowed actions, estimand, deadline, and policy version.
+- E(n) be the full candidate-visible evidence universe after exact scope and authority partitioning.
+- S be a retained subset or a compressed, derived representation of that evidence.
+- pi(n, S) be the frozen decision policy applied to the evidence resolved from (S).
+- y be evaluator-only world truth.
+- U_y(a) be the declared utility of action a in world y.
 
 Define absolute regret:
 
-[
-R_y(S)=max_{ain A(n)} U_y(a)-U_y(pi(n,S)).
-]
+```text
+R_y(S) = max over a in A(n) of U_y(a) - U_y(pi(n, S)).
+```
 
 Define compression-induced regret relative to the full candidate-visible evidence reference:
 
-[
-G_y(S)=R_y(S)-R_y(E(n)).
-]
+```text
+G_y(S) = R_y(S) - R_y(E(n)).
+```
 
 The second quantity isolates degradation caused by compression relative to the declared reference. It must not replace absolute regret: the full-evidence policy may itself make a poor decision, and the candidate-visible evidence universe may be incomplete with respect to the real world.
 
-A representation is (epsilon)-decision-sufficient only when both of the following hold:
+A representation is epsilon-decision-sufficient only when both of the following hold:
 
 1. Every hard admission, authority, scope, provenance, independence, and lifecycle constraint passes.
 2. The preregistered regret criterion is met, for example (G_y(S)leqepsilon), together with an absolute-regret ceiling.
@@ -83,11 +83,11 @@ Evidence utility is not assumed to be monotonic in set size. More records can in
 
 ### 2.2 Decision sufficiency is not universal statistical sufficiency
 
-The intended property is conditional on a declared decision problem. If (Q_E(a)) is expected utility for action (a) using all evidence and (Q_S(a)) is the corresponding value using a representation, then a useful sufficient condition is:
+The intended property is conditional on a declared decision problem. If Q_E(a) is expected utility for action a using all evidence and Q_S(a) is the corresponding value using a representation, then a useful sufficient condition is:
 
-[
-sup_{ain A(n)} |Q_E(a)-Q_S(a)|leqdelta.
-]
+```text
+max over a in A(n) of abs(Q_E(a) - Q_S(a)) <= delta.
+```
 
 If both policies choose the utility-maximizing action under their own value estimates, this uniform value error bounds the full-evidence regret of the compressed choice by (2delta). This is a theoretical guide for future probabilistic policies, not a property established by the current synthetic runner.
 
@@ -95,20 +95,15 @@ If both policies choose the utility-maximizing action under their own value esti
 
 The naive formulation is:
 
-[
-min_{Ssubseteq E(n)} C(S)
-quad	ext{subject to}quad
-G_y(S)leqepsilon.
-]
+```text
+minimize C(S) over S subseteq E(n), subject to G_y(S) <= epsilon.
+```
 
-In practice, (C(S)) is not one natural scalar. Keep an explicit cost vector:
+In practice, C(S) is not one natural scalar. Keep an explicit cost vector:
 
-[
-mathbf C(S)=
-(B_{mathrm{memory}}, B_{mathrm{sidecar}}, T_{mathrm{context}},
-T_{mathrm{index}}, T_{mathrm{update}}, T_{mathrm{verify}},
-L_{p50},L_{p95},L_{p99},M_{mathrm{calls}},$,mathrm{energy}).
-]
+```text
+C(S) = (memory_bytes, sidecar_bytes, context_tokens, index_time, update_time, verification_time, p50_latency, p95_latency, p99_latency, model_calls, monetary_cost, energy).
+```
 
 Include source receipts, lifecycle history, tombstones, compaction, canonical evidence revalidation, and background consolidation. A vector index that appears small but depends on a large unreported sidecar is not a low-cost memory.
 
@@ -174,13 +169,11 @@ This work belongs with #13264 and should precede any claim that counterfactual k
 
 Retrieval asks, “Which stored item should I fetch?” Active acquisition asks, “Which new observation should I obtain, and is it worth obtaining?”
 
-For a candidate query or observation (q), define expected value of sample information (EVSI) in decision-risk units:
+For a candidate query or observation q, define expected value of sample information (EVSI) in decision-risk units:
 
-[
-operatorname{EVSI}(q)
-=
-R(b)-mathbb E_{osim P(omid b,q)}[R(bmid o)].
-]
+```text
+EVSI(q) = R(b) - E_{o ~ P(o | b, q)}[R(b | o)].
+```
 
 Here (b) is the candidate-visible belief state, (o) is a possible observation, and (R(b)) is minimum expected decision risk under the declared policy and action set.
 
