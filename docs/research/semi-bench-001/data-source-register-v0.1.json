@@ -697,9 +697,10 @@
       "auroc_implementation": "O(n log n) descending tie-group rank accumulation; exact half-credit for ties",
       "large_tied_case_rows": 40000,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262",
-      "tested_commit": "061cc034d38afabe12cbe189f2ef2f0a31183786",
-      "claim_ceiling": "frozen metric contract parity and evaluator implementation only; no predictive or manufacturing claim"
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047",
+      "tested_commit": "ab51ea5cc44076eb07cc863a3419b6940ef5fdee",
+      "claim_ceiling": "frozen metric contract parity and evaluator implementation only; no predictive or manufacturing claim",
+      "total_rust_unit_tests": 32
     },
     "rust_split_manifest_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs",
@@ -734,6 +735,17 @@
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
       "tests": 5,
       "claim_ceiling": "digest-bound raw-file integrity/shape/clock contract only; synthetic fixture used; no complete sensor-matrix result"
+    },
+    "rust_dtco_lineage_validator": {
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs",
+      "tests": "inline-unit-tests",
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json",
+      "test_count": 8,
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047",
+      "total_rust_unit_tests": 32,
+      "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy"
     }
   },
   "reproducibility_artifacts": [
