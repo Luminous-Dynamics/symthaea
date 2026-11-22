@@ -456,25 +456,29 @@
       "status": "evaluator_authored_not_executed",
       "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval",
       "baselines": [
-        "keyword_exact",
+        "keyword_overlap",
         "BM25",
         "sparse_TFIDF",
-        "dense_embedding",
         "HDC_associative",
-        "hybrid_sparse_dense_HDC"
+        "hybrid_RRF_BM25_TFIDF_HDC"
       ],
       "primary_metrics": [
         "recall_at_1",
         "recall_at_3",
+        "hit_rate_at_1",
+        "hit_rate_at_3",
         "mean_reciprocal_rank",
         "ndcg_at_3",
         "precision_at_3",
-        "abstention_accuracy_on_hard_negatives",
+        "abstention_accuracy_after_development_split_calibration",
         "latency_p50_p95",
         "memory_bytes",
         "cost_per_1000_queries"
       ],
-      "note": "The 42-query set is public-pilot development data; no retrieval scores have been measured and it is not a blind holdout."
+      "note": "The 42-query set is public-pilot development data; no retrieval scores have been measured and it is not a blind holdout.",
+      "planned_comparison_arms": [
+        "dense_embedding_requires_pinned_model_adapter"
+      ]
     },
     "source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
     "source_anchor_count": 17,
