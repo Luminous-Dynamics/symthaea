@@ -1473,6 +1473,60 @@ mod tests {
     }
 
     #[test]
+    fn one_tip_can_have_multiple_distinct_candidate_targets() {
+        let mut model = fixture_model(0.25);
+        let branch = SpatialPoint3 {
+            x: 0.0,
+            y: 10.0,
+            z: 0.0,
+        };
+        model.filaments.push(filament(
+            4,
+            Some(1),
+            true,
+            branch,
+            SpatialPoint3 {
+                x: 0.25,
+                y: 11.5,
+                z: 0.0,
+            },
+            SpatialPoint3 {
+                x: 0.75,
+                y: 13.5,
+                z: 0.0,
+            },
+            SpatialPoint3 {
+                x: 1.0,
+                y: 15.0,
+                z: 0.0,
+            },
+        ));
+        let first = tip_to_side_candidate_between(&model, 17, 2, 3);
+        let alternative = tip_to_side_candidate_between(&model, 18, 2, 4);
+        let profile = build_mycelial_contact_filtration(
+            &model,
+            &[first, alternative],
+            MycelialContactFiltrationConfig {
+                maximum_contact_tolerance_model_units: 5.0,
+            },
+        )
+        .unwrap();
+        assert_eq!(profile.metrics.candidate_count_total, 2);
+        assert_eq!(profile.metrics.candidate_count_in_filtration, 2);
+        assert_eq!(profile.metrics.cycle_birth_count, 2);
+        assert_eq!(profile.metrics.final_cycle_rank, 2);
+        assert_eq!(profile.candidate_observations.len(), 2);
+        assert_eq!(
+            profile.candidate_observations[0].source_filament_id,
+            profile.candidate_observations[1].source_filament_id
+        );
+        assert_ne!(
+            profile.candidate_observations[0].target_filament_id,
+            profile.candidate_observations[1].target_filament_id
+        );
+    }
+
+    #[test]
     fn two_candidates_cannot_claim_the_same_tip_contact() {
         let model = fixture_model(0.25);
         let first = tip_to_side_candidate(&model, 17, 0.25);
