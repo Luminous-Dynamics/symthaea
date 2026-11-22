@@ -32,3 +32,22 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 Tests are authored but have not been executed in the current environment.
 
 Candidate hits also carry a SHA-256 fingerprint of the candidate-visible `Experience` view at index-build time. The consumer compares it to the current canonical record before resolving the ID. A correction or retraction that changes the view invalidates the old hit and requires re-indexing. This is a consistency check only: it does not bind raw source bytes or authenticate source provenance.
+
+
+## Typed-content, query-conditioned HDC v0.1
+
+The crate also exposes `typed_content::TypedContentIndexV1`, a separate experimental index that encodes candidate-visible MACE fields rather than event IDs:
+
+- scope regime/objective and action;
+- observed utility and measurement-error bound;
+- identification method, estimand digests, propensity and balance descriptors;
+- intervention, pre-registration, reconciliation, trust, retraction, confounder and delayed-horizon flags.
+
+Categorical features use deterministic role/value binding. Continuous values use deterministic random Fourier features for a one-dimensional Gaussian RBF kernel; utility, measurement-error, propensity and balance bandwidths are frozen in `TypedContentConfigV1` and its profile digest. `SemanticExperienceQueryV1` supplies the same typed fields, including optional numeric targets and evidence-quality cues.
+
+**Identity and authority are deliberately not approximated.** Event IDs, source-family/root identity, source signatures, tenant/authority information and canonical receipt bytes remain outside the vector. Retrieval returns the exact event ID and candidate-view digest; the caller must resolve the canonical record and re-run MACE qualification.
+
+The current policy `Query` only exposes regime/objective. Therefore this module's richer numeric/causal query fields are an API and controlled unit-test capability, not yet an end-to-end task runner integration. Do not fabricate them from evaluator truth. An agent-level comparison needs a candidate-visible `DecisionNeed` derived from the actual observation and task.
+
+The typed index is structured semantic retrieval, **not natural-language understanding** and not proof that HDC-LTC has learned temporal dynamics. It is static HDC v0.1; event-driven LTC and irregular-time streams remain separate follow-on work.
+
