@@ -756,9 +756,17 @@ fn validate_observation_closures<'a>(
         let forecast = forecasts
             .get(closure.forecast_id.as_str())
             .copied()
-            .ok_or_else(|| format!("observation closure references unknown forecast {}", closure.forecast_id))?;
+            .ok_or_else(|| {
+                format!(
+                    "observation closure references unknown forecast {}",
+                    closure.forecast_id
+                )
+            })?;
         require_text(&closure.forecast_id, "observation closure forecast_id")?;
-        require_text(&closure.clock_domain_id, "observation closure clock_domain_id")?;
+        require_text(
+            &closure.clock_domain_id,
+            "observation closure clock_domain_id",
+        )?;
         require_digest(
             &closure.observation_receipt_sha256,
             "observation receipt digest",
@@ -852,7 +860,10 @@ fn validate_observation_closures<'a>(
                 ));
             }
         }
-        if closures.insert(closure.forecast_id.as_str(), closure).is_some() {
+        if closures
+            .insert(closure.forecast_id.as_str(), closure)
+            .is_some()
+        {
             return Err(format!(
                 "duplicate observation closure for forecast {}",
                 closure.forecast_id
@@ -1337,7 +1348,10 @@ mod tests {
             serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
         successor_closure["output_evidence_sha256"] =
             serde_json::json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        value["observation_closures"].as_array_mut().unwrap().push(successor_closure);
+        value["observation_closures"]
+            .as_array_mut()
+            .unwrap()
+            .push(successor_closure);
         let report = audit(&value).expect("superseded realization remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
         assert!(
@@ -1482,7 +1496,8 @@ mod tests {
         value["realizations"] = serde_json::json!([]);
         value["observation_closures"][0]["status"] = serde_json::json!("partial");
         value["observation_closures"][0]["coverage_end_ns"] = serde_json::json!(1_200_000_000_u64);
-        value["observation_closures"][0]["observed_through_ns"] = serde_json::json!(1_200_000_000_u64);
+        value["observation_closures"][0]["observed_through_ns"] =
+            serde_json::json!(1_200_000_000_u64);
         let report = audit(&value).expect("partial output is reportable but not a negative");
         assert_eq!(report.unfulfilled_forecast_event_count, 0);
         assert_eq!(report.unobserved_forecast_event_count, 1);
@@ -1498,8 +1513,7 @@ mod tests {
     #[test]
     fn complete_capture_must_cover_the_last_tick_of_the_target_window() {
         let mut value = panel();
-        value["observation_closures"][0]["coverage_end_ns"] =
-            serde_json::json!(1_499_999_999_u64);
+        value["observation_closures"][0]["coverage_end_ns"] = serde_json::json!(1_499_999_999_u64);
         value["observation_closures"][0]["observed_through_ns"] =
             serde_json::json!(1_499_999_999_u64);
         let error = audit(&value).expect_err("a one-nanosecond short capture is not complete");
@@ -1513,8 +1527,7 @@ mod tests {
         value["observation_closures"][0]["status"] = serde_json::json!("unavailable");
         value["observation_closures"][0]["coverage_start_ns"] =
             serde_json::json!(1_000_000_000_u64);
-        value["observation_closures"][0]["coverage_end_ns"] =
-            serde_json::json!(1_000_000_000_u64);
+        value["observation_closures"][0]["coverage_end_ns"] = serde_json::json!(1_000_000_000_u64);
         value["observation_closures"][0]["observed_through_ns"] =
             serde_json::json!(1_000_000_000_u64);
         value["observation_closures"][0]["output_evidence_sha256"] = serde_json::Value::Null;
