@@ -210,6 +210,9 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
         .map(|hypothesis| hypothesis.prior_probability)
         .collect();
     let risk_before = bayes_risk(&context.hypotheses, &prior);
+    if !risk_before.is_finite() {
+        return Err("prior expected decision risk is non-finite".into());
+    }
     let mut evaluations = Vec::with_capacity(context.queries.len());
 
     for query in &context.queries {
@@ -227,6 +230,9 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
         let total_cost = query.acquisition_cost
             + query.delay_cost
             + query.disclosure_exposure_cost;
+        if !total_cost.is_finite() {
+            return Err(format!("query {} has non-finite total cost", query.id));
+        }
 
         if let Some(reason) = rejection_reason {
             evaluations.push(QueryEvaluation {
@@ -259,6 +265,9 @@ pub(crate) fn plan_next_evidence(context: &VoiContext) -> Result<VoiPlan, String
         }
         let reduction = raw_reduction.max(0.0);
         let net_evsi = reduction - total_cost;
+        if !net_evsi.is_finite() {
+            return Err(format!("query {} has non-finite net EVSI", query.id));
+        }
         evaluations.push(QueryEvaluation {
             query_id: query.id.clone(),
             observation_model_digest: query.observation_model_digest.clone(),
