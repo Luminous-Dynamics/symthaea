@@ -173,7 +173,7 @@ Next: connect the plan to receipt-qualified consolidation proposals, add environ
 
 ### Conservative fixed-point cost accounting
 
-Expected success value is rounded conservatively: positive expected value is rounded down and negative expected value toward negative infinity. Expected failure loss is rounded up to the next micro-unit, while exact zero remains zero. This prevents fractional expected failure costs from disappearing and making an unreliable locator look artificially cheap. The re-observation module now contains **22 authored regression tests**, including sub-micro failure-risk and negative-value rounding controls. These are authored tests, not executed passes.
+Expected success value is rounded conservatively: positive expected value is rounded down and negative expected value toward negative infinity. Expected failure loss is rounded up to the next micro-unit, while exact zero remains zero. This prevents fractional expected failure costs from disappearing and making an unreliable locator look artificially cheap. The re-observation module now contains **29 authored regression tests**, including sub-micro failure-risk and negative-value rounding controls. These are authored tests, not executed passes.
 
 
 ## Joint portfolio optimization

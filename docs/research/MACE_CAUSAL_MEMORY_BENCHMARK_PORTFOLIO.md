@@ -519,7 +519,7 @@ This adds a new benchmark axis: **memory versus perception**. It is not enough t
 
 The re-observation representation contract now binds principal, capability, audience, resource/tenant, purpose and policy revision using opaque digests. Both the independent source verifier and the decision policy must match the expected authority scope exactly. This follows Mycelix's principal/capability, destination/audience and purpose binding pattern. The injected verifier is a test seam only; production still requires live Mycelix capability and revocation checks at use.
 
-The module now contains **23 authored unit tests**, including wrong-principal, wrong-audience and wrong-purpose controls; the raw Session-A integration fixture binds an `EnvironmentState` authority scope. These are source counts only, not executed passes.
+The re-observation module now contains **29 authored unit tests**, including wrong-principal, wrong-audience and wrong-purpose controls; the raw Session-A integration fixture binds an `EnvironmentState` authority scope. These are source counts only, not executed passes.
 
 
 ### Joint representation allocation (MACE v0.17)
