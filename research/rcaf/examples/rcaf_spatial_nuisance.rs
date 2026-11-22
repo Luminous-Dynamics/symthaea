@@ -71,22 +71,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|label| format!("\"{label}\""))
         .collect::<Vec<_>>()
         .join(", ");
-    let rendered_edges = graph
-        .adjacency
-        .iter()
-        .enumerate()
-        .flat_map(|(left, row)| {
-            row.iter().enumerate().filter_map(move |(right, weight)| {
-                (*weight > 0.0 && left < right).then(|| {
-                    format!(
-                        "[\"{}\", \"{}\", {:.12}]",
-                        graph.roi_labels[left], graph.roi_labels[right], weight
-                    )
-                })
-            })
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
+    let mut edge_rows = Vec::new();
+    for (left, row) in graph.adjacency.iter().enumerate() {
+        for (right, weight) in row.iter().enumerate().skip(left + 1) {
+            if *weight > 0.0 {
+                edge_rows.push(format!(
+                    "[\"{}\", \"{}\", {:.12}]",
+                    graph.roi_labels[left], graph.roi_labels[right], weight
+                ));
+            }
+        }
+    }
+    let rendered_edges = edge_rows.join(", ");
 
     let common = SpatialNuisanceConfig {
         family: SpatialNuisanceFamily::GraphSmoothLowRank {
