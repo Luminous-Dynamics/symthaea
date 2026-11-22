@@ -1597,6 +1597,16 @@ mod tests {
             .expect("both source events should enter the evidence pack");
         let sidecar = pack.dependency_sidecar();
         assert!(sidecar.verify_integrity());
+        assert!(sidecar.has_verified_ingress_provenance());
+
+        // Export/import preserves the sidecar digest but cannot preserve the
+        // process-local ingress verification capability. Untrusted edges can
+        // still drive diagnostic closures, never complete-lineage qualification.
+        let exported = sidecar.to_json_value();
+        let imported = EvidenceDependencySidecarV1::from_json_value(&exported)
+            .expect("self-consistent sidecar JSON should decode");
+        assert_eq!(imported.canonical_digest(), sidecar.canonical_digest());
+        assert!(!imported.has_verified_ingress_provenance());
 
         let memory: Vec<Experience> = pack
             .events()
@@ -1611,6 +1621,17 @@ mod tests {
         assert_eq!(index.lineage_incomplete_event_count, 0);
         assert_eq!(index.unresolved_parent_reference_count, 0);
         assert_eq!(index.dependent_closure(&[42]), vec![42, 43]);
+        let untrusted_index = EvidenceDependencyIndex::build_with_sidecar(&memory, &imported)
+            .expect("integrity-only JSON remains usable for diagnostic dependency closure");
+        assert_eq!(untrusted_index.dependency_sidecar_ingress_verified(), Some(false));
+        assert_eq!(untrusted_index.lineage_incomplete_event_count, 2);
+        assert_eq!(untrusted_index.dependent_closure(&[42]), vec![42, 43]);
+        let untrusted_manifest =
+            build_manifest_with_sidecar(&memory, Some(&imported), 1234, 8).unwrap();
+        assert_eq!(untrusted_manifest.dependency_sidecar_ingress_verified, Some(false));
+        assert_eq!(untrusted_manifest.lineage_incomplete_event_count, 2);
+        assert_eq!(untrusted_manifest.matched_random_count, 0);
+
         let projection = index.receipt_dependencies.as_ref().unwrap();
         assert!(projection.all_lineage_complete(&[42, 43]));
         assert!(projection.depends_on_any(43, &BTreeSet::from([42])));
