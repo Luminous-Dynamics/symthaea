@@ -279,9 +279,9 @@ This creates a stronger claim than “HDC beats RAG”: MACE would demonstrate w
 4. Added deterministic event, source-root, source-family, bounded root-pair, matched-random and no-memory interventions.
 5. Stratified matched-random controls by scope, objective, action and estimand digest; report when a target has no matched control.
 6. Bound the candidate input digest to DecisionNeedV1 plus the post-intervention canonical evidence-set digest.
-7. Split candidate decision records from evaluator intervention manifests/scores. The candidate stream does not receive intervention kinds, removed IDs or evaluator utilities.
+7. Split candidate decision records from evaluator intervention manifests/scores. Candidate-facing pair identifiers are opaque and derived only from candidate-visible task/evidence digests, not evaluator scenario-family labels. The candidate stream does not receive intervention kinds, removed IDs or evaluator utilities.
 8. Added source-code and fixture digests to the evaluator run manifest and introduced `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`.
-9. Added authored tests for duplicate IDs, root aliases, unknown identities, source-family closures, deterministic/truth-blind planning, matched controls, evidence-digest changes and abstention.
+9. Added authored tests for duplicate IDs, root aliases, unknown identities, source-family closures, deterministic/truth-blind planning, coalition caps, matched controls, evidence-digest changes and abstention.
 
 ### Remaining qualification work
 
@@ -317,9 +317,9 @@ Arguments are cluster count, candidate JSONL path, evaluator JSONL path, public 
 - The root index groups equal nonzero `SourceRootDigest` values. A nonzero digest is an identity key, **not cryptographic authentication of its issuer**. The synthetic `source_family` integer is also a fixture identity, not an independently verified family credential.
 - The current `Experience` structure has no explicit parent/derived-view edges. The implementation therefore does not yet compute transitive lineage closure; it groups records sharing the same direct root digest or family label.
 - Unknown root/family values are counted separately and do not inflate known-identity counts. The code does not independently verify signatures, source authority, tenant permissions or external receipts.
-- Matched-random controls preserve count by scope, objective, action and estimand, but are omitted when the candidate-visible pool cannot match a stratum. Coverage is reported. The current byte measure is only `size_of::<Experience>()` per record; it excludes serialization, allocator, index, sidecar, source and verification costs.
+- Matched-random controls preserve count within regime/objective/action/estimand strata, but do not yet guarantee equal source-root/family multiplicity, exact serialized bytes or equal verification work. They are stratified random controls, not fully dependency- and cost-matched placebo interventions. They are omitted when the candidate-visible pool cannot match a stratum; coverage is reported. The current byte measure is only `size_of::<Experience>()` per record and excludes serialization, allocator, index, sidecar, source and verification costs.
 - Root-pair interventions are deterministically enumerated up to a caller-supplied cap. Higher-order coalition sampling, exact subset optimization, Shapley attribution, statistical aggregation and confidence intervals are not yet implemented.
-- This binary tests the synthetic `Policy::CausalQualified` over the existing public fixture. DecisionNeedV1 is digested into the candidate input, but a general natural-language/task/environment parser is not implemented.
+- This binary is a **policy-level evidence-availability audit**: it supplies the retained candidate-visible set to the unchanged `Policy::CausalQualified`. It does not yet rerun typed-content HDC ranking over each knocked-out subset. That retrieval-versus-policy decomposition is the next implementation increment. DecisionNeedV1 is digested into the candidate input, but a general natural-language/task/environment parser is not implemented.
 - The candidate/evaluator are still in one public repository. Separate JSONL files are a data-boundary test, not independent evaluator custody.
 - The existing typed HDC remains structured typed-content retrieval; it is not natural-language understanding, a learned causal model or a production source verifier.
 
