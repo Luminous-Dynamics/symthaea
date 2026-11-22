@@ -702,7 +702,11 @@ fn pearson(left: &[f64], right: &[f64]) -> Option<f64> {
         right_variance += right_delta.powi(2);
     }
     let denominator = (left_variance * right_variance).sqrt();
-    (denominator > f64::EPSILON).then(|| covariance / denominator)
+    if denominator <= f64::EPSILON {
+        None
+    } else {
+        Some(covariance / denominator)
+    }
 }
 
 #[cfg(test)]
