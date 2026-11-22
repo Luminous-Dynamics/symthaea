@@ -2,6 +2,7 @@ pub mod reobservation;
 pub mod salience_learning;
 pub mod salience;
 pub mod memory_budget;
+pub mod portfolio;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later

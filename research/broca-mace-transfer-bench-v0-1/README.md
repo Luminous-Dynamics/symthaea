@@ -547,3 +547,20 @@ The industry comparison distinguishes Microsoft Research's Memora memory-represe
 The re-observation benchmark now includes a WorldMemArena crosswalk: representation choices are evaluated separately at write/maintain/retrieve/use. External reference baselines also distinguish Microsoft Research Memora from the separate ACL Memora/FAMA work and from Mem0's vendor-maintained benchmark results; no cross-protocol score comparison is claimed.
 
 Re-observation plans are now authority-scoped: a typed Mycelix-aligned scope binds principal, capability, audience, resource/tenant, purpose and policy revision. Source verification and decision planning must match that scope exactly; this is an injected verifier contract, not a replacement authorization system or a live capability/revocation check.
+
+
+## Joint memory/re-observation portfolio (MACE v0.17 research)
+
+The new `consolidation::portfolio` module consumes only representation plans reconstructed from a verified salience prediction and a verified re-observation profile. For one exact authority scope, task scope and `(valid_at, known_at)` snapshot, it chooses at most one representation per event under five shared limits:
+
+- total context tokens;
+- number of re-observation calls;
+- aggregate re-observation latency work (not parallel wall-clock latency);
+- estimated monetary/compute cost in the caller-declared micro-unit;
+- expected failure-loss budget.
+
+The re-observation module now enumerates individually valid alternatives for a stable fact (persist or locator), current state (locator or valid snapshot), and learned rules/procedures/preferences (persist only). The portfolio solver can therefore select a lower-value per-item option when the higher-value choice would consume scarce shared calls or tokens.
+
+Two strategies are exposed: an exact deterministic branch-and-bound optimizer (up to 24 event groups and two million search nodes by default) and a greedy highest-individual-net-value baseline. The exact optimizer maximizes the sum of per-item net values already reduced by each option's own cost and expected failure loss, while separately enforcing aggregate resource/risk caps. It selects at most one representation per event. Ties prefer lower resource use, then canonical option digests. If the exact-search node limit is exceeded, the solver returns an error rather than publishing a partial or approximate plan.
+
+The portfolio result is a digest-bound proposal, not a persistence operation, source-access grant, or action authorization. All options must use the same authority, scope and bitemporal snapshot. This first implementation sums latency work conservatively; it does not yet model parallel scheduling, shared query batching, privacy-exposure budgets or dynamic replanning.

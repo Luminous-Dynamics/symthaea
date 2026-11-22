@@ -520,3 +520,8 @@ This adds a new benchmark axis: **memory versus perception**. It is not enough t
 The re-observation representation contract now binds principal, capability, audience, resource/tenant, purpose and policy revision using opaque digests. Both the independent source verifier and the decision policy must match the expected authority scope exactly. This follows Mycelix's principal/capability, destination/audience and purpose binding pattern. The injected verifier is a test seam only; production still requires live Mycelix capability and revocation checks at use.
 
 The module now contains **23 authored unit tests**, including wrong-principal, wrong-audience and wrong-purpose controls; the raw Session-A integration fixture binds an `EnvironmentState` authority scope. These are source counts only, not executed passes.
+
+
+### Joint representation allocation (MACE v0.17)
+
+MACE now enumerates alternative per-item representations and can allocate them jointly under shared token, observation-call, latency-work, monetary/compute-cost and expected-failure-loss budgets. The exact bounded branch-and-bound solver is compared with a greedy highest-individual-value baseline. The prototype is limited to 24 event groups / 2,000,000 nodes and fails closed on search exhaustion. It does not yet model parallel query scheduling, batching or privacy exposure as a resource.

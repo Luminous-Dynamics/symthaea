@@ -404,6 +404,7 @@ impl ReobservationPlanV1 {
             self.event_id.to_string(),
             self.as_known.valid_at_ms.to_string(),
             self.as_known.known_at_ms.to_string(),
+            self.authority_scope.canonical_digest(),
             self.evidence_sha256.clone(),
             self.prediction_sha256.clone(),
             self.profile_sha256.clone(),
@@ -677,6 +678,179 @@ pub fn plan_memory_representation(
     };
     plan.plan_sha256 = plan.canonical_digest();
     Ok(plan)
+}
+
+/// Enumerate all individually valid representations for one item.
+/// The caller can then allocate these alternatives jointly across a portfolio.
+/// This function does not execute a locator or grant access.
+pub fn enumerate_memory_representation_options(
+    prediction: &VerifiedFutureUsePredictionV1,
+    profile: &VerifiedReobservationProfileV1,
+    policy: ReobservationPolicyV1,
+) -> Result<Vec<ReobservationPlanV1>, ReobservationReject> {
+    // Reuse the single-item planner as the canonical input/receipt/clock gate.
+    // It always returns a plan, including Discard, once the inputs are valid.
+    let _validated = plan_memory_representation(prediction, profile, policy)?;
+    let proposal = profile.proposal();
+    let expected = prediction.prediction().expected_net_value_micros();
+    let prediction_sha = prediction.prediction().prediction_sha256.clone();
+    let profile_sha = profile.profile_sha256();
+    let mut options = Vec::new();
+
+    let mut push_option = |disposition: ReobservationDispositionV1,
+                           reason: ReobservationReasonV1,
+                           tokens: u32,
+                           estimated_cost: u64,
+                           failure_loss: i64,
+                           net_value: i64,
+                           locator: Option<String>,
+                           snapshot_expiry: Option<i64>| {
+        let mut plan = ReobservationPlanV1 {
+            event_id: proposal.event_id,
+            as_known: proposal.as_known,
+            authority_scope: proposal.authority_scope.clone(),
+            evidence_sha256: proposal.evidence_sha256.clone(),
+            prediction_sha256: prediction_sha.clone(),
+            profile_sha256: profile_sha.clone(),
+            disposition,
+            reason,
+            context_tokens_reserved: tokens,
+            estimated_cost_micros: estimated_cost,
+            expected_failure_loss_micros: failure_loss,
+            expected_value_micros: expected,
+            net_value_micros: net_value,
+            locator_sha256: locator,
+            snapshot_valid_until_ms: snapshot_expiry,
+            decision_deadline_ms: policy.decision_deadline_ms,
+            plan_sha256: String::new(),
+        };
+        plan.plan_sha256 = plan.canonical_digest();
+        options.push(plan);
+    };
+
+    let snapshot_cost = u64::from(proposal.snapshot_context_tokens)
+        .saturating_mul(u64::from(policy.context_cost_per_token_micros));
+    let snapshot_fits = proposal.snapshot_context_tokens <= policy.context_budget_tokens;
+    let snapshot_valid = proposal
+        .snapshot_valid_until_ms
+        .is_some_and(|expiry| expiry > policy.decision_deadline_ms);
+    let snapshot_cost_i64 = i64::try_from(snapshot_cost).unwrap_or(i64::MAX);
+
+    match proposal.object_kind {
+        MemoryObjectKindV1::LearnedRule
+        | MemoryObjectKindV1::Procedure
+        | MemoryObjectKindV1::Preference
+        | MemoryObjectKindV1::StableFact => {
+            if snapshot_fits {
+                let net = expected.saturating_sub(snapshot_cost_i64);
+                if net > policy.minimum_net_value_micros {
+                    let reason = if proposal.object_kind == MemoryObjectKindV1::StableFact {
+                        ReobservationReasonV1::StableKnowledgeCheaperToRetain
+                    } else {
+                        ReobservationReasonV1::KnowledgeIsNotReconstructible
+                    };
+                    push_option(
+                        ReobservationDispositionV1::PersistKnowledge,
+                        reason,
+                        proposal.snapshot_context_tokens,
+                        snapshot_cost,
+                        0,
+                        net,
+                        None,
+                        None,
+                    );
+                }
+            }
+
+            if proposal.object_kind == MemoryObjectKindV1::StableFact {
+                if let Some((locator, cost)) = usable_locator(profile, policy) {
+                    let failure_loss = expected_failure_loss(
+                        proposal.reobservation_failure_penalty_micros,
+                        proposal.availability_success_probability_bps,
+                    );
+                    let success_value = expected_success_value(
+                        expected,
+                        proposal.availability_success_probability_bps,
+                    );
+                    let net = success_value
+                        .saturating_sub(failure_loss)
+                        .saturating_sub(i64::try_from(cost).unwrap_or(i64::MAX));
+                    if net > policy.minimum_net_value_micros {
+                        push_option(
+                            ReobservationDispositionV1::StoreLocator,
+                            ReobservationReasonV1::CheaperToReobserveBeforeDeadline,
+                            policy.locator_context_tokens,
+                            cost,
+                            failure_loss,
+                            net,
+                            Some(locator),
+                            None,
+                        );
+                    }
+                }
+            }
+        }
+        MemoryObjectKindV1::CurrentState => {
+            if let Some((locator, cost)) = usable_locator(profile, policy) {
+                let failure_loss = expected_failure_loss(
+                    proposal.reobservation_failure_penalty_micros,
+                    proposal.availability_success_probability_bps,
+                );
+                let success_value = expected_success_value(
+                    expected,
+                    proposal.availability_success_probability_bps,
+                );
+                let net = success_value
+                    .saturating_sub(failure_loss)
+                    .saturating_sub(i64::try_from(cost).unwrap_or(i64::MAX));
+                if net > policy.minimum_net_value_micros {
+                    push_option(
+                        ReobservationDispositionV1::StoreLocator,
+                        ReobservationReasonV1::CheaperToReobserveBeforeDeadline,
+                        policy.locator_context_tokens,
+                        cost,
+                        failure_loss,
+                        net,
+                        Some(locator),
+                        None,
+                    );
+                }
+            }
+
+            if snapshot_fits && snapshot_valid {
+                let net = expected.saturating_sub(snapshot_cost_i64);
+                if net > policy.minimum_net_value_micros {
+                    let reason = match &proposal.availability {
+                        ReobservationAvailabilityV1::Available { .. } => {
+                            ReobservationReasonV1::ReobservationTooSlowOrExpensive
+                        }
+                        ReobservationAvailabilityV1::Unavailable => {
+                            ReobservationReasonV1::SnapshotRemainsValidThroughDeadline
+                        }
+                    };
+                    push_option(
+                        ReobservationDispositionV1::CacheSnapshot,
+                        reason,
+                        proposal.snapshot_context_tokens,
+                        snapshot_cost,
+                        0,
+                        net,
+                        None,
+                        proposal.snapshot_valid_until_ms,
+                    );
+                }
+            }
+        }
+    }
+
+    options.sort_by_key(|plan| {
+        (
+            plan.event_id,
+            disposition_code(plan.disposition),
+            plan.plan_sha256.clone(),
+        )
+    });
+    Ok(options)
 }
 
 fn object_kind_code(kind: MemoryObjectKindV1) -> &'static str {
@@ -1008,6 +1182,101 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn representation_plan_digest_binds_principal_and_authority_scope() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::Preference,
+            ReobservationAvailabilityV1::Unavailable,
+            None,
+        ));
+        let mut plan = plan_memory_representation(
+            &prediction(50_000, 1_000),
+            &profile,
+            policy(),
+        )
+        .unwrap();
+        let original_digest = plan.canonical_digest();
+        assert_eq!(plan.plan_sha256, original_digest);
+
+        plan.authority_scope.principal_sha256 = digest("substituted-principal");
+        assert_ne!(plan.canonical_digest(), original_digest);
+    }
+
+    #[test]
+    fn stable_fact_enumerates_persist_and_locator_options_for_joint_selection() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::StableFact,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("stable-fact-live-source"),
+            },
+            None,
+        ));
+        let options = enumerate_memory_representation_options(
+            &prediction(50_000, 1_000),
+            &profile,
+            policy(),
+        )
+        .unwrap();
+        let dispositions: Vec<_> = options.iter().map(|item| item.disposition).collect();
+
+        assert!(dispositions.contains(&ReobservationDispositionV1::PersistKnowledge));
+        assert!(dispositions.contains(&ReobservationDispositionV1::StoreLocator));
+        assert!(options.iter().all(|item| item.plan_sha256 == item.canonical_digest()));
+    }
+
+    #[test]
+    fn current_state_enumerates_locator_and_valid_snapshot_as_distinct_options() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("current-state-live-source"),
+            },
+            Some(900),
+        ));
+        let options = enumerate_memory_representation_options(
+            &prediction(50_000, 1_000),
+            &profile,
+            policy(),
+        )
+        .unwrap();
+
+        assert_eq!(options.len(), 2);
+        assert!(options.iter().any(|item| {
+            item.disposition == ReobservationDispositionV1::StoreLocator
+                && item.locator_sha256.is_some()
+        }));
+        assert!(options.iter().any(|item| {
+            item.disposition == ReobservationDispositionV1::CacheSnapshot
+                && item.snapshot_valid_until_ms == Some(900)
+        }));
+    }
+
+    #[test]
+    fn non_reconstructible_rules_are_not_replaced_by_reobservation_options() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::LearnedRule,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("rule-source"),
+            },
+            Some(900),
+        ));
+        let options = enumerate_memory_representation_options(
+            &prediction(50_000, 1_000),
+            &profile,
+            policy(),
+        )
+        .unwrap();
+
+        assert_eq!(options.len(), 1);
+        assert_eq!(
+            options[0].disposition,
+            ReobservationDispositionV1::PersistKnowledge
+        );
     }
 
     #[test]

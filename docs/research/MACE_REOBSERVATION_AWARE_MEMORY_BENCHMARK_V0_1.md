@@ -174,3 +174,12 @@ Next: connect the plan to receipt-qualified consolidation proposals, add environ
 ### Conservative fixed-point cost accounting
 
 Expected success value is rounded conservatively: positive expected value is rounded down and negative expected value toward negative infinity. Expected failure loss is rounded up to the next micro-unit, while exact zero remains zero. This prevents fractional expected failure costs from disappearing and making an unreliable locator look artificially cheap. The re-observation module now contains **22 authored regression tests**, including sub-micro failure-risk and negative-value rounding controls. These are authored tests, not executed passes.
+
+
+## Joint portfolio optimization
+
+The per-item re-observation policy now exposes all individually valid representation alternatives to a portfolio allocator. The allocator chooses at most one option per event under shared context-token, re-observation-call, total latency-work, estimated-cost and expected-failure-loss budgets.
+
+The exact bounded solver maximizes total per-item net value using deterministic branch-and-bound, with a 24-event-group and 2,000,000-node cap. It fails closed if the search budget is exhausted. A highest-individual-net-value greedy baseline is retained for matched comparison. The result is a digest-bound proposal, not a write or permission to query a source.
+
+The resource model deliberately sums latency work rather than claiming parallel wall-clock latency. Shared query batching, parallel scheduling, privacy-exposure budgets and dynamic replanning remain outside v0.17.
