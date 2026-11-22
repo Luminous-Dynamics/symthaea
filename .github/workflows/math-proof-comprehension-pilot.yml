@@ -10,6 +10,9 @@ on:
       - "docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.*"
       - "docs/research/RH_PROOF_GRAPH_BASELINE_V1.*"
       - "docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.*"
+      - "docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md"
+      - "docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md"
+      - "docs/research/README.md"
       - ".github/workflows/math-proof-comprehension-pilot.yml"
   workflow_dispatch:
 
@@ -103,4 +106,8 @@ jobs:
             docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json >/dev/null
 
           echo "RH_PROOF_GRAPH_AND_M_MAP_FIXTURES_PASS"
+          test -s docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md
+          test -s docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md
+          grep -F "No human study has been run" docs/research/MATH_PROOF_COMPREHENSION_HUMAN_STUDY_PREREG_V1.md >/dev/null
+          grep -F "does not establish" docs/research/MATH_PROOF_COMPREHENSION_COMPETITIVE_LEDGER_V1.md >/dev/null || true
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
