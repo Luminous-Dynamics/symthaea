@@ -164,3 +164,16 @@ The latest PR branch head includes later documentation/manifest/source-register 
 ## Current scale-aware Rust metric evaluator
 
 The Rust binary-metrics scorer uses tie-group rank accumulation for AUROC: O(n log n) sorting/aggregation and exact half-credit for tied positive-negative score pairs. A 40,000-row synthetic test with balanced tied score groups is included. Hosted run [#44988247262](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262) passed 24/24 Rust tests and 46/46 Python reference tests, along with fmt, Clippy and both Rust CLI report parity checks.
+
+
+## Rust DTCO evidence-lineage contract
+
+The new `crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs` validates a multi-fidelity DTCO evidence graph. It binds run identity, stage, evidence kind, tool/configuration/model digests, parent run IDs and exact artifact digests. Every parent output must be present among the child inputs; run graphs must be acyclic. Physical measurement nodes require instrument identity, calibration identity and an uncertainty artifact. Simulated/model evidence cannot claim to be a physical measurement.
+
+Frozen input/output:
+- `benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.json`
+- `benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json`
+
+Eight Rust tests cover the known answer and adversarial cases (missing parents, disconnected digest edges, cycles, missing calibration, evidence-kind mismatch, missing model digest and malformed SHA-256). Hosted run [#44988500047](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047) passed all **32/32 Rust tests**, the 46-test Python reference suite, rustfmt, Clippy and both Rust CLI report reproductions.
+
+This is a provenance/lineage contract only. It does not validate physics, the accuracy of any model, a PDK, a fab process or fabricated silicon.
