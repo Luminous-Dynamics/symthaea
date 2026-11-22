@@ -13,6 +13,7 @@ const MAX_INTERACTION_OPTIONS: usize = 90;
 const MIN_TRAINING_PAIRS: u32 = 200;
 const MIN_CALIBRATION_PAIRS: u32 = 64;
 const MIN_HELDOUT_PAIRS: u32 = 64;
+const MIN_HELDOUT_MULTI_EVENT_SAMPLES: u32 = 32;
 const MIN_INDEPENDENT_SEEDS: u16 = 5;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -137,6 +138,9 @@ pub struct PortfolioInteractionCalibrationReceiptV1 {
     pub heldout_base_rate_mae_micros: u64,
     /// Paired-cluster-bootstrap 95% lower bound for held-out MAE improvement.
     pub heldout_mae_improvement_lower_95_micros: i64,
+    pub heldout_multi_event_sample_count: u32,
+    pub heldout_higher_order_residual_micros: u64,
+    pub maximum_allowed_higher_order_residual_micros: u64,
     pub verified_at_ms: u64,
     pub valid_until_ms: u64,
     pub verifier_id: String,
@@ -169,6 +173,9 @@ impl PortfolioInteractionCalibrationReceiptV1 {
                 self.heldout_mae_micros.to_string(),
                 self.heldout_base_rate_mae_micros.to_string(),
                 self.heldout_mae_improvement_lower_95_micros.to_string(),
+                self.heldout_multi_event_sample_count.to_string(),
+                self.heldout_higher_order_residual_micros.to_string(),
+                self.maximum_allowed_higher_order_residual_micros.to_string(),
                 self.verified_at_ms.to_string(),
                 self.valid_until_ms.to_string(),
                 self.verifier_id.clone(),
@@ -384,8 +391,18 @@ pub fn verify_portfolio_interactions(
     if calibration.calibration_mae_micros >= calibration.base_rate_mae_micros
         || calibration.heldout_mae_micros >= calibration.heldout_base_rate_mae_micros
         || calibration.heldout_mae_improvement_lower_95_micros <= 0
+        || calibration.heldout_higher_order_residual_micros
+            > calibration.maximum_allowed_higher_order_residual_micros
     {
         return Err(PortfolioInteractionReject::CalibrationQualityInsufficient);
+    }
+    let distinct_events: BTreeSet<_> =
+        options.iter().map(MemoryPortfolioOptionV1::event_id).collect();
+    if distinct_events.len() >= 3
+        && calibration.heldout_multi_event_sample_count
+            < MIN_HELDOUT_MULTI_EVENT_SAMPLES
+    {
+        return Err(PortfolioInteractionReject::CalibrationEvidenceInsufficient);
     }
     if calibration.verified_at_ms > context.as_known.known_at_ms
         || calibration.valid_until_ms <= context.as_known.known_at_ms
@@ -1070,6 +1087,9 @@ mod tests {
             heldout_mae_micros: 85,
             heldout_base_rate_mae_micros: 120,
             heldout_mae_improvement_lower_95_micros: 12,
+            heldout_multi_event_sample_count: 128,
+            heldout_higher_order_residual_micros: 2_500,
+            maximum_allowed_higher_order_residual_micros: 5_000,
             verified_at_ms: 250,
             valid_until_ms: 500,
             verifier_id: "fixture-only".to_owned(),
@@ -1197,6 +1217,36 @@ mod tests {
                 &verifier,
             ),
             Err(PortfolioInteractionReject::CalibrationQualityInsufficient)
+        );
+    }
+
+    #[test]
+    fn higher_order_residual_above_preregistered_margin_rejects_pairwise_model() {
+        let options = vec![option(1, 10), option(2, 10), option(3, 10)];
+        let proposal = proposal(&options, 10, 1);
+        let mut bad = receipt(&proposal);
+        bad.heldout_higher_order_residual_micros = 5_001;
+        bad.receipt_sha256 = bad.canonical_digest();
+        let verifier = FixtureVerifier { receipt: bad };
+        assert_eq!(
+            verify_portfolio_interactions(proposal, &options, &context(), &verifier),
+            Err(PortfolioInteractionReject::CalibrationQualityInsufficient)
+        );
+    }
+
+    #[test]
+    fn three_event_portfolio_requires_multi_event_holdout_samples() {
+        let options = vec![option(1, 10), option(2, 10), option(3, 10)];
+        let proposal = proposal(&options, 10, 1);
+        let mut insufficient = receipt(&proposal);
+        insufficient.heldout_multi_event_sample_count = 31;
+        insufficient.receipt_sha256 = insufficient.canonical_digest();
+        let verifier = FixtureVerifier {
+            receipt: insufficient,
+        };
+        assert_eq!(
+            verify_portfolio_interactions(proposal, &options, &context(), &verifier),
+            Err(PortfolioInteractionReject::CalibrationEvidenceInsufficient)
         );
     }
 
