@@ -22,7 +22,9 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("invalid DTCO lineage JSON: {error}"))?;
     let report = validate_dtco_lineage_v1(&manifest)
         .map_err(|error| format!("DTCO lineage rejected input: {error}"))?;
-    let rendered = serde_json::to_string_pretty(&report)
+    let canonical = serde_json::to_value(report)
+        .map_err(|error| format!("cannot construct DTCO lineage report JSON: {error}"))?;
+    let rendered = serde_json::to_string_pretty(&canonical)
         .map_err(|error| format!("cannot render DTCO lineage report: {error}"))?;
     println!("{rendered}");
     Ok(())
