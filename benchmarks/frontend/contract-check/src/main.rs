@@ -136,6 +136,61 @@ fn fixture_sha256(html: &[u8], css: &[u8]) -> String {
     hex::encode(digest.finalize())
 }
 
+/// Static integrity checks for the first public SFEB dashboard reference.
+///
+/// These checks qualify the *reference fixture and task brief*, not an agent's
+/// rendered implementation. Runtime layout, keyboard and accessibility
+/// behavior still require the isolated browser evaluator.
+fn validate_service_dashboard_reference(html: &str, css: &str) -> Result<(), String> {
+    let normalized_html = html.to_ascii_lowercase();
+    let normalized_css = css.to_ascii_lowercase();
+
+    if normalized_html.matches("<main ").count() != 1 {
+        return Err("dashboard reference must contain exactly one main landmark".to_string());
+    }
+    if normalized_html.matches("<h1").count() != 1
+        || !html.contains("<h1 id=\"dashboard-title\">Service overview</h1>")
+    {
+        return Err("dashboard reference must contain one level-one heading named Service overview".to_string());
+    }
+    if !html.contains("href=\"#main-content\"")
+        || !html.contains("class=\"skip-link\"")
+        || !normalized_css.contains(".skip-link:focus")
+    {
+        return Err("dashboard reference must include a focus-visible skip-to-main link".to_string());
+    }
+    if !html.contains("aria-label=\"Workspace\"")
+        || !html.contains("aria-label=\"Operational summary\"")
+        || !html.contains("aria-labelledby=\"activity-title\"")
+        || !html.contains("aria-labelledby=\"schedule-title\"")
+    {
+        return Err("dashboard reference is missing a required named region".to_string());
+    }
+
+    let metric_anchor_count = html.matches("data-sfeb-id=\"dashboard.metric-card.").count();
+    if metric_anchor_count != 3 {
+        return Err(format!(
+            "dashboard reference must contain exactly three metric-card anchors, found {metric_anchor_count}"
+        ));
+    }
+    if !normalized_css.contains("grid-template-columns: repeat(3, minmax(0, 1fr))") {
+        return Err("dashboard reference is missing the three-column desktop metric layout".to_string());
+    }
+    if !normalized_css.contains("@media (max-width: 520px)")
+        || !normalized_css.contains("grid-template-columns: minmax(0, 1fr)")
+    {
+        return Err("dashboard reference is missing the narrow-screen one-column metric layout".to_string());
+    }
+    if normalized_css.contains("@import")
+        || normalized_css.contains("url(")
+        || normalized_html.contains("src=\"//")
+        || normalized_html.contains("href=\"//")
+    {
+        return Err("dashboard reference must not contain external asset imports".to_string());
+    }
+    Ok(())
+}
+
 fn validate_task_instance(
     schema: &Value,
     task: &Value,
@@ -182,6 +237,9 @@ fn validate_task_instance(
     }
 
     let anchors = extract_source_anchors(html_text)?;
+    if task.get("task_id").and_then(Value::as_str) == Some("SFEB-L1-004") {
+        validate_service_dashboard_reference(html_text, css_text)?;
+    }
     let regions = task
         .get("required_regions")
         .and_then(Value::as_array)
@@ -1672,6 +1730,56 @@ mod tests {
             .expect("task schema, canonical fixture digest and region anchors must validate");
         assert_eq!(regions, 8);
         assert_eq!(assertions, 11);
+    }
+
+    #[test]
+    fn checked_in_dashboard_reference_satisfies_static_semantic_contract() {
+        let html = include_str!("../../fixtures/service-dashboard/reference.html");
+        let css = include_str!("../../fixtures/service-dashboard/style.css");
+        validate_service_dashboard_reference(html, css)
+            .expect("reference should satisfy the statically auditable subset of its brief");
+    }
+
+    #[test]
+    fn dashboard_reference_audit_rejects_missing_heading_even_with_new_fixture_digest() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../task-oracle-v1.schema.json"
+        ))
+        .expect("checked-in task schema is valid JSON");
+        let mut task: Value = serde_json::from_str(include_str!(
+            "../../tasks/sfeb-l1-service-dashboard-v1.json"
+        ))
+        .expect("checked-in task is valid JSON");
+        let original_html = include_bytes!("../../fixtures/service-dashboard/reference.html");
+        let css = include_bytes!("../../fixtures/service-dashboard/style.css");
+        let changed_html = String::from_utf8(original_html.to_vec())
+            .expect("reference HTML is UTF-8")
+            .replace("Service overview</h1>", "Service summary</h1>");
+        task["reference_fixture"]["sha256"] =
+            Value::String(fixture_sha256(changed_html.as_bytes(), css));
+
+        assert!(validate_task_instance(&schema, &task, changed_html.as_bytes(), css).is_err());
+    }
+
+    #[test]
+    fn dashboard_reference_audit_rejects_breakpoint_gaming() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../task-oracle-v1.schema.json"
+        ))
+        .expect("checked-in task schema is valid JSON");
+        let mut task: Value = serde_json::from_str(include_str!(
+            "../../tasks/sfeb-l1-service-dashboard-v1.json"
+        ))
+        .expect("checked-in task is valid JSON");
+        let html = include_bytes!("../../fixtures/service-dashboard/reference.html");
+        let original_css = include_bytes!("../../fixtures/service-dashboard/style.css");
+        let changed_css = String::from_utf8(original_css.to_vec())
+            .expect("reference CSS is UTF-8")
+            .replace("@media (max-width: 520px)", "@media (max-width: 200px)");
+        task["reference_fixture"]["sha256"] =
+            Value::String(fixture_sha256(html, changed_css.as_bytes()));
+
+        assert!(validate_task_instance(&schema, &task, html, changed_css.as_bytes()).is_err());
     }
 
     #[test]
