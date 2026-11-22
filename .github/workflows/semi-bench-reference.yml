@@ -305,7 +305,7 @@ jobs:
           ' /tmp/secom-real/tabular-baselines-report.json
 
 
-      - name: Run Rust B5 FTRL logistic baselines on synthetic known answer
+      - name: Run Rust B5/B6 FTRL logistic baselines on synthetic known answer
         run: |
           cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-logistic -- \
             /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data \
@@ -317,14 +317,18 @@ jobs:
             .schema == "luminous.semi-bench.secom-logistic-report.v1" and
             .feature_count == 2 and
             .training_rows == 4 and
-            (.models | keys == ["B5","B5-balanced"]) and
+            (.models | keys == ["B5","B5-balanced","B6","B6-balanced","B6-strong","B6-strong-balanced"]) and
             .models.B5.config.class_balanced_loss == false and
             .models["B5-balanced"].config.class_balanced_loss == true and
+            .models.B6.config.l1 == 0.01 and
+            .models["B6-balanced"].config.l1 == 0.01 and
+            .models["B6-strong"].config.l1 == 1.0 and
+            .models["B6-strong-balanced"].config.l1 == 1.0 and
             .claim_limits.imputation_normalization_and_model_fit_on_train_only == true
           ' /tmp/semi-secom-logistic-synthetic.json > /dev/null
 
 
-      - name: Run Rust B5 FTRL logistic baselines on full pinned SECOM chronology
+      - name: Run Rust B5/B6 FTRL logistic baselines on full pinned SECOM chronology
         run: |
           EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
           SPLIT=/tmp/semi-rust-work/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
@@ -340,21 +344,23 @@ jobs:
             .training_rows == 940 and
             .training_failures == 76 and
             .training_passes == 864 and
-            (.models | keys == ["B5","B5-balanced"]) and
+            (.models | keys == ["B5","B5-balanced","B6","B6-balanced","B6-strong","B6-strong-balanced"]) and
             .models.B5.held_out.validation.rows == 313 and
             .models.B5.held_out.test.failures == 17 and
             .models["B5-balanced"].held_out.test.failures == 17
           ' /tmp/secom-real/logistic-report.json > /dev/null
 
-          echo "B5 FTRL logistic held-out diagnostics (pinned public mirror):"
+          echo "B5/B6 FTRL logistic held-out diagnostics (pinned public mirror):"
           jq -r '
-            ["model","split","AUROC","average precision","Brier"],
-            (["B5","B5-balanced"][] as $b |
+            ["model","split","AUROC","average precision","Brier","nonzero coefficients","support mask SHA-256"],
+            (["B5","B5-balanced","B6","B6-balanced","B6-strong","B6-strong-balanced"][] as $b |
               ["validation","test"][] as $s |
               [$b,$s,
                (.models[$b].held_out[$s].metrics.ranking_metrics.auroc|tostring),
                (.models[$b].held_out[$s].metrics.ranking_metrics.average_precision|tostring),
-               (.models[$b].held_out[$s].metrics.probability_metrics.brier_score|tostring)])
+               (.models[$b].held_out[$s].metrics.probability_metrics.brier_score|tostring),
+               (.models[$b].nonzero_coefficient_count|tostring),
+               .models[$b].coefficient_support_sha256])
             | @tsv
           ' /tmp/secom-real/logistic-report.json
 

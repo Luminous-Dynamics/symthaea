@@ -332,3 +332,42 @@ cargo run -p symthaea-semiconductor --bin semi-secom-logistic -- \\
 \`\`\`
 
 B5 is a strong discriminative challenger to B2–B4, but it is still a linear model over anonymous sensor columns. Class weighting changes the training objective; the prior correction restores the training class prior under the ideal weighted-likelihood identity, but does not guarantee calibration under covariate/observation shift. Validate Brier/log-loss and high-confidence errors in addition to AUROC/AP. Do not tune the frozen epoch count, regularization or thresholds on the final chronological test.
+
+
+### Sparse Elastic-Net B6 extension
+
+The same CLI now also evaluates two B6 variants using a frozen FTRL elastic-net setting:
+
+- **B6 sparse:** unweighted FTRL-Proximal with L1 = 0.01 and L2 = 1.0.
+- **B6 sparse-balanced:** inverse-frequency class-weighted FTRL with the same L1/L2 penalty and training-prior correction.
+
+B5 retains L1 = 0 and L2 = 1.0. B6 reports the count of coefficients whose absolute value exceeds \`1e-12\`, so sparsity is measurable rather than inferred from the selected algorithm name. The synthetic and full pinned-source workflow checks assert both B6 variants and their declared L1 configuration.
+
+B6 is a fixed research comparator, not a validation-selected hyperparameter winner. The L1 penalty has not been tuned on the final chronological test. Feature selection/zero coefficients do not establish physical sensor importance because the public SECOM mirror does not carry interpretable sensor semantics.
+
+
+### Sparse Elastic-Net B6 extension
+
+The \`semi-secom-logistic\` CLI also evaluates:
+
+- **B6 sparse:** unweighted FTRL-Proximal with L1=0.01 and L2=1.0.
+- **B6-balanced:** the same sparse penalty with inverse-frequency class weights and the training-prior correction.
+
+B5 retains L1=0 and L2=1.0. B6 reports the number of nonzero coefficients (absolute weight > 1e-12), so sparsity is measured rather than assumed from the algorithm name. The synthetic and full pinned-source workflow checks assert the two B6 variants and their fixed L1 configuration.
+
+B6 is a preregistered research comparator, not a validation-selected hyperparameter winner. No tuning on the final chronological test is permitted. Zero coefficients do not establish physical sensor importance because the anonymous public SECOM mirror does not provide sensor semantics.
+
+
+### B6 sparsity audit and stronger regularization arm
+
+The first B6 arm used L1=0.01 and L2=1.0. Its full pinned-source report showed 894 nonzero coefficients for all four B5/B6 variants and the identical coefficient-support SHA-256:
+
+\`d9d8dcd4e3d330408be5f34ffd79211090dd8f94e69126b63cd8e6cac9dfb460\`
+
+Therefore L1=0.01 did not change feature support; it is retained as a near-zero-penalty control, not evidence of meaningful sparsity.
+
+A second fixed arm is now added:
+- **B6-strong:** unweighted FTRL with L1=1.0, L2=1.0.
+- **B6-strong-balanced:** class-weighted FTRL with L1=1.0, L2=1.0 and the same training-prior correction.
+
+Both arms report nonzero count and SHA-256 over the binary coefficient-support mask. The exact-head workflow evaluates both on the same chronological split and archives model support and metrics. The stronger setting is preregistered, not selected by test performance. If it produces severe sparsity, predictive collapse or calibration failure, that is a negative result to preserve.

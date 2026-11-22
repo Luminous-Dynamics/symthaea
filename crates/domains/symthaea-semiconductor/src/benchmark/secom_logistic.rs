@@ -26,6 +26,8 @@ const HELD_OUT_SPLITS: [&str; 2] = ["validation", "test"];
 const FTRL_ALPHA: f64 = 0.05;
 const FTRL_BETA: f64 = 1.0;
 const FTRL_L1: f64 = 0.0;
+const FTRL_L1_SPARSE: f64 = 0.01;
+const FTRL_L1_STRONG: f64 = 1.0;
 const FTRL_L2: f64 = 1.0;
 const FTRL_EPOCHS: usize = 80;
 
@@ -74,6 +76,8 @@ pub struct SecomLogisticModelConfigV1 {
 pub struct SecomLogisticModelResultV1 {
     pub model_id: String,
     pub config: SecomLogisticModelConfigV1,
+    pub nonzero_coefficient_count: usize,
+    pub coefficient_support_sha256: String,
     pub missing_features_without_observed_training_values: usize,
     pub model_sha256: String,
     pub held_out: BTreeMap<String, SecomLogisticHeldOutV1>,
@@ -198,15 +202,19 @@ struct FtrlStateV1 {
     n: Vec<f64>,
     intercept_z: f64,
     intercept_n: f64,
+    l1: f64,
+    l2: f64,
 }
 
 impl FtrlStateV1 {
-    fn new(feature_count: usize) -> Self {
+    fn new(feature_count: usize, l1: f64, l2: f64) -> Self {
         Self {
             z: vec![0.0; feature_count],
             n: vec![0.0; feature_count],
             intercept_z: 0.0,
             intercept_n: 0.0,
+            l1,
+            l2,
         }
     }
 
@@ -216,8 +224,8 @@ impl FtrlStateV1 {
             self.n[index],
             FTRL_ALPHA,
             FTRL_BETA,
-            FTRL_L1,
-            FTRL_L2,
+            self.l1,
+            self.l2,
         )
     }
 
@@ -321,6 +329,7 @@ fn median(values: &mut [f64]) -> f64 {
 fn fit_model_v1(
     model_id: &str,
     class_balanced: bool,
+    l1: f64,
     features: &[SecomSensorRowV1],
     labels: &[SecomLabelRowV1],
     assignments: &[crate::benchmark::split_manifest::SplitAssignmentV1],
@@ -457,7 +466,7 @@ fn fit_model_v1(
         0.0
     };
 
-    let mut state = FtrlStateV1::new(input_feature_count);
+    let mut state = FtrlStateV1::new(input_feature_count, l1, FTRL_L2);
     for _epoch in 0..FTRL_EPOCHS {
         for (row_index, vector) in &transformed_training {
             let positive = labels[*row_index].label == 1;
@@ -474,7 +483,7 @@ fn fit_model_v1(
         epochs: FTRL_EPOCHS,
         ftrl_alpha: FTRL_ALPHA,
         ftrl_beta: FTRL_BETA,
-        l1: FTRL_L1,
+        l1,
         l2: FTRL_L2,
         input_feature_count,
         input_description: "train-standardized numeric values with train-median imputation followed by train-standardized missingness indicators".into(),
@@ -551,11 +560,12 @@ fn held_out_report(
 fn evaluate_model(
     model_id: &str,
     class_balanced: bool,
+    l1: f64,
     features: &[SecomSensorRowV1],
     labels: &[SecomLabelRowV1],
     assignments: &[crate::benchmark::split_manifest::SplitAssignmentV1],
 ) -> Result<SecomLogisticModelResultV1, SecomLogisticError> {
-    let model = fit_model_v1(model_id, class_balanced, features, labels, assignments)?;
+    let model = fit_model_v1(model_id, class_balanced, l1, features, labels, assignments)?;
     let model_bytes = serde_json::to_vec(&model)
         .map_err(|error| SecomLogisticError(format!("model serialization failed: {error}")))?;
     let model_sha256 = sha256_hex(&model_bytes);
@@ -579,6 +589,18 @@ fn evaluate_model(
     Ok(SecomLogisticModelResultV1 {
         model_id: model_id.into(),
         config: model.config.clone(),
+        nonzero_coefficient_count: model
+            .weights
+            .iter()
+            .filter(|weight| weight.abs() > 1.0e-12)
+            .count(),
+        coefficient_support_sha256: sha256_hex(
+            &model
+                .weights
+                .iter()
+                .map(|weight| u8::from(weight.abs() > 1.0e-12))
+                .collect::<Vec<_>>(),
+        ),
         missing_features_without_observed_training_values: model
             .missing_features_without_observed_training_values,
         model_sha256,
@@ -650,6 +672,7 @@ pub fn evaluate_secom_logistic_v1(
         evaluate_model(
             "B5-ftrl-logistic-unweighted",
             false,
+            FTRL_L1,
             &features,
             &labels,
             &split_manifest.assignments,
@@ -660,6 +683,51 @@ pub fn evaluate_secom_logistic_v1(
         evaluate_model(
             "B5-ftrl-logistic-class-balanced",
             true,
+            FTRL_L1,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
+    );
+    models.insert(
+        "B6".into(),
+        evaluate_model(
+            "B6-ftrl-elastic-net-sparse",
+            false,
+            FTRL_L1_SPARSE,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
+    );
+    models.insert(
+        "B6-balanced".into(),
+        evaluate_model(
+            "B6-ftrl-elastic-net-sparse-class-balanced",
+            true,
+            FTRL_L1_SPARSE,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
+    );
+    models.insert(
+        "B6-strong".into(),
+        evaluate_model(
+            "B6-ftrl-elastic-net-strong-l1",
+            false,
+            FTRL_L1_STRONG,
+            &features,
+            &labels,
+            &split_manifest.assignments,
+        )?,
+    );
+    models.insert(
+        "B6-strong-balanced".into(),
+        evaluate_model(
+            "B6-ftrl-elastic-net-strong-l1-class-balanced",
+            true,
+            FTRL_L1_STRONG,
             &features,
             &labels,
             &split_manifest.assignments,
@@ -731,6 +799,18 @@ mod tests {
         assert_eq!(report.training_passes, 2);
         assert!(report.models.contains_key("B5"));
         assert!(report.models.contains_key("B5-balanced"));
+        assert!(report.models.contains_key("B6"));
+        assert!(report.models.contains_key("B6-balanced"));
+        assert!(report.models.contains_key("B6-strong"));
+        assert!(report.models.contains_key("B6-strong-balanced"));
+        assert_eq!(report.models["B5"].config.l1, 0.0);
+        assert_eq!(report.models["B6"].config.l1, FTRL_L1_SPARSE);
+        assert_eq!(report.models["B6-balanced"].config.l1, FTRL_L1_SPARSE);
+        assert_eq!(report.models["B6-strong"].config.l1, FTRL_L1_STRONG);
+        assert_eq!(
+            report.models["B6-strong-balanced"].config.l1,
+            FTRL_L1_STRONG
+        );
         for model in report.models.values() {
             for split in ["validation", "test"] {
                 assert_eq!(model.held_out[split].rows, 2);
@@ -750,7 +830,14 @@ mod tests {
             .replace("1 \"19/07/2008 12:20:00\"", "-1 \"19/07/2008 12:20:00\"");
         let original = evaluate(FEATURES, LABELS);
         let modified = evaluate(FEATURES, changed.as_bytes());
-        for key in ["B5", "B5-balanced"] {
+        for key in [
+            "B5",
+            "B5-balanced",
+            "B6",
+            "B6-balanced",
+            "B6-strong",
+            "B6-strong-balanced",
+        ] {
             assert_eq!(
                 original.models[key].model_sha256,
                 modified.models[key].model_sha256
@@ -765,7 +852,14 @@ mod tests {
             .replace("1.2 2.2", "9999.0 -9999.0");
         let original = evaluate(FEATURES, LABELS);
         let modified = evaluate(changed.as_bytes(), LABELS);
-        for key in ["B5", "B5-balanced"] {
+        for key in [
+            "B5",
+            "B5-balanced",
+            "B6",
+            "B6-balanced",
+            "B6-strong",
+            "B6-strong-balanced",
+        ] {
             assert_eq!(
                 original.models[key].model_sha256,
                 modified.models[key].model_sha256
@@ -795,10 +889,18 @@ mod tests {
         permuted_labels[..4].reverse();
         permuted_assignments[..4].reverse();
 
-        for balanced in [false, true] {
+        for (balanced, l1) in [
+            (false, FTRL_L1),
+            (true, FTRL_L1),
+            (false, FTRL_L1_SPARSE),
+            (true, FTRL_L1_SPARSE),
+            (false, FTRL_L1_STRONG),
+            (true, FTRL_L1_STRONG),
+        ] {
             let original = fit_model_v1(
                 "sample-order",
                 balanced,
+                l1,
                 &features,
                 &labels,
                 &split.assignments,
@@ -807,6 +909,7 @@ mod tests {
             let permuted = fit_model_v1(
                 "sample-order",
                 balanced,
+                l1,
                 &permuted_features,
                 &permuted_labels,
                 &permuted_assignments,
