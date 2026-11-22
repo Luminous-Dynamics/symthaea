@@ -131,11 +131,11 @@ Build rejects:
 - duplicate event IDs;
 - dimensions outside the supported interval;
 - non-finite numeric fields;
-- negative measurement-error bounds;
+- observed utility or measurement-error bounds outside the normalized [0, 1] domain;
 - malformed propensity bounds;
 - invalid bandwidth configuration.
 
-Query rejects non-finite numeric targets, negative measurement-error targets and propensity targets outside the valid range.
+Query rejects non-finite targets, utility/error targets outside [0, 1], and propensity targets outside the valid range.
 
 A candidate consumer must:
 1. resolve each ID to exactly one canonical Experience;
@@ -157,8 +157,7 @@ The module now contains ten authored tests for:
 - profile digest sensitivity to dimension, seed, bandwidth and exact-filter policy;
 - duplicate-ID and non-finite input rejection;
 - query-time estimand/evidence-quality cues while preserving candidate-only authority;
-- the paired-runner typed arm uses the MACE qualification profile, exact scope/action prefilters and emits a typed retrieval-profile digest;
-- high-similarity wrong-scope/wrong-action items cannot displace in-scope candidates.
+- the paired-runner typed arm uses the MACE qualification profile, exact scope/action prefilters and emits a typed retrieval-profile digest.
 
 These tests are authored source, not executed passes. Cargo, rustc and rustfmt are unavailable in the present environment.
 
