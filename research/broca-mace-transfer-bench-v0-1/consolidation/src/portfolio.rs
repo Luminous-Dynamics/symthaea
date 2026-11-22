@@ -19,6 +19,7 @@ use crate::reobservation::{
 use crate::salience::VerifiedFutureUsePredictionV1;
 
 const MAX_EVENT_GROUPS: usize = 24;
+const MAX_PORTFOLIO_FRONTIER: usize = 128;
 const DEFAULT_MAX_SEARCH_NODES: u64 = 2_000_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -43,6 +44,7 @@ impl MemoryPortfolioBudgetV1 {
 pub enum PortfolioStrategyV1 {
     ExactBounded,
     GreedyHighestNetValue,
+    ParetoFrontier,
 }
 
 impl PortfolioStrategyV1 {
@@ -50,6 +52,7 @@ impl PortfolioStrategyV1 {
         match self {
             Self::ExactBounded => "exact_bounded",
             Self::GreedyHighestNetValue => "greedy_highest_net_value",
+            Self::ParetoFrontier => "pareto_frontier",
         }
     }
 }
@@ -76,6 +79,7 @@ pub enum PortfolioReject {
     InconsistentAuthorityScope,
     TooManyEventGroups,
     SearchLimitExceeded,
+    FrontierLimitExceeded,
     ValueOverflow,
 }
 
@@ -391,6 +395,37 @@ struct PreparedPortfolio {
     scope: Scope,
     as_known: AsKnownQuery,
     authority_scope_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MemoryPortfolioFrontierV1 {
+    pub budget: MemoryPortfolioBudgetV1,
+    pub plans: Vec<MemoryPortfolioPlanV1>,
+    pub search_nodes: u64,
+    pub frontier_sha256: String,
+}
+
+impl MemoryPortfolioFrontierV1 {
+    pub fn canonical_digest(&self) -> String {
+        let mut fields = vec![
+            self.budget.context_tokens.to_string(),
+            self.budget.reobservation_calls.to_string(),
+            self.budget.latency_work_ms.to_string(),
+            self.budget.estimated_cost_micros.to_string(),
+            self.budget.expected_failure_loss_micros.to_string(),
+            self.search_nodes.to_string(),
+            self.plans.len().to_string(),
+        ];
+        fields.extend(self.plans.iter().map(|plan| plan.plan_sha256.clone()));
+        digest_fields(b"mace:memory-portfolio-frontier:v1\0", &fields)
+    }
+
+    pub fn is_canonical(&self) -> bool {
+        !self.plans.is_empty()
+            && self.plans.iter().all(MemoryPortfolioPlanV1::is_canonical)
+            && is_lower_sha256(&self.frontier_sha256)
+            && self.frontier_sha256 == self.canonical_digest()
+    }
 }
 
 fn prepare_options(
@@ -759,6 +794,215 @@ pub fn optimize_memory_portfolio_greedy(
         budget,
         0,
     ))
+}
+
+fn resource_vector(
+    metrics: MemoryPortfolioMetricsV1,
+) -> (u64, u64, u64, u64, u64) {
+    (
+        metrics.context_tokens,
+        metrics.reobservation_calls,
+        metrics.latency_work_ms,
+        metrics.estimated_cost_micros,
+        metrics.expected_failure_loss_micros,
+    )
+}
+
+fn plan_dominates(
+    left: &MemoryPortfolioPlanV1,
+    right: &MemoryPortfolioPlanV1,
+) -> bool {
+    let left_resources = resource_vector(left.metrics);
+    let right_resources = resource_vector(right.metrics);
+    let weakly_better = left.total_net_value_micros >= right.total_net_value_micros
+        && left_resources.0 <= right_resources.0
+        && left_resources.1 <= right_resources.1
+        && left_resources.2 <= right_resources.2
+        && left_resources.3 <= right_resources.3
+        && left_resources.4 <= right_resources.4;
+    let strictly_better = left.total_net_value_micros > right.total_net_value_micros
+        || left_resources != right_resources;
+    weakly_better && strictly_better
+}
+
+fn plan_selected_key(plan: &MemoryPortfolioPlanV1) -> Vec<String> {
+    plan.selected
+        .iter()
+        .map(|item| item.option_sha256.clone())
+        .collect()
+}
+
+fn insert_frontier_plan(
+    frontier: &mut Vec<MemoryPortfolioPlanV1>,
+    candidate: MemoryPortfolioPlanV1,
+    max_frontier: usize,
+) -> Result<(), PortfolioReject> {
+    for existing in frontier.iter() {
+        if plan_dominates(existing, &candidate) {
+            return Ok(());
+        }
+        let same_objective = existing.total_net_value_micros
+            == candidate.total_net_value_micros
+            && existing.metrics == candidate.metrics;
+        if same_objective && plan_selected_key(existing) <= plan_selected_key(&candidate) {
+            return Ok(());
+        }
+    }
+
+    frontier.retain(|existing| {
+        let same_objective = existing.total_net_value_micros
+            == candidate.total_net_value_micros
+            && existing.metrics == candidate.metrics;
+        !plan_dominates(&candidate, existing)
+            && !(same_objective
+                && plan_selected_key(&candidate) < plan_selected_key(existing))
+    });
+    frontier.push(candidate);
+    if frontier.len() > max_frontier {
+        return Err(PortfolioReject::FrontierLimitExceeded);
+    }
+    Ok(())
+}
+
+fn search_frontier(
+    group_index: usize,
+    prepared: &PreparedPortfolio,
+    options: &[MemoryPortfolioOptionV1],
+    budget: MemoryPortfolioBudgetV1,
+    state: &mut SearchState,
+    frontier: &mut Vec<MemoryPortfolioPlanV1>,
+    nodes: &mut u64,
+    max_nodes: u64,
+    max_frontier: usize,
+) -> Result<(), PortfolioReject> {
+    *nodes = (*nodes).saturating_add(1);
+    if *nodes > max_nodes {
+        return Err(PortfolioReject::SearchLimitExceeded);
+    }
+    if group_index == prepared.groups.len() {
+        let plan = make_plan(
+            PortfolioStrategyV1::ParetoFrontier,
+            prepared.clone(),
+            options,
+            &state.selected_indices,
+            state.metrics,
+            state.value_micros,
+            budget,
+            *nodes,
+        );
+        return insert_frontier_plan(frontier, plan, max_frontier);
+    }
+
+    // Discard this evidence item.
+    search_frontier(
+        group_index + 1,
+        prepared,
+        options,
+        budget,
+        state,
+        frontier,
+        nodes,
+        max_nodes,
+        max_frontier,
+    )?;
+
+    // Choose at most one representation of this event.
+    for index in &prepared.groups[group_index] {
+        let option = &options[*index];
+        let Some(metrics) = state.metrics.add_option(option, budget) else {
+            continue;
+        };
+        let next_value = state
+            .value_micros
+            .checked_add(option.net_value_micros)
+            .ok_or(PortfolioReject::ValueOverflow)?;
+        let prior_metrics = state.metrics;
+        let prior_value = state.value_micros;
+        state.metrics = metrics;
+        state.value_micros = next_value;
+        state.selected_indices.push(*index);
+
+        search_frontier(
+            group_index + 1,
+            prepared,
+            options,
+            budget,
+            state,
+            frontier,
+            nodes,
+            max_nodes,
+            max_frontier,
+        )?;
+
+        state.selected_indices.pop();
+        state.metrics = prior_metrics;
+        state.value_micros = prior_value;
+    }
+    Ok(())
+}
+
+fn sort_frontier(plans: &mut [MemoryPortfolioPlanV1]) {
+    plans.sort_by(|left, right| {
+        right
+            .total_net_value_micros
+            .cmp(&left.total_net_value_micros)
+            .then_with(|| resource_vector(left.metrics).cmp(&resource_vector(right.metrics)))
+            .then_with(|| plan_selected_key(left).cmp(&plan_selected_key(right)))
+    });
+}
+
+pub fn optimize_memory_portfolio_frontier(
+    options: &[MemoryPortfolioOptionV1],
+    budget: MemoryPortfolioBudgetV1,
+) -> Result<MemoryPortfolioFrontierV1, PortfolioReject> {
+    optimize_memory_portfolio_frontier_with_limits(
+        options,
+        budget,
+        DEFAULT_MAX_SEARCH_NODES,
+        MAX_PORTFOLIO_FRONTIER,
+    )
+}
+
+/// Enumerate every nondominated feasible portfolio within explicit search and
+/// frontier bounds. Any bound exhaustion rejects the whole result; no partial
+/// frontier is returned.
+pub fn optimize_memory_portfolio_frontier_with_limits(
+    options: &[MemoryPortfolioOptionV1],
+    budget: MemoryPortfolioBudgetV1,
+    max_search_nodes: u64,
+    max_frontier: usize,
+) -> Result<MemoryPortfolioFrontierV1, PortfolioReject> {
+    if max_search_nodes == 0 {
+        return Err(PortfolioReject::SearchLimitExceeded);
+    }
+    if max_frontier == 0 {
+        return Err(PortfolioReject::FrontierLimitExceeded);
+    }
+    let prepared = prepare_options(options, budget)?;
+    let mut state = SearchState::default();
+    let mut frontier = Vec::new();
+    let mut nodes = 0_u64;
+    search_frontier(
+        0,
+        &prepared,
+        options,
+        budget,
+        &mut state,
+        &mut frontier,
+        &mut nodes,
+        max_search_nodes,
+        max_frontier,
+    )?;
+    sort_frontier(&mut frontier);
+
+    let mut result = MemoryPortfolioFrontierV1 {
+        budget,
+        plans: frontier,
+        search_nodes: nodes,
+        frontier_sha256: String::new(),
+    };
+    result.frontier_sha256 = result.canonical_digest();
+    Ok(result)
 }
 
 fn disposition_code(disposition: ReobservationDispositionV1) -> &'static str {
@@ -1178,6 +1422,161 @@ mod tests {
         let second = optimize_memory_portfolio_exact(&reversed, budget(7, 1, 10, 20, 2))
             .unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn pareto_frontier_preserves_value_resource_tradeoffs_and_drops_dominated_plans() {
+        let options = vec![
+            option(
+                1,
+                "high-value-persist",
+                ReobservationDispositionV1::PersistKnowledge,
+                100,
+                10,
+                0,
+                0,
+                1,
+                0,
+            ),
+            option(
+                1,
+                "compact-locator",
+                ReobservationDispositionV1::StoreLocator,
+                75,
+                4,
+                1,
+                10,
+                1,
+                1,
+            ),
+            option(
+                2,
+                "complementary-persist",
+                ReobservationDispositionV1::PersistKnowledge,
+                70,
+                8,
+                0,
+                0,
+                1,
+                0,
+            ),
+            option(
+                3,
+                "dominated-persist",
+                ReobservationDispositionV1::PersistKnowledge,
+                20,
+                10,
+                1,
+                10,
+                1,
+                1,
+            ),
+        ];
+        let frontier = optimize_memory_portfolio_frontier(
+            &options,
+            budget(12, 1, 20, 100, 10),
+        )
+        .unwrap();
+
+        assert!(frontier.is_canonical());
+        let values: BTreeSet<_> = frontier
+            .plans
+            .iter()
+            .map(|plan| plan.total_net_value_micros)
+            .collect();
+        assert!(values.contains(&145));
+        assert!(values.contains(&100));
+        assert!(values.contains(&75));
+        assert!(values.contains(&70));
+        assert!(!values.contains(&20));
+    }
+
+    #[test]
+    fn pareto_frontier_is_deterministic_under_input_permutation() {
+        let options = vec![
+            option(
+                1,
+                "one",
+                ReobservationDispositionV1::PersistKnowledge,
+                30,
+                3,
+                0,
+                0,
+                5,
+                0,
+            ),
+            option(
+                2,
+                "two",
+                ReobservationDispositionV1::CacheSnapshot,
+                40,
+                4,
+                0,
+                0,
+                5,
+                0,
+            ),
+            option(
+                3,
+                "three",
+                ReobservationDispositionV1::StoreLocator,
+                50,
+                2,
+                1,
+                5,
+                5,
+                1,
+            ),
+        ];
+        let first = optimize_memory_portfolio_frontier(
+            &options,
+            budget(7, 1, 10, 20, 2),
+        )
+        .unwrap();
+        let reversed: Vec<_> = options.iter().cloned().rev().collect();
+        let second = optimize_memory_portfolio_frontier(
+            &reversed,
+            budget(7, 1, 10, 20, 2),
+        )
+        .unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn pareto_frontier_limit_exhaustion_returns_no_partial_result() {
+        let options = vec![
+            option(
+                1,
+                "high",
+                ReobservationDispositionV1::PersistKnowledge,
+                100,
+                10,
+                0,
+                0,
+                1,
+                0,
+            ),
+            option(
+                1,
+                "compact",
+                ReobservationDispositionV1::StoreLocator,
+                75,
+                4,
+                1,
+                10,
+                1,
+                1,
+            ),
+        ];
+        assert_eq!(
+            optimize_memory_portfolio_frontier_with_limits(
+                &options,
+                budget(12, 1, 20, 100, 10),
+                100,
+                1,
+            ),
+            Err(PortfolioReject::FrontierLimitExceeded)
+        );
     }
 
     #[test]

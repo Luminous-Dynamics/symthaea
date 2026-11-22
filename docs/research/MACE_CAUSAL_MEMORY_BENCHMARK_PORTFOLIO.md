@@ -532,3 +532,12 @@ MACE now enumerates alternative per-item representations and can allocate them j
 Portfolio options are now admitted only when their representation-plan digest matches an option independently re-derived by `enumerate_memory_representation_options` from the same verified salience prediction, verified source profile and policy. A caller cannot mutate a plan's cost/disposition, recompute its digest, and present it as an eligible choice. The portfolio constructor still verifies the complete source/prediction/snapshot/authority binding before creating an option.
 
 The exact optimizer assumes the supplied per-item `net_value_micros` are additive across distinct evidence payloads. It now rejects a byte-identical evidence digest being assigned multiple event IDs, but semantically overlapping facts with different payloads can still have interacting or diminishing value. This prototype is not a submodular/interaction-aware optimizer. A credible next version needs independently qualified marginal-value groups or a portfolio-level evaluator that measures the value of combinations against the same no-memory baseline; it must not simply sum correlated single-item predictions and call the result realized utility.
+
+
+## Pareto resource frontier (MACE v0.18)
+
+The consolidation crate now also exposes `optimize_memory_portfolio_frontier`. Instead of selecting only the maximum-net-value plan under one caller budget, it enumerates the bounded nondominated feasible plans across five dimensions: context tokens, re-observation calls, summed latency work, estimated cost and expected failure loss, while maximizing total net value. Dominated plans are removed; ties use canonical option digests. The frontier itself is digest-bound. It is bounded to 24 event groups, 2,000,000 search nodes and 128 nondominated plans by default. Exhaustion returns an error and never a partial frontier.
+
+This is analogous in spirit—not an implementation reuse—to Sol-Atlas's bounded workforce active-evidence verifier, which keeps a Pareto frontier over staff time, cash (ZAR cents) and delay. MACE preserves its own memory-specific resource vector. The scalar exact optimizer and greedy baseline remain available; a caller can choose from the Pareto frontier under an explicit governance policy.
+
+The frontier does not solve non-additive memory utility. It still assumes per-item net values add across distinct evidence payloads. Interaction-aware marginal value is tracked separately in #13184.
