@@ -933,6 +933,20 @@ fn rank_failure_entities(
                     .then_with(|| left.cmp(right))
             });
         }
+        MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions => {
+            let mut degree = vec![0usize; indexed.node_ids.len()];
+            for &(source, target, _) in &indexed.edge_endpoints {
+                degree[source] = degree[source].saturating_add(1);
+                degree[target] = degree[target].saturating_add(1);
+            }
+            ranked.sort_by(|left, right| {
+                let left_index = indexed.node_index[left];
+                let right_index = indexed.node_index[right];
+                degree[right_index]
+                    .cmp(&degree[left_index])
+                    .then_with(|| left.cmp(right))
+            });
+        }
         MycelialFailureAttackStrategy::LowestDegreeJunctions => {
             let mut degree = vec![0usize; indexed.node_ids.len()];
             for &(source, target, _) in &indexed.edge_endpoints {
@@ -996,6 +1010,77 @@ fn rank_failure_entities(
     Ok(ranked)
 }
 
+fn adaptive_highest_degree_ranking(
+    indexed: &IndexedGraph,
+    failed_junction_ids: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut degree = vec![0usize; indexed.node_ids.len()];
+    let active_nodes: Vec<_> = indexed
+        .node_ids
+        .iter()
+        .map(|id| !failed_junction_ids.contains(id))
+        .collect();
+    for &(source, target, _) in &indexed.edge_endpoints {
+        if active_nodes[source] && active_nodes[target] {
+            degree[source] = degree[source].saturating_add(1);
+            degree[target] = degree[target].saturating_add(1);
+        }
+    }
+    let mut ranked: Vec<_> = indexed
+        .node_ids
+        .iter()
+        .filter(|id| !failed_junction_ids.contains(*id))
+        .cloned()
+        .collect();
+    ranked.sort_by(|left, right| {
+        let left_index = indexed.node_index[left];
+        let right_index = indexed.node_index[right];
+        degree[right_index]
+            .cmp(&degree[left_index])
+            .then_with(|| left.cmp(right))
+    });
+    ranked
+}
+
+fn build_attack_rankings(
+    indexed: &IndexedGraph,
+    demands: &[MycelialDemandPair],
+    config: &MycelialFailureAttackConfig,
+) -> Result<(Vec<String>, Vec<Vec<String>>), MycelialFailureResilienceError> {
+    let base_ranking = rank_failure_entities(indexed, demands, config)?;
+    if config.maximum_failure_budget > base_ranking.len() {
+        return Err(MycelialFailureResilienceError::InvalidAttackConfig(
+            "maximum failure budget exceeds the number of attackable entities",
+        ));
+    }
+    let adaptive = attack_strategy_is_adaptive(config.strategy);
+    let mut failed_junctions = BTreeSet::new();
+    let mut selected = Vec::with_capacity(config.maximum_failure_budget);
+    let mut rankings_per_step = Vec::with_capacity(config.maximum_failure_budget);
+    for _ in 0..config.maximum_failure_budget {
+        let ranking = if adaptive {
+            adaptive_highest_degree_ranking(indexed, &failed_junctions)
+        } else {
+            base_ranking
+                .iter()
+                .filter(|id| !selected.iter().any(|chosen| chosen == *id))
+                .cloned()
+                .collect()
+        };
+        let Some(next_id) = ranking.first().cloned() else {
+            return Err(MycelialFailureResilienceError::InvalidAttackConfig(
+                "attack ranking became empty before the requested budget",
+            ));
+        };
+        rankings_per_step.push(ranking);
+        selected.push(next_id.clone());
+        if !attack_strategy_targets_segments(config.strategy) {
+            failed_junctions.insert(next_id);
+        }
+    }
+    Ok((selected, rankings_per_step))
+}
+
 pub fn build_mycelial_failure_attack_plan(
     graph: &MycelialJunctionHyphaGraph,
     demands: &[MycelialDemandPair],
@@ -1029,12 +1114,8 @@ pub fn build_mycelial_failure_attack_plan(
         }
     }
 
-    let ranked_entity_ids = rank_failure_entities(&indexed, demands, &config)?;
-    if config.maximum_failure_budget > ranked_entity_ids.len() {
-        return Err(MycelialFailureResilienceError::InvalidAttackConfig(
-            "maximum failure budget exceeds the number of attackable entities",
-        ));
-    }
+    let (ranked_entity_ids, ranked_entity_ids_per_step) =
+        build_attack_rankings(&indexed, demands, &config)?;
     let strategy_id = config.strategy.stable_id();
     let seed_id = config.seed;
     let mut scenarios = Vec::with_capacity(config.maximum_failure_budget);
@@ -1068,6 +1149,7 @@ pub fn build_mycelial_failure_attack_plan(
         maximum_failure_budget: config.maximum_failure_budget,
         spatial_seed_junction_id: config.spatial_seed_junction_id,
         ranked_entity_ids,
+        ranked_entity_ids_per_step,
         scenarios,
     };
     plan.validate_against(graph, demands)?;
@@ -1114,8 +1196,10 @@ impl MycelialFailureAttackPlan {
         }
         let indexed = index_source_graph(graph)?;
         validate_demands(&indexed, demands)?;
-        let expected_rank = rank_failure_entities(&indexed, demands, &config)?;
+        let (expected_rank, expected_rankings_per_step) =
+            build_attack_rankings(&indexed, demands, &config)?;
         if self.ranked_entity_ids != expected_rank
+            || self.ranked_entity_ids_per_step != expected_rankings_per_step
             || self.maximum_failure_budget == 0
             || self.maximum_failure_budget > expected_rank.len()
             || self.scenarios.len() != self.maximum_failure_budget
@@ -1155,6 +1239,13 @@ impl MycelialFailureAttackPlan {
             || self.maximum_failure_budget > MAX_FAILURE_SCENARIOS
             || self.scenarios.len() != self.maximum_failure_budget
             || self.ranked_entity_ids.len() < self.maximum_failure_budget
+            || self.ranked_entity_ids_per_step.len() != self.maximum_failure_budget
+            || self.ranked_entity_ids_per_step.iter().any(|ranking| ranking.is_empty())
+            || self
+                .ranked_entity_ids_per_step
+                .iter()
+                .zip(&self.ranked_entity_ids)
+                .any(|(ranking, selected)| ranking.first() != Some(selected))
             || !valid_digest(&self.source_graph_digest)
             || !valid_digest(&self.demand_digest)
             || self.ranked_entity_ids.iter().any(|id| !valid_id(id))
@@ -1184,6 +1275,13 @@ impl MycelialFailureAttackPlan {
         hasher.update(&(self.ranked_entity_ids.len() as u64).to_le_bytes());
         for id in &self.ranked_entity_ids {
             hash_string(&mut hasher, id);
+        }
+        hasher.update(&(self.ranked_entity_ids_per_step.len() as u64).to_le_bytes());
+        for ranking in &self.ranked_entity_ids_per_step {
+            hasher.update(&(ranking.len() as u64).to_le_bytes());
+            for id in ranking {
+                hash_string(&mut hasher, id);
+            }
         }
         hasher.update(&(self.scenarios.len() as u64).to_le_bytes());
         for scenario in &self.scenarios {
