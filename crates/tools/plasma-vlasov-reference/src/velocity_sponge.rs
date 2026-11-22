@@ -895,7 +895,16 @@ mod tests {
             permittivity: 1.0,
             background_density: 1.0,
         };
-        let initial = crate::maxwellian_perturbation(config, 1.0e-3, 1, 1.0).unwrap();
+        let mut initial = vec![0.0; config.nx * config.nv];
+        for ix in 0..config.nx {
+            let spatial = 1.0 + 0.01 * (TAU * config.x(ix) / config.domain_length).cos();
+            for iv in 0..config.nv {
+                let phase = TAU * iv as f64 / config.nv as f64;
+                initial[ix * config.nv + iv] = spatial
+                    * (1.0 + 0.05 * (8.0 * phase).cos() + 0.1 * (112.0 * phase).cos());
+            }
+        }
+        assert!(initial.iter().all(|value| *value > 0.8));
         let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
         let report = solver
             .apply_moment_constrained_velocity_fourier_sponge(0.1, 0.5, 0.25, 2, 0.0)
