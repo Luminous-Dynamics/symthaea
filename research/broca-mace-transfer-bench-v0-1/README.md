@@ -364,7 +364,7 @@ See [MACE AML Add/Search Adapter v0.1](../../docs/research/MACE_AML_ADD_SEARCH_A
 
 ## Current end-to-end integration inventory (2026-11-19)
 
-The MACE branch contains six Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation, provider-neutral AML Add/Search contract core, and HDC retrieval adapter. Current authored source counts are 25 policy tests, 15 fixed-evaluator tests, 14 generated-stress tests, 30 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 9 consolidation-core tests, 29 re-observation tests, 11 portfolio-optimizer tests, 15 salience tests, 10 predictive-salience-learning tests, 11 memory-dose-response tests, 5 raw-session integration tests, 1 evaluator-level ingress→consolidation→MACE integration test, 14 AML adapter tests, 6 HDC retrieval unit tests and 5 HDC→MACE integration tests. These are source counts, **not executed test results**.
+The MACE branch contains six Rust packages: candidate policy, synthetic evaluator, receipt-gated ingress, proposal-only consolidation, provider-neutral AML Add/Search contract core, and HDC retrieval adapter. Current authored source counts are 25 policy tests, 15 fixed-evaluator tests, 14 generated-stress tests, 30 raw-JSONL evaluator tests, 36 ingress receipt/bitemporal tests, 11 provider-trace tests, 9 source-span claim tests, 9 consolidation-core tests, 29 re-observation tests, 13 portfolio-optimizer tests, 15 salience tests, 10 predictive-salience-learning tests, 11 memory-dose-response tests, 5 raw-session integration tests, 1 evaluator-level ingress→consolidation→MACE integration test, 14 AML adapter tests, 6 HDC retrieval unit tests and 5 HDC→MACE integration tests. These are source counts, **not executed test results**.
 
 The new cross-package regression is `evaluator/tests/ingress_consolidation_transfer.rs`. It admits six raw Session-A interactions through `EvidenceVerifier`, builds the canonical `ConsolidationEvidencePackV1`, obtains action-specific procedure proposals for A and B, binds source/input/output digests into receipt proposals, releases experiences only after an independent fixture verifier accepts the proposal digests, and makes the Session-B causal-qualified choice. Session C retracts two A sources, rejects the retracted events at the later `known_at`, rebuilds the evidence pack, rejects replay of the stale consolidation receipt against the new snapshot, refuses to mint a replacement Action-A procedure from the one remaining qualified source, and verifies that the next candidate decision abstains and requests a bounded probe.
 
@@ -585,3 +585,17 @@ The frontier does not solve non-additive memory utility. It still assumes per-it
 ## Cross-system evidence and authority bridge
 
 See [MACE cross-system evidence and authority bridge v0.1](../../docs/research/MACE_CROSS_SYSTEM_EVIDENCE_BRIDGE_V0_1.md) for the Mycelix signed-event/authority-receipt mapping, Sol-Atlas federated evidence/rights contract, Symtropy execution/outcome boundary and provider-neutral MACE projection. This is a contract and source mapping, not a live cryptographic connector.
+
+
+## v0.18.1 semantic integrity hardening
+
+The source-level canonicality checks now verify more than a recalculable digest:
+
+- each selected item carries its own cost and expected-failure-loss values, allowing the plan to recompute all five aggregate resource totals and the summed net value;
+- event IDs and option digests are unique within a selected plan;
+- selected resources fit the declared budget;
+- exact-search plans report the completed search-node count;
+- Pareto frontiers verify each plan's digest and aggregate accounting, shared scope/as-known/authority/budget, strategy identity, deterministic sort order and pairwise nondominance;
+- mutation controls rehash tampered values and require semantic validation to reject them.
+
+This is internal consistency and semantic validation, **not** authenticity. A public digest is not a signature; production plans still require the appropriate Mycelix-signed receipt and policy/authority validation at use. The portfolio module now has **13 authored tests** by source count (not execution status).

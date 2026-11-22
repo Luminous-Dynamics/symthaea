@@ -199,3 +199,17 @@ The consolidation crate now also exposes `optimize_memory_portfolio_frontier`. I
 This is analogous in spirit—not an implementation reuse—to Sol-Atlas's bounded workforce active-evidence verifier, which keeps a Pareto frontier over staff time, cash (ZAR cents) and delay. MACE preserves its own memory-specific resource vector. The scalar exact optimizer and greedy baseline remain available; a caller can choose from the Pareto frontier under an explicit governance policy.
 
 The frontier does not solve non-additive memory utility. It still assumes per-item net values add across distinct evidence payloads. Interaction-aware marginal value is tracked separately in #13184.
+
+
+## v0.18.1 semantic integrity hardening
+
+The source-level canonicality checks now verify more than a recalculable digest:
+
+- each selected item carries its own cost and expected-failure-loss values, allowing the plan to recompute all five aggregate resource totals and the summed net value;
+- event IDs and option digests are unique within a selected plan;
+- selected resources fit the declared budget;
+- exact-search plans report the completed search-node count;
+- Pareto frontiers verify each plan's digest and aggregate accounting, shared scope/as-known/authority/budget, strategy identity, deterministic sort order and pairwise nondominance;
+- mutation controls rehash tampered values and require semantic validation to reject them.
+
+This is internal consistency and semantic validation, **not** authenticity. A public digest is not a signature; production plans still require the appropriate Mycelix-signed receipt and policy/authority validation at use. The portfolio module now has **13 authored tests** by source count (not execution status).
