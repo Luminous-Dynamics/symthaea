@@ -1,6 +1,5 @@
 use cetb_rcaf::spatial_nuisance::{
-    generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig,
-    SpatialNuisanceFamily,
+    generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig, SpatialNuisanceFamily,
 };
 use std::error::Error;
 use std::fs;
@@ -8,7 +7,11 @@ use std::io::{self, Write};
 
 fn field_rms(values: &[Vec<f64>]) -> f64 {
     let count = values.iter().map(Vec::len).sum::<usize>();
-    let sum_squares = values.iter().flatten().map(|value| value * value).sum::<f64>();
+    let sum_squares = values
+        .iter()
+        .flatten()
+        .map(|value| value * value)
+        .sum::<f64>();
     (sum_squares / count as f64).sqrt()
 }
 
@@ -35,7 +38,9 @@ fn render_family(
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let roi_labels = (0..8).map(|index| format!("roi-{index:02}")).collect::<Vec<_>>();
+    let roi_labels = (0..8)
+        .map(|index| format!("roi-{index:02}"))
+        .collect::<Vec<_>>();
     let mut adjacency = vec![vec![0.0; 8]; 8];
     for index in 0..7 {
         adjacency[index][index + 1] = 1.0;
@@ -54,11 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         temporal_coherence: 0.0,
         seed: 0x5243_4146_5350_4154,
     };
-    let graph_smooth = render_family(
-        "graph_smooth_low_rank",
-        common.clone(),
-        &graph,
-    )?;
+    let graph_smooth = render_family("graph_smooth_low_rank", common.clone(), &graph)?;
     let localized = render_family(
         "heat_kernel_localized",
         SpatialNuisanceConfig {
