@@ -678,6 +678,42 @@ mod tests {
         })
     }
 
+    fn manifest_record(run_id: &str, source_sha: &str) -> Value {
+        json!({
+            "schema_version": INPUT_SCHEMA,
+            "record_type": "intervention_manifest",
+            "run_id": run_id,
+            "source_code_sha256": source_sha,
+            "fixture_sha256": "b".repeat(64),
+            "schema_sha256": "c".repeat(64),
+            "source_revision": "d".repeat(40),
+            "manifest_sha256": "e".repeat(64)
+        })
+    }
+
+    #[test]
+    fn manifest_provenance_requires_canonical_hashes() {
+        let valid = manifest_record("run-1", &"a".repeat(64));
+        let (provenance, manifest_sha) = parse_manifest(&valid).unwrap();
+        assert_eq!(provenance.run_id, "run-1");
+        assert_eq!(provenance.source_revision.as_deref(), Some(&"d".repeat(40)));
+        assert_eq!(manifest_sha, "e".repeat(64));
+
+        let invalid = manifest_record("run-1", "not-a-sha");
+        assert!(parse_manifest(&invalid).is_err());
+    }
+
+    #[test]
+    fn mixed_run_provenance_is_not_equal() {
+        let first = parse_manifest(&manifest_record("run-1", &"a".repeat(64)))
+            .unwrap()
+            .0;
+        let second = parse_manifest(&manifest_record("run-2", &"a".repeat(64)))
+            .unwrap()
+            .0;
+        assert_ne!(first, second);
+    }
+
     #[test]
     fn parses_opaque_pair_identifier_to_world_cluster() {
         assert_eq!(
