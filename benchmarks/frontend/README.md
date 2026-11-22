@@ -388,3 +388,8 @@ The external comparator ledger now includes Arena Code Arena's WebDev, Image-to-
 
 - [Judge qualification plan](judge-qualification-v1.json) and [schema](judge-qualification-v1.schema.json) compare deterministic, code-only, visual, interaction-grounded and bounded-ensemble evaluators.
 - [Judge qualification research note](../../docs/research/SFEB_JUDGE_QUALIFICATION_2026-11-22.md) defines authority separation, calibration, adversarial testing and Arena dataset rights constraints.
+
+
+## 30-task pilot family blueprint
+
+[`task-family-plan-v1.json`](task-family-plan-v1.json) defines 30 candidate task briefs across static visual, interactive multi-route and fullstack/maintenance levels. It is a planning artifact only: all 30 candidate fixtures and oracle policies are marked not authored, and the current runnable candidate count remains zero. See [issue #13251](https://github.com/Luminous-Dynamics/symthaea/issues/13251).

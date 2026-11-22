@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/task-family-plan-v1.schema.json",
+  "title": "SFEB 30-task pilot family plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "plan_id",
+    "as_of",
+    "status",
+    "candidate_task_count",
+    "runnable_task_count",
+    "target_distribution",
+    "exposure_policy",
+    "tasks",
+    "promotion_rules",
+    "limits"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sfeb-task-family-plan-v1"
+    },
+    "plan_id": {
+      "const": "SFEB-TASK-PLAN-001"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "enum": [
+        "blueprint_only",
+        "fixtures_in_progress",
+        "pilot_qualified"
+      ]
+    },
+    "candidate_task_count": {
+      "const": 30
+    },
+    "runnable_task_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 30
+    },
+    "target_distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "static_visual",
+        "interactive_multiroute",
+        "fullstack_maintenance"
+      ],
+      "properties": {
+        "static_visual": {
+          "const": 10
+        },
+        "interactive_multiroute": {
+          "const": 10
+        },
+        "fullstack_maintenance": {
+          "const": 10
+        }
+      }
+    },
+    "exposure_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "public_pilot",
+        "controller_only",
+        "hidden_holdout"
+      ],
+      "properties": {
+        "public_pilot": {
+          "type": "string"
+        },
+        "controller_only": {
+          "type": "string"
+        },
+        "hidden_holdout": {
+          "type": "string"
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 30,
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "level",
+          "family",
+          "title",
+          "objective",
+          "required_oracle_families",
+          "seeded_defect_families",
+          "metamorphic_controls",
+          "required_evidence",
+          "fixture_status",
+          "oracle_status",
+          "exposure",
+          "promotion_status"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "pattern": "^SFEB-PILOT-(VIS|INT|FS)-[0-9]{3}$"
+          },
+          "level": {
+            "enum": [
+              "static_visual",
+              "interactive_multiroute",
+              "fullstack_maintenance"
+            ]
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 5
+          },
+          "objective": {
+            "type": "string",
+            "minLength": 20
+          },
+          "required_oracle_families": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "seeded_defect_families": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "metamorphic_controls": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_evidence": {
+            "type": "array",
+            "minItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "fixture_status": {
+            "const": "not_authored"
+          },
+          "oracle_status": {
+            "const": "not_authored"
+          },
+          "exposure": {
+            "const": "public_pilot"
+          },
+          "promotion_status": {
+            "const": "planned_not_runnable"
+          }
+        }
+      }
+    },
+    "promotion_rules": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 20
+      }
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 20
+      }
+    }
+  }
+}
