@@ -6,6 +6,7 @@
 //! after repeated segment measurements have been reduced within participant.
 
 pub mod estimator_response;
+pub mod held_out_null_calibration;
 pub mod factorial_counterfactual;
 pub mod factorial_dose_response;
 pub mod motion_transient;
