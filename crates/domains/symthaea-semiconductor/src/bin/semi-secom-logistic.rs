@@ -8,8 +8,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use symthaea_semiconductor::benchmark::{
-    SecomLogisticReportV1, SecomRawExpectationsV1, SplitManifestV1,
-    evaluate_secom_logistic_v1,
+    SecomLogisticReportV1, SecomRawExpectationsV1, SplitManifestV1, evaluate_secom_logistic_v1,
 };
 
 fn run() -> Result<(), String> {
@@ -38,13 +37,9 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("invalid expectations JSON: {error}"))?;
     let split_manifest: SplitManifestV1 = serde_json::from_str(&split_text)
         .map_err(|error| format!("invalid split manifest JSON: {error}"))?;
-    let report: SecomLogisticReportV1 = evaluate_secom_logistic_v1(
-        &feature_bytes,
-        &label_bytes,
-        &expectations,
-        &split_manifest,
-    )
-    .map_err(|error| format!("SECOM logistic evaluation rejected input: {error}"))?;
+    let report: SecomLogisticReportV1 =
+        evaluate_secom_logistic_v1(&feature_bytes, &label_bytes, &expectations, &split_manifest)
+            .map_err(|error| format!("SECOM logistic evaluation rejected input: {error}"))?;
     let rendered = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("cannot render logistic report: {error}"))?;
     println!("{rendered}");
