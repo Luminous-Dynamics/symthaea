@@ -41,7 +41,7 @@ The evaluator also exposes `decompose_exact_joint_interactions()`. It uses the a
 
 Positive exposure dividends represent synergy; negative exposure dividends represent antagonism. Resource dividends use the opposite interpretation: positive means added cost, negative means savings. The transform does not establish causal effects unless the intervention design identifies them. It is limited to the declared finite binary factors and shares the oracle's 16-factor maximum.
 
-Fourteen Rust test functions are authored in the evaluator package, including hand-calculated pairwise, three-way and four-way controls. **None has been executed** in the current authoring environment.
+Fifteen Rust test functions are authored in the evaluator package, including hand-calculated pairwise, three-way and four-way controls plus a direct inclusion–exclusion reference implementation checked against the production transform. **None has been executed** in the current authoring environment.
 
 ## Local validation
 
