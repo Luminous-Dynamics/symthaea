@@ -1,0 +1,268 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "ALPOGE-RH-MAIN-INEQUALITY-MAP-V1",
+  "status": "source_inspected_composition_map_not_complete_reconstruction",
+  "source_identity": {
+    "repository": "leanprover-community/riemann-hypothesis",
+    "revision": "40e56bab026552e089d7afcfeff08d2defb9c005",
+    "revision_date": "2026-11-20T14:36:09Z",
+    "provenance": "Public mirror commit message says it mirrors the published Alpöge archive without changes; original proof source has no license identified here and is not copied into Symthaea.",
+    "cited_exposition": "https://www.math.uwaterloo.ca/~mrubinst/alpoge_claude_grh/zeta-paper.pdf"
+  },
+  "formal_scope": {
+    "target": "Main inequality (M) in the zeta-specialized human exposition; a central arithmetic input to the chain from theta lifts / divisibility / size to a one-sided smoothed prime-sum bound",
+    "final_effect": "Together with character estimates B and C, (M) yields a bound for G(x) on long intervals [Y,Y^(3/2)], which excludes zeros to the right of 1/2+epsilon.",
+    "not_a_claim": "This fixture does not reconstruct all of (M), prove its quoted inputs, or claim Symthaea independently verified RH."
+  },
+  "main_inequality": {
+    "paper_identity": "Part II, §4, equation (M), PDF page 32",
+    "statement_lhs": "(1/n) * sum_{u in H} sum_{t in T} sum_{j=1}^m (P_{u,t,j} - M_{u,t,j})",
+    "statement_rhs": "≤ E",
+    "normalized_error": "E/B ≤ x^(C ε) * (x/m + x m/k + m + k/n^2)",
+    "normalization": "B = |T| m b δ / 2, with b=exp(x^ε), δ=|T2|/n",
+    "parameter_orders_from_the_exposition": {
+      "m": "x^(1/2+O(ε))",
+      "k": "x^(9/2+O(ε))",
+      "n": "x^(2+O(ε))"
+    },
+    "conceptual_role": "The average arithmetic divisibility sum is bounded by a size-derived main term plus a controlled error. The four error contributions balance with m about sqrt(x), enabling the one-sided prime-sum estimate."
+  },
+  "quantities": [
+    {
+      "name": "P_{u,t,j}",
+      "meaning": "Smoothed weighted sum over odd prime powers, with coefficient (1 - χ_d(p^h)) log p and positive-part cutoff (a_t / p^h - w_{u,j}(v(p^h), t[p^h]))_+.",
+      "paper_equation": "(4.1)"
+    },
+    {
+      "name": "M_{u,t,j}",
+      "meaning": "Main term a_t (log a_t - 1 - γ + c_{χ_d} - average_cell(log w)).",
+      "paper_equation": "(4.2)"
+    },
+    {
+      "name": "E",
+      "meaning": "Aggregate error from comparison of integral divisibility against complex size; the source splits it into four scale terms after normalization.",
+      "paper_equations": [
+        "(II.15)",
+        "(II.16)"
+      ]
+    }
+  ],
+  "proof_bridge": [
+    {
+      "role": "prime-sum representation and main term",
+      "source_file": "src/Formalism/SizeWindowBrackets/FirstPrimeNeSecondPrime.lean",
+      "blob_sha": "18deb7cb85d6f650a69f01fda6e0c789b9f04d89",
+      "cited_pdf_reference": "[3]",
+      "source_lines": {
+        "ASK": [
+          84,
+          87
+        ],
+        "MAIN": [
+          89,
+          90
+        ],
+        "AskMainBalance": [
+          98,
+          101
+        ],
+        "AskExpansion": [
+          133,
+          139
+        ]
+      },
+      "declarations": [
+        "ASK",
+        "MAIN",
+        "AskMainBalance",
+        "AskExpansion"
+      ],
+      "observed_role": "Source inspection confirms these are the formal ASK and MAIN quantities and candidate identities that expand the smoothed prime sum / character expression. The paper lists weighted sums ASK and MAIN from [3] among the declarations used by the final proof.",
+      "extraction_status": "source-inspected; exact elaborated dependency edges still require local extraction or upstream edge lookup"
+    },
+    {
+      "role": "per-translate bound used by the final proof",
+      "source_file": "src/Formalism/SizeWindowBrackets/ChainSlopeWindows/LevelOfCongruence.lean",
+      "blob_sha": "e08edc360cdf8d5d95d82ef1b805a8ea1a6151ef",
+      "cited_pdf_reference": "[28]",
+      "source_lines": {
+        "each_unit_bound_statement": [
+          175,
+          197
+        ],
+        "weighted_mean_bound_statement": [
+          199,
+          235
+        ]
+      },
+      "declarations": [
+        "each_unit_bound_statement",
+        "weighted_mean_bound_statement"
+      ],
+      "observed_role": "The human exposition explicitly says the final theorem uses each_unit_bound_statement with hypotheses defined in [7]. It explicitly says the averaged MeanBoundSecondForm declaration in [7] is not the used statement. The Lean source signature proves a PointwiseBoundVariant per unit after consuming the listed hypotheses.",
+      "extraction_status": "source-inspected and explicitly identified as used by the exposition; edge closure still needs differential verification"
+    },
+    {
+      "role": "composition into a gap / error-bracket bound",
+      "source_file": "src/Development/AutomorphicArithmetic/DedekindLFunctions/LandauTheorems/ChTop.lean",
+      "blob_sha": "ce06a34a9e0b1b332e10d3b7efb04a06e9ab77f5",
+      "cited_pdf_reference": "[5]",
+      "source_lines": {
+        "ch_top_main_eq": [
+          11,
+          35
+        ],
+        "ch_top": [
+          37,
+          73
+        ]
+      },
+      "declarations": [
+        "Deduction.ch_top_main_eq",
+        "Deduction.ch_top"
+      ],
+      "observed_role": "Source inspection shows ch_top_main_eq rewrites the abstract Data.Main quantity as a sum over MAIN. ch_top then applies each_unit_bound_statement and combines size/error hypotheses to bound gapA. This is the strongest currently inspected bridge from the pointwise ASK−MAIN statement to the prime-sum estimate used in the RH argument.",
+      "extraction_status": "source-inspected; verify exact final-root closure using pinned kernel graph before promoting to formal-proof dependency"
+    },
+    {
+      "role": "hypothesis and averaged-bound definitions used as context",
+      "source_file": "src/Formalism/RankGapBounds/MeanBoundSecondForm.lean",
+      "blob_sha": "e4332fd8680d2b2f82e0a1e44a276453e03e2109",
+      "cited_pdf_reference": "[7]",
+      "source_lines": {
+        "MeanBoundSecondForm": [
+          187,
+          190
+        ]
+      },
+      "declarations": [
+        "MeanBoundSecondForm"
+      ],
+      "observed_role": "The exposition says hypotheses for each_unit_bound_statement are defined in [7], but the averaged MeanBoundSecondForm declaration itself is not used by the final theorem. Do not substitute it for the per-unit statement.",
+      "extraction_status": "source-inspected negative / nearby-formulation control"
+    },
+    {
+      "role": "theta-lift size / period arithmetic input",
+      "source_file": "src/Development/AutomorphicSpectrum/Proofs/GeometryProofs/ChowlaSelbergPeriodStatement.lean",
+      "blob_sha": "41529351e00c543d71d4b9406f0bd1e856772fee",
+      "cited_pdf_reference": "[16]",
+      "source_lines": {
+        "chowla_selberg_period": [
+          9,
+          11
+        ]
+      },
+      "declarations": [
+        "GlobalTheory.T.chowla_selberg_period"
+      ],
+      "observed_role": "The exposition names the Chowla–Selberg period statement among the formal inputs used by the final theorem. The theorem connects a CM curve period to the Euler-constant/log discriminant and L'/L expression.",
+      "extraction_status": "source-inspected; mathematical role still needs expert review"
+    },
+    {
+      "role": "height / lattice map estimates",
+      "source_file": "src/Formalism/HarderNarasimhan/StatementPl.lean",
+      "blob_sha": "0ef994d7e7998e4b46dfce96b8ccd24bebe4bda8",
+      "cited_pdf_reference": "[25]",
+      "source_lines": {
+        "htMap_definition": [
+          55,
+          62
+        ],
+        "SizeIneq": [
+          121,
+          132
+        ],
+        "SlopeIneqMean": [
+          148,
+          160
+        ]
+      },
+      "declarations": [
+        "htMap",
+        "SizeIneq",
+        "SlopeIneqMean"
+      ],
+      "observed_role": "The human exposition names the height of a map [25] among the final theorem's formal inputs. These declarations form a plausible source-level map for the lattice-height / slope component, but exact role matching must be reviewed before calling each declaration the central used statement.",
+      "extraction_status": "source-inspected candidate"
+    },
+    {
+      "role": "digit / valuation arithmetic",
+      "source_file": "src/Formalism/ThetaLogCoordinates/UniformThetaSubstitution/StatementAB.lean",
+      "blob_sha": "f29a92be06011e418e5d81a4b7e71b28a3440945",
+      "cited_pdf_reference": "[21]",
+      "source_lines": {
+        "StarArith": [
+          103,
+          114
+        ]
+      },
+      "declarations": [
+        "StarArith",
+        "FactorialLg",
+        "ChargeLemma",
+        "ExcessGainBound",
+        "BCore"
+      ],
+      "observed_role": "The exposition explicitly lists the digit inequality StarArith among the formal statements used. It belongs to the p-adic valuation / digit-loss accounting behind divisibility at inert primes.",
+      "extraction_status": "source-inspected candidate"
+    },
+    {
+      "role": "global arithmetic / trace / divisibility statement bundle",
+      "source_file": "src/Formalism/SharpRestriction/GlobalTheoremInputs.lean",
+      "blob_sha": "ba31f5120ed089d48968754ae577427912d467c5",
+      "cited_pdf_reference": "[19]",
+      "source_lines": {
+        "LinkS_at": [
+          145,
+          158
+        ],
+        "GlobalTheoremInputs": [
+          158,
+          162
+        ]
+      },
+      "declarations": [
+        "LinkS_at",
+        "LinkS",
+        "GlobalTheoremInputs",
+        "LinkGLOBAL",
+        "BesselId",
+        "LinkDIV"
+      ],
+      "observed_role": "The exposition names local comparisons, layer-cake, Bessel and related inputs from [19]. This file exposes several hypothesis bundles, but precise matching of each quoted item to a specific declaration requires targeted reviewer work.",
+      "extraction_status": "source-inspected candidate; not a complete declaration map"
+    }
+  ],
+  "explicit_non_used_or_ambiguous": [
+    {
+      "declaration": "MeanBoundSecondForm",
+      "file": "src/Formalism/RankGapBounds/MeanBoundSecondForm.lean",
+      "reason": "Human exposition says this averaged statement is not the statement used by the final proof; final proof uses each_unit_bound_statement in [28]."
+    },
+    {
+      "declaration": "GrowthBoundGivesRiemannHypothesis (as cited in [6])",
+      "file": "src/Formalism/SizeWindowBrackets/GrowthBoundGivesRiemannHypothesis.lean",
+      "reason": "The exposition says the cited form is a parallel/earlier formulation and is not among the declarations on which final theorem depends."
+    },
+    {
+      "declaration": "ChainInt / FrameLA / FrameLast / CountIdentity (specific cited forms)",
+      "reason": "The exposition identifies these cited forms as not among the final theorem's dependency closure; avoid accepting a source filename as proof that every statement in it is used."
+    }
+  ],
+  "remaining_obligations": [
+    "Locate and verify the exact Lean declarations for the integrality of theta kernels in height-two logarithm coordinates (hypothesis B) and the valuations built on it.",
+    "Map the exact quoted inner-product formula, local factors, covolumes and local index bounds used in the theta-lift size estimate.",
+    "Map the trace/rank/pairing statements that yield the dimension bound.",
+    "Map the Galois-cohomology bound and the denominator passage.",
+    "Verify exact dependency membership for each named declaration against the upstream kernel-export dependency graph, not merely against a source file or the human guide.",
+    "Reconstruct the assembly of maps and weights and the averaged M inequality, including the explicit constants/parameter constraints.",
+    "Obtain independent mathematical review of the role graph."
+  ],
+  "limitations": [
+    "The original Lean source mirror is an exact mirror of the published source but no license was established here; this Symthaea artifact stores only paths, declaration names, line spans, blob IDs and explanatory metadata, not source code.",
+    "This is a source-inspected map of the M proof bridge, not a full formal dependency closure or mathematical reconstruction.",
+    "The proof's main inequality is still not derived in Rubinstein's working guide; the guide explicitly quotes substantial inputs from Lean.",
+    "The Mathlib theorem extractor in #13295 has not been implemented or run.",
+    "No theorem or proof acceptance is claimed by Symthaea."
+  ]
+}
