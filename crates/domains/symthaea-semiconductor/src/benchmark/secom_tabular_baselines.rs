@@ -240,11 +240,16 @@ fn fit_model_v1(
         ));
     }
 
-    let training_indices: Vec<usize> = assignments
+    let mut training_indices: Vec<usize> = assignments
         .iter()
         .enumerate()
         .filter_map(|(index, assignment)| (assignment.split == "train").then_some(index))
         .collect();
+    // Canonical identity ordering makes floating-point accumulation independent
+    // of manifest row order while preserving feature/label/sample alignment.
+    training_indices.sort_by(|&left, &right| {
+        assignments[left].sample_id.cmp(&assignments[right].sample_id)
+    });
     if training_indices.is_empty() {
         return Err(SecomTabularBaselineError(
             "training split: expected non-empty rows".into(),
