@@ -650,6 +650,86 @@ mod tests {
         ));
     }
 
+    fn estimator_response(
+        direction_cosine: Option<f64>,
+    ) -> FactorialEstimatorResponseReport {
+        use crate::estimator_response::{
+            ConnectivityDirectionReport, EstimatorResponseSummary,
+        };
+        FactorialEstimatorResponseReport {
+            schema_version: "rcaf.factorial-estimator-response/0.1.0",
+            experiment_id: "adapter-fixture".into(),
+            signal_id: "target".into(),
+            nuisance_family_id: "transient".into(),
+            nuisance_instance_id: "instance-01".into(),
+            time_points: 64,
+            roi_count: 6,
+            connectivity_estimator: "pearson_sample_correlation_v1",
+            estimators: ESTIMATOR_IDS
+                .iter()
+                .enumerate()
+                .map(|(index, estimator_id)| EstimatorResponseSummary {
+                    estimator_id,
+                    clean_to_signal_similarity: 0.9,
+                    clean_to_nuisance_similarity: 0.8,
+                    signal_to_combined_similarity: 0.85,
+                    clean_to_combined_similarity: 0.75,
+                    clean_signal_distance: 0.1,
+                    nuisance_only_distance: 0.2 + index as f64 * 0.01,
+                    combined_signal_residual_distance: 0.15,
+                    nuisance_to_signal_distance_ratio: Some(2.0),
+                    signal_retention_fraction: Some(0.5),
+                })
+                .collect(),
+            connectivity_direction: ConnectivityDirectionReport {
+                signal_projection_gain: direction_cosine.map(|_| 0.8),
+                signal_directional_cosine: direction_cosine,
+                signal_change_residual_fraction: direction_cosine.map(|_| 0.4),
+                clean_signal_change_norm: 0.2,
+                combined_signal_change_norm: 0.18,
+            },
+        }
+    }
+
+    #[test]
+    fn estimator_response_adapter_uses_nuisance_and_combined_distances() {
+        let response = estimator_response(Some(0.9));
+        let null = null_observation_from_estimator_response("cal-001", &response).unwrap();
+        let evaluation =
+            evaluation_observation_from_estimator_response("eval-001", &response).unwrap();
+        assert_eq!(null.statistics, [0.2, 0.21, 0.22]);
+        assert_eq!(evaluation.null_statistics, [0.2, 0.21, 0.22]);
+        assert_eq!(evaluation.signal_statistics, [0.25, 0.25, 0.25]);
+        assert_eq!(evaluation.signal_directional_cosine, 0.9);
+    }
+
+    #[test]
+    fn estimator_response_adapter_rejects_undefined_signal_direction() {
+        assert!(matches!(
+            evaluation_observation_from_estimator_response(
+                "zero-signal",
+                &estimator_response(None)
+            ),
+            Err(HeldOutCalibrationError::UndefinedSignalDirection { .. })
+        ));
+    }
+
+    #[test]
+    fn estimator_response_adapter_rejects_missing_or_reordered_estimators() {
+        let mut response = estimator_response(Some(0.5));
+        response.estimators.swap(0, 1);
+        assert!(matches!(
+            null_observation_from_estimator_response("bad-order", &response),
+            Err(HeldOutCalibrationError::InvalidStatistic { .. })
+        ));
+        response.estimators.swap(0, 1);
+        response.estimators.pop();
+        assert!(matches!(
+            evaluation_observation_from_estimator_response("missing", &response),
+            Err(HeldOutCalibrationError::InvalidStatistic { .. })
+        ));
+    }
+
     #[test]
     fn invalid_statistics_directions_and_thresholds_fail_closed() {
         let mut calibration = calibration();
