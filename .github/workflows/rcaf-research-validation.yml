@@ -279,6 +279,36 @@ jobs:
           print("PASS: RCAF graph-smooth and heat-kernel spatial nuisance generators")
           PY
 
+      - name: Run event-triggered spatial motion-transient nuisance
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_motion_transient -- "$RUNNER_TEMP/rcaf-motion-transient.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/motion-transient.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-motion-transient.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["source_status"] == "synthetic_fixture"
+          assert report["geometry"]["interpretation_scope"] == "synthetic_topology_only"
+          assert len(report["geometry"]["roi_labels"]) == 8
+          assert len(report["geometry"]["weighted_edges"]) == 7
+          assert report["event_train_rule"] == "amplitude_exp_negative_elapsed_over_decay_samples"
+          assert len(report["broad_events"]) == 2
+          assert len(report["localized_events"]) == 2
+          assert len(report["localized_spatial_loadings"]) == 2
+          for event, loadings in zip(report["localized_events"], report["localized_spatial_loadings"]):
+              assert loadings[event["seed_roi_index"]] == 1.0
+              assert 0 <= event["onset"] < report["time_points"]
+              assert event["decay_samples"] > 0.0
+          assert report["realized_field_rms"] > 0.0
+          assert report["realized_field_max_abs"] >= report["realized_field_rms"]
+          print("PASS: event-triggered broad and localized spatial transient nuisance")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -290,7 +320,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
               "$RUNNER_TEMP/rcaf-estimator-dose-surface.json" \
               "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json" \
-              "$RUNNER_TEMP/rcaf-spatial-nuisance.json"
+              "$RUNNER_TEMP/rcaf-spatial-nuisance.json" \
+              "$RUNNER_TEMP/rcaf-motion-transient.json"
           python - <<'PY'
           import json
           import os
@@ -305,7 +336,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 6
+          assert len(receipt["simulation_reports"]) == 7
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -321,6 +352,7 @@ jobs:
             ${{ runner.temp }}/rcaf-estimator-dose-surface.json
             ${{ runner.temp }}/rcaf-common-mode-nuisance-sweep.json
             ${{ runner.temp }}/rcaf-spatial-nuisance.json
+            ${{ runner.temp }}/rcaf-motion-transient.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
