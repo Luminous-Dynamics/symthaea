@@ -58,29 +58,10 @@
           "uniqueItems": true
         },
         "lifecycle_status_as_known": {
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["status"],
-              "properties": {"status": {"const": "active"}}
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["status"],
-              "properties": {"status": {"const": "retracted"}}
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["status", "successor_event_id"],
-              "properties": {
-                "status": {"const": "superseded"},
-                "successor_event_id": {"$ref": "#/$defs/event_id"}
-              }
-            }
-          ]
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {"status": {"const": "active"}}
         }
       },
       "allOf": [
