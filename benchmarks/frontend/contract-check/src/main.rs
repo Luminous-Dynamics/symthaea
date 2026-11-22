@@ -738,7 +738,7 @@ mod tests {
 
         let (regions, journeys) = validate_contract(&schema, &contract, source)
             .expect("checked-in contract validates against its schema and source anchors");
-        assert_eq!(regions, 16);
+        assert_eq!(regions, 17);
         assert_eq!(journeys, 6);
     }
 
