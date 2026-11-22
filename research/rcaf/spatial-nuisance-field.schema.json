@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/spatial-nuisance-field.schema.json",
+  "title": "RCAF spatial nuisance field smoke report",
+  "description": "Synthetic generator smoke report only; not a biological qualification result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "geometry",
+    "time_points",
+    "families",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.spatial-nuisance-field/0.1.0"
+    },
+    "source_status": {
+      "const": "synthetic_fixture"
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation",
+        "source",
+        "interpretation_scope",
+        "roi_count",
+        "edge_count"
+      ],
+      "properties": {
+        "representation": {
+          "const": "weighted_undirected_graph"
+        },
+        "source": {
+          "const": "synthetic_path_graph"
+        },
+        "interpretation_scope": {
+          "const": "synthetic_topology_only"
+        },
+        "roi_count": {
+          "const": 8
+        },
+        "edge_count": {
+          "const": 7
+        }
+      }
+    },
+    "time_points": {
+      "const": 160
+    },
+    "families": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "spatial_rank",
+          "dose",
+          "temporal_ar1",
+          "temporal_coherence",
+          "realized_field_rms",
+          "realized_temporal_ar1"
+        ],
+        "properties": {
+          "family_id": {
+            "enum": [
+              "graph_smooth_low_rank",
+              "heat_kernel_localized"
+            ]
+          },
+          "spatial_rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dose": {
+            "type": "number",
+            "minimum": 0
+          },
+          "temporal_ar1": {
+            "type": "number",
+            "exclusiveMinimum": -1,
+            "exclusiveMaximum": 1
+          },
+          "temporal_coherence": {
+            "const": 0
+          },
+          "realized_field_rms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "realized_temporal_ar1": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
