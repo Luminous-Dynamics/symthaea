@@ -900,8 +900,8 @@ mod tests {
             let spatial = 1.0 + 0.01 * (TAU * config.x(ix) / config.domain_length).cos();
             for iv in 0..config.nv {
                 let phase = TAU * iv as f64 / config.nv as f64;
-                initial[ix * config.nv + iv] = spatial
-                    * (1.0 + 0.05 * (8.0 * phase).cos() + 0.1 * (112.0 * phase).cos());
+                initial[ix * config.nv + iv] =
+                    spatial * (1.0 + 0.05 * (8.0 * phase).cos() + 0.1 * (112.0 * phase).cos());
             }
         }
         assert!(initial.iter().all(|value| *value > 0.8));
