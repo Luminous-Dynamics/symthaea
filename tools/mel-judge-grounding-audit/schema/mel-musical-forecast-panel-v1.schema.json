@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-musical-forecast-panel-v1.schema.json",
+  "title": "MEL Musical Forecast Panel v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "case_id",
+    "clock_domain_id",
+    "input_history_sha256",
+    "policy",
+    "forecasts",
+    "displays",
+    "dispositions",
+    "realizations",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-forecast-panel-v1"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_history_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "forecasts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/forecast"
+      }
+    },
+    "displays": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/display"
+      }
+    },
+    "dispositions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/disposition"
+      }
+    },
+    "realizations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/realization"
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_onset_error_beats",
+        "minimum_anticipation_lead_ns"
+      ],
+      "properties": {
+        "maximum_onset_error_beats": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_anticipation_lead_ns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "predictedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forecast_event_id",
+        "role",
+        "beat_index",
+        "expected_onset_ns",
+        "local_beat_period_ns",
+        "presence_probability"
+      ],
+      "properties": {
+        "forecast_event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beat_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_onset_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "local_beat_period_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "presence_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "forecast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forecast_id",
+        "commitment_series_id",
+        "revision",
+        "supersedes_forecast_id",
+        "committed_at_ns",
+        "target_start_ns",
+        "target_end_ns",
+        "expires_at_ns",
+        "input_history_sha256",
+        "policy_sha256",
+        "events"
+      ],
+      "properties": {
+        "forecast_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commitment_series_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "supersedes_forecast_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "committed_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_start_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_end_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expires_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_history_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/predictedEvent"
+          }
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forecast_id",
+        "delivered_at_ns",
+        "displayed_at_ns",
+        "display_receipt_sha256"
+      ],
+      "properties": {
+        "forecast_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delivered_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "displayed_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "display_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forecast_id",
+        "action",
+        "acted_at_ns",
+        "actor_scope",
+        "action_receipt_sha256"
+      ],
+      "properties": {
+        "forecast_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "enum": [
+            "accept",
+            "steer",
+            "veto",
+            "branch",
+            "ignore",
+            "abstain"
+          ]
+        },
+        "acted_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actor_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "realizedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "forecast_event_id",
+        "role",
+        "beat_index",
+        "onset_ns"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "forecast_event_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beat_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "onset_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "realization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "realization_id",
+        "forecast_id",
+        "started_at_ns",
+        "completed_at_ns",
+        "artifact_sha256",
+        "events"
+      ],
+      "properties": {
+        "realization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "forecast_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "started_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/realizedEvent"
+          }
+        }
+      }
+    }
+  }
+}
