@@ -17,10 +17,11 @@ use std::time::Instant;
 use symthaea_canvas::{
     JunctionKind, JunctionLengthUnit, MAX_FAILURE_TOTAL_DEMAND_WEIGHT,
     MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MYCELIAL_MODEL_VERSION, MycelialDemandPair,
-    MycelialFailureAttackConfig, MycelialFailureAttackStrategy, MycelialHyphaSegment,
-    MycelialJunction, MycelialJunctionHyphaGraph, PARAMETER_SCALE, SpatialPoint3,
-    build_mycelial_failure_attack_plan, build_single_failure_resilience_profile,
-    evaluate_mycelial_failure_attack_plan,
+    MycelialFailureAttackConfig, MycelialFailureAttackStrategy,
+    MycelialFailureDeliveryConfig, MycelialHyphaSegment, MycelialJunction,
+    MycelialJunctionHyphaGraph, PARAMETER_SCALE, SpatialPoint3,
+    build_mycelial_failure_attack_plan, build_mycelial_failure_delivery_profile,
+    build_single_failure_resilience_profile, evaluate_mycelial_failure_attack_plan,
 };
 
 const DEFAULT_SAMPLES: usize = 100;
@@ -168,6 +169,54 @@ fn run_attack_family(
     Ok(())
 }
 
+fn run_attack_delivery_uncertainty(
+    graph: &MycelialJunctionHyphaGraph,
+    demands: &[MycelialDemandPair],
+) -> Result<(), Box<dyn Error>> {
+    let plan = build_mycelial_failure_attack_plan(
+        graph,
+        demands,
+        MycelialFailureAttackConfig {
+            strategy: MycelialFailureAttackStrategy::DemandPathLoadSegments,
+            seed: 0xacc0_0015,
+            maximum_failure_budget: 2,
+            spatial_seed_junction_id: None,
+        },
+    )?;
+    println!("attack_delivery_uncertainty: simulated-not-empirical");
+    for probability in [0, 250_000, 500_000, 750_000, 1_000_000] {
+        let profile = build_mycelial_failure_delivery_profile(
+            graph,
+            demands,
+            &plan,
+            MycelialFailureDeliveryConfig {
+                trials_per_scenario: 128,
+                removal_success_probability_micros: probability,
+                seed: 0xfeed_2026,
+            },
+        )?;
+        println!(
+            "delivery_probability_micros:{} profile_digest:{}",
+            probability,
+            profile.canonical_digest_hex()?
+        );
+        for summary in &profile.scenarios {
+            println!(
+                "delivery_scenario:{} attempts={} trials={} mean_realized_failures={:.3} probability_any_failure={:.3} reachability_mean={:?} reachability_p05={:?} reachability_p95={:?}",
+                summary.scenario_id,
+                summary.attempted_entity_count,
+                summary.trial_count,
+                summary.mean_realized_failure_count,
+                summary.probability_at_least_one_failure,
+                summary.mean_weighted_reachability,
+                summary.weighted_reachability_p05,
+                summary.weighted_reachability_p95
+            );
+        }
+    }
+    Ok(())
+}
+
 fn percentile(sorted: &[u128], percentage: usize) -> u128 {
     sorted[((sorted.len() - 1) * percentage) / 100]
 }
@@ -307,6 +356,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         0,
         Some("A"),
     )?;
+    run_attack_delivery_uncertainty(&graph, &demands)?;
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
     println!(
