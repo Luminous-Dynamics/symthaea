@@ -553,8 +553,13 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             let brier = (predicted.presence_probability - observed_probability).powi(2);
             brier_sum += brier;
             brier_count += 1;
-            let within =
-                phase_error.map(|value| value.abs() <= panel.policy.maximum_onset_error_beats);
+            let worst_case_phase_error = signed_error_ns.map(|signed| {
+                (signed.unsigned_abs() as f64
+                    + panel.time_alignment_max_uncertainty_ns as f64)
+                    / predicted.local_beat_period_ns as f64
+            });
+            let within = worst_case_phase_error
+                .map(|value| value <= panel.policy.maximum_onset_error_beats);
             event_findings.push(EventForecastFinding {
                 forecast_id: forecast.forecast_id.clone(),
                 forecast_event_id: predicted.forecast_event_id.clone(),
@@ -568,12 +573,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 observed_onset_ns,
                 signed_onset_error_ns: signed_error_ns,
                 absolute_onset_error_beats: phase_error.map(f64::abs),
-                worst_case_absolute_onset_error_beats: realized.map(|_| {
-                    let signed_error_ns = signed_error_ns.expect("matched event has signed error");
-                    (signed_error_ns.unsigned_abs() as f64
-                        + panel.time_alignment_max_uncertainty_ns as f64)
-                        / predicted.local_beat_period_ns as f64
-                }),
+                worst_case_absolute_onset_error_beats: worst_case_phase_error,
                 within_onset_tolerance: within,
                 presence_probability: predicted.presence_probability,
                 presence_observed,
