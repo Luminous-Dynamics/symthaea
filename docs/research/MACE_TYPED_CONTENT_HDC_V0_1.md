@@ -148,7 +148,7 @@ An invalid or unresolved ID must fail closed. Similarity cannot override a MACE 
 
 ## 7. Authored metamorphic tests
 
-The module now contains nine authored tests for:
+The module now contains ten authored tests for:
 - ranking invariance under event-ID permutation when content is preserved;
 - ranking changes when utility content changes but event IDs remain fixed;
 - changed ranking when the target action/scope query changes;
