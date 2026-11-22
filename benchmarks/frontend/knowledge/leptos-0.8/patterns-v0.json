@@ -237,18 +237,18 @@
       "code": "// App root\nlet muse = MuseState::new();\nprovide_context(muse);\n\n// Descendant route\nlet muse = use_context::<MuseState>()\n    .expect(\"MuseState provided by App\");",
       "source": {
         "path": "crates/domains/symthaea-muse-ui/src/app.rs",
-        "blob_sha": "71722f9f51ce9cf5bb74196819b333187a5587d6"
+        "blob_sha": "71722f9f51ce9cf5bb74196819b333187a5587d6",
+        "related_sources": [
+          {
+            "path": "crates/domains/symthaea-muse-ui/src/create_page.rs",
+            "blob_sha": "f6a6129eb63b5338e2782b2a175621869b16c826"
+          },
+          {
+            "path": "crates/domains/symthaea-muse-ui/src/state.rs",
+            "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
+          }
+        ]
       },
-      "related_sources": [
-        {
-          "path": "crates/domains/symthaea-muse-ui/src/create_page.rs",
-          "blob_sha": "f6a6129eb63b5338e2782b2a175621869b16c826"
-        },
-        {
-          "path": "crates/domains/symthaea-muse-ui/src/state.rs",
-          "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
-        }
-      ],
       "evidence_status": "source_observed_reference_checked",
       "use_when": [
         "Several route components need the same cohesive state object.",
@@ -321,14 +321,14 @@
       "code": "impl PlaybackState {\n    pub fn reduce(&mut self, event: PlaybackEvent) -> Vec<PlaybackEffect> {\n        match event {\n            PlaybackEvent::LoadRequested { source, autoplay } => {\n                self.load_epoch = self.load_epoch.wrapping_add(1).max(1);\n                self.phase = PlaybackPhase::Loading;\n                self.position_seconds = 0.0;\n                self.autoplay_pending = autoplay;\n                self.error = None;\n                let effect = PlaybackEffect::Load {\n                    load_epoch: self.load_epoch,\n                    audio_url: source.audio_url.clone(),\n                };\n                self.source = Some(source);\n                vec![effect]\n            }\n            // Other typed events update state and emit effects.\n        }\n    }\n}",
       "source": {
         "path": "crates/domains/symthaea-muse-ui/src/playback.rs",
-        "blob_sha": "1575397781dc99198296177a132ed601f322b69d"
+        "blob_sha": "1575397781dc99198296177a132ed601f322b69d",
+        "related_sources": [
+          {
+            "path": "crates/domains/symthaea-muse-ui/src/state.rs",
+            "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
+          }
+        ]
       },
-      "related_sources": [
-        {
-          "path": "crates/domains/symthaea-muse-ui/src/state.rs",
-          "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
-        }
-      ],
       "evidence_status": "source_observed_reference_checked",
       "use_when": [
         "A complex widget has transitions that can be tested without a DOM.",
@@ -353,14 +353,14 @@
       "code": "view! {\n    <Router>\n        <div class=\"app-shell\">\n            <GlobalHeader />\n            // This element remains mounted across route switches.\n            <audio node_ref=muse.audio_ref></audio>\n            <Routes fallback=|| view! { <p>\"Page not found\"</p> }>\n                <Route path=path!(\"/\") view=ListenPage />\n                <Route path=path!(\"/create\") view=CreatePage />\n                <Route path=path!(\"/research\") view=ResearchPage />\n            </Routes>\n            <PlayerBar muse=muse />\n        </div>\n    </Router>\n}",
       "source": {
         "path": "crates/domains/symthaea-muse-ui/src/app.rs",
-        "blob_sha": "71722f9f51ce9cf5bb74196819b333187a5587d6"
+        "blob_sha": "71722f9f51ce9cf5bb74196819b333187a5587d6",
+        "related_sources": [
+          {
+            "path": "crates/domains/symthaea-muse-ui/src/state.rs",
+            "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
+          }
+        ]
       },
-      "related_sources": [
-        {
-          "path": "crates/domains/symthaea-muse-ui/src/state.rs",
-          "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
-        }
-      ],
       "evidence_status": "source_observed_not_compiled",
       "use_when": [
         "Audio/video/media contexts must persist across pages.",
@@ -384,18 +384,18 @@
       "code": "on:timeupdate=move |_| {\n    if let Some(audio) = muse.audio_ref.get_untracked() {\n        let audio: HtmlAudioElement = audio.into();\n        let load_epoch = muse.playback.get_untracked().load_epoch;\n        muse.dispatch(PlaybackEvent::TimeAdvanced {\n            load_epoch,\n            seconds: audio.current_time(),\n        });\n    }\n}",
       "source": {
         "path": "crates/domains/symthaea-muse-ui/src/app.rs",
-        "blob_sha": "71722f9f51ce9cf5bb74196819b333187a5587d6"
+        "blob_sha": "71722f9f51ce9cf5bb74196819b333187a5587d6",
+        "related_sources": [
+          {
+            "path": "crates/domains/symthaea-muse-ui/src/state.rs",
+            "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
+          },
+          {
+            "path": "crates/domains/symthaea-muse-ui/src/playback.rs",
+            "blob_sha": "1575397781dc99198296177a132ed601f322b69d"
+          }
+        ]
       },
-      "related_sources": [
-        {
-          "path": "crates/domains/symthaea-muse-ui/src/state.rs",
-          "blob_sha": "a5ea408e1854282ba9708cc15b6c7cb03086061d"
-        },
-        {
-          "path": "crates/domains/symthaea-muse-ui/src/playback.rs",
-          "blob_sha": "1575397781dc99198296177a132ed601f322b69d"
-        }
-      ],
       "evidence_status": "source_observed_reference_checked",
       "use_when": [
         "A browser API emits delayed or out-of-order events.",
