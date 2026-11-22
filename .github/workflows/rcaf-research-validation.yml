@@ -64,6 +64,7 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import math
           from pathlib import Path
           import jsonschema
 
@@ -446,8 +447,14 @@ jobs:
                   direction = point["connectivity_direction"]
                   assert direction["clean_signal_change_norm"] >= 0.0
                   assert direction["combined_signal_change_norm"] >= 0.0
+                  assert direction["signal_directional_cosine"] is None or -1.0 <= direction["signal_directional_cosine"] <= 1.0
+                  assert direction["signal_change_residual_fraction"] is None or direction["signal_change_residual_fraction"] >= 0.0
+                  for item in point["estimators"]:
+                      assert item["signal_retention_fraction"] is None or math.isfinite(item["signal_retention_fraction"])
+                      assert item["nuisance_to_signal_distance_ratio"] is None or math.isfinite(item["nuisance_to_signal_distance_ratio"])
                   if signal_scale == 0.0:
                       assert all(item["signal_retention_fraction"] is None for item in point["estimators"])
+                      assert all(item["nuisance_to_signal_distance_ratio"] is None for item in point["estimators"])
                       assert direction["signal_projection_gain"] is None
                       assert direction["signal_directional_cosine"] is None
               assert all(
@@ -470,7 +477,7 @@ jobs:
           for point in zero_signal:
               assert point["cells"][0]["fnv1a64_fingerprint"] == point["cells"][1]["fnv1a64_fingerprint"]
               assert point["cells"][2]["fnv1a64_fingerprint"] == point["cells"][3]["fnv1a64_fingerprint"]
-          print("PASS: 4 x 4 common-random-numbers signal × nuisance dose-response surface")
+          print("PASS: 4 x 4 common-random-numbers dose-response with three RCAF estimators and connectivity-direction diagnostics")
           PY
 
       - name: Build content-addressed simulation execution receipt
