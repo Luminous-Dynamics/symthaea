@@ -132,10 +132,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("observed_duration_ns: {}", profile.observed_duration_ns);
     println!("complete_duration_ns: {}", profile.complete_duration_ns);
     println!("partial_duration_ns: {}", profile.partial_duration_ns);
-    println!("edge_observations: {}", profile.edge_evidence_counts.total_edge_observations);
-    println!("synthetic_edge_observations: {}", profile.edge_evidence_counts.synthetic_fixture_observations);
+    println!(
+        "edge_observations: {}",
+        profile.edge_evidence_counts.total_edge_observations
+    );
+    println!(
+        "synthetic_edge_observations: {}",
+        profile.edge_evidence_counts.synthetic_fixture_observations
+    );
     println!("distinct_cycles: {}", profile.cycles.len());
-    println!("persistent_cycle_hyperedges: {}", profile.persistent_cycle_hyperedges.len());
+    println!(
+        "persistent_cycle_hyperedges: {}",
+        profile.persistent_cycle_hyperedges.len()
+    );
     for node in &profile.node_metrics {
         println!(
             "node:{} tcn_duration_ns={} tcr={:?} degree_exposure_ns={} exposure_complete={}",
@@ -149,10 +158,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("profile_digest: {}", profile.canonical_digest_hex()?);
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
-    println!("profile_build_time_ns_p50: {}", percentile(&durations_ns, 50));
-    println!("profile_build_time_ns_p95: {}", percentile(&durations_ns, 95));
+    println!(
+        "profile_build_time_ns_p50: {}",
+        percentile(&durations_ns, 50)
+    );
+    println!(
+        "profile_build_time_ns_p95: {}",
+        percentile(&durations_ns, 95)
+    );
     println!("platform_os: {}", std::env::consts::OS);
     println!("platform_arch: {}", std::env::consts::ARCH);
-    println!("claim_boundary: synthetic recurrence contract only; not empirical biology, transport or resilience");
+    println!(
+        "claim_boundary: synthetic recurrence contract only; not empirical biology, transport or resilience"
+    );
     Ok(())
 }
