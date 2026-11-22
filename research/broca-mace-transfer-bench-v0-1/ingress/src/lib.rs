@@ -971,6 +971,191 @@ impl ConsolidationEvidencePackV1 {
     pub fn unknown_trust_event_count(&self) -> usize {
         self.unknown_trust_event_count
     }
+
+    /// Export a deterministic, receipt-preserving dependency sidecar.
+    /// Unknown dependency ancestry remains explicitly Unknown; this method
+    /// never infers edges from event order, source names, or shared artifacts.
+    pub fn dependency_sidecar(&self) -> EvidenceDependencySidecarV1 {
+        let records: Vec<EvidenceDependencyRecordV1> = self
+            .events
+            .iter()
+            .map(|event| {
+                let receipt = &event.receipts;
+                EvidenceDependencyRecordV1 {
+                    event_id: event.event_id,
+                    source_family: receipt.source_family,
+                    source_root_digest: receipt.source_root_digest,
+                    upstream_source_id: receipt.upstream_source_id.clone(),
+                    source_artifact_digest: receipt.source_artifact_digest.clone(),
+                    transformation_digest: receipt.transformation_digest.clone(),
+                    lineage_receipt_digest: receipt.lineage_digest.clone(),
+                    raw_event_receipt_digest: receipt.raw_event_receipt_digest.clone(),
+                    dependency_manifest_digest: receipt.dependency_manifest_digest.clone(),
+                    dependency_lineage_status: receipt.dependency_lineage_status,
+                    derived_from_event_ids: receipt.derived_from_event_ids.clone(),
+                    lifecycle_status_as_known: receipt.lifecycle_status_as_known,
+                }
+            })
+            .collect();
+        EvidenceDependencySidecarV1::new(self.as_known, records)
+    }
+}
+
+/// One event's dependency identity, projected only from an ingress-verified
+/// EvidenceReceiptBundle. It is not a general evidence graph node.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceDependencyRecordV1 {
+    pub event_id: u32,
+    pub source_family: u16,
+    pub source_root_digest: SourceRootDigest,
+    pub upstream_source_id: String,
+    pub source_artifact_digest: String,
+    pub transformation_digest: String,
+    pub lineage_receipt_digest: String,
+    pub raw_event_receipt_digest: String,
+    pub dependency_manifest_digest: Option<String>,
+    pub dependency_lineage_status: DependencyLineageStatusV1,
+    /// Canonical upstream event IDs attested by the verified lineage receipt.
+    pub derived_from_event_ids: Vec<u32>,
+    /// Lifecycle assertion verified at this exact as-known snapshot.
+    pub lifecycle_status_as_known: SourceLifecycleStatus,
+}
+
+/// Immutable, deterministic sidecar for a single bitemporal knowledge
+/// snapshot. The digest binds event lineage and explicit unknown states.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceDependencySidecarV1 {
+    as_known: AsKnownQuery,
+    records: Vec<EvidenceDependencyRecordV1>,
+    canonical_digest: String,
+}
+
+impl EvidenceDependencySidecarV1 {
+    fn new(
+        as_known: AsKnownQuery,
+        mut records: Vec<EvidenceDependencyRecordV1>,
+    ) -> Self {
+        records.sort_by_key(|record| record.event_id);
+        let canonical_digest = Self::digest_records(as_known, &records);
+        Self {
+            as_known,
+            records,
+            canonical_digest,
+        }
+    }
+
+    fn put_bytes(hasher: &mut Sha256, value: &[u8]) {
+        hasher.update((value.len() as u64).to_be_bytes());
+        hasher.update(value);
+    }
+
+    fn digest_records(
+        as_known: AsKnownQuery,
+        records: &[EvidenceDependencyRecordV1],
+    ) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"luminous:mace:evidence-dependency-sidecar:v1\0");
+        hasher.update(as_known.valid_at_ms.to_be_bytes());
+        hasher.update(as_known.known_at_ms.to_be_bytes());
+        hasher.update((records.len() as u64).to_be_bytes());
+        for record in records {
+            hasher.update(record.event_id.to_be_bytes());
+            hasher.update(record.source_family.to_be_bytes());
+            hasher.update(record.source_root_digest.as_bytes());
+            Self::put_bytes(&mut hasher, record.upstream_source_id.as_bytes());
+            Self::put_bytes(&mut hasher, record.source_artifact_digest.as_bytes());
+            Self::put_bytes(&mut hasher, record.transformation_digest.as_bytes());
+            Self::put_bytes(&mut hasher, record.lineage_receipt_digest.as_bytes());
+            Self::put_bytes(&mut hasher, record.raw_event_receipt_digest.as_bytes());
+            match record.dependency_lineage_status {
+                DependencyLineageStatusV1::Complete => hasher.update([1]),
+                DependencyLineageStatusV1::Partial => hasher.update([2]),
+                DependencyLineageStatusV1::Unknown => hasher.update([0]),
+            }
+            match &record.dependency_manifest_digest {
+                Some(digest) => {
+                    hasher.update([1]);
+                    Self::put_bytes(&mut hasher, digest.as_bytes());
+                }
+                None => hasher.update([0]),
+            }
+            hasher.update((record.derived_from_event_ids.len() as u64).to_be_bytes());
+            for dependency in &record.derived_from_event_ids {
+                hasher.update(dependency.to_be_bytes());
+            }
+            match record.lifecycle_status_as_known {
+                SourceLifecycleStatus::Active => hasher.update([1]),
+                SourceLifecycleStatus::Retracted => hasher.update([2]),
+                SourceLifecycleStatus::Superseded { successor_event_id } => {
+                    hasher.update([3]);
+                    hasher.update(successor_event_id.to_be_bytes());
+                }
+            }
+        }
+        hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    pub fn as_known(&self) -> AsKnownQuery {
+        self.as_known
+    }
+
+    pub fn records(&self) -> &[EvidenceDependencyRecordV1] {
+        &self.records
+    }
+
+    pub fn canonical_digest(&self) -> &str {
+        &self.canonical_digest
+    }
+
+    /// Recheck ordering, event/dependency identity and the sidecar commitment.
+    pub fn verify_integrity(&self) -> bool {
+        let mut prior_event_id = None;
+        for record in &self.records {
+            if record.event_id == 0
+                || prior_event_id.is_some_and(|prior| prior >= record.event_id)
+                || record.source_family == 0
+                || !record.source_root_digest.is_known()
+                || record.upstream_source_id.is_empty()
+                || !is_sha256_hex(&record.source_artifact_digest)
+                || !is_sha256_hex(&record.transformation_digest)
+                || !is_sha256_hex(&record.lineage_receipt_digest)
+                || !is_sha256_hex(&record.raw_event_receipt_digest)
+            {
+                return false;
+            }
+            let mut sorted = record.derived_from_event_ids.clone();
+            sorted.sort_unstable();
+            sorted.dedup();
+            if sorted != record.derived_from_event_ids
+                || sorted.iter().any(|id| *id == 0 || *id == record.event_id)
+            {
+                return false;
+            }
+            match record.dependency_lineage_status {
+                DependencyLineageStatusV1::Complete | DependencyLineageStatusV1::Partial => {
+                    if !record
+                        .dependency_manifest_digest
+                        .as_deref()
+                        .is_some_and(is_sha256_hex)
+                    {
+                        return false;
+                    }
+                }
+                DependencyLineageStatusV1::Unknown => {
+                    if !record.derived_from_event_ids.is_empty()
+                        || record.dependency_manifest_digest.is_some()
+                    {
+                        return false;
+                    }
+                }
+            }
+            if record.lifecycle_status_as_known != SourceLifecycleStatus::Active {
+                return false;
+            }
+            prior_event_id = Some(record.event_id);
+        }
+        Self::digest_records(self.as_known, &self.records) == self.canonical_digest
+    }
 }
 
 /// Decision-neutral support for one action in one scope. Counts are
@@ -1254,6 +1439,9 @@ mod tests {
         vary_root_digest_by_event: bool,
         vary_upstream_source_by_event: bool,
         unknown_root_digest: bool,
+        dependency_event_ids: Vec<u32>,
+        dependency_lineage_status: DependencyLineageStatusV1,
+        dependency_manifest_digest: Option<String>,
         lifecycle_event_id: Option<u32>,
     }
 
@@ -1293,6 +1481,9 @@ mod tests {
                 vary_root_digest_by_event: false,
                 vary_upstream_source_by_event: false,
                 unknown_root_digest: false,
+                dependency_event_ids: Vec::new(),
+                dependency_lineage_status: DependencyLineageStatusV1::Unknown,
+                dependency_manifest_digest: None,
                 lifecycle_event_id: None,
             }
         }
