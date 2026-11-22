@@ -13,12 +13,18 @@ const FUTURE_HORIZON: f64 = 5.2;
 const REQUESTED_EPSILON: f64 = 1.0e-3;
 const POSITIVITY_FLOOR: f64 = 1.0e-12;
 const VELOCITY_MODES: [usize; 8] = [4, 8, 16, 32, 48, 64, 80, 112];
+const VELOCITY_PHASES: [f64; 2] = [0.0, std::f64::consts::FRAC_PI_2];
+
+type ComplexTraceSample = (f64, f64, f64);
+type ComplexTrace = Vec<ComplexTraceSample>;
+type SensitivityTracePair = (ComplexTrace, ComplexTrace);
 
 #[derive(Debug, Clone, Copy)]
 struct ResponsePeak {
     time: f64,
     magnitude: f64,
     phase: f64,
+    fwhm: f64,
 }
 
 fn config() -> VlasovPoissonConfig {
@@ -80,17 +86,23 @@ fn solve_three_by_three(gram: [[f64; 3]; 3], rhs: [f64; 3]) -> Result<[f64; 3], 
     Ok(solution)
 }
 
-/// Build a perturbation with zero per-row mass, momentum and second moment.
+/// Build a real perturbation in the per-x nullspace of [1,v,v^2].
 fn moment_neutral_direction(
     base: &[f64],
     config: VlasovPoissonConfig,
     spatial_mode: usize,
     velocity_mode: usize,
-) -> Result<(Vec<f64>, f64, f64), Box<dyn Error>> {
+    velocity_phase: f64,
+) -> Result<(Vec<f64>, f64), Box<dyn Error>> {
+    let velocity_scale = config
+        .velocity_min
+        .abs()
+        .max(config.velocity_max.abs())
+        .max(1.0);
     let mut gram = [[0.0; 3]; 3];
     for iv in 0..config.nv {
-        let velocity = config.velocity(iv);
-        let basis = [1.0, velocity, velocity * velocity];
+        let u = config.velocity(iv) / velocity_scale;
+        let basis = [1.0, u, u * u];
         for row in 0..3 {
             for column in 0..3 {
                 gram[row][column] += config.dv() * basis[row] * basis[column];
@@ -99,79 +111,148 @@ fn moment_neutral_direction(
     }
 
     let mut direction = vec![0.0; base.len()];
-    let mut maximum_moment_residual = 0.0_f64;
+    let mut maximum_relative_moment_residual = 0.0_f64;
     let spatial_wave_number = TAU * spatial_mode as f64 / config.domain_length;
     let velocity_length = config.velocity_max - config.velocity_min;
 
     for ix in 0..config.nx {
         let start = ix * config.nv;
-        let end = start + config.nv;
-        let mut raw = vec![0.0; config.nv];
         let x_factor = (spatial_wave_number * config.x(ix)).cos();
+        let mut raw = vec![0.0; config.nv];
         let mut moments = [0.0; 3];
 
         for iv in 0..config.nv {
             let velocity = config.velocity(iv);
+            let u = velocity / velocity_scale;
             let angle = TAU * (velocity - config.velocity_min) / velocity_length;
-            let value = base[start + iv] * x_factor * (velocity_mode as f64 * angle).cos();
+            let value = base[start + iv]
+                * x_factor
+                * (velocity_mode as f64 * angle + velocity_phase).cos();
             raw[iv] = value;
             let weighted = value * config.dv();
             moments[0] += weighted;
-            moments[1] = velocity.mul_add(weighted, moments[1]);
-            moments[2] = (velocity * velocity).mul_add(weighted, moments[2]);
+            moments[1] = u.mul_add(weighted, moments[1]);
+            moments[2] = (u * u).mul_add(weighted, moments[2]);
         }
 
         let coefficients = solve_three_by_three(gram, moments)?;
         for iv in 0..config.nv {
-            let velocity = config.velocity(iv);
-            let polynomial = coefficients[0]
-                + coefficients[1] * velocity
-                + coefficients[2] * velocity * velocity;
+            let u = config.velocity(iv) / velocity_scale;
+            let polynomial = coefficients[0] + coefficients[1] * u + coefficients[2] * u * u;
             direction[start + iv] = raw[iv] - polynomial;
         }
 
         let mut residual = [0.0; 3];
+        let mut scales = [0.0; 3];
         for iv in 0..config.nv {
-            let velocity = config.velocity(iv);
-            let weighted = direction[start + iv] * config.dv();
+            let u = config.velocity(iv) / velocity_scale;
+            let value = direction[start + iv];
+            let weighted = value * config.dv();
             residual[0] += weighted;
-            residual[1] = velocity.mul_add(weighted, residual[1]);
-            residual[2] = (velocity * velocity).mul_add(weighted, residual[2]);
+            residual[1] = u.mul_add(weighted, residual[1]);
+            residual[2] = (u * u).mul_add(weighted, residual[2]);
+            let absolute = value.abs() * config.dv();
+            scales[0] += absolute;
+            scales[1] += absolute * u.abs();
+            scales[2] += absolute * u * u;
         }
-        for value in residual {
-            maximum_moment_residual = maximum_moment_residual.max(value.abs());
+        for moment in 0..3 {
+            let relative = residual[moment].abs() / scales[moment].max(f64::MIN_POSITIVE);
+            maximum_relative_moment_residual =
+                maximum_relative_moment_residual.max(relative);
         }
-        let _ = end;
     }
 
+    if maximum_relative_moment_residual > 1.0e-11 {
+        return Err("moment-neutral projection residual exceeds tolerance".into());
+    }
+    Ok((direction, maximum_relative_moment_residual))
+}
+
+fn positivity_limited_epsilon(
+    pulse_base: &[f64],
+    control_base: &[f64],
+    direction: &[f64],
+) -> Result<f64, Box<dyn Error>> {
     let mut maximum_epsilon = f64::INFINITY;
-    for (value, delta) in base.iter().zip(&direction) {
+    for ((pulse, control), delta) in pulse_base.iter().zip(control_base).zip(direction) {
         if delta.abs() > f64::MIN_POSITIVE {
-            maximum_epsilon = maximum_epsilon.min((value - POSITIVITY_FLOOR) / delta.abs());
+            maximum_epsilon = maximum_epsilon.min(
+                (pulse.min(control) - POSITIVITY_FLOOR) / delta.abs(),
+            );
         }
     }
     let epsilon = REQUESTED_EPSILON.min(0.25 * maximum_epsilon);
     if !epsilon.is_finite() || epsilon <= 0.0 {
         return Err("no positive symmetric perturbation satisfies the positivity floor".into());
     }
-
-    Ok((direction, epsilon, maximum_moment_residual))
+    Ok(epsilon)
 }
 
-type ComplexTraceSample = (f64, f64, f64);
-type ComplexTrace = Vec<ComplexTraceSample>;
-type SensitivityTracePair = (ComplexTrace, ComplexTrace);
+fn interpolate_crossing(
+    left_time: f64,
+    left_value: f64,
+    right_time: f64,
+    right_value: f64,
+    target: f64,
+) -> f64 {
+    let difference = right_value - left_value;
+    if difference.abs() <= f64::MIN_POSITIVE {
+        return 0.5 * (left_time + right_time);
+    }
+    left_time + (target - left_value) * (right_time - left_time) / difference
+}
 
 fn peak(samples: &[ComplexTraceSample]) -> ResponsePeak {
-    let (time, real, imaginary) = samples
+    let amplitudes: Vec<f64> = samples
         .iter()
-        .copied()
-        .max_by(|left, right| left.1.hypot(left.2).total_cmp(&right.1.hypot(right.2)))
-        .unwrap_or((0.0, 0.0, 0.0));
+        .map(|(_, real, imaginary)| real.hypot(*imaginary))
+        .collect();
+    let peak_index = amplitudes
+        .iter()
+        .enumerate()
+        .max_by(|left, right| left.1.total_cmp(right.1))
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    let magnitude = amplitudes.get(peak_index).copied().unwrap_or(0.0);
+    let half = 0.5 * magnitude;
+
+    let mut left_crossing = None;
+    for index in (1..=peak_index).rev() {
+        if amplitudes[index - 1] <= half && amplitudes[index] >= half {
+            left_crossing = Some(interpolate_crossing(
+                samples[index - 1].0,
+                amplitudes[index - 1],
+                samples[index].0,
+                amplitudes[index],
+                half,
+            ));
+            break;
+        }
+    }
+    let mut right_crossing = None;
+    for index in peak_index..samples.len().saturating_sub(1) {
+        if amplitudes[index] >= half && amplitudes[index + 1] <= half {
+            right_crossing = Some(interpolate_crossing(
+                samples[index].0,
+                amplitudes[index],
+                samples[index + 1].0,
+                amplitudes[index + 1],
+                half,
+            ));
+            break;
+        }
+    }
+    let fwhm = match (left_crossing, right_crossing) {
+        (Some(left), Some(right)) => right - left,
+        _ => f64::NAN,
+    };
+    let (_, real, imaginary) = samples.get(peak_index).copied().unwrap_or((0.0, 0.0, 0.0));
     ResponsePeak {
-        time,
-        magnitude: real.hypot(imaginary),
+        time: samples.get(peak_index).map(|sample| sample.0).unwrap_or(0.0),
+        magnitude,
         phase: imaginary.atan2(real),
+        fwhm,
     }
 }
 
@@ -235,7 +316,23 @@ fn central_difference_trace(
     Ok((target_sensitivity, off_target_sensitivity))
 }
 
-fn sensitivity_at_time(samples: &[ComplexTraceSample], target_time: f64) -> ComplexTraceSample {
+fn subtract_traces(left: &[ComplexTraceSample], right: &[ComplexTraceSample]) -> ComplexTrace {
+    left.iter()
+        .zip(right)
+        .map(|(pulse, control)| {
+            (
+                pulse.0,
+                pulse.1 - control.1,
+                pulse.2 - control.2,
+            )
+        })
+        .collect()
+}
+
+fn sensitivity_at_time(
+    samples: &[ComplexTraceSample],
+    target_time: f64,
+) -> ComplexTraceSample {
     samples
         .iter()
         .copied()
@@ -262,6 +359,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for _ in 0..pulse_steps {
         checkpoint_solver.step(DT)?;
     }
+    let control_checkpoint = checkpoint_solver.distribution().to_vec();
     let second_kick: Vec<f64> = (0..config.nx)
         .map(|ix| {
             SECOND_PULSE_AMPLITUDE
@@ -269,67 +367,123 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .collect();
     checkpoint_solver.apply_velocity_impulse(&second_kick)?;
-    let checkpoint = checkpoint_solver.distribution().to_vec();
+    let pulse_checkpoint = checkpoint_solver.distribution().to_vec();
 
-    let checkpoint_diagnostics = checkpoint_solver.diagnostics()?;
     println!(
-        "spatial_mode,velocity_mode,epsilon,minimum_plus,minimum_minus,max_moment_residual,ballistic_rephase_time,target_dE_rephase_magnitude,target_dE_rephase_phase,target_peak_time,target_peak_sensitivity,target_peak_phase,intervention_mode_peak_sensitivity,intervention_to_echo_sensitivity_ratio,epsilon_half_peak_sensitivity,epsilon_half_peak_relative_delta"
+        "spatial_mode,velocity_mode,velocity_phase,epsilon,minimum_pulse_plus,minimum_pulse_minus,minimum_control_plus,minimum_control_minus,max_relative_moment_residual,ballistic_rephase_elapsed,target_pulse_dE_rephase_magnitude,target_pulse_dE_rephase_phase,target_control_dE_rephase_magnitude,intervention_susceptibility_peak_time,intervention_susceptibility_peak,intervention_susceptibility_phase,intervention_susceptibility_fwhm,intervention_mode_peak_sensitivity,intervention_to_echo_sensitivity_ratio,epsilon_half_peak_relative_delta"
     );
 
     for velocity_mode in VELOCITY_MODES {
-        let (direction, epsilon, moment_residual) =
-            moment_neutral_direction(&checkpoint, config, FIRST_MODE, velocity_mode)?;
-        let plus_minimum = checkpoint
-            .iter()
-            .zip(&direction)
-            .map(|(value, delta)| value + epsilon * delta)
-            .fold(f64::INFINITY, f64::min);
-        let minus_minimum = checkpoint
-            .iter()
-            .zip(&direction)
-            .map(|(value, delta)| value - epsilon * delta)
-            .fold(f64::INFINITY, f64::min);
+        for velocity_phase in VELOCITY_PHASES {
+            let (direction, moment_residual) = moment_neutral_direction(
+                &pulse_checkpoint,
+                config,
+                FIRST_MODE,
+                velocity_mode,
+                velocity_phase,
+            )?;
+            let epsilon = positivity_limited_epsilon(
+                &pulse_checkpoint,
+                &control_checkpoint,
+                &direction,
+            )?;
 
-        let (target_trace, off_target_trace) =
-            central_difference_trace(config, &checkpoint, &direction, epsilon, future_steps, 2)?;
-        let target_peak = peak(&target_trace);
-        let off_target_peak = peak(&off_target_trace);
-        let rephase = sensitivity_at_time(&target_trace, 2.0);
-        let epsilon_half = 0.5 * epsilon;
-        let (half_trace, _) = central_difference_trace(
-            config,
-            &checkpoint,
-            &direction,
-            epsilon_half,
-            future_steps,
-            2,
-        )?;
-        let half_peak = peak(&half_trace);
-        let half_relative_delta = (half_peak.magnitude - target_peak.magnitude).abs()
-            / target_peak.magnitude.max(f64::MIN_POSITIVE);
-        let off_target_ratio =
-            off_target_peak.magnitude / target_peak.magnitude.max(f64::MIN_POSITIVE);
+            let (pulse_trace, pulse_off_trace) = central_difference_trace(
+                config,
+                &pulse_checkpoint,
+                &direction,
+                epsilon,
+                future_steps,
+                2,
+            )?;
+            let (control_trace, _) = central_difference_trace(
+                config,
+                &control_checkpoint,
+                &direction,
+                epsilon,
+                future_steps,
+                2,
+            )?;
+            let intervention_trace = subtract_traces(&pulse_trace, &control_trace);
+            let intervention_peak = peak(&intervention_trace);
+            let intervention_mode_peak = peak(&pulse_off_trace);
+            let pulse_rephase = sensitivity_at_time(&pulse_trace, 2.0);
+            let control_rephase = sensitivity_at_time(&control_trace, 2.0);
 
-        println!(
-            "{},{},{:.12e},{:.12e},{:.12e},{:.12e},4.0,{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
-            FIRST_MODE,
-            velocity_mode,
-            epsilon,
-            plus_minimum,
-            minus_minimum,
-            moment_residual,
-            rephase.1.hypot(rephase.2),
-            rephase.2.atan2(rephase.1),
-            target_peak.time,
-            target_peak.magnitude,
-            target_peak.phase,
-            off_target_peak.magnitude,
-            off_target_ratio,
-            half_peak.magnitude,
-            half_relative_delta,
-        );
+            let half_epsilon = 0.5 * epsilon;
+            let (half_pulse_trace, _) = central_difference_trace(
+                config,
+                &pulse_checkpoint,
+                &direction,
+                half_epsilon,
+                future_steps,
+                2,
+            )?;
+            let (half_control_trace, _) = central_difference_trace(
+                config,
+                &control_checkpoint,
+                &direction,
+                half_epsilon,
+                future_steps,
+                2,
+            )?;
+            let half_intervention_trace =
+                subtract_traces(&half_pulse_trace, &half_control_trace);
+            let half_intervention_peak = peak(&half_intervention_trace);
+            let half_relative_delta = (half_intervention_peak.magnitude
+                - intervention_peak.magnitude)
+                .abs()
+                / intervention_peak.magnitude.max(f64::MIN_POSITIVE);
+            let off_target_ratio = intervention_mode_peak.magnitude
+                / intervention_peak.magnitude.max(f64::MIN_POSITIVE);
+
+            let minima = [
+                pulse_checkpoint
+                    .iter()
+                    .zip(&direction)
+                    .map(|(value, delta)| value + epsilon * delta)
+                    .fold(f64::INFINITY, f64::min),
+                pulse_checkpoint
+                    .iter()
+                    .zip(&direction)
+                    .map(|(value, delta)| value - epsilon * delta)
+                    .fold(f64::INFINITY, f64::min),
+                control_checkpoint
+                    .iter()
+                    .zip(&direction)
+                    .map(|(value, delta)| value + epsilon * delta)
+                    .fold(f64::INFINITY, f64::min),
+                control_checkpoint
+                    .iter()
+                    .zip(&direction)
+                    .map(|(value, delta)| value - epsilon * delta)
+                    .fold(f64::INFINITY, f64::min),
+            ];
+
+            println!(
+                "{},{},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},4.0,{:.12e},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.8},{:.12e},{:.12e},{:.12e}",
+                FIRST_MODE,
+                velocity_mode,
+                velocity_phase,
+                epsilon,
+                minima[0],
+                minima[1],
+                minima[2],
+                minima[3],
+                moment_residual,
+                pulse_rephase.1.hypot(pulse_rephase.2),
+                pulse_rephase.2.atan2(pulse_rephase.1),
+                control_rephase.1.hypot(control_rephase.2),
+                intervention_peak.time,
+                intervention_peak.magnitude,
+                intervention_peak.phase,
+                intervention_peak.fwhm,
+                intervention_mode_peak.magnitude,
+                off_target_ratio,
+                half_relative_delta,
+            );
+        }
     }
 
-    let _ = checkpoint_diagnostics;
     Ok(())
 }
