@@ -143,7 +143,8 @@ pub struct FactorialInteractionReport {
     /// Common denominator for every exact Shapley attribution.
     pub shapley_common_denominator: u64,
     pub factor_shapley_attributions: Vec<FactorShapleyAttribution>,
-}\n
+}
+
 /// Shapley allocation of the complete joint effect to one binary action factor.
 ///
 /// Every numerator is expressed over the report's shared
