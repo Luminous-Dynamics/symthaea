@@ -338,6 +338,9 @@ The proof-to-concept reconstruction and human-transfer research programme is tra
 
 - [MATH-COMPREHENSION-001 design](MATH_PROOF_COMPREHENSION_001_V0_1.md)
 - [Pilot seed and source annotations](MATH_PROOF_COMPREHENSION_PILOT_V1.md)
+- [Mathlib proof-comprehension pilot](MATHLIB_PROOF_COMPREHENSION_PILOT_V1.md) — four source-pinned Mathlib theorem examples spanning recursion, simplification, quotient induction and embeddings.
+- [Mathlib pilot dataset](MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json) and [schema](MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json) — machine-readable source pins, provisional mechanism annotations and counterfactual tasks.
+- [Finite pilot oracle](../../scripts/research/proof_comprehension_oracle.rs) — dependency-free Rust tests for the ETH unique-extension mutation and selected counterfactual examples.
 - [Pilot dataset](MATH_PROOF_COMPREHENSION_PILOT_V1.json)
 - [Pilot dataset schema](MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json)
 - [Evidence receipt schema](MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json)
