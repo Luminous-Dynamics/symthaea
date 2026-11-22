@@ -80,7 +80,8 @@
       "observed_at_ns": 0,
       "estimated_period_ns": 500000000,
       "confidence": 0.95,
-      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evidence_window_end_ns": 0
     },
     {
       "estimate_id": "e1-2",
@@ -88,7 +89,8 @@
       "observed_at_ns": 80000000,
       "estimated_period_ns": 500000000,
       "confidence": 0.95,
-      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evidence_window_end_ns": 80000000
     },
     {
       "estimate_id": "e1-3",
@@ -96,7 +98,8 @@
       "observed_at_ns": 160000000,
       "estimated_period_ns": 500000000,
       "confidence": 0.95,
-      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evidence_window_end_ns": 160000000
     },
     {
       "estimate_id": "e1-4",
@@ -104,7 +107,8 @@
       "observed_at_ns": 240000000,
       "estimated_period_ns": 500000000,
       "confidence": 0.95,
-      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evidence_window_end_ns": 240000000
     },
     {
       "estimate_id": "e1-5",
@@ -112,7 +116,8 @@
       "observed_at_ns": 320000000,
       "estimated_period_ns": 500000000,
       "confidence": 0.95,
-      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evidence_window_end_ns": 320000000
     },
     {
       "estimate_id": "e2-1",
@@ -120,7 +125,8 @@
       "observed_at_ns": 2080000000,
       "estimated_period_ns": 400000000,
       "confidence": 0.95,
-      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_window_end_ns": 2080000000
     },
     {
       "estimate_id": "e2-2",
@@ -128,7 +134,8 @@
       "observed_at_ns": 2160000000,
       "estimated_period_ns": 400000000,
       "confidence": 0.95,
-      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_window_end_ns": 2160000000
     },
     {
       "estimate_id": "e2-3",
@@ -136,7 +143,8 @@
       "observed_at_ns": 2240000000,
       "estimated_period_ns": 400000000,
       "confidence": 0.95,
-      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_window_end_ns": 2240000000
     },
     {
       "estimate_id": "e2-4",
@@ -144,7 +152,8 @@
       "observed_at_ns": 2320000000,
       "estimated_period_ns": 400000000,
       "confidence": 0.95,
-      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_window_end_ns": 2320000000
     },
     {
       "estimate_id": "e2-5",
@@ -152,7 +161,8 @@
       "observed_at_ns": 2400000000,
       "estimated_period_ns": 400000000,
       "confidence": 0.95,
-      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_window_end_ns": 2400000000
     }
   ],
   "extra_onsets": [
@@ -169,5 +179,6 @@
     "receipt hashes are shape-checked but not cryptographically authenticated",
     "the phase drift slope is descriptive only and has no inferential confidence interval",
     "performance claims require musician/composition-held-out sessions and independent loopback capture"
-  ]
+  ],
+  "clock_calibration_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
 }
