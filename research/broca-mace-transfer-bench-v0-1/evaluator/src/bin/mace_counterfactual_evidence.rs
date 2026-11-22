@@ -1186,6 +1186,13 @@ mod tests {
     #[test]
     fn typed_content_hdc_resolves_only_canonical_in_scope_hits() {
         let case = generated_worlds(1).remove(0);
+        let exact = run_candidate(
+            CandidateMode::ExactScopeScan,
+            case.query,
+            case.decision_need,
+            &case.memory,
+        )
+        .unwrap();
         let typed = run_candidate(
             CandidateMode::TypedContentHdc,
             case.query,
@@ -1194,6 +1201,8 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(typed.input_sha256, exact.input_sha256);
+        assert!(typed.retrieved_event_ids.len() <= exact.retrieved_event_ids.len());
         assert!(typed.retrieval_profile_sha256.is_some());
         assert!(typed.index_bytes > 0);
         assert!(typed.retrieved_event_ids.len() <= TYPED_HDC_TOP_K * 2);
