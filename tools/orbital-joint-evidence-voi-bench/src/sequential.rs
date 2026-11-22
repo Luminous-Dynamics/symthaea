@@ -222,7 +222,6 @@ fn policy_tree_nodes(node: &PolicyNode) -> usize {
     }
 }
 
-
 fn valid_commit(value: &str) -> bool {
     value.len() == 40
         && value
@@ -505,7 +504,9 @@ fn select_plan(mut candidates: Vec<Plan>) -> Result<Plan, String> {
                         && candidates[*other_index]
                             .expected_resources
                             .as_ref()
-                            .is_some_and(|other_cost| expected_dominates(other_cost, candidate_cost))
+                            .is_some_and(|other_cost| {
+                                expected_dominates(other_cost, candidate_cost)
+                            })
                 })
             })
             .collect()
@@ -1233,7 +1234,10 @@ mod tests {
         let result = receipt();
         let scenario = &result.scenarios[0];
         assert!(scenario.search_states_expanded > 0);
-        assert_eq!(scenario.search_memo_entries, scenario.search_states_expanded);
+        assert_eq!(
+            scenario.search_memo_entries,
+            scenario.search_states_expanded
+        );
         assert!(scenario.policy_tree_nodes > 0);
         assert_eq!(scenario.baseline_terminal_disposition, "HOLD");
         assert_eq!(scenario.baseline_worst_case_regret, 2.0);
