@@ -361,7 +361,7 @@ pub fn calibrate_and_evaluate_held_out_null(
 
     let minimum_resolvable_alpha = 1.0 / (calibration.len() as f64 + 1.0);
     let mut estimators = Vec::with_capacity(3);
-    for estimator_index in 0..3 {
+    for (estimator_index, &estimator_id) in ESTIMATOR_IDS.iter().enumerate() {
         let critical_value = conservative_upper_threshold(
             calibration
                 .iter()
@@ -397,7 +397,7 @@ pub fn calibrate_and_evaluate_held_out_null(
             .count();
 
         estimators.push(EstimatorNullCalibrationSummary {
-            estimator_id: ESTIMATOR_IDS[estimator_index],
+            estimator_id,
             alpha,
             critical_value,
             minimum_resolvable_alpha,
