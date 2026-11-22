@@ -306,7 +306,9 @@ This creates a stronger claim than “HDC beats RAG”: MACE would demonstrate w
 The follow-on branch is stacked directly on the inspected #13221 child-PR head and contains the following authored artifacts:
 
 - `research/broca-mace-transfer-bench-v0-1/evaluator/src/bin/mace_counterfactual_evidence.rs`
+- `research/broca-mace-transfer-bench-v0-1/evaluator/src/bin/mace_counterfactual_aggregate.rs`
 - `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`
+- `data/schemas/mace_counterfactual_summary_v0_1.schema.json`
 - `docs/research/MACE_COUNTERFACTUAL_EVIDENCE_SUFFICIENCY_V0_1.md`
 
 Example invocation after a Rust-enabled checkout:
@@ -328,7 +330,7 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Carg
   mace_counterfactual_evaluator.jsonl mace_counterfactual_summary.jsonl 12345
 ```
 
-The reducer verifies that all manifest rows belong to one run and share source-code, fixture, schema and source-revision provenance. It hashes the sorted manifest set and binds the summary to both input and reducer-code digests. It averages repeated interventions within each opaque task block, averages task blocks within each world cluster, then bootstrap-resamples world clusters (2,000 replicates). It emits method summaries and paired method-minus-exact-scope contrasts only when both methods exist for the same task block. The output contract is `data/schemas/mace_counterfactual_summary_v0_1.schema.json`.
+The reducer requires exactly one manifest receipt per scored task block, verifies that all manifest rows belong to one run and share source-code, fixture, schema and source-revision provenance, and rejects score rows without a matching manifest. It hashes the sorted manifest set and binds the summary to both input and reducer-code digests. It averages repeated interventions within each opaque task block, averages task blocks within each world cluster, then bootstrap-resamples the resulting world-cluster means (2,000 replicates). The reported field is a world-cluster count; the reducer does not assert that cluster independence has been proven. It emits method summaries and paired method-minus-exact-scope contrasts only when both methods exist for the same task block. The output contract is `data/schemas/mace_counterfactual_summary_v0_1.schema.json`.
 
 This is an initial cluster-aware statistical reducer, not a preregistered confirmatory analysis. It does not yet apply multiplicity correction across intervention families, establish independent-world assumptions empirically, or provide hierarchical model-fit-seed resampling; those remain #13265.
 
