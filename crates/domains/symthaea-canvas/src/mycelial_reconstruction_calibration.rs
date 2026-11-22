@@ -390,14 +390,7 @@ pub fn evaluate_mycelial_reconstruction_calibration(
             .get(item.predicted_junction_id.as_str())
             .copied()
             .unwrap_or(ReconstructionCalibrationClass::NoObject);
-        let predicted_class = ReconstructionCalibrationClass::ALL
-            .into_iter()
-            .max_by(|left, right| {
-                item.probabilities[left.index()]
-                    .total_cmp(&item.probabilities[right.index()])
-                    .then_with(|| right.index().cmp(&left.index()))
-            })
-            .expect("calibration class set is non-empty");
+        let predicted_class = top_class(&item.probabilities);
         let confidence = item.probabilities[predicted_class.index()];
         samples.push(CalibrationSample {
             prediction_id: item.predicted_junction_id.clone(),
@@ -428,27 +421,28 @@ pub fn evaluate_mycelial_reconstruction_calibration(
     let top_label_calibration = top_label_calibration(&samples, config.bin_count, config.negative_log_likelihood_epsilon);
     let selective_risk_curve = selective_risk_curve(&samples);
 
+    let observations: Vec<_> = samples
+        .iter()
+        .map(|sample| JunctionCalibrationObservation {
+            predicted_junction_id: sample.prediction_id.clone(),
+            target_class: sample.target,
+            probabilities: sample.probabilities,
+        })
+        .collect();
     let report = MycelialReconstructionCalibrationReport {
         schema_version: MYCELIAL_RECONSTRUCTION_CALIBRATION_SCHEMA_VERSION,
         source_observation_digest: ground_truth.source_observation_digest.clone(),
         ground_truth_graph_digest: ground_truth_digest,
         prediction_graph_digest: prediction_digest,
         reconstruction_score_digest: score_digest,
-        probability_inventory_digest: probability_inventory_digest(&predictions),
+        probability_inventory_digest: probability_inventory_digest(&observations),
         matching_policy_id: reconstruction_score.matching_policy_id.clone(),
         calibration_policy_id: calibration_policy_id.to_string(),
         bin_count: config.bin_count,
         probability_sum_tolerance: config.probability_sum_tolerance,
         negative_log_likelihood_epsilon: config.negative_log_likelihood_epsilon,
         counts,
-        observations: samples
-            .iter()
-            .map(|sample| JunctionCalibrationObservation {
-                predicted_junction_id: sample.prediction_id.clone(),
-                target_class: sample.target,
-                probabilities: sample.probabilities,
-            })
-            .collect(),
+        observations,
         class_prediction_counts,
         class_calibration,
         top_label_calibration,
@@ -456,6 +450,18 @@ pub fn evaluate_mycelial_reconstruction_calibration(
     };
     report.validate()?;
     Ok(report)
+}
+
+fn top_class(
+    probabilities: &[f64; RECONSTRUCTION_CALIBRATION_CLASS_COUNT],
+) -> ReconstructionCalibrationClass {
+    let mut best = ReconstructionCalibrationClass::ALL[0];
+    for class in ReconstructionCalibrationClass::ALL.into_iter().skip(1) {
+        if probabilities[class.index()] > probabilities[best.index()] {
+            best = class;
+        }
+    }
+    best
 }
 
 #[derive(Debug, Clone)]
@@ -842,14 +848,15 @@ impl MycelialReconstructionCalibrationReport {
 }
 
 fn probability_inventory_digest(
-    predictions: &[JunctionClassProbabilityPrediction],
+    observations: &[JunctionCalibrationObservation],
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-reconstruction-probability-inventory-v1");
-    hasher.update(&(predictions.len() as u64).to_le_bytes());
-    for prediction in predictions {
-        hash_str(&mut hasher, &prediction.predicted_junction_id);
-        for probability in prediction.probabilities {
+    hasher.update(&(observations.len() as u64).to_le_bytes());
+    for observation in observations {
+        hash_str(&mut hasher, &observation.predicted_junction_id);
+        hasher.update(&[observation.target_class.index() as u8]);
+        for probability in observation.probabilities {
             hasher.update(&probability.to_bits().to_le_bytes());
         }
     }
