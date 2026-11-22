@@ -22,11 +22,11 @@ Move from reactive generation plus retrospective explanation to a **precommitted
 
 The system should be able to issue a compact prediction of its next musical commitment, display that prediction early enough to be useful, let the musician accept/steer/veto/branch/ignore it, and bind the actual output back to the exact preview. Revised predictions supersede earlier ones; they never rewrite them.
 
-Keep four separate clocks/outcomes:
+Keep five separate timing quantities/outcomes:
 
 1. **Input observation:** the exact performer event and the clock domain in which it was observed.
 2. **Forecast issue:** when the policy committed to a prediction.
-3. **Preview display:** when the forecast became available to the human-facing interface.
+3. **Preview display:** when the forecast became available to the human-facing interface. Record issue-to-display delivery latency separately.
 4. **Realization:** when the first bound musical event actually began and when its artifact completed.
 
 This prevents output-generation latency, display latency, performer anticipation lead time and MIDI/audio scheduling error from being collapsed into one number.
@@ -78,6 +78,7 @@ Integrate, rather than duplicate, #10391's runner→CPAL callback→predicted-pl
 - input-to-forecast issue latency p50/p95/p99;
 - issue-to-display latency p50/p95/p99;
 - display-to-target lead time;
+- display-to-target lead time;
 - output scheduling error in milliseconds and beat fractions;
 - event late/miss/drop rate, jitter and clock-drift residuals;
 - latency by tempo, velocity, patch, device and buffer configuration.
@@ -113,3 +114,8 @@ Muse should aim to exceed SOTA on the capabilities it can demonstrate under matc
 ## Claim ceiling
 
 A passing offline trace establishes that the evaluator can distinguish valid and invalid event histories. It does not establish that a model forecast is musically accurate, that a preview was actually rendered to or understood by a musician, that a musician anticipated the response, or that a live system beats jam_bot. Those claims require the clock bridge, a real display adapter, matched live baselines and a preregistered musician study.
+
+
+## Additional evaluation-design control
+
+The MIREX CMI-RewardBench table reports 59.0% for a degenerate always-choose-B baseline and shows an orientation-reversed submission changing from 39.8% to 60.2%. This means raw preference accuracy is not enough. All Muse preference studies must randomize candidate order, include mirrored A/B trials, report orientation-stratified and balanced accuracy, and verify that swapping candidates swaps the prediction. System identity must remain blinded and candidate order must be independently randomized per judge.
