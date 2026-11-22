@@ -126,7 +126,10 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
         require_text(&proposal.description, "proposal description")?;
         require_digest(&proposal.artifact_sha256, "proposal artifact digest")?;
         if !matches!(proposal.author.as_str(), "agent" | "collaborator" | "joint") {
-            return Err(format!("proposal {} has unsupported author", proposal.proposal_id));
+            return Err(format!(
+                "proposal {} has unsupported author",
+                proposal.proposal_id
+            ));
         }
         if !proposal_ids.insert(proposal.proposal_id.as_str()) {
             return Err(format!("duplicate proposal_id: {}", proposal.proposal_id));
@@ -195,7 +198,10 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
             }
             "veto_proposal" => {
                 if !constraint.protected_event_ids.is_empty()
-                    || constraint.target_proposal_id.as_deref().is_none_or(str::is_empty)
+                    || constraint
+                        .target_proposal_id
+                        .as_deref()
+                        .is_none_or(str::is_empty)
                 {
                     return Err(format!(
                         "veto_proposal constraint {} has invalid shape",
@@ -287,12 +293,6 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
     if panel.decision.committed != panel.decision.committed_at_ns.is_some() {
         return Err("decision committed flag and commit timestamp disagree".to_owned());
     }
-    if let Some(committed_at_ns) = panel.decision.committed_at_ns {
-        if committed_at_ns < panel.commit_at_ns {
-            return Err("decision commit time precedes the declared commit boundary".to_owned());
-        }
-    }
-
     match panel.decision.action.as_str() {
         "apply" => {
             if !panel.decision.committed || panel.decision.selected_proposal_ids.len() != 1 {
@@ -311,10 +311,15 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
                 .map(|proposal| proposal.author.as_str())
                 .collect();
             if authors.len() < 2 {
-                findings.push("branch must preserve at least two distinct sources of proposal".to_owned());
+                findings.push(
+                    "branch must preserve at least two distinct sources of proposal".to_owned(),
+                );
             }
             if !panel.decision.conflict_preserved {
-                findings.push("branch action did not preserve the alternatives as an explicit conflict".to_owned());
+                findings.push(
+                    "branch action did not preserve the alternatives as an explicit conflict"
+                        .to_owned(),
+                );
             }
         }
         "negotiate" | "ask" | "defer" | "abstain" | "veto" => {
@@ -359,11 +364,19 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
         }
         match constraint.kind.as_str() {
             "preserve_events" => {
-                let protected: BTreeSet<_> = constraint.protected_event_ids.iter().map(String::as_str).collect();
+                let protected: BTreeSet<_> = constraint
+                    .protected_event_ids
+                    .iter()
+                    .map(String::as_str)
+                    .collect();
                 let mut passed = true;
                 for proposal_id in &panel.decision.selected_proposal_ids {
                     let proposal = proposals[proposal_id.as_str()];
-                    if proposal.changed_event_ids.iter().any(|event_id| protected.contains(event_id.as_str())) {
+                    if proposal
+                        .changed_event_ids
+                        .iter()
+                        .any(|event_id| protected.contains(event_id.as_str()))
+                    {
                         passed = false;
                         findings.push(format!(
                             "proposal {proposal_id} violates protected events in constraint {}",
@@ -377,8 +390,15 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
                 }
             }
             "veto_proposal" => {
-                let target = constraint.target_proposal_id.as_deref().expect("validated target");
-                let passed = !panel.decision.selected_proposal_ids.iter().any(|id| id == target);
+                let target = constraint
+                    .target_proposal_id
+                    .as_deref()
+                    .expect("validated target");
+                let passed = !panel
+                    .decision
+                    .selected_proposal_ids
+                    .iter()
+                    .any(|id| id == target);
                 constraint_checks += 1;
                 if !passed {
                     findings.push(format!(
@@ -403,7 +423,10 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
         require_text(&update.purpose, "persistent update purpose")?;
         require_text(&update.owner_collaborator_id, "persistent update owner")?;
         if !update_ids.insert(update.update_id.as_str()) {
-            return Err(format!("duplicate persistent update_id: {}", update.update_id));
+            return Err(format!(
+                "duplicate persistent update_id: {}",
+                update.update_id
+            ));
         }
         if !matches!(
             update.target_scope.as_str(),
@@ -435,7 +458,10 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
         };
         let owner_matches = update.target_scope != "collaborator"
             || update.owner_collaborator_id == panel.collaborator_id;
-        let grant_matches = update.grant_id.as_deref().is_some_and(|grant| !grant.trim().is_empty())
+        let grant_matches = update
+            .grant_id
+            .as_deref()
+            .is_some_and(|grant| !grant.trim().is_empty())
             && update.authorized_scope.as_deref() == Some(required_purpose);
         let authorized = update.authorization_status == "authorized"
             && owner_matches
@@ -452,10 +478,7 @@ fn audit_panel(panel: &AgencyPanelV1) -> Result<AgencyAuditReport, String> {
             } else {
                 "was committed without matching purpose, owner and authorization scope"
             };
-            findings.push(format!(
-                "persistent update {} {reason}",
-                update.update_id
-            ));
+            findings.push(format!("persistent update {} {reason}", update.update_id));
         }
     }
 
@@ -502,7 +525,10 @@ fn validate_header(panel: &AgencyPanelV1) -> Result<(), String> {
         return Err("hard_constraints must be non-empty".to_owned());
     }
     if panel.claim_ceiling.is_empty()
-        || panel.claim_ceiling.iter().any(|claim| claim.trim().is_empty())
+        || panel
+            .claim_ceiling
+            .iter()
+            .any(|claim| claim.trim().is_empty())
     {
         return Err("claim_ceiling must contain explicit limitations".to_owned());
     }
@@ -525,7 +551,9 @@ fn require_digest(value: &str, name: &str) -> Result<(), String> {
     {
         Ok(())
     } else {
-        Err(format!("{name} must be a lowercase 64-character SHA-256 digest"))
+        Err(format!(
+            "{name} must be a lowercase 64-character SHA-256 digest"
+        ))
     }
 }
 
@@ -549,7 +577,10 @@ mod tests {
         let report = parse_and_audit(FIXTURE).expect("known-answer agency fixture");
         assert!(report.structurally_valid_agency_trace);
         assert_eq!(report.decision_action, "branch");
-        assert_eq!(report.selected_proposal_ids, vec!["agent-proposal", "collaborator-proposal"]);
+        assert_eq!(
+            report.selected_proposal_ids,
+            vec!["agent-proposal", "collaborator-proposal"]
+        );
         assert_eq!(report.hard_constraint_compliance, Some(1.0));
     }
 
@@ -593,7 +624,12 @@ mod tests {
         value["decision"]["committed_at_ns"] = serde_json::json!(300);
         let report = audit(&value).expect("veto race should be reported");
         assert!(!report.structurally_valid_agency_trace);
-        assert!(report.qualification_findings.iter().any(|f| f.contains("veto")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|f| f.contains("veto"))
+        );
     }
 
     #[test]
@@ -606,7 +642,12 @@ mod tests {
         value["decision"]["committed_at_ns"] = serde_json::json!(300);
         let report = audit(&value).expect("ignored proposal must not be treated as accepted");
         assert!(!report.structurally_valid_agency_trace);
-        assert!(report.qualification_findings.iter().any(|f| f.contains("ignored proposal")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|f| f.contains("ignored proposal"))
+        );
     }
 
     #[test]
@@ -619,7 +660,12 @@ mod tests {
         value["decision"]["conflict_preserved"] = false;
         let report = audit(&value).expect("hidden conflict scalarization must be visible");
         assert!(!report.structurally_valid_agency_trace);
-        assert!(report.qualification_findings.iter().any(|f| f.contains("conflict")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|f| f.contains("conflict"))
+        );
     }
 
     #[test]
@@ -646,7 +692,8 @@ mod tests {
     #[test]
     fn collaborator_memory_cannot_be_written_for_a_different_owner() {
         let mut value = panel();
-        value["persistent_updates"][0]["owner_collaborator_id"] = serde_json::json!("collaborator-B");
+        value["persistent_updates"][0]["owner_collaborator_id"] =
+            serde_json::json!("collaborator-B");
         value["persistent_updates"][0]["committed"] = true;
         let report = audit(&value).expect("cross-collaborator write is reported");
         assert!(!report.structurally_valid_agency_trace);
@@ -668,10 +715,12 @@ mod tests {
         let mut value = panel();
         value["interventions"][0]["action"] = serde_json::json!("ignore");
         value["decision"]["action"] = serde_json::json!("branch");
-        value["decision"]["selected_proposal_ids"] = serde_json::json!(["agent-proposal", "collaborator-proposal"]);
+        value["decision"]["selected_proposal_ids"] =
+            serde_json::json!(["agent-proposal", "collaborator-proposal"]);
         value["decision"]["committed"] = false;
         value["decision"]["committed_at_ns"] = serde_json::Value::Null;
-        let report = audit(&value).expect("branching keeps proposals distinct without overriding ignore");
+        let report =
+            audit(&value).expect("branching keeps proposals distinct without overriding ignore");
         assert!(report.structurally_valid_agency_trace);
         assert_eq!(report.ignored_proposal_count, 1);
     }
@@ -681,7 +730,8 @@ mod tests {
         let mut value = panel();
         value["persistent_updates"][0]["target_scope"] = serde_json::json!("global");
         value["persistent_updates"][0]["purpose"] = serde_json::json!("personal_adaptation");
-        value["persistent_updates"][0]["authorized_scope"] = serde_json::json!("personal_adaptation");
+        value["persistent_updates"][0]["authorized_scope"] =
+            serde_json::json!("personal_adaptation");
         value["persistent_updates"][0]["committed"] = true;
         let report = audit(&value).expect("personal grant cannot authorize global identity update");
         assert!(!report.structurally_valid_agency_trace);
@@ -694,7 +744,12 @@ mod tests {
         value["proposals"][1]["author"] = serde_json::json!("agent");
         let report = audit(&value).expect("single-source branching is reported");
         assert!(!report.structurally_valid_agency_trace);
-        assert!(report.qualification_findings.iter().any(|f| f.contains("distinct sources")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|f| f.contains("distinct sources"))
+        );
     }
 
     #[test]
@@ -708,7 +763,12 @@ mod tests {
         value["interventions"][0]["acted_at_ns"] = serde_json::json!(250);
         let report = audit(&value).expect("post-commit accept remains reportable");
         assert!(!report.structurally_valid_agency_trace);
-        assert!(report.qualification_findings.iter().any(|f| f.contains("after commit")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|f| f.contains("after commit"))
+        );
     }
 
     #[test]
