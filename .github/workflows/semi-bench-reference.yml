@@ -269,6 +269,61 @@ jobs:
             | @tsv
           ' /tmp/secom-real/stratified-fold-preprocessing.json
 
+
+      - name: Run 200-tree Random Forest baselines on five stratified SECOM folds
+        run: |
+          EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
+          SNAPSHOT=/tmp/semi-rust-work/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+          cargo run --release --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-random-forest -- \
+            /tmp/secom-real/secom.data \
+            /tmp/secom-real/secom_labels.data \
+            "$EXPECTATIONS" \
+            /tmp/secom-real/stratified-80-20-repeats.json \
+            "$SNAPSHOT" \
+            > /tmp/secom-real/stratified-random-forest-report.json
+
+          jq -e '
+            .schema == "luminous.semi-bench.secom-five-repeat-random-forest-report.v1" and
+            .repeat_count == null and
+            (.repeats | length == 5) and
+            all(.repeats[];
+              .training_rows == null and
+              .preprocessing.training_rows == 1253 and
+              .preprocessing.test_rows == 314 and
+              .preprocessing.training_failures == 83 and
+              .preprocessing.test_failures == 21 and
+              (.arms | length == 2) and
+              all(.arms[];
+                .parameters.n_trees == 200 and
+                .parameters.max_depth == 12 and
+                .parameters.min_samples_leaf == 4 and
+                .training_rows == 1253 and
+                .training_positive == 83 and
+                .training_negative == 1170 and
+                (.model_sha256 | length == 64) and
+                .prediction_report.prediction_count == 314 and
+                .metrics.sample_count == 314 and
+                .metrics.class_counts.positive == 21 and
+                .metrics.class_counts.negative == 293 and
+                all(.prediction_report.predictions[]; .score >= 0 and .score <= 1)
+              )
+            ) and
+            (.source_identity_manifest_sha256 | length == 64)
+          ' /tmp/secom-real/stratified-random-forest-report.json > /dev/null
+
+          echo "Five-repeat Random Forest metrics (stratified protocol only):"
+          jq -r '
+            .repeats[] as $repeat |
+            $repeat.arms[] |
+            [$repeat.repeat_index,.model_id,.metrics.ranking_metrics.average_precision,
+             .metrics.ranking_metrics.auroc,.metrics.probability_metrics.brier_score,
+             .metrics.probability_metrics.expected_calibration_error,
+             .metrics.threshold_metrics.tp,.metrics.threshold_metrics.fp,
+             .metrics.threshold_metrics.fn,.fit_milliseconds,.prediction_milliseconds,
+             .model_sha256]
+            | @tsv
+          ' /tmp/secom-real/stratified-random-forest-report.json
+
       - name: Run Rust B0/B1 and observation drift on the full pinned SECOM chronology
         run: |
           EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
@@ -452,4 +507,5 @@ jobs:
             /tmp/secom-real/logistic-report.json
             /tmp/secom-real/stratified-80-20-repeats.json
             /tmp/secom-real/stratified-fold-preprocessing.json
+            /tmp/secom-real/stratified-random-forest-report.json
           if-no-files-found: error
