@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::time::Instant;
@@ -15,7 +15,6 @@ const RRF_K: f64 = 60.0;
 #[derive(Clone)]
 struct PatternDoc {
     id: String,
-    title: String,
     tokens: Vec<String>,
     term_frequency: HashMap<String, usize>,
     hdc: Vec<i8>,
@@ -199,7 +198,7 @@ impl CorpusIndex {
         let mut docs = Vec::new();
         for pattern in patterns {
             let id = text_field(pattern, "id");
-            let (title, content) = pattern_text(pattern);
+            let (_title, content) = pattern_text(pattern);
             if id.is_empty() || title.is_empty() {
                 bail!("every pattern must have a non-empty id and title");
             }
@@ -208,7 +207,6 @@ impl CorpusIndex {
             let term_frequency = term_frequency(&tokens);
             docs.push(PatternDoc {
                 id,
-                title,
                 tokens,
                 term_frequency,
                 hdc,
