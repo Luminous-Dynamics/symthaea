@@ -695,7 +695,6 @@ pub fn evaluate_secom_logistic_v1(
 mod tests {
     use super::*;
     use crate::benchmark::split_manifest::SplitManifestV1;
-    use sha2::{Digest, Sha256};
 
     const FEATURES: &[u8] = include_bytes!(
         "../../../../../benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data"
