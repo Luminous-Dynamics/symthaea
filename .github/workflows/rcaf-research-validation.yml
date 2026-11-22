@@ -294,11 +294,22 @@ jobs:
           jsonschema.validate(report, schema)
           assert report["source_status"] == "synthetic_fixture"
           assert report["target_component_variance_fraction"] == 0.10
-          assert {item["family_id"] for item in report["families"]} == {
+          assert report["geometry"]["interpretation_scope"] == "synthetic_topology_only"
+          assert len(report["geometry"]["roi_labels"]) == 8
+          assert len(report["geometry"]["weighted_edges"]) == 7
+          by_family = {item["family_id"]: item for item in report["families"]}
+          assert set(by_family) == {
               "graph_smooth_low_rank",
               "heat_kernel_localized",
           }
+          assert by_family["graph_smooth_low_rank"]["spatial_rank"] == 2
+          assert by_family["graph_smooth_low_rank"]["seed_roi_indices"] is None
+          assert by_family["heat_kernel_localized"]["spatial_rank"] == 1
+          assert by_family["heat_kernel_localized"]["seed_roi_indices"] == [3]
           for item in report["families"]:
+              assert item["diffusion_time"] == 0.35
+              assert item["temporal_ar1"] == 0.30
+              assert item["temporal_coherence"] == 0.0
               clean = item["clean_component_variance"]
               nuisance = item["nuisance_component_variance"]
               covariance = item["clean_nuisance_covariance"]
