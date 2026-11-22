@@ -4,8 +4,8 @@ use std::f64::consts::TAU;
 use plasma_vlasov_reference::echo_analysis::{
     EchoMeasurementConfig, EchoModeTrace, EchoPulsePair, EchoTraceSample, measure_echo_trace,
 };
-use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 use plasma_vlasov_reference::phase_space_cascade::JointPhaseSpaceSpectrum;
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 const FIRST_MODE: usize = 1;
 const SECOND_MODE: usize = 2;
@@ -28,10 +28,7 @@ struct EchoRidgeMetrics {
     dominant_signed_s: isize,
 }
 
-fn echo_mode_ridge(
-    spectrum: &JointPhaseSpaceSpectrum,
-    signed_x_mode: isize,
-) -> EchoRidgeMetrics {
+fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> EchoRidgeMetrics {
     let x_mode_index = if signed_x_mode >= 0 {
         signed_x_mode as usize
     } else {
