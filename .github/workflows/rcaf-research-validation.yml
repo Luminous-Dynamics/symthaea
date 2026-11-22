@@ -250,6 +250,30 @@ jobs:
           print("PASS: matched-input estimator-by-effect-size surface")
           PY
 
+      - name: Run synthetic graph spatial nuisance field generators
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisance -- "$RUNNER_TEMP/rcaf-spatial-nuisance.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/spatial-nuisance-field.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-spatial-nuisance.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["source_status"] == "synthetic_fixture"
+          assert report["geometry"]["interpretation_scope"] == "synthetic_topology_only"
+          assert {item["family_id"] for item in report["families"]} == {
+              "graph_smooth_low_rank",
+              "heat_kernel_localized",
+          }
+          assert all(item["spatial_rank"] >= 1 for item in report["families"])
+          assert all(item["realized_field_rms"] > 0.0 for item in report["families"])
+          print("PASS: RCAF graph-smooth and heat-kernel spatial nuisance generators")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -260,7 +284,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-injection-sweep.json" \
               "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
               "$RUNNER_TEMP/rcaf-estimator-dose-surface.json" \
-              "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json"
+              "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json" \
+              "$RUNNER_TEMP/rcaf-spatial-nuisance.json"
           python - <<'PY'
           import json
           import os
@@ -275,7 +300,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 5
+          assert len(receipt["simulation_reports"]) == 6
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -290,6 +315,7 @@ jobs:
             ${{ runner.temp }}/rcaf-estimator-tournament.json
             ${{ runner.temp }}/rcaf-estimator-dose-surface.json
             ${{ runner.temp }}/rcaf-common-mode-nuisance-sweep.json
+            ${{ runner.temp }}/rcaf-spatial-nuisance.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
