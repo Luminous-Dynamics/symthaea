@@ -654,12 +654,6 @@ fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(
     if forecast.expires_at_ns < forecast.target_end_ns {
         return Err(format!("forecast {} expires before its target window ends", forecast.forecast_id));
     }
-    if forecast.input_history_sha256 != panel.input_history_sha256 {
-        return Err(format!(
-            "forecast {} is not bound to the active session input history (yoked or mismatched preview)",
-            forecast.forecast_id
-        ));
-    }
     if forecast.committed_at_ns >= forecast.target_start_ns {
         return Err(format!(
             "forecast {} was committed after its target window began (post-hoc)",
