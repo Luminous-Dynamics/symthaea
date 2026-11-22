@@ -1,22 +1,22 @@
 # Decision-Relevant Predictability Metrics
 
-Dependency-free Rust metric contracts and a deterministic paired-world evaluator fixture for [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
+Dependency-free Rust metric contracts, a paired-world evaluator fixture and a first transparent forecasting tournament adapter for [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
 
-The package includes no candidate forecasting model. It currently provides evaluator-side primitives:
+## Included
 
 - Qualified Lyapunov-time normalization that rejects any reference exponent not marked `Reliable`.
 - Observed forecast-horizon extraction with finite-value and monotonic-time validation.
 - Information-set Bayes risk, candidate policy risk, a separately labelled perfect-information lower bound, and regret.
 - Expected value of information from expected posterior Bayes risk and acquisition cost in task-loss units.
-- Componentwise Pareto dominance over a resource vector that includes sensing, acquisition, compute, p99 latency, peak/persistent memory, training, update, preprocessing, energy and communication.
-- A paired-world fixture in which a physical hazard and a sensor-offset-only world generate exactly the same passive primary-sensor observations.
+- Componentwise Pareto dominance over sensing, acquisition, compute, p99 latency, peak/persistent memory, training, update, preprocessing, energy and communication.
+- A paired-world fixture in which a physical hazard and sensor-offset-only world generate the same passive primary-sensor observations.
 - Separate candidate-visible episode/observation types and evaluator-only mechanism/loss records.
 - Probe permission, remaining-budget and decision-deadline admission checks.
-- Known-answer tests for passive observational equivalence, irreducible abstention risk, a decision-changing reference probe, a one-bit nuisance observation with zero decision value, and denied probes.
+- A **Decision-Relevant Predictability Horizon (DRPH)** contract that consumes independently qualified simultaneous upper bounds on decision regret and critical-event risk. It does not construct or certify those bounds.
+- Transparent univariate forecasting baselines: persistence, training-window mean, and recursive linear AR(p) fitted with Householder QR and optional ridge regularization.
+- A CSV adapter/runner that evaluates those baselines against the output contract of the independent chaos-reference generator.
 
-The decision evaluator distinguishes the best action available under the candidate's information set from the evaluator-only perfect-information lower bound. This prevents irreducible uncertainty from being charged to the candidate as avoidable model error.
-
-## Run
+## Run the focused crate
 
 ```bash
 cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
@@ -24,18 +24,56 @@ cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.to
 cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
 ```
 
-The crate uses only the Rust standard library and is an isolated Cargo workspace. The focused workflow is pinned to Rust 1.96.0.
+The package uses only the Rust standard library and is an isolated Cargo workspace. Its focused GitHub Actions workflow is pinned to Rust 1.96.0.
+
+## Run the transparent forecasting tournament
+
+The runner consumes the comment/header/CSV output emitted by `research/chaos-reference-suite`. It does not link against that separate crate: this keeps the fixture generator and candidate evaluator independently buildable while the two pull requests are reviewed.
+
+After the chaos-reference-suite package is present in the same checkout:
+
+```bash
+cargo run --manifest-path research/chaos-reference-suite/Cargo.toml --bin chaos-fixtures -- 2048 20261116 > chaos-fixtures.csv
+cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
+```
+
+The smoke fixture at `fixtures/forecast-smoke.csv` lets CI test the adapter without depending on the separate generator pull request:
+
+```bash
+cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
+```
+
+### Evaluation protocol v0
+
+- Split each individual trajectory chronologically: 60% training, next 10% validation, final 30% test.
+- Forecast the validation and test segments recursively/free-running from one fixed as-of origin. Test observations are never assimilated after forecasting begins.
+- Compare persistence, mean, AR(1), AR(2), AR(4), AR(8), and validation-selected AR(order).
+- Select the AR order only on the validation continuation; choose the lowest full-validation rollout NRMSE, with lower order winning exact ties.
+- Refit each test arm on the first 70% and forecast the final 30% once.
+- Report MAE, RMSE, NRMSE (RMSE divided by development-segment population standard deviation), and skill relative to persistence in fixed lead-time bins. Persistence skill is left undefined when the reference RMSE is no greater than 1e-12 times the development signal scale, avoiding unstable ratios when the baseline is already effectively exact.
+- Preserve fit/forecast failures and constant channels as explicit status rows rather than silently dropping them. Channels whose population standard deviation is no greater than 16 machine epsilons times their maximum absolute value are treated as numerically unresolved; no NRMSE is reported for those channels.
+
+**Claim boundary:** this is a within-trajectory, same-regime continuation diagnostic. It is not a held-out equation/parameter-family generalization test, it has one trajectory per generator, and it reports no confidence intervals because adjacent forecast leads are correlated. A chronological split prevents future-to-past leakage but does not create independent episodes. Do not treat this report as an SOTA comparison.
+
+The runner reports an FNV-1a input digest labelled `non_security`; it is only a reproducibility convenience, never an authentication mechanism.
 
 ## Paired-world evaluator boundary
 
-Candidate-facing code should receive only `CandidateEpisode` and authorized `PrimarySensorObservation` values. Evaluator-only `EvaluatorWorld` records contain the latent mechanism and action losses. The Rust type split helps make the benchmark interface explicit, but this package is **not a sandbox or process-security boundary**. Confirmatory evaluations must keep evaluator truth in a separate process or permissioned environment and release only authorized observations to candidates.
+Candidate-facing code should receive only `CandidateEpisode` and authorized `PrimarySensorObservation` values. Evaluator-only `EvaluatorWorld` records contain latent mechanism and action losses. The Rust type split makes this boundary explicit, but this package is **not a sandbox or process-security boundary**. Confirmatory evaluations must keep evaluator truth in a separate process or permissioned environment and release only authorized observations to candidates.
 
 The canonical fixture currently tests a single pair of worlds and exact deterministic probe outcomes. Its step-based deadline and budget checks are local benchmark controls, not a replacement for capture/arrival clock domains or full observation-event semantics. It does not yet implement noisy/missing/delayed probe channels or a broad world generator.
 
 ## Scope and limits
 
-These are metric/oracle primitives and finite synthetic controls, not a complete benchmark tournament, forecasting system, physical sensor system, or safety controller. Remaining work includes broader paired-world generators, clock-domain and duplicate/stale-event controls, candidate/evaluator process isolation, independent fixture review, and matched external predictor baselines.
+The crate contains reference metrics and transparent diagnostic arms, not a complete benchmark tournament, a forecasting foundation model, a physical sensor system, or a safety controller. Remaining work includes:
 
-Resource vectors are comparable only when units, measurement boundaries, hardware and workloads match. The crate does not measure physical energy or hardware performance. Lyapunov normalization is rejected unless the reference exponent is marked `Reliable`; a candidate's own unqualified estimate must not define its score.
+- Held-out equation and parameter families, independent seeds and paired uncertainty analysis.
+- ESN, NGRC and NGRC-MDS matched baselines, followed by HDC/CfC/LTC and external foundation models.
+- Probabilistic forecasts and independently qualified coverage/confidence bounds.
+- Irregular timestamp, missingness, delayed observation and event-time adapters through the existing #9700/#12407 owners.
+- Noisy active-probe and decision-focused EVSI tournament through #9817.
+- Candidate/evaluator process isolation and independent fixture review through #12567.
 
-No output from this crate establishes SOTA, physical reliability, consciousness or causal reconstruction.
+Resource vectors are comparable only when units, measurement boundaries, hardware and workloads match. This crate does not measure physical energy or hardware performance.
+
+No output from this crate establishes SOTA, physical reliability, causal reconstruction, consciousness or real-world risk guarantees.

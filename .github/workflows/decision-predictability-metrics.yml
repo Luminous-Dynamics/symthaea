@@ -1,0 +1,105 @@
+name: Decision Predictability Metrics
+
+on:
+  pull_request:
+    paths:
+      - "research/decision-predictability-benchmark/**"
+      - ".github/workflows/decision-predictability-metrics.yml"
+  push:
+    branches:
+      - "research/decision-relevant-predictability-v*"
+    paths:
+      - "research/decision-predictability-benchmark/**"
+      - ".github/workflows/decision-predictability-metrics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: decision-predictability-metrics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Standalone Rust metric contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
+
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run all tests
+        run: cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
+
+      - name: Run transparent forecast evaluator smoke test
+        run: |
+          cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- research/decision-predictability-benchmark/fixtures/forecast-smoke.csv > forecast-report.csv
+          test -s forecast-report.csv
+          grep -q '^fixture,regime,channel,model,' forecast-report.csv
+          grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
+          grep -q ",ok" forecast-report.csv
+
+      - name: Checkout pinned chaos reference generator
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/symthaea
+          ref: d39d1ad9e2c1b72db10ff8859aac379662615a86
+          path: chaos-reference-source
+
+      - name: Run full frozen generator-to-baseline integration
+        run: |
+          cargo run --manifest-path chaos-reference-source/research/chaos-reference-suite/Cargo.toml --bin chaos-fixtures -- 2048 20261116 > chaos-fixtures.csv
+          test -s chaos-fixtures.csv
+          grep -q "fixture,regime,step,x,y,z" chaos-fixtures.csv
+          for fixture in stable_linear logistic_fixed logistic_period2 logistic_chaotic henon quasiperiodic_torus ar1_colored_noise lorenz63; do
+            grep -q "^$fixture," chaos-fixtures.csv
+          done
+          cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --bin forecast-fixtures -- chaos-fixtures.csv > forecast-report.csv
+          test -s forecast-report.csv
+          grep -q '^fixture,regime,channel,model,' forecast-report.csv
+          grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
+          grep -q '^stable_linear,' forecast-report.csv
+          grep -q '^lorenz63,' forecast-report.csv
+          grep -q ",ok" forecast-report.csv
+
+      - name: Summarize per-fixture forecast metrics
+        run: |
+          awk -F, '
+            $1 != "fixture" && $1 !~ /^#/ && NF >= 18 {
+              fixtures[$1] = 1
+              models[$4] = 1
+              if ($18 == "ok") successful++
+              else failures[$18]++
+            }
+            END {
+              for (fixture in fixtures) fixture_count++
+              for (model in models) model_count++
+              printf "fixture_families=%d\n", fixture_count
+              printf "reported_models_including_status_rows=%d\n", model_count
+              printf "successful_metric_rows=%d\n", successful
+              for (status in failures) {
+                printf "rows_with_status_%s=%d\n", status, failures[status]
+              }
+              if (fixture_count != 8 || successful == 0) exit 1
+            }
+          ' forecast-report.csv
+
+      - name: Upload reproducible generator and forecast report
+        uses: actions/upload-artifact@v4
+        with:
+          name: forecast-baseline-report-${{ github.sha }}
+          path: |
+            chaos-fixtures.csv
+            forecast-report.csv
+          if-no-files-found: error
+          retention-days: 14
