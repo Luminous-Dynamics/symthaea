@@ -23,16 +23,46 @@
     "claim_limits"
   ],
   "properties": {
-    "schema_version": { "const": "rcaf.factorial-dose-response/0.1.0" },
-    "source_status": { "const": "synthetic_factorial_sweep" },
-    "experiment_id": { "const": "s3-dose-response-01" },
-    "signal_id": { "const": "distributed-target-v1" },
-    "nuisance_family_id": { "const": "motion_transient" },
-    "nuisance_instance_id": { "const": "fixed-transient-events-12-27-41" },
-    "time_points": { "const": 64 },
-    "roi_count": { "const": 6 },
-    "signal_scales": { "const": [0.0, 0.5, 1.0, 2.0] },
-    "nuisance_component_variance_fractions": { "const": [0.0, 0.05, 0.1, 0.2] },
+    "schema_version": {
+      "const": "rcaf.factorial-dose-response/0.1.0"
+    },
+    "source_status": {
+      "const": "synthetic_factorial_sweep"
+    },
+    "experiment_id": {
+      "const": "s3-dose-response-01"
+    },
+    "signal_id": {
+      "const": "distributed-target-v1"
+    },
+    "nuisance_family_id": {
+      "const": "motion_transient"
+    },
+    "nuisance_instance_id": {
+      "const": "fixed-transient-events-12-27-41"
+    },
+    "time_points": {
+      "const": 64
+    },
+    "roi_count": {
+      "const": 6
+    },
+    "signal_scales": {
+      "const": [
+        0,
+        0.5,
+        1,
+        2
+      ]
+    },
+    "nuisance_component_variance_fractions": {
+      "const": [
+        0,
+        0.05,
+        0.1,
+        0.2
+      ]
+    },
     "raw_signal_fingerprint": {
       "type": "string",
       "pattern": "^[0-9a-f]{16}$"
@@ -41,17 +71,24 @@
       "type": "string",
       "pattern": "^[0-9a-f]{16}$"
     },
-    "point_count": { "const": 16 },
+    "point_count": {
+      "const": 16
+    },
     "points": {
       "type": "array",
       "minItems": 16,
       "maxItems": 16,
-      "items": { "$ref": "#/$defs/point" }
+      "items": {
+        "$ref": "#/$defs/point"
+      }
     },
     "claim_limits": {
       "type": "array",
       "minItems": 5,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
   "$defs": {
@@ -72,32 +109,76 @@
         "signal_component_rms",
         "nuisance_component_rms",
         "cells",
-        "invariants"
+        "invariants",
+        "estimators",
+        "connectivity_direction"
       ],
       "properties": {
-        "signal_scale_index": { "type": "integer", "minimum": 0, "maximum": 3 },
-        "nuisance_fraction_index": { "type": "integer", "minimum": 0, "maximum": 3 },
-        "signal_scale": { "enum": [0.0, 0.5, 1.0, 2.0] },
+        "signal_scale_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "nuisance_fraction_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "signal_scale": {
+          "enum": [
+            0,
+            0.5,
+            1,
+            2
+          ]
+        },
         "requested_nuisance_component_variance_fraction": {
-          "enum": [0.0, 0.05, 0.1, 0.2]
+          "enum": [
+            0,
+            0.05,
+            0.1,
+            0.2
+          ]
         },
         "realized_nuisance_component_variance_fraction": {
           "type": "number",
           "minimum": 0,
           "maximum": 0.200000000001
         },
-        "nuisance_scale_multiplier": { "type": "number", "minimum": 0 },
-        "clean_component_variance": { "type": "number", "exclusiveMinimum": 0 },
-        "nuisance_component_variance": { "type": "number", "minimum": 0 },
-        "clean_nuisance_covariance": { "type": "number" },
-        "combined_observed_variance": { "type": "number", "minimum": 0 },
-        "signal_component_rms": { "type": "number", "minimum": 0 },
-        "nuisance_component_rms": { "type": "number", "minimum": 0 },
+        "nuisance_scale_multiplier": {
+          "type": "number",
+          "minimum": 0
+        },
+        "clean_component_variance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "nuisance_component_variance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "clean_nuisance_covariance": {
+          "type": "number"
+        },
+        "combined_observed_variance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "signal_component_rms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "nuisance_component_rms": {
+          "type": "number",
+          "minimum": 0
+        },
         "cells": {
           "type": "array",
           "minItems": 4,
           "maxItems": 4,
-          "items": { "$ref": "#/$defs/cell" }
+          "items": {
+            "$ref": "#/$defs/cell"
+          }
         },
         "invariants": {
           "type": "object",
@@ -110,11 +191,144 @@
             "all_invariants_within_tolerance"
           ],
           "properties": {
-            "matched_nuisance_delta_max_abs": { "type": "number", "minimum": 0 },
-            "matched_signal_delta_max_abs": { "type": "number", "minimum": 0 },
-            "additive_interaction_max_abs": { "type": "number", "minimum": 0 },
-            "numerical_tolerance": { "type": "number", "exclusiveMinimum": 0 },
-            "all_invariants_within_tolerance": { "const": true }
+            "matched_nuisance_delta_max_abs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "matched_signal_delta_max_abs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "additive_interaction_max_abs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "numerical_tolerance": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "all_invariants_within_tolerance": {
+              "const": true
+            }
+          }
+        },
+        "estimators": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "estimator_id",
+              "clean_to_signal_similarity",
+              "clean_to_nuisance_similarity",
+              "signal_to_combined_similarity",
+              "clean_to_combined_similarity",
+              "clean_signal_distance",
+              "nuisance_only_distance",
+              "combined_signal_residual_distance",
+              "nuisance_to_signal_distance_ratio",
+              "signal_retention_fraction"
+            ],
+            "properties": {
+              "estimator_id": {
+                "enum": [
+                  "absolute_weighted_jaccard",
+                  "signed_shift_weighted_jaccard",
+                  "normalized_mean_absolute_edge_error"
+                ]
+              },
+              "clean_to_signal_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "clean_to_nuisance_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "signal_to_combined_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "clean_to_combined_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "clean_signal_distance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "nuisance_only_distance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "combined_signal_residual_distance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "nuisance_to_signal_distance_ratio": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "signal_retention_fraction": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "connectivity_direction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signal_projection_gain",
+            "signal_directional_cosine",
+            "signal_change_residual_fraction",
+            "clean_signal_change_norm",
+            "combined_signal_change_norm"
+          ],
+          "properties": {
+            "signal_projection_gain": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "signal_directional_cosine": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": -1,
+              "maximum": 1
+            },
+            "signal_change_residual_fraction": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "clean_signal_change_norm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "combined_signal_change_norm": {
+              "type": "number",
+              "minimum": 0
+            }
           }
         }
       }
@@ -137,8 +351,14 @@
             "signal_plus_nuisance"
           ]
         },
-        "rms": { "type": "number", "minimum": 0 },
-        "max_absolute_value": { "type": "number", "minimum": 0 },
+        "rms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_absolute_value": {
+          "type": "number",
+          "minimum": 0
+        },
         "fnv1a64_fingerprint": {
           "type": "string",
           "pattern": "^[0-9a-f]{16}$"
