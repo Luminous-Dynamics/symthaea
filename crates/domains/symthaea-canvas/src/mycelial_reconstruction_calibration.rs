@@ -548,7 +548,7 @@ fn top_label_calibration(
     let mut correct = 0usize;
     for sample in samples {
         let is_correct = sample.predicted_class == sample.target;
-        correct += usize::from(is_correct);
+        correct += if is_correct { 1 } else { 0 };
         brier += (sample.confidence - if is_correct { 1.0 } else { 0.0 }).powi(2);
         nll -= sample.probabilities[sample.target.index()]
             .max(epsilon)
@@ -601,12 +601,14 @@ fn selective_risk_curve(samples: &[CalibrationSample]) -> Vec<ReconstructionSele
         let threshold = ordered[cursor].confidence;
         while cursor < ordered.len() && ordered[cursor].confidence == threshold {
             let sample = ordered[cursor];
-            errors += usize::from(sample.predicted_class != sample.target);
+            errors += if sample.predicted_class != sample.target { 1 } else { 0 };
             if sample.predicted_class == ReconstructionCalibrationClass::Anastomosis {
                 predicted_anastomosis += 1;
-                false_anastomosis += usize::from(
-                    sample.target != ReconstructionCalibrationClass::Anastomosis,
-                );
+                false_anastomosis += if sample.target != ReconstructionCalibrationClass::Anastomosis {
+                    1
+                } else {
+                    0
+                };
             }
             cursor += 1;
         }
