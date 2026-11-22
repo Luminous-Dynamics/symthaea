@@ -5,9 +5,9 @@
 //! within-/between-condition similarities. Participant-level inference is performed only
 //! after repeated segment measurements have been reduced within participant.
 
+pub mod motion_transient;
 pub mod simulation;
 pub mod spatial_nuisance;
-pub mod motion_transient;
 
 use std::fmt;
 
