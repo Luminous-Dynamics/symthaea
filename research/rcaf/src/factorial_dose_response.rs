@@ -4,6 +4,10 @@
 //! the sweep. Signal scales and nuisance component-variance fractions are varied without redrawing
 //! either matrix. This is a common-random-numbers construction that isolates declared dose changes.
 
+use crate::estimator_response::{
+    evaluate_factorial_estimator_response, ConnectivityDirectionReport, EstimatorResponseError,
+    EstimatorResponseSummary,
+};
 use crate::factorial_counterfactual::{
     run_factorial_counterfactual_experiment, FactorialCellSummary, FactorialExperimentError,
     FactorialExperimentMetadata, FactorialInvariantReport,
@@ -38,6 +42,8 @@ pub struct FactorialDoseResponsePoint {
     pub combined_observed_variance: f64,
     pub signal_component_rms: f64,
     pub nuisance_component_rms: f64,
+    pub estimators: Vec<EstimatorResponseSummary>,
+    pub connectivity_direction: ConnectivityDirectionReport,
     pub cells: Vec<FactorialCellSummary>,
     pub invariants: FactorialInvariantReport,
 }
@@ -129,6 +135,7 @@ pub enum FactorialDoseResponseError {
     FactorialInvariantFailure,
     Factorial(FactorialExperimentError),
     Calibration(SpatialVarianceCalibrationError),
+    EstimatorResponse(EstimatorResponseError),
 }
 
 impl fmt::Display for FactorialDoseResponseError {
@@ -167,6 +174,7 @@ impl fmt::Display for FactorialDoseResponseError {
             }
             Self::Factorial(error) => write!(f, "factorial cell construction failed: {error}"),
             Self::Calibration(error) => write!(f, "nuisance calibration failed: {error}"),
+            Self::EstimatorResponse(error) => write!(f, "estimator response failed: {error}"),
         }
     }
 }
@@ -182,6 +190,12 @@ impl From<FactorialExperimentError> for FactorialDoseResponseError {
 impl From<SpatialVarianceCalibrationError> for FactorialDoseResponseError {
     fn from(value: SpatialVarianceCalibrationError) -> Self {
         Self::Calibration(value)
+    }
+}
+
+impl From<EstimatorResponseError> for FactorialDoseResponseError {
+    fn from(value: EstimatorResponseError) -> Self {
+        Self::EstimatorResponse(value)
     }
 }
 
@@ -266,6 +280,7 @@ pub fn run_factorial_dose_response_sweep(
             if !experiment.report.invariants.all_invariants_within_tolerance {
                 return Err(FactorialDoseResponseError::FactorialInvariantFailure);
             }
+            let estimator_response = evaluate_factorial_estimator_response(&experiment)?;
             let calibration = &calibration_reports[fraction_index];
             points.push(FactorialDoseResponsePoint {
                 signal_scale_index: signal_index,
@@ -282,6 +297,8 @@ pub fn run_factorial_dose_response_sweep(
                 combined_observed_variance: experiment.report.combined_observed_variance,
                 signal_component_rms: experiment.report.signal_component_rms,
                 nuisance_component_rms: experiment.report.nuisance_component_rms,
+                estimators: estimator_response.estimators,
+                connectivity_direction: estimator_response.connectivity_direction,
                 cells: experiment.report.cells,
                 invariants: experiment.report.invariants,
             });
@@ -407,24 +424,80 @@ fn number_array_json(values: &[f64]) -> String {
 }
 
 fn render_point(point: &FactorialDoseResponsePoint) -> String {
+    let estimators = point
+        .estimators
+        .iter()
+        .map(|item| {
+            let nuisance_ratio = item
+                .nuisance_to_signal_distance_ratio
+                .map(|value| format!("{value:.12}"))
+                .unwrap_or_else(|| "null".to_string());
+            let retention = item
+                .signal_retention_fraction
+                .map(|value| format!("{value:.12}"))
+                .unwrap_or_else(|| "null".to_string());
+            format!(
+                concat!(
+                    "        {{\n",
+                    "          \"estimator_id\": \"{}\",\n",
+                    "          \"clean_to_signal_similarity\": {:.12},\n",
+                    "          \"clean_to_nuisance_similarity\": {:.12},\n",
+                    "          \"signal_to_combined_similarity\": {:.12},\n",
+                    "          \"clean_to_combined_similarity\": {:.12},\n",
+                    "          \"clean_signal_distance\": {:.12},\n",
+                    "          \"nuisance_only_distance\": {:.12},\n",
+                    "          \"combined_signal_residual_distance\": {:.12},\n",
+                    "          \"nuisance_to_signal_distance_ratio\": {},\n",
+                    "          \"signal_retention_fraction\": {}\n",
+                    "        }}"
+                ),
+                item.estimator_id,
+                item.clean_to_signal_similarity,
+                item.clean_to_nuisance_similarity,
+                item.signal_to_combined_similarity,
+                item.clean_to_combined_similarity,
+                item.clean_signal_distance,
+                item.nuisance_only_distance,
+                item.combined_signal_residual_distance,
+                nuisance_ratio,
+                retention,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",\n");
+    let direction = &point.connectivity_direction;
+    let direction_gain = direction
+        .signal_projection_gain
+        .map(|value| format!("{value:.12}"))
+        .unwrap_or_else(|| "null".to_string());
+    let direction_cosine = direction
+        .signal_directional_cosine
+        .map(|value| format!("{value:.12}"))
+        .unwrap_or_else(|| "null".to_string());
+    let direction_residual = direction
+        .signal_change_residual_fraction
+        .map(|value| format!("{value:.12}"))
+        .unwrap_or_else(|| "null".to_string());
+
     let cells = point
         .cells
         .iter()
         .map(|cell| {
             format!(
                 concat!(
-                    "      {{\n",
-                    "        \"cell_id\": \"{}\",\n",
-                    "        \"rms\": {:.12},\n",
-                    "        \"max_absolute_value\": {:.12},\n",
-                    "        \"fnv1a64_fingerprint\": \"{}\"\n",
-                    "      }}"
+                    "        {{\n",
+                    "          \"cell_id\": \"{}\",\n",
+                    "          \"rms\": {:.12},\n",
+                    "          \"max_absolute_value\": {:.12},\n",
+                    "          \"fnv1a64_fingerprint\": \"{}\"\n",
+                    "        }}"
                 ),
                 cell.cell_id, cell.rms, cell.max_absolute_value, cell.fnv1a64_fingerprint
             )
         })
         .collect::<Vec<_>>()
         .join(",\n");
+
     format!(
         concat!(
             "    {{\n",
@@ -440,6 +513,14 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
             "      \"combined_observed_variance\": {:.12},\n",
             "      \"signal_component_rms\": {:.12},\n",
             "      \"nuisance_component_rms\": {:.12},\n",
+            "      \"estimators\": [\n{}\n      ],\n",
+            "      \"connectivity_direction\": {{\n",
+            "        \"signal_projection_gain\": {},\n",
+            "        \"signal_directional_cosine\": {},\n",
+            "        \"signal_change_residual_fraction\": {},\n",
+            "        \"clean_signal_change_norm\": {:.12},\n",
+            "        \"combined_signal_change_norm\": {:.12}\n",
+            "      }},\n",
             "      \"cells\": [\n{}\n      ],\n",
             "      \"invariants\": {{\n",
             "        \"matched_nuisance_delta_max_abs\": {:.12},\n",
@@ -462,6 +543,12 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
         point.combined_observed_variance,
         point.signal_component_rms,
         point.nuisance_component_rms,
+        estimators,
+        direction_gain,
+        direction_cosine,
+        direction_residual,
+        direction.clean_signal_change_norm,
+        direction.combined_signal_change_norm,
         cells,
         point.invariants.matched_nuisance_delta_max_abs,
         point.invariants.matched_signal_delta_max_abs,
@@ -635,6 +722,49 @@ mod tests {
             run_factorial_dose_response_sweep(&clean, &signal, &nuisance, &config).unwrap(),
             run_factorial_dose_response_sweep(&clean, &signal, &nuisance, &config).unwrap()
         );
+    }
+
+    #[test]
+    fn every_dose_point_contains_all_estimator_response_scores() {
+        let report =
+            run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
+        for point in &report.points {
+            assert_eq!(
+                point
+                    .estimators
+                    .iter()
+                    .map(|item| item.estimator_id)
+                    .collect::<Vec<_>>(),
+                vec![
+                    "absolute_weighted_jaccard",
+                    "signed_shift_weighted_jaccard",
+                    "normalized_mean_absolute_edge_error",
+                ]
+            );
+            assert!(point.estimators.iter().all(|item| {
+                (0.0..=1.0).contains(&item.clean_to_signal_similarity)
+                    && (0.0..=1.0).contains(&item.clean_to_nuisance_similarity)
+                    && (0.0..=1.0).contains(&item.signal_to_combined_similarity)
+            }));
+            assert!(point.connectivity_direction.clean_signal_change_norm >= 0.0);
+            assert!(point.connectivity_direction.combined_signal_change_norm >= 0.0);
+        }
+    }
+
+    #[test]
+    fn zero_signal_axis_produces_undefined_estimator_retention() {
+        let report =
+            run_factorial_dose_response_sweep(&clean(), &signal(), &nuisance(), &config()).unwrap();
+        for point in &report.points[..4] {
+            assert!(point
+                .estimators
+                .iter()
+                .all(|item| item.signal_retention_fraction.is_none()));
+            assert!(point
+                .connectivity_direction
+                .signal_projection_gain
+                .is_none());
+        }
     }
 
     #[test]
