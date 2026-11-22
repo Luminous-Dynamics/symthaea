@@ -382,7 +382,10 @@ fn usable_locator(
 
 fn expected_success_value(value_micros: i64, success_probability_bps: u16) -> i64 {
     let product = i128::from(value_micros) * i128::from(success_probability_bps);
-    let expected = (product / 10_000)
+    // Floor signed expected value so a negative estimate is never made
+    // artificially less negative by truncation toward zero.
+    let expected = product
+        .div_euclid(10_000)
         .clamp(i128::from(i64::MIN), i128::from(i64::MAX));
     i64::try_from(expected).unwrap_or(i64::MAX)
 }
@@ -392,9 +395,11 @@ fn expected_failure_loss(
     success_probability_bps: u16,
 ) -> i64 {
     let failure_probability_bps = 10_000_u32.saturating_sub(u32::from(success_probability_bps));
-    let expected_loss = u64::from(failure_probability_bps)
-        * u64::from(failure_penalty_micros)
-        / 10_000;
+    // Expected failure cost is rounded up: fractional micro-loss must not
+    // disappear and make re-observation look cheaper than its risk warrants.
+    let numerator =
+        u64::from(failure_probability_bps) * u64::from(failure_penalty_micros);
+    let expected_loss = numerator.saturating_add(9_999) / 10_000;
     i64::try_from(expected_loss).unwrap_or(i64::MAX)
 }
 
@@ -1240,6 +1245,21 @@ mod tests {
         ));
         let plan = plan_memory_representation(&prediction(0, 1), &profile, policy()).unwrap();
         assert_eq!(plan.disposition, ReobservationDispositionV1::Discard);
+    }
+
+    #[test]
+    fn fractional_expected_failure_loss_rounds_up_instead_of_disappearing() {
+        assert_eq!(expected_failure_loss(1, 9_999), 1);
+        assert_eq!(expected_failure_loss(1, 1), 1);
+        assert_eq!(expected_failure_loss(100, 9_900), 1);
+        assert_eq!(expected_failure_loss(1_000, 10_000), 0);
+    }
+
+    #[test]
+    fn negative_expected_success_value_rounds_down_away_from_zero() {
+        assert_eq!(expected_success_value(-1, 1), -1);
+        assert_eq!(expected_success_value(-10_001, 5_000), -5_001);
+        assert_eq!(expected_success_value(1, 1), 0);
     }
 
     #[test]
