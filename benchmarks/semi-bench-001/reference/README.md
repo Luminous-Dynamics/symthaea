@@ -310,3 +310,25 @@ All three baselines share the exact same frozen rows and binary scoring contract
 For comparison, report B0/B1/B2/B3/B4 side by side. The prevalence-only AP reference equals the positive prevalence on the scored split; a B1 AP below this reference is not useful ranking performance. A high B1 score with poor held-out calibration must be treated as a failure, not converted into a threshold recommendation.
 
 The B2/B3/B4 chronological test has only 17 failures. Before leaderboard claims, add lot/tool/time groups from a source that actually carries those identities, multiple independent time periods, confidence intervals and a second independent dataset. The anonymous SECOM mirror cannot establish fab transfer.
+
+
+## SECOM discriminative logistic baseline B5
+
+The Rust CLI \`semi-secom-logistic\` adds two train-only FTRL-Proximal logistic models over a shared feature transform:
+
+- **B5 unweighted:** L2-regularized logistic regression, with training-median value imputation and training-standardized values plus per-sensor missingness indicators.
+- **B5-balanced:** the same model and transform with inverse-frequency training loss weights. Its emitted log-odds receive the analytic training-prior correction \`ln(weight_negative / weight_positive)\`; the correction is fitted from training class counts only.
+
+The model uses a frozen FTRL configuration (80 epochs, alpha 0.05, beta 1.0, L1 0, L2 1.0). Training rows are sorted by stable sample identity before gradient accumulation, making the serialized weights reproducible under input-row permutation. The report binds the raw feature/label digests, split-manifest digest and model SHA-256.
+
+Run against the pinned mirror:
+
+\`\`\`sh
+cargo run -p symthaea-semiconductor --bin semi-secom-logistic -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+B5 is a strong discriminative challenger to B2–B4, but it is still a linear model over anonymous sensor columns. Class weighting changes the training objective; the prior correction restores the training class prior under the ideal weighted-likelihood identity, but does not guarantee calibration under covariate/observation shift. Validate Brier/log-loss and high-confidence errors in addition to AUROC/AP. Do not tune the frozen epoch count, regularization or thresholds on the final chronological test.
