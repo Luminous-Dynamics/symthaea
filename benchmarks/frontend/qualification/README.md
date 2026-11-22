@@ -69,3 +69,17 @@ This suite measures whether SFEB's acceptance machinery is trustworthy. It is
 not a website-generation leaderboard and its mutation score must never be
 compared to Vision2Web, Design2Code or browser-agent scores. Those require
 separate matched evaluations.
+
+## Structural plan validation
+
+The campaign is also checked by the standalone Rust contract checker:
+
+```bash
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --mutations
+```
+
+This checks schema conformance, unique case IDs, reject/accept dispositions, the
+presence of critical/security/evidence-integrity mutants, minimum case counts and
+hard 100% targets for the critical classes. It does not execute any mutation or
+browser test. Run the checker and the actual campaign separately; only retained
+per-case evidence can establish an executed qualification result.
