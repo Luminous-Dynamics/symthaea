@@ -185,6 +185,9 @@ impl std::error::Error for TypedContentError {}
 struct EncodedExperience {
     event_id: u32,
     view_digest: [u8; 32],
+    /// Hard applicability keys: similarity must never retrieve across these.
+    scope: Scope,
+    action: Action,
     vector: ContinuousHV,
 }
 
@@ -229,6 +232,8 @@ impl TypedContentIndexV1 {
             candidates.push(EncodedExperience {
                 event_id: item.event_id,
                 view_digest: experience_view_digest(item),
+                scope: item.scope,
+                action: item.action,
                 vector: encode_experience(item, config),
             });
             payload_bytes = payload_bytes
@@ -263,6 +268,11 @@ impl TypedContentIndexV1 {
         let mut ranked: Vec<(u32, [u8; 32], f32)> = self
             .candidates
             .iter()
+            // Regime/objective/action are hard applicability keys, not
+            // approximate semantic hints. Rank content only inside the exact
+            // query scope/action partition so a wrong-scope distractor cannot
+            // crowd out valid in-scope evidence.
+            .filter(|candidate| candidate.scope == query.scope && candidate.action == query.action)
             .map(|candidate| {
                 (
                     candidate.event_id,
@@ -943,6 +953,26 @@ mod tests {
             index.retrieve(query(shifted_cost, Action::B, None), 1).unwrap().candidates[0].event_id,
             2
         );
+    }
+
+    #[test]
+    fn exact_scope_action_prefilter_blocks_high_similarity_wrong_scope_candidates() {
+        let target_scope = scope(Regime::Baseline, Objective::Quality);
+        let wrong_scope = scope(Regime::Shifted, Objective::Cost);
+        let memory = vec![
+            fixture(1, Action::A, target_scope, 0.40, 0.01),
+            fixture(2, Action::A, wrong_scope, 0.90, 0.01),
+            fixture(3, Action::B, target_scope, 0.90, 0.01),
+        ];
+        let index = TypedContentIndexV1::build(
+            &memory,
+            TypedContentConfigV1 { dimension: 2_048, ..TypedContentConfigV1::default() },
+        )
+        .unwrap();
+
+        let result = index.retrieve(query(target_scope, Action::A, Some(0.90)), 8).unwrap();
+        assert_eq!(ids(&result), vec![1]);
+        assert!(result.candidates.iter().all(|hit| hit.event_id != 2 && hit.event_id != 3));
     }
 
     #[test]
