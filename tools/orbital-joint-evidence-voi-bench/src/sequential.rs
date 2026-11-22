@@ -643,8 +643,7 @@ fn solve(
             )?;
             worst_case_regret = worst_case_regret.max(child.worst_case_regret);
             if let Some(child_expected) = &child.expected_resources {
-                let probability =
-                    conditional_branch_probability(scenario, belief, branch_belief)?;
+                let probability = conditional_branch_probability(scenario, belief, branch_belief)?;
                 expected_future = expected_add(
                     &expected_future,
                     &expected_scale(child_expected, probability),
