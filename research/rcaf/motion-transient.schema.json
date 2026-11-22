@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/motion-transient.schema.json",
+  "title": "RCAF motion-like spatial transient report",
+  "description": "Synthetic event-triggered spatial transient smoke report; not an empirical motion model.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "geometry",
+    "time_points",
+    "dose",
+    "broad_loading",
+    "localized_loading",
+    "spatial_decay_length",
+    "rng_seed",
+    "event_train_rule",
+    "broad_events",
+    "localized_events",
+    "localized_spatial_loadings",
+    "realized_field_rms",
+    "realized_field_max_abs",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": { "const": "rcaf.motion-transient/0.1.0" },
+    "source_status": { "const": "synthetic_fixture" },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation",
+        "source",
+        "interpretation_scope",
+        "roi_labels",
+        "weighted_edges",
+        "edge_length_rule"
+      ],
+      "properties": {
+        "representation": { "const": "weighted_undirected_graph" },
+        "source": { "const": "synthetic_path_graph" },
+        "interpretation_scope": { "const": "synthetic_topology_only" },
+        "roi_labels": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "weighted_edges": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "string" },
+              { "type": "string" },
+              { "type": "number", "exclusiveMinimum": 0 }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          }
+        },
+        "edge_length_rule": { "const": "inverse_adjacency_weight" }
+      }
+    },
+    "time_points": { "const": 160 },
+    "dose": { "type": "number", "minimum": 0 },
+    "broad_loading": { "type": "number", "minimum": 0 },
+    "localized_loading": { "type": "number", "minimum": 0 },
+    "spatial_decay_length": { "type": "number", "exclusiveMinimum": 0 },
+    "rng_seed": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{16}$"
+    },
+    "event_train_rule": {
+      "const": "amplitude_exp_negative_elapsed_over_decay_samples"
+    },
+    "broad_events": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "localized_events": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "onset",
+          "amplitude",
+          "decay_samples",
+          "seed_roi_index"
+        ],
+        "properties": {
+          "onset": { "type": "integer", "minimum": 0, "maximum": 159 },
+          "amplitude": { "type": "number" },
+          "decay_samples": { "type": "number", "exclusiveMinimum": 0 },
+          "seed_roi_index": { "type": "integer", "minimum": 0, "maximum": 7 }
+        }
+      }
+    },
+    "localized_spatial_loadings": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 8,
+        "maxItems": 8,
+        "items": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "realized_field_rms": { "type": "number", "minimum": 0 },
+    "realized_field_max_abs": { "type": "number", "minimum": 0 },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["onset", "amplitude", "decay_samples"],
+      "properties": {
+        "onset": { "type": "integer", "minimum": 0, "maximum": 159 },
+        "amplitude": { "type": "number" },
+        "decay_samples": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}
