@@ -124,7 +124,7 @@ jobs:
           cmp /tmp/sequential-campaign-a.json /tmp/sequential-campaign-b.json
           jq '{scenario_count, oracle_matches, oracle_mismatches, scenarios: [.scenarios[] | {scenario_id, search_states_expanded, search_memo_hits, search_memo_entries, policy_tree_nodes, baseline_terminal_disposition, adaptive_first_action: .adaptive_campaign.first_action_id, adaptive_worst_case_regret: .adaptive_campaign.worst_case_regret, expected_resources: .adaptive_campaign.expected_resources}]}' /tmp/sequential-campaign-a.json
           jq -e '
-            .scenario_count == 2 and .oracle_matches == 2 and
+            .scenario_count == 3 and .oracle_matches == 3 and
             .oracle_mismatches == 0 and .authority_granted == false and
             (.scenarios | all(.search_states_expanded > 0 and .search_memo_entries == .search_states_expanded and .policy_tree_nodes > 0)) and
             .scenarios[0].baseline_terminal_disposition == "HOLD" and
@@ -156,6 +156,25 @@ jobs:
             .scenarios[1].adaptive_campaign.policy.branches.CLEAR.action_id == "A-COMBINED-LOAD-SCREEN" and
             .scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.decision == "ACCEPT" and
             (.scenarios[1].adaptive_campaign.policy.branches.CLEAR.branches.PASS.covered_obligations | sort) == ["COMBINED-LOAD-CAPABILITY-001","THERMAL-WEAR-INSPECTABILITY-001"]
+            .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
+            .scenarios[2].baseline_terminal_disposition == "HOLD" and
+            .scenarios[2].baseline_worst_case_regret == 2 and
+            .scenarios[2].myopic.worst_case_regret == 2 and
+            .scenarios[2].myopic.stops_without_action == true and
+            .scenarios[2].fixed_campaign.worst_case_regret == 0 and
+            .scenarios[2].adaptive_campaign.first_action_id == "A-CALIBRATION-CHAIN" and
+            .scenarios[2].adaptive_campaign.worst_case_regret == 0 and
+            .scenarios[2].adaptive_campaign.policy.branches.INVALID.decision == "HOLD" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.action_id == "B-LOAD-CAPACITY" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.FAIL.decision == "REJECT" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.PASS.action_id == "C-ULTRASONIC-NDE" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.PASS.branches.CLEAR.decision == "ACCEPT" and
+            .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.PASS.branches.INDICATION.decision == "REJECT" and
+            ((.scenarios[2].adaptive_campaign.expected_resources.engineering_hours - 1.25) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.facility_hours - 1.215) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.specimen_count - 0.95) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.review_hours - 0.235) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.external_cost_units - 0.5275) | fabs) < 0.000000001
           ' /tmp/sequential-campaign-a.json
       - name: Independent stdlib sequential campaign oracle
         run: |
@@ -163,7 +182,7 @@ jobs:
             fixtures/orbital-joint-evidence-voi/v0.1/sequential-campaign.synthetic.json \
             "$GITHUB_SHA" > /tmp/sequential-campaign-oracle.json
           jq -e '
-            .scenario_count == 2 and .oracle_matches == 2 and .oracle_mismatches == 0 and
+            .scenario_count == 3 and .oracle_matches == 3 and .oracle_mismatches == 0 and
             .scenarios[0].adaptive_first_action == "A-COMBINED-LOAD-SCREEN" and
             .scenarios[0].adaptive_worst_case_regret == 0 and
             .scenarios[0].baseline_terminal_disposition == "HOLD" and
@@ -176,4 +195,21 @@ jobs:
             .scenarios[1].adaptive_worst_case_regret == 0 and
             ((.scenarios[1].adaptive_expected_resources.engineering_hours - 1.15) | fabs) < 0.000000001 and
             ((.scenarios[1].adaptive_expected_resources.facility_hours - 1.65) | fabs) < 0.000000001
+            .scenarios[2].scenario_id == "SEQ-003-AER01-NDE-STRUCTURAL" and
+            .scenarios[2].baseline_terminal_disposition == "HOLD" and
+            .scenarios[2].myopic_worst_case_regret == 2 and
+            .scenarios[2].fixed_campaign_worst_case_regret == 0 and
+            .scenarios[2].adaptive_first_action == "A-CALIBRATION-CHAIN" and
+            .scenarios[2].adaptive_worst_case_regret == 0 and
+            .scenarios[2].adaptive_policy.branches.INVALID.decision == "HOLD" and
+            .scenarios[2].adaptive_policy.branches.VALID.action_id == "B-LOAD-CAPACITY" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.FAIL.decision == "REJECT" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.PASS.action_id == "C-ULTRASONIC-NDE" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.PASS.branches.CLEAR.decision == "ACCEPT" and
+            .scenarios[2].adaptive_policy.branches.VALID.branches.PASS.branches.INDICATION.decision == "REJECT" and
+            ((.scenarios[2].adaptive_expected_resources.engineering_hours - 1.25) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.facility_hours - 1.215) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.specimen_count - 0.95) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.review_hours - 0.235) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.external_cost_units - 0.5275) | fabs) < 0.000000001
           ' /tmp/sequential-campaign-oracle.json
