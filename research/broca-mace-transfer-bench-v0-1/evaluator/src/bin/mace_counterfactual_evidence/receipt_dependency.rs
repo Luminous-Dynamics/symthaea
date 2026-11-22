@@ -81,6 +81,13 @@ impl ReceiptDependencyProjection {
             }
 
             for parent_id in &record.derived_from_event_ids {
+                // Preserve the declared parent identity even when it is not
+                // present in the selected pool. It remains useful for detecting
+                // a control that descends from a knocked-out target.
+                parents_by_child
+                    .get_mut(&record.event_id)
+                    .expect("every candidate event has a parent set")
+                    .insert(*parent_id);
                 if !event_ids.contains(parent_id) {
                     // A declared parent can be outside the selected memory
                     // pool. Preserve the unresolved dependency, never assume
@@ -89,10 +96,6 @@ impl ReceiptDependencyProjection {
                     incomplete_event_ids.insert(record.event_id);
                     continue;
                 }
-                parents_by_child
-                    .get_mut(&record.event_id)
-                    .expect("every candidate event has a parent set")
-                    .insert(*parent_id);
                 if children_by_parent
                     .get_mut(parent_id)
                     .expect("every candidate event has a child set")
