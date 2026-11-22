@@ -77,6 +77,7 @@ pub struct SemanticExperienceQueryV1 {
     pub target_outcome_reconciled: Option<bool>,
     pub target_source_trusted: Option<bool>,
     pub target_source_retracted: Option<bool>,
+    pub target_interference_controlled: Option<bool>,
     pub target_confounders_controlled: Option<bool>,
     pub target_delayed_horizon_complete: Option<bool>,
 }
@@ -98,9 +99,28 @@ impl SemanticExperienceQueryV1 {
             target_outcome_reconciled: None,
             target_source_trusted: None,
             target_source_retracted: None,
+            target_interference_controlled: None,
             target_confounders_controlled: None,
             target_delayed_horizon_complete: None,
         }
+    }
+
+    /// Candidate-visible query profile corresponding to the current MACE
+    /// causal-transfer admission predicates. Numeric overlap/balance limits
+    /// remain exact policy gates after resolution; they are not RBF point targets.
+    pub fn qualified_transfer(scope: Scope, action: Action) -> Self {
+        let mut query = Self::exact_scope_action(scope, action);
+        query.identification_method =
+            Some(IdentificationMethodV1::RandomizedControlledTrial);
+        query.target_intervention = Some(true);
+        query.target_prediction_pre_registered = Some(true);
+        query.target_outcome_reconciled = Some(true);
+        query.target_source_trusted = Some(true);
+        query.target_source_retracted = Some(false);
+        query.target_interference_controlled = Some(true);
+        query.target_confounders_controlled = Some(true);
+        query.target_delayed_horizon_complete = Some(true);
+        query
     }
 }
 
@@ -628,6 +648,7 @@ fn encode_query(
         ("outcome_reconciled", query.target_outcome_reconciled),
         ("source_trusted", query.target_source_trusted),
         ("source_retracted", query.target_source_retracted),
+        ("causal.interference_controlled", query.target_interference_controlled),
         ("confounders_controlled", query.target_confounders_controlled),
         (
             "delayed_horizon_complete",
@@ -993,12 +1014,14 @@ mod tests {
         let mut safe_query = query(target_scope, Action::A, None);
         safe_query.target_source_trusted = Some(true);
         safe_query.target_source_retracted = Some(false);
+        safe_query.target_interference_controlled = Some(true);
         let safe = index.retrieve(safe_query, 2).unwrap();
         assert_eq!(safe.candidates[0].event_id, 31);
 
         let mut negative_control = query(target_scope, Action::A, None);
         negative_control.target_source_trusted = Some(false);
         negative_control.target_source_retracted = Some(true);
+        negative_control.target_interference_controlled = Some(false);
         let negative = index.retrieve(negative_control, 2).unwrap();
         assert_eq!(negative.candidates[0].event_id, 32);
     }
