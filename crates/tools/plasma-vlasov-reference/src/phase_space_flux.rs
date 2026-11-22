@@ -489,8 +489,7 @@ mod tests {
                 let electric_rhs = -acceleration * derivative_v[index];
                 total_casimir_rate = (2.0 * value * electric_rhs)
                     .mul_add(config.dx() * config.dv(), total_casimir_rate);
-                total_casimir =
-                    (value * value).mul_add(config.dx() * config.dv(), total_casimir);
+                total_casimir = (value * value).mul_add(config.dx() * config.dv(), total_casimir);
             }
         }
 
