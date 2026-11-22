@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-event-universe-panel-v1.schema.json",
+  "title": "MEL Full Event Universe Forecast Panel v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "universe",
+    "candidate",
+    "policy",
+    "predictions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-event-universe-panel-v1"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "universe": {
+      "$ref": "#/$defs/universe"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "universe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "universe_id",
+        "universe_frozen_at_ns",
+        "labels_adjudicated_at_ns",
+        "task_family",
+        "canonical_time_map_id",
+        "canonical_time_map_version",
+        "canonical_time_map_kind",
+        "canonical_time_map_clock_domain_id",
+        "evaluator_clock_domain_id",
+        "time_alignment_receipt_sha256",
+        "time_alignment_valid_from_ns",
+        "time_alignment_valid_until_ns",
+        "time_alignment_max_uncertainty_ns",
+        "opportunity_manifest_sha256",
+        "label_protocol_sha256",
+        "adjudication_receipt_sha256",
+        "slots"
+      ],
+      "properties": {
+        "universe_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "universe_frozen_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "labels_adjudicated_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "task_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_time_map_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_time_map_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_time_map_kind": {
+          "const": "performance_time"
+        },
+        "canonical_time_map_clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_alignment_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "time_alignment_valid_from_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time_alignment_valid_until_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time_alignment_max_uncertainty_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "opportunity_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "label_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "adjudication_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "slots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot_id",
+        "role",
+        "beat_index",
+        "target_start_ns",
+        "target_end_ns",
+        "local_beat_period_ns",
+        "alternatives",
+        "truth_status",
+        "actual_alternative"
+      ],
+      "properties": {
+        "slot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beat_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_start_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_end_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "local_beat_period_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "truth_status": {
+          "enum": [
+            "present",
+            "absent",
+            "ambiguous"
+          ]
+        },
+        "actual_alternative": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_version",
+        "model_sha256",
+        "forecast_payload_sha256",
+        "committed_at_ns",
+        "input_snapshot_available_at_ns",
+        "input_snapshot_sha256",
+        "policy_sha256"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "forecast_payload_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "committed_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_snapshot_available_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "presence_decision_threshold"
+      ],
+      "properties": {
+        "presence_decision_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "alternativeProbability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alternative_id",
+        "conditional_probability"
+      ],
+      "properties": {
+        "alternative_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditional_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot_id",
+        "presence_probability",
+        "alternative_probabilities"
+      ],
+      "properties": {
+        "slot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presence_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "alternative_probabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/alternativeProbability"
+          }
+        }
+      }
+    }
+  }
+}
