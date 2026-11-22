@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 pub const INPUT_SCHEMA_V1: &str = "luminous.semi-bench.stratified-repeat-subject.v1";
