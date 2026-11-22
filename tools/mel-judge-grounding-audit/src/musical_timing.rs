@@ -225,10 +225,16 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
         match target.outcome.as_str() {
             "observed" => {
                 let observed = target.observed_onset_ns.ok_or_else(|| {
-                    format!("observed event {} is missing observed_onset_ns", target.event_id)
+                    format!(
+                        "observed event {} is missing observed_onset_ns",
+                        target.event_id
+                    )
                 })?;
                 let receipt = target.capture_receipt_sha256.as_deref().ok_or_else(|| {
-                    format!("observed event {} is missing capture receipt", target.event_id)
+                    format!(
+                        "observed event {} is missing capture receipt",
+                        target.event_id
+                    )
                 })?;
                 require_digest(receipt, "target onset capture receipt")?;
                 if observed < segment.change_observed_ns {
@@ -303,16 +309,29 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
         require_text(&extra.event_id, "extra onset event_id")?;
         require_text(&extra.instrument_id, "extra onset instrument_id")?;
         require_digest(&extra.capture_receipt_sha256, "extra onset capture receipt")?;
-        if !extra_ids.insert(extra.event_id.as_str()) || event_ids.contains(extra.event_id.as_str()) {
-            return Err(format!("duplicate or target-colliding extra onset ID: {}", extra.event_id));
+        if !extra_ids.insert(extra.event_id.as_str()) || event_ids.contains(extra.event_id.as_str())
+        {
+            return Err(format!(
+                "duplicate or target-colliding extra onset ID: {}",
+                extra.event_id
+            ));
         }
     }
     if !panel.extra_onsets.is_empty() {
-        findings.push(format!("{} unmatched extra onsets were supplied", panel.extra_onsets.len()));
+        findings.push(format!(
+            "{} unmatched extra onsets were supplied",
+            panel.extra_onsets.len()
+        ));
     }
 
-    let signed: Vec<f64> = computed.iter().map(|item| item.signed_phase_error).collect();
-    let absolute: Vec<f64> = computed.iter().map(|item| item.absolute_phase_error).collect();
+    let signed: Vec<f64> = computed
+        .iter()
+        .map(|item| item.signed_phase_error)
+        .collect();
+    let absolute: Vec<f64> = computed
+        .iter()
+        .map(|item| item.absolute_phase_error)
+        .collect();
     let absolute_ms: Vec<f64> = computed.iter().map(|item| item.absolute_error_ms).collect();
     let signed_bias = mean(&signed);
     let drift = regression_slope(
@@ -330,9 +349,13 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
     let mut target_counts = BTreeMap::<String, usize>::new();
     let mut missed_counts = BTreeMap::<String, usize>::new();
     for target in &panel.target_events {
-        *target_counts.entry(target.instrument_id.clone()).or_default() += 1;
+        *target_counts
+            .entry(target.instrument_id.clone())
+            .or_default() += 1;
         if target.outcome == "missed" {
-            *missed_counts.entry(target.instrument_id.clone()).or_default() += 1;
+            *missed_counts
+                .entry(target.instrument_id.clone())
+                .or_default() += 1;
         }
     }
     for item in &computed {
@@ -420,7 +443,10 @@ fn validate_header(panel: &MusicalTimingPanelV1) -> Result<(), String> {
     require_text(&panel.case_id, "case_id")?;
     require_text(&panel.clock_domain_id, "clock_domain_id")?;
     require_text(&panel.instrument_scope, "instrument_scope")?;
-    require_digest(&panel.reference_grid_receipt_sha256, "reference grid receipt")?;
+    require_digest(
+        &panel.reference_grid_receipt_sha256,
+        "reference grid receipt",
+    )?;
     require_digest(&panel.onset_capture_receipt_sha256, "onset capture receipt")?;
     require_digest(
         &panel.clock_calibration_receipt_sha256,
@@ -446,7 +472,9 @@ fn validate_header(panel: &MusicalTimingPanelV1) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_segments(segments: &[TempoSegmentV1]) -> Result<BTreeMap<&str, &TempoSegmentV1>, String> {
+fn validate_segments(
+    segments: &[TempoSegmentV1],
+) -> Result<BTreeMap<&str, &TempoSegmentV1>, String> {
     let mut result = BTreeMap::new();
     let mut previous_beat = None;
     let mut previous_phase = None;
@@ -454,7 +482,10 @@ fn validate_segments(segments: &[TempoSegmentV1]) -> Result<BTreeMap<&str, &Temp
     for segment in segments {
         require_text(&segment.segment_id, "tempo segment ID")?;
         if segment.beat_period_ns == 0 {
-            return Err(format!("tempo segment {} has zero beat period", segment.segment_id));
+            return Err(format!(
+                "tempo segment {} has zero beat period",
+                segment.segment_id
+            ));
         }
         if segment.change_observed_ns > segment.phase_zero_ns {
             return Err(format!(
@@ -471,8 +502,14 @@ fn validate_segments(segments: &[TempoSegmentV1]) -> Result<BTreeMap<&str, &Temp
         previous_beat = Some(segment.start_beat_index);
         previous_phase = Some(segment.phase_zero_ns);
         previous_observed = Some(segment.change_observed_ns);
-        if result.insert(segment.segment_id.as_str(), segment).is_some() {
-            return Err(format!("duplicate tempo segment ID: {}", segment.segment_id));
+        if result
+            .insert(segment.segment_id.as_str(), segment)
+            .is_some()
+        {
+            return Err(format!(
+                "duplicate tempo segment ID: {}",
+                segment.segment_id
+            ));
         }
     }
     Ok(result)
@@ -489,7 +526,9 @@ fn next_segment_start(segments: &[TempoSegmentV1], current: &TempoSegmentV1) -> 
 fn expected_onset_ns(segment: &TempoSegmentV1, target: &TargetEventV1) -> Result<u64, String> {
     let beat_offset = u128::from(target.beat_index - segment.start_beat_index);
     let period = u128::from(segment.beat_period_ns);
-    let whole_beats = beat_offset.checked_mul(period).ok_or_else(|| "beat time overflow".to_owned())?;
+    let whole_beats = beat_offset
+        .checked_mul(period)
+        .ok_or_else(|| "beat time overflow".to_owned())?;
     let subdivision = period
         .checked_mul(u128::from(target.subdivision_index))
         .ok_or_else(|| "subdivision time overflow".to_owned())?
@@ -512,13 +551,19 @@ fn validate_estimates<'a>(
         require_text(&estimate.estimate_id, "tempo estimate ID")?;
         require_digest(&estimate.provenance_sha256, "tempo estimate provenance")?;
         if !ids.insert(estimate.estimate_id.as_str()) {
-            return Err(format!("duplicate tempo estimate ID: {}", estimate.estimate_id));
+            return Err(format!(
+                "duplicate tempo estimate ID: {}",
+                estimate.estimate_id
+            ));
         }
         if estimate.estimated_period_ns == 0
             || !estimate.confidence.is_finite()
             || !(0.0..=1.0).contains(&estimate.confidence)
         {
-            return Err(format!("tempo estimate {} has invalid values", estimate.estimate_id));
+            return Err(format!(
+                "tempo estimate {} has invalid values",
+                estimate.estimate_id
+            ));
         }
         if estimate.evidence_window_end_ns > estimate.observed_at_ns {
             return Err(format!(
@@ -530,9 +575,12 @@ fn validate_estimates<'a>(
             return Err("tempo estimate observations must be monotonic".to_owned());
         }
         previous_time = Some(estimate.observed_at_ns);
-        let segment = segments
-            .get(estimate.segment_id.as_str())
-            .ok_or_else(|| format!("estimate {} references unknown segment", estimate.estimate_id))?;
+        let segment = segments.get(estimate.segment_id.as_str()).ok_or_else(|| {
+            format!(
+                "estimate {} references unknown segment",
+                estimate.estimate_id
+            )
+        })?;
         if estimate.observed_at_ns < segment.change_observed_ns {
             return Err(format!(
                 "tempo estimate {} was observed before its segment became available",
@@ -555,13 +603,17 @@ fn score_tempo_adaptation<'a>(
     let tolerance = panel.policy.maximum_relative_period_error;
     let mut output = Vec::new();
     for segment in &panel.tempo_segments {
-        let values = estimates.get(segment.segment_id.as_str()).cloned().unwrap_or_default();
+        let values = estimates
+            .get(segment.segment_id.as_str())
+            .cloned()
+            .unwrap_or_default();
         let mut stable_run = 0usize;
         let mut stable_start = None;
         let mut recovered_at = None;
         for estimate in &values {
-            let relative_error = (estimate.estimated_period_ns as f64 - segment.beat_period_ns as f64).abs()
-                / segment.beat_period_ns as f64;
+            let relative_error =
+                (estimate.estimated_period_ns as f64 - segment.beat_period_ns as f64).abs()
+                    / segment.beat_period_ns as f64;
             if relative_error <= tolerance {
                 stable_run += 1;
                 if stable_run == 1 {
@@ -584,7 +636,8 @@ fn score_tempo_adaptation<'a>(
             stable_estimates_required: required,
             recovered: recovered_at.is_some(),
             adaptation_time_ns,
-            adaptation_time_beats: adaptation_time_ns.map(|time| time as f64 / segment.beat_period_ns as f64),
+            adaptation_time_beats: adaptation_time_ns
+                .map(|time| time as f64 / segment.beat_period_ns as f64),
             stable_run_start_ns: stable_start,
             last_estimated_period_ns: values.last().map(|estimate| estimate.estimated_period_ns),
         });
@@ -624,7 +677,9 @@ fn threshold_rate(values: &[f64], threshold: f64) -> Option<f64> {
     if values.is_empty() {
         None
     } else {
-        Some(values.iter().filter(|value| **value <= threshold).count() as f64 / values.len() as f64)
+        Some(
+            values.iter().filter(|value| **value <= threshold).count() as f64 / values.len() as f64,
+        )
     }
 }
 
@@ -634,9 +689,19 @@ fn regression_slope(points: Vec<(f64, f64)>) -> Option<f64> {
     }
     let x_mean = points.iter().map(|point| point.0).sum::<f64>() / points.len() as f64;
     let y_mean = points.iter().map(|point| point.1).sum::<f64>() / points.len() as f64;
-    let numerator = points.iter().map(|point| (point.0 - x_mean) * (point.1 - y_mean)).sum::<f64>();
-    let denominator = points.iter().map(|point| (point.0 - x_mean).powi(2)).sum::<f64>();
-    if denominator == 0.0 { None } else { Some(numerator / denominator) }
+    let numerator = points
+        .iter()
+        .map(|point| (point.0 - x_mean) * (point.1 - y_mean))
+        .sum::<f64>();
+    let denominator = points
+        .iter()
+        .map(|point| (point.0 - x_mean).powi(2))
+        .sum::<f64>();
+    if denominator == 0.0 {
+        None
+    } else {
+        Some(numerator / denominator)
+    }
 }
 
 fn require_text(value: &str, name: &str) -> Result<(), String> {
@@ -648,10 +713,16 @@ fn require_text(value: &str, name: &str) -> Result<(), String> {
 }
 
 fn require_digest(value: &str, name: &str) -> Result<(), String> {
-    if value.len() == 64 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+    if value.len() == 64
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
         Ok(())
     } else {
-        Err(format!("{name} must be a lowercase 64-character SHA-256 digest"))
+        Err(format!(
+            "{name} must be a lowercase 64-character SHA-256 digest"
+        ))
     }
 }
 
@@ -780,7 +851,10 @@ mod tests {
     #[test]
     fn missing_tempo_recovery_remains_a_failure_not_a_pass() {
         let mut value = panel();
-        value["tempo_estimates"].as_array_mut().unwrap().retain(|estimate| estimate["segment_id"] != "tempo-2");
+        value["tempo_estimates"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|estimate| estimate["segment_id"] != "tempo-2");
         let report = score(&value).expect("no recovery is a reportable result");
         assert!(!report.tempo_adaptation[1].recovered);
         assert!(!report.qualified_for_declared_timing_contract);
@@ -794,6 +868,9 @@ mod tests {
         value["target_events"][2]["observed_onset_ns"] = serde_json::json!(2_000_000_000_u64);
         let report = score(&value).expect("new segment boundary event should score");
         assert_eq!(report.event_findings[2].expected_onset_ns, 2_000_000_000);
-        assert_eq!(report.event_findings[2].absolute_phase_error_beats, Some(0.0));
+        assert_eq!(
+            report.event_findings[2].absolute_phase_error_beats,
+            Some(0.0)
+        );
     }
 }
