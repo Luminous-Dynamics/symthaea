@@ -16,7 +16,8 @@ use std::time::Instant;
 
 use symthaea_canvas::{
     EmbodimentSnapshot, MycelialContactFiltrationConfig, MycelialJunctionGraphConfig,
-    MycelialNetworkConfig, PresenceMode, build_mycelial_contact_filtration,
+    MycelialNetworkConfig, PresenceMode, SpatialReferenceDimensionality,
+    build_euclidean_minimum_spanning_tree, build_mycelial_contact_filtration,
     build_mycelial_junction_hypha_graph, build_mycelial_model,
     build_observed_network_minimum_spanning_forest, detect_anastomosis_candidates,
 };
@@ -66,6 +67,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         black_box(graph.metrics()?);
         black_box(graph.global_geometric_efficiency()?);
         black_box(graph.root_directed_geometric_efficiency(&root_ids)?);
+        black_box(build_euclidean_minimum_spanning_tree(
+            &graph,
+            &root_ids,
+            SpatialReferenceDimensionality::ThreeD,
+        )?);
     }
 
     let mut durations_ns = Vec::with_capacity(samples);
@@ -77,7 +83,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         let metrics = graph.metrics()?;
         let global = graph.global_geometric_efficiency()?;
         let root = graph.root_directed_geometric_efficiency(&root_ids)?;
-        black_box((metrics, global, root));
+        let euclidean_mst = build_euclidean_minimum_spanning_tree(
+            &graph,
+            &root_ids,
+            SpatialReferenceDimensionality::ThreeD,
+        )?;
+        black_box((metrics, global, root, euclidean_mst));
         durations_ns.push(started.elapsed().as_nanos());
         final_graph = Some(graph);
     }
@@ -88,6 +99,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let global = graph.global_geometric_efficiency()?;
     let root = graph.root_directed_geometric_efficiency(&root_ids)?;
     let mst_report = build_observed_network_minimum_spanning_forest(&graph, &root_ids)?;
+    let euclidean_mst = build_euclidean_minimum_spanning_tree(
+        &graph,
+        &root_ids,
+        SpatialReferenceDimensionality::ThreeD,
+    )?;
     let digest = graph.canonical_digest_hex()?;
 
     println!("benchmark: mycelial-junction-hypha-v1");
@@ -196,6 +212,33 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "observed_network_mst_source_graph_digest: {}",
         mst_report.source_graph_digest
+    );
+    println!("euclidean_mst_reference_kind: straight_line_complete_point_set_mst_not_observed_hypha");
+    println!("euclidean_mst_dimensionality: 3d");
+    println!("euclidean_mst_selected_edges: {}", euclidean_mst.selected_edge_count);
+    println!(
+        "euclidean_mst_total_cost_model_units_microunits: {}",
+        euclidean_mst.total_euclidean_cost_model_units_microunits
+    );
+    println!(
+        "euclidean_mst_global_directness: {:?}",
+        euclidean_mst.global_geometric_efficiency.mean_directness
+    );
+    println!(
+        "euclidean_mst_global_scored_pairs: {}",
+        euclidean_mst.global_geometric_efficiency.scored_pairs
+    );
+    println!(
+        "euclidean_mst_global_coincident_zero_path_pairs: {}",
+        euclidean_mst.global_geometric_efficiency.coincident_zero_path_pairs
+    );
+    println!(
+        "euclidean_mst_root_directness: {:?}",
+        euclidean_mst.root_directed_geometric_efficiency.mean_directness
+    );
+    println!(
+        "euclidean_mst_source_graph_digest: {}",
+        euclidean_mst.source_graph_digest
     );
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
