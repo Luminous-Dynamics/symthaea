@@ -130,9 +130,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "contact_filtration_threshold_snapshots: {}",
         contact_filtration.snapshots.len()
     );
-    println!(
-        "contact_filtration_time_ns: {contact_filtration_elapsed_ns}"
-    );
+    println!("contact_filtration_time_ns: {contact_filtration_elapsed_ns}");
     println!("contact_filtration_digest: {contact_filtration_digest}");
     println!("junctions: {}", metrics.junction_count);
     println!("hypha_segments: {}", metrics.hypha_segment_count);
@@ -169,8 +167,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!("source_geometry_digest: {}", graph.source_geometry_digest);
     println!("junction_graph_digest: {digest}");
-    println!("observed_network_mst_selected_segments: {}", mst_report.selected_segment_count);
-    println!("observed_network_mst_components: {}", mst_report.connected_components);
+    println!(
+        "observed_network_mst_selected_segments: {}",
+        mst_report.selected_segment_count
+    );
+    println!(
+        "observed_network_mst_components: {}",
+        mst_report.connected_components
+    );
     println!(
         "observed_network_mst_arc_cost_model_units_microunits: {}",
         mst_report.hypha_arc_cost_model_units_microunits
@@ -185,9 +189,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!(
         "observed_network_mst_root_directness: {:?}",
-        mst_report.root_directed_geometric_efficiency.mean_directness
+        mst_report
+            .root_directed_geometric_efficiency
+            .mean_directness
     );
-    println!("observed_network_mst_source_graph_digest: {}", mst_report.source_graph_digest);
+    println!(
+        "observed_network_mst_source_graph_digest: {}",
+        mst_report.source_graph_digest
+    );
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
     println!(
