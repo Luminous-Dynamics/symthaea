@@ -244,7 +244,10 @@ pub fn evaluate(
     let mut predictions_by_pair = BTreeMap::new();
     let mut presentation_ids = BTreeSet::new();
     for pair in &predictions.pairs {
-        if predictions_by_pair.insert(pair.pair_id.as_str(), pair).is_some() {
+        if predictions_by_pair
+            .insert(pair.pair_id.as_str(), pair)
+            .is_some()
+        {
             return Err(format!("duplicate prediction pair_id: {}", pair.pair_id));
         }
         if pair.presentations.len() != 2 {
@@ -301,7 +304,9 @@ pub fn evaluate(
         .collect();
     if strengths.len() != human_reference.item_strengths.len()
         || strengths.len() != candidate_ids.len()
-        || strengths.keys().any(|item_id| !candidate_ids.contains(*item_id))
+        || strengths
+            .keys()
+            .any(|item_id| !candidate_ids.contains(*item_id))
         || human_reference
             .item_strengths
             .iter()
@@ -317,12 +322,12 @@ pub fn evaluate(
         .collect();
     if uncertainty.len() != human_reference.pair_uncertainty.len()
         || uncertainty.len() != pair_by_id.len()
-        || uncertainty.keys().any(|pair_id| !pair_by_id.contains_key(pair_id))
-        || human_reference
-            .pair_uncertainty
-            .iter()
-            .any(|pair| !pair.gap_standard_error_logit.is_finite()
-                || pair.gap_standard_error_logit < 0.0)
+        || uncertainty
+            .keys()
+            .any(|pair_id| !pair_by_id.contains_key(pair_id))
+        || human_reference.pair_uncertainty.iter().any(|pair| {
+            !pair.gap_standard_error_logit.is_finite() || pair.gap_standard_error_logit < 0.0
+        })
     {
         return Err("pair uncertainty must uniquely cover every manifest pair".to_owned());
     }
@@ -404,7 +409,10 @@ pub fn evaluate(
             if let JudgeOutcome::StableDirectional = outcome {
                 counter.judge_stable_directional_count += 1;
                 let selected = first_selected.ok_or_else(|| {
-                    format!("stable directional pair {} has no selected item", pair.pair_id)
+                    format!(
+                        "stable directional pair {} has no selected item",
+                        pair.pair_id
+                    )
                 })?;
                 if Some(selected) == human_winner {
                     correct_directional_decision_count += 1;
@@ -443,10 +451,7 @@ pub fn evaluate(
                     counter.correct_count,
                     counter.judge_stable_directional_count,
                 ),
-                effective_accuracy: rate(
-                    counter.correct_count,
-                    counter.human_directional_count,
-                ),
+                effective_accuracy: rate(counter.correct_count, counter.human_directional_count),
             }
         })
         .collect();
@@ -461,7 +466,8 @@ pub fn evaluate(
         manifest_sha256: sha256_hex(manifest_json.as_bytes()),
         predictions_sha256: sha256_hex(predictions_json.as_bytes()),
         human_reference_sha256: sha256_hex(human_reference_json.as_bytes()),
-        temporal_order_assurance: "declared_metadata_only_external_attestation_unverified".to_owned(),
+        temporal_order_assurance: "declared_metadata_only_external_attestation_unverified"
+            .to_owned(),
         pair_count: manifest.pairs.len(),
         human_directional_pair_count,
         judge_stable_directional_pair_count: judged_gold_directional,
@@ -473,10 +479,7 @@ pub fn evaluate(
             judged_gold_directional,
             human_directional_pair_count,
         ),
-        conditional_accuracy: rate(
-            correct_directional_decision_count,
-            judged_gold_directional,
-        ),
+        conditional_accuracy: rate(correct_directional_decision_count, judged_gold_directional),
         effective_accuracy: rate(
             correct_directional_decision_count,
             human_directional_pair_count,
@@ -508,10 +511,22 @@ fn validate_manifest(manifest: &ManifestV1) -> Result<(), String> {
     )?;
     validate_judge(&manifest.judge)?;
     for (name, digest) in [
-        ("comparison_protocol_sha256", &manifest.protocol.comparison_protocol_sha256),
-        ("audio_delivery_sha256", &manifest.protocol.audio_delivery_sha256),
-        ("normalization_sha256", &manifest.protocol.normalization_sha256),
-        ("presentation_ui_sha256", &manifest.protocol.presentation_ui_sha256),
+        (
+            "comparison_protocol_sha256",
+            &manifest.protocol.comparison_protocol_sha256,
+        ),
+        (
+            "audio_delivery_sha256",
+            &manifest.protocol.audio_delivery_sha256,
+        ),
+        (
+            "normalization_sha256",
+            &manifest.protocol.normalization_sha256,
+        ),
+        (
+            "presentation_ui_sha256",
+            &manifest.protocol.presentation_ui_sha256,
+        ),
     ] {
         require_digest(digest, name)?;
     }
@@ -530,7 +545,9 @@ fn validate_manifest(manifest: &ManifestV1) -> Result<(), String> {
         || !manifest.confidence_z.is_finite()
         || manifest.confidence_z <= 0.0
     {
-        return Err("directional-gap and confidence thresholds must be finite and valid".to_owned());
+        return Err(
+            "directional-gap and confidence thresholds must be finite and valid".to_owned(),
+        );
     }
     validate_bins(&manifest.difficulty_bins)?;
     if manifest.candidates.len() < 2 || manifest.pairs.is_empty() {
@@ -546,12 +563,17 @@ fn validate_manifest(manifest: &ManifestV1) -> Result<(), String> {
             || candidate.genre.trim().is_empty()
             || !candidate_ids.insert(candidate.item_id.as_str())
         {
-            return Err("candidate identity or provenance fields are empty or duplicated".to_owned());
+            return Err(
+                "candidate identity or provenance fields are empty or duplicated".to_owned(),
+            );
         }
         for (name, digest) in [
             ("audio_sha256", &candidate.audio_sha256),
             ("prompt_sha256", &candidate.prompt_sha256),
-            ("generation_config_sha256", &candidate.generation_config_sha256),
+            (
+                "generation_config_sha256",
+                &candidate.generation_config_sha256,
+            ),
             ("rights_receipt_sha256", &candidate.rights_receipt_sha256),
         ] {
             require_digest(digest, &format!("{name} for {}", candidate.item_id))?;
@@ -565,7 +587,10 @@ fn validate_manifest(manifest: &ManifestV1) -> Result<(), String> {
             || !candidate_ids.contains(pair.item_b_id.as_str())
             || !pair_ids.insert(pair.pair_id.as_str())
         {
-            return Err(format!("invalid or duplicate manifest pair {}", pair.pair_id));
+            return Err(format!(
+                "invalid or duplicate manifest pair {}",
+                pair.pair_id
+            ));
         }
     }
     validate_claim_ceiling(&manifest.claim_ceiling, "manifest")
@@ -613,12 +638,17 @@ fn validate_reference_header(
         || !is_canonical_utc_timestamp(&reference.released_at_utc)
         || reference.released_at_utc <= predictions.frozen_at_utc
     {
-        return Err("human reference must be separately released after prediction freeze".to_owned());
+        return Err(
+            "human reference must be separately released after prediction freeze".to_owned(),
+        );
     }
     if reference.manifest_sha256 != sha256_hex(manifest_json.as_bytes())
         || reference.predictions_sha256 != sha256_hex(predictions_json.as_bytes())
     {
-        return Err("human reference does not bind the exact manifest and frozen prediction bytes".to_owned());
+        return Err(
+            "human reference does not bind the exact manifest and frozen prediction bytes"
+                .to_owned(),
+        );
     }
     require_digest(&reference.cohort_sha256, "human cohort digest")?;
     require_digest(&reference.estimator_sha256, "human estimator digest")?;
@@ -652,7 +682,9 @@ fn validate_bins(bins: &[DifficultyBinV1]) -> Result<(), String> {
             || !bin.minimum_gap_logit.is_finite()
             || (bin.minimum_gap_logit - expected_minimum).abs() > 1e-12
         {
-            return Err("difficulty bins must have unique names and contiguous finite bounds".to_owned());
+            return Err(
+                "difficulty bins must have unique names and contiguous finite bounds".to_owned(),
+            );
         }
         match bin.maximum_gap_logit_exclusive {
             Some(maximum)
@@ -777,7 +809,9 @@ fn is_canonical_utc_timestamp(value: &str) -> bool {
 
 fn validate_claim_ceiling(claims: &[String], source: &str) -> Result<(), String> {
     if claims.is_empty() || claims.iter().any(|claim| claim.trim().is_empty()) {
-        Err(format!("{source} claim_ceiling must contain non-empty limits"))
+        Err(format!(
+            "{source} claim_ceiling must contain non-empty limits"
+        ))
     } else {
         Ok(())
     }
@@ -787,7 +821,9 @@ fn require_digest(value: &str, name: &str) -> Result<(), String> {
     if is_lower_hex_64(value) {
         Ok(())
     } else {
-        Err(format!("{name} must be a 64-character lowercase SHA-256 digest"))
+        Err(format!(
+            "{name} must be a 64-character lowercase SHA-256 digest"
+        ))
     }
 }
 
@@ -846,7 +882,10 @@ mod tests {
         assert_eq!(report.coverage_of_human_directional_pairs, Some(0.75));
         assert!((report.conditional_accuracy.unwrap() - (2.0 / 3.0)).abs() < 1e-12);
         assert_eq!(report.effective_accuracy, Some(0.5));
-        assert_eq!(report.temporal_order_assurance, "declared_metadata_only_external_attestation_unverified");
+        assert_eq!(
+            report.temporal_order_assurance,
+            "declared_metadata_only_external_attestation_unverified"
+        );
         assert_eq!(report.brier_pair_count, 5);
     }
 
@@ -871,8 +910,7 @@ mod tests {
 
     #[test]
     fn manifest_rejects_human_reference_fields() {
-        let mut manifest: serde_json::Value =
-            serde_json::from_str(MANIFEST).expect("fixture JSON");
+        let mut manifest: serde_json::Value = serde_json::from_str(MANIFEST).expect("fixture JSON");
         manifest["human_reference"] = serde_json::json!({
             "item_strengths": [{"item_id":"c1","strength_logit":123.0}]
         });
@@ -909,8 +947,7 @@ mod tests {
     fn altered_order_assignment_is_rejected() {
         let mut predictions: serde_json::Value =
             serde_json::from_str(PREDICTIONS).expect("fixture JSON");
-        predictions["pairs"][0]["presentations"][0]["left_item_id"] =
-            serde_json::json!("c1");
+        predictions["pairs"][0]["presentations"][0]["left_item_id"] = serde_json::json!("c1");
         let changed_predictions = serde_json::to_string(&predictions).expect("serialize");
         let mut reference: serde_json::Value =
             serde_json::from_str(HUMAN_REFERENCE).expect("fixture JSON");
