@@ -1088,4 +1088,227 @@ mod tests {
                 .unreachable_pairs
         );
     }
+    fn brute_force_euclidean_tree_cost(
+        graph: &MycelialJunctionHyphaGraph,
+        dimensionality: SpatialReferenceDimensionality,
+    ) -> f64 {
+        let mut junctions: Vec<_> = graph.junctions.iter().collect();
+        junctions.sort_by(|left, right| left.id.cmp(&right.id));
+        let count = junctions.len();
+        if count <= 1 {
+            return 0.0;
+        }
+        let mut edges = Vec::new();
+        for source in 0..count {
+            for target in (source + 1)..count {
+                edges.push((
+                    source,
+                    target,
+                    spatial_distance(
+                        junctions[source].position,
+                        junctions[target].position,
+                        dimensionality,
+                    ),
+                ));
+            }
+        }
+        assert!(edges.len() < usize::BITS as usize);
+        let mut best = f64::INFINITY;
+        for mask in 0usize..(1usize << edges.len()) {
+            if mask.count_ones() as usize != count - 1 {
+                continue;
+            }
+            let mut parent: Vec<_> = (0..count).collect();
+            let mut components = count;
+            let mut cost = 0.0;
+            let mut is_tree = true;
+            for (edge_index, (source, target, weight)) in edges.iter().enumerate() {
+                if mask & (1usize << edge_index) == 0 {
+                    continue;
+                }
+                let mut left = *source;
+                while parent[left] != left {
+                    left = parent[left];
+                }
+                let mut right = *target;
+                while parent[right] != right {
+                    right = parent[right];
+                }
+                if left == right {
+                    is_tree = false;
+                    break;
+                }
+                let (lower, higher) = if left < right {
+                    (left, right)
+                } else {
+                    (right, left)
+                };
+                parent[higher] = lower;
+                components -= 1;
+                cost += weight;
+            }
+            if is_tree && components == 1 {
+                best = best.min(cost);
+            }
+        }
+        best
+    }
+
+    #[test]
+    fn euclidean_mst_matches_exhaustive_point_set_oracle() {
+        let graph = build_mycelial_junction_hypha_graph(
+            &fixture_model(),
+            &[],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        let report = build_euclidean_minimum_spanning_tree(
+            &graph,
+            &["origin:1".to_string()],
+            SpatialReferenceDimensionality::ThreeD,
+        )
+        .unwrap();
+        let expected = brute_force_euclidean_tree_cost(
+            &graph,
+            SpatialReferenceDimensionality::ThreeD,
+        );
+        let actual = report.total_euclidean_cost_model_units_microunits as f64 / 1_000_000.0;
+        assert_eq!(report.selected_edge_count, graph.junctions.len() - 1);
+        assert_eq!(report.connected_components, 1);
+        assert!((actual - expected).abs() <= 1.0e-6);
+    }
+
+    #[test]
+    fn euclidean_mst_is_permutation_invariant_and_uses_explicit_2d_metric() {
+        let graph = build_mycelial_junction_hypha_graph(
+            &fixture_model(),
+            &[],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        let roots = vec!["origin:1".to_string()];
+        let first = build_euclidean_minimum_spanning_tree(
+            &graph,
+            &roots,
+            SpatialReferenceDimensionality::TwoD,
+        )
+        .unwrap();
+        let mut reordered = graph.clone();
+        reordered.junctions.reverse();
+        reordered.segments.reverse();
+        let second = build_euclidean_minimum_spanning_tree(
+            &reordered,
+            &roots,
+            SpatialReferenceDimensionality::TwoD,
+        )
+        .unwrap();
+        assert_eq!(first.selected_edges, second.selected_edges);
+        assert_eq!(
+            first.total_euclidean_cost_model_units_microunits,
+            second.total_euclidean_cost_model_units_microunits
+        );
+        assert_eq!(
+            first.global_geometric_efficiency.mean_directness,
+            second.global_geometric_efficiency.mean_directness
+        );
+        assert_eq!(
+            first.root_directed_geometric_efficiency.mean_directness,
+            second.root_directed_geometric_efficiency.mean_directness
+        );
+    }
+
+    #[test]
+    fn euclidean_mst_rejects_implicit_flattening_of_nonplanar_graphs() {
+        let model = MycelialModel {
+            schema_version: crate::MYCELIAL_MODEL_VERSION,
+            mode: PresenceMode::Ambient,
+            activity: None,
+            speech_output: None,
+            viseme: None,
+            gaze: None,
+            uncertainty: None,
+            filaments: vec![filament(
+                99,
+                None,
+                true,
+                SpatialPoint3 { x: 0.0, y: 0.0, z: 0.5 },
+                SpatialPoint3 { x: 1.0, y: 1.0, z: 0.5 },
+                SpatialPoint3 { x: 2.0, y: 2.0, z: 0.5 },
+                SpatialPoint3 { x: 3.0, y: 3.0, z: 0.5 },
+            )],
+            orbital_cells: Vec::new(),
+        };
+        let graph = build_mycelial_junction_hypha_graph(
+            &model,
+            &[],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            build_euclidean_minimum_spanning_tree(
+                &graph,
+                &[],
+                SpatialReferenceDimensionality::TwoD
+            ),
+            Err(MycelialReferenceNetworkError::NonPlanarJunction { .. })
+        ));
+    }
+
+    #[test]
+    fn euclidean_mst_reports_coincident_zero_path_pairs_separately() {
+        let model = MycelialModel {
+            schema_version: crate::MYCELIAL_MODEL_VERSION,
+            mode: PresenceMode::Ambient,
+            activity: None,
+            speech_output: None,
+            viseme: None,
+            gaze: None,
+            uncertainty: None,
+            filaments: vec![
+                filament(
+                    4,
+                    None,
+                    true,
+                    SpatialPoint3::ZERO,
+                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
+                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
+                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
+                ),
+                filament(
+                    5,
+                    None,
+                    true,
+                    SpatialPoint3::ZERO,
+                    SpatialPoint3 { x: 0.0, y: 1.0, z: 0.0 },
+                    SpatialPoint3 { x: 0.0, y: 2.0, z: 0.0 },
+                    SpatialPoint3 { x: 0.0, y: 3.0, z: 0.0 },
+                ),
+            ],
+            orbital_cells: Vec::new(),
+        };
+        let graph = build_mycelial_junction_hypha_graph(
+            &model,
+            &[],
+            MycelialJunctionGraphConfig::default(),
+        )
+        .unwrap();
+        let report = build_euclidean_minimum_spanning_tree(
+            &graph,
+            &[],
+            SpatialReferenceDimensionality::ThreeD,
+        )
+        .unwrap();
+        assert_eq!(report.selected_edge_count, graph.junctions.len() - 1);
+        assert!(report.global_geometric_efficiency.coincident_zero_path_pairs > 0);
+        assert_eq!(
+            report.global_geometric_efficiency.reachable_pairs,
+            report.global_geometric_efficiency.eligible_pairs
+        );
+        assert_eq!(
+            report.global_geometric_efficiency.scored_pairs
+                + report.global_geometric_efficiency.coincident_zero_path_pairs,
+            report.global_geometric_efficiency.reachable_pairs
+        );
+    }
+
 }
