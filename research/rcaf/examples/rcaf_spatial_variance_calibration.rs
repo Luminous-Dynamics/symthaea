@@ -1,7 +1,6 @@
 use cetb_rcaf::spatial_calibration::calibrate_spatial_nuisance_to_component_fraction;
 use cetb_rcaf::spatial_nuisance::{
-    generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig,
-    SpatialNuisanceFamily,
+    generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig, SpatialNuisanceFamily,
 };
 use std::error::Error;
 use std::fs;
@@ -48,7 +47,9 @@ fn render_calibration(
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let roi_labels = (0..8).map(|index| format!("roi-{index:02}")).collect::<Vec<_>>();
+    let roi_labels = (0..8)
+        .map(|index| format!("roi-{index:02}"))
+        .collect::<Vec<_>>();
     let mut adjacency = vec![vec![0.0; 8]; 8];
     for index in 0..7 {
         adjacency[index][index + 1] = 1.0;
@@ -118,10 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "  ]\n",
             "}}\n"
         ),
-        time_points,
-        target_fraction,
-        graph_smooth,
-        heat_kernel,
+        time_points, target_fraction, graph_smooth, heat_kernel,
     );
 
     if let Some(path) = std::env::args_os().nth(1) {
