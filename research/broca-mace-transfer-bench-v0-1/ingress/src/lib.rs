@@ -1032,6 +1032,10 @@ pub struct EvidenceDependencySidecarV1 {
     as_known: AsKnownQuery,
     records: Vec<EvidenceDependencyRecordV1>,
     canonical_digest: String,
+    // This capability is set only by the private constructor used after the
+    // ingress verifier has admitted the source receipts. JSON decoding never
+    // upgrades an integrity commitment into issuer authentication.
+    ingress_receipts_verified: bool,
 }
 
 impl EvidenceDependencySidecarV1 {
@@ -1045,6 +1049,7 @@ impl EvidenceDependencySidecarV1 {
             as_known,
             records,
             canonical_digest,
+            ingress_receipts_verified: true,
         }
     }
 
@@ -1129,7 +1134,19 @@ impl EvidenceDependencySidecarV1 {
             .filter(|record| !removed_event_ids.contains(&record.event_id))
             .cloned()
             .collect();
-        Self::new(self.as_known, retained)
+        let canonical_digest = Self::digest_records(self.as_known, &retained);
+        Self {
+            as_known: self.as_known,
+            records: retained,
+            canonical_digest,
+            ingress_receipts_verified: self.ingress_receipts_verified,
+        }
+    }
+
+    /// True only when this process created the sidecar from ingress-admitted
+    /// receipts. A JSON round-trip intentionally loses this provenance capability.
+    pub fn has_verified_ingress_provenance(&self) -> bool {
+        self.ingress_receipts_verified
     }
 
     pub fn canonical_digest(&self) -> &str {
@@ -1340,7 +1357,15 @@ impl EvidenceDependencySidecarV1 {
         }
 
         let canonical_digest = str_field(value, "canonical_sha256", context)?;
-        let sidecar = Self { as_known, records, canonical_digest };
+        // Deserialized bytes are never granted ingress provenance by their
+        // self-asserted digest. A configured verifier must re-verify receipts
+        // and issue a fresh sidecar through the private ingress constructor.
+        let sidecar = Self {
+            as_known,
+            records,
+            canonical_digest,
+            ingress_receipts_verified: false,
+        };
         if !sidecar.verify_integrity() {
             return Err("sidecar failed canonical digest, order, dependency, lifecycle, or field-integrity verification".into());
         }
@@ -3212,7 +3237,10 @@ mod sidecar_json_roundtrip_tests {
         let interchange = sidecar.to_json_value();
         let decoded = EvidenceDependencySidecarV1::from_json_value(&interchange)
             .expect("canonical sidecar interchange should decode");
-        assert_eq!(decoded, sidecar);
+        assert_eq!(decoded.records(), sidecar.records());
+        assert_eq!(decoded.canonical_digest(), sidecar.canonical_digest());
+        assert!(sidecar.has_verified_ingress_provenance());
+        assert!(!decoded.has_verified_ingress_provenance());
         let mut tampered = interchange;
         tampered["records"][0]["upstream_source_id"] = serde_json::json!("tampered");
         assert!(EvidenceDependencySidecarV1::from_json_value(&tampered).is_err());
