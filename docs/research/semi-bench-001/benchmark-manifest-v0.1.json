@@ -1257,18 +1257,25 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44917385489",
-      "run_id": 44917385489,
-      "tested_commit": "010faa4a517d4dc46a57a9b0f6b07015a188bf35",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262",
+      "run_id": 44988247262,
+      "tested_commit": "061cc034d38afabe12cbe189f2ef2f0a31183786",
       "conclusion": "success",
-      "test_count": 46,
-      "passed_steps": [
-        "Run reference unit tests",
-        "Reproduce binary metric report byte-for-byte",
-        "Reproduce inspection decision report byte-for-byte",
-        "Reproduce contrastive-pair validation report byte-for-byte"
+      "python_reference_tests": 46,
+      "rust_unit_tests": 24,
+      "rust_checks": [
+        "cargo fmt --check",
+        "cargo clippy --all-targets -- -D warnings",
+        "cargo test"
       ],
-      "note": "Hosted GitHub Actions verified the complete 46-test suite and all three frozen CLI reports on the current clean-base v0.2 PR head."
+      "byte_for_byte_reports": [
+        "binary-metrics-Python-reference",
+        "inspection-decision-reference",
+        "contrastive-pair-validation-reference",
+        "Rust-binary-metrics",
+        "Rust-SECOM-raw-integrity-audit"
+      ],
+      "note": "Hosted GitHub Actions verified both Python and isolated Rust workspaces on the current clean-base PR head. Root workspace resolution remains a separate repository-level issue."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -1318,35 +1325,30 @@
       "crate_path": "crates/domains/symthaea-semiconductor",
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/binary_metrics.rs",
       "tests": "inline-unit-tests",
+      "test_count": 7,
       "reference_oracle": "benchmarks/semi-bench-001/reference/python/semi_binary_metrics_reference.py",
       "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.json",
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/binary-metrics-known-answer-v1.expected.json",
       "semantics": [
         "fixed-threshold-confusion-metrics",
         "tie-grouped-average-precision",
-        "pairwise-auroc-half-credit-ties",
+        "rank-group-auroc-with-half-credit-for-ties",
         "brier-score",
         "fixed-width-ece",
         "fpr-at-recall",
         "tie-grouped-risk-coverage"
       ],
+      "complexity": {
+        "auroc": "O(n log n) sorting and tie-group accumulation",
+        "large_synthetic_test_rows": 40000,
+        "old_pairwise_algorithm_removed": true
+      },
       "implementation_class": "production-Rust-scorer-with-independent-test-only-Python-reference",
       "hosted_ci_status": "success",
-      "claim_ceiling": "known-answer metric semantic agreement only; not a model-quality or physical manufacturing result",
-      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
-      "test_count": 6,
-      "test_result": "6 binary-metric Rust unit tests passed; fmt and clippy passed in combined Rust hosted run",
-      "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9",
-      "verification_steps": [
-        "cargo fmt --check",
-        "cargo clippy --all-targets -- -D warnings",
-        "cargo test: 18 passed, 0 failed",
-        "Rust binary metric CLI matched frozen Python JSON byte-for-byte",
-        "Rust split-manifest known-answer and actual SECOM chronology tests passed",
-        "Rust contrastive-pair known-answer and adversarial tests passed"
-      ],
-      "workspace_note": "Checks were run in a temporary minimal workspace because the repository root workspace currently references missing crates/core/symthaea/Cargo.toml; this avoids modifying unrelated root workspace state."
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988247262",
+      "tested_commit": "061cc034d38afabe12cbe189f2ef2f0a31183786",
+      "claim_ceiling": "known-answer metric semantic agreement and tested complexity path; not predictive model quality or physical manufacturing result",
+      "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13129"
     },
     "rust_split_manifest_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs",
@@ -1446,7 +1448,8 @@
       ],
       "real_sensor_matrix_ingested": false,
       "claim_ceiling": "synthetic parser contract and raw-source digest/shape validation code; no full-matrix model result"
-    }
+    },
+    "rust_unit_test_count": 24
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
   "eda_end_to_end_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13069",
