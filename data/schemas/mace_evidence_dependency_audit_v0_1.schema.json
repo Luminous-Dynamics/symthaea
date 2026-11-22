@@ -98,7 +98,9 @@
         "decision_changed_vs_full_evidence", "invalid_evidence_use_count",
         "remaining_event_count", "remaining_unique_root_count",
         "remaining_unique_family_count", "remaining_unknown_root_event_count",
-        "fixture_dependency_link_count"
+        "fixture_dependency_link_count",
+        "lineage_incomplete_event_count",
+        "unresolved_dependency_reference_count"
       ],
       "properties": {
         "schema_version": {"const": "mace_evidence_dependency_audit_v0_1"},
@@ -131,6 +133,8 @@
         "remaining_unique_family_count": {"type": "integer", "minimum": 0},
         "remaining_unknown_root_event_count": {"type": "integer", "minimum": 0},
         "fixture_dependency_link_count": {"type": "integer", "minimum": 0},
+        "lineage_incomplete_event_count": {"type": "integer", "minimum": 0},
+        "unresolved_dependency_reference_count": {"type": "integer", "minimum": 0},
         "matched_to_plan_id": {"$ref": "#/$defs/sha256"},
         "matched_control": {"$ref": "#/$defs/matched_control"}
       }
