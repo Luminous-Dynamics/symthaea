@@ -243,3 +243,37 @@ This protocol defines an evaluator-side paired factorial benchmark. It does not 
 It can measure finite treatment effects and decision-regret contrasts under the declared episodes, task losses, timing and resource boundaries. It does not prove global optimality, arbitrary-distribution guarantees, universal synergy, measured hardware advantage or deployment readiness.
 
 Confirmatory evaluation must reuse the isolated evaluator and source-bound receipt requirements in #9437, the decision/observation evaluators in #13152/#13202/#12567, and the existing joint resource/interaction owners #9666/#9882/#13176.
+
+
+## 14. November 2026 research update: DEEP v2 and long-horizon embodied evaluation
+
+The latest DEEP revision is v2, last revised November 16, 2026. Its central contribution is already decision-aligned perception-compute allocation: the value of escalating from cheap to expensive perception is the signed change in downstream loss, and the allocator is charged for its own computation against a budget-constrained decision oracle. The reported KITTI, nuScenes and open-loop nuPlan results include harmful escalation and cases where improved perception disagrees in sign with downstream decision value. We must treat signed decision value, negative escalation value, allocator-cost accounting and budgeted-oracle comparison as established prior art, not as Symthaea inventions.
+
+- DEEP v2: https://arxiv.org/abs/2609.35910
+- The paper's fixed-history track conventions make per-input escalation value additive for its cache/oracle evaluation. That enables efficient re-evaluation of pre-escalation allocators against cached outcomes, but it is not a complete model of a recurrent agent whose actions, observations and environment evolve together.
+- This tournament's narrower extension is an explicitly paired compute × observation factorial contrast, with each arm's action evaluated at its own actual application time and with fallback exposure, all resource dimensions and treatment interaction reported separately. It extends DEEP's decision-aligned accounting; it does not supersede or replace DEEP's benchmark.
+
+The open-access survey **Long-horizon embodied manipulation: a survey of methods, trends, and challenges** (published November 16, 2026) argues that binary task success can obscure partial completion, error propagation, recovery cost and horizon-dependent degradation. It emphasizes shared task state, progress-aware monitoring and failure-conditioned recovery. The tournament should therefore preserve verified partial progress, first divergence, recovery cost and horizon-specific results as separate outcomes rather than treating a late correct action as equivalent to uninterrupted successful execution.
+
+- Survey: https://link.springer.com/article/10.1007/s44336-026-00048-x
+
+### Reproduction priority
+
+1. Reproduce DEEP v2 on its declared perception/planning tracks with its fixed models, official splits, costs and decision oracle. Use its public cached outcomes where the release provides them; do not substitute Symthaea-specific labels or loss weights.
+2. Report official DEEP allocator/oracle metrics unchanged.
+3. Run the Symthaea compute × observation extension as a separate paired experiment on compatible dynamic tasks, using the same initial episode and exogenous hidden-world stream across the four arms.
+4. Add memory and verification as further factors only through #9666/#9882/#13176 after the four-arm compute × observation comparison is stable.
+5. Evaluate partial completion, failure propagation and recovery cost under the long-horizon survey's recommendations; do not collapse those into a weighted aggregate.
+
+## 15. Industry comparison and claim discipline
+
+MLPerf Inference v6.1 (September 16, 2026) adds Edge Agentic Inference and end-to-end RAG alongside established datacenter/edge system workloads. Its official results evaluate declared workloads, quality targets and latency/throughput scenarios. Symthaea should reproduce any compatible official test exactly, then publish decision regret, observation interactions and temporal freshness as separate extension metrics. Do not compare an HDC/LTC task result to an MLPerf token/query throughput figure as if they measured the same capability.
+
+- MLCommons v6.1 results: https://mlcommons.org/2026/09/mlperf-inference-v6-1-results/
+- MLPerf Edge suite and scenario rules: https://mlcommons.org/benchmarks/inference-edge/
+
+NeuroBench 2.4.0 supplies algorithm workloads such as few-shot class-incremental learning, event-camera object detection, non-human-primate motor prediction and chaotic-function prediction, with system metrics such as parameter footprint, activation sparsity and synaptic operations. Symthaea should enter the official track only where its model/task interface matches, retaining NeuroBench's native metrics and reporting measured wall-power/latency separately from theoretical operation counts.
+
+- NeuroBench 2.4.0: https://neurobench.readthedocs.io/en/2.4.0/readme.html
+
+The defensible competitive claim is not that Symthaea is more efficient or more intelligent today. It is that this programme is setting up a reproducible comparison of decision quality, temporal application cost, observation-compute interaction and non-fungible resources, while retaining official benchmark metrics where applicable.
