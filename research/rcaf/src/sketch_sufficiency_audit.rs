@@ -22,7 +22,7 @@ pub struct SketchSufficiencyConfig {
     pub target_split_id: String,
     /// Sketch cells are declared before inspecting target scores.
     pub expected_sketch_cells: Vec<String>,
-    /// Family-wise DKW confidence error across both domains and all expected cells.
+    /// Family-wise DKW confidence error across both domains, all cells and all three estimators.
     pub confidence_delta: f64,
     pub minimum_replicates_per_domain_cell: usize,
 }
@@ -221,10 +221,10 @@ impl std::error::Error for SketchSufficiencyError {}
 
 /// Audit conditional null-score CDFs within predeclared source/target sketch cells.
 ///
-/// For G expected cells and family-wise error delta, each domain/cell empirical CDF receives
-/// radius sqrt(log(4G/delta)/(2n)). The reported upper envelope is the observed two-sample KS
+/// For G expected cells, M estimators and family-wise error delta, each domain/cell/estimator CDF receives
+/// radius sqrt(log(4GM/delta)/(2n)). The reported upper envelope is the observed two-sample KS
 /// distance plus the source and target radii, clipped to one. The union bound covers both domains
-/// in all expected cells under within-cell i.i.d./exchangeability. It does not bound arbitrary
+/// across both domains, all expected cells and all estimators under within-cell i.i.d./exchangeability. It does not bound arbitrary
 /// changes in the full conditional response law or equal the paper's theoretical Delta_T.
 pub fn audit_sketch_conditional_score_leakage(
     source: &[SketchScoreObservation],
@@ -292,8 +292,11 @@ pub fn audit_sketch_conditional_score_leakage(
         })
         .collect::<Vec<_>>();
 
-    let family_radius_factor =
-        (4.0 * config.expected_sketch_cells.len() as f64 / config.confidence_delta).ln();
+    let family_radius_factor = (4.0
+        * config.expected_sketch_cells.len() as f64
+        * ESTIMATOR_IDS.len() as f64
+        / config.confidence_delta)
+        .ln();
     let mut cells = Vec::with_capacity(config.expected_sketch_cells.len());
     for cell_id in &config.expected_sketch_cells {
         let source_cell = source_by_cell.get(cell_id).map_or(&[][..], |items| items.as_slice());
@@ -665,7 +668,7 @@ mod tests {
     fn dkw_radius_uses_a_simultaneous_union_bound_over_cells_and_domains() {
         let (source, target) = source_and_target(0.0, 0.0);
         let report = audit_sketch_conditional_score_leakage(&source, &target, &config()).unwrap();
-        let expected = ((4.0 * 3.0 / 0.05_f64).ln() / (2.0 * 99.0)).sqrt();
+        let expected = ((4.0 * 3.0 * 3.0 / 0.05_f64).ln() / (2.0 * 99.0)).sqrt();
         assert!((report.cells[0].estimators[0].source_dkw_radius.unwrap() - expected).abs() < 1e-12);
         assert!((report.cells[0].estimators[0].target_dkw_radius.unwrap() - expected).abs() < 1e-12);
     }
