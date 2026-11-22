@@ -549,7 +549,7 @@ Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferr
 | Programme, task/oracle schemas and source-observed contract | **Authored** in this branch |
 | First static design fixture and task definition | **Authored public pilot**; canonical digest confirmed with `sha256sum`; not a hidden holdout |
 | Standalone Rust contract/task/provenance validator | **Implemented in source with tests authored**; compilation/tests not run |
-| Leptos 0.8 pattern corpus | **17 source-grounded entries across six/seven source files with exact Git blob provenance**; compilation pending |
+| Leptos 0.8 pattern corpus | **17 source-grounded entries across seven source files with exact Git blob provenance**; compilation pending |
 | Fixture exposure / anti-contamination policy | **Specified** for public pilot, controller-only and hidden holdout |
 | Viewport-only browser capture | **Implemented in source**; Chromium capture timed out in this container |
 | Runnable SFEB browser evaluator and screenshot baselines | **Not implemented** |
