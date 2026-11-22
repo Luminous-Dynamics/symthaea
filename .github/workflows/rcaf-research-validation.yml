@@ -643,6 +643,58 @@ jobs:
           print("PASS: per-stratum calibration, common max-quantile guard, worst-group rates and unseen-stratum abstention")
           PY
 
+      - name: Run weighted continuous covariate-shift calibration
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_weighted_covariate_shift -- "$RUNNER_TEMP/rcaf-weighted-covariate-shift.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/weighted-covariate-shift.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-weighted-covariate-shift.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["source_status"] == "synthetic_weighted_covariate_shift_diagnostics"
+          assert report["ratio_provenance"] == "known_density_ratio"
+          assert report["finite_sample_guarantee_applicable"] is True
+          assert report["validity_status"] == "known_ratio_under_attested_covariate_shift"
+          assert report["source_support_attested"] is True
+          assert report["conditional_score_invariance_attested"] is True
+          assert report["calibration_replicates"] == 99
+          assert report["evaluation_replicates"] == 100
+          diagnostics = report["diagnostics"]
+          assert diagnostics["effective_sample_size"] >= report["minimum_effective_sample_size"]
+          assert 0.0 < diagnostics["effective_sample_fraction"] <= 1.0
+          assert diagnostics["chi_square_divergence_proxy"] >= 0.0
+          assert diagnostics["maximum_normalized_calibration_weight"] > 0.0
+          assert diagnostics["maximum_test_weight_share"] > 0.05
+          expected_ids = [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          assert [item["estimator_id"] for item in report["estimators"]] == expected_ids
+          for item in report["estimators"]:
+              assert item["finite_threshold_count"] == 99
+              assert item["abstained_evaluation_count"] == 1
+              for key in [
+                  "held_out_false_positive_rate",
+                  "signal_detection_rate",
+                  "directionally_correct_signal_rate",
+                  "wrong_direction_acceptance_rate",
+              ]:
+                  interval = item[key]
+                  assert interval["trials"] == 99
+                  assert 0 <= interval["successes"] <= 99
+                  assert interval["wilson_95_lower"] <= interval["estimate"] <= interval["wilson_95_upper"]
+          assert len(report["abstentions"]) == 3
+          assert {item["replicate_id"] for item in report["abstentions"]} == {"eval-099"}
+          assert {item["reason"] for item in report["abstentions"]} == {"test_point_mass_exceeds_alpha"}
+          print("PASS: weighted covariate-shift quantiles, ESS/chi-square diagnostics and test-point-mass abstention")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -659,7 +711,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-factorial-counterfactual.json" \
               "$RUNNER_TEMP/rcaf-factorial-dose-response.json" \
               "$RUNNER_TEMP/rcaf-held-out-null-calibration.json" \
-              "$RUNNER_TEMP/rcaf-groupwise-null-calibration.json"
+              "$RUNNER_TEMP/rcaf-groupwise-null-calibration.json" \
+              "$RUNNER_TEMP/rcaf-weighted-covariate-shift.json"
           python - <<'PY'
           import json
           import os
@@ -674,7 +727,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 12
+          assert len(receipt["simulation_reports"]) == 11
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -695,6 +748,7 @@ jobs:
             ${{ runner.temp }}/rcaf-factorial-dose-response.json
             ${{ runner.temp }}/rcaf-held-out-null-calibration.json
             ${{ runner.temp }}/rcaf-groupwise-null-calibration.json
+            ${{ runner.temp }}/rcaf-weighted-covariate-shift.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
