@@ -31,6 +31,7 @@ pub mod mycelial_junction_graph;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_reference_networks;
 pub mod mycelial_reconstruction_metrics;
+pub mod mycelial_temporal_cycles;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
@@ -115,6 +116,17 @@ pub use mycelial_reconstruction_metrics::{
     ReconstructionLengthError, ReconstructionLengthUnit, ReconstructionLocalizationError,
     ReconstructionPoint3, ReconstructionTopologyDelta, ReconstructionTopologySummary,
     evaluate_mycelial_reconstruction, match_junctions_hungarian,
+};
+pub use mycelial_temporal_cycles::{
+    MAX_TEMPORAL_CYCLES_PER_WINDOW, MAX_TEMPORAL_MYCIELIAL_EDGES,
+    MAX_TEMPORAL_MYCIELIAL_NODES, MAX_TEMPORAL_MYCIELIAL_WINDOWS,
+    MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION, MYCELIAL_TEMPORAL_CYCLE_SCHEMA_VERSION,
+    MycelialTemporalCycleConfig, MycelialTemporalCycleError, TemporalCycleWindowObservation,
+    TemporalCycleWindowState, TemporalEdgeEvidence, TemporalMycelialCycleHyperedge,
+    TemporalMycelialCycleProfile, TemporalMycelialCycleRecord, TemporalMycelialEdge,
+    TemporalMycelialNodeMetrics, TemporalMycelialSequence, TemporalMycelialSnapshot,
+    TemporalMycelialSnapshotMetrics, TemporalWindowCoverage,
+    build_temporal_mycelial_cycle_profile,
 };
 pub use mycelial_mesh::{
     FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
