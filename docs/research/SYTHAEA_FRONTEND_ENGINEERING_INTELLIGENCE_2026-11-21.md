@@ -167,7 +167,7 @@ Verified existing capabilities include:
 
 - Chromium launch or attachment through `CdpSession`;
 - bounded accessibility-tree observations with redaction and URL sanitization;
-- full-page PNG screenshots;
+- viewport PNG screenshots;
 - capability- and policy-governed browser mutations through `BrowserExecutor`;
 - URL scheme, origin, credential and local-network checks (with an explicit warning that a production network boundary must additionally pin DNS resolution and re-check redirects).
 
