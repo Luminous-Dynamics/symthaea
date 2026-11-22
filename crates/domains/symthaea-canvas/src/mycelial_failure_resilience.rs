@@ -1222,6 +1222,350 @@ pub fn evaluate_mycelial_failure_attack_plan(
     })
 }
 
+fn validate_delivery_config(
+    config: MycelialFailureDeliveryConfig,
+    scenario_count: usize,
+) -> Result<(), MycelialFailureResilienceError> {
+    if config.trials_per_scenario == 0
+        || config.trials_per_scenario > MAX_FAILURE_DELIVERY_TRIALS_PER_SCENARIO
+        || config.removal_success_probability_micros > 1_000_000
+        || scenario_count.saturating_mul(config.trials_per_scenario)
+            > MAX_FAILURE_DELIVERY_EVALUATIONS
+    {
+        return Err(MycelialFailureResilienceError::InvalidDeliveryConfig(
+            "trial count, delivery probability or total evaluation budget is out of bounds",
+        ));
+    }
+    Ok(())
+}
+
+fn delivery_trial_seed(seed: u64, scenario_id: &str, trial_index: usize) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-failure-delivery-trial-seed-v1");
+    hasher.update(&seed.to_le_bytes());
+    hash_string(&mut hasher, scenario_id);
+    hasher.update(&(trial_index as u64).to_le_bytes());
+    let digest = hasher.finalize();
+    u64::from_le_bytes(digest.as_bytes()[..8].try_into().expect("digest prefix is eight bytes"))
+}
+
+fn realize_attack_delivery(
+    scenario: &MycelialFailureScenario,
+    config: MycelialFailureDeliveryConfig,
+    trial_index: usize,
+) -> (Vec<String>, Vec<String>) {
+    let mut state = delivery_trial_seed(config.seed, &scenario.scenario_id, trial_index);
+    let mut failed_segments = Vec::new();
+    let mut failed_junctions = Vec::new();
+    for id in &scenario.failed_segment_ids {
+        if splitmix64_next(&mut state) % 1_000_000
+            < u64::from(config.removal_success_probability_micros)
+        {
+            failed_segments.push(id.clone());
+        }
+    }
+    for id in &scenario.failed_junction_ids {
+        if splitmix64_next(&mut state) % 1_000_000
+            < u64::from(config.removal_success_probability_micros)
+        {
+            failed_junctions.push(id.clone());
+        }
+    }
+    (failed_segments, failed_junctions)
+}
+
+fn summarize_delivery_trials(
+    scenario_id: &str,
+    attempted_entity_count: usize,
+    trials: &[MycelialFailureDeliveryTrial],
+) -> Result<MycelialFailureDeliveryScenarioSummary, MycelialFailureResilienceError> {
+    if trials.is_empty()
+        || trials.iter().any(|trial| trial.scenario_id != scenario_id)
+    {
+        return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+            "scenario summary has no matching trial inventory",
+        ));
+    }
+    let mean_realized_failure_count = trials
+        .iter()
+        .map(|trial| {
+            (trial.realized_failed_segment_ids.len()
+                + trial.realized_failed_junction_ids.len()) as f64
+        })
+        .sum::<f64>()
+        / trials.len() as f64;
+    let probability_at_least_one_failure = trials
+        .iter()
+        .filter(|trial| {
+            !trial.realized_failed_segment_ids.is_empty()
+                || !trial.realized_failed_junction_ids.is_empty()
+        })
+        .count() as f64
+        / trials.len() as f64;
+
+    let mut reachability: Vec<_> = trials
+        .iter()
+        .filter_map(|trial| trial.weighted_reachability)
+        .collect();
+    reachability.sort_by(f64::total_cmp);
+    let mean_weighted_reachability = mean_optional(&reachability);
+    let weighted_reachability_p05 = quantile_sorted(&reachability, 0.05);
+    let weighted_reachability_p50 = quantile_sorted(&reachability, 0.50);
+    let weighted_reachability_p95 = quantile_sorted(&reachability, 0.95);
+    let weighted_reachability_minimum = reachability.first().copied();
+    let weighted_reachability_maximum = reachability.last().copied();
+
+    let mut directness: Vec<_> = trials
+        .iter()
+        .filter_map(|trial| trial.weighted_mean_directness)
+        .collect();
+    directness.sort_by(f64::total_cmp);
+    let mut path_lengths: Vec<_> = trials
+        .iter()
+        .filter_map(|trial| trial.weighted_mean_network_path_length)
+        .collect();
+    path_lengths.sort_by(f64::total_cmp);
+
+    Ok(MycelialFailureDeliveryScenarioSummary {
+        scenario_id: scenario_id.to_string(),
+        attempted_entity_count,
+        trial_count: trials.len(),
+        mean_realized_failure_count,
+        probability_at_least_one_failure,
+        mean_weighted_reachability,
+        weighted_reachability_p05,
+        weighted_reachability_p50,
+        weighted_reachability_p95,
+        weighted_reachability_minimum,
+        weighted_reachability_maximum,
+        directness_defined_trial_count: directness.len(),
+        mean_weighted_directness_among_reachable: mean_optional(&directness),
+        mean_weighted_path_length_among_reachable: mean_optional(&path_lengths),
+    })
+}
+
+fn mean_optional(values: &[f64]) -> Option<f64> {
+    (!values.is_empty()).then_some(values.iter().sum::<f64>() / values.len() as f64)
+}
+
+fn quantile_sorted(values: &[f64], quantile: f64) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let index = ((values.len() - 1) as f64 * quantile).ceil() as usize;
+    values.get(index).copied()
+}
+
+pub fn build_mycelial_failure_delivery_profile(
+    graph: &MycelialJunctionHyphaGraph,
+    demands: &[MycelialDemandPair],
+    plan: &MycelialFailureAttackPlan,
+    config: MycelialFailureDeliveryConfig,
+) -> Result<MycelialFailureDeliveryProfile, MycelialFailureResilienceError> {
+    plan.validate_against(graph, demands)?;
+    validate_delivery_config(config, plan.scenarios.len())?;
+    let indexed = index_source_graph(graph)?;
+    validate_demands(&indexed, demands)?;
+    let source_graph_digest = graph.canonical_digest_hex()?;
+    let demand_digest = canonical_demand_digest(demands);
+    let attack_plan_digest = plan.canonical_digest_hex()?;
+    let mut trials = Vec::with_capacity(plan.scenarios.len() * config.trials_per_scenario);
+    let mut summaries = Vec::with_capacity(plan.scenarios.len());
+
+    for scenario in &plan.scenarios {
+        let start = trials.len();
+        for trial_index in 0..config.trials_per_scenario {
+            let (failed_segments, failed_junctions) =
+                realize_attack_delivery(scenario, config, trial_index);
+            let metric = evaluate_one(
+                &indexed,
+                demands,
+                &scenario.scenario_id,
+                &failed_segments,
+                &failed_junctions,
+                graph.length_unit,
+            )?;
+            trials.push(MycelialFailureDeliveryTrial {
+                scenario_id: scenario.scenario_id.clone(),
+                trial_index,
+                realized_failed_segment_ids: failed_segments,
+                realized_failed_junction_ids: failed_junctions,
+                weighted_reachability: metric.weighted_reachability,
+                weighted_mean_directness: metric.weighted_mean_directness,
+                weighted_mean_network_path_length: metric.weighted_mean_network_path_length,
+                connected_components: metric.connected_components,
+                cycle_rank: metric.cycle_rank,
+            });
+        }
+        let scenario_trials = &trials[start..];
+        summaries.push(summarize_delivery_trials(
+            &scenario.scenario_id,
+            scenario.failed_segment_ids.len() + scenario.failed_junction_ids.len(),
+            scenario_trials,
+        )?);
+    }
+
+    let profile = MycelialFailureDeliveryProfile {
+        schema_version: MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION,
+        source_graph_digest,
+        demand_digest,
+        attack_plan_digest,
+        config,
+        trials,
+        scenarios: summaries,
+    };
+    profile.validate_against(graph, demands, plan)?;
+    Ok(profile)
+}
+
+impl MycelialFailureDeliveryProfile {
+    pub fn validate_against(
+        &self,
+        graph: &MycelialJunctionHyphaGraph,
+        demands: &[MycelialDemandPair],
+        plan: &MycelialFailureAttackPlan,
+    ) -> Result<(), MycelialFailureResilienceError> {
+        plan.validate_against(graph, demands)?;
+        validate_delivery_config(self.config, plan.scenarios.len())?;
+        if self.schema_version != MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION
+            || self.source_graph_digest != graph.canonical_digest_hex()?
+            || self.demand_digest != canonical_demand_digest(demands)
+            || self.attack_plan_digest != plan.canonical_digest_hex()?
+            || self.scenarios.len() != plan.scenarios.len()
+            || self.trials.len()
+                != plan
+                    .scenarios
+                    .len()
+                    .saturating_mul(self.config.trials_per_scenario)
+        {
+            return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                "source graph, demand, plan, scenario or trial inventory mismatch",
+            ));
+        }
+        let mut cursor = 0usize;
+        for (scenario_index, scenario) in plan.scenarios.iter().enumerate() {
+            let start = cursor;
+            for trial_index in 0..self.config.trials_per_scenario {
+                let Some(trial) = self.trials.get(cursor) else {
+                    return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                        "trial inventory ended before all configured scenario trials",
+                    ));
+                };
+                let (expected_segments, expected_junctions) =
+                    realize_attack_delivery(scenario, self.config, trial_index);
+                if trial.scenario_id != scenario.scenario_id
+                    || trial.trial_index != trial_index
+                    || trial.realized_failed_segment_ids != expected_segments
+                    || trial.realized_failed_junction_ids != expected_junctions
+                    || trial.realized_failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                    || trial.realized_failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                    || trial.weighted_reachability.is_some_and(|value| {
+                        !value.is_finite() || !(0.0..=1.0).contains(&value)
+                    })
+                    || trial.weighted_mean_directness.is_some_and(|value| {
+                        !value.is_finite() || !(0.0..=1.0 + 1.0e-5).contains(&value)
+                    })
+                    || trial.weighted_mean_network_path_length.is_some_and(|value| {
+                        !value.is_finite() || value <= 0.0
+                    })
+                    || trial.weighted_mean_directness.is_some()
+                        != trial.weighted_mean_network_path_length.is_some()
+                {
+                    return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                        "trial delivery realization or metric fields are inconsistent",
+                    ));
+                }
+                cursor += 1;
+            }
+            let attempted_entity_count =
+                scenario.failed_segment_ids.len() + scenario.failed_junction_ids.len();
+            let expected_summary = summarize_delivery_trials(
+                &scenario.scenario_id,
+                attempted_entity_count,
+                &self.trials[start..cursor],
+            )?;
+            if self.scenarios.get(scenario_index) != Some(&expected_summary) {
+                return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                    "scenario summary does not match its complete trial inventory",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn canonical_digest_hex(
+        &self,
+    ) -> Result<String, MycelialFailureResilienceError> {
+        if self.schema_version != MYCELIAL_FAILURE_DELIVERY_PROFILE_SCHEMA_VERSION
+            || !valid_digest(&self.source_graph_digest)
+            || !valid_digest(&self.demand_digest)
+            || !valid_digest(&self.attack_plan_digest)
+            || self.scenarios.is_empty()
+            || self.trials.is_empty()
+            || self.scenarios.windows(2).any(|pair| {
+                pair[0].scenario_id >= pair[1].scenario_id
+            })
+        {
+            return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                "invalid schema, digest or empty/unsorted trial inventory",
+            ));
+        }
+        validate_delivery_config(self.config, self.scenarios.len())?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-mycelial-failure-delivery-profile-v1");
+        hasher.update(&self.schema_version.to_le_bytes());
+        hasher.update(self.source_graph_digest.as_bytes());
+        hasher.update(self.demand_digest.as_bytes());
+        hasher.update(self.attack_plan_digest.as_bytes());
+        hasher.update(&(self.config.trials_per_scenario as u64).to_le_bytes());
+        hasher.update(&self.config.removal_success_probability_micros.to_le_bytes());
+        hasher.update(&self.config.seed.to_le_bytes());
+        hasher.update(&(self.trials.len() as u64).to_le_bytes());
+        for trial in &self.trials {
+            hash_string(&mut hasher, &trial.scenario_id);
+            hasher.update(&(trial.trial_index as u64).to_le_bytes());
+            hasher.update(&(trial.realized_failed_segment_ids.len() as u64).to_le_bytes());
+            for id in &trial.realized_failed_segment_ids {
+                hash_string(&mut hasher, id);
+            }
+            hasher.update(&(trial.realized_failed_junction_ids.len() as u64).to_le_bytes());
+            for id in &trial.realized_failed_junction_ids {
+                hash_string(&mut hasher, id);
+            }
+            hash_option(&mut hasher, trial.weighted_reachability);
+            hash_option(&mut hasher, trial.weighted_mean_directness);
+            hash_option(&mut hasher, trial.weighted_mean_network_path_length);
+            hasher.update(&(trial.connected_components as u64).to_le_bytes());
+            hasher.update(&(trial.cycle_rank as u64).to_le_bytes());
+        }
+        for scenario in &self.scenarios {
+            hash_string(&mut hasher, &scenario.scenario_id);
+            hasher.update(&(scenario.attempted_entity_count as u64).to_le_bytes());
+            hasher.update(&(scenario.trial_count as u64).to_le_bytes());
+            for value in [
+                scenario.mean_realized_failure_count,
+                scenario.probability_at_least_one_failure,
+            ] {
+                hasher.update(&value.to_bits().to_le_bytes());
+            }
+            for value in [
+                scenario.mean_weighted_reachability,
+                scenario.weighted_reachability_p05,
+                scenario.weighted_reachability_p50,
+                scenario.weighted_reachability_p95,
+                scenario.weighted_reachability_minimum,
+                scenario.weighted_reachability_maximum,
+                scenario.mean_weighted_directness_among_reachable,
+                scenario.mean_weighted_path_length_among_reachable,
+            ] {
+                hash_option(&mut hasher, value);
+            }
+            hasher.update(&(scenario.directness_defined_trial_count as u64).to_le_bytes());
+        }
+        Ok(hex_digest(hasher.finalize().as_bytes()))
+    }
+}
+
 impl MycelialFailureResilienceProfile {
     pub fn validate(&self) -> Result<(), MycelialFailureResilienceError> {
         if self.schema_version != MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION
