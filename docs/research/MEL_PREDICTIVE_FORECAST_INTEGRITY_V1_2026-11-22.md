@@ -43,7 +43,7 @@ The isolated Rust 2024 crate at tools/mel-forecast-integrity provides:
 - realization-start and realization-completion links;
 - monotonic event ordering and a replayable SHA-256 event chain;
 - a JSON report with separate input-to-issue latency, display lead time, input-to-realization latency and issue-to-realization latency;
-- 12 deterministic tests covering positive lifecycle, post-hoc display, late issue, unresolved realization, supersession, missing display, outside-window realization, invalidation, event tampering and ordering controls.
+- 13 deterministic tests covering positive lifecycle, post-hoc display, late issue, unresolved realization, supersession, missing display, outside-window realization, invalidation, event tampering and ordering controls.
 
 The checked-in positive fixture is an unsealed trace seed; the CLI seals it deterministically before validation. The seal operation is a fixture utility, not an authorization operation.
 
