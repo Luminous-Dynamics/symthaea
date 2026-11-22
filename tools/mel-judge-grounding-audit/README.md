@@ -74,3 +74,12 @@ The musical forecast auditor checks precommitted, input-snapshot-bound forecasts
       tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json report.json
 
 The fixture is synthetic. Its Brier score is conditional on predicted event slots, not a general recall/calibration result. See docs/research/MEL_PREDICTIVE_TRANSPARENCY_AUDITOR_V1_2026-11-23.md.
+
+
+## Musical agency and non-assimilation audit
+
+The agency auditor distinguishes hard current-operation constraints from soft collaborator preferences and agent proposals. It checks protected-event and veto compliance, explicit ignore/accept/steer behavior, non-canonical branching, cross-collaborator memory leakage, and purpose-scoped persistent-write authorization. It emits no composite creativity or agency score.
+
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-musical-agency-audit -- audit tools/mel-judge-grounding-audit/fixtures/valid-musical-agency-v1.json report.json
+
+The synthetic fixture validates structural behavior only. It does not authenticate collaborators, verify signatures, or execute Studio writes. See docs/research/MEL_MUSICAL_AGENCY_AUDITOR_V1_2026-11-23.md.

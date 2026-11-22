@@ -1,0 +1,108 @@
+{
+  "schema_version": "mel-musical-agency-panel-v1",
+  "session_id": "synthetic-agency-session-001",
+  "collaborator_id": "collaborator-A",
+  "clock_domain_id": "synthetic-runner-monotonic-v1",
+  "hard_constraints": [
+    {
+      "constraint_id": "keep-hook",
+      "kind": "preserve_events",
+      "scope": "current_operation",
+      "protected_event_ids": [
+        "protected-hook-1"
+      ],
+      "target_proposal_id": null
+    },
+    {
+      "constraint_id": "veto-unsafe",
+      "kind": "veto_proposal",
+      "scope": "current_operation",
+      "protected_event_ids": [],
+      "target_proposal_id": "unsafe-proposal"
+    }
+  ],
+  "soft_preferences": [
+    {
+      "preference_id": "pref-a-quiet-space",
+      "owner_collaborator_id": "collaborator-A",
+      "dimension": "density",
+      "context_id": "accompaniment",
+      "source_event_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "proposals": [
+    {
+      "proposal_id": "agent-proposal",
+      "author": "agent",
+      "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "changed_event_ids": [
+        "bass-fill-1"
+      ],
+      "description": "Agent proposes a syncopated bass counterline"
+    },
+    {
+      "proposal_id": "collaborator-proposal",
+      "author": "collaborator",
+      "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "changed_event_ids": [
+        "piano-voicing-2"
+      ],
+      "description": "Collaborator proposes a sparse piano voicing"
+    },
+    {
+      "proposal_id": "unsafe-proposal",
+      "author": "agent",
+      "artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "changed_event_ids": [
+        "protected-hook-1"
+      ],
+      "description": "Synthetic deliberately invalid edit to protected hook"
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "ignore-agent-preview",
+      "actor_collaborator_id": "collaborator-A",
+      "action": "ignore",
+      "proposal_id": "agent-proposal",
+      "acted_at_ns": 100
+    },
+    {
+      "intervention_id": "branch-two-directions",
+      "actor_collaborator_id": "collaborator-A",
+      "action": "branch",
+      "proposal_id": "collaborator-proposal",
+      "acted_at_ns": 120
+    }
+  ],
+  "decision": {
+    "action": "branch",
+    "selected_proposal_ids": [
+      "agent-proposal",
+      "collaborator-proposal"
+    ],
+    "committed": false,
+    "committed_at_ns": null,
+    "conflict_preserved": true
+  },
+  "persistent_updates": [
+    {
+      "update_id": "session-memory-update",
+      "target_scope": "collaborator",
+      "purpose": "personal_adaptation",
+      "owner_collaborator_id": "collaborator-A",
+      "grant_id": "grant-synthetic-001",
+      "authorization_status": "authorized",
+      "authorized_scope": "personal_adaptation",
+      "attempted": true,
+      "committed": false
+    }
+  ],
+  "claim_ceiling": [
+    "synthetic conformance fixture only; identifiers and digests are invented",
+    "actor IDs and authorization claims are declared values, not authenticated identity or consent",
+    "artifact hashes are schema checked, not recomputed from musical files",
+    "no real collaborator, music model, studio transaction, memory store or persistent update was exercised",
+    "the evaluator tests declared hard/soft authority boundaries, not musical quality or legal authorship"
+  ]
+}

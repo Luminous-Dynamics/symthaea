@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-musical-agency-panel-v1.schema.json",
+  "title": "MEL Musical Agency Panel V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "collaborator_id",
+    "clock_domain_id",
+    "hard_constraints",
+    "soft_preferences",
+    "proposals",
+    "interventions",
+    "decision",
+    "persistent_updates",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-agency-panel-v1"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "collaborator_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hard_constraints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hardConstraint"
+      }
+    },
+    "soft_preferences": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/softPreference"
+      }
+    },
+    "proposals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/proposal"
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/intervention"
+      }
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "persistent_updates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/persistentUpdate"
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hardConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "kind",
+        "scope",
+        "protected_event_ids",
+        "target_proposal_id"
+      ],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "preserve_events",
+            "veto_proposal"
+          ]
+        },
+        "scope": {
+          "const": "current_operation"
+        },
+        "protected_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target_proposal_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "softPreference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preference_id",
+        "owner_collaborator_id",
+        "dimension",
+        "context_id",
+        "source_event_sha256"
+      ],
+      "properties": {
+        "preference_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_collaborator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimension": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_event_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_id",
+        "author",
+        "artifact_sha256",
+        "changed_event_ids",
+        "description"
+      ],
+      "properties": {
+        "proposal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "author": {
+          "enum": [
+            "agent",
+            "collaborator",
+            "joint"
+          ]
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "changed_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "actor_collaborator_id",
+        "action",
+        "proposal_id",
+        "acted_at_ns"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_collaborator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "enum": [
+            "accept",
+            "steer",
+            "veto",
+            "branch",
+            "ignore",
+            "clarify"
+          ]
+        },
+        "proposal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acted_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "selected_proposal_ids",
+        "committed",
+        "committed_at_ns",
+        "conflict_preserved"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "apply",
+            "branch",
+            "negotiate",
+            "ask",
+            "defer",
+            "abstain",
+            "veto"
+          ]
+        },
+        "selected_proposal_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "committed": {
+          "type": "boolean"
+        },
+        "committed_at_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "conflict_preserved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "persistentUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "update_id",
+        "target_scope",
+        "purpose",
+        "owner_collaborator_id",
+        "grant_id",
+        "authorization_status",
+        "authorized_scope",
+        "attempted",
+        "committed"
+      ],
+      "properties": {
+        "update_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_scope": {
+          "enum": [
+            "session",
+            "project",
+            "collaborator",
+            "global"
+          ]
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_collaborator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grant_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "authorization_status": {
+          "enum": [
+            "authorized",
+            "denied",
+            "revoked",
+            "unavailable"
+          ]
+        },
+        "authorized_scope": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "attempted": {
+          "type": "boolean"
+        },
+        "committed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
+pub mod agency;
 pub mod collab_trace;
 pub mod musical_timing;
 pub mod predictive_transparency;
