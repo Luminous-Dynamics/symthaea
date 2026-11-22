@@ -352,13 +352,14 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                         == Some(forecast.forecast_id.as_str())
                 })
             });
-        if let Some(disposition) = dispositions_by_forecast.get(forecast.forecast_id.as_str()) {
-            if matches!(disposition.action.as_str(), "steer" | "branch") && !has_child {
-                findings.push(format!(
-                    "{} disposition for {} has no superseding forecast",
-                    disposition.action, forecast.forecast_id
-                ));
-            }
+        if let Some(disposition) = dispositions_by_forecast.get(forecast.forecast_id.as_str())
+            && matches!(disposition.action.as_str(), "steer" | "branch")
+            && !has_child
+        {
+            findings.push(format!(
+                "{} disposition for {} has no superseding forecast",
+                disposition.action, forecast.forecast_id
+            ));
         }
     }
 
@@ -437,9 +438,9 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 forecast.forecast_id
             ));
         }
-        if !latest_by_series
+        if latest_by_series
             .get(forecast.commitment_series_id.as_str())
-            .is_some_and(|latest| latest.forecast_id == forecast.forecast_id)
+            .is_none_or(|latest| latest.forecast_id != forecast.forecast_id)
             && realization.started_at_ns
                 >= latest_by_series[forecast.commitment_series_id.as_str()].committed_at_ns
         {
