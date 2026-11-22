@@ -26,8 +26,15 @@ fn render_family(
         SpatialNuisanceFamily::GraphSmoothLowRank { diffusion_time, .. } => {
             (*diffusion_time, String::from("null"))
         }
-        SpatialNuisanceFamily::HeatKernelLocalized { seed_roi_indices, diffusion_time } => {
-            let indices = seed_roi_indices.iter().map(usize::to_string).collect::<Vec<_>>().join(", ");
+        SpatialNuisanceFamily::HeatKernelLocalized {
+            seed_roi_indices,
+            diffusion_time,
+        } => {
+            let indices = seed_roi_indices
+                .iter()
+                .map(usize::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
             (*diffusion_time, format!("[{indices}]"))
         }
     };
@@ -58,17 +65,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         adjacency[index + 1][index] = 1.0;
     }
     let graph = SpatialGraph::new(roi_labels, adjacency)?;
-    let rendered_labels = graph.roi_labels.iter()
+    let rendered_labels = graph
+        .roi_labels
+        .iter()
         .map(|label| format!("\"{label}\""))
         .collect::<Vec<_>>()
         .join(", ");
-    let rendered_edges = graph.adjacency.iter().enumerate()
-        .flat_map(|(left, row)| row.iter().enumerate()
-            .filter_map(move |(right, weight)| {
+    let rendered_edges = graph
+        .adjacency
+        .iter()
+        .enumerate()
+        .flat_map(|(left, row)| {
+            row.iter().enumerate().filter_map(move |(right, weight)| {
                 (*weight > 0.0 && left < right).then(|| {
-                    format!("[\"{}\", \"{}\", {:.12}]", graph.roi_labels[left], graph.roi_labels[right], weight)
+                    format!(
+                        "[\"{}\", \"{}\", {:.12}]",
+                        graph.roi_labels[left], graph.roi_labels[right], weight
+                    )
                 })
-            }))
+            })
+        })
         .collect::<Vec<_>>()
         .join(", ");
 
