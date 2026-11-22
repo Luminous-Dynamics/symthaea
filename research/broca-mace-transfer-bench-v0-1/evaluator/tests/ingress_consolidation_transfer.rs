@@ -36,7 +36,6 @@ use broca_mace_consolidation::salience::{
     FutureUsePredictionV1, MemoryAccessTelemetryV1, MemorySurfacingCandidateV1,
     MemorySurfacingModeV1, SalienceCalibrationReceiptV1, SaliencePredictionVerifierV1,
 };
-use broca_mace_policy::AsKnownQuery as PolicyAsKnownQuery;
 
 fn fixture_semantic_estimand() -> broca_mace_policy::SemanticEstimandV1 {
     broca_mace_policy::SemanticEstimandV1::new(
@@ -369,7 +368,7 @@ impl SaliencePredictionVerifierV1 for FixtureSalienceVerifier {
         &self,
         prediction: &FutureUsePredictionV1,
         target_scope: Scope,
-        as_known: PolicyAsKnownQuery,
+        as_known: AsKnownQuery,
     ) -> Option<SalienceCalibrationReceiptV1> {
         let mut receipt = SalienceCalibrationReceiptV1 {
             prediction_sha256: prediction.prediction_sha256.clone(),
@@ -407,7 +406,7 @@ impl SaliencePredictionVerifierV1 for FixtureSalienceVerifier {
 fn verified_salience_candidate(
     evidence: &broca_mace_ingress::ConsolidationEvidenceRefV1,
     target_model_sha256: &str,
-    known_at: PolicyAsKnownQuery,
+    known_at: AsKnownQuery,
 ) -> MemorySurfacingCandidateV1 {
     let ingress_as_known = AsKnownQuery {
         valid_at_ms: known_at.valid_at_ms,
@@ -554,7 +553,7 @@ fn qualified_memory_dose_and_salience_compose_over_verified_session_a_evidence()
     assert_eq!(qualified_budget.context_budget_tokens(), 512);
     assert!(qualified_budget.heldout_ci95_lower_micros() > 0);
 
-    let known_for_policy = PolicyAsKnownQuery {
+    let known_for_policy = AsKnownQuery {
         valid_at_ms: known.valid_at_ms,
         known_at_ms: known.known_at_ms,
     };
@@ -641,7 +640,7 @@ fn receipt_qualified_session_a_evidence_selects_reobservation_aware_memory() {
         hex_digest(510_003),
         evidence_digest.clone(),
     );
-    let policy_as_known = PolicyAsKnownQuery {
+    let policy_as_known = AsKnownQuery {
         valid_at_ms: known.valid_at_ms,
         known_at_ms: known.known_at_ms,
     };

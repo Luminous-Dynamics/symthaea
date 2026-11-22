@@ -168,6 +168,7 @@ pub enum ReobservationReject {
     InvalidSnapshotCost,
     InvalidVerifierReceipt,
     ReceiptNotValidAtSnapshot,
+    PredictionCalibrationNotValidAtDeadline,
     DecisionBeforeKnowledgeTime,
     InvalidDecisionDeadline,
     PredictionHorizonTooShort,
@@ -414,11 +415,17 @@ pub fn plan_memory_representation(
     {
         return Err(ReobservationReject::PredictionMismatch);
     }
+    let calibration = prediction.calibration_receipt();
     if proposal.as_known != policy.as_known
+        || calibration.as_known != proposal.as_known
+        || calibration.target_scope != proposal.scope
         || raw_prediction.predicted_at_ms > proposal.as_known.known_at_ms
         || profile.receipt().verified_at_ms > proposal.as_known.known_at_ms
     {
         return Err(ReobservationReject::SnapshotMismatch);
+    }
+    if calibration.valid_until_ms <= policy.decision_deadline_ms {
+        return Err(ReobservationReject::PredictionCalibrationNotValidAtDeadline);
     }
     if policy.decision_at_ms < proposal.as_known.known_at_ms {
         return Err(ReobservationReject::DecisionBeforeKnowledgeTime);
@@ -718,7 +725,9 @@ mod tests {
         }
     }
 
-    struct FixtureSalienceVerifier;
+    struct FixtureSalienceVerifier {
+        valid_for_ms: i64,
+    }
 
     impl SaliencePredictionVerifierV1 for FixtureSalienceVerifier {
         fn verify_prediction(
@@ -751,7 +760,7 @@ mod tests {
                 task_families_disjoint: true,
                 source_roots_disjoint: true,
                 verified_at_ms: as_known.known_at_ms,
-                valid_until_ms: as_known.known_at_ms + 10_000,
+                valid_until_ms: as_known.known_at_ms + self.valid_for_ms,
                 verifier_id: "fixture-salience-v1".to_owned(),
                 receipt_sha256: String::new(),
             };
@@ -818,7 +827,38 @@ mod tests {
             raw,
             scope(),
             as_known(),
-            &FixtureSalienceVerifier,
+            &FixtureSalienceVerifier {
+                valid_for_ms: 10_000,
+            },
+        )
+        .unwrap()
+    }
+
+    fn prediction_with_validity(
+        expected_value_gain_micros: u32,
+        uncertainty_penalty_micros: u32,
+        valid_for_ms: i64,
+    ) -> VerifiedFutureUsePredictionV1 {
+        let raw = FutureUsePredictionV1::new(
+            7,
+            digest("target-model"),
+            scope(),
+            150,
+            10_000,
+            9_000,
+            expected_value_gain_micros,
+            uncertainty_penalty_micros,
+            "future-use-model",
+            "v1",
+            digest("model-config"),
+            digest("rationale"),
+            digest("evidence"),
+        );
+        verify_future_use_prediction(
+            raw,
+            scope(),
+            as_known(),
+            &FixtureSalienceVerifier { valid_for_ms },
         )
         .unwrap()
     }
@@ -880,6 +920,61 @@ mod tests {
                 stale_policy,
             ),
             Err(ReobservationReject::InvalidPolicyConfiguration)
+        );
+    }
+
+    #[test]
+    fn prediction_calibration_must_match_the_source_profile_snapshot() {
+        let older_snapshot = AsKnownQuery {
+            valid_at_ms: 100,
+            known_at_ms: 200,
+        };
+        let raw = FutureUsePredictionV1::new(
+            7,
+            digest("target-model"),
+            scope(),
+            150,
+            10_000,
+            9_000,
+            50_000,
+            1_000,
+            "future-use-model",
+            "v1",
+            digest("model-config"),
+            digest("rationale"),
+            digest("evidence"),
+        );
+        let old_prediction = verify_future_use_prediction(
+            raw,
+            scope(),
+            older_snapshot,
+            &FixtureSalienceVerifier {
+                valid_for_ms: 10_000,
+            },
+        )
+        .unwrap();
+        let profile = verified(proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Unavailable,
+            Some(900),
+        ));
+        assert_eq!(
+            plan_memory_representation(&old_prediction, &profile, policy()),
+            Err(ReobservationReject::SnapshotMismatch)
+        );
+    }
+
+    #[test]
+    fn prediction_calibration_expiring_at_the_deadline_is_not_usable() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Unavailable,
+            Some(900),
+        ));
+        let forecast = prediction_with_validity(50_000, 1_000, 200);
+        assert_eq!(
+            plan_memory_representation(&forecast, &profile, policy()),
+            Err(ReobservationReject::PredictionCalibrationNotValidAtDeadline)
         );
     }
 
