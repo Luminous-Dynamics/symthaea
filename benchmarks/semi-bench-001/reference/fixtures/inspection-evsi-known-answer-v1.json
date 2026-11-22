@@ -1,0 +1,56 @@
+{
+  "schema": "luminous.semi-bench.evsi-subject.v1",
+  "case_id": "EVSI-SECOM-SYNTHETIC-001",
+  "budget": {
+    "max_minutes": 10.0,
+    "max_measurement_cost": 3.0,
+    "max_per_group": 1
+  },
+  "candidates": [
+    {
+      "candidate_id": "A",
+      "group_id": "LOT-1",
+      "prior_defect_probability": 0.20,
+      "test_sensitivity": 0.90,
+      "test_specificity": 0.95,
+      "defect_loss": 100.0,
+      "intervention_cost": 4.0,
+      "false_intervention_cost": 10.0,
+      "actionability_probability": 0.90,
+      "measurement_cost": 1.0,
+      "measurement_minutes": 5.0,
+      "delay_hours": 0.0,
+      "delay_cost_per_hour": 0.0
+    },
+    {
+      "candidate_id": "B",
+      "group_id": "LOT-2",
+      "prior_defect_probability": 0.10,
+      "test_sensitivity": 0.80,
+      "test_specificity": 0.90,
+      "defect_loss": 80.0,
+      "intervention_cost": 4.0,
+      "false_intervention_cost": 8.0,
+      "actionability_probability": 0.85,
+      "measurement_cost": 1.0,
+      "measurement_minutes": 5.0,
+      "delay_hours": 0.0,
+      "delay_cost_per_hour": 0.0
+    },
+    {
+      "candidate_id": "C",
+      "group_id": "LOT-3",
+      "prior_defect_probability": 0.25,
+      "test_sensitivity": 0.25,
+      "test_specificity": 0.75,
+      "defect_loss": 100.0,
+      "intervention_cost": 4.0,
+      "false_intervention_cost": 10.0,
+      "actionability_probability": 0.90,
+      "measurement_cost": 0.5,
+      "measurement_minutes": 5.0,
+      "delay_hours": 0.0,
+      "delay_cost_per_hour": 0.0
+    }
+  ]
+}
