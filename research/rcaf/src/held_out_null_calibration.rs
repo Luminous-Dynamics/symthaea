@@ -546,14 +546,26 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.estimators.len(), 3);
-        for estimator in &report.estimators {
+        let expected_signal_detections = [49, 100, 100];
+        let expected_directionally_correct = [45, 90, 90];
+        let expected_wrong_direction = [4, 10, 10];
+        for (index, estimator) in report.estimators.iter().enumerate() {
             assert_eq!(estimator.calibration_replicates, 99);
             assert_eq!(estimator.evaluation_replicates, 100);
             assert!(estimator.critical_value.is_some());
-            assert!(estimator.signal_detection_rate.estimate > 0.8);
-            assert!(estimator.held_out_false_positive_rate.estimate <= 0.05);
-            assert!(estimator.directionally_correct_signal_rate.estimate > 0.7);
-            assert!(estimator.wrong_direction_acceptance_rate.estimate > 0.0);
+            assert_eq!(estimator.held_out_false_positive_rate.successes, 5);
+            assert_eq!(
+                estimator.signal_detection_rate.successes,
+                expected_signal_detections[index]
+            );
+            assert_eq!(
+                estimator.directionally_correct_signal_rate.successes,
+                expected_directionally_correct[index]
+            );
+            assert_eq!(
+                estimator.wrong_direction_acceptance_rate.successes,
+                expected_wrong_direction[index]
+            );
         }
     }
 
