@@ -22,6 +22,15 @@ fn render_family(
 ) -> Result<String, Box<dyn Error>> {
     let field = generate_spatial_nuisance_field(graph, &config, None)?;
     let rank = field.spatial_basis.first().map_or(0, Vec::len);
+    let (diffusion_time, seed_roi_indices) = match &config.family {
+        SpatialNuisanceFamily::GraphSmoothLowRank { diffusion_time, .. } => {
+            (*diffusion_time, String::from("null"))
+        }
+        SpatialNuisanceFamily::HeatKernelLocalized { seed_roi_indices, diffusion_time } => {
+            let indices = seed_roi_indices.iter().map(usize::to_string).collect::<Vec<_>>().join(", ");
+            (*diffusion_time, format!("[{indices}]"))
+        }
+    };
     let autocorrelation = field
         .realized_temporal_ar1
         .iter()
@@ -29,10 +38,12 @@ fn render_family(
         .collect::<Vec<_>>()
         .join(", ");
     Ok(format!(
-        "{{\n  \"family_id\": \"{family_id}\",\n  \"spatial_rank\": {rank},\n  \"dose\": {:.12},\n  \"temporal_ar1\": {:.12},\n  \"temporal_coherence\": {:.12},\n  \"realized_field_rms\": {:.12},\n  \"realized_temporal_ar1\": [{autocorrelation}]\n}}",
+        "{{\n  \"family_id\": \"{family_id}\",\n  \"spatial_rank\": {rank},\n  \"diffusion_time\": {:.12},\n  \"seed_roi_indices\": {seed_roi_indices},\n  \"dose\": {:.12},\n  \"temporal_ar1\": {:.12},\n  \"temporal_coherence\": {:.12},\n  \"rng_seed\": \"0x{:016x}\",\n  \"rng_algorithm\": \"xorshift64-boxmuller-v1\",\n  \"realized_field_rms\": {:.12},\n  \"realized_temporal_ar1\": [{autocorrelation}]\n}}",
+        diffusion_time,
         config.dose,
         config.temporal_ar1,
         config.temporal_coherence,
+        config.seed,
         field_rms(&field.values),
     ))
 }
@@ -47,6 +58,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         adjacency[index + 1][index] = 1.0;
     }
     let graph = SpatialGraph::new(roi_labels, adjacency)?;
+    let rendered_labels = graph.roi_labels.iter()
+        .map(|label| format!("\"{label}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let rendered_edges = graph.adjacency.iter().enumerate()
+        .flat_map(|(left, row)| row.iter().enumerate()
+            .filter_map(move |(right, weight)| {
+                (*weight > 0.0 && left < right).then(|| {
+                    format!("[\"{}\", \"{}\", {:.12}]", graph.roi_labels[left], graph.roi_labels[right], weight)
+                })
+            }))
+        .collect::<Vec<_>>()
+        .join(", ");
 
     let common = SpatialNuisanceConfig {
         family: SpatialNuisanceFamily::GraphSmoothLowRank {
@@ -73,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let report = format!(
-        "{{\n  \"schema_version\": \"rcaf.spatial-nuisance-field/0.1.0\",\n  \"source_status\": \"synthetic_fixture\",\n  \"geometry\": {{\n    \"representation\": \"weighted_undirected_graph\",\n    \"source\": \"synthetic_path_graph\",\n    \"interpretation_scope\": \"synthetic_topology_only\",\n    \"roi_count\": 8,\n    \"edge_count\": 7\n  }},\n  \"time_points\": 160,\n  \"families\": [\n{graph_smooth},\n{localized}\n  ],\n  \"claim_limits\": [\n    \"synthetic graph topology only; not an anatomical atlas\",\n    \"field generator qualification only; no biological data analysed\",\n    \"dose is an additive loading, not a nuisance variance fraction\",\n    \"does not qualify preprocessing or causal interpretation\"\n  ]\n}}\n"
+        "{{\n  \"schema_version\": \"rcaf.spatial-nuisance-field/0.1.0\",\n  \"source_status\": \"synthetic_fixture\",\n  \"geometry\": {{\n    \"representation\": \"weighted_undirected_graph\",\n    \"source\": \"synthetic_path_graph\",\n    \"interpretation_scope\": \"synthetic_topology_only\",\n    \"roi_count\": 8,\n    \"edge_count\": 7,\n    \"roi_labels\": [{rendered_labels}],\n    \"weighted_edges\": [{rendered_edges}]\n  }},\n  \"time_points\": 160,\n  \"families\": [\n{graph_smooth},\n{localized}\n  ],\n  \"claim_limits\": [\n    \"synthetic graph topology only; not an anatomical atlas\",\n    \"field generator qualification only; no biological data analysed\",\n    \"dose is an additive loading, not a nuisance variance fraction\",\n    \"does not qualify preprocessing or causal interpretation\"\n  ]\n}}\n"
     );
 
     if let Some(path) = std::env::args_os().nth(1) {
