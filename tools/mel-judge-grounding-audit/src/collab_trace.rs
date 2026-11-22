@@ -10,6 +10,11 @@ struct InteractionTraceV1 {
     schema_version: String,
     session_id: String,
     case_id: String,
+    musician_pseudonym: String,
+    instrument_id: String,
+    agent_role: String,
+    task_family: TaskFamily,
+    evaluation_consent_receipt_sha256: String,
     track: TrackKind,
     clock_domain_id: String,
     hardware_profile_id: String,
@@ -17,6 +22,17 @@ struct InteractionTraceV1 {
     rest_windows: Vec<RestWindowV1>,
     loopback_measurement: Option<LoopbackMeasurementV1>,
     claim_ceiling: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskFamily {
+    CallResponse,
+    AdaptiveAccompaniment,
+    PhraseContinuation,
+    StructuralTransition,
+    SilenceRestraint,
+    Recovery,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -107,6 +123,8 @@ pub struct TraceAuditReport {
     pub schema_version: String,
     pub session_id: String,
     pub case_id: String,
+    pub musician_pseudonym: String,
+    pub task_family: TaskFamily,
     pub track: TrackKind,
     pub event_count: usize,
     pub input_chunk_count: usize,
@@ -361,6 +379,8 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
         schema_version: "mel-collab-interaction-trace-report-v1".to_owned(),
         session_id: trace.session_id.clone(),
         case_id: trace.case_id.clone(),
+        musician_pseudonym: trace.musician_pseudonym.clone(),
+        task_family: trace.task_family,
         track: trace.track,
         event_count: trace.events.len(),
         input_chunk_count,
@@ -390,6 +410,13 @@ fn validate_header(trace: &InteractionTraceV1) -> Result<(), String> {
     }
     require_text(&trace.session_id, "session_id")?;
     require_text(&trace.case_id, "case_id")?;
+    require_text(&trace.musician_pseudonym, "musician_pseudonym")?;
+    require_text(&trace.instrument_id, "instrument_id")?;
+    require_text(&trace.agent_role, "agent_role")?;
+    require_digest(
+        &trace.evaluation_consent_receipt_sha256,
+        "evaluation consent receipt digest",
+    )?;
     require_text(&trace.clock_domain_id, "clock_domain_id")?;
     require_text(&trace.hardware_profile_id, "hardware_profile_id")?;
     if trace.events.is_empty() {
