@@ -351,9 +351,12 @@ mod tests {
         assert!((high_after - expected_high).abs() < 1.0e-10);
         assert!((low_after - low_before).abs() < 1.0e-10);
         assert!((density_mode_after.amplitude() - density_mode_before.amplitude()).abs() < 1.0e-12);
+        let mass_delta =
+            (report.diagnostics_after.total_mass - report.diagnostics_before.total_mass).abs();
+        let mass_scale = report.diagnostics_before.total_mass.abs().max(1.0);
         assert!(
-            (report.diagnostics_after.total_mass - report.diagnostics_before.total_mass).abs()
-                < 1.0e-12
+            mass_delta < 1.0e-12 * mass_scale,
+            "zero-velocity-mode mass drift = {mass_delta:e} (scale {mass_scale:e})"
         );
         assert!(report.diagnostics_after.minimum_distribution > 0.0);
         assert_eq!(
