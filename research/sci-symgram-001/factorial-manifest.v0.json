@@ -1,0 +1,224 @@
+{
+  "schema_version": "sci-symgram-factorial-manifest-v0",
+  "study_id": "SCI-SYMGRAM-001",
+  "status": "PROTOCOL_ONLY_NO_RUNS",
+  "owner_issue": "Luminous-Dynamics/symthaea#12781",
+  "protocol_document": "docs/research/SCI_SYMGRAM_001_PROTOCOL_V0_2026-11-18.md",
+  "upstream_owners": [
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "issue": 11336,
+      "role": "symmetry discovery evidence and calibration"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "issue": 8919,
+      "role": "shared generative grammar discovery across worlds"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "issue": 8705,
+      "role": "cross-environment and intervention transport"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "issue": 6862,
+      "role": "cold discovery, holdout, symbolic qualification"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "issue": 6879,
+      "role": "canonical ScientificModel and PhysicsIR"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "issue": 11616,
+      "role": "task-preserving quotient compilation, orbit certificates and lifting"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "issue": 3749,
+      "role": "analytic physics oracles and solver V&V"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "issue": 6027,
+      "role": "candidate-independent models and counterexamples"
+    },
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "issue": 2886,
+      "role": "bounded grammar induction and identifiability-aware probing"
+    }
+  ],
+  "factorial": {
+    "factors": [
+      {
+        "name": "symmetry_treatment",
+        "levels": [
+          "none",
+          "exact_proof_qualified_quotient"
+        ]
+      },
+      {
+        "name": "discovery_mode",
+        "levels": [
+          "independent_per_world",
+          "pooled_no_reusable_grammar",
+          "explicit_shared_grammar"
+        ]
+      }
+    ],
+    "primary_arms": [
+      {
+        "arm_id": "A",
+        "symmetry_treatment": "none",
+        "discovery_mode": "independent_per_world"
+      },
+      {
+        "arm_id": "B",
+        "symmetry_treatment": "none",
+        "discovery_mode": "pooled_no_reusable_grammar"
+      },
+      {
+        "arm_id": "C",
+        "symmetry_treatment": "none",
+        "discovery_mode": "explicit_shared_grammar"
+      },
+      {
+        "arm_id": "D",
+        "symmetry_treatment": "exact_proof_qualified_quotient",
+        "discovery_mode": "independent_per_world"
+      },
+      {
+        "arm_id": "E",
+        "symmetry_treatment": "exact_proof_qualified_quotient",
+        "discovery_mode": "pooled_no_reusable_grammar"
+      },
+      {
+        "arm_id": "F",
+        "symmetry_treatment": "exact_proof_qualified_quotient",
+        "discovery_mode": "explicit_shared_grammar"
+      }
+    ],
+    "primary_interaction_contrast": "(F-C)-(E-B)",
+    "diagnostic_arms": [
+      "soft_sampled_symmetry_hint_no_hard_pruning",
+      "false_hard_quotient_negative_control",
+      "tiny_exact_group_and_grammar_oracle",
+      "no_transfer_fresh_search",
+      "oracle_structure_parameter_fit_ceiling"
+    ]
+  },
+  "world_families": [
+    "coupled_oscillators",
+    "central_force_motion",
+    "spring_mass_networks",
+    "rigid_body_rotations",
+    "constrained_mechanical_systems",
+    "non_mechanics_family_after_physical_typing"
+  ],
+  "challenge_controls": [
+    "exact_symmetry_positive",
+    "broken_symmetry",
+    "graded_near_symmetry",
+    "admissible_coordinate_representation_change",
+    "heterogeneous_non_shared_grammar",
+    "observational_non_identifiability",
+    "out_of_grammar_mechanism",
+    "measurement_process_confounding",
+    "intervention_and_environment_shift"
+  ],
+  "matching_contract": {
+    "must_match": [
+      "world_and_paired_seed",
+      "initial_observations",
+      "permitted_interventions_and_costs",
+      "discovery_calibration_confirmation_splits",
+      "candidate_evaluation_budget",
+      "model_prompt_tools_and_memory_access",
+      "wall_time_cpu_gpu_memory_and_energy_ceilings_where_metered",
+      "stopping_abstention_and_safe_abort_semantics"
+    ],
+    "split_names": [
+      "discovery",
+      "calibration",
+      "sealed_confirmation"
+    ],
+    "preserve_all_terminal_outcomes": true
+  },
+  "metric_families": {
+    "symmetry_correctness": [
+      "group_action_or_observable_equivalence_recovery",
+      "false_exact_admission_rate",
+      "sampled_lane_risk_coverage_and_abstention",
+      "representation_covariance_consistency",
+      "claim_scope_confusion_rate"
+    ],
+    "shared_discovery": [
+      "semantic_shared_production_rule_recovery",
+      "world_law_equivalence_recovery",
+      "held_out_trajectory_prediction",
+      "held_out_intervention_prediction",
+      "held_out_composition_transfer",
+      "false_shared_grammar_rate",
+      "false_confident_singleton_rate"
+    ],
+    "search_efficiency": [
+      "candidate_ast_and_grammar_expansion_count",
+      "candidate_model_evaluations",
+      "experiment_and_intervention_count",
+      "wall_time_cpu_gpu_memory_and_energy_where_metered",
+      "cost_to_first_independently_confirmed_transferable_law"
+    ],
+    "evidence_quality": [
+      "paired_family_level_intervals",
+      "calibration_and_selective_risk",
+      "complete_terminal_denominators",
+      "deterministic_replay_and_artifact_identity"
+    ]
+  },
+  "statistical_plan": {
+    "paired_seeds_per_family_target": 30,
+    "confidence_level": 0.95,
+    "sampling_unit": "world_or_task_cluster",
+    "pseudo_replication_prohibited": true,
+    "preregister_primary_contrasts": true,
+    "confirmation_is_sealed": true
+  },
+  "proposed_targets": [
+    {
+      "target_id": "zero_false_exact_quotient",
+      "threshold": "0 observed false admissions in declared exact fixture suite",
+      "status": "NOT_MEASURED"
+    },
+    {
+      "target_id": "no_sampled_to_exact_promotion",
+      "threshold": "0 sampled-evidence promotions to exact or formal status",
+      "status": "NOT_MEASURED"
+    },
+    {
+      "target_id": "quotient_efficiency",
+      "threshold": "at least 20% lower median candidate-evaluation cost on eligible families, paired interval excludes zero",
+      "status": "NOT_MEASURED"
+    },
+    {
+      "target_id": "correctness_noninferiority",
+      "threshold": "no regression beyond a preregistered practical margin on semantic recovery and held-out prediction",
+      "status": "NOT_MEASURED"
+    },
+    {
+      "target_id": "shared_grammar_transfer",
+      "threshold": "improve a preregistered held-out composition outcome without increasing false-shared or false-singleton claims",
+      "status": "NOT_MEASURED"
+    }
+  ],
+  "claim_ceiling": [
+    "protocol_and_manifest_only",
+    "no_benchmark_execution_claim",
+    "no_new_physical_law_claim",
+    "no_external_sota_claim",
+    "synthetic_results_do_not_establish_physical_truth",
+    "radial polynomial oracle does not grant quotient pruning permission"
+  ]
+}

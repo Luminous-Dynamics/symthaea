@@ -1,0 +1,10 @@
+[package]
+name = "sci-symgram-radial-oracle"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact polynomial reference checks for the SCI-SYMGRAM-001 radial-force development family"
+
+[lib]
+path = "src/lib.rs"

@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/sci-symgram-001/factorial-manifest.schema.json",
+  "title": "SCI-SYMGRAM-001 factorial study manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "status",
+    "owner_issue",
+    "protocol_document",
+    "upstream_owners",
+    "factorial",
+    "world_families",
+    "challenge_controls",
+    "matching_contract",
+    "metric_families",
+    "statistical_plan",
+    "proposed_targets",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sci-symgram-factorial-manifest-v0"
+    },
+    "study_id": {
+      "const": "SCI-SYMGRAM-001"
+    },
+    "status": {
+      "const": "PROTOCOL_ONLY_NO_RUNS"
+    },
+    "owner_issue": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_document": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_owners": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "repository",
+          "issue",
+          "role"
+        ],
+        "properties": {
+          "repository": {
+            "type": "string",
+            "pattern": "^[^/]+/[^/]+$"
+          },
+          "issue": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "factorial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factors",
+        "primary_arms",
+        "primary_interaction_contrast",
+        "diagnostic_arms"
+      ],
+      "properties": {
+        "factors": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "levels"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "levels": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "primary_arms": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "arm_id",
+              "symmetry_treatment",
+              "discovery_mode"
+            ],
+            "properties": {
+              "arm_id": {
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "E",
+                  "F"
+                ]
+              },
+              "symmetry_treatment": {
+                "enum": [
+                  "none",
+                  "exact_proof_qualified_quotient"
+                ]
+              },
+              "discovery_mode": {
+                "enum": [
+                  "independent_per_world",
+                  "pooled_no_reusable_grammar",
+                  "explicit_shared_grammar"
+                ]
+              }
+            }
+          }
+        },
+        "primary_interaction_contrast": {
+          "const": "(F-C)-(E-B)"
+        },
+        "diagnostic_arms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "world_families": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "challenge_controls": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "matching_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "must_match",
+        "split_names",
+        "preserve_all_terminal_outcomes"
+      ],
+      "properties": {
+        "must_match": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "split_names": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "discovery",
+              "calibration",
+              "sealed_confirmation"
+            ]
+          }
+        },
+        "preserve_all_terminal_outcomes": {
+          "const": true
+        }
+      }
+    },
+    "metric_families": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symmetry_correctness",
+        "shared_discovery",
+        "search_efficiency",
+        "evidence_quality"
+      ],
+      "properties": {
+        "symmetry_correctness": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "shared_discovery": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "search_efficiency": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_quality": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "statistical_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_seeds_per_family_target",
+        "confidence_level",
+        "sampling_unit",
+        "pseudo_replication_prohibited",
+        "preregister_primary_contrasts",
+        "confirmation_is_sealed"
+      ],
+      "properties": {
+        "paired_seeds_per_family_target": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "sampling_unit": {
+          "enum": [
+            "world_or_task_cluster"
+          ]
+        },
+        "pseudo_replication_prohibited": {
+          "const": true
+        },
+        "preregister_primary_contrasts": {
+          "const": true
+        },
+        "confirmation_is_sealed": {
+          "const": true
+        }
+      }
+    },
+    "proposed_targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target_id",
+          "threshold",
+          "status"
+        ],
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "threshold": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "NOT_MEASURED"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
