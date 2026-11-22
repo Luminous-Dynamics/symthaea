@@ -283,7 +283,7 @@
       "raw_prime_density_per_cell": "1/(4n): one half nonsquare mod d, one half specified sign mod q, and 1/n specified residue-pair column; CRT gives independence over invertible residue classes",
       "weight_coefficient": "c(r) = (1-χ_d(r)) log p; coefficient is 2 log p on contributing ordinary primes, doubling the raw density",
       "weighted_density": "μ = 1/(2n)",
-      "caveat": "This uses the fixed-modulus prime number theorem for each fixed q,d,N. Its error constants can depend on the moduli. Uniformity as q,d,N vary with x is not supplied by this fixed-modulus argument; Estimate C handles the uniform non-distinguished-cell control later."
+      "caveat": "The source explicitly says the fixed-modulus PNT error O_A(z/(log z)^A) absorbs higher prime powers and the one exceptional prime. Its constants may depend on q,d,N. Uniformity as these moduli vary with x is not supplied by this fixed-modulus argument; Estimate C handles uniform nondistinguished-cell control later."
     },
     "constants": {
       "identity": "sum_i C_i = -1 - γ + c_{χ_d}",
@@ -338,5 +338,40 @@
       "Finite cyclic groups only; not a formal proof for the actual group H used in the RH construction.",
       "Does not verify the theta-lift, cell-weight perturbations, prime density or any uniform analytic estimate."
     ]
+  },
+  "upstream_graph_crosschecks": [
+    {
+      "declaration": "Formalism.RankGapBounds.WeightedMeanData.Data.Tterm",
+      "source_file": "src/Formalism/RankGapBounds/MeanBoundSecondForm.lean",
+      "source_lines": [
+        97,
+        99
+      ],
+      "upstream_file": "data/aux-only-decls.tsv",
+      "upstream_blob_sha": "6d5ab51bcc7c517f9fdbff294155c7953130fab3",
+      "upstream_row": "Formalism.RankGapBounds.WeightedMeanData.Data.Tterm\\tdef\\tsrc/Formalism/RankGapBounds/MeanBoundSecondForm.lean\\t97\\t99\\t2",
+      "upstream_semantics": "The upstream method defines this class as a declaration whose own constant is not in the kernel proof closure but which generated shared auxiliary lemma(s) used elsewhere. n_shared_aux_in_cone=2; use of those helper constants does not make the generator declaration itself used.",
+      "interpretation": "Independent support for excluding MeanBoundSecondForm itself from the final theorem's kernel-proof declaration closure, while preserving the fact that two generated helper constants are used by the proof.",
+      "limit": "This does not imply the helper constants are mathematically irrelevant, nor does it replace the exposition's exact statement that each_unit_bound_statement is used."
+    }
+  ],
+  "uniform_error_bridges": {
+    "non_distinguished_cells": {
+      "paper_equation": "(5.6), (II.25)",
+      "bound": "For y >= exp(x^ε/3)/3, |G_χ(y)| <= y exp(-κ x^(ε/8)), where κ is independent of x,q,d.",
+      "consequence": "Each cell residual is a character combination with sum of absolute Fourier coefficients 2, so |w_i R_i(a/w_i)| <= 2aθ; after averaging and normalization the nondistinguished contribution is o(1).",
+      "status": "Source-inspected in working guide; exact Lean declaration(s) for Estimate C are not yet mapped."
+    },
+    "distinguished_weight_perturbation": {
+      "paper_equation": "(II.26)",
+      "bound": "w_i=b+Δ_i, 0<=Δ_i<<b/(n x^2); |w_i R_i(a/w_i)-bR_i(a/b)|<<xΔ_i.",
+      "consequence": "After normalization, aggregate distinguished-weight perturbation is O(1/x).",
+      "status": "Source-inspected; exact formal declaration and dependency path are not yet mapped."
+    },
+    "cutoff_argument_shift": {
+      "source_identity": "|a_t/b-x|<=1",
+      "consequence": "S_{q,d}(y), y log y, and the centering constants vary by O(1+log x); combining (5.3), (5.5), (II.25), (II.26) gives (5.7).",
+      "status": "Source-inspected; proof-dependency mapping remains open."
+    }
   }
 }
