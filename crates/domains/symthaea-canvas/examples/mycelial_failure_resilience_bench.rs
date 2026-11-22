@@ -152,6 +152,9 @@ fn run_attack_family(
         plan.ranked_entity_ids,
         evaluation.attack_plan_digest
     );
+    for (step, ranking) in plan.ranked_entity_ids_per_step.iter().enumerate() {
+        println!("attack_ranking_step:{} candidates={:?}", step + 1, ranking);
+    }
     for scenario in &evaluation.resilience_profile.scenarios {
         println!(
             "attack_scenario:{} failed_edges={:?} failed_junctions={:?} weighted_reachability={:?} weighted_directness={:?}",
@@ -325,6 +328,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         &graph,
         &demands,
         MycelialFailureAttackStrategy::HighestDegreeJunctions,
+        0,
+        None,
+    )?;
+    run_attack_family(
+        &graph,
+        &demands,
+        MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions,
         0,
         None,
     )?;
