@@ -30,12 +30,18 @@ pub(crate) struct EvidenceQuery {
     pub id: String,
     pub observation_model_digest: String,
     pub outcomes: Vec<ObservationOutcome>,
+    /// All three costs must already be normalized to the decision-loss unit.
     pub acquisition_cost: f64,
     pub delay_cost: f64,
+    /// Only an approved exposure burden; this never substitutes for privacy approval.
     pub disclosure_exposure_cost: f64,
+    /// Upstream gate result, not a self-authenticating authority assertion.
     pub source_authorized: bool,
+    /// Upstream decision-scope validator result.
     pub scope_valid: bool,
+    /// Separate rights/privacy approval gate; exposure cost is not compensatory.
     pub privacy_approved: bool,
+    /// Whether the request can return within the decision's allowed time horizon.
     pub deadline_feasible: bool,
 }
 
