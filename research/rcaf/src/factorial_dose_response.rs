@@ -336,7 +336,7 @@ fn validate_matrix(
     matrix: &[Vec<f64>],
     name: &'static str,
 ) -> Result<(usize, usize), FactorialDoseResponseError> {
-    if matrix.is_empty() || matrix.first().map_or(true, Vec::is_empty) {
+    if matrix.is_empty() || matrix.first().is_none_or(Vec::is_empty) {
         return Err(FactorialDoseResponseError::EmptyMatrix);
     }
     let roi_count = matrix[0].len();
