@@ -326,8 +326,7 @@ mod tests {
             let spatial_nyquist = if ix % 2 == 0 { 1.0 } else { -1.0 };
             for (iv, value) in row.iter_mut().enumerate() {
                 let velocity_nyquist = if iv % 2 == 0 { 1.0 } else { -1.0 };
-                *value *=
-                    (1.0 + 0.02 * spatial_nyquist) * (1.0 + 0.03 * velocity_nyquist);
+                *value *= (1.0 + 0.02 * spatial_nyquist) * (1.0 + 0.03 * velocity_nyquist);
             }
         }
 
