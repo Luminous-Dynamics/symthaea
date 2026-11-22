@@ -6,7 +6,7 @@ existing public Symthaea applications.
 ## Current status
 
 - `patterns-v0.json` contains seventeen source-grounded patterns across the Symthaea and Muse Leptos applications.
-- Every pattern records its exact source path and Git blob SHA.
+- Every pattern records its primary source path and Git blob SHA, plus related source paths for multi-file patterns.
 - Every pattern has an explicit evidence state; none is marked browser-verified.
 - The corpus is pinned to the Leptos 0.8 API family. The repository's current
   `Cargo.lock` resolves `leptos` to 0.8.20; this exact resolved version is the
@@ -45,7 +45,7 @@ pattern spans multiple modules.
 ## Framework version discipline
 
 As of 2026-11-22, upstream has published Leptos 0.8.23 as the latest stable
-0.8 release, with 0.9.0-rc1 as a prerelease. This repository's checked-in
+0.8 release, with 0.9.0-rc1 as a prerelease. See the [0.8.23 API docs](https://docs.rs/leptos/0.8.23/leptos/) and [upstream release notes](https://github.com/leptos-rs/leptos/releases/tag/v0.8.23). This repository's checked-in
 `Cargo.lock` currently resolves Leptos 0.8.20. The SFEB baseline must record
 and use 0.8.20 until an explicit 0.8.23 compatibility experiment updates the
 lockfile and passes compile, browser and regression gates. Do not silently mix
