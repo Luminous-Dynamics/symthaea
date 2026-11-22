@@ -187,6 +187,22 @@ struct SearchStats {
 
 type MemoKey = (Vec<String>, [u64; 6], usize, Vec<String>, Vec<String>);
 
+struct SearchContext<'a> {
+    scenario: &'a SequentialScenario,
+    memo: BTreeMap<MemoKey, Plan>,
+    stats: SearchStats,
+}
+
+impl<'a> SearchContext<'a> {
+    fn new(scenario: &'a SequentialScenario) -> Self {
+        Self {
+            scenario,
+            memo: BTreeMap::new(),
+            stats: SearchStats::default(),
+        }
+    }
+}
+
 fn memo_key(
     belief: &[String],
     remaining_budget: &Resources,
@@ -203,7 +219,7 @@ fn memo_key(
             remaining_budget.engineering_hours.to_bits(),
             remaining_budget.compute_core_hours.to_bits(),
             remaining_budget.facility_hours.to_bits(),
-            remaining_budget.specimen_count as u64,
+            remaining_budget.specimen_count,
             remaining_budget.review_hours.to_bits(),
             remaining_budget.external_cost_units.to_bits(),
         ],
@@ -549,14 +565,12 @@ fn select_plan(mut candidates: Vec<Plan>) -> Result<Plan, String> {
 }
 
 fn solve(
-    scenario: &SequentialScenario,
+    context: &mut SearchContext<'_>,
     belief: &[String],
     remaining_budget: &Resources,
     depth_remaining: usize,
     used: &BTreeSet<String>,
     covered_obligations: &BTreeSet<String>,
-    memo: &mut BTreeMap<MemoKey, Plan>,
-    stats: &mut SearchStats,
 ) -> Result<Plan, String> {
     let key = memo_key(
         belief,
@@ -565,16 +579,17 @@ fn solve(
         used,
         covered_obligations,
     );
-    if let Some(cached) = memo.get(&key) {
-        stats.memo_hits += 1;
+    if let Some(cached) = context.memo.get(&key) {
+        context.stats.memo_hits += 1;
         return Ok(cached.clone());
     }
-    stats.states_expanded += 1;
+    context.stats.states_expanded += 1;
 
+    let scenario = context.scenario;
     let mut candidates = vec![terminal_plan(scenario, belief, covered_obligations)?];
     if depth_remaining == 0 {
         let result = candidates.remove(0);
-        memo.insert(key, result.clone());
+        context.memo.insert(key, result.clone());
         return Ok(result);
     }
     for action in &scenario.actions {
@@ -619,18 +634,17 @@ fn solve(
                 })?;
             next_covered.extend(outcome_obligations.iter().cloned());
             let child = solve(
-                scenario,
+                context,
                 branch_belief,
                 &child_budget,
                 depth_remaining - 1,
                 &next_used,
                 &next_covered,
-                memo,
-                stats,
             )?;
             worst_case_regret = worst_case_regret.max(child.worst_case_regret);
             if let Some(child_expected) = &child.expected_resources {
-                let probability = conditional_branch_probability(scenario, belief, branch_belief)?;
+                let probability =
+                    conditional_branch_probability(scenario, belief, branch_belief)?;
                 expected_future = expected_add(
                     &expected_future,
                     &expected_scale(child_expected, probability),
@@ -660,7 +674,7 @@ fn solve(
         });
     }
     let result = select_plan(candidates)?;
-    memo.insert(key, result.clone());
+    context.memo.insert(key, result.clone());
     Ok(result)
 }
 
@@ -963,17 +977,14 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     let baseline = baseline_plan.worst_case_regret;
     let myopic = myopic_policy(scenario, baseline)?;
     let fixed = fixed_policy(scenario)?;
-    let mut memo = BTreeMap::new();
-    let mut search_stats = SearchStats::default();
+    let mut search = SearchContext::new(scenario);
     let adaptive = solve(
-        scenario,
+        &mut search,
         &scenario.states,
         &scenario.budget,
         scenario.max_actions,
         &BTreeSet::new(),
         &no_obligations,
-        &mut memo,
-        &mut search_stats,
     )?;
     let tree_nodes = policy_tree_nodes(&adaptive.node);
     let first_action_id = match &adaptive.node {
@@ -1033,9 +1044,9 @@ fn validate_scenario(scenario: &SequentialScenario) -> Result<SequentialScenario
     }
     Ok(SequentialScenarioAudit {
         scenario_id: scenario.scenario_id.clone(),
-        search_states_expanded: search_stats.states_expanded,
-        search_memo_hits: search_stats.memo_hits,
-        search_memo_entries: memo.len(),
+        search_states_expanded: search.stats.states_expanded,
+        search_memo_hits: search.stats.memo_hits,
+        search_memo_entries: search.memo.len(),
         policy_tree_nodes: tree_nodes,
         baseline_terminal_disposition,
         baseline_worst_case_regret: baseline,
@@ -1195,38 +1206,33 @@ mod tests {
     fn memoized_exact_state_replay_does_not_expand_the_search_twice() {
         let corpus: SequentialCorpus = serde_json::from_slice(FIXTURE).unwrap();
         let scenario = &corpus.scenarios[0];
-        let mut memo = BTreeMap::new();
-        let mut stats = SearchStats::default();
+        let mut search = SearchContext::new(scenario);
         let first = solve(
-            scenario,
+            &mut search,
             &scenario.states,
             &scenario.budget,
             scenario.max_actions,
             &BTreeSet::new(),
             &BTreeSet::new(),
-            &mut memo,
-            &mut stats,
         )
         .unwrap();
-        let expanded = stats.states_expanded;
+        let expanded = search.stats.states_expanded;
         assert!(expanded > 0);
-        assert_eq!(memo.len(), expanded);
+        assert_eq!(search.memo.len(), expanded);
 
         let second = solve(
-            scenario,
+            &mut search,
             &scenario.states,
             &scenario.budget,
             scenario.max_actions,
             &BTreeSet::new(),
             &BTreeSet::new(),
-            &mut memo,
-            &mut stats,
         )
         .unwrap();
         assert_eq!(first.node, second.node);
         assert_eq!(first.worst_case_regret, second.worst_case_regret);
-        assert_eq!(stats.states_expanded, expanded);
-        assert_eq!(stats.memo_hits, 1);
+        assert_eq!(search.stats.states_expanded, expanded);
+        assert_eq!(search.stats.memo_hits, 1);
     }
 
     #[test]
