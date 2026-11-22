@@ -188,8 +188,6 @@ fn run_case(
         / baseline_measurement.peak_amplitude.max(f64::MIN_POSITIVE);
     let mass_relative_delta = (final_diagnostics.total_mass - initial_diagnostics.total_mass)
         / initial_diagnostics.total_mass.abs().max(f64::MIN_POSITIVE);
-    let momentum_relative_delta = (final_diagnostics.momentum - initial_diagnostics.momentum)
-        / initial_diagnostics.momentum.abs().max(initial_diagnostics.total_mass.abs() * 1.0e-12);
     let kinetic_energy_relative_delta =
         (final_diagnostics.kinetic_energy - initial_diagnostics.kinetic_energy)
             / initial_diagnostics.kinetic_energy.abs().max(f64::MIN_POSITIVE);
@@ -230,8 +228,6 @@ fn run_case(
         "{label},{start_fraction:.4},{maximum_damping_rate:.4},{echo_mode},{predicted_rephase_time:.8},{baseline_peak_amplitude:.12e},{sponge_peak_amplitude:.12e},{baseline_peak_time:.8},{sponge_peak_time:.8},{response_ratio:.12e},{baseline_peak_phase:.12e},{sponge_peak_phase:.12e},{baseline_detected},{sponge_detected},{baseline_fwhm:.8},{sponge_fwhm:.8},{cumulative_c2_fraction:.12e},{direct_c2_fraction:.12e},{c2_accounting_error:.12e},{control_cumulative_c2_fraction:.12e},{control_direct_c2_drop_fraction:.12e},{control_c2_accounting_error:.12e},{pulse_removed_f_strophy_value:.12e},{control_removed_f_strophy_value:.12e},{mass_relative_delta:.12e},{momentum_delta:.12e},{kinetic_energy_relative_delta:.12e},{field_energy_relative_delta:.12e},{minimum_f:.12e},{wall_seconds:.6}"
     );
 
-    let _ = control_removed_c2;
-    let _ = control_removed_f_strophy;
     Ok(())
 }
 
