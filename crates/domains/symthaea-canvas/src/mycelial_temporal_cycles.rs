@@ -1270,6 +1270,11 @@ fn hex_digest(bytes: &[u8; 32]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mycelial_reconstruction_metrics::{
+        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
+        AnnotatedMycelialSkeleton, ReconstructionDimensionality, ReconstructionLengthUnit,
+        ReconstructionPoint3,
+    };
 
     fn digest(character: char) -> String {
         std::iter::repeat_n(character, 64).collect()
@@ -1323,6 +1328,103 @@ mod tests {
             minimum_known_duration_fraction: 0.5,
             tcr_epsilon: 1.0e-12,
         }
+    }
+
+    fn annotated_fixture() -> AnnotatedMycelialSkeleton {
+        AnnotatedMycelialSkeleton {
+            schema_version: crate::mycelial_reconstruction_metrics::MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
+            frame_id: "frame-001".to_string(),
+            coordinate_frame_id: "microscope-stage-v1".to_string(),
+            calibration_digest: digest('c'),
+            source_observation_digest: digest('a'),
+            dimensionality: ReconstructionDimensionality::TwoD,
+            length_unit: ReconstructionLengthUnit::Micrometer,
+            producer_id: "human-annotation".to_string(),
+            producer_version: "annotator-v1".to_string(),
+            junctions: vec![
+                AnnotatedJunction {
+                    id: "A".to_string(),
+                    kind: AnnotatedJunctionKind::Branch,
+                    position: ReconstructionPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "B".to_string(),
+                    kind: AnnotatedJunctionKind::Tip,
+                    position: ReconstructionPoint3 { x: 10.0, y: 0.0, z: 0.0 },
+                },
+                AnnotatedJunction {
+                    id: "C".to_string(),
+                    kind: AnnotatedJunctionKind::ProjectedCrossing,
+                    position: ReconstructionPoint3 { x: 0.0, y: 10.0, z: 0.0 },
+                },
+            ],
+            segments: vec![
+                AnnotatedHyphaSegment {
+                    id: "segment-ab".to_string(),
+                    start_junction_id: "A".to_string(),
+                    end_junction_id: "B".to_string(),
+                    length: 10.0,
+                },
+                AnnotatedHyphaSegment {
+                    id: "segment-ac".to_string(),
+                    start_junction_id: "A".to_string(),
+                    end_junction_id: "C".to_string(),
+                    length: 10.0,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn annotated_skeleton_adapter_preserves_source_ids_and_does_not_invent_crossing_edges() {
+        let annotation = annotated_fixture();
+        let evidence = vec![
+            TemporalMycelialEdgeEvidenceRecord {
+                edge_id: "segment-ab".to_string(),
+                evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
+            },
+            TemporalMycelialEdgeEvidenceRecord {
+                edge_id: "segment-ac".to_string(),
+                evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
+            },
+        ];
+        let snapshot = temporal_snapshot_from_annotated_skeleton(
+            &annotation,
+            0,
+            10,
+            "roi:whole-domain-v1",
+            TemporalWindowCoverage::CompleteWithinDeclaredScope,
+            &evidence,
+        )
+        .unwrap();
+        assert_eq!(snapshot.snapshot_id, "frame-001");
+        assert_eq!(snapshot.source_observation_digest, annotation.source_observation_digest);
+        assert_eq!(snapshot.node_ids, vec!["A", "B", "C"]);
+        assert_eq!(snapshot.edges.len(), 2);
+        assert!(!snapshot.edges.iter().any(|edge| {
+            (edge.source_node_id == "B" && edge.target_node_id == "C")
+                || (edge.source_node_id == "C" && edge.target_node_id == "B")
+        }));
+    }
+
+    #[test]
+    fn annotated_skeleton_adapter_rejects_missing_or_extra_evidence_records() {
+        let annotation = annotated_fixture();
+        let evidence = vec![TemporalMycelialEdgeEvidenceRecord {
+            edge_id: "wrong-segment-id".to_string(),
+            evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
+        }];
+        assert!(matches!(
+            temporal_snapshot_from_annotated_skeleton(
+                &annotation,
+                0,
+                10,
+                "roi:whole-domain-v1",
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                &evidence,
+            ),
+            Err(MycelialTemporalCycleError::EdgeEvidenceInventoryMismatch(_))
+        ));
     }
 
     #[test]
