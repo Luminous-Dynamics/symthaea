@@ -611,7 +611,7 @@ fn interaction_option_set_digest(options: &[MemoryPortfolioOptionV1]) -> String 
         .collect();
     digests.sort();
     let mut hasher = Sha256::new();
-    hasher.update(b"mace:portfolio-interaction-option-set:v1\\0");
+    hasher.update(b"mace:portfolio-interaction-option-set:v1\0");
     for field in digests {
         hasher.update((field.len() as u64).to_be_bytes());
         hasher.update(field.as_bytes());
