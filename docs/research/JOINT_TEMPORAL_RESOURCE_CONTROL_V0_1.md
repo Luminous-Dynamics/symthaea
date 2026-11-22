@@ -3,7 +3,7 @@
 **Tracking:** NEURO-SILICON-009 / #9666  
 **Base implementation:** #9828 (`research/temporal-joint-resource-control-20261101`)  
 **Interaction extension:** `research/temporal-factorial-interactions-20261122`  
-**Status:** candidate allocator and evaluator exact-oracle source authored; 14 Rust tests are authored for the oracle (none executed); no Rust compilation, benchmark runs, hardware measurements or security deployment are claimed.
+**Status:** candidate allocator and evaluator exact-oracle source authored; 15 Rust tests are authored for the oracle (none executed); no Rust compilation, benchmark runs, hardware measurements or security deployment are claimed.
 
 ## 1. Research thesis
 
@@ -116,7 +116,7 @@ The computation is integer-only after outcome intake and uses checked `i128` ari
 
 **Important causal boundary:** exact decomposition explains the finite factorial response surface supplied to it. It does not make observationally confounded real-world data causal. A real campaign still needs valid paired interventions/randomization or a controlled replay design, an identical episode commitment, measured resource costs and evaluator-only outcomes. It covers binary factor presence/absence; graded doses, sequential adaptive policies and unenumerated actions need separate designs.
 
-The new hand-calculated controls use a known three-factor surface with an AB synergy of +7 µs and an ABC antagonism of −5 µs, plus distinct resource-cost interactions. A separate four-factor control isolates the sensing × memory × compute × verification term from every proper subset. Input-row permutation must not change the report; omitted subsets fail closed.
+The new hand-calculated controls use a known three-factor surface with an AB synergy of +7 µs and an ABC antagonism of −5 µs, plus distinct resource-cost interactions. A separate four-factor control isolates the sensing × memory × compute × verification term from every proper subset. A test-only direct inclusion–exclusion implementation independently computes every subset dividend and is compared term-by-term with the production in-place transform on both three- and four-factor fixtures. Input-row permutation must not change the report; omitted subsets fail closed.
 
 
 ## 5. The paradigm shift: measure the value of not remaining ignorant
