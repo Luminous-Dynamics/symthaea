@@ -567,7 +567,12 @@ mod tests {
     fn observable_but_undetected_transient_is_a_miss() {
         let run = SamplingRun {
             episode: episode(),
-            observations: vec![ObservationSample { time_us: 10 }, ObservationSample { time_us: 40 }],
+            observations: vec![
+                ObservationSample { time_us: 10 },
+                ObservationSample { time_us: 25 },
+                ObservationSample { time_us: 40 },
+                ObservationSample { time_us: 80 },
+            ],
             decisions: vec![],
             measured_energy_nj: Some(100),
         };
