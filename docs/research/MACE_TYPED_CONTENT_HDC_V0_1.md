@@ -103,11 +103,13 @@ Optional query cues include:
 - target maximum standardized mean difference;
 - identification method;
 - exact estimand digest;
-- target intervention / pre-registration / outcome-reconciliation / source-trust / retraction / confounder-control / delayed-horizon values.
+- target intervention / pre-registration / outcome-reconciliation / source-trust / retraction / interference-control / confounder-control / delayed-horizon values.
+
+The convenience constructor `SemanticExperienceQueryV1::qualified_transfer` builds the current MACE policy's categorical qualification profile: RCT identification, intervention, pre-registration, reconciled outcome, trusted/non-retracted source, controlled interference/confounders and completed delayed horizon. It does not guess numeric overlap or balance requirements.
 
 Optional numeric targets mean similarity to a declared reference value under the matching RBF bandwidth. They are not threshold predicates. Optional evidence-quality boolean targets are exact-match ranking cues, not admission gates; either true or false can be queried for positive controls and negative controls.
 
-**Current integration limitation:** the existing MACE policy Query has scope only. It does not expose a candidate-visible target utility, desired estimand or richer decision-state descriptor. A paired runner must not invent these fields or populate them from Truth/oracle state. End-to-end evaluation needs an independently candidate-visible DecisionNeed derived from the actual current task observation. Until that exists, this module supports representation-level and controlled typed-query tests only.
+**Current integration boundary:** the paired MACE runner now includes `typed_content_hdc` as a seventh arm. It supplies only candidate-visible scope/action and the fixed categorical qualification profile derived from the MACE policy. This supports a structured evidence-retrieval comparison through the unchanged MACE decision gate, but it does not supply a task-defined target outcome distribution, semantic estimand or target horizon. The richer optional numeric/estimand fields remain unpopulated until #13222 defines a candidate-visible DecisionNeed. Never populate them from Truth/oracle state.
 
 ## 6. Retrieval and fail-closed behavior
 
@@ -151,7 +153,8 @@ The module adds tests for:
 - higher similarity for numeric values near the target than for distant values under the frozen kernel;
 - profile digest sensitivity to dimension, seed and bandwidth;
 - duplicate-ID and non-finite input rejection;
-- query-time estimand/evidence-quality cues while preserving candidate-only authority.
+- query-time estimand/evidence-quality cues while preserving candidate-only authority;
+- the paired-runner typed arm uses the MACE qualification profile and emits a typed retrieval-profile digest.
 
 These tests are authored source, not executed passes. Cargo, rustc and rustfmt are unavailable in the present environment.
 
@@ -169,7 +172,7 @@ It would not establish:
 - retrieval from images, audio, video or spatial observations;
 - temporal learning from event streams;
 - HDC-LTC improvement over static typed HDC;
-- causal transport or decision utility lift;
+- a measured retrieval/decision utility lift or superiority in the paired runner;
 - production source verification or authority;
 - an official benchmark result or SOTA superiority.
 
@@ -177,14 +180,13 @@ The current implementation is static typed HDC. Input-driven LTC over irregular 
 
 ## 9. Next engineering gates
 
-1. Execute Cargo tests and rustfmt on an exact, recorded source head.
+1. Execute Cargo tests, rustfmt, JSON Schema validation and the seven-arm runner on an exact recorded source head.
 2. Add deterministic retrieval-score receipts and validate their schemas.
-3. Connect a candidate-visible DecisionNeed from a real environment/task observation. Do not change the base policy Query until ownership and semantics are clear.
-4. Add typed-content HDC as a separate arm to the paired MACE runner.
-5. Compare against exact scan, event-ID HDC, deterministic KV, BM25, dense and hybrid retrieval at equal all-in resource budgets.
-6. Add a genuine same-scope, relevance-negative placebo matched on context, token and byte budgets.
-7. Add source correction/retraction between retrieval and decision consumption; query canonical lifecycle again at use.
-8. Move evaluator labels and custody outside candidate-visible code before independent qualification.
+3. Connect a candidate-visible DecisionNeed with task-defined outcome/horizon/estimand details; never derive them from evaluator truth.
+4. Compare against exact scan, event-ID HDC, deterministic KV, BM25, dense and hybrid retrieval at equal all-in resource budgets.
+5. Add a genuine same-scope, relevance-negative placebo matched on context, token and byte budgets.
+6. Add source correction/retraction between retrieval and decision consumption; query canonical lifecycle again at use.
+7. Move evaluator labels and custody outside candidate-visible code before independent qualification.
 
 ## 10. Benchmark interpretation and SOTA strategy
 
