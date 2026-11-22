@@ -1537,10 +1537,14 @@ mod tests {
         let evidence = vec![
             TemporalMycelialEdgeEvidenceRecord {
                 edge_id: "segment-ab".to_string(),
+                source_node_id: "A".to_string(),
+                target_node_id: "B".to_string(),
                 evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
             },
             TemporalMycelialEdgeEvidenceRecord {
                 edge_id: "segment-ac".to_string(),
+                source_node_id: "A".to_string(),
+                target_node_id: "C".to_string(),
                 evidence: TemporalEdgeEvidence::DirectlyObservedHypha,
             },
         ];
