@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 pub const INPUT_SCHEMA_V1: &str = "luminous.semi-bench.stratified-repeat-subject.v1";
@@ -64,7 +64,7 @@ pub struct StratifiedRepeatManifestV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct StratifiedRepeatReportV1 {
+pub struct StratifiedRepeatMetricsV1 {
     pub repeat_index: usize,
     pub seed: u64,
     pub split_manifest_sha256: String,
@@ -96,7 +96,7 @@ pub struct StratifiedRepeatReportV1 {
     pub total_samples: usize,
     pub total_positive: usize,
     pub total_negative: usize,
-    pub repeats: Vec<StratifiedRepeatReportV1>,
+    pub repeats: Vec<StratifiedRepeatMetricsV1>,
     pub manifests: Vec<StratifiedRepeatManifestV1>,
     pub claim_limits: StratifiedRepeatClaimLimitsV1,
 }
@@ -255,7 +255,7 @@ fn build_repeat(
     subject: &StratifiedSplitSubjectV1,
     repeat_index: usize,
     seed: u64,
-) -> Result<(StratifiedRepeatManifestV1, StratifiedRepeatReportV1), StratifiedSplitError> {
+) -> Result<(StratifiedRepeatManifestV1, StratifiedRepeatMetricsV1), StratifiedSplitError> {
     let mut negative_ids: Vec<String> = subject
         .samples
         .iter()
@@ -336,7 +336,7 @@ fn build_repeat(
         .filter(|row| row.positive)
         .count();
     let total_negative = manifest.assignments.len() - total_positive;
-    let report = StratifiedRepeatReportV1 {
+    let report = StratifiedRepeatMetricsV1 {
         repeat_index,
         seed,
         split_manifest_sha256: manifest_sha256,
