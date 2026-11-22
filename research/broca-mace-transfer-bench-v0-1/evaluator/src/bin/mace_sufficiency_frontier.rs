@@ -193,11 +193,10 @@ fn candidate_identity(
     hasher.update(need.canonical_digest().as_bytes());
     hasher.update((method.len() as u64).to_be_bytes());
     hasher.update(method.as_bytes());
-    hasher.update(
-        per_action_top_k
-            .unwrap_or(usize::MAX)
-            .to_be_bytes(),
-    );
+    let budget = per_action_top_k
+        .and_then(|value| u64::try_from(value).ok())
+        .unwrap_or(u64::MAX);
+    hasher.update(budget.to_be_bytes());
     let mut ids: Vec<&Experience> = selected.iter().collect();
     ids.sort_by_key(|item| item.event_id);
     for item in ids {
@@ -523,7 +522,6 @@ fn run() -> Result<(), String> {
             case.cluster,
         )?;
         let full_action = full.decision.action;
-        let full_regret = decision_regret(case.truth, full_action);
 
         let mut candidates = Vec::new();
         candidates.push(select_candidate(
@@ -557,6 +555,7 @@ fn run() -> Result<(), String> {
 
         // Only after every candidate has been selected and decided do we
         // read the evaluator-only truth to score the frozen outputs.
+        let full_regret = decision_regret(case.truth, full_action);
         let mut evaluated = Vec::with_capacity(candidates.len());
         for candidate in candidates {
             let utility = decision_utility(case.truth, candidate.decision.action);
