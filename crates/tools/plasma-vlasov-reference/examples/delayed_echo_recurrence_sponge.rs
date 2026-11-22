@@ -160,6 +160,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut fine_trace = Vec::new();
     let mut sponge_trace = Vec::new();
 
+    println!("trace_columns,time,coarse_real,coarse_imag,fine_real,fine_imag,sponge_real,sponge_imag");
     for step in 0..=total_steps {
         if step == pulse_step {
             coarse_pulse.apply_velocity_impulse(&second_kick)?;
@@ -265,7 +266,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         / initial_c2.abs().max(f64::MIN_POSITIVE);
 
     println!(
-        "summary,case,nv,t_nyquist,t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_removed_C2_fraction,sponge_C2_closure_error,sponge_removed_f_strophy,coarse_initial_E,fine_initial_E,sponge_initial_E"
+        "summary,case,nv,t_nyquist,t_recurrence,echo_mode,predicted_rephase_time,coarse_peak_time,coarse_amplitude,coarse_phase,coarse_fwhm,fine_peak_time,fine_amplitude,fine_phase,fine_fwhm,sponge_peak_time,sponge_amplitude,sponge_phase,sponge_fwhm,sponge_to_fine_amplitude_ratio,sponge_pulse_removed_C2_fraction,sponge_C2_closure_error,sponge_pulse_removed_f_strophy,sponge_control_removed_C2_fraction,sponge_control_removed_f_strophy,coarse_initial_E,fine_initial_E,sponge_initial_E"
     );
     println!(
         "summary,delayed_echo,{},{:.8},{:.8},{},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.8},{:.12e},{:.8},{:.8},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
