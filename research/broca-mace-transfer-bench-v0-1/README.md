@@ -30,6 +30,12 @@ No external service, GPU, database or model API is required. The current verifie
 
 The broader research thesis and qualification ladder are documented in [MACE Decision-Sufficient Memory Architecture v0.1](../../docs/research/MACE_DECISION_SUFFICIENT_MEMORY_ARCHITECTURE_V0_1.md). It defines decision capsules, representation choice (persist/locator/snapshot/discard), use-time evidence revalidation, the HDC semantic/query-conditioned follow-on, and the external benchmark/industry comparison lanes. It is an integration contract over existing owners, not a second memory store or authority.
 
+## Typed-content, query-conditioned HDC follow-on
+
+The follow-on branch adds a separate typed-content index to the existing HDC retrieval crate: candidate Experience fields are encoded using deterministic role/value binding, continuous values use deterministic random Fourier features, and SemanticExperienceQueryV1 creates a structured query in the same field space. Exact event IDs and provenance remain sidecar references; all MACE admission gates still execute after canonical resolution.
+
+This is a representation-level prototype only. The current MACE Query exposes scope, not the richer candidate-visible decision features required for end-to-end utility evaluation. Do not populate those richer query fields from evaluator truth. See [MACE Decision Sufficiency and Benchmark Frontier v0.2](../../docs/research/MACE_DECISION_SUFFICIENCY_AND_BENCHMARK_FRONTIER_V0_2.md) and [MACE typed-content HDC v0.1 protocol](../../docs/research/MACE_TYPED_CONTENT_HDC_V0_1.md).
+
 ## Paired memory-to-decision intervention runner
 
 A separate executable now schedules the six initial intervention arms over the existing generated MACE worlds: true empty memory, exact-scope scan, deterministic key-value retrieval, static HDC, HDC-LTC, and a same-cluster sibling-task structural placebo. It writes candidate decisions, evaluator-only synthetic scores, and cluster-bootstrap summaries to separate JSONL streams.
