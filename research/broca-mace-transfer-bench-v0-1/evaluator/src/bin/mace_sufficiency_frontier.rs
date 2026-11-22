@@ -43,7 +43,7 @@ const PER_ACTION_BUDGETS: [usize; 4] = [1, 2, 4, 8];
 enum RetrievalArm {
     NoMemory,
     FullScopeReference,
-    EventIdKeyValue,
+    EventIdOrderedControl,
     RandomControl,
     StaticHdc,
     TypedContentHdc,
@@ -51,7 +51,7 @@ enum RetrievalArm {
 
 impl RetrievalArm {
     const BUDGETED: [Self; 4] = [
-        Self::EventIdKeyValue,
+        Self::EventIdOrderedControl,
         Self::RandomControl,
         Self::StaticHdc,
         Self::TypedContentHdc,
@@ -61,7 +61,7 @@ impl RetrievalArm {
         match self {
             Self::NoMemory => "no_memory",
             Self::FullScopeReference => "full_scope_reference",
-            Self::EventIdKeyValue => "event_id_key_value",
+            Self::EventIdOrderedControl => "event_id_ordered_control",
             Self::RandomControl => "random_control",
             Self::StaticHdc => "static_hdc",
             Self::TypedContentHdc => "typed_content_hdc",
@@ -289,8 +289,8 @@ fn select_candidate(
                     .map(|item| item.event_id),
             );
         }
-        RetrievalArm::EventIdKeyValue => {
-            let k = per_action_top_k.ok_or("event-ID key/value arm requires a budget")?;
+        RetrievalArm::EventIdOrderedControl => {
+            let k = per_action_top_k.ok_or("event-ID ordered arm requires a budget")?;
             for action in need.action_alternatives {
                 let mut candidates: Vec<&Experience> = memory
                     .iter()
@@ -583,6 +583,17 @@ fn run() -> Result<(), String> {
                 "record_type": "candidate_decision",
                 "run_id": run_id,
                 "pair_block_id": pair_block_id,
+                "world_cluster": case.cluster,
+                "public_seed": public_seed,
+                "source_revision": source_revision,
+                "source_code_sha256": source_code_sha256,
+                "fixture_sha256": fixture_sha256,
+                "schema_sha256": schema_sha256,
+                "public_seed": public_seed,
+                "source_revision": source_revision,
+                "source_code_sha256": source_code_sha256,
+                "fixture_sha256": fixture_sha256,
+                "schema_sha256": schema_sha256,
                 "candidate_observation_id": point.candidate.candidate_observation_id,
                 "candidate_input_sha256": point.candidate.candidate_input_sha256,
                 "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
