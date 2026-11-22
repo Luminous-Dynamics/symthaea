@@ -155,3 +155,23 @@ jobs:
             .held_out.validation.missingness_only_metrics.ranking_metrics.auroc == 1.0 and
             .held_out.test.missingness_only_metrics.ranking_metrics.auroc == 1.0
           ' /tmp/semi-rust-secom-missingness.json > /dev/null
+
+      - name: Run Rust SECOM observation drift report on synthetic known answer
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-observation-drift -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-labels-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-expectations-v1.json \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-split-v1.json \
+            > /tmp/semi-rust-secom-observation-drift.json
+          jq -e '
+            .schema == "luminous.semi-bench.secom-observation-drift-report.v1" and
+            .training_profile.rows == 4 and
+            .held_out_profiles.validation.rows == 2 and
+            .held_out_profiles.test.rows == 2 and
+            .drift_vs_training.validation.mean_feature_js_divergence_bits == 0 and
+            .drift_vs_training.test.mean_feature_js_divergence_bits == 0 and
+            .drift_vs_training.validation.row_missing_count_js_divergence_bits == 0 and
+            .drift_vs_training.test.row_missing_count_js_divergence_bits == 0 and
+            .claim_limits.drift_does_not_use_labels == true
+          ' /tmp/semi-rust-secom-observation-drift.json > /dev/null
