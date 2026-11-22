@@ -683,7 +683,7 @@ It ranks positive-net-EVSI requests deterministically and otherwise returns \`st
 
 The planner receives prior probabilities, declared action-loss vectors and candidate observation likelihoods. It does not inspect realized future outcomes or evaluator labels. The current CLI emits a small analytic two-hypothesis fixture to \`acquisition.jsonl\`; it does not contact a source, execute a measurement or obtain a receipt. Cost and loss terms must be expressed in a common, declared decision-loss unit; the code does not invent a conversion from dollars, seconds or privacy exposure. The exposure term applies only after the separate hard privacy-approval gate has passed.
 
-The fixture is a policy unit test, not an empirical agent benchmark. The module has regression tests for decision-relevant versus uncertainty-only evidence, unauthorized high-value queries, malformed observation models and order invariance.
+The fixture is a policy unit test, not an empirical agent benchmark. The module has regression tests for decision-relevant versus uncertainty-only evidence, unauthorized high-value queries, malformed observation models and query/outcome order invariance. The frontier also tests retrieval-profile binding in candidate identity and random-control selection invariance under reversed memory ordering.
 
 ### Current competitor and baseline boundaries
 
@@ -762,5 +762,5 @@ The research opportunity is to combine active reconstruction, learned consolidat
 
 ### Current verification
 
-Three frontier unit tests and four EVSI unit tests are authored. They have not been run. No Cargo, rustc, rustfmt or Nix toolchain is available in the authoring environment. JSON Schema files parse as JSON, but independent schema validation, build, test, formatting and deterministic execution remain pending. All results remain unexecuted source work; no SOTA, benchmark, safety or empirical utility claim is made.
+Five frontier unit tests and four EVSI unit tests are authored. They have not been run. No Cargo, rustc, rustfmt or Nix toolchain is available in the authoring environment. JSON Schema files parse as JSON, but independent schema validation, build, test, formatting and deterministic execution remain pending. All results remain unexecuted source work; no SOTA, benchmark, safety or empirical utility claim is made.
 
