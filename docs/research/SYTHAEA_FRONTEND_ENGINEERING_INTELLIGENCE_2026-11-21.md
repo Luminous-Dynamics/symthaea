@@ -569,3 +569,114 @@ The programme advances only when the next increment adds one of:
 - a security, accessibility or reliability gate that prevents a real failure.
 
 More architecture, more generated components or more benchmark names are not progress by themselves. The unit of progress is an independently verifiable improvement in a real interface-engineering task.
+
+
+## 11. 2026-11-22 update — qualify the benchmark before optimizing the agent
+
+### New paradigm: benchmark the benchmark
+
+A benchmark score is only as trustworthy as its weakest oracle. SFEB now has a
+separate seeded **oracle-qualification campaign** rather than assuming that
+schema-valid task definitions and well-formed receipts imply a capable evaluator.
+
+The campaign contains 20 planned negative controls, 5 semantics-preserving
+positive controls and 5 metamorphic relations. The negative controls cover
+functional behavior, accessibility, responsive layout, authorization/network
+boundaries, evidence identity/integrity and benchmark gaming. Positive controls
+ensure the evaluator does not reject harmless refactors. Metamorphic relations
+check that equivalent user journeys and source transformations preserve the
+required outcome.
+
+This leads to a stricter promotion rule:
+
+1. A task oracle is authored and schema-validated.
+2. Its negative controls demonstrate that seeded failures are rejected.
+3. Positive controls demonstrate that harmless transformations are accepted.
+4. Metamorphic tests establish required invariants across viewports and interaction paths.
+5. Only then is the oracle eligible for a benchmark run.
+6. The independent runner records all outcomes; a model's own report cannot promote evidence.
+
+Targets for the qualification campaign (not measured results): 100% rejection
+of critical, security and evidence-integrity mutants; at least 95% rejection
+of high-severity mutants; at least 90% overall mutation kill rate; and zero
+false rejections of the five positive controls. Report numerators, denominators,
+per-class scores and confidence intervals—not only a blended mutation score.
+
+### External benchmark landscape and fair comparison
+
+The current public field has several distinct evaluation surfaces:
+
+- **Vision2Web (ICML 2026)** evaluates visual website development across 193
+  tasks, 16 categories, 918 prototype images and 1,255 test cases. Its levels
+  cover static responsive pages, interactive multi-page frontend work and
+  long-horizon full-stack systems. Its verification combines workflow-driven
+  GUI testing with a VLM judge. This is the closest broad external comparator
+  for the end-to-end SFEB objective. The live leaderboard page can display
+  an empty current season; benchmark scale and published historical runs must
+  not be conflated with a live current-season SOTA score.
+  Source: https://proceedings.mlr.press/v306/he26n.html and
+  https://vision2web-bench.github.io/
+- **Design2Code (NAACL 2025)** covers 484 real-world webpages for screenshot-to-code
+  reconstruction and combines automatic metrics with human evaluation. It is
+  valuable for the visual-fidelity lane, but does not by itself measure the
+  full interactive, runtime, security and maintenance loop SFEB targets.
+  Source: https://aclanthology.org/2025.naacl-long.199/
+- **WebdriverIO Browser Agent Benchmark** fixes the model, harness and prompt
+  while swapping browser tools, samples 100 tasks from Online-Mind2Web
+  (300 tasks across 136 live websites), and uses an independent judge with
+  Wilson confidence intervals. Its own methodology warns that 100 tasks and
+  one run per task produce intervals around ±10 percentage points and that
+  the judge disagrees with human reviewers on roughly one run in seven.
+  Live-site variability and its browser-tool focus make it a complementary
+  tool-use comparator, not a direct code-generation score.
+  Source: https://benchmark.webdriver.io/
+
+Do not compare raw scores across these benchmarks. Their task distributions,
+models, tools, judges, sites, environments and scoring functions differ. SFEB
+should reproduce a public comparator protocol where practical and report a
+separate result for each external benchmark.
+
+### What would constitute a credible SOTA advance
+
+The near-term target is not a headline percentage from the 11-task public
+pilot. It is a matched, blinded evaluation:
+
+- Reproduce at least one established visual website benchmark and one
+  interaction/browser-agent benchmark under their stated protocols.
+- Run identical base models and tools with (a) no Symthaea memory,
+  (b) documentation retrieval, (c) interface contracts, (d) browser evidence
+  and repair, and (e) the full system.
+- Use paired task outcomes, repeated trials, bootstrap or Wilson intervals
+  as appropriate, and publish per-task failures and total task cost.
+- Require a positive paired lift whose 95% interval excludes zero, or match
+  success within a predeclared 2-point non-inferiority margin while reducing
+  cost per accepted task by at least 30%.
+- Keep all hard gates independent: zero critical security-boundary failures,
+  zero critical accessibility blockers and complete artifact/source identity.
+
+The existing internal aspirational targets remain separate from achieved
+results: at least 90/100 static visual score with no viewport below 85;
+at least 90% required interactive-journey completion; at least 85% full-stack
+completion; at least 85% seeded-defect repair success with regression rate
+below 5%; at least 95% keyboard-journey completion; ECE below 0.10; and cost
+per accepted task at or below 70% of the matched baseline. These targets
+require a qualified, larger and partly hidden task set before they can be
+meaningfully evaluated.
+
+### Immediate execution order
+
+1. Repair and compile the retrieval evaluator; preserve its distinction from
+   the full SFEB browser runner.
+2. Validate the 17-pattern source corpus and 42 public-pilot retrieval queries.
+3. Qualify task oracles with the mutation and metamorphic campaign.
+4. Run the ignored Chromium capture smoke test on a machine with a responsive,
+   pinned browser; then implement the isolated runner.
+5. Expand from the one public dashboard fixture to 30 public pilot tasks,
+   then 150 comparison tasks with controller-only and hidden holdout partitions.
+6. Submit to the official Vision2Web evaluation when the runner can produce
+   compliant artifacts; report the official result independently of SFEB.
+
+Execution state: source changes and this research plan are authored. Rust
+compilation, unit tests, retrieval measurements, browser smoke tests and
+mutation-campaign execution remain pending; no performance improvement or
+SOTA superiority is claimed.
