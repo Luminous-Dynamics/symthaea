@@ -438,7 +438,7 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
                 .unwrap_or_else(|| "null".to_string());
             format!(
                 concat!(
-                    "        {\n",
+                    "        {{\n",
                     "          \"estimator_id\": \"{}\",\n",
                     "          \"clean_to_signal_similarity\": {:.12},\n",
                     "          \"clean_to_nuisance_similarity\": {:.12},\n",
@@ -449,7 +449,7 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
                     "          \"combined_signal_residual_distance\": {:.12},\n",
                     "          \"nuisance_to_signal_distance_ratio\": {},\n",
                     "          \"signal_retention_fraction\": {}\n",
-                    "        }"
+                    "        }}"
                 ),
                 item.estimator_id,
                 item.clean_to_signal_similarity,
@@ -500,7 +500,7 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
 
     format!(
         concat!(
-            "    {\n",
+            "    {{\n",
             "      \"signal_scale_index\": {},\n",
             "      \"nuisance_fraction_index\": {},\n",
             "      \"signal_scale\": {:.12},\n",
@@ -514,22 +514,22 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
             "      \"signal_component_rms\": {:.12},\n",
             "      \"nuisance_component_rms\": {:.12},\n",
             "      \"estimators\": [\n{}\n      ],\n",
-            "      \"connectivity_direction\": {\n",
+            "      \"connectivity_direction\": {{\n",
             "        \"signal_projection_gain\": {},\n",
             "        \"signal_directional_cosine\": {},\n",
             "        \"signal_change_residual_fraction\": {},\n",
             "        \"clean_signal_change_norm\": {:.12},\n",
             "        \"combined_signal_change_norm\": {:.12}\n",
-            "      },\n",
+            "      }},\n",
             "      \"cells\": [\n{}\n      ],\n",
-            "      \"invariants\": {\n",
+            "      \"invariants\": {{\n",
             "        \"matched_nuisance_delta_max_abs\": {:.12},\n",
             "        \"matched_signal_delta_max_abs\": {:.12},\n",
             "        \"additive_interaction_max_abs\": {:.12},\n",
             "        \"numerical_tolerance\": {:.12},\n",
             "        \"all_invariants_within_tolerance\": {}\n",
-            "      }\n",
-            "    }"
+            "      }}\n",
+            "    }}"
         ),
         point.signal_scale_index,
         point.nuisance_fraction_index,
