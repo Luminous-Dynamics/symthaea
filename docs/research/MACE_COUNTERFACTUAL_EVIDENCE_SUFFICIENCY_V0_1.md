@@ -622,3 +622,92 @@ For rare integrity failures, report exact one-sided confidence bounds and indepe
 5. Reproduce the public AML, TimlMemBench, FAMA, StateMemBench, MemoryArena, WorldMemArena and AMA-Bench protocols separately, then run matched-budget MACE extensions.
 6. Move hidden labels, seeds and primary evaluator custody outside the candidate implementation before confirmatory claims.
 
+
+
+## 15. First executable decision-sufficiency frontier and EVSI planner (2026-11-23)
+
+### Deliverables on the stacked frontier branch
+
+The new Rust binary is \`mace_sufficiency_frontier\` in the existing evaluator crate. It is a separate increment stacked on the receipt-lineage branch and tracked under #13284. It does not modify the receipt-lineage PR's ownership.
+
+Invocation from the repository root:
+
+\`\`\`text
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/evaluator/Cargo.toml --bin mace_sufficiency_frontier -- 64 candidate.jsonl evaluator.jsonl 557... 0.01 acquisition.jsonl
+\`\`\`
+
+Arguments are: world-cluster count (1..=1000), candidate JSONL output, evaluator JSONL output, public random seed, regret-gap epsilon and acquisition-plan JSONL output. Omitted arguments use documented defaults in the binary.
+
+Each generated world has:
+- a no-memory reference;
+- a full-scope information reference (not an equal-cost competitor);
+- event-ID-ordered candidate selection (explicitly not a learned key/value retriever);
+- a deterministic seed-clustered random control;
+- static event-ID HDC;
+- typed-content HDC.
+
+The four budgeted arms are swept at per-action top-k values 1, 2, 4 and 8. The same frozen \`Policy::CausalQualified\` is applied to every selected evidence set. HDC and typed-content indexes are built once per world/arm and their build time and payload lower bound are reported for each corresponding budget point.
+
+### Decision-sufficiency outputs
+
+The candidate JSONL contains task contracts, selected event IDs, candidate decisions, exact candidate-input digests, method/budget identity, profile identity and measured costs. It contains no evaluator optimal action, realized utility, scenario-family label or regret.
+
+The evaluator JSONL separately scores:
+- absolute regret against the evaluator-only optimal action;
+- regret gap against the full-scope reference;
+- epsilon sufficiency by regret alone;
+- full-scope decision agreement;
+- oracle-optimal agreement;
+- per-world Pareto-frontier membership over selected Experience-struct bytes, index-payload bytes, measured index-build plus selection/decision latency, and absolute regret.
+
+The exact-scope/full-scope reference is an information reference, not proof of world completeness. A lower regret gap is not by itself an evidence-qualification certificate.
+
+**Accounting boundary:** current byte values are lower bounds from \`size_of::<Experience>()\` and retrieval index payload. They exclude allocator/container overhead, receipts, sidecars, raw source bytes, journals, lifecycle metadata, serialization, background maintenance and verification work. Token cost is null because the synthetic typed Experience records are not raw conversational text. Do not present these fields as all-in cost.
+
+**Evidence boundary:** the current generated-world lane has no authenticated dependency sidecar. Every available event is counted as lineage-incomplete, imported/verified sidecar fields are null, and \`evidence_qualified_sufficient\` is always false. The runner can explore decision-regret sufficiency only; it cannot claim evidence-qualified or production memory sufficiency.
+
+### Active evidence acquisition: first decision-specific EVSI core
+
+The new \`acquisition.rs\` module implements exact finite-hypothesis expected value of sample information (EVSI). For a candidate query \(q\):
+
+\`\`\`text
+prior Bayes risk
+  - expected posterior Bayes risk after q
+  - acquisition cost
+  - delay cost
+  - approved-disclosure exposure cost
+= net EVSI
+\`\`\`
+
+It ranks positive-net-EVSI requests deterministically and otherwise returns \`stop_or_abstain\`. It compares decision-relevant measurement with a high-entropy but decision-irrelevant observation. Source authorization, scope validity, privacy approval and deadline feasibility are hard admissibility gates; no amount of predicted utility can override them.
+
+The planner receives prior probabilities, declared action-loss vectors and candidate observation likelihoods. It does not inspect realized future outcomes or evaluator labels. The current CLI emits a small analytic two-hypothesis fixture to \`acquisition.jsonl\`; it does not contact a source, execute a measurement or obtain a receipt. Cost and loss terms must be expressed in a common, declared decision-loss unit; the code does not invent a conversion from dollars, seconds or privacy exposure. The exposure term applies only after the separate hard privacy-approval gate has passed.
+
+The fixture is a policy unit test, not an empirical agent benchmark. The module has regression tests for decision-relevant versus uncertainty-only evidence, unauthorized high-value queries, malformed observation models and order invariance.
+
+### Current competitor and baseline boundaries
+
+The latest official AML Cycle 2 open-method references are Resurface 61.22 (textual), Khipu 43.26 (multimodal) and InsightMem 63.33% resolved (coding), published 19 November 2026. Keep the commercial/closed-source divisions separate. These are leaderboard targets, not MACE measurements.
+
+MemoryArena evaluates interdependent multi-session agent/environment tasks and reports a gap between long-context recall and downstream task completion. StateMemBench has 234 evolving-state scenarios and demonstrates the value of explicit current-state tracking. FAMA penalizes obsolete-memory reuse. WorldMemArena covers 400 multimodal multi-session tasks and separates write, maintain, retrieve and use. These external benchmarks provide distinct qualification lanes; their raw percentages must not be pooled with MACE regret.
+
+References:
+- AML Cycle 2 official results: https://agentmemoryleaderboard.ai/results/cycle-2/
+- MemoryArena, ICML 2026: https://proceedings.mlr.press/v306/he26am.html
+- StateMemBench: https://arxiv.org/abs/2608.19652
+- FAMA / Memora benchmark, Findings ACL 2026: https://aclanthology.org/2026.findings-acl.1337/
+- WorldMemArena: https://worldmemarena-mem.github.io/
+
+### Next qualification gates for this slice
+
+1. Execute exact-head \`cargo fmt --check\`, \`cargo check\`, unit tests and deterministic fixture run on a real Rust toolchain. Authored tests are not passes.
+2. Validate both JSON Schemas with an independent Draft 2020-12 validator and replay the JSONL outputs through a separate schema/receipt checker.
+3. Add a raw-trajectory adapter; only then add BM25, dense, hybrid retrieval and strong reranker arms. Do not create synthetic language from the Experience struct.
+4. Add independent source verification and V2 multi-parent/root-closure/history semantics from #13264 before any evidence-qualified frontier point.
+5. Replace the analytic EVSI fixture with a sealed multi-session query/observation dataset; calibrate the likelihood models on train/calibration clusters, evaluate on held-out clusters, and record realized observation receipts.
+6. Add cluster-level paired inference and bootstrap over independent world/root clusters. Intervention rows and budget points are not independent samples.
+7. Add uncertainty over observation-model likelihoods and robust EVSI bounds. Point-estimate EVSI is only the first planner core.
+8. Move evaluator labels, seed custody and primary evaluation outside the candidate implementation before making superiority claims.
+
+The branch is source-authored and statically inspected, not compiled. No frontier metric, EVSI gain, empirical utility lift or SOTA result is claimed yet.
+
