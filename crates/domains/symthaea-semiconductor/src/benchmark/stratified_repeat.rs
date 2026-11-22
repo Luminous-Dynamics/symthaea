@@ -122,10 +122,10 @@ impl SplitMix64 {
 
     fn below(&mut self, upper_exclusive: usize) -> usize {
         let bound = upper_exclusive as u64;
-        let zone = u64::MAX - u64::MAX % bound;
+        let rejection_threshold = bound.wrapping_neg() % bound;
         loop {
             let value = self.next_u64();
-            if value < zone {
+            if value >= rejection_threshold {
                 return (value % bound) as usize;
             }
         }
@@ -314,14 +314,20 @@ fn build_repeat(
     let manifest_sha256 = sha256_hex(&serialized);
     let train = class_counts(&manifest.assignments, "train");
     let test = class_counts(&manifest.assignments, "test");
+    let total_positive = manifest
+        .assignments
+        .iter()
+        .filter(|row| row.positive)
+        .count();
+    let total_negative = manifest.assignments.len() - total_positive;
     let report = StratifiedRepeatReportV1 {
         repeat_index,
         seed,
         split_manifest_sha256: manifest_sha256,
         train,
-        test,
-        positive_test_fraction: rounded(test.positive as f64 / (test.positive + manifest.assignments.iter().filter(|row| row.positive).count() - test.positive) as f64),
-        negative_test_fraction: rounded(test.negative as f64 / (test.negative + manifest.assignments.iter().filter(|row| !row.positive).count() - test.negative) as f64),
+        test: test.clone(),
+        positive_test_fraction: rounded(test.positive as f64 / total_positive as f64),
+        negative_test_fraction: rounded(test.negative as f64 / total_negative as f64),
     };
     Ok((manifest, report))
 }
