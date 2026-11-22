@@ -578,35 +578,27 @@ pub fn estimate_metrology_population_v1(
         .iter()
         .map(String::as_str)
         .collect();
-    let graph_labels: BTreeMap<&str, _> = graph
-        .metrology_labels
-        .iter()
-        .map(|label| (label.label_id.as_str(), label))
-        .collect();
     let selection_by_id: BTreeMap<&str, &MetrologyAuditSelectionRowV1> = selection
         .rows
         .iter()
         .map(|row| (row.candidate_id.as_str(), row))
         .collect();
-    let mut outcome_by_candidate = BTreeMap::new();
+    validate_binary_measurand_semantics_v1(&selection.binary_semantics).map_err(|error| {
+        MetrologyAuditError(format!("selection binary semantics rejected: {error}"))
+    })?;
+    let mut derived_positive_by_candidate = BTreeMap::new();
     let mut used_label_ids = BTreeSet::new();
     let mut used_candidate_ids = BTreeSet::new();
     for (index, outcome) in outcomes.iter().enumerate() {
         require_text(&outcome.candidate_id, &format!("outcomes[{index}].candidate_id"))?;
         require_text(&outcome.label_id, &format!("outcomes[{index}].label_id"))?;
-        require_text(
-            &outcome.class_semantics_ref,
-            &format!("outcomes[{index}].class_semantics_ref"),
-        )?;
-        require_sha256(
-            &outcome.class_semantics_sha256,
-            &format!("outcomes[{index}].class_semantics_sha256"),
-        )?;
         let selected = selection_by_id
             .get(outcome.candidate_id.as_str())
-            .ok_or_else(|| MetrologyAuditError(format!(
-                "outcomes[{index}].candidate_id does not exist in selection"
-            )))?;
+            .ok_or_else(|| {
+                MetrologyAuditError(format!(
+                    "outcomes[{index}].candidate_id does not exist in selection"
+                ))
+            })?;
         if !selected.selected {
             return Err(MetrologyAuditError(format!(
                 "outcomes[{index}] refers to an unselected candidate"
@@ -627,29 +619,34 @@ pub fn estimate_metrology_population_v1(
                 "outcomes[{index}].label_id: duplicate label"
             )));
         }
-        if outcome.class_semantics_ref != selected.class_semantics_ref
-            || outcome.class_semantics_sha256 != selected.class_semantics_sha256
+        if selected.target_measurand_id != selection.binary_semantics.target_measurand_id
+            || selected.class_semantics_ref != selection.binary_semantics.semantics_id
+            || selected.class_semantics_sha256 != selection.binary_semantics.semantics_sha256
         {
             return Err(MetrologyAuditError(format!(
-                "outcomes[{index}] class-semantics mapping mismatch"
+                "outcomes[{index}] selected candidate does not bind the frozen binary semantics"
             )));
         }
-        let label = graph_labels
-            .get(outcome.label_id.as_str())
-            .ok_or_else(|| MetrologyAuditError(format!(
-                "outcomes[{index}].label_id is absent from graph"
-            )))?;
-        if !matches!(&label.status, MetrologyLabelStatusV1::Validated)
-            || label.subject_id != selected.subject_id
-            || label.measurand_id != selected.target_measurand_id
+        let classification = classify_validated_metrology_label_v1(
+            graph,
+            &outcome.label_id,
+            &selection.binary_semantics,
+        )
+        .map_err(|error| {
+            MetrologyAuditError(format!(
+                "outcomes[{index}] physical class derivation rejected: {error}"
+            ))
+        })?;
+        if classification.subject_id != selected.subject_id
+            || classification.target_measurand_id != selected.target_measurand_id
         {
             return Err(MetrologyAuditError(format!(
-                "outcomes[{index}] graph label subject/measurand/status mismatch"
+                "outcomes[{index}] graph subject/measurand does not match selected candidate"
             )));
         }
-        outcome_by_candidate.insert(outcome.candidate_id.as_str(), outcome);
+        derived_positive_by_candidate
+            .insert(outcome.candidate_id.as_str(), classification.derived_positive);
     }
-
     let mut stratum_map: BTreeMap<String, Vec<&MetrologyAuditSelectionRowV1>> = BTreeMap::new();
     for row in &selection.rows {
         stratum_map
@@ -702,8 +699,11 @@ pub fn estimate_metrology_population_v1(
         let mut audit_brier = Vec::with_capacity(audit_count);
 
         for row in exploit {
-            let outcome = outcome_by_candidate[row.candidate_id.as_str()];
-            let positive = if outcome.positive { 1.0 } else { 0.0 };
+            let positive = if derived_positive_by_candidate[row.candidate_id.as_str()] {
+                1.0
+            } else {
+                0.0
+            };
             let brier = (row.predicted_defect_probability - positive).powi(2);
             exploit_positive += positive;
             exploit_brier += brier;
@@ -715,8 +715,11 @@ pub fn estimate_metrology_population_v1(
             exploit_outcome_count += 1;
         }
         for row in &audit {
-            let outcome = outcome_by_candidate[row.candidate_id.as_str()];
-            let positive = if outcome.positive { 1.0 } else { 0.0 };
+            let positive = if derived_positive_by_candidate[row.candidate_id.as_str()] {
+                1.0
+            } else {
+                0.0
+            };
             let brier = (row.predicted_defect_probability - positive).powi(2);
             audit_positive.push(positive);
             audit_brier.push(brier);
@@ -849,14 +852,31 @@ mod tests {
     const SHA_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const SHA_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
+    fn semantics() -> BinaryMeasurandSemanticsV1 {
+        let mut rule = BinaryMeasurandSemanticsV1 {
+            schema: crate::benchmark::metrology_semantics::SEMANTICS_SCHEMA_V1.into(),
+            semantics_id: "defect-rate-binary-v1".into(),
+            revision: 1,
+            target_measurand_id: "defect-rate".into(),
+            unit: "binary".into(),
+            positive_class_name: "defect".into(),
+            negative_class_name: "pass".into(),
+            positive_condition: crate::benchmark::metrology_semantics::PositiveConditionV1::GreaterThanOrEqual,
+            threshold: 0.5,
+            authority_ref: "quality-plan:defect-rate-v1".into(),
+            semantics_sha256: String::new(),
+        };
+        crate::benchmark::metrology_semantics::seal_binary_measurand_semantics_v1(&mut rule)
+            .unwrap();
+        rule
+    }
+
     fn candidate(index: usize, stratum: &str) -> MetrologyAuditCandidateV1 {
         MetrologyAuditCandidateV1 {
             candidate_id: format!("candidate-{index:02}"),
             subject_id: format!("wafer-{index:02}"),
             stratum_id: stratum.into(),
             target_measurand_id: "defect-rate".into(),
-            class_semantics_ref: "defect-threshold-v1".into(),
-            class_semantics_sha256: SHA_C.into(),
             predicted_defect_probability: (index % 5) as f64 / 5.0,
             epistemic_uncertainty: 0.2 + (index % 3) as f64 * 0.1,
             expected_value_of_information: 0.3 + (index % 4) as f64 * 0.1,
@@ -874,6 +894,7 @@ mod tests {
             model_sha256: SHA_A.into(),
             prediction_packet_sha256: SHA_B.into(),
             policy_config_sha256: SHA_C.into(),
+            binary_semantics: semantics(),
             total_cost_budget: 8,
             exploit_cost_budget: 2,
             audit_cost_budget: 6,
@@ -1017,9 +1038,6 @@ mod tests {
             outcomes.push(MetrologyAuditOutcomeV1 {
                 candidate_id: row.candidate_id.clone(),
                 label_id,
-                positive: index % 3 == 0,
-                class_semantics_ref: row.class_semantics_ref.clone(),
-                class_semantics_sha256: row.class_semantics_sha256.clone(),
             });
         }
         let graph = ProcessEventGraphV1 {
@@ -1058,9 +1076,6 @@ mod tests {
         let outcome = MetrologyAuditOutcomeV1 {
             candidate_id: selection.rows.iter().find(|row| row.selected).unwrap().candidate_id.clone(),
             label_id: "not-in-graph".into(),
-            positive: false,
-            class_semantics_ref: "defect-threshold-v1".into(),
-            class_semantics_sha256: SHA_C.into(),
         };
         let graph = ProcessEventGraphV1 {
             schema: crate::benchmark::process_event_graph::GRAPH_SCHEMA_V1.into(),
