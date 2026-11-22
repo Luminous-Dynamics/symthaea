@@ -1725,6 +1725,131 @@ mod tests {
     }
 
     #[test]
+    fn attack_plans_are_deterministic_nested_and_bound_to_source_evidence() {
+        let graph = triangle_graph();
+        let demand_pairs = demands();
+        let config = MycelialFailureAttackConfig {
+            strategy: MycelialFailureAttackStrategy::RandomSegments,
+            seed: 0x5eed,
+            maximum_failure_budget: 2,
+            spatial_seed_junction_id: None,
+        };
+        let first = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            config.clone(),
+        )
+        .unwrap();
+        let second =
+            build_mycelial_failure_attack_plan(&graph, &demand_pairs, config).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.scenarios.len(), 2);
+        assert_eq!(first.ranked_entity_ids.len(), 3);
+        let budget_one: BTreeSet<_> =
+            first.scenarios[0].failed_segment_ids.iter().collect();
+        let budget_two: BTreeSet<_> =
+            first.scenarios[1].failed_segment_ids.iter().collect();
+        assert!(budget_one.is_subset(&budget_two));
+        first.validate_against(&graph, &demand_pairs).unwrap();
+
+        let evaluation =
+            evaluate_mycelial_failure_attack_plan(&graph, &demand_pairs, &first).unwrap();
+        assert_eq!(evaluation.resilience_profile.scenarios.len(), 2);
+        assert_eq!(
+            evaluation.attack_plan_digest,
+            first.canonical_digest_hex().unwrap()
+        );
+        assert_eq!(
+            evaluation.canonical_digest_hex().unwrap(),
+            evaluation.canonical_digest_hex().unwrap()
+        );
+    }
+
+    #[test]
+    fn targeted_and_spatial_attack_rankings_match_their_declared_policies() {
+        let graph = triangle_graph();
+        let demand_pairs = demands();
+
+        let degree = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::HighestDegreeJunctions,
+                seed: 0,
+                maximum_failure_budget: 1,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(degree.ranked_entity_ids[0], "A");
+
+        let load = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::DemandPathLoadSegments,
+                seed: 0,
+                maximum_failure_budget: 1,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(load.ranked_entity_ids[0], "edge-ca");
+
+        let spatial = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::SpatialClusterJunctions,
+                seed: 0,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: Some("A".to_string()),
+            },
+        )
+        .unwrap();
+        assert_eq!(&spatial.ranked_entity_ids[..2], &["A", "B"]);
+        assert_eq!(
+            spatial.scenarios[1].failed_junction_ids,
+            vec!["A".to_string(), "B".to_string()]
+        );
+    }
+
+    #[test]
+    fn attack_plan_mutation_and_missing_spatial_seed_fail_closed() {
+        let graph = triangle_graph();
+        let demand_pairs = demands();
+        let mut plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::HighestDegreeJunctions,
+                seed: 7,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        plan.ranked_entity_ids.reverse();
+        assert!(matches!(
+            plan.validate_against(&graph, &demand_pairs),
+            Err(MycelialFailureResilienceError::InvalidAttackPlan(_))
+        ));
+        assert!(matches!(
+            build_mycelial_failure_attack_plan(
+                &graph,
+                &demand_pairs,
+                MycelialFailureAttackConfig {
+                    strategy: MycelialFailureAttackStrategy::SpatialClusterJunctions,
+                    seed: 7,
+                    maximum_failure_budget: 1,
+                    spatial_seed_junction_id: None,
+                }
+            ),
+            Err(MycelialFailureResilienceError::InvalidAttackConfig(_))
+        ));
+    }
+
+    #[test]
     fn invalid_or_ambiguous_demand_scenarios_fail_closed() {
         let graph = triangle_graph();
         let mut bad_demands = demands();
