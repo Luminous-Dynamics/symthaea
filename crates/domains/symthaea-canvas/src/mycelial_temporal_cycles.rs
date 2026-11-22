@@ -22,9 +22,9 @@ use serde::{Deserialize, Serialize};
 
 pub const MYCELIAL_TEMPORAL_CYCLE_SCHEMA_VERSION: u16 = 1;
 pub const MYCELIAL_TEMPORAL_CYCLE_PROFILE_SCHEMA_VERSION: u16 = 1;
-pub const MAX_TEMPORAL_MYCIELIAL_WINDOWS: usize = 4_096;
-pub const MAX_TEMPORAL_MYCIELIAL_NODES: usize = 128;
-pub const MAX_TEMPORAL_MYCIELIAL_EDGES: usize = 512;
+pub const MAX_TEMPORAL_MYCELIAL_WINDOWS: usize = 4_096;
+pub const MAX_TEMPORAL_MYCELIAL_NODES: usize = 128;
+pub const MAX_TEMPORAL_MYCELIAL_EDGES: usize = 512;
 pub const MAX_TEMPORAL_CYCLES_PER_WINDOW: usize = 2_048;
 pub const MAX_TEMPORAL_CYCLE_ID_BYTES: usize = 128;
 const MAX_TEMPORAL_NODE_ID_BYTES: usize = 128;
@@ -257,7 +257,7 @@ impl fmt::Display for MycelialTemporalCycleError {
             }
             Self::InvalidConfig => write!(f, "invalid temporal cycle recurrence configuration"),
             Self::TooManyWindows(count) => {
-                write!(f, "snapshot count {count} exceeds {MAX_TEMPORAL_MYCIELIAL_WINDOWS}")
+                write!(f, "snapshot count {count} exceeds {MAX_TEMPORAL_MYCELIAL_WINDOWS}")
             }
             Self::TooManyNodes { snapshot_id, count } => {
                 write!(f, "snapshot {snapshot_id} node count {count} exceeds its bound")
@@ -301,13 +301,13 @@ fn validate_snapshot(
     {
         return Err(fail("invalid ID, source digest or observation interval"));
     }
-    if snapshot.node_ids.len() > MAX_TEMPORAL_MYCIELIAL_NODES {
+    if snapshot.node_ids.len() > MAX_TEMPORAL_MYCELIAL_NODES {
         return Err(MycelialTemporalCycleError::TooManyNodes {
             snapshot_id: snapshot.snapshot_id.clone(),
             count: snapshot.node_ids.len(),
         });
     }
-    if snapshot.edges.len() > MAX_TEMPORAL_MYCIELIAL_EDGES {
+    if snapshot.edges.len() > MAX_TEMPORAL_MYCELIAL_EDGES {
         return Err(MycelialTemporalCycleError::TooManyEdges {
             snapshot_id: snapshot.snapshot_id.clone(),
             count: snapshot.edges.len(),
@@ -346,14 +346,13 @@ impl TemporalMycelialSequence {
         {
             return Err(MycelialTemporalCycleError::InvalidSequenceMetadata);
         }
-        if self.snapshots.is_empty() || self.snapshots.len() > MAX_TEMPORAL_MYCIELIAL_WINDOWS {
+        if self.snapshots.is_empty() || self.snapshots.len() > MAX_TEMPORAL_MYCELIAL_WINDOWS {
             return Err(MycelialTemporalCycleError::TooManyWindows(
                 self.snapshots.len(),
             ));
         }
 
         let mut snapshot_ids = BTreeSet::new();
-        let mut node_identity = BTreeMap::<&str, ()>::new();
         let mut edge_identity =
             BTreeMap::<&str, (String, String, TemporalEdgeEvidence)>::new();
         let mut previous_end = None;
@@ -375,9 +374,6 @@ impl TemporalMycelialSequence {
             }
             previous_end = Some(snapshot.window_end_ns);
             previous_snapshot.clone_from(&snapshot.snapshot_id);
-            for node_id in &snapshot.node_ids {
-                node_identity.insert(node_id.as_str(), ());
-            }
             for edge in &snapshot.edges {
                 let endpoints = if edge.source_node_id <= edge.target_node_id {
                     (
@@ -670,20 +666,15 @@ pub fn build_temporal_mycelial_cycle_profile(
     }
 
     let mut degree_exposure = BTreeMap::<String, u128>::new();
-    let mut degree_exposure_complete = BTreeMap::<String, bool>::new();
+    // Any partial window makes degree exposure incomplete for this profile.
+    // Missing nodes/edges in a partial window are unknown, not zero degree.
+    let degree_exposure_is_complete = sequence.snapshots.iter().all(|snapshot| {
+        snapshot.coverage == TemporalWindowCoverage::CompleteWithinDeclaredScope
+    });
     for snapshot in &sequence.snapshots {
         let mut degree = BTreeMap::<&str, u128>::new();
         for node_id in &snapshot.node_ids {
             degree.insert(node_id.as_str(), 0);
-            degree_exposure_complete
-                .entry(node_id.clone())
-                .and_modify(|complete| {
-                    *complete &= snapshot.coverage
-                        == TemporalWindowCoverage::CompleteWithinDeclaredScope;
-                })
-                .or_insert(
-                    snapshot.coverage == TemporalWindowCoverage::CompleteWithinDeclaredScope,
-                );
         }
         for edge in &snapshot.edges {
             if let Some(value) = degree.get_mut(edge.source_node_id.as_str()) {
@@ -725,10 +716,7 @@ pub fn build_temporal_mycelial_cycle_profile(
     for node_id in all_node_ids {
         let tcn_duration_ns = tcn.get(&node_id).copied().unwrap_or(0);
         let degree_exposure_ns = degree_exposure.get(&node_id).copied().unwrap_or(0);
-        let exposure_complete = degree_exposure_complete
-            .get(&node_id)
-            .copied()
-            .unwrap_or(false);
+        let exposure_complete = degree_exposure_is_complete;
         let tcr = if exposure_complete {
             Some(
                 tcn_duration_ns as f64
