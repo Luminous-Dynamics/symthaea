@@ -1,0 +1,226 @@
+{
+  "schema": "symthaea.temporal_joint_factorial_interactions",
+  "version": "0.1.0",
+  "tracking_issue": 9666,
+  "parent_pr": 9828,
+  "extension_branch": "research/temporal-factorial-interactions-20261122",
+  "status": "source_authored_not_executed",
+  "method": {
+    "name": "subset_mobius_harsanyi_dividend_decomposition",
+    "factor_design": "complete_binary_factorial",
+    "max_factors": 16,
+    "max_subsets": 65536,
+    "interaction_term_count": "2^n - 1",
+    "arithmetic": "checked_i128_integer",
+    "axes": {
+      "exposure_benefit": [
+        "wrong_belief_us",
+        "abstention_us",
+        "missing_output_us"
+      ],
+      "resource_cost_order": [
+        "persistent_bytes",
+        "retained_byte_us",
+        "read_bytes",
+        "write_bytes",
+        "compute_us",
+        "refresh_ops",
+        "observations",
+        "sensor_active_us",
+        "latency_us",
+        "energy_nj",
+        "verification_ops",
+        "receipt_bytes"
+      ]
+    },
+    "sign_convention": {
+      "exposure_benefit": "positive_dividend_is_synergy_negative_is_antagonism",
+      "resource_cost": "positive_dividend_is_additional_cost_negative_is_resource_saving"
+    },
+    "reconstruction": "sum_all_nonempty_subset_dividends_equals_full_joint_value_minus_empty_action_baseline"
+  },
+  "controlled_example": {
+    "factor_action_ids": [
+      10,
+      20,
+      30
+    ],
+    "factor_names": [
+      "observe",
+      "retain",
+      "compute"
+    ],
+    "candidate_plan_id": 507,
+    "baseline_plan_id": 500,
+    "full_joint_plan_id": 507,
+    "exposure_debt_by_mask": [
+      {
+        "mask": 0,
+        "wrong_belief_us": 500,
+        "abstention_us": 300,
+        "missing_output_us": 100
+      },
+      {
+        "mask": 1,
+        "wrong_belief_us": 490,
+        "abstention_us": 298,
+        "missing_output_us": 99
+      },
+      {
+        "mask": 2,
+        "wrong_belief_us": 480,
+        "abstention_us": 297,
+        "missing_output_us": 98
+      },
+      {
+        "mask": 3,
+        "wrong_belief_us": 463,
+        "abstention_us": 295,
+        "missing_output_us": 97
+      },
+      {
+        "mask": 4,
+        "wrong_belief_us": 470,
+        "abstention_us": 296,
+        "missing_output_us": 97
+      },
+      {
+        "mask": 5,
+        "wrong_belief_us": 460,
+        "abstention_us": 294,
+        "missing_output_us": 96
+      },
+      {
+        "mask": 6,
+        "wrong_belief_us": 450,
+        "abstention_us": 293,
+        "missing_output_us": 95
+      },
+      {
+        "mask": 7,
+        "wrong_belief_us": 438,
+        "abstention_us": 291,
+        "missing_output_us": 94
+      }
+    ],
+    "resource_cost_by_mask": [
+      {
+        "mask": 0,
+        "persistent_bytes": 4,
+        "energy_nj": 100
+      },
+      {
+        "mask": 1,
+        "persistent_bytes": 6,
+        "energy_nj": 110
+      },
+      {
+        "mask": 2,
+        "persistent_bytes": 7,
+        "energy_nj": 120
+      },
+      {
+        "mask": 3,
+        "persistent_bytes": 14,
+        "energy_nj": 141
+      },
+      {
+        "mask": 4,
+        "persistent_bytes": 8,
+        "energy_nj": 130
+      },
+      {
+        "mask": 5,
+        "persistent_bytes": 10,
+        "energy_nj": 140
+      },
+      {
+        "mask": 6,
+        "persistent_bytes": 11,
+        "energy_nj": 150
+      },
+      {
+        "mask": 7,
+        "persistent_bytes": 16,
+        "energy_nj": 168
+      }
+    ],
+    "expected_nonzero_terms": {
+      "1": {
+        "order": 1,
+        "wrong_belief_benefit_us": 10,
+        "abstention_benefit_us": 2,
+        "missing_output_benefit_us": 1,
+        "energy_cost_delta_nj": 10,
+        "persistent_bytes_delta": 2
+      },
+      "2": {
+        "order": 1,
+        "wrong_belief_benefit_us": 20,
+        "abstention_benefit_us": 3,
+        "missing_output_benefit_us": 2,
+        "energy_cost_delta_nj": 20,
+        "persistent_bytes_delta": 3
+      },
+      "3": {
+        "order": 2,
+        "wrong_belief_benefit_us": 7,
+        "energy_cost_delta_nj": 11,
+        "persistent_bytes_delta": 5
+      },
+      "4": {
+        "order": 1,
+        "wrong_belief_benefit_us": 30,
+        "abstention_benefit_us": 4,
+        "missing_output_benefit_us": 3,
+        "energy_cost_delta_nj": 30,
+        "persistent_bytes_delta": 4
+      },
+      "7": {
+        "order": 3,
+        "wrong_belief_benefit_us": -5,
+        "energy_cost_delta_nj": -3,
+        "persistent_bytes_delta": -2
+      }
+    },
+    "expected_total_exposure_benefit_us": {
+      "wrong_belief": 62,
+      "abstention": 9,
+      "missing_output": 6
+    },
+    "expected_total_energy_cost_delta_nj": 68,
+    "expected_total_persistent_bytes_delta": 12
+  },
+  "additional_four_factor_control": {
+    "factor_action_ids": [
+      10,
+      20,
+      30,
+      40
+    ],
+    "factor_names": [
+      "observe",
+      "retain",
+      "compute",
+      "verify"
+    ],
+    "tested_mask": 15,
+    "expected_four_way_exposure_benefit_dividend_us": [
+      72,
+      61,
+      53
+    ],
+    "test_purpose": "prove_four_way_interaction_is_separate_from_all_proper_subsets"
+  },
+  "tests_authored": 14,
+  "tests_executed": false,
+  "benchmark_runs": false,
+  "causal_claim_requires": "paired_randomized_interventions_or_a_controlled_replay_design_that_identifies_the_declared_factor_effects",
+  "no_claims": [
+    "no proof of global optimality over unenumerated action spaces",
+    "no continuous-dose or sequential-policy decomposition",
+    "no causal identification from observationally confounded inputs",
+    "no hardware or energy superiority claim",
+    "no SOTA claim"
+  ]
+}
