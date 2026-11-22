@@ -47,6 +47,8 @@ pub struct DtcoRunV1 {
     #[serde(default)]
     pub model_sha256: Option<String>,
     #[serde(default)]
+    pub prediction_uncertainty_artifact_sha256: Option<String>,
+    #[serde(default)]
     pub instrument_ref: Option<String>,
     #[serde(default)]
     pub calibration_ref: Option<String>,
@@ -215,6 +217,21 @@ pub fn validate_dtco_lineage_v1(
             require_sha256(model_sha256, &format!("runs[{index}].model_sha256"))?;
             artifacts.insert(model_sha256.to_string());
         }
+        if run.evidence_kind == "model_prediction" {
+            let prediction_uncertainty = run
+                .prediction_uncertainty_artifact_sha256
+                .as_deref()
+                .unwrap_or_default();
+            require_sha256(
+                prediction_uncertainty,
+                &format!("runs[{index}].prediction_uncertainty_artifact_sha256"),
+            )?;
+            artifacts.insert(prediction_uncertainty.to_string());
+        } else if run.prediction_uncertainty_artifact_sha256.is_some() {
+            return Err(DtcoLineageError(format!(
+                "runs[{index}].prediction_uncertainty_artifact_sha256: only permitted for model_prediction evidence"
+            )));
+        }
 
         require_text(&run.tool_name, &format!("runs[{index}].tool_name"))?;
         require_text(&run.tool_version, &format!("runs[{index}].tool_version"))?;
@@ -303,6 +320,20 @@ pub fn validate_dtco_lineage_v1(
                     run.run_id, parent_id
                 ))
             })?;
+            let parent_stage = STAGES
+                .iter()
+                .position(|stage| *stage == parent.stage)
+                .expect("parent stage was validated");
+            let child_stage = STAGES
+                .iter()
+                .position(|stage| *stage == run.stage)
+                .expect("child stage was validated");
+            if parent_stage > child_stage {
+                return Err(DtcoLineageError(format!(
+                    "run {:?}: parent fidelity stage cannot be later than child stage",
+                    run.run_id
+                )));
+            }
             let child_inputs: BTreeSet<&str> = run
                 .input_artifact_sha256
                 .iter()
@@ -349,6 +380,32 @@ pub fn validate_dtco_lineage_v1(
     if visited != run_by_id.len() {
         return Err(DtcoLineageError(
             "runs: parent relationships contain a cycle".to_string(),
+        ));
+    }
+
+    // Bind declared top-level candidate identity into actual evaluation inputs.
+    // Every root run begins from the immutable design identity, and declared
+    // constraints must be consumed by at least one run in the candidate graph.
+    for (run_id, run) in &run_by_id {
+        if run.parent_run_ids.is_empty()
+            && !run
+                .input_artifact_sha256
+                .iter()
+                .any(|digest| digest == &manifest.design_input_sha256)
+        {
+            return Err(DtcoLineageError(format!(
+                "root run {:?}: design_input_sha256 is not bound to root inputs",
+                run_id
+            )));
+        }
+    }
+    if !manifest.runs.iter().any(|run| {
+        run.input_artifact_sha256
+            .iter()
+            .any(|digest| digest == &manifest.constraints_sha256)
+    }) {
+        return Err(DtcoLineageError(
+            "constraints_sha256: not bound to any run input artifact".to_string(),
         ));
     }
 
@@ -477,6 +534,60 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("model_sha256")
+        );
+    }
+
+    #[test]
+    fn model_prediction_requires_uncertainty_artifact() {
+        let mut manifest = known_answer();
+        manifest.runs[0].evidence_kind = "model_prediction".to_string();
+        manifest.runs[0].model_sha256 = Some(
+            "5555555555555555555555555555555555555555555555555555555555555555".to_string(),
+        );
+        assert!(
+            validate_dtco_lineage_v1(&manifest)
+                .unwrap_err()
+                .to_string()
+                .contains("prediction_uncertainty_artifact_sha256")
+        );
+    }
+
+    #[test]
+    fn later_fidelity_stage_cannot_be_parent_of_earlier_stage() {
+        let mut manifest = known_answer();
+        manifest.runs[0].parent_run_ids = vec!["run-measurement".to_string()];
+        manifest.runs[0].input_artifact_sha256 =
+            manifest.runs[2].output_artifact_sha256.clone();
+        manifest.runs[2].parent_run_ids.clear();
+        assert!(
+            validate_dtco_lineage_v1(&manifest)
+                .unwrap_err()
+                .to_string()
+                .contains("parent fidelity stage cannot be later")
+        );
+    }
+
+    #[test]
+    fn root_run_must_bind_design_and_constraints_must_be_consumed() {
+        let mut manifest = known_answer();
+        manifest.runs[0].input_artifact_sha256 = vec![
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+        ];
+        assert!(
+            validate_dtco_lineage_v1(&manifest)
+                .unwrap_err()
+                .to_string()
+                .contains("design_input_sha256 is not bound")
+        );
+
+        let mut manifest = known_answer();
+        manifest.runs[0].input_artifact_sha256 =
+            vec![manifest.design_input_sha256.clone()];
+        assert!(
+            validate_dtco_lineage_v1(&manifest)
+                .unwrap_err()
+                .to_string()
+                .contains("constraints_sha256: not bound")
         );
     }
 
