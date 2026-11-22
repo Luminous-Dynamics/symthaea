@@ -414,7 +414,7 @@ mod tests {
         assert_eq!(result.baseline_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
-        assert!(!result.post_observation_regret_within_tolerance);
+        assert!(!result.post_observation_information_set_sufficient);
         assert_eq!(result.outcomes.len(), 2);
         assert!(result.outcomes.iter().all(|outcome| outcome.possible_world_count == 2));
     }
@@ -436,8 +436,8 @@ mod tests {
         assert_eq!(result.baseline_worst_case_regret_ppm, 0);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 0);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
-        assert!(result.baseline_regret_within_tolerance);
-        assert!(result.post_observation_regret_within_tolerance);
+        assert!(result.baseline_information_set_sufficient);
+        assert!(result.post_observation_information_set_sufficient);
     }
 
     #[test]
@@ -452,7 +452,7 @@ mod tests {
         assert_eq!(result.outcomes[0].candidate_visible_outcome_sha256, None);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
-        assert!(!result.post_observation_regret_within_tolerance);
+        assert!(!result.post_observation_information_set_sufficient);
     }
 
     #[test]
@@ -552,8 +552,8 @@ mod tests {
         assert_eq!(exact.unavoidable_worst_case_regret_ppm, 100_000);
 
         let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
-        assert!(result.baseline_regret_within_tolerance);
-        assert!(result.post_observation_regret_within_tolerance);
+        assert!(result.baseline_information_set_sufficient);
+        assert!(result.post_observation_information_set_sufficient);
         assert!(result.outcomes.iter().all(|outcome| outcome.information_set_sufficient));
     }
 
