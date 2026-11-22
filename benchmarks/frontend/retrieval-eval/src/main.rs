@@ -186,8 +186,8 @@ fn hdc_similarity(left: &[i8], right: &[i8]) -> f64 {
 
 impl CorpusIndex {
     fn from_json(corpus: &Value, dimensions: usize) -> Result<Self> {
-        if dimensions == 0 || dimensions % 256 != 0 {
-            bail!("HDC dimensions must be a positive multiple of 256");
+        if !(256..=65_536).contains(&dimensions) || dimensions % 256 != 0 {
+            bail!("HDC dimensions must be a multiple of 256 in the supported range 256..=65536");
         }
 
         let patterns = corpus
@@ -195,14 +195,25 @@ impl CorpusIndex {
             .and_then(Value::as_array)
             .context("corpus.patterns must be an array")?;
 
+        if patterns.len() > 10_000 {
+            bail!("pattern corpus exceeds the 10,000-document safety limit");
+        }
+
         let mut docs = Vec::new();
+        let mut pattern_ids = HashSet::new();
         for pattern in patterns {
             let id = text_field(pattern, "id");
-            let (_title, content) = pattern_text(pattern);
-            if id.is_empty() || title.is_empty() {
+            let (title, content) = pattern_text(pattern);
+            if id.trim().is_empty() || title.trim().is_empty() {
                 bail!("every pattern must have a non-empty id and title");
             }
+            if !pattern_ids.insert(id.clone()) {
+                bail!("duplicate pattern id in corpus: {id}");
+            }
             let tokens = tokenize(&content);
+            if tokens.is_empty() {
+                bail!("pattern {id} has no indexable terms after tokenization");
+            }
             let hdc = encode_hdc(&content, dimensions);
             let term_frequency = term_frequency(&tokens);
             docs.push(PatternDoc {
@@ -785,6 +796,39 @@ mod tests {
             assert_eq!(ranking.len(), 2);
             assert!(ranking.iter().all(|item| item.score.is_finite()));
         }
+    }
+
+    #[test]
+    fn corpus_rejects_duplicate_pattern_ids() {
+        let corpus = json!({
+            "patterns": [
+                {"id":"duplicate","title":"First pattern","concept":"reactive state"},
+                {"id":"duplicate","title":"Second pattern","concept":"router navigation"}
+            ]
+        });
+        assert!(CorpusIndex::from_json(&corpus, 256).is_err());
+    }
+
+    #[test]
+    fn corpus_rejects_empty_indexable_pattern_text() {
+        let corpus = json!({
+            "patterns": [
+                {"id":"empty","title":"The and a","concept":"is it"}
+            ]
+        });
+        assert!(CorpusIndex::from_json(&corpus, 256).is_err());
+    }
+
+    #[test]
+    fn hdc_dimensions_are_bounded_to_supported_ablation_range() {
+        let corpus = json!({
+            "patterns": [
+                {"id":"p1","title":"Reactive signals","concept":"reactive state"}
+            ]
+        });
+        assert!(CorpusIndex::from_json(&corpus, 0).is_err());
+        assert!(CorpusIndex::from_json(&corpus, 65_792).is_err());
+        assert!(CorpusIndex::from_json(&corpus, 16_384).is_ok());
     }
 
     #[test]
