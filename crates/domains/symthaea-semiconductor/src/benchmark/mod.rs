@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod conformal_abstention;
 pub mod dtco_manifest;
+pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
@@ -72,6 +73,12 @@ pub use secom_raw::{
 
 pub use dtco_manifest::{
     DtcoLineageError, DtcoLineageManifestV1, DtcoLineageReportV1, validate_dtco_lineage_v1,
+};
+
+pub use metrology_semantics::{
+    BinaryMeasurandSemanticsV1, MetrologySemanticsError, PositiveConditionV1,
+    ValidatedMetrologyClassificationV1, classify_validated_metrology_label_v1,
+    seal_binary_measurand_semantics_v1, validate_binary_measurand_semantics_v1,
 };
 
 pub use mf_acquisition::{
