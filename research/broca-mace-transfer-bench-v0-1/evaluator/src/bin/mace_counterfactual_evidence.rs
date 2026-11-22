@@ -719,18 +719,31 @@ fn run() -> Result<(), String> {
     for case in &cases {
         let manifest = build_manifest(&case.memory, public_seed, max_root_pairs)
             .map_err(|error| format!("dependency index failed: {error:?}"))?;
-        let baseline = run_candidate(case.query, case.decision_need, &case.memory)
-            .map_err(|error| format!("baseline candidate failed: {error:?}"))?;
-        let baseline_regret = regret(case.truth, baseline.decision.action);
+        let baseline_exact = run_candidate(
+            CandidateMode::ExactScopeScan,
+            case.query,
+            case.decision_need,
+            &case.memory,
+        )
+        .map_err(|error| format!("exact-scope baseline failed: {error:?}"))?;
+        let baseline_typed = run_candidate(
+            CandidateMode::TypedContentHdc,
+            case.query,
+            case.decision_need,
+            &case.memory,
+        )
+        .map_err(|error| format!("typed-content baseline failed: {error:?}"))?;
+        let baseline_exact_regret = regret(case.truth, baseline_exact.decision.action);
+        let baseline_typed_regret = regret(case.truth, baseline_typed.decision.action);
+
         // Opaque pair identity: do not expose generated evaluator scenario
-        // family labels (for example, retraction or common-cause attack) to
-        // the candidate-facing stream. Bind only candidate-visible inputs.
+        // family labels (for example, retraction or common-cause attack).
         let pair_block_id = candidate_pair_block_id(
             case.cluster,
             case.decision_need,
             &manifest.baseline_evidence_sha256,
         );
-        let manifest_record = json!({
+        evaluator_records.push(json!({
             "schema_version": SCHEMA_VERSION,
             "record_type": "intervention_manifest",
             "run_id": run_id,
@@ -751,132 +764,175 @@ fn run() -> Result<(), String> {
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .known_root_count(),
             "candidate_validity": "diagnostic_only"
-        });
-        evaluator_records.push(manifest_record);
-
-        let baseline_support = {
-            let index = EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?;
-            index.support_closure_counts(&baseline.decision.evidence_ids)
-        };
-        let baseline_observation_id = format!("obs-{}", &baseline.input_sha256[..16]);
-        candidate_records.push(json!({
-            "schema_version": SCHEMA_VERSION,
-            "record_type": "candidate_decision",
-            "run_id": run_id,
-            "pair_block_id": pair_block_id,
-            "candidate_observation_id": baseline_observation_id,
-            "candidate_input_sha256": baseline.input_sha256,
-            "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
-            "candidate_evidence_sha256": baseline.evidence_sha256,
-            "decision": action_name(baseline.decision.action),
-            "decision_support_event_ids": baseline.decision.evidence_ids,
-            "support_event_count": baseline_support.0,
-            "support_known_root_count": baseline_support.1,
-            "support_known_family_count": baseline_support.2,
-            "support_unresolved_count": baseline_support.3,
-            "available_event_count": baseline.evidence_event_count,
-            "available_experience_struct_bytes": baseline.evidence_event_count.saturating_mul(size_of::<Experience>()),
-            "available_known_root_count": baseline.evidence_root_count,
-            "available_known_family_count": baseline.evidence_family_count,
-            "unknown_root_event_count": baseline.unknown_root_event_count,
-            "unknown_family_event_count": baseline.unknown_family_event_count,
-            "latency_ns": baseline.latency_ns
-        }));
-        evaluator_records.push(json!({
-            "schema_version": SCHEMA_VERSION,
-            "record_type": "evaluator_score",
-            "run_id": run_id,
-            "pair_block_id": pair_block_id,
-            "candidate_observation_id": baseline_observation_id,
-            "candidate_input_sha256": baseline.input_sha256,
-            "intervention_id": "full_evidence_reference",
-            "intervention_kind": "reference",
-            "target_key": "full_evidence_reference",
-            "removed_event_ids": [],
-            "removed_event_count": 0,
-            "removed_experience_struct_bytes": 0,
-            "decision": action_name(baseline.decision.action),
-            "full_evidence_decision": action_name(baseline.decision.action),
-            "utility": truth_utility(case.truth, baseline.decision.action),
-            "regret": baseline_regret,
-            "full_evidence_regret": baseline_regret,
-            "regret_gap_vs_full_evidence": 0.0,
-            "decision_is_optimal": baseline.decision.action == Some(case.truth.optimal_action()),
-            "abstained": baseline.decision.action.is_none(),
-            "decision_agrees_with_full": true,
-            "decision_changed": false,
-            "evaluation_validity": "diagnostic_only",
-            "invalidity_reason": "public synthetic fixture and co-located evaluator"
         }));
 
-        for intervention in &manifest.interventions {
-            let index = EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?;
-            let retained = index.retain_without(&intervention.removed_event_ids);
-            let candidate = run_candidate(case.query, case.decision_need, &retained)
-                .map_err(|error| format!("intervention candidate failed: {error:?}"))?;
-            let support = EvidenceDependencyIndex::build(&retained)
-                .map_err(|error| format!("retained evidence index failed: {error:?}"))?
-                .support_closure_counts(&candidate.decision.evidence_ids);
-            let candidate_observation_id = format!(
-                "obs-{}",
-                &candidate.input_sha256[..16]
-            );
-
-            candidate_records.push(json!({
+        for baseline in [&baseline_exact, &baseline_typed] {
+            let support = EvidenceDependencyIndex::build(&case.memory)
+                .map_err(|error| format!("dependency index failed: {error:?}"))?
+                .support_closure_counts(&baseline.decision.evidence_ids);
+            let observation_id = candidate_observation_id(baseline);
+            let candidate_record = json!({
                 "schema_version": SCHEMA_VERSION,
                 "record_type": "candidate_decision",
                 "run_id": run_id,
                 "pair_block_id": pair_block_id,
-                "candidate_observation_id": candidate_observation_id,
-                "candidate_input_sha256": candidate.input_sha256,
+                "candidate_observation_id": observation_id,
+                "method": baseline.mode.name(),
+                "candidate_input_sha256": baseline.input_sha256,
                 "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
-                "candidate_evidence_sha256": candidate.evidence_sha256,
-                "decision": action_name(candidate.decision.action),
-                "decision_support_event_ids": candidate.decision.evidence_ids,
+                "candidate_evidence_sha256": baseline.evidence_sha256,
+                "retrieved_event_ids": baseline.retrieved_event_ids,
+                "decision": action_name(baseline.decision.action),
+                "decision_support_event_ids": baseline.decision.evidence_ids,
                 "support_event_count": support.0,
                 "support_known_root_count": support.1,
                 "support_known_family_count": support.2,
                 "support_unresolved_count": support.3,
-                "available_event_count": candidate.evidence_event_count,
-                "available_experience_struct_bytes": candidate.evidence_event_count.saturating_mul(size_of::<Experience>()),
-                "available_known_root_count": candidate.evidence_root_count,
-                "available_known_family_count": candidate.evidence_family_count,
-                "unknown_root_event_count": candidate.unknown_root_event_count,
-                "unknown_family_event_count": candidate.unknown_family_event_count,
-                "latency_ns": candidate.latency_ns
-            }));
+                "available_event_count": baseline.evidence_event_count,
+                "available_experience_struct_bytes": baseline.evidence_event_count.saturating_mul(size_of::<Experience>()),
+                "available_known_root_count": baseline.evidence_root_count,
+                "available_known_family_count": baseline.evidence_family_count,
+                "unknown_root_event_count": baseline.unknown_root_event_count,
+                "unknown_family_event_count": baseline.unknown_family_event_count,
+                "index_bytes": baseline.index_bytes,
+                "latency_ns": baseline.latency_ns
+            });
+            let mut candidate_record = candidate_record;
+            if let Some(profile) = &baseline.retrieval_profile_sha256 {
+                candidate_record["retrieval_profile_sha256"] = json!(profile);
+            }
+            candidate_records.push(candidate_record);
 
-            let current_regret = regret(case.truth, candidate.decision.action);
-            let baseline_action = baseline.decision.action;
+            let current_regret = regret(case.truth, baseline.decision.action);
             evaluator_records.push(json!({
                 "schema_version": SCHEMA_VERSION,
                 "record_type": "evaluator_score",
                 "run_id": run_id,
                 "pair_block_id": pair_block_id,
-                "candidate_observation_id": candidate_observation_id,
-                "candidate_input_sha256": candidate.input_sha256,
-                "intervention_id": intervention.intervention_id,
-                "intervention_kind": intervention.kind,
-                "target_key": intervention.target_key,
-                "matched_to": intervention.matched_to,
-                "removed_event_ids": intervention.removed_event_ids,
-                "removed_event_count": intervention.removed_event_ids.len(),
-                "removed_experience_struct_bytes": intervention.removed_event_ids.len().saturating_mul(size_of::<Experience>()),
-                "decision": action_name(candidate.decision.action),
-                "full_evidence_decision": action_name(baseline_action),
-                "decision_agrees_with_full": candidate.decision.action == baseline_action,
-                "decision_changed": candidate.decision.action != baseline_action,
-                "utility": truth_utility(case.truth, candidate.decision.action),
+                "candidate_observation_id": observation_id,
+                "candidate_input_sha256": baseline.input_sha256,
+                "method": baseline.mode.name(),
+                "intervention_id": format!("full_evidence_{}", baseline.mode.name()),
+                "intervention_kind": "reference",
+                "target_key": baseline.mode.name(),
+                "retrieved_event_ids": baseline.retrieved_event_ids,
+                "index_bytes": baseline.index_bytes,
+                "removed_event_ids": [],
+                "removed_event_count": 0,
+                "removed_experience_struct_bytes": 0,
+                "decision": action_name(baseline.decision.action),
+                "full_evidence_decision": action_name(baseline_exact.decision.action),
+                "decision_agrees_with_full": baseline.decision.action == baseline_exact.decision.action,
+                "decision_changed": baseline.decision.action != baseline_exact.decision.action,
+                "utility": truth_utility(case.truth, baseline.decision.action),
                 "regret": current_regret,
-                "full_evidence_regret": baseline_regret,
-                "regret_gap_vs_full_evidence": current_regret - baseline_regret,
-                "decision_is_optimal": candidate.decision.action == Some(case.truth.optimal_action()),
-                "abstained": candidate.decision.action.is_none(),
+                "full_evidence_regret": baseline_exact_regret,
+                "regret_gap_vs_full_evidence": current_regret - baseline_exact_regret,
+                "regret_gap_vs_full_method": 0.0,
+                "decision_is_optimal": baseline.decision.action == Some(case.truth.optimal_action()),
+                "abstained": baseline.decision.action.is_none(),
                 "evaluation_validity": "diagnostic_only",
                 "invalidity_reason": "public synthetic fixture and co-located evaluator"
             }));
+            if let Some(profile) = &baseline.retrieval_profile_sha256 {
+                if let Some(last) = evaluator_records.last_mut() {
+                    last["retrieval_profile_sha256"] = json!(profile);
+                }
+            }
+        }
+
+        for intervention in &manifest.interventions {
+            let index = EvidenceDependencyIndex::build(&case.memory)
+                .map_err(|error| format!("dependency index failed: {error:?}"))?;
+            let retained = index.retain_without(&intervention.removed_event_ids);
+
+            for mode in CandidateMode::ALL {
+                let candidate = run_candidate(
+                    mode,
+                    case.query,
+                    case.decision_need,
+                    &retained,
+                )
+                .map_err(|error| format!("intervention candidate failed: {error:?}"))?;
+                let support = EvidenceDependencyIndex::build(&retained)
+                    .map_err(|error| format!("retained evidence index failed: {error:?}"))?
+                    .support_closure_counts(&candidate.decision.evidence_ids);
+                let observation_id = candidate_observation_id(&candidate);
+
+                let candidate_record = json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "record_type": "candidate_decision",
+                    "run_id": run_id,
+                    "pair_block_id": pair_block_id,
+                    "candidate_observation_id": observation_id,
+                    "method": candidate.mode.name(),
+                    "candidate_input_sha256": candidate.input_sha256,
+                    "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
+                    "candidate_evidence_sha256": candidate.evidence_sha256,
+                    "retrieved_event_ids": candidate.retrieved_event_ids,
+                    "decision": action_name(candidate.decision.action),
+                    "decision_support_event_ids": candidate.decision.evidence_ids,
+                    "support_event_count": support.0,
+                    "support_known_root_count": support.1,
+                    "support_known_family_count": support.2,
+                    "support_unresolved_count": support.3,
+                    "available_event_count": candidate.evidence_event_count,
+                    "available_experience_struct_bytes": candidate.evidence_event_count.saturating_mul(size_of::<Experience>()),
+                    "available_known_root_count": candidate.evidence_root_count,
+                    "available_known_family_count": candidate.evidence_family_count,
+                    "unknown_root_event_count": candidate.unknown_root_event_count,
+                    "unknown_family_event_count": candidate.unknown_family_event_count,
+                    "index_bytes": candidate.index_bytes,
+                    "latency_ns": candidate.latency_ns
+                });
+                let mut candidate_record = candidate_record;
+                if let Some(profile) = &candidate.retrieval_profile_sha256 {
+                    candidate_record["retrieval_profile_sha256"] = json!(profile);
+                }
+                candidate_records.push(candidate_record);
+
+                let current_regret = regret(case.truth, candidate.decision.action);
+                let same_method_baseline_regret = match mode {
+                    CandidateMode::ExactScopeScan => baseline_exact_regret,
+                    CandidateMode::TypedContentHdc => baseline_typed_regret,
+                };
+                let evaluator_record = json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "record_type": "evaluator_score",
+                    "run_id": run_id,
+                    "pair_block_id": pair_block_id,
+                    "candidate_observation_id": observation_id,
+                    "candidate_input_sha256": candidate.input_sha256,
+                    "method": candidate.mode.name(),
+                    "intervention_id": intervention.intervention_id,
+                    "intervention_kind": intervention.kind,
+                    "target_key": intervention.target_key,
+                    "matched_to": intervention.matched_to,
+                    "retrieved_event_ids": candidate.retrieved_event_ids,
+                    "index_bytes": candidate.index_bytes,
+                    "removed_event_ids": intervention.removed_event_ids,
+                    "removed_event_count": intervention.removed_event_ids.len(),
+                    "removed_experience_struct_bytes": intervention.removed_event_ids.len().saturating_mul(size_of::<Experience>()),
+                    "decision": action_name(candidate.decision.action),
+                    "full_evidence_decision": action_name(baseline_exact.decision.action),
+                    "decision_agrees_with_full": candidate.decision.action == baseline_exact.decision.action,
+                    "decision_changed": candidate.decision.action != baseline_exact.decision.action,
+                    "utility": truth_utility(case.truth, candidate.decision.action),
+                    "regret": current_regret,
+                    "full_evidence_regret": baseline_exact_regret,
+                    "regret_gap_vs_full_evidence": current_regret - baseline_exact_regret,
+                    "regret_gap_vs_full_method": current_regret - same_method_baseline_regret,
+                    "decision_is_optimal": candidate.decision.action == Some(case.truth.optimal_action()),
+                    "abstained": candidate.decision.action.is_none(),
+                    "evaluation_validity": "diagnostic_only",
+                    "invalidity_reason": "public synthetic fixture and co-located evaluator"
+                });
+                let mut evaluator_record = evaluator_record;
+                if let Some(profile) = &candidate.retrieval_profile_sha256 {
+                    evaluator_record["retrieval_profile_sha256"] = json!(profile);
+                }
+                evaluator_records.push(evaluator_record);
+            }
         }
     }
 
