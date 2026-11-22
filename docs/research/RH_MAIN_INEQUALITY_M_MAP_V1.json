@@ -333,12 +333,13 @@
     "row_indicator_cases": 1240,
     "checked_identity": "For every target s, exactly |T2| translates u satisfy s in u+T2. With chi_q in {-1,+1}, the row-filtered count satisfies 2*selected_count = |T2|*(1+chi_q).",
     "test_function": "translation_average_selects_each_column_exactly_cardinality_t2_times",
-    "status": "passed_exact_head_ci",
+    "status": "source_added_exact_head_ci_pending",
     "limitations": [
       "Finite cyclic groups only; not a formal proof for the actual group H used in the RH construction.",
-      "Does not verify the theta-lift, cell-weight perturbations, prime density or any uniform analytic estimate."
+      "Does not verify the theta-lift, cell-weight perturbations, prime density or any uniform analytic estimate.",
+      "The product-group oracle tests six finite abelian groups C_m × C_n; it is still not a Lean proof for the specific RH group H or a proof for all finite groups."
     ],
-    "ci_receipt": {
+    "previous_ci_receipt": {
       "tested_pr_head": "fa47d22d2dc72cf4281ec93605befe0e726d8f06",
       "workflow_run_id": 45074621157,
       "workflow_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/45074621157",
@@ -350,7 +351,53 @@
       "rustfmt": "passed",
       "json_fixture_assertions": "passed",
       "scope": "Standalone finite oracle and research fixture parsing only; no Lean build, kernel proof, RH proof validation, or complete workspace CI."
-    }
+    },
+    "product_group_structures": [
+      {
+        "group": "C2 × C2",
+        "m": 2,
+        "n": 2,
+        "group_size": 4
+      },
+      {
+        "group": "C2 × C3",
+        "m": 2,
+        "n": 3,
+        "group_size": 6
+      },
+      {
+        "group": "C2 × C4",
+        "m": 2,
+        "n": 4,
+        "group_size": 8
+      },
+      {
+        "group": "C3 × C3",
+        "m": 3,
+        "n": 3,
+        "group_size": 9
+      },
+      {
+        "group": "C2 × C5",
+        "m": 2,
+        "n": 5,
+        "group_size": 10
+      },
+      {
+        "group": "C3 × C4",
+        "m": 3,
+        "n": 4,
+        "group_size": 12
+      }
+    ],
+    "product_group_target_cases": 66447,
+    "product_group_row_indicator_cases": 132894,
+    "total_group_target_cases": 67067,
+    "total_row_indicator_cases": 134134,
+    "test_functions": [
+      "translation_average_selects_each_column_exactly_cardinality_t2_times",
+      "translation_average_holds_for_small_product_cyclic_groups"
+    ]
   },
   "upstream_graph_crosschecks": [
     {
