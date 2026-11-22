@@ -114,6 +114,9 @@ pub struct EventForecastFinding {
     pub realized_event_id: Option<String>,
     pub predicted_role: String,
     pub realized_role: Option<String>,
+    pub predicted_beat_index: u64,
+    pub realized_beat_index: Option<u64>,
+    pub beat_index_match: Option<bool>,
     pub expected_onset_ns: u64,
     pub observed_onset_ns: Option<u64>,
     pub signed_onset_error_ns: Option<i128>,
@@ -152,6 +155,7 @@ pub struct ForecastAuditReport {
     pub unfulfilled_forecast_event_count: usize,
     pub unforecasted_realized_event_count: usize,
     pub role_match_rate: Option<f64>,
+    pub beat_index_match_rate: Option<f64>,
     pub conditional_presence_brier_score: Option<f64>,
     pub absolute_onset_error_beats: Vec<f64>,
     pub median_absolute_onset_error_beats: Option<f64>,
@@ -489,6 +493,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     let mut brier_sum = 0.0;
     let mut brier_count = 0usize;
     let mut role_matches = 0usize;
+    let mut beat_index_matches = 0usize;
     let mut matched_count = 0usize;
     let mut unfulfilled_count = 0usize;
     let mut onset_errors = Vec::new();
@@ -499,24 +504,36 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 forecast.forecast_id.as_str(),
                 predicted.forecast_event_id.as_str(),
             ));
-            let (realized_event_id, realized_role, observed_onset_ns, signed_error_ns, phase_error) =
+            let (
+                realized_event_id,
+                realized_role,
+                realized_beat_index,
+                beat_index_match,
+                observed_onset_ns,
+                signed_error_ns,
+                phase_error,
+            ) =
                 if let Some((_, actual)) = realized {
                     let signed =
                         i128::from(actual.onset_ns) - i128::from(predicted.expected_onset_ns);
                     let phase = signed as f64 / predicted.local_beat_period_ns as f64;
                     role_matches += usize::from(actual.role == predicted.role);
+                    let beat_match = actual.beat_index == predicted.beat_index;
+                    beat_index_matches += usize::from(beat_match);
                     matched_count += 1;
                     onset_errors.push(phase.abs());
                     (
                         Some(actual.event_id.clone()),
                         Some(actual.role.clone()),
+                        Some(actual.beat_index),
+                        Some(beat_match),
                         Some(actual.onset_ns),
                         Some(signed),
                         Some(phase),
                     )
                 } else {
                     unfulfilled_count += 1;
-                    (None, None, None, None, None)
+                    (None, None, None, None, None, None, None)
                 };
             let presence_observed = realized.is_some();
             let observed_probability = if presence_observed { 1.0 } else { 0.0 };
@@ -531,6 +548,9 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 realized_event_id,
                 predicted_role: predicted.role.clone(),
                 realized_role,
+                predicted_beat_index: predicted.beat_index,
+                realized_beat_index,
+                beat_index_match,
                 expected_onset_ns: predicted.expected_onset_ns,
                 observed_onset_ns,
                 signed_onset_error_ns: signed_error_ns,
@@ -583,6 +603,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         unfulfilled_forecast_event_count: unfulfilled_count,
         unforecasted_realized_event_count,
         role_match_rate: rate(role_matches, matched_count),
+        beat_index_match_rate: rate(beat_index_matches, matched_count),
         conditional_presence_brier_score: mean(brier_sum, brier_count),
         absolute_onset_error_beats: absolute_sorted,
         median_absolute_onset_error_beats,
@@ -893,6 +914,7 @@ mod tests {
         assert_eq!(report.displayed_before_target_count, 1);
         assert_eq!(report.matched_forecast_event_count, 1);
         assert_eq!(report.role_match_rate, Some(1.0));
+        assert_eq!(report.beat_index_match_rate, Some(1.0));
         assert!((report.conditional_presence_brier_score.unwrap() - 0.0025).abs() < 1e-9);
         assert!(report.within_onset_tolerance_rate.unwrap() >= 1.0);
     }
@@ -1029,6 +1051,17 @@ mod tests {
             .push(extra);
         let error = audit(&value).expect_err("forecast event cannot be used twice");
         assert!(error.contains("duplicate realized event_id"));
+    }
+
+    #[test]
+    fn off_beat_realization_is_reported_even_when_onset_is_close() {
+        let mut value = panel();
+        value["realizations"][0]["events"][0]["beat_index"] = serde_json::json!(5);
+        let report = audit(&value).expect("off-beat structure should be reported");
+        assert!(report.structurally_valid_anticipatory_trace);
+        assert_eq!(report.beat_index_match_rate, Some(0.0));
+        assert_eq!(report.absolute_onset_error_beats, vec![0.04]);
+        assert_eq!(report.event_findings[0].beat_index_match, Some(false));
     }
 
     #[test]
