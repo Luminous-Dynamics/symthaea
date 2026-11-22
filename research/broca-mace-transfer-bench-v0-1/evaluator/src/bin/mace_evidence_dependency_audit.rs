@@ -56,14 +56,16 @@ impl EvidenceNode {
     }
 }
 
+// Run-scoped, bounded projection for this evaluator only. It is not a persistent
+// system-wide graph, trust score, or replacement for Mycelix DKG / #6283.
 #[derive(Clone, Debug)]
-struct EvidenceDependencyIndex {
+struct MaceAuditDependencyIndex {
     nodes: BTreeMap<u32, EvidenceNode>,
     dependents: BTreeMap<u32, BTreeSet<u32>>,
     lifecycle_neighbors: BTreeMap<u32, BTreeSet<u32>>,
 }
 
-impl EvidenceDependencyIndex {
+impl MaceAuditDependencyIndex {
     fn from_experiences(memory: &[Experience]) -> Result<Self, String> {
         Self::new(memory.iter().map(EvidenceNode::from_experience).collect())
     }
@@ -406,7 +408,7 @@ fn selection_key(seed: u64, plan_id: &str, event_id: u32) -> [u8; 32] {
 /// closure with a deterministic hash ordering. It is a count/byte/action
 /// control, not a claim that the records are semantically exchangeable.
 fn matched_random_control(
-    index: &EvidenceDependencyIndex,
+    index: &MaceAuditDependencyIndex,
     removed_ids: &BTreeSet<u32>,
     seed: u64,
     plan_id: &str,
@@ -466,7 +468,7 @@ fn matched_random_control(
 }
 
 fn build_plans(
-    index: &EvidenceDependencyIndex,
+    index: &MaceAuditDependencyIndex,
     seed: u64,
 ) -> Result<Vec<InterventionPlan>, String> {
     let mut interventions = Vec::new();
@@ -660,7 +662,7 @@ fn evaluate_plan(
         })
         .count();
 
-    let index = EvidenceDependencyIndex::from_experiences(&candidate_memory);
+    let index = MaceAuditDependencyIndex::from_experiences(&candidate_memory);
     let (candidate_root_count, candidate_family_count, unknown_root_count) = match index {
         Ok(index) => {
             let ids = index.event_ids();
@@ -669,7 +671,7 @@ fn evaluate_plan(
         Err(_) => (0, 0, candidate_memory.len()),
     };
 
-    let original_index = EvidenceDependencyIndex::from_experiences(&case.memory)
+    let original_index = MaceAuditDependencyIndex::from_experiences(&case.memory)
         .expect("plans are only evaluated for a valid canonical event index");
     let (removed_roots, removed_families, _) =
         original_index.counts_for_ids(&plan.removed_ids);
@@ -835,7 +837,7 @@ fn run() -> Result<(), String> {
     }));
 
     for case in &cases {
-        let index = match EvidenceDependencyIndex::from_experiences(&case.memory) {
+        let index = match MaceAuditDependencyIndex::from_experiences(&case.memory) {
             Ok(index) => index,
             Err(reason) => {
                 rejected_blocks += 1;
@@ -987,7 +989,7 @@ mod tests {
         child.derived_from.push(1);
         let mut grandchild = node(3, 3, root(3), Action::A);
         grandchild.derived_from.push(2);
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 1, root(1), Action::A),
             child,
             grandchild,
@@ -1001,7 +1003,7 @@ mod tests {
     #[test]
     fn root_closure_unifies_different_family_aliases() {
         let shared = root(9);
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 11, shared, Action::A),
             node(2, 12, shared, Action::A),
             node(3, 13, root(10), Action::B),
@@ -1018,7 +1020,7 @@ mod tests {
     fn family_closure_removes_all_family_members_and_descendants() {
         let mut dependent = node(3, 30, root(3), Action::B);
         dependent.derived_from.push(1);
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 7, root(1), Action::A),
             node(2, 7, root(2), Action::A),
             dependent,
@@ -1037,7 +1039,7 @@ mod tests {
         corrected.supersedes.push(1);
         let mut derived = node(3, 3, root(3), Action::A);
         derived.derived_from.push(2);
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 1, root(1), Action::A),
             corrected,
             derived,
@@ -1059,7 +1061,7 @@ mod tests {
     fn event_knockout_preserves_superseding_replacement() {
         let mut replacement = node(2, 2, root(2), Action::A);
         replacement.supersedes.push(1);
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 1, root(1), Action::A),
             replacement,
         ])
@@ -1075,7 +1077,7 @@ mod tests {
     fn coalition_closure_unions_root_groups_and_dependents() {
         let mut child = node(3, 3, root(3), Action::B);
         child.derived_from.push(1);
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 1, root(1), Action::A),
             node(2, 2, root(2), Action::B),
             child,
@@ -1090,7 +1092,7 @@ mod tests {
 
     #[test]
     fn unknown_root_cannot_be_used_as_an_independence_group() {
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 1, [0; 32], Action::A),
             node(2, 2, root(2), Action::B),
         ])
@@ -1104,7 +1106,7 @@ mod tests {
     fn experience_projection_does_not_invent_dependency_lineage() {
         let cases = stress::generated_worlds(1);
         let case = cases.iter().find(|case| !case.memory.is_empty()).unwrap();
-        let index = EvidenceDependencyIndex::from_experiences(&case.memory).unwrap();
+        let index = MaceAuditDependencyIndex::from_experiences(&case.memory).unwrap();
         assert_eq!(index.dependency_link_count(), 0);
         assert_eq!(index.event_closure(case.memory[0].event_id).unwrap(),
                    BTreeSet::from([case.memory[0].event_id]));
@@ -1116,7 +1118,7 @@ mod tests {
             node(1, 1, root(1), Action::A),
             node(1, 2, root(2), Action::A),
         ];
-        assert!(EvidenceDependencyIndex::new(duplicate)
+        assert!(MaceAuditDependencyIndex::new(duplicate)
             .unwrap_err()
             .contains("duplicate"));
     }
@@ -1125,7 +1127,7 @@ mod tests {
     fn missing_predecessor_is_rejected() {
         let mut child = node(2, 2, root(2), Action::A);
         child.derived_from.push(99);
-        assert!(EvidenceDependencyIndex::new(vec![child])
+        assert!(MaceAuditDependencyIndex::new(vec![child])
             .unwrap_err()
             .contains("missing predecessor"));
     }
@@ -1136,14 +1138,14 @@ mod tests {
         first.derived_from.push(2);
         let mut second = node(2, 2, root(2), Action::B);
         second.derived_from.push(1);
-        assert!(EvidenceDependencyIndex::new(vec![first, second])
+        assert!(MaceAuditDependencyIndex::new(vec![first, second])
             .unwrap_err()
             .contains("cycle"));
     }
 
     #[test]
     fn matched_random_control_preserves_action_and_byte_histogram() {
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 1, root(1), Action::A),
             node(2, 2, root(2), Action::A),
             node(3, 3, root(3), Action::A),
@@ -1179,7 +1181,7 @@ mod tests {
 
     #[test]
     fn matched_random_control_fails_closed_when_no_equivalent_records_exist() {
-        let index = EvidenceDependencyIndex::new(vec![
+        let index = MaceAuditDependencyIndex::new(vec![
             node(1, 1, root(1), Action::A),
             node(2, 2, root(2), Action::B),
         ])
@@ -1227,10 +1229,10 @@ mod tests {
         let case = cases
             .iter()
             .find(|case| {
-                EvidenceDependencyIndex::from_experiences(&case.memory).is_ok()
+                MaceAuditDependencyIndex::from_experiences(&case.memory).is_ok()
             })
             .unwrap();
-        let index = EvidenceDependencyIndex::from_experiences(&case.memory).unwrap();
+        let index = MaceAuditDependencyIndex::from_experiences(&case.memory).unwrap();
         let plan = build_plans(&index, 7).unwrap().remove(0);
         let decision = decide(Policy::CausalQualified, &case.memory, case.query);
         let regret = (case.truth.optimal_utility() - action_utility(case.truth, decision.action))
