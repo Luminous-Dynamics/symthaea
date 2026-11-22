@@ -245,7 +245,19 @@ It can measure finite treatment effects and decision-regret contrasts under the 
 Confirmatory evaluation must reuse the isolated evaluator and source-bound receipt requirements in #9437, the decision/observation evaluators in #13152/#13202/#12567, and the existing joint resource/interaction owners #9666/#9882/#13176.
 
 
-## 14. November 2026 research update: DEEP v2 and long-horizon embodied evaluation
+## 14. Executable paired decision-regret reference
+
+The narrow signed paired 2×2 decision-regret contrast is implemented in the standalone crate:
+
+research/decision-value-interaction-001/
+
+Tracking issue: #13279. The crate requires exactly one baseline, compute-only, observation-only and joint result for the same frozen episode/hidden-world/action-loss scope. It binds the common task/loss, evaluator, model/configuration, policy and seed identities; preserves the distinct actual application timestamps; rejects missing/duplicate arms, identity mismatches, empty digests and out-of-range regret; and retains negative marginal benefits and negative interactions.
+
+Eleven Rust unit tests are authored for positive complementarity (+230,000 PPM), zero/additive interaction, negative antagonism (−170,000 PPM), harmful compute escalation, row-order independence, distinct application times, missing/duplicate arms and identity/range failures.
+
+This reference does not replace #13176. #13176 remains responsible for exposure and resource factorial attribution; the new crate supplies only the paired decision-regret contrast, which is not in the current #13176 outcome schema. Rust execution and CI qualification remain pending.
+
+## 15. November 2026 research update: DEEP v2 and long-horizon embodied evaluation
 
 The latest DEEP revision is v2, last revised November 16, 2026. Its central contribution is already decision-aligned perception-compute allocation: the value of escalating from cheap to expensive perception is the signed change in downstream loss, and the allocator is charged for its own computation against a budget-constrained decision oracle. The reported KITTI, nuScenes and open-loop nuPlan results include harmful escalation and cases where improved perception disagrees in sign with downstream decision value. We must treat signed decision value, negative escalation value, allocator-cost accounting and budgeted-oracle comparison as established prior art, not as Symthaea inventions.
 
@@ -265,7 +277,7 @@ The open-access survey **Long-horizon embodied manipulation: a survey of methods
 4. Add memory and verification as further factors only through #9666/#9882/#13176 after the four-arm compute × observation comparison is stable.
 5. Evaluate partial completion, failure propagation and recovery cost under the long-horizon survey's recommendations; do not collapse those into a weighted aggregate.
 
-## 15. Industry comparison and claim discipline
+## 16. Industry comparison and claim discipline
 
 MLPerf Inference v6.1 (September 16, 2026) adds Edge Agentic Inference and end-to-end RAG alongside established datacenter/edge system workloads. Its official results evaluate declared workloads, quality targets and latency/throughput scenarios. Symthaea should reproduce any compatible official test exactly, then publish decision regret, observation interactions and temporal freshness as separate extension metrics. Do not compare an HDC/LTC task result to an MLPerf token/query throughput figure as if they measured the same capability.
 
