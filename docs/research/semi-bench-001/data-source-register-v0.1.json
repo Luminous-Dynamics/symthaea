@@ -697,8 +697,8 @@
       "auroc_implementation": "O(n log n) descending tie-group rank accumulation; exact half-credit for ties",
       "large_tied_case_rows": 40000,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
-      "tested_commit": "6d0e67c991525b8d4308cde03f99f5e4d97ec6d6",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
+      "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
       "claim_ceiling": "frozen metric contract parity and evaluator implementation only; no predictive or manufacturing claim",
       "total_rust_unit_tests": 35
     },
@@ -753,8 +753,10 @@
         "physical-measurement-instrument-calibration-uncertainty"
       ],
       "fixture_unique_artifacts": 7,
+      "cli_report_byte_for_byte": true,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
+      "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
       "total_rust_unit_tests": 35,
       "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy"
     }
