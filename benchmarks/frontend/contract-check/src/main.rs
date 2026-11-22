@@ -1765,6 +1765,41 @@ mod tests {
     }
 
     #[test]
+    fn qualification_report_schema_is_valid_and_has_paired_case_contract() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../qualification/qualification-report-v1.schema.json"
+        ))
+        .expect("qualification report schema must be valid JSON");
+        validator_for(&schema).expect("qualification report schema must compile");
+
+        let case = &schema["$defs"]["case"];
+        assert!(case["required"].as_array().unwrap().iter().any(|value| value == "baseline"));
+        assert!(case["required"].as_array().unwrap().iter().any(|value| value == "candidate"));
+        assert_eq!(schema["properties"]["case_results"]["minItems"], 30);
+    }
+
+    #[test]
+    fn qualification_report_rejects_campaign_hash_mismatch_before_artifact_access() {
+        let campaign: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.json"
+        ))
+        .expect("campaign must be valid JSON");
+        let report = serde_json::json!({
+            "campaign_id": campaign["campaign_id"],
+            "campaign_sha256": "0".repeat(64)
+        });
+
+        let error = validate_qualification_report(
+            &campaign,
+            &report,
+            &"1".repeat(64),
+            Path::new("report.json"),
+        )
+        .expect_err("report with wrong campaign digest must fail closed");
+        assert!(error.contains("exact campaign file SHA-256"));
+    }
+
+    #[test]
     fn wilson_interval_is_bounded_and_nonzero_for_small_perfect_samples() {
         let interval = wilson_interval(5, 5);
         assert!(interval["lower_95"].as_f64().unwrap() > 0.0);
