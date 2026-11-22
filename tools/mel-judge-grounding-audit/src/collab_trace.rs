@@ -759,7 +759,7 @@ mod tests {
         let mut value = trace();
         value["events"].as_array_mut().unwrap().remove(2);
         value["events"][2]["sequence"] = serde_json::json!(3);
-        value["events"][2]["monotonic_ns"] = serde_json::json!(220);
+        value["events"][3]["sequence"] = serde_json::json!(4);
         let report = audit(&value).expect("missing output is an evaluation failure");
         assert_eq!(report.response_decisions_without_output, 1);
         assert!(!report.qualified_for_declared_trace_contract);
