@@ -17,6 +17,7 @@ use std::time::Instant;
 use broca_mace_hdc_retrieval::{
     experience_view_digest,
     typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
+    CandidateIndex, IndexConfig, RepresentationProfile,
 };
 use broca_mace_policy::{
     decide, Action, Decision, DecisionNeedV1, Experience, Objective, Policy, Query, Regime, Scope, SourceRootDigest,
@@ -32,6 +33,10 @@ const ABSTENTION_UTILITY: f64 = 0.0;
 const TYPED_HDC_DIMENSION: usize = 2_048;
 const TYPED_HDC_SEED: u64 = 0x4D41_4345_4844_4301;
 const TYPED_HDC_TOP_K: usize = 2;
+const EVENT_ID_HDC_DIMENSION: usize = 2_048;
+const EVENT_ID_HDC_SEED: u64 = 0x4D41_4345_4844_4301;
+const EVENT_ID_LTC_SEED: u64 = 0x4D41_4345_4C54_4301;
+const BASELINE_TOP_K: usize = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -508,19 +513,31 @@ fn candidate_input_digest(
     hex_digest(Sha256::digest(payload.as_bytes()).as_slice())
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum CandidateMode {
     ExactScopeScan,
+    EventIdKeyValueTopK,
+    StaticHdc,
+    HdcLtcZeroInput,
     TypedContentHdc,
 }
 
 impl CandidateMode {
-    const ALL: [Self; 2] = [Self::ExactScopeScan, Self::TypedContentHdc];
+    const ALL: [Self; 5] = [
+        Self::ExactScopeScan,
+        Self::EventIdKeyValueTopK,
+        Self::StaticHdc,
+        Self::HdcLtcZeroInput,
+        Self::TypedContentHdc,
+    ];
 
     fn name(self) -> &'static str {
         match self {
             Self::ExactScopeScan => "exact_scope_scan",
+            Self::EventIdKeyValueTopK => "event_id_key_value_topk",
+            Self::StaticHdc => "static_hdc",
+            Self::HdcLtcZeroInput => "hdc_ltc_zero_input",
             Self::TypedContentHdc => "typed_content_hdc",
         }
     }
@@ -572,6 +589,79 @@ fn run_candidate(
                     .collect();
                 let ids = eligible.iter().map(|item| item.event_id).collect();
                 (eligible, ids, None, 0)
+            }
+            CandidateMode::EventIdKeyValueTopK => {
+                let mut resolved = Vec::new();
+                let mut ids = Vec::new();
+                for action in decision_need.action_alternatives {
+                    let mut candidates: Vec<&Experience> = evidence_index
+                        .records
+                        .values()
+                        .filter(|item| item.scope == query.scope && item.action == action)
+                        .collect();
+                    candidates.sort_by_key(|item| item.event_id);
+                    for item in candidates.into_iter().take(BASELINE_TOP_K) {
+                        ids.push(item.event_id);
+                        resolved.push(*item);
+                    }
+                }
+                let bytes = memory.len().saturating_mul(size_of::<u32>()) as u64;
+                (resolved, ids, None, bytes)
+            }
+            CandidateMode::StaticHdc | CandidateMode::HdcLtcZeroInput => {
+                if memory.is_empty() {
+                    (Vec::new(), Vec::new(), None, 0)
+                } else {
+                    let profile = match mode {
+                        CandidateMode::StaticHdc => RepresentationProfile::StaticContinuousHv,
+                        CandidateMode::HdcLtcZeroInput => RepresentationProfile::HdcLtcZeroInput {
+                            elapsed_seconds: 0.25,
+                            tau_base_seconds: 10.0,
+                            tau_min_seconds: 0.01,
+                            tau_max_seconds: 20.0,
+                            neuron_seed: EVENT_ID_LTC_SEED,
+                        },
+                        _ => unreachable!("matched HDC modes only"),
+                    };
+                    let index = CandidateIndex::build(
+                        memory,
+                        IndexConfig {
+                            dimension: EVENT_ID_HDC_DIMENSION,
+                            codebook_seed: EVENT_ID_HDC_SEED,
+                            profile,
+                        },
+                    )
+                    .map_err(|error| IndexError::TypedIndexFailure(error.to_string()))?;
+
+                    let mut hits = Vec::new();
+                    let mut profile_sha256 = None;
+                    for action in decision_need.action_alternatives {
+                        let retrieval = index.retrieve(query.scope, action, BASELINE_TOP_K);
+                        profile_sha256 = Some(retrieval.profile_digest.clone());
+                        for hit in retrieval.candidates {
+                            hits.push((hit.event_id, hit.view_digest, hit.rank));
+                        }
+                    }
+                    hits.sort_by(|left, right| {
+                        left.2.cmp(&right.2).then_with(|| left.0.cmp(&right.0))
+                    });
+                    let mut resolved = Vec::new();
+                    let mut ids = Vec::new();
+                    let mut seen = BTreeSet::new();
+                    for (event_id, indexed_digest, _) in hits {
+                        if !seen.insert(event_id) {
+                            continue;
+                        }
+                        let item = evidence_index.records.get(&event_id).copied()
+                            .ok_or(IndexError::UnresolvedCandidateId(event_id))?;
+                        if experience_view_digest(&item) != indexed_digest || item.event_id != event_id {
+                            return Err(IndexError::CanonicalViewMismatch(event_id));
+                        }
+                        ids.push(event_id);
+                        resolved.push(item);
+                    }
+                    (resolved, ids, profile_sha256, index.index_payload_bytes())
+                }
             }
             CandidateMode::TypedContentHdc => {
                 if memory.is_empty() {
