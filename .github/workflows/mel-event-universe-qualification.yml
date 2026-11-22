@@ -1,0 +1,90 @@
+name: MEL full event-universe qualification
+
+on:
+  pull_request:
+    branches:
+      - research/mel-predictive-transparency-audit-v1-20261123
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_EVENT_UNIVERSE_SCORER_V1_2026-11-23.md"
+      - ".github/workflows/mel-event-universe-qualification.yml"
+  push:
+    branches:
+      - research/mel-event-universe-score-v1-20261123
+    paths:
+      - "tools/mel-judge-grounding-audit/**"
+      - "docs/research/MEL_EVENT_UNIVERSE_SCORER_V1_2026-11-23.md"
+      - ".github/workflows/mel-event-universe-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  event-universe:
+    name: Full-universe musical event calibration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Verify committed dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch tools/mel-judge-grounding-audit/Cargo.lock > /dev/null
+          test -f tools/mel-judge-grounding-audit/Cargo.lock
+      - name: Run deterministic Rust tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schema and replay synthetic full universe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-judge-grounding-audit/schema/mel-event-universe-panel-v1.schema.json > /dev/null
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml \
+            --bin mel-event-universe-audit -- score \
+            tools/mel-judge-grounding-audit/fixtures/valid-event-universe-v1.json \
+            "$RUNNER_TEMP/mel-event-universe-report.json"
+          jq -e '.opportunity_slot_count == 6 and .scored_slot_count == 5 and .ambiguous_slot_count == 1 and .omitted_slot_count == 2 and .omitted_positive_count == 1 and .true_positive_count == 2 and .false_positive_count == 1 and .false_negative_count == 1 and .true_negative_count == 1 and .structurally_valid_panel == true' \
+            "$RUNNER_TEMP/mel-event-universe-report.json" > /dev/null
+      - name: Assemble exact-head reproducibility evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-event-universe-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/event_universe.rs > "$evidence/event-universe-lib-blob.txt"
+          git rev-parse HEAD:tools/mel-judge-grounding-audit/src/bin/mel-event-universe-audit.rs > "$evidence/event-universe-cli-blob.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-judge-grounding-audit/Cargo.toml "$evidence/"
+          cp tools/mel-judge-grounding-audit/Cargo.lock "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/event_universe.rs "$evidence/"
+          cp tools/mel-judge-grounding-audit/src/bin/mel-event-universe-audit.rs "$evidence/"
+          cp tools/mel-judge-grounding-audit/schema/mel-event-universe-panel-v1.schema.json "$evidence/"
+          cp tools/mel-judge-grounding-audit/fixtures/valid-event-universe-v1.json "$evidence/"
+          cp docs/research/MEL_EVENT_UNIVERSE_SCORER_V1_2026-11-23.md "$evidence/"
+          if [[ -f "$RUNNER_TEMP/mel-event-universe-report.json" ]]; then
+            cp "$RUNNER_TEMP/mel-event-universe-report.json" "$evidence/"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-event-universe-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-event-universe-evidence/
+          if-no-files-found: error
+          retention-days: 90
