@@ -148,7 +148,7 @@ The current generator adds an independent AR(1) common-mode factor to one observ
 
 ## Preprocessing projection composition reference
 
-The `operator_composition` module is a small mathematical reference for finite-dimensional temporal projection operators. It compares nuisance-then-filter, filter-then-nuisance, and one-shot joint projection, then measures the energy that remains in each declared design subspace after the complete sequence.
+The `operator_composition` module is a small mathematical reference for finite-dimensional temporal projection operators. It compares nuisance-then-filter, filter-then-nuisance, and one-shot joint projection, then measures the energy that remains in each declared design subspace after the complete sequence. It also reports the normalized Frobenius norm of the operator commutator, `||P_N P_H - P_H P_N||_F / sqrt(T)`, which quantifies structural order-sensitivity independently of the particular observation matrix.
 
 Run its synthetic projection fixture:
 
