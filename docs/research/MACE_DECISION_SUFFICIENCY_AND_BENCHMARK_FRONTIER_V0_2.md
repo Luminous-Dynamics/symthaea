@@ -110,7 +110,7 @@ A SemanticExperienceQueryV1 uses the same vocabulary and can include optional nu
 
 **Important scope boundary:** this is structured content retrieval over a typed evidence object. It is not natural-language understanding, and it does not prove that a vector has learned causal semantics. Event IDs, source-family/root identity, signatures, tenant/authority information and canonical receipt bytes remain exact sidecar data; none is approximated by a vector.
 
-The current MACE policy Query exposes only regime/objective. The paired runner now includes typed-content HDC as a seventh arm using this candidate-visible scope/action plus the policy's categorical qualification profile (RCT method and explicit evidence-quality flags). Numeric overlap/balance limits remain exact post-retrieval MACE gates, not RBF point targets. A richer task-defined outcome/horizon/estimand profile still needs the candidate-visible DecisionNeed in #13222. Never populate target utility, causal estimand, hidden state or other query fields from evaluator truth.
+The paired runner now includes typed-content HDC as a seventh arm and consumes a candidate-visible DecisionNeedV1 from the generated task contract. It binds scope/action alternatives, outcome/unit/horizon and population/treatment estimand digests, identification method and the MACE qualification-profile digest. The candidate projection still excludes Truth/OracleTruth, and a negative control mutates hidden utilities while requiring the candidate-input/DecisionNeed digests to remain unchanged. Numeric overlap/balance limits remain exact post-retrieval MACE gates, not RBF point targets. The current fixed DecisionNeed is generated independently of scenario utility; broader environment/task contracts remain tracked in #13222.
 
 ### 5.1 Required metamorphic qualification
 
@@ -225,7 +225,7 @@ This is falsifiable. If typed HDC cannot beat a simple structured KV/BM25/dense/
 ## 9. Immediate implementation sequence
 
 1. Compile and test TypedContentIndexV1 and the seven-arm paired runner in the Rust workspace; run formatting and record exact-head receipts.
-2. Validate ID-permutation, content-swap, query-swap, numeric-locality, profile-digest and decision-trace schema controls.
+2. Validate ID-permutation, content-swap, query-swap, numeric-locality, DecisionNeed outcome-leakage controls, profile-digest and decision-trace schema controls.
 3. Add the richer candidate-visible DecisionNeed from an actual environment/task observation; do not derive it from evaluator labels.
 4. Add an embedding/token/byte-matched relevance-negative placebo and competitive KV, BM25, dense and hybrid arms.
 5. Add source correction between retrieval and consumption; query current canonical lifecycle on use.
