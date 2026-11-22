@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_evidence_dependency_sidecar_v1.schema.json",
+  "title": "MACE Receipt-Backed Evidence Dependency Sidecar v1",
+  "description": "Bitemporal, deterministic projection of ingress-verified receipt lineage. Unknown dependency ancestry is explicit and is never equivalent to independence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "valid_at_ms", "known_at_ms", "records", "canonical_sha256"],
+  "properties": {
+    "schema_version": {"const": "mace_evidence_dependency_sidecar_v1"},
+    "valid_at_ms": {"type": "integer"},
+    "known_at_ms": {"type": "integer"},
+    "records": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/record"}
+    },
+    "canonical_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "event_id": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id", "action", "scope", "source_family", "source_root_digest",
+        "upstream_source_id", "source_artifact_digest", "transformation_digest",
+        "lineage_receipt_digest", "raw_event_receipt_digest",
+        "dependency_manifest_digest", "dependency_lineage_status",
+        "derived_from_event_ids", "lifecycle_status_as_known"
+      ],
+      "properties": {
+        "event_id": {"$ref": "#/$defs/event_id"},
+        "action": {"enum": ["A", "B"]},
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["regime", "objective"],
+          "properties": {
+            "regime": {"enum": ["baseline", "shifted"]},
+            "objective": {"enum": ["quality", "cost", "speed"]}
+          }
+        },
+        "source_family": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "source_root_digest": {"$ref": "#/$defs/sha256"},
+        "upstream_source_id": {"type": "string", "minLength": 1},
+        "source_artifact_digest": {"$ref": "#/$defs/sha256"},
+        "transformation_digest": {"$ref": "#/$defs/sha256"},
+        "lineage_receipt_digest": {"$ref": "#/$defs/sha256"},
+        "raw_event_receipt_digest": {"$ref": "#/$defs/sha256"},
+        "dependency_manifest_digest": {
+          "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+        },
+        "dependency_lineage_status": {"enum": ["complete", "partial", "unknown"]},
+        "derived_from_event_ids": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/event_id"},
+          "uniqueItems": true
+        },
+        "lifecycle_status_as_known": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status"],
+              "properties": {"status": {"const": "active"}}
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status"],
+              "properties": {"status": {"const": "retracted"}}
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "successor_event_id"],
+              "properties": {
+                "status": {"const": "superseded"},
+                "successor_event_id": {"$ref": "#/$defs/event_id"}
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"dependency_lineage_status": {"enum": ["complete", "partial"]}}},
+          "then": {"properties": {"dependency_manifest_digest": {"$ref": "#/$defs/sha256"}}}
+        },
+        {
+          "if": {"properties": {"dependency_lineage_status": {"const": "unknown"}}},
+          "then": {
+            "properties": {
+              "dependency_manifest_digest": {"type": "null"},
+              "derived_from_event_ids": {"maxItems": 0}
+            }
+          }
+        }
+      ]
+    }
+  }
+}
