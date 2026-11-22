@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod conformal_abstention;
 pub mod dtco_manifest;
+pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod online_conformal;
 pub mod pair_manifest;
@@ -75,11 +76,18 @@ pub use dtco_manifest::{
     DtcoLineageError, DtcoLineageManifestV1, DtcoLineageReportV1, validate_dtco_lineage_v1,
 };
 
+pub use metrology_semantics::{
+    BinaryMeasurandSemanticsV1, MetrologySemanticsError, PositiveConditionV1,
+    ValidatedMetrologyClassificationV1, classify_validated_metrology_label_v1,
+    seal_binary_measurand_semantics_v1, validate_binary_measurand_semantics_v1,
+};
+
 pub use online_conformal::{
     OnlineConformalConfigV1, OnlineConformalError, OnlineConformalStateV1,
-    OnlineCoverageStateV1, OnlineFeedbackReceiptV1, OnlineMaturedFeedbackV1,
-    OnlinePredictionInputV1, OnlinePredictionReceiptV1, ingest_online_metrology_feedback_v1,
-    initialize_online_conformal_v1, predict_online_conformal_v1,
+    OnlineCoverageDiagnosticV1, OnlineCoverageStateV1, OnlineFeedbackReceiptV1,
+    OnlineMaturedFeedbackV1, OnlinePredictionInputV1, OnlinePredictionReceiptV1,
+    ingest_online_metrology_feedback_v1, initialize_online_conformal_v1,
+    predict_online_conformal_v1,
 };
 
 pub use mf_acquisition::{
