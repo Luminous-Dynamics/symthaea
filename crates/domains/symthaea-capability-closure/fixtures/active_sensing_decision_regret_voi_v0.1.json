@@ -61,6 +61,12 @@
         "outcome_possible_world_counts": [
           1,
           1
+        ],
+        "baseline_information_set_sufficient": false,
+        "post_observation_information_set_sufficient": true,
+        "outcome_information_set_sufficient": [
+          true,
+          true
         ]
       }
     },
@@ -96,6 +102,12 @@
         "outcome_possible_world_counts": [
           2,
           2
+        ],
+        "baseline_information_set_sufficient": false,
+        "post_observation_information_set_sufficient": false,
+        "outcome_information_set_sufficient": [
+          false,
+          false
         ]
       }
     },
@@ -131,6 +143,12 @@
         "outcome_possible_world_counts": [
           1,
           1
+        ],
+        "baseline_information_set_sufficient": true,
+        "post_observation_information_set_sufficient": true,
+        "outcome_information_set_sufficient": [
+          true,
+          true
         ]
       }
     },
@@ -156,16 +174,62 @@
         "guaranteed_regret_reduction_ppm": 0,
         "outcome_possible_world_counts": [
           2
+        ],
+        "baseline_information_set_sufficient": false,
+        "post_observation_information_set_sufficient": false,
+        "outcome_information_set_sufficient": [
+          false
+        ]
+      }
+    },
+    {
+      "id": "epsilon_nonzero_information_set",
+      "description": "A common action is not exactly optimal in all worlds but its worst-case regret is within a preregistered 100,000 PPM tolerance.",
+      "decision_regret_tolerance_ppm": 100000,
+      "action_losses_by_world": {
+        "1": {
+          "left": 0,
+          "right": 100000
+        },
+        "2": {
+          "left": 100000,
+          "right": 0
+        }
+      },
+      "possible_outcomes": [
+        {
+          "world_id": 1,
+          "candidate_visible_outcome_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+          "available_at_us": 50
+        },
+        {
+          "world_id": 2,
+          "candidate_visible_outcome_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+          "available_at_us": 50
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret_ppm": 100000,
+        "post_observation_worst_case_regret_ppm": 100000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "baseline_information_set_sufficient": true,
+        "post_observation_information_set_sufficient": true,
+        "outcome_possible_world_counts": [
+          2
+        ],
+        "outcome_information_set_sufficient": [
+          true
         ]
       }
     }
   ],
-  "authored_rust_tests": 11,
+  "authored_rust_tests": 13,
   "executed_rust_tests": 0,
   "candidate_hidden_world_exposure": false,
   "candidate_payload_contains_support_manifest": false,
   "deterministic_robust_policy_contract": true,
   "mixed_strategy_robust_contract": "delegated_to_pr_13165",
   "expected_value_contract": "delegated_to_issues_12567_and_pr_12551",
-  "no_energy_or_sota_claim": true
+  "no_energy_or_sota_claim": true,
+  "decision_regret_tolerance_ppm": 0
 }
