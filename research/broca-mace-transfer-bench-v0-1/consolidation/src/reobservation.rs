@@ -1294,7 +1294,7 @@ mod tests {
         let plans = enumerate_memory_representation_options(
             &forecast,
             &profile,
-            policy,
+            policy.clone(),
         )
         .unwrap();
         assert_eq!(plans.len(), 2);
@@ -1306,7 +1306,7 @@ mod tests {
                     plan,
                     &forecast,
                     &profile,
-                    policy,
+                    &policy,
                 )
                 .expect("only independently re-derived options may enter the portfolio")
             })
@@ -1375,7 +1375,7 @@ mod tests {
                 &forged,
                 &forecast,
                 &profile,
-                policy,
+                &policy,
             ),
             Err(crate::portfolio::PortfolioReject::PlanNotAdmissible)
         );

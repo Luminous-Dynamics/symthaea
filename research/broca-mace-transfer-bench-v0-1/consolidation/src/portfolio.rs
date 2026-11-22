@@ -104,12 +104,12 @@ impl MemoryPortfolioOptionV1 {
         plan: &ReobservationPlanV1,
         prediction: &VerifiedFutureUsePredictionV1,
         profile: &VerifiedReobservationProfileV1,
-        policy: crate::reobservation::ReobservationPolicyV1,
+        policy: &crate::reobservation::ReobservationPolicyV1,
     ) -> Result<Self, PortfolioReject> {
         let admissible = crate::reobservation::enumerate_memory_representation_options(
             prediction,
             profile,
-            policy,
+            policy.clone(),
         )
         .map_err(|_| PortfolioReject::ReobservationProfileRejected)?;
         if !admissible
