@@ -131,7 +131,8 @@ pub use mycelial_reconstruction_metrics::{
 pub use mycelial_reference_networks::{
     MAX_REFERENCE_NETWORK_JUNCTIONS, MycelialEuclideanMstEdge, MycelialEuclideanMstReport,
     MycelialMinimumSpanningForestReport, MycelialReferenceNetworkError,
-    SpatialReferenceDimensionality, SpatialReferenceEfficiencyReport,
+    MYCELIAL_EUCLIDEAN_MST_SCHEMA_VERSION, SpatialReferenceDimensionality,
+    SpatialReferenceEfficiencyReport,
     build_euclidean_minimum_spanning_tree, build_observed_network_minimum_spanning_forest,
 };
 pub use mycelial_temporal_cycles::{
