@@ -62,6 +62,8 @@ pub struct TemporalMycelialSnapshot {
     /// Half-open observation interval [start_ns, end_ns).
     pub window_start_ns: u64,
     pub window_end_ns: u64,
+    /// Stable ROI/mask/scope identity; must not silently change across windows.
+    pub observation_scope_id: String,
     pub source_observation_digest: String,
     pub coverage: TemporalWindowCoverage,
     /// Sorted, unique persistent node identities visible in this window.
@@ -82,6 +84,7 @@ impl TemporalMycelialSnapshot {
         hash_string(&mut hasher, &self.snapshot_id);
         hasher.update(&self.window_start_ns.to_le_bytes());
         hasher.update(&self.window_end_ns.to_le_bytes());
+        hash_string(&mut hasher, &self.observation_scope_id);
         hasher.update(self.source_observation_digest.as_bytes());
         hasher.update(&[match self.coverage {
             TemporalWindowCoverage::CompleteWithinDeclaredScope => 0,
@@ -216,6 +219,7 @@ pub struct TemporalMycelialCycleProfile {
     pub session_id: String,
     pub coordinate_frame_id: String,
     pub calibration_digest: String,
+    pub observation_scope_id: String,
     pub sequence_digest: String,
     pub config: TemporalMycelialCycleConfig,
     /// Complete sorted node identity inventory over every snapshot.
@@ -242,6 +246,7 @@ pub enum MycelialTemporalCycleError {
     InvalidSnapshot { snapshot_id: String, reason: &'static str },
     DuplicateSnapshotId(String),
     OverlappingWindows { previous: String, current: String },
+    ObservationScopeMismatch { previous: String, current: String },
     UnstableNodeIdentity(String),
     UnstableEdgeIdentity(String),
     InvalidProfile(&'static str),
@@ -276,6 +281,9 @@ impl fmt::Display for MycelialTemporalCycleError {
             Self::OverlappingWindows { previous, current } => {
                 write!(f, "snapshot windows {previous} and {current} overlap or are unordered")
             }
+            Self::ObservationScopeMismatch { previous, current } => {
+                write!(f, "observation scope changed across temporal sequence: {previous} vs {current}")
+            }
             Self::UnstableNodeIdentity(id) => {
                 write!(f, "node ID {id} is reused with conflicting identity evidence")
             }
@@ -297,6 +305,7 @@ fn validate_snapshot(
         reason,
     };
     if !valid_id(&snapshot.snapshot_id)
+        || !valid_id(&snapshot.observation_scope_id)
         || !valid_digest(&snapshot.source_observation_digest)
         || snapshot.window_end_ns <= snapshot.window_start_ns
     {
@@ -344,6 +353,7 @@ impl TemporalMycelialSequence {
         if !valid_id(&self.session_id)
             || !valid_id(&self.coordinate_frame_id)
             || !valid_digest(&self.calibration_digest)
+            || !valid_id(&self.observation_scope_id)
         {
             return Err(MycelialTemporalCycleError::InvalidSequenceMetadata);
         }
@@ -358,8 +368,18 @@ impl TemporalMycelialSequence {
             BTreeMap::<&str, (String, String, TemporalEdgeEvidence)>::new();
         let mut previous_end = None;
         let mut previous_snapshot = String::new();
+        let mut observation_scope_id: Option<&str> = None;
         for snapshot in &self.snapshots {
             validate_snapshot(snapshot)?;
+            if observation_scope_id
+                .is_some_and(|previous| previous != snapshot.observation_scope_id)
+            {
+                return Err(MycelialTemporalCycleError::ObservationScopeMismatch {
+                    previous: observation_scope_id.unwrap_or_default().to_string(),
+                    current: snapshot.observation_scope_id.clone(),
+                });
+            }
+            observation_scope_id = Some(&snapshot.observation_scope_id);
             if !snapshot_ids.insert(snapshot.snapshot_id.as_str()) {
                 return Err(MycelialTemporalCycleError::DuplicateSnapshotId(
                     snapshot.snapshot_id.clone(),
@@ -742,6 +762,7 @@ pub fn build_temporal_mycelial_cycle_profile(
         session_id: sequence.session_id.clone(),
         coordinate_frame_id: sequence.coordinate_frame_id.clone(),
         calibration_digest: sequence.calibration_digest.clone(),
+        observation_scope_id: sequence.snapshots[0].observation_scope_id.clone(),
         sequence_digest,
         config,
         source_node_ids,
@@ -1035,6 +1056,7 @@ impl TemporalMycelialCycleProfile {
         hash_string(&mut hasher, &self.session_id);
         hash_string(&mut hasher, &self.coordinate_frame_id);
         hasher.update(self.calibration_digest.as_bytes());
+        hash_string(&mut hasher, &self.observation_scope_id);
         hasher.update(self.sequence_digest.as_bytes());
         hasher.update(&self.config.minimum_present_windows.to_le_bytes());
         hasher.update(&self.config.minimum_present_duration_ns.to_le_bytes());
@@ -1187,6 +1209,7 @@ mod tests {
             snapshot_id: id.to_string(),
             window_start_ns: start,
             window_end_ns: end,
+            observation_scope_id: "scope:whole-domain-v1".to_string(),
             source_observation_digest: digest('a'),
             coverage,
             node_ids: vec!["A".to_string(), "B".to_string(), "C".to_string()],
@@ -1437,6 +1460,30 @@ mod tests {
         assert!(matches!(
             overlapping.validate(),
             Err(MycelialTemporalCycleError::OverlappingWindows { .. })
+        ));
+    }
+
+    #[test]
+    fn observation_scope_changes_fail_closed() {
+        let first = snapshot(
+            "w1",
+            0,
+            10,
+            TemporalWindowCoverage::CompleteWithinDeclaredScope,
+            Vec::new(),
+        );
+        let mut second = snapshot(
+            "w2",
+            10,
+            20,
+            TemporalWindowCoverage::CompleteWithinDeclaredScope,
+            Vec::new(),
+        );
+        second.observation_scope_id = "scope:shifted-roi".to_string();
+        let input = sequence(vec![first, second]);
+        assert!(matches!(
+            input.validate(),
+            Err(MycelialTemporalCycleError::ObservationScopeMismatch { .. })
         ));
     }
 
