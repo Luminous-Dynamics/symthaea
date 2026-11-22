@@ -1027,6 +1027,15 @@ fn run() -> Result<(), String> {
             Arm::TypedContentHdc,
             &scores,
         ),
+        // Evidence-complete decision reference: exact-scope candidate-visible
+        // records versus the compressed top-k typed representation. This is a
+        // decision-sufficiency gap, not an equal-cost practical baseline.
+        contrast_record(
+            "typed_content_hdc_vs_exact_scope_scan",
+            Arm::ExactScopeScan,
+            Arm::TypedContentHdc,
+            &scores,
+        ),
     ];
     let summary = json!({
         "schema_version": SCHEMA_VERSION,
