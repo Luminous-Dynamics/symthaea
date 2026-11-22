@@ -473,6 +473,44 @@ struct CalibrationSample {
     confidence: f64,
 }
 
+fn samples_from_observations(
+    observations: &[JunctionCalibrationObservation],
+    probability_sum_tolerance: f64,
+) -> Result<Vec<CalibrationSample>, MycelialReconstructionCalibrationError> {
+    if observations.windows(2).any(|pair| {
+        pair[0].predicted_junction_id >= pair[1].predicted_junction_id
+    }) {
+        return Err(MycelialReconstructionCalibrationError::InvalidReport(
+            "calibration observations are not uniquely sorted by prediction ID",
+        ));
+    }
+    let mut samples = Vec::with_capacity(observations.len());
+    for observation in observations {
+        let sum = observation.probabilities.iter().sum::<f64>();
+        if !valid_id(&observation.predicted_junction_id)
+            || observation
+                .probabilities
+                .iter()
+                .any(|probability| !probability.is_finite() || !(0.0..=1.0).contains(probability))
+            || !sum.is_finite()
+            || (sum - 1.0).abs() > probability_sum_tolerance
+        {
+            return Err(MycelialReconstructionCalibrationError::InvalidReport(
+                "calibration observation has an invalid probability vector",
+            ));
+        }
+        let predicted_class = top_class(&observation.probabilities);
+        samples.push(CalibrationSample {
+            prediction_id: observation.predicted_junction_id.clone(),
+            probabilities: observation.probabilities,
+            target: observation.target_class,
+            predicted_class,
+            confidence: observation.probabilities[predicted_class.index()],
+        });
+    }
+    Ok(samples)
+}
+
 fn calculate_counts(samples: &[CalibrationSample]) -> ReconstructionCalibrationCounts {
     let matched_prediction_count = samples
         .iter()
@@ -732,6 +770,50 @@ impl MycelialReconstructionCalibrationReport {
         {
             return Err(MycelialReconstructionCalibrationError::InvalidReport(
                 "metadata, sample totals or calibration metrics are invalid",
+            ));
+        }
+        if self.observations.len() != self.counts.prediction_count
+            || probability_inventory_digest(&self.observations) != self.probability_inventory_digest
+        {
+            return Err(MycelialReconstructionCalibrationError::InvalidReport(
+                "probability inventory does not match its digest or prediction count",
+            ));
+        }
+        let samples = samples_from_observations(
+            &self.observations,
+            self.probability_sum_tolerance,
+        )?;
+        let expected_counts = calculate_counts(&samples);
+        let expected_class_prediction_counts = ReconstructionCalibrationClass::ALL
+            .into_iter()
+            .map(|class| {
+                (
+                    class,
+                    samples
+                        .iter()
+                        .filter(|sample| sample.predicted_class == class)
+                        .count(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let expected_class_calibration = ReconstructionCalibrationClass::ALL
+            .into_iter()
+            .map(|class| class_calibration(class, &samples, self.bin_count))
+            .collect::<Vec<_>>();
+        let expected_top_label_calibration = top_label_calibration(
+            &samples,
+            self.bin_count,
+            self.negative_log_likelihood_epsilon,
+        );
+        let expected_selective_risk_curve = selective_risk_curve(&samples);
+        if self.counts != expected_counts
+            || self.class_prediction_counts != expected_class_prediction_counts
+            || self.class_calibration != expected_class_calibration
+            || self.top_label_calibration != expected_top_label_calibration
+            || self.selective_risk_curve != expected_selective_risk_curve
+        {
+            return Err(MycelialReconstructionCalibrationError::InvalidReport(
+                "calibration aggregates cannot be reproduced from the retained observations",
             ));
         }
         let mut previous_coverage = 0.0;
