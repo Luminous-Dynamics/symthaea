@@ -1,0 +1,77 @@
+{
+  "schema_version": "mel-musical-forecast-panel-v1",
+  "session_id": "synthetic-session-forecast-001",
+  "case_id": "cadence-to-bass-entry-001",
+  "clock_domain_id": "synthetic-runner-monotonic-v1",
+  "input_history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "policy": {
+    "maximum_onset_error_beats": 0.1,
+    "minimum_anticipation_lead_ns": 100000000
+  },
+  "forecasts": [
+    {
+      "forecast_id": "forecast-001",
+      "commitment_series_id": "bass-entry-series-001",
+      "revision": 1,
+      "supersedes_forecast_id": null,
+      "committed_at_ns": 500000000,
+      "target_start_ns": 1000000000,
+      "target_end_ns": 1500000000,
+      "expires_at_ns": 1600000000,
+      "input_history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "events": [
+        {
+          "forecast_event_id": "ghost-bass-entry-001",
+          "role": "bass",
+          "beat_index": 4,
+          "expected_onset_ns": 1000000000,
+          "local_beat_period_ns": 500000000,
+          "presence_probability": 0.95
+        }
+      ]
+    }
+  ],
+  "displays": [
+    {
+      "forecast_id": "forecast-001",
+      "delivered_at_ns": 600000000,
+      "displayed_at_ns": 650000000,
+      "display_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "dispositions": [
+    {
+      "forecast_id": "forecast-001",
+      "action": "accept",
+      "acted_at_ns": 700000000,
+      "actor_scope": "synthetic-musician-evaluation-only",
+      "action_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "realizations": [
+    {
+      "realization_id": "realization-001",
+      "forecast_id": "forecast-001",
+      "started_at_ns": 1000000000,
+      "completed_at_ns": 1300000000,
+      "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "events": [
+        {
+          "event_id": "realized-bass-entry-001",
+          "forecast_event_id": "ghost-bass-entry-001",
+          "role": "bass",
+          "beat_index": 4,
+          "onset_ns": 1020000000
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": [
+    "synthetic conformance fixture only; timestamps and digests are invented",
+    "forecast events are symbolic commitments and do not establish musical quality",
+    "display and disposition receipts are structurally validated but not cryptographically authenticated",
+    "no live model, musician, display device, MIDI device or audio loopback was measured",
+    "the presence Brier score is conditional on declared forecast event slots and is not a full event-recall/calibration study"
+  ]
+}
