@@ -11,13 +11,25 @@ struct ForecastPanelV1 {
     session_id: String,
     case_id: String,
     clock_domain_id: String,
-    input_history_sha256: String,
+    reference_time_map_id: String,
+    reference_time_map_version: String,
+    reference_time_map_kind: String,
+    reference_time_map_receipt_sha256: String,
+    input_snapshots: Vec<InputSnapshotV1>,
     policy: ForecastPolicyV1,
     forecasts: Vec<ForecastV1>,
     displays: Vec<ForecastDisplayV1>,
     dispositions: Vec<ForecastDispositionV1>,
     realizations: Vec<ForecastRealizationV1>,
     claim_ceiling: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InputSnapshotV1 {
+    input_snapshot_id: String,
+    available_at_ns: u64,
+    input_history_sha256: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +46,7 @@ struct ForecastV1 {
     commitment_series_id: String,
     revision: u32,
     supersedes_forecast_id: Option<String>,
+    input_snapshot_id: String,
     committed_at_ns: u64,
     target_start_ns: u64,
     target_end_ns: u64,
@@ -124,6 +137,9 @@ pub struct ForecastAuditReport {
     pub schema_version: String,
     pub session_id: String,
     pub case_id: String,
+    pub reference_time_map_id: String,
+    pub reference_time_map_version: String,
+    pub reference_time_map_kind: String,
     pub forecast_count: usize,
     pub forecast_event_count: usize,
     pub display_count: usize,
@@ -531,6 +547,9 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         schema_version: "mel-musical-forecast-report-v1".to_owned(),
         session_id: panel.session_id.clone(),
         case_id: panel.case_id.clone(),
+        reference_time_map_id: panel.reference_time_map_id.clone(),
+        reference_time_map_version: panel.reference_time_map_version.clone(),
+        reference_time_map_kind: panel.reference_time_map_kind.clone(),
         forecast_count: panel.forecasts.len(),
         forecast_event_count: forecast_events.len(),
         display_count: panel.displays.len(),
@@ -564,7 +583,31 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
     require_text(&panel.session_id, "session_id")?;
     require_text(&panel.case_id, "case_id")?;
     require_text(&panel.clock_domain_id, "clock_domain_id")?;
-    require_digest(&panel.input_history_sha256, "input history digest")?;
+    require_text(&panel.reference_time_map_id, "reference_time_map_id")?;
+    require_text(&panel.reference_time_map_version, "reference_time_map_version")?;
+    if !matches!(panel.reference_time_map_kind.as_str(), "notation_tempo" | "performance_time") {
+        return Err("unsupported canonical time-map kind".to_owned());
+    }
+    require_digest(
+        &panel.reference_time_map_receipt_sha256,
+        "canonical time-map receipt digest",
+    )?;
+    if panel.input_snapshots.is_empty() {
+        return Err("input_snapshots must be non-empty".to_owned());
+    }
+    let mut snapshot_ids = BTreeSet::new();
+    let mut previous_snapshot_time = None;
+    for snapshot in &panel.input_snapshots {
+        require_text(&snapshot.input_snapshot_id, "input_snapshot_id")?;
+        require_digest(&snapshot.input_history_sha256, "input snapshot digest")?;
+        if !snapshot_ids.insert(snapshot.input_snapshot_id.as_str()) {
+            return Err("duplicate input_snapshot_id".to_owned());
+        }
+        if previous_snapshot_time.is_some_and(|time| snapshot.available_at_ns < time) {
+            return Err("input snapshots must be ordered by availability".to_owned());
+        }
+        previous_snapshot_time = Some(snapshot.available_at_ns);
+    }
     if panel.forecasts.is_empty() {
         return Err("forecasts must be non-empty".to_owned());
     }
@@ -585,7 +628,25 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
 fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(), String> {
     require_text(&forecast.forecast_id, "forecast_id")?;
     require_text(&forecast.commitment_series_id, "commitment_series_id")?;
+    require_text(&forecast.input_snapshot_id, "input_snapshot_id")?;
     require_digest(&forecast.input_history_sha256, "forecast input history digest")?;
+    let input_snapshot = panel
+        .input_snapshots
+        .iter()
+        .find(|snapshot| snapshot.input_snapshot_id == forecast.input_snapshot_id)
+        .ok_or_else(|| format!("forecast {} references unknown or yoked input snapshot", forecast.forecast_id))?;
+    if input_snapshot.input_history_sha256 != forecast.input_history_sha256 {
+        return Err(format!(
+            "forecast {} input-history digest does not match its snapshot",
+            forecast.forecast_id
+        ));
+    }
+    if input_snapshot.available_at_ns > forecast.committed_at_ns {
+        return Err(format!(
+            "forecast {} uses input not available at commit time",
+            forecast.forecast_id
+        ));
+    }
     require_digest(&forecast.policy_sha256, "forecast policy digest")?;
     if forecast.revision == 0 || forecast.target_start_ns >= forecast.target_end_ns {
         return Err(format!("forecast {} has invalid revision or target window", forecast.forecast_id));
@@ -678,9 +739,9 @@ fn validate_series(
                         "series {series_id} changed its target window across revisions"
                     ));
                 }
-                if forecast.input_history_sha256 != previous.input_history_sha256 {
+                if forecast.policy_sha256 != previous.policy_sha256 {
                     return Err(format!(
-                        "series {series_id} changed input-history identity across revisions"
+                        "series {series_id} changed policy identity across revisions"
                     ));
                 }
             }
