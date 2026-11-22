@@ -1381,9 +1381,9 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
-      "run_id": 44990230782,
-      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342",
+      "run_id": 44990424342,
+      "tested_commit": "f5073aab67d8aaf987bfe42d74d0ebd43365cf6e",
       "conclusion": "success",
       "python_reference_tests": 46,
       "rust_unit_tests": 43,
@@ -1403,7 +1403,7 @@
         "DTCO-lineage",
         "multi-fidelity-acquisition"
       ],
-      "note": "Hosted GitHub Actions verified both suites on the current PR head. Rust validation occurs in a minimal isolated workspace because the root workspace on main references a missing member."
+      "note": "Hosted GitHub Actions verified the current clean-base PR head. Rust checks run in an isolated temporary Cargo workspace because the root workspace on main references a missing member."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -1602,8 +1602,8 @@
       "unique_artifact_count_in_fixture": 7,
       "cli_report_byte_for_byte": true,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
-      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342",
+      "tested_commit": "f5073aab67d8aaf987bfe42d74d0ebd43365cf6e",
       "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model predictive accuracy, PDK qualification or fabricated silicon"
     },
     "rust_mf_acquisition": {
@@ -1629,8 +1629,8 @@
         "lexicographic-candidate-ids"
       ],
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990230782",
-      "tested_commit": "056dfe2b2597212a13ebf8b3c8e280bb7452e131",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44990424342",
+      "tested_commit": "f5073aab67d8aaf987bfe42d74d0ebd43365cf6e",
       "synthetic_known_answer": {
         "candidate_count": 5,
         "budget": 13,
