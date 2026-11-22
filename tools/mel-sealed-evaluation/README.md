@@ -6,7 +6,7 @@ A standalone Rust reference scorer for a leakage-resistant music-judge study. Th
 2. A frozen prediction bundle. The judge returns two separately executed presentations per pair in reversed order. The bundle binds the raw manifest bytes by SHA-256 and contains the revealed order seed, the judge responses and a freeze-receipt digest.
 3. A human-reference release. This is created and access-controlled separately. It binds both the raw manifest and prediction bytes by SHA-256 and contains human-derived item strengths and pair-specific uncertainty. It must be released after the prediction freeze.
 
-The scorer checks the byte-level links, schema identities, candidate and pair coverage, seed commitment, actual swapped presentation order, response digests, reference coverage and declared chronology. It reports stable directional decisions, ties, abstentions, order-inconsistent judgments, human-reference coverage, conditional/effective accuracy and rank-gap-stratified results. It does not silently convert ties or abstentions into votes.
+The scorer checks the byte-level links, schema identities, candidate and pair coverage, seed commitment, actual swapped-order presentation, response digests, reference coverage and calendar-valid declared chronology. It reports stable directional decisions, ties, abstentions, order-inconsistent judgments, human-reference coverage, conditional/effective accuracy, rank-gap-stratified results and a reference-probability MSE when the judge supplies probabilities. That MSE compares the judge probability with the logistic transform of a fitted human Bradley–Terry strength gap; it is not a conventional Brier score computed against raw binary human outcomes. It does not silently convert ties or abstentions into votes.
 
 ## Run
 
