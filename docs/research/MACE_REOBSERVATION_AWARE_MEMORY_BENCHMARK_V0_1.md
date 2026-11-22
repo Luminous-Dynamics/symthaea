@@ -124,6 +124,27 @@ External comparison protocol:
 
 This mapping is an evaluation plan, not an assertion that a WorldMemArena adapter or run exists. It makes the central research claim falsifiable: representation choice should improve future action under matched budgets, not merely improve the memory artefact.
 
+### WorldMemArena crosswalk: representation choice across the action-world lifecycle
+
+WorldMemArena defines four observable memory stages—write, maintain, retrieve and use—across 400 multi-session multimodal tasks. MACE's re-observation factor should map as follows:
+
+| WorldMemArena stage | MACE representation experiment | Required receipt / metric |
+|---|---|---|
+| Write | Persist knowledge vs store locator vs cache snapshot vs discard | Source/evidence digest, target-model prediction, representation plan digest, tokens and expected costs |
+| Maintain | Refresh, supersede, revoke or expire a locator/snapshot after source change | Current Mycelix lifecycle receipt; stale activation and correction-propagation latency |
+| Retrieve | Retrieve a compact locator or learned rule, not an obsolete full-state copy | Candidate IDs, canonical registry resolution, evidence provenance and retrieval latency |
+| Use | Revalidate exact `(valid_at, known_at)`, scope, source revision and deadline at decision consumption | Freshness-at-use, correct-on-time coverage, regret, stale/wrong-scope use and abstention |
+
+The paired experiment should clone the same world state and current observation, then randomize these memory arms within world clusters:
+- full-history / store-everything;
+- predictive salience only;
+- always re-observe mutable state;
+- always cache mutable state;
+- risk-adjusted representation selection;
+- evaluator-only oracle representation as an upper bound.
+
+Keep original screenshots, frames, spatial state and tool feedback as the evidence source; captions are candidate interpretations, not ground truth. Report write, maintain, retrieve and use failures separately. Preserve task/domain splits and score paired outcomes at the world-cluster unit. The MACE representation comparison must not claim to reproduce WorldMemArena until its official task loader, evidence artifacts, answer/action evaluator and resource budgets are matched.
+
 ## Limitations and next steps
 
 - The module uses verifier-declared availability probability, failure penalty, normalized costs and a decision deadline; real deployments need independently calibrated tool latency, API availability, energy/cost and failure distributions. Stable-fact retention and mutable-state caching deliberately have different validity rules.

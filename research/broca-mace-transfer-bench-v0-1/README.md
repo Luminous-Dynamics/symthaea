@@ -543,3 +543,5 @@ MACE now has a separate reobservation policy prototype alongside predictive sali
 See [MACE Re-observation-Aware Memory Benchmark v0.1](../../docs/research/MACE_REOBSERVATION_AWARE_MEMORY_BENCHMARK_V0_1.md). This is a candidate representation policy, not a production source adapter or measured performance gain.
 
 The industry comparison distinguishes Microsoft Research's Memora memory-representation system (reported 86.3% LoCoMo / 87.4% LongMemEval in its own setup) from ACL 2026 Memora/FAMA. Any MACE comparison must reproduce the same backbone, judge, task split, memory interface and token accounting; no direct score comparison is claimed.
+
+The re-observation benchmark now includes a WorldMemArena crosswalk: representation choices are evaluated separately at write/maintain/retrieve/use. External reference baselines also distinguish Microsoft Research Memora from the separate ACL Memora/FAMA work and from Mem0's vendor-maintained benchmark results; no cross-protocol score comparison is claimed.
