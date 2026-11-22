@@ -515,29 +515,27 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 observed_onset_ns,
                 signed_error_ns,
                 phase_error,
-            ) =
-                if let Some((_, actual)) = realized {
-                    let signed =
-                        i128::from(actual.onset_ns) - i128::from(predicted.expected_onset_ns);
-                    let phase = signed as f64 / predicted.local_beat_period_ns as f64;
-                    role_matches += usize::from(actual.role == predicted.role);
-                    let beat_match = actual.beat_index == predicted.beat_index;
-                    beat_index_matches += usize::from(beat_match);
-                    matched_count += 1;
-                    onset_errors.push(phase.abs());
-                    (
-                        Some(actual.event_id.clone()),
-                        Some(actual.role.clone()),
-                        Some(actual.beat_index),
-                        Some(beat_match),
-                        Some(actual.onset_ns),
-                        Some(signed),
-                        Some(phase),
-                    )
-                } else {
-                    unfulfilled_count += 1;
-                    (None, None, None, None, None, None, None)
-                };
+            ) = if let Some((_, actual)) = realized {
+                let signed = i128::from(actual.onset_ns) - i128::from(predicted.expected_onset_ns);
+                let phase = signed as f64 / predicted.local_beat_period_ns as f64;
+                role_matches += usize::from(actual.role == predicted.role);
+                let beat_match = actual.beat_index == predicted.beat_index;
+                beat_index_matches += usize::from(beat_match);
+                matched_count += 1;
+                onset_errors.push(phase.abs());
+                (
+                    Some(actual.event_id.clone()),
+                    Some(actual.role.clone()),
+                    Some(actual.beat_index),
+                    Some(beat_match),
+                    Some(actual.onset_ns),
+                    Some(signed),
+                    Some(phase),
+                )
+            } else {
+                unfulfilled_count += 1;
+                (None, None, None, None, None, None, None)
+            };
             let presence_observed = realized.is_some();
             let observed_probability = if presence_observed { 1.0 } else { 0.0 };
             let brier = (predicted.presence_probability - observed_probability).powi(2);
@@ -923,7 +921,10 @@ mod tests {
         let report = parse_and_audit(FIXTURE).expect("forecast fixture should validate");
         assert!(report.structurally_valid_anticipatory_trace);
         assert_eq!(report.forecast_count, 1);
-        assert_eq!(report.reference_time_map_clock_domain_id, "muse-performance-time-v1");
+        assert_eq!(
+            report.reference_time_map_clock_domain_id,
+            "muse-performance-time-v1"
+        );
         assert_eq!(report.displayed_before_target_count, 1);
         assert_eq!(report.matched_forecast_event_count, 1);
         assert_eq!(report.role_match_rate, Some(1.0));
