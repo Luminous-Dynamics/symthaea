@@ -6,8 +6,8 @@
 //! after repeated segment measurements have been reduced within participant.
 
 pub mod simulation;
-pub mod spatial_nuisance;
 pub mod spatial_calibration;
+pub mod spatial_nuisance;
 
 use std::fmt;
 
