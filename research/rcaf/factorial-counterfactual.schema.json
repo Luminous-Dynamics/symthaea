@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/factorial-counterfactual.schema.json",
+  "title": "RCAF matched factorial counterfactual suite",
+  "description": "Synthetic four-cell counterfactual reports across nuisance families.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "time_points",
+    "roi_count",
+    "experiment_count",
+    "nuisance_families",
+    "experiments",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.factorial-counterfactual-suite/0.1.0"
+    },
+    "source_status": {
+      "const": "synthetic_fixture"
+    },
+    "time_points": {
+      "const": 96
+    },
+    "roi_count": {
+      "const": 8
+    },
+    "experiment_count": {
+      "const": 4
+    },
+    "nuisance_families": {
+      "const": [
+        "common_mode",
+        "graph_smooth_low_rank",
+        "heat_kernel_localized",
+        "motion_transient"
+      ]
+    },
+    "experiments": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "experiment_id",
+          "signal_id",
+          "nuisance_family_id",
+          "nuisance_instance_id",
+          "time_points",
+          "roi_count",
+          "compared_values",
+          "target_component_variance_fraction",
+          "realized_component_variance_fraction",
+          "clean_component_variance",
+          "nuisance_component_variance",
+          "clean_nuisance_covariance",
+          "combined_observed_variance",
+          "signal_component_rms",
+          "nuisance_component_rms",
+          "cells",
+          "invariants"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "rcaf.factorial-counterfactual/0.1.0"
+          },
+          "experiment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "signal_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nuisance_family_id": {
+            "enum": [
+              "common_mode",
+              "graph_smooth_low_rank",
+              "heat_kernel_localized",
+              "motion_transient"
+            ]
+          },
+          "nuisance_instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "time_points": {
+            "const": 96
+          },
+          "roi_count": {
+            "const": 8
+          },
+          "compared_values": {
+            "const": 768
+          },
+          "target_component_variance_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 1
+          },
+          "realized_component_variance_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "clean_component_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "nuisance_component_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "clean_nuisance_covariance": {
+            "type": "number"
+          },
+          "combined_observed_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "signal_component_rms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "nuisance_component_rms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cells": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cell_id",
+                "rms",
+                "max_absolute_value",
+                "fnv1a64_fingerprint"
+              ],
+              "properties": {
+                "cell_id": {
+                  "enum": [
+                    "clean_null",
+                    "signal_only",
+                    "nuisance_only",
+                    "signal_plus_nuisance"
+                  ]
+                },
+                "rms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max_absolute_value": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "fnv1a64_fingerprint": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                }
+              }
+            }
+          },
+          "invariants": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "matched_nuisance_delta_max_abs",
+              "matched_signal_delta_max_abs",
+              "additive_interaction_max_abs",
+              "numerical_tolerance",
+              "all_invariants_within_tolerance"
+            ],
+            "properties": {
+              "matched_nuisance_delta_max_abs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "matched_signal_delta_max_abs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "additive_interaction_max_abs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "numerical_tolerance": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "all_invariants_within_tolerance": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
