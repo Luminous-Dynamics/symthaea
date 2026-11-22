@@ -6,6 +6,7 @@
 //! after repeated segment measurements have been reduced within participant.
 
 pub mod simulation;
+pub mod operator_composition;
 
 use std::fmt;
 
