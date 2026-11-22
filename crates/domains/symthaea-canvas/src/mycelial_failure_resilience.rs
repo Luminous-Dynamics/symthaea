@@ -3019,6 +3019,74 @@ mod tests {
     }
 
     #[test]
+    fn attack_delivery_uses_common_random_numbers_across_strategies_and_nested_budgets() {
+        let graph = triangle_graph();
+        let demand_pairs = demands();
+        let random_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::RandomSegments,
+                seed: 11,
+                maximum_failure_budget: 3,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let demand_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::DemandPathLoadSegments,
+                seed: 97,
+                maximum_failure_budget: 3,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let config = MycelialFailureDeliveryConfig {
+            trials_per_scenario: 24,
+            removal_success_probability_micros: 400_000,
+            seed: 0x1a2b_3c4d,
+        };
+        let random_profile =
+            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &random_plan, config)
+                .unwrap();
+        let demand_profile =
+            build_mycelial_failure_delivery_profile(&graph, &demand_pairs, &demand_plan, config)
+                .unwrap();
+
+        let random_final_start = (random_plan.scenarios.len() - 1) * config.trials_per_scenario;
+        let demand_final_start = (demand_plan.scenarios.len() - 1) * config.trials_per_scenario;
+        for trial_index in 0..config.trials_per_scenario {
+            assert_eq!(
+                random_profile.trials[random_final_start + trial_index]
+                    .realized_failed_segment_ids,
+                demand_profile.trials[demand_final_start + trial_index]
+                    .realized_failed_segment_ids
+            );
+        }
+
+        for trial_index in 0..config.trials_per_scenario {
+            let mut previous = BTreeSet::new();
+            for scenario_index in 0..random_plan.scenarios.len() {
+                let trial =
+                    &random_profile.trials[scenario_index * config.trials_per_scenario + trial_index];
+                let current: BTreeSet<_> =
+                    trial.realized_failed_segment_ids.iter().cloned().collect();
+                assert!(previous.is_subset(&current));
+                previous = current;
+            }
+        }
+        random_profile
+            .validate_against(&graph, &demand_pairs, &random_plan)
+            .unwrap();
+        demand_profile
+            .validate_against(&graph, &demand_pairs, &demand_plan)
+            .unwrap();
+    }
+
+    #[test]
     fn attack_delivery_trials_are_seed_replayable_and_detached_mutations_reject() {
         let graph = triangle_graph();
         let demand_pairs = demands();
