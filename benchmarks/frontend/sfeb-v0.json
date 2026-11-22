@@ -325,5 +325,52 @@
       "independent_judgment",
       "final_status"
     ]
+  },
+  "observation_harness": {
+    "status": "library_primitive_implemented_runner_pending",
+    "crate": "crates/domains/symthaea-browser",
+    "browser_control": "chromiumoxide CDP (existing repository dependency)",
+    "entrypoint": "CdpSession::capture_frontend_evidence",
+    "outputs": [
+      "sanitized accessibility-tree JSON",
+      "bounded layout JSON (viewport, overflow, semantic element geometry)",
+      "full-page PNG screenshot",
+      "SHA-256 content-addressed artifact records",
+      "receipt SHA-256 and artifact-integrity verification"
+    ],
+    "instrumentation": "Use stable data-sfeb-id attributes on original fixture components to connect rendered regions to implementation source.",
+    "limits": [
+      "Capture is sequential, not an atomic browser transaction.",
+      "This is not yet an executable SFEB runner.",
+      "The capture library does not enforce OS-level network isolation.",
+      "Screenshot artifacts remain potentially sensitive and must be stored separately with fixture-only data.",
+      "CDP endpoints must not be exposed beyond the isolated benchmark environment."
+    ]
+  },
+  "evidence_contract": {
+    "schema": "sfeb-frontend-evidence/v1",
+    "required_context": [
+      "run_id",
+      "task_id",
+      "fixture_id",
+      "source_commit",
+      "environment_manifest_sha256"
+    ],
+    "artifact_digests": "SHA-256",
+    "required_artifacts": [
+      {
+        "kind": "screenshot",
+        "media_type": "image/png"
+      },
+      {
+        "kind": "accessibility",
+        "media_type": "application/json"
+      },
+      {
+        "kind": "layout",
+        "media_type": "application/json"
+      }
+    ],
+    "receipt_integrity": "The serialized receipt has its own SHA-256 digest; each artifact length and digest must verify before evaluation."
   }
 }
