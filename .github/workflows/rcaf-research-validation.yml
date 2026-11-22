@@ -390,6 +390,7 @@ jobs:
           cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_dose_response -- "$RUNNER_TEMP/rcaf-factorial-dose-response.json"
           python - <<'PY'
           import json
+          import math
           import os
           from pathlib import Path
           import jsonschema
