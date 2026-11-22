@@ -968,6 +968,20 @@
           "hold-out-complete-circuit-or-design-family"
         ],
         "claim_status": "research-targets-only"
+      },
+      "acquisition_oracle": {
+        "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/mf_acquisition.rs",
+        "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-mf-acquire.rs",
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13175",
+        "method": "exact-budgeted-subset-of-risk-adjusted-expected-HV-gain-plus-calibrated-uncertainty-bonus",
+        "candidate_limit": 18,
+        "binds": [
+          "prediction-packet",
+          "model",
+          "uncertainty-calibration",
+          "objective-specification"
+        ],
+        "claim_status": "synthetic-known-answer-reference-only"
       }
     }
   ],
@@ -1367,12 +1381,12 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
-      "run_id": 44989451987,
-      "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104",
+      "run_id": 44989958104,
+      "tested_commit": "66ed78d31b858a383f5eaa90036e7226f8a7cc93",
       "conclusion": "success",
       "python_reference_tests": 46,
-      "rust_unit_tests": 35,
+      "rust_unit_tests": 43,
       "rust_checks": [
         "cargo fmt --check",
         "cargo clippy --all-targets -- -D warnings",
@@ -1386,9 +1400,10 @@
       "rust_byte_for_byte_reports": [
         "binary-metrics",
         "SECOM-raw-integrity-audit",
-        "DTCO-lineage"
+        "DTCO-lineage",
+        "multi-fidelity-acquisition"
       ],
-      "note": "Hosted GitHub Actions verified the full Python reference suite and Rust crate suite on the latest clean-base PR head. Rust checks run in a temporary isolated Cargo workspace because the repository root workspace references a missing member on main."
+      "note": "Hosted GitHub Actions verified the complete Python reference suite and isolated Rust crate suite on the current acquisition-oracle commit. The acquisition CLI report is digest-bound to prediction packet, model, uncertainty calibration and objective specification."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -1504,7 +1519,7 @@
       "claim_ceiling": "pair-manifest integrity only; does not prove pair semantic correctness or model quality",
       "tested_commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9"
     },
-    "total_rust_test_count": 23,
+    "total_rust_test_count": 43,
     "latest_rust_hosted_ci": {
       "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44935276557",
       "commit": "162a96cd423daa1f4f9297f00a32e434cd19a5f9",
@@ -1562,7 +1577,7 @@
       "real_sensor_matrix_ingested": false,
       "claim_ceiling": "synthetic parser contract and raw-source digest/shape validation code; no full-matrix model result"
     },
-    "rust_unit_test_count": 35,
+    "rust_unit_test_count": 43,
     "rust_dtco_lineage": {
       "package": "symthaea-semiconductor",
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs",
@@ -1590,6 +1605,39 @@
       "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
       "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
       "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model predictive accuracy, PDK qualification or fabricated silicon"
+    },
+    "rust_mf_acquisition": {
+      "package": "symthaea-semiconductor",
+      "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/mf_acquisition.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-mf-acquire.rs",
+      "tests": "inline-unit-tests",
+      "test_count": 8,
+      "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.json",
+      "expected_output": "benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.expected.json",
+      "decision_method": "exact-subset-knapsack",
+      "maximum_candidates": 18,
+      "utility": "expected_feasible_hv_gain + exploration_weight * epistemic_stddev * frontier_relevance",
+      "required_digest_bindings": [
+        "prediction_packet_sha256",
+        "model_sha256",
+        "uncertainty_calibration_sha256",
+        "objective_spec_sha256"
+      ],
+      "deterministic_tie_break": "maximize utility; then minimize cost; then lexicographic candidate IDs",
+      "current_fixture_result": {
+        "budget_unit": "normalized-high-fidelity-minutes",
+        "budget": 13,
+        "selected_candidates": [
+          "B",
+          "E"
+        ],
+        "used_budget": 13,
+        "synthetic_total_utility": 0.3115
+      },
+      "hosted_ci_status": "success",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104",
+      "tested_commit": "66ed78d31b858a383f5eaa90036e7226f8a7cc93",
+      "claim_ceiling": "scheduler semantics on a synthetic fixture only; does not execute SPICE/TCAD/route, prove Pareto improvement, or authorize a design"
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
