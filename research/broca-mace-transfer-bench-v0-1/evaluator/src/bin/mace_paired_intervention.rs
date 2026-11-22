@@ -444,11 +444,11 @@ fn candidate_record(
     arm: Arm,
     result: &CandidateRun,
 ) -> Value {
-    let pair_block_id = pair_block_id(case.cluster, case.family, case.query);
-    let query_id = format!("query-{}", sha256(pair_block_id.as_bytes())[..16].to_string());
+    let block_id = pair_block_id(case.cluster, case.family, case.query);
+    let query_id = format!("query-{}", sha256(block_id.as_bytes())[..16].to_string());
     let decision_support_ids = result.decision.evidence_ids.clone();
     let trace_digest = json_sha256(&json!({
-        "pair_block_id": pair_block_id,
+        "pair_block_id": block_id,
         "arm": arm.name(),
         "decision": action_name(result.decision.action),
         "retrieved_event_ids": result.retrieved_ids,
@@ -462,7 +462,7 @@ fn candidate_record(
         "schema_version": SCHEMA_VERSION,
         "record_type": "candidate_decision",
         "run_id": run_id,
-        "pair_block_id": pair_block_id,
+        "pair_block_id": block_id,
         "world_cluster_id": format!("world-{}", case.cluster),
         "query_id": query_id,
         "arm": arm.name(),
