@@ -165,7 +165,7 @@ Each experience now carries a claimed absolute measurement-error bound. Invarian
 
 This is a conservative deterministic interval-containment check, not a statistical confidence interval. Error bounds are candidate-visible claims in this prototype and need sensor/protocol attestation; future work should add calibrated uncertainty models, preregistered equivalence tests and independent target-regime witnesses.
 
-## Provider-ecosystem findings (snapshot: 2026-11-19)
+## Provider-ecosystem findings (snapshot: 2026-11-22)
 
 ### OpenAI: durable memory is separate from session history
 
@@ -541,3 +541,5 @@ HDC retrieval hits now carry a candidate-visible Experience-view digest; canonic
 MACE now has a separate reobservation policy prototype alongside predictive salience. It chooses whether to persist a learned rule/procedure/preference, retain a verified locator for current state only when the locator receipt remains valid strictly beyond the decision deadline and calibrated availability justifies the expected failure penalty, cache a snapshot only through a verified expiry, or discard non-positive-value material. Locator value is risk-adjusted by calibrated availability probability and the consequence of failed re-observation. Stable facts can be retained without a transient-state expiry; the planner compares a locator against persistent retention where a source can be queried. The plan binds source/evidence identity, target-model prediction, exact `(valid_at, known_at)` snapshot, source-profile receipt, decision deadline, context cost, re-observation cost, calibrated availability probability and expected failure loss. A profile proved at an earlier knowledge time cannot be reused after the knowledge snapshot advances. The evaluator includes a raw Session-A ingress → calibrated future-use prediction → independently checked source-availability profile → representation-plan integration fixture.
 
 See [MACE Re-observation-Aware Memory Benchmark v0.1](../../docs/research/MACE_REOBSERVATION_AWARE_MEMORY_BENCHMARK_V0_1.md). This is a candidate representation policy, not a production source adapter or measured performance gain.
+
+The industry comparison distinguishes Microsoft Research's Memora memory-representation system (reported 86.3% LoCoMo / 87.4% LongMemEval in its own setup) from ACL 2026 Memora/FAMA. Any MACE comparison must reproduce the same backbone, judge, task split, memory interface and token accounting; no direct score comparison is claimed.

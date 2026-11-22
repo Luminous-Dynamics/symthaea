@@ -90,10 +90,15 @@ Do not combine governance failures with utility into one weighted score.
 - Zero snapshot activation after its verified expiry.
 - At least 95% of high-value, non-reconstructible held-out rules retained under the declared budget.
 - At least 90% fewer snapshot tokens for a fixture where state is cheaply re-observable, without a downstream utility regression.
+- On an exact, matched Microsoft Research Memora reproduction, first fall within 1 percentage point of its published LoCoMo/LongMemEval results, then target +2 points on a held-out extension without a higher memory-token budget.
 - Positive paired held-out utility lift over predictive-salience-only, with cluster-bootstrap 95% lower bound above zero.
 - At least five independent seeds and held-out environment/task families before any external claim.
 
 These are target thresholds, not current results. They should be recalibrated after the reference environment and tool-cost units are frozen.
+
+### External reference target: Microsoft Research Memora
+
+Microsoft Research reports 86.3% LoCoMo and 87.4% LongMemEval for its separate Memora representation, with about half as many memory entries as Mem0 and up to 98% token savings versus full-context baselines in its evaluated settings. These are protocol-specific research-report results, not scores from a shared public leaderboard. MACE should first reproduce the exact backbone, judge, task split, context/token accounting and memory API; then target at least +2 percentage points on a held-out extension with no higher memory-token budget. On mutable-state episodes, the additional target is at least 90% fewer retained snapshot tokens than store-everything without a downstream utility regression. Do not confuse this system with the separate ACL Memora/FAMA benchmark.
 
 ## Limitations and next steps
 
