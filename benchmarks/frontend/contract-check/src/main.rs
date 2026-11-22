@@ -765,6 +765,23 @@ mod tests {
     }
 
     #[test]
+    fn pattern_validator_rejects_stale_related_source_blob() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/pattern-v1.schema.json"
+        ))
+        .expect("checked-in Leptos pattern schema is valid JSON");
+        let mut corpus: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/patterns-v0.json"
+        ))
+        .expect("checked-in Leptos pattern corpus is valid JSON");
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+
+        corpus["patterns"][1]["source"]["related_sources"][0]["blob_sha"] =
+            Value::String("0".repeat(40));
+        assert!(validate_pattern_corpus(&schema, &corpus, &repository_root).is_err());
+    }
+
+    #[test]
     fn pattern_validator_rejects_unsafe_repository_paths() {
         assert!(validate_relative_repo_path("../outside.rs").is_err());
         assert!(validate_relative_repo_path("/etc/passwd").is_err());
