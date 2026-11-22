@@ -17,7 +17,8 @@ use std::time::Instant;
 
 use symthaea_canvas::{
     AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
-    JunctionClassProbabilityPrediction, JunctionIdentityMatch,
+    JunctionClassProbabilityPrediction, JunctionIdentityMatch, MycelialAnnotationTriageConfig,
+    MycelialReviewOrderingPolicy, build_mycelial_annotation_triage,
     MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH, MycelialReconstructionError,
     ReconstructionCalibrationClass, ReconstructionCalibrationConfig, ReconstructionDimensionality,
     ReconstructionEvaluationConfig, ReconstructionLengthUnit, ReconstructionPoint3,
@@ -257,9 +258,57 @@ fn evaluate_case(
         calibration.probability_inventory_digest
     );
     println!(
+        "selective_risk_aurc: {:?}",
+        calibration.selective_risk_summary.area_under_risk_coverage
+    );
+    println!(
+        "selective_risk_oracle_aurc: {:?}",
+        calibration.selective_risk_summary.oracle_area_under_risk_coverage
+    );
+    println!(
+        "selective_risk_excess_aurc: {:?}",
+        calibration.selective_risk_summary.excess_area_under_risk_coverage
+    );
+    println!(
         "calibration_receipt_digest: {}",
         calibration.canonical_digest_hex()?
     );
+
+    for policy in [
+        MycelialReviewOrderingPolicy::StructuralImpactThenUncertainty,
+        MycelialReviewOrderingPolicy::UncertaintyThenStructuralImpact,
+        MycelialReviewOrderingPolicy::AnastomosisProbabilityThenImpact,
+    ] {
+        let triage = build_mycelial_annotation_triage(
+            prediction,
+            &calibration,
+            MycelialAnnotationTriageConfig {
+                ordering_policy: policy,
+                ..MycelialAnnotationTriageConfig::default()
+            },
+        )?;
+        triage.validate_against(prediction, &calibration)?;
+        println!("triage_policy: {policy:?}");
+        println!("triage_uncertain_review_count: {}", triage.uncertain_review_count);
+        println!("triage_articulation_critical_count: {}", triage.articulation_critical_count);
+        println!("triage_anastomosis_sensitive_count: {}", triage.anastomosis_sensitive_count);
+        for item in triage.review_items.iter().take(5) {
+            println!(
+                "triage_item: rank={} id={} class={:?} confidence={:.6} entropy={:.6} degree={} component_delta={} cycle_loss={} anastomosis_p={:.6} crossing_p={:.6}",
+                item.review_rank,
+                item.junction_id,
+                item.predicted_class,
+                item.top_label_confidence,
+                item.predictive_entropy_nats,
+                item.degree,
+                item.component_delta,
+                item.cycle_rank_loss,
+                item.anastomosis_probability,
+                item.projected_crossing_probability
+            );
+        }
+        println!("triage_receipt_digest: {}", triage.canonical_digest_hex()?);
+    }
     Ok(())
 }
 
