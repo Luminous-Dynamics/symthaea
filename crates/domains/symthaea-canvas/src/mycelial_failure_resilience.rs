@@ -42,6 +42,8 @@ pub enum MycelialFailureAttackStrategy {
     LowestDegreeJunctions,
     DemandPathLoadSegments,
     DemandPathLoadJunctions,
+    AdaptiveDemandPathLoadSegments,
+    AdaptiveDemandPathLoadJunctions,
     SpatialClusterJunctions,
 }
 
@@ -55,6 +57,8 @@ impl MycelialFailureAttackStrategy {
             Self::LowestDegreeJunctions => "lowest-degree-junctions-v1",
             Self::DemandPathLoadSegments => "demand-path-load-segments-v1",
             Self::DemandPathLoadJunctions => "demand-path-load-junctions-v1",
+            Self::AdaptiveDemandPathLoadSegments => "adaptive-demand-path-load-segments-v1",
+            Self::AdaptiveDemandPathLoadJunctions => "adaptive-demand-path-load-junctions-v1",
             Self::SpatialClusterJunctions => "spatial-cluster-junctions-v1",
         }
     }
@@ -785,6 +789,8 @@ fn attack_strategy_is_adaptive(strategy: MycelialFailureAttackStrategy) -> bool 
     matches!(
         strategy,
         MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions
+            | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments
+            | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadJunctions
     )
 }
 
@@ -793,6 +799,7 @@ fn attack_strategy_targets_segments(strategy: MycelialFailureAttackStrategy) -> 
         strategy,
         MycelialFailureAttackStrategy::RandomSegments
             | MycelialFailureAttackStrategy::DemandPathLoadSegments
+            | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments
     )
 }
 
@@ -815,9 +822,22 @@ fn deterministic_shuffle<T>(values: &mut [T], seed: u64) {
 fn demand_weighted_path_load(
     indexed: &IndexedGraph,
     demands: &[MycelialDemandPair],
+    failed_segment_ids: &BTreeSet<String>,
+    failed_junction_ids: &BTreeSet<String>,
 ) -> (Vec<u128>, Vec<u128>) {
     let mut adjacency = vec![Vec::<(usize, f64, usize)>::new(); indexed.node_ids.len()];
+    let active_nodes: Vec<_> = indexed
+        .node_ids
+        .iter()
+        .map(|id| !failed_junction_ids.contains(id))
+        .collect();
     for (edge_index, &(source, target, weight)) in indexed.edge_endpoints.iter().enumerate() {
+        if failed_segment_ids.contains(&indexed.edge_ids[edge_index])
+            || !active_nodes[source]
+            || !active_nodes[target]
+        {
+            continue;
+        }
         adjacency[source].push((target, weight, edge_index));
         adjacency[target].push((source, weight, edge_index));
     }
@@ -834,6 +854,9 @@ fn demand_weighted_path_load(
     for demand in demands {
         let source = indexed.node_index[&demand.source_junction_id];
         let target = indexed.node_index[&demand.target_junction_id];
+        if !active_nodes[source] || !active_nodes[target] {
+            continue;
+        }
         let (distances, predecessor_node, predecessor_edge) = cache.entry(source).or_insert_with(|| {
             let mut distances = vec![f64::INFINITY; indexed.node_ids.len()];
             let mut predecessor_node = vec![None; indexed.node_ids.len()];
@@ -963,8 +986,11 @@ fn rank_failure_entities(
             });
         }
         MycelialFailureAttackStrategy::DemandPathLoadSegments
-        | MycelialFailureAttackStrategy::DemandPathLoadJunctions => {
-            let (segment_load, junction_load) = demand_weighted_path_load(indexed, demands);
+        | MycelialFailureAttackStrategy::DemandPathLoadJunctions
+        | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments
+        | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadJunctions => {
+            let (segment_load, junction_load) =
+                demand_weighted_path_load(indexed, demands, &BTreeSet::new(), &BTreeSet::new());
             ranked.sort_by(|left, right| {
                 let left_load = if targets_segments {
                     segment_load[indexed.edge_index[left]]
@@ -1043,6 +1069,51 @@ fn adaptive_highest_degree_ranking(
     ranked
 }
 
+fn adaptive_demand_path_load_ranking(
+    indexed: &IndexedGraph,
+    demands: &[MycelialDemandPair],
+    strategy: MycelialFailureAttackStrategy,
+    failed_segment_ids: &BTreeSet<String>,
+    failed_junction_ids: &BTreeSet<String>,
+) -> Vec<String> {
+    let targets_segments = attack_strategy_targets_segments(strategy);
+    let (segment_load, junction_load) = demand_weighted_path_load(
+        indexed,
+        demands,
+        failed_segment_ids,
+        failed_junction_ids,
+    );
+    let mut ranked: Vec<_> = if targets_segments {
+        indexed
+            .edge_ids
+            .iter()
+            .filter(|id| !failed_segment_ids.contains(*id))
+            .cloned()
+            .collect()
+    } else {
+        indexed
+            .node_ids
+            .iter()
+            .filter(|id| !failed_junction_ids.contains(*id))
+            .cloned()
+            .collect()
+    };
+    ranked.sort_by(|left, right| {
+        let left_load = if targets_segments {
+            segment_load[indexed.edge_index[left]]
+        } else {
+            junction_load[indexed.node_index[left]]
+        };
+        let right_load = if targets_segments {
+            segment_load[indexed.edge_index[right]]
+        } else {
+            junction_load[indexed.node_index[right]]
+        };
+        right_load.cmp(&left_load).then_with(|| left.cmp(right))
+    });
+    ranked
+}
+
 fn build_attack_rankings(
     indexed: &IndexedGraph,
     demands: &[MycelialDemandPair],
@@ -1054,19 +1125,30 @@ fn build_attack_rankings(
             "maximum failure budget exceeds the number of attackable entities",
         ));
     }
-    let adaptive = attack_strategy_is_adaptive(config.strategy);
     let mut failed_junctions = BTreeSet::new();
+    let mut failed_segments = BTreeSet::new();
     let mut selected = Vec::with_capacity(config.maximum_failure_budget);
     let mut rankings_per_step = Vec::with_capacity(config.maximum_failure_budget);
     for _ in 0..config.maximum_failure_budget {
-        let ranking = if adaptive {
-            adaptive_highest_degree_ranking(indexed, &failed_junctions)
-        } else {
-            base_ranking
+        let ranking = match config.strategy {
+            MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions => {
+                adaptive_highest_degree_ranking(indexed, &failed_junctions)
+            }
+            MycelialFailureAttackStrategy::AdaptiveDemandPathLoadSegments
+            | MycelialFailureAttackStrategy::AdaptiveDemandPathLoadJunctions => {
+                adaptive_demand_path_load_ranking(
+                    indexed,
+                    demands,
+                    config.strategy,
+                    &failed_segments,
+                    &failed_junctions,
+                )
+            }
+            _ => base_ranking
                 .iter()
                 .filter(|id| !selected.iter().any(|chosen| chosen == *id))
                 .cloned()
-                .collect()
+                .collect(),
         };
         let Some(next_id) = ranking.first().cloned() else {
             return Err(MycelialFailureResilienceError::InvalidAttackConfig(
@@ -1075,7 +1157,9 @@ fn build_attack_rankings(
         };
         rankings_per_step.push(ranking);
         selected.push(next_id.clone());
-        if !attack_strategy_targets_segments(config.strategy) {
+        if attack_strategy_targets_segments(config.strategy) {
+            failed_segments.insert(next_id);
+        } else {
             failed_junctions.insert(next_id);
         }
     }
