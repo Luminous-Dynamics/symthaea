@@ -7,7 +7,7 @@
     "api_family": "0.8",
     "rendering_model": "csr",
     "dependency_requirement": "leptos = { version = \"0.8\", features = [\"csr\"] }",
-    "source_commit": "fa4e726d542b40d7ec8cd22e8275c237f1de5915",
+    "source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
     "compile_status": "not_compiled_in_this_environment"
   },
   "scope": {
@@ -29,7 +29,7 @@
       "code": "#[component]\npub fn App() -> impl IntoView {\n    view! { <main class=\"shell\">...</main> }\n}",
       "source": {
         "path": "crates/bridges/symthaea-ui/src/app.rs",
-        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+        "blob_sha": "04eca4c048b06daa8d4fc88bedf7efbbb120b9c6"
       },
       "evidence_status": "source_observed_not_compiled",
       "use_when": [
@@ -51,7 +51,7 @@
       "code": "let gateway = RwSignal::new(DEFAULT_GATEWAY.to_string());\nlet sending = RwSignal::new(false);\n// Read reactively in the view:\nprop:value=move || gateway.get()\n// Update from an event:\non:change=move |ev| gateway.set(event_target_value(&ev))",
       "source": {
         "path": "crates/bridges/symthaea-ui/src/app.rs",
-        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+        "blob_sha": "04eca4c048b06daa8d4fc88bedf7efbbb120b9c6"
       },
       "evidence_status": "source_observed_reference_checked",
       "use_when": [
@@ -74,7 +74,7 @@
       "code": "// Tracked: changing gateway re-runs the effect.\nEffect::new(move |_| {\n    let current = gateway.get();\n    use_gateway(current);\n});\n\n// Untracked: read the current endpoint on each explicit retry iteration.\nlet current = gateway.get_untracked();",
       "source": {
         "path": "crates/bridges/symthaea-ui/src/app.rs",
-        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+        "blob_sha": "04eca4c048b06daa8d4fc88bedf7efbbb120b9c6"
       },
       "evidence_status": "source_observed_reference_checked",
       "use_when": [
@@ -97,7 +97,7 @@
       "code": "Effect::new(move |_| {\n    let gateway = gateway.get_untracked();\n    spawn_local(async move {\n        // Open and maintain an external telemetry stream.\n    });\n});",
       "source": {
         "path": "crates/bridges/symthaea-ui/src/app.rs",
-        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+        "blob_sha": "04eca4c048b06daa8d4fc88bedf7efbbb120b9c6"
       },
       "evidence_status": "source_observed_reference_checked",
       "use_when": [
@@ -121,7 +121,7 @@
       "code": "let send = move || {\n    let text = draft.get_untracked();\n    if text.trim().is_empty() || sending.get_untracked() { return; }\n    sending.set(true);\n    spawn_local(async move {\n        match api::send_query(&gateway.get_untracked(), &text).await {\n            Ok(response) => { /* update transcript or error */ }\n            Err(error) => last_error.set(Some(error)),\n        }\n        sending.set(false);\n    });\n};",
       "source": {
         "path": "crates/bridges/symthaea-ui/src/app.rs",
-        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+        "blob_sha": "04eca4c048b06daa8d4fc88bedf7efbbb120b9c6"
       },
       "evidence_status": "source_observed_not_compiled",
       "use_when": [
@@ -146,7 +146,7 @@
       "code": "<For\n    each=move || history.get().into_iter().enumerate()\n    key=|(index, _)| *index\n    children=move |(_, turn)| view! { <div class=\"turn\">{turn.text}</div> }\n/>",
       "source": {
         "path": "crates/bridges/symthaea-ui/src/app.rs",
-        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+        "blob_sha": "04eca4c048b06daa8d4fc88bedf7efbbb120b9c6"
       },
       "evidence_status": "source_observed_not_compiled",
       "use_when": [
@@ -166,7 +166,7 @@
       "code": "let movie_canvas = NodeRef::<leptos::html::Canvas>::new();\n// In the view:\n<canvas node_ref=movie_canvas></canvas>\n// In an effect:\nlet Some(canvas) = movie_canvas.get() else { return; };",
       "source": {
         "path": "crates/bridges/symthaea-ui/src/app.rs",
-        "blob_sha": "de6fd5c81d0df8c6e9ecf553a4df0cb418b2e3a7"
+        "blob_sha": "04eca4c048b06daa8d4fc88bedf7efbbb120b9c6"
       },
       "evidence_status": "source_observed_not_compiled",
       "use_when": [
