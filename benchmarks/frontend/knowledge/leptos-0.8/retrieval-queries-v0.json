@@ -1,0 +1,220 @@
+{
+  "schema": "sfeb-leptos-pattern-retrieval-v1",
+  "version": "1.0.0",
+  "status": "specification_only",
+  "corpus": "benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json",
+  "corpus_version": "0.1.0",
+  "exposure": "public_pilot",
+  "purpose": "Measure whether Symthaea can retrieve the correct Leptos 0.8 engineering pattern from paraphrased developer intent, while abstaining when the corpus has no relevant answer.",
+  "queries": [
+    {
+      "id": "LEPTOS-RET-001",
+      "query": "I need to split my page into reusable Rust UI pieces that each return part of the view tree.",
+      "expected_pattern_ids": [
+        "LEPTOS08-COMPONENT-001"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-002",
+      "query": "What is the idiomatic way to declare a page root and compose its markup with the macro?",
+      "expected_pattern_ids": [
+        "LEPTOS08-COMPONENT-001"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-003",
+      "query": "A text field and a submit button both need access to the same component-local value. How should I own that state?",
+      "expected_pattern_ids": [
+        "LEPTOS08-SIGNAL-002"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-004",
+      "query": "How do I make a view update when a value changes and still allow event handlers to change it?",
+      "expected_pattern_ids": [
+        "LEPTOS08-SIGNAL-002"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-005",
+      "query": "Why does reading a signal inside an effect cause reruns, but reading it through the untracked accessor does not?",
+      "expected_pattern_ids": [
+        "LEPTOS08-TRACKING-003"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-006",
+      "query": "I want to sample the latest gateway URL on each retry without making the effect subscribe to that signal.",
+      "expected_pattern_ids": [
+        "LEPTOS08-TRACKING-003"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-007",
+      "query": "Where should I start a browser subscription or external connection when a component is mounted?",
+      "expected_pattern_ids": [
+        "LEPTOS08-EFFECT-004"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-008",
+      "query": "What should an Effect be used for, and what should I avoid using it to synchronize?",
+      "expected_pattern_ids": [
+        "LEPTOS08-EFFECT-004"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-009",
+      "query": "A form sends a request asynchronously. How do I handle loading state, success, failure and prevent double submits?",
+      "expected_pattern_ids": [
+        "LEPTOS08-ASYNC-005"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-010",
+      "query": "How do I run a browser-side future after a click and ensure the error path also clears the pending indicator?",
+      "expected_pattern_ids": [
+        "LEPTOS08-ASYNC-005"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-011",
+      "query": "My messages are appended to a conversation. How should I render the collection and choose stable identity keys?",
+      "expected_pattern_ids": [
+        "LEPTOS08-KEYED-006"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-012",
+      "query": "When is using the array position as a list key safe, and when does it break updates?",
+      "expected_pattern_ids": [
+        "LEPTOS08-KEYED-006"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-013",
+      "query": "I need to draw into a canvas once it exists in the browser DOM. How do I obtain the mounted element?",
+      "expected_pattern_ids": [
+        "LEPTOS08-NODEREF-007"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-014",
+      "query": "What is the typed reference pattern for accessing a real HTML canvas from an effect?",
+      "expected_pattern_ids": [
+        "LEPTOS08-NODEREF-007"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-015",
+      "query": "The cognitive engine is too large for WebAssembly. How should a small Rust web frontend communicate with it?",
+      "expected_pattern_ids": [
+        "LEPTOS08-TRANSPORT-008"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-016",
+      "query": "Should my browser UI link the full reasoning crate directly, or talk to a narrower service endpoint?",
+      "expected_pattern_ids": [
+        "LEPTOS08-TRANSPORT-008"
+      ],
+      "kind": "positive"
+    },
+    {
+      "id": "LEPTOS-RET-017",
+      "query": "How do I configure nested routes, route parameters and navigation guards in Leptos Router?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-018",
+      "query": "What is the correct way to implement server-side rendering and hydrate the page on the client?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-019",
+      "query": "How do I style a CSS grid with container queries and fluid typography?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-020",
+      "query": "How do I pass typed properties and children through several layers of reusable components?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-021",
+      "query": "What is the best way to handle validation and accessible error messages in a multi-step form?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-022",
+      "query": "How should I test a Leptos component in a real browser with keyboard navigation and screenshots?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-023",
+      "query": "Can I use a CSS animation to make a telemetry visualization move more smoothly?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    },
+    {
+      "id": "LEPTOS-RET-024",
+      "query": "How can I securely sandbox an agent that can run generated browser code?",
+      "expected_pattern_ids": [],
+      "kind": "hard_negative"
+    }
+  ],
+  "metrics": [
+    "recall_at_1",
+    "recall_at_3",
+    "mean_reciprocal_rank",
+    "ndcg_at_3",
+    "precision_at_3",
+    "abstention_accuracy_on_hard_negatives",
+    "latency_p50_p95",
+    "memory_bytes",
+    "cost_per_1000_queries"
+  ],
+  "baselines": [
+    "keyword_exact",
+    "BM25",
+    "sparse_TFIDF",
+    "dense_embedding",
+    "HDC_associative",
+    "hybrid_sparse_dense_HDC"
+  ],
+  "controls": [
+    "Freeze corpus version and query wording before each run.",
+    "Do not train or tune retrieval on this public pilot query set and report it as held-out.",
+    "Use an additional private query set for final comparison.",
+    "Normalize top-k outputs to unique pattern IDs.",
+    "Report negative-query false-positive rate separately.",
+    "Compare under identical corpus, hardware, token budget and latency measurement conditions."
+  ],
+  "notes": [
+    "Queries are paraphrases and are not copied from the pattern titles.",
+    "Hard negatives deliberately target topics not currently represented by the eight-entry corpus.",
+    "Expected empty sets require calibrated abstention, not forced retrieval.",
+    "No retrieval scores have been measured."
+  ]
+}
