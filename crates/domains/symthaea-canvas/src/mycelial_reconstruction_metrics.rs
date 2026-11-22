@@ -494,12 +494,16 @@ pub fn match_junctions_hungarian(
         return Ok(Vec::new());
     }
 
-    // Leaving one prediction and one truth node unmatched costs just over the
-    // maximum admissible pair distance, so every additional admissible match
-    // is preferable to leaving both unmatched. The Hungarian objective
-    // therefore maximizes cardinality before minimizing total distance.
-    let unmatched_cost = maximum_distance * 0.5 + maximum_distance * 1.0e-9;
-    let forbidden_cost = maximum_distance * 10.0 + unmatched_cost * 2.0;
+    // The unmatched penalty must dominate the *aggregate* possible distance
+    // change across every existing match when cardinality increases by one.
+    // With k <= min(prediction_count, truth_count), k*D is the largest possible
+    // distance penalty; 2*(min+1)*D is strictly larger. This makes match count
+    // the primary objective and total distance secondary.
+    let unmatched_cost =
+        (prediction_count.min(truth_count) as f64 + 1.0) * maximum_distance;
+    // A forbidden real edge must cost more than assigning every real endpoint
+    // to its own unmatched dummy. Therefore it can never appear in an optimum.
+    let forbidden_cost = (matrix_size as f64 + 1.0) * unmatched_cost;
     let mut costs = vec![vec![0.0f64; matrix_size]; matrix_size];
 
     for prediction_index in 0..prediction_count {
@@ -1344,6 +1348,44 @@ mod tests {
         // unmatched. A global assignment must choose p1->B and p2->A.
         let matches =
             match_junctions_hungarian(&truth, &prediction, 2.0).unwrap();
+        assert_eq!(matches.len(), 2);
+        assert_eq!(
+            matches,
+            vec![
+                JunctionIdentityMatch {
+                    predicted_junction_id: "p1".to_string(),
+                    ground_truth_junction_id: "B".to_string(),
+                },
+                JunctionIdentityMatch {
+                    predicted_junction_id: "p2".to_string(),
+                    ground_truth_junction_id: "A".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn hungarian_matching_uses_cardinality_before_total_distance() {
+        let truth = graph(
+            "human",
+            vec![
+                node("A", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("B", AnnotatedJunctionKind::Branch, 10.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let prediction = graph(
+            "model",
+            vec![
+                node("p1", AnnotatedJunctionKind::Branch, 0.0, 0.0, 0.0),
+                node("p2", AnnotatedJunctionKind::Branch, -10.0, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        // The one-match solution p1->A has zero localization error. The only
+        // two-match solution costs 20 units (p1->B, p2->A). Cardinality must
+        // win before total distance, otherwise a small dummy penalty picks 1.
+        let matches = match_junctions_hungarian(&truth, &prediction, 10.0).unwrap();
         assert_eq!(matches.len(), 2);
         assert_eq!(
             matches,
