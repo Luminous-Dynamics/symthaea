@@ -244,10 +244,7 @@ fn timestamp_micros(
     }
 }
 
-fn optional_identifier(
-    value: Option<&str>,
-    field: &str,
-) -> Result<(), ProcessEventGraphError> {
+fn optional_identifier(value: Option<&str>, field: &str) -> Result<(), ProcessEventGraphError> {
     if let Some(value) = value {
         require_text(value, field)?;
     }
@@ -257,15 +254,16 @@ fn optional_identifier(
 fn validate_event(event: &ProcessEventV1, index: usize) -> Result<(), ProcessEventGraphError> {
     let prefix = format!("events[{index}]");
     require_text(&event.event_id, &format!("{prefix}.event_id"))?;
-    require_text(&event.event_clock_domain_id, &format!("{prefix}.event_clock_domain_id"))?;
+    require_text(
+        &event.event_clock_domain_id,
+        &format!("{prefix}.event_clock_domain_id"),
+    )?;
     require_text(
         &event.availability_clock_domain_id,
         &format!("{prefix}.availability_clock_domain_id"),
     )?;
     require_text(&event.authority_ref, &format!("{prefix}.authority_ref"))?;
-    if !valid_sha256(&event.source_artifact_sha256)
-        || !valid_sha256(&event.transform_sha256)
-    {
+    if !valid_sha256(&event.source_artifact_sha256) || !valid_sha256(&event.transform_sha256) {
         return Err(ProcessEventGraphError(format!(
             "{prefix}: invalid source or transform SHA-256"
         )));
@@ -310,10 +308,7 @@ fn validate_event(event: &ProcessEventV1, index: usize) -> Result<(), ProcessEve
     Ok(())
 }
 
-fn validate_label(
-    label: &MetrologyLabelV1,
-    index: usize,
-) -> Result<(), ProcessEventGraphError> {
+fn validate_label(label: &MetrologyLabelV1, index: usize) -> Result<(), ProcessEventGraphError> {
     let prefix = format!("metrology_labels[{index}]");
     for (field, value) in [
         ("label_id", label.label_id.as_str()),
@@ -321,8 +316,14 @@ fn validate_label(
         ("subject_id", label.subject_id.as_str()),
         ("measurand_id", label.measurand_id.as_str()),
         ("unit", label.unit.as_str()),
-        ("measurement_clock_domain_id", label.measurement_clock_domain_id.as_str()),
-        ("availability_clock_domain_id", label.availability_clock_domain_id.as_str()),
+        (
+            "measurement_clock_domain_id",
+            label.measurement_clock_domain_id.as_str(),
+        ),
+        (
+            "availability_clock_domain_id",
+            label.availability_clock_domain_id.as_str(),
+        ),
         ("authority_ref", label.authority_ref.as_str()),
     ] {
         require_text(value, &format!("{prefix}.{field}"))?;
@@ -332,8 +333,14 @@ fn validate_label(
             "{prefix}.source_artifact_sha256: expected lowercase SHA-256"
         )));
     }
-    optional_identifier(label.instrument_id.as_deref(), &format!("{prefix}.instrument_id"))?;
-    optional_identifier(label.calibration_ref.as_deref(), &format!("{prefix}.calibration_ref"))?;
+    optional_identifier(
+        label.instrument_id.as_deref(),
+        &format!("{prefix}.instrument_id"),
+    )?;
+    optional_identifier(
+        label.calibration_ref.as_deref(),
+        &format!("{prefix}.calibration_ref"),
+    )?;
     if label.revision == 0 {
         return Err(ProcessEventGraphError(format!(
             "{prefix}.revision: revisions start at one"
@@ -395,8 +402,7 @@ fn validate_label(
             )));
         }
     }
-    if let (Some(lower), Some(upper)) =
-        (label.censoring_lower_bound, label.censoring_upper_bound)
+    if let (Some(lower), Some(upper)) = (label.censoring_lower_bound, label.censoring_upper_bound)
         && lower > upper
     {
         return Err(ProcessEventGraphError(format!(
@@ -429,8 +435,7 @@ fn validate_label(
         }
         MetrologyLabelStatusV1::Censored => {
             if label.value.is_some()
-                || (label.censoring_lower_bound.is_none()
-                    && label.censoring_upper_bound.is_none())
+                || (label.censoring_lower_bound.is_none() && label.censoring_upper_bound.is_none())
             {
                 return Err(ProcessEventGraphError(format!(
                     "{prefix}: censored label requires bounds and no point value"
@@ -456,9 +461,7 @@ pub fn validate_process_event_graph_v1(
         ));
     }
     require_text(&graph.graph_id, "graph_id")?;
-    if !valid_sha256(&graph.source_artifact_sha256)
-        || !valid_sha256(&graph.transform_sha256)
-    {
+    if !valid_sha256(&graph.source_artifact_sha256) || !valid_sha256(&graph.transform_sha256) {
         return Err(ProcessEventGraphError(
             "graph: invalid source or transform SHA-256".into(),
         ));
@@ -711,10 +714,12 @@ pub fn build_information_cutoff_snapshot_v1(
         unaligned_label_ids,
         claim_limits: vec![
             "Only event records available in the declared cutoff clock domain are included".into(),
-            "Metrology labels are trainable only after available_at and only in validated state".into(),
+            "Metrology labels are trainable only after available_at and only in validated state"
+                .into(),
             "Event-time and availability-time are distinct and not interchangeable".into(),
             "Clock-domain mismatches are excluded rather than coerced".into(),
-            "Process sequence edges are evidence-backed ordering/context, not causal discovery".into(),
+            "Process sequence edges are evidence-backed ordering/context, not causal discovery"
+                .into(),
         ],
     })
 }
@@ -892,8 +897,16 @@ mod tests {
             clock_basis: ClockBasisV1::SourceLocalNaive,
         };
         let snapshot = build_information_cutoff_snapshot_v1(&input, &cutoff).unwrap();
-        assert!(snapshot.unavailable_event_ids.contains(&"late-old-event".into()));
-        assert!(!snapshot.available_event_ids.contains(&"late-old-event".into()));
+        assert!(
+            snapshot
+                .unavailable_event_ids
+                .contains(&"late-old-event".into())
+        );
+        assert!(
+            !snapshot
+                .available_event_ids
+                .contains(&"late-old-event".into())
+        );
     }
 
     #[test]
@@ -909,7 +922,11 @@ mod tests {
         };
         let snapshot = build_information_cutoff_snapshot_v1(&input, &cutoff).unwrap();
         assert!(snapshot.unaligned_event_ids.contains(&"process-17".into()));
-        assert!(snapshot.unaligned_label_ids.contains(&"label-validated".into()));
+        assert!(
+            snapshot
+                .unaligned_label_ids
+                .contains(&"label-validated".into())
+        );
     }
 
     #[test]
