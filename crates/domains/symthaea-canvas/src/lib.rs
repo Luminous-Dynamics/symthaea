@@ -27,6 +27,7 @@ pub mod color;
 pub mod embodiment;
 pub mod embodiment_trace;
 pub mod geometry;
+pub mod mycelial_annotation_triage;
 pub mod mycelial_contact_persistence;
 pub mod mycelial_failure_resilience;
 pub mod mycelial_junction_graph;
@@ -34,9 +35,8 @@ pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
 pub mod mycelial_presence;
-pub mod mycelial_reconstruction_metrics;
 pub mod mycelial_reconstruction_calibration;
-pub mod mycelial_annotation_triage;
+pub mod mycelial_reconstruction_metrics;
 pub mod mycelial_reference_networks;
 pub mod mycelial_temporal_cycles;
 pub mod scene_features;
@@ -88,6 +88,12 @@ pub use embodiment_trace::{
     MAX_EMBODIMENT_TRACE_EVENTS, OpenActivityInterval, OpenPlaybackInterval,
 };
 pub use geometry::build_scene;
+pub use mycelial_annotation_triage::{
+    MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS, MYCELIAL_ANNOTATION_TRIAGE_SCHEMA_VERSION,
+    MycelialAnnotationTriageConfig, MycelialAnnotationTriageError, MycelialAnnotationTriageReport,
+    MycelialAnnotationTriageTopologySummary, MycelialJunctionReviewItem,
+    MycelialReviewOrderingPolicy, build_mycelial_annotation_triage,
+};
 pub use mycelial_contact_persistence::{
     DEFAULT_MAX_CONTACT_TOLERANCE_MODEL_UNITS, MAX_CONTACT_FILTRATION_CANDIDATES,
     MYCELIAL_CONTACT_FILTRATION_SCHEMA_VERSION, MycelialContactBaselineEdge,
@@ -119,23 +125,15 @@ pub use mycelial_junction_graph::{
     MycelialJunctionGraphMetrics, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
     build_mycelial_junction_hypha_graph,
 };
-pub use mycelial_annotation_triage::{
-    MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS, MYCELIAL_ANNOTATION_TRIAGE_SCHEMA_VERSION,
-    MycelialAnnotationTriageConfig, MycelialAnnotationTriageError,
-    MycelialAnnotationTriageReport, MycelialAnnotationTriageTopologySummary,
-    MycelialJunctionReviewItem, MycelialReviewOrderingPolicy,
-    build_mycelial_annotation_triage,
-};
 pub use mycelial_reconstruction_calibration::{
+    JunctionCalibrationObservation, JunctionClassProbabilityPrediction,
     MAX_RECONSTRUCTION_CALIBRATION_BINS, MAX_RECONSTRUCTION_CALIBRATION_PREDICTIONS,
-    MYCELIAL_RECONSTRUCTION_CALIBRATION_SCHEMA_VERSION, JunctionCalibrationObservation,
-    JunctionClassProbabilityPrediction, MycelialReconstructionCalibrationError,
+    MYCELIAL_RECONSTRUCTION_CALIBRATION_SCHEMA_VERSION, MycelialReconstructionCalibrationError,
     MycelialReconstructionCalibrationReport, ReconstructionCalibrationBin,
     ReconstructionCalibrationClass, ReconstructionCalibrationConfig,
     ReconstructionCalibrationCounts, ReconstructionClassCalibration,
     ReconstructionSelectiveRiskPoint, ReconstructionSelectiveRiskSummary,
-    ReconstructionTopLabelCalibration,
-    evaluate_mycelial_reconstruction_calibration,
+    ReconstructionTopLabelCalibration, evaluate_mycelial_reconstruction_calibration,
 };
 pub use mycelial_reconstruction_metrics::{
     AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
@@ -149,11 +147,11 @@ pub use mycelial_reconstruction_metrics::{
     ReconstructionTopologySummary, evaluate_mycelial_reconstruction, match_junctions_hungarian,
 };
 pub use mycelial_reference_networks::{
-    MAX_REFERENCE_NETWORK_JUNCTIONS, MycelialEuclideanMstEdge, MycelialEuclideanMstReport,
-    MycelialMinimumSpanningForestReport, MycelialReferenceNetworkError,
-    MYCELIAL_EUCLIDEAN_MST_SCHEMA_VERSION, SpatialReferenceDimensionality,
-    SpatialReferenceEfficiencyReport,
-    build_euclidean_minimum_spanning_tree, build_observed_network_minimum_spanning_forest,
+    MAX_REFERENCE_NETWORK_JUNCTIONS, MYCELIAL_EUCLIDEAN_MST_SCHEMA_VERSION,
+    MycelialEuclideanMstEdge, MycelialEuclideanMstReport, MycelialMinimumSpanningForestReport,
+    MycelialReferenceNetworkError, SpatialReferenceDimensionality,
+    SpatialReferenceEfficiencyReport, build_euclidean_minimum_spanning_tree,
+    build_observed_network_minimum_spanning_forest,
 };
 pub use mycelial_temporal_cycles::{
     MAX_TEMPORAL_CYCLE_RECORDS, MAX_TEMPORAL_CYCLE_SEARCH_STEPS,
