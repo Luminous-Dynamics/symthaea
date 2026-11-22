@@ -40,8 +40,7 @@ impl VlasovPoissonConfig {
             });
         }
 
-        let physical_wave_number =
-            std::f64::consts::TAU * spatial_mode as f64 / self.domain_length;
+        let physical_wave_number = std::f64::consts::TAU * spatial_mode as f64 / self.domain_length;
         let velocity_spacing = self.dv();
         let phase_rate = physical_wave_number.abs() * velocity_spacing;
         let nyquist_encounter_time = std::f64::consts::PI / phase_rate;
@@ -483,22 +482,17 @@ mod tests {
         let base_mode_one = base.velocity_sampling_horizon(1).unwrap();
         let base_mode_two = base.velocity_sampling_horizon(2).unwrap();
         assert!(
-            (base_mode_two.discrete_recurrence_time
-                - 0.5 * base_mode_one.discrete_recurrence_time)
+            (base_mode_two.discrete_recurrence_time - 0.5 * base_mode_one.discrete_recurrence_time)
                 .abs()
                 < 1.0e-12
         );
         assert!(
-            (base_mode_one.discrete_recurrence_time
-                - 2.0 * base_mode_one.nyquist_encounter_time)
+            (base_mode_one.discrete_recurrence_time - 2.0 * base_mode_one.nyquist_encounter_time)
                 .abs()
                 < 1.0e-12
         );
 
-        let refined_velocity = VlasovPoissonConfig {
-            nv: 512,
-            ..base
-        };
+        let refined_velocity = VlasovPoissonConfig { nv: 512, ..base };
         let refined_horizon = refined_velocity.velocity_sampling_horizon(1).unwrap();
         assert!(
             (refined_horizon.discrete_recurrence_time
@@ -516,8 +510,7 @@ mod tests {
         let fixed_dv_horizon = expanded_fixed_dv.velocity_sampling_horizon(1).unwrap();
         assert!((fixed_dv_horizon.velocity_spacing - base.dv()).abs() < 1.0e-14);
         assert!(
-            (fixed_dv_horizon.discrete_recurrence_time
-                - base_mode_one.discrete_recurrence_time)
+            (fixed_dv_horizon.discrete_recurrence_time - base_mode_one.discrete_recurrence_time)
                 .abs()
                 < 1.0e-12
         );
