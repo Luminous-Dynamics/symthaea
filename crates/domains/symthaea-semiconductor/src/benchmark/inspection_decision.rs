@@ -232,8 +232,14 @@ fn validate_subject(subject: &InspectionDecisionSubjectV1) -> Result<(), Inspect
 
         for (field, value) in [
             ("exposed_units", candidate.exposed_units),
-            ("avoidable_loss_per_defect", candidate.avoidable_loss_per_defect),
-            ("false_hold_cost_per_unit", candidate.false_hold_cost_per_unit),
+            (
+                "avoidable_loss_per_defect",
+                candidate.avoidable_loss_per_defect,
+            ),
+            (
+                "false_hold_cost_per_unit",
+                candidate.false_hold_cost_per_unit,
+            ),
             ("inspection_cost", candidate.inspection_cost),
             ("inspection_minutes", candidate.inspection_minutes),
             ("delay_hours", candidate.delay_hours),
@@ -307,10 +313,7 @@ fn subset_is_better(candidate: &SubsetScore, incumbent: &SubsetScore) -> bool {
     candidate.selected_ids < incumbent.selected_ids
 }
 
-fn exact_subset(
-    rows: &[CandidateValue],
-    budget: &InspectionBudgetV1,
-) -> SubsetScore {
+fn exact_subset(rows: &[CandidateValue], budget: &InspectionBudgetV1) -> SubsetScore {
     let subsets = 1usize << rows.len();
     let mut best = SubsetScore {
         selected_ids: Vec::new(),
@@ -363,10 +366,7 @@ fn exact_subset(
     best
 }
 
-fn risk_only(
-    rows: &[CandidateValue],
-    budget: &InspectionBudgetV1,
-) -> SubsetScore {
+fn risk_only(rows: &[CandidateValue], budget: &InspectionBudgetV1) -> SubsetScore {
     let mut ordered: Vec<&CandidateValue> = rows.iter().collect();
     ordered.sort_by(|left, right| {
         right
@@ -384,7 +384,10 @@ fn risk_only(
         if row.expected_net_value <= 0.0 {
             continue;
         }
-        if group_counts.get(row.group_id.as_str()).copied().unwrap_or(0)
+        if group_counts
+            .get(row.group_id.as_str())
+            .copied()
+            .unwrap_or(0)
             >= budget.max_per_group
         {
             continue;
@@ -430,7 +433,10 @@ pub fn evaluate_inspection_decision_v1(
             ("expected_false_hold_cost", row.expected_false_hold_cost),
             ("delay_penalty", row.delay_penalty),
             ("expected_net_value", row.expected_net_value),
-            ("residual_missed_defect_loss", row.residual_missed_defect_loss),
+            (
+                "residual_missed_defect_loss",
+                row.residual_missed_defect_loss,
+            ),
         ] {
             finite(value, &format!("{}.{}", row.candidate_id, field))?;
         }
@@ -543,7 +549,10 @@ mod tests {
     fn selects_value_aware_subset_not_risk_only_subset() {
         let report = evaluate_inspection_decision_v1(&subject()).expect("fixture evaluates");
         assert_eq!(report.selected_candidate_ids, ["A", "C", "F"]);
-        assert_eq!(report.risk_only_comparator.selected_candidate_ids, ["A", "B", "D", "F"]);
+        assert_eq!(
+            report.risk_only_comparator.selected_candidate_ids,
+            ["A", "B", "D", "F"]
+        );
         assert_eq!(report.selected_expected_net_value, 1286.16);
         assert_eq!(report.risk_only_comparator.expected_net_value, 607.05);
     }
@@ -554,7 +563,9 @@ mod tests {
         let mut permuted = subject();
         permuted.candidates.reverse();
         assert_eq!(report_value(&original), report_value(&permuted));
-        original.candidates.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+        original
+            .candidates
+            .sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
         assert_eq!(report_value(&original), report_value(&permuted));
     }
 
@@ -584,7 +595,11 @@ mod tests {
         let mut input = subject();
         input.candidates[0].inspection_minutes = 0.0;
         let report = evaluate_inspection_decision_v1(&input).expect("zero time is valid");
-        let row = report.candidate_ledger.iter().find(|row| row.candidate_id == "A").unwrap();
+        let row = report
+            .candidate_ledger
+            .iter()
+            .find(|row| row.candidate_id == "A")
+            .unwrap();
         assert_eq!(row.net_value_per_minute, None);
     }
 
