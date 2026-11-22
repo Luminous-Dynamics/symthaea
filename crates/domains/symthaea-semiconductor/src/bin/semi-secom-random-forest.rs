@@ -10,6 +10,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use serde::Serialize;
+use sha2::Digest;
 use symthaea_semiconductor::benchmark::{
     ForestClassWeightingV1, RandomForestInputSampleV1, RandomForestParametersV1,
     RandomForestPredictionReportV1, RandomForestTrainingSampleV1, fit_random_forest_v1,
