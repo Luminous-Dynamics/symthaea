@@ -381,7 +381,9 @@ pub fn fit_secom_preprocessor_v1(
         });
     }
     if retained.is_empty() {
-        return Err(SecomFoldPreprocessorError("all features removed by train-only filtering".into()));
+        return Err(SecomFoldPreprocessorError(
+            "all features removed by train-only filtering".into(),
+        ));
     }
 
     let mut fitted = FittedSecomPreprocessorV1 {
@@ -405,7 +407,9 @@ pub fn transform_secom_rows_v1(
     rows: &[SecomPreprocessingRowV1],
 ) -> Result<Vec<SecomTransformedSampleV1>, SecomFoldPreprocessorError> {
     if rows.is_empty() {
-        return Err(SecomFoldPreprocessorError("transform rows must be non-empty".into()));
+        return Err(SecomFoldPreprocessorError(
+            "transform rows must be non-empty".into(),
+        ));
     }
     let mut ordered = rows.to_vec();
     ordered.sort_by(|a, b| a.sample_id.cmp(&b.sample_id));
