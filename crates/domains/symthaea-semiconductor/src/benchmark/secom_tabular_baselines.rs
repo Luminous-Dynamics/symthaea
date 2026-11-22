@@ -155,7 +155,7 @@ impl GaussianBernoulliModelV1 {
                 )));
             }
 
-            for class_index in 0..2 {
+            for (class_index, class_log_probability) in log_probability.iter_mut().enumerate() {
                 let variance = self.class_variances[feature_index][class_index];
                 let delta = standardized - self.class_means[feature_index][class_index];
                 let gaussian = -0.5 * (LN_2_PI + variance.ln() + delta * delta / variance);
@@ -164,12 +164,12 @@ impl GaussianBernoulliModelV1 {
                         "sample {sample_id:?}, feature {feature_index}: non-finite Gaussian likelihood"
                     )));
                 }
-                log_probability[class_index] += gaussian;
+                *class_log_probability += gaussian;
 
                 if self.uses_missingness_indicators {
                     let probability_missing =
                         self.missing_probability_by_class[feature_index][class_index];
-                    log_probability[class_index] += if row.values[feature_index].is_none() {
+                    *class_log_probability += if row.values[feature_index].is_none() {
                         probability_missing.ln()
                     } else {
                         (1.0 - probability_missing).ln()
@@ -323,15 +323,15 @@ fn fit_model_v1(
             normalization_scales[feature_index] += delta * delta;
         }
     }
-    for feature_index in 0..feature_count {
-        let variance = normalization_scales[feature_index] / training_indices.len() as f64;
+    for (feature_index, sum_squared_deviations) in normalization_scales.iter_mut().enumerate() {
+        let variance = *sum_squared_deviations / training_indices.len() as f64;
         if !variance.is_finite() {
             return Err(SecomTabularBaselineError(format!(
                 "feature {feature_index}: non-finite normalization variance"
             )));
         }
         let scale = variance.max(0.0).sqrt();
-        normalization_scales[feature_index] = if scale > 1.0e-12 { scale } else { 1.0 };
+        *sum_squared_deviations = if scale > 1.0e-12 { scale } else { 1.0 };
     }
 
     let mut class_means = vec![[0.0; 2]; feature_count];
@@ -351,10 +351,10 @@ fn fit_model_v1(
         }
         normalized_training.push((class_index, normalized));
     }
-    for feature_index in 0..feature_count {
-        for class_index in 0..2 {
-            class_means[feature_index][class_index] /= class_counts[class_index] as f64;
-            if !class_means[feature_index][class_index].is_finite() {
+    for (feature_index, means_by_class) in class_means.iter_mut().enumerate() {
+        for (class_index, mean) in means_by_class.iter_mut().enumerate() {
+            *mean /= class_counts[class_index] as f64;
+            if !mean.is_finite() {
                 return Err(SecomTabularBaselineError(format!(
                     "feature {feature_index}: non-finite class mean"
                 )));
@@ -369,16 +369,15 @@ fn fit_model_v1(
             class_variances[feature_index][*class_index] += delta * delta;
         }
     }
-    for feature_index in 0..feature_count {
-        for class_index in 0..2 {
-            let variance =
-                class_variances[feature_index][class_index] / class_counts[class_index] as f64;
+    for (feature_index, variances_by_class) in class_variances.iter_mut().enumerate() {
+        for (class_index, variance_slot) in variances_by_class.iter_mut().enumerate() {
+            let variance = *variance_slot / class_counts[class_index] as f64;
             if !variance.is_finite() {
                 return Err(SecomTabularBaselineError(format!(
                     "feature {feature_index}: non-finite class variance"
                 )));
             }
-            class_variances[feature_index][class_index] = variance.max(GAUSSIAN_VARIANCE_FLOOR);
+            *variance_slot = variance.max(GAUSSIAN_VARIANCE_FLOOR);
         }
     }
 
