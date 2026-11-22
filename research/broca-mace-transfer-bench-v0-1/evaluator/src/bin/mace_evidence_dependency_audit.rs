@@ -1295,8 +1295,15 @@ mod tests {
         assert_eq!(index.lineage_incomplete_count(), 0);
         assert_eq!(index.unresolved_dependency_reference_count, 0);
 
-        let base_digest = candidate_evidence_digest(&memory, memory[0].causal_identification.semantic_estimand.into());
-        assert!(!base_digest.is_empty());
+        let need = DecisionNeedV1::new(
+            memory[0].scope,
+            memory[0].causal_identification.semantic_estimand,
+        )
+        .expect("ingress evidence contains a complete candidate estimand");
+        let base_digest = candidate_evidence_digest(&memory, need);
+        let sidecar_bound_digest =
+            candidate_evidence_digest_with_sidecar(&memory, need, &sidecar);
+        assert_ne!(base_digest, sidecar_bound_digest);
     }
 
     #[test]
