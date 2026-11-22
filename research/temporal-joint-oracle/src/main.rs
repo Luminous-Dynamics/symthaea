@@ -972,6 +972,48 @@ mod tests {
     }
 
     #[test]
+    fn exact_shapley_attributions_reconstruct_joint_effect_with_rational_shares() {
+        let report = decompose_exact_joint_interactions(&three_factor_interaction_input()).unwrap();
+        assert_eq!(report.shapley_common_denominator, 6);
+        assert_eq!(report.factor_shapley_attributions.len(), 3);
+
+        let first = &report.factor_shapley_attributions[0];
+        let second = &report.factor_shapley_attributions[1];
+        let third = &report.factor_shapley_attributions[2];
+
+        // Shapley shares split each coalition dividend equally among members,
+        // then retain the exact rational values using denominator 6.
+        assert_eq!(first.action_id, 10);
+        assert_eq!(second.action_id, 20);
+        assert_eq!(third.action_id, 30);
+        assert_eq!(first.exposure_benefit_scaled_numerator_us[0], 71);
+        assert_eq!(second.exposure_benefit_scaled_numerator_us[0], 131);
+        assert_eq!(third.exposure_benefit_scaled_numerator_us[0], 170);
+
+        assert_eq!(first.resource_cost_scaled_numerator[9], 87);
+        assert_eq!(second.resource_cost_scaled_numerator[9], 147);
+        assert_eq!(third.resource_cost_scaled_numerator[9], 174);
+
+        let total_wrong_belief_numerator =
+            first.exposure_benefit_scaled_numerator_us[0]
+                + second.exposure_benefit_scaled_numerator_us[0]
+                + third.exposure_benefit_scaled_numerator_us[0];
+        assert_eq!(
+            total_wrong_belief_numerator,
+            report.total_exposure_benefit_us[0] * i128::from(report.shapley_common_denominator)
+        );
+
+        let total_energy_numerator = first.resource_cost_scaled_numerator[9]
+            + second.resource_cost_scaled_numerator[9]
+            + third.resource_cost_scaled_numerator[9];
+        assert_eq!(
+            total_energy_numerator,
+            report.total_resource_cost_delta[9]
+                * i128::from(report.shapley_common_denominator)
+        );
+    }
+
+    #[test]
     fn interaction_order_summaries_reconstruct_total_joint_effect() {
         let report = decompose_exact_joint_interactions(&three_factor_interaction_input()).unwrap();
         assert_eq!(report.interaction_order_summaries.len(), 3);
