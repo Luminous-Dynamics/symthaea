@@ -1284,10 +1284,12 @@ mod tests {
         assert_eq!(node_a.tcn_duration_ns, 20);
         assert!(node_a.tcr.is_some());
         profile.validate().unwrap();
-        assert_eq!(
-            profile.canonical_digest_hex().unwrap(),
-            profile.canonical_digest_hex().unwrap()
-        );
+        let digest = profile.canonical_digest_hex().unwrap();
+        assert_eq!(digest, profile.canonical_digest_hex().unwrap());
+        let bytes = serde_json::to_vec(&profile).unwrap();
+        let restored: TemporalMycelialCycleProfile = serde_json::from_slice(&bytes).unwrap();
+        restored.validate().unwrap();
+        assert_eq!(restored.canonical_digest_hex().unwrap(), digest);
     }
 
     #[test]
@@ -1331,6 +1333,45 @@ mod tests {
         let node_a = profile.node_metrics.iter().find(|node| node.node_id == "A").unwrap();
         assert!(node_a.tcr.is_none());
         assert!(!node_a.degree_exposure_complete);
+    }
+
+    #[test]
+    fn temporal_profile_validator_rejects_tampered_cycle_state() {
+        let cycle_edges = vec![
+            edge("e-ab", "A", "B"),
+            edge("e-ac", "A", "C"),
+            edge("e-bc", "B", "C"),
+        ];
+        let input = sequence(vec![
+            snapshot(
+                "w1",
+                0,
+                10,
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                cycle_edges.clone(),
+            ),
+            snapshot(
+                "w2",
+                10,
+                20,
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                Vec::new(),
+            ),
+            snapshot(
+                "w3",
+                20,
+                30,
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                cycle_edges,
+            ),
+        ]);
+        let mut profile =
+            build_temporal_mycelial_cycle_profile(&input, cycle_config()).unwrap();
+        profile.cycles[0].observations[1].state = TemporalCycleWindowState::Unknown;
+        assert!(matches!(
+            profile.validate(),
+            Err(MycelialTemporalCycleError::InvalidProfile(_))
+        ));
     }
 
     #[test]
