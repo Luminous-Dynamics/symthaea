@@ -38,6 +38,20 @@ Symthaea's telemetry retry loop deliberately reads the gateway with
 already-open socket when the gateway field changes. That behavior is stated in
 the source-observed interface contract.
 
+## Validation and provenance
+
+Run the standalone Rust validator from the repository root:
+
+```bash
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns
+```
+
+The validator checks the corpus against `pattern-v1.schema.json`, then
+recomputes Git blob SHA-1 for every source path. If a referenced source file
+changes, the pattern is stale and validation fails until the example and
+provenance are reviewed and updated. Unsafe or parent-traversing paths fail
+closed.
+
 ## Evidence promotion
 
 Knowledge moves through explicit states:
