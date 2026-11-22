@@ -485,12 +485,12 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
         .map(|cell| {
             format!(
                 concat!(
-                    "        {\n",
+                    "        {{\n",
                     "          \"cell_id\": \"{}\",\n",
                     "          \"rms\": {:.12},\n",
                     "          \"max_absolute_value\": {:.12},\n",
                     "          \"fnv1a64_fingerprint\": \"{}\"\n",
-                    "        }"
+                    "        }}"
                 ),
                 cell.cell_id, cell.rms, cell.max_absolute_value, cell.fnv1a64_fingerprint
             )
@@ -522,13 +522,13 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
             "        \"combined_signal_change_norm\": {:.12}\n",
             "      }},\n",
             "      \"cells\": [\n{}\n      ],\n",
-            "      \"invariants\": {\n",
+            "      \"invariants\": {{\n",
             "        \"matched_nuisance_delta_max_abs\": {:.12},\n",
             "        \"matched_signal_delta_max_abs\": {:.12},\n",
             "        \"additive_interaction_max_abs\": {:.12},\n",
             "        \"numerical_tolerance\": {:.12},\n",
             "        \"all_invariants_within_tolerance\": {}\n",
-            "      }\n",
+            "      }}\n",
             "    }}"
         ),
         point.signal_scale_index,
