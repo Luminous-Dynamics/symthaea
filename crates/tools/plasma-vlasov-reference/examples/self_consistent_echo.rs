@@ -10,7 +10,7 @@ const FIRST_MODE: usize = 1;
 const SECOND_MODE: usize = 2;
 const FIRST_TIME: f64 = 0.0;
 const SECOND_TIME: f64 = 2.0;
-const FINAL_TIME: f64 = 8.0;
+const FINAL_TIME: f64 = 12.0;
 const INITIAL_AMPLITUDE: f64 = 1.0e-3;
 const THERMAL_SPEED: f64 = 1.0;
 const IMPULSE_AMPLITUDE: f64 = 5.0e-2;
@@ -53,7 +53,7 @@ fn run_resolution(
     }
 
     let echo_window_start = prediction.echo_time - 1.5;
-    let echo_window_end = prediction.echo_time + 3.5;
+    let echo_window_end = prediction.echo_time + 7.5;
     let mut echo_trace = Vec::new();
 
     for step in 0..=total_steps {
