@@ -20,6 +20,19 @@ struct Prediction {
     score: f64,
 }
 
+#[derive(Debug)]
+struct ParsedMetadata {
+    items: Vec<MetadataItem>,
+    id_column: String,
+    target_column: Option<String>,
+}
+
+#[derive(Debug)]
+struct ParsedPredictions {
+    items: Vec<Prediction>,
+    id_column: String,
+}
+
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct Metrics {
     pub count: usize,
@@ -64,6 +77,9 @@ pub struct ScoreReport {
     pub schema_version: String,
     pub mode: String,
     pub metadata_sha256: String,
+    pub metadata_id_column: String,
+    pub target_score_column: String,
+    pub prediction_id_column: String,
     pub item_count: usize,
     pub metrics: Metrics,
     pub system: SystemReport,
@@ -86,6 +102,10 @@ pub struct ComparisonReport {
     pub schema_version: String,
     pub mode: String,
     pub metadata_sha256: String,
+    pub metadata_id_column: String,
+    pub target_score_column: String,
+    pub baseline_prediction_id_column: String,
+    pub candidate_prediction_id_column: String,
     pub item_count: usize,
     pub baseline: SystemReport,
     pub candidate: SystemReport,
@@ -100,6 +120,8 @@ pub struct SubmissionReport {
     pub mode: String,
     pub evaluation_manifest_sha256: String,
     pub prediction_sha256: String,
+    pub evaluation_id_column: String,
+    pub prediction_id_column: String,
     pub expected_item_count: usize,
     pub received_item_count: usize,
     pub minimum_prediction: f64,
@@ -124,7 +146,7 @@ pub fn score_csv(
 ) -> Result<ScoreReport, String> {
     let metadata = parse_metadata(metadata_bytes, true)?;
     let predictions = parse_predictions(prediction_bytes)?;
-    let aligned = align_predictions(&metadata, &predictions)?;
+    let aligned = align_predictions(&metadata.items, &predictions.items)?;
     let pairs: Vec<ItemPair> = aligned
         .iter()
         .map(|(item, prediction)| ItemPair {
@@ -135,7 +157,7 @@ pub fn score_csv(
 
     let system = build_system_report(
         system_name,
-        &metadata,
+        &metadata.items,
         prediction_bytes,
         &pairs,
         bootstrap_samples,
@@ -146,7 +168,12 @@ pub fn score_csv(
         schema_version: "mel-xacle-audit-report-v1".to_owned(),
         mode: "score".to_owned(),
         metadata_sha256: sha256_hex(metadata_bytes),
-        item_count: metadata.len(),
+        metadata_id_column: metadata.id_column,
+        target_score_column: metadata
+            .target_column
+            .expect("labelled mode requires a target score column"),
+        prediction_id_column: predictions.id_column,
+        item_count: metadata.items.len(),
         metrics: system.metrics,
         system,
         claim_ceiling: score_claim_ceiling(),
@@ -168,8 +195,8 @@ pub fn compare_csv(
     let metadata = parse_metadata(metadata_bytes, true)?;
     let baseline_predictions = parse_predictions(baseline_bytes)?;
     let candidate_predictions = parse_predictions(candidate_bytes)?;
-    let baseline_aligned = align_predictions(&metadata, &baseline_predictions)?;
-    let candidate_aligned = align_predictions(&metadata, &candidate_predictions)?;
+    let baseline_aligned = align_predictions(&metadata.items, &baseline_predictions.items)?;
+    let candidate_aligned = align_predictions(&metadata.items, &candidate_predictions.items)?;
 
     let baseline_pairs: Vec<ItemPair> = baseline_aligned
         .iter()
@@ -188,7 +215,7 @@ pub fn compare_csv(
 
     let baseline = build_system_report(
         baseline_name,
-        &metadata,
+        &metadata.items,
         baseline_bytes,
         &baseline_pairs,
         0,
@@ -196,7 +223,7 @@ pub fn compare_csv(
     )?;
     let candidate = build_system_report(
         candidate_name,
-        &metadata,
+        &metadata.items,
         candidate_bytes,
         &candidate_pairs,
         0,
@@ -214,7 +241,13 @@ pub fn compare_csv(
         schema_version: "mel-xacle-audit-report-v1".to_owned(),
         mode: "compare".to_owned(),
         metadata_sha256: sha256_hex(metadata_bytes),
-        item_count: metadata.len(),
+        metadata_id_column: metadata.id_column,
+        target_score_column: metadata
+            .target_column
+            .expect("labelled mode requires a target score column"),
+        baseline_prediction_id_column: baseline_predictions.id_column,
+        candidate_prediction_id_column: candidate_predictions.id_column,
+        item_count: metadata.items.len(),
         baseline,
         candidate,
         candidate_minus_baseline_srcc,
@@ -230,7 +263,7 @@ pub fn validate_submission_csv(
 ) -> Result<SubmissionReport, String> {
     let metadata = parse_metadata(evaluation_manifest_bytes, false)?;
     let predictions = parse_predictions(prediction_bytes)?;
-    let _aligned = align_predictions(&metadata, &predictions)?;
+    let _aligned = align_predictions(&metadata.items, &predictions.items)?;
 
     let minimum_prediction = predictions
         .iter()
@@ -246,8 +279,10 @@ pub fn validate_submission_csv(
         mode: "validate-submission".to_owned(),
         evaluation_manifest_sha256: sha256_hex(evaluation_manifest_bytes),
         prediction_sha256: sha256_hex(prediction_bytes),
-        expected_item_count: metadata.len(),
-        received_item_count: predictions.len(),
+        evaluation_id_column: metadata.id_column,
+        prediction_id_column: predictions.id_column,
+        expected_item_count: metadata.items.len(),
+        received_item_count: predictions.items.len(),
         minimum_prediction,
         maximum_prediction,
         exact_id_coverage: true,
@@ -260,15 +295,30 @@ pub fn validate_submission_csv(
     })
 }
 
-fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataItem>, String> {
+fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<ParsedMetadata, String> {
     let mut reader = csv::ReaderBuilder::new().flexible(false).from_reader(bytes);
     let headers = reader
         .headers()
         .map_err(|error| format!("invalid metadata CSV header: {error}"))?
         .clone();
 
-    let id_index = header_index(&headers, "wave_file_name", true)?.expect("required header index");
-    let target_index = header_index(&headers, "average_score", labels_required)?;
+    let (id_index, id_column) = header_alias_index(
+        &headers,
+        &["wave_file_name", "wav_file_name"],
+        "metadata item ID",
+        true,
+    )?
+    .expect("required metadata ID column");
+    let target = header_alias_index(
+        &headers,
+        &["average_score", "average_semantic_alignement_score"],
+        "target score",
+        labels_required,
+    )?;
+    let (target_index, target_column) = match target {
+        Some((index, name)) => (Some(index), Some(name)),
+        None => (None, None),
+    };
     let model_id_index = header_index(&headers, "model_id", false)?;
     let model_name_index = header_index(&headers, "model_name", false)?;
 
@@ -281,20 +331,22 @@ fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataIte
                 row_index + 2
             )
         })?;
-        let id = field(&record, id_index, "wave_file_name", row_index + 2)?;
+        let id = field(&record, id_index, &id_column, row_index + 2)?;
         if id.trim().is_empty() {
             return Err(format!(
-                "empty wave_file_name at metadata row {}",
+                "empty {} at metadata row {}",
+                id_column,
                 row_index + 2
             ));
         }
         if !seen.insert(id.to_owned()) {
-            return Err(format!("duplicate metadata wave_file_name: {id}"));
+            return Err(format!("duplicate metadata {}: {id}", id_column));
         }
 
-        let target = if let Some(index) = target_index {
-            let value = field(&record, index, "average_score", row_index + 2)?;
-            Some(parse_score(value, "average_score", row_index + 2)?)
+        let target_value = if let Some(index) = target_index {
+            let score_column = target_column.as_deref().expect("target column name");
+            let value = field(&record, index, score_column, row_index + 2)?;
+            Some(parse_score(value, score_column, row_index + 2)?)
         } else {
             None
         };
@@ -313,7 +365,7 @@ fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataIte
 
         metadata.push(MetadataItem {
             id: id.to_owned(),
-            target,
+            target: target_value,
             group,
         });
     }
@@ -321,16 +373,26 @@ fn parse_metadata(bytes: &[u8], labels_required: bool) -> Result<Vec<MetadataIte
     if metadata.is_empty() {
         return Err("metadata CSV contains no data rows".to_owned());
     }
-    Ok(metadata)
+    Ok(ParsedMetadata {
+        items: metadata,
+        id_column,
+        target_column,
+    })
 }
 
-fn parse_predictions(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
+fn parse_predictions(bytes: &[u8]) -> Result<ParsedPredictions, String> {
     let mut reader = csv::ReaderBuilder::new().flexible(false).from_reader(bytes);
     let headers = reader
         .headers()
         .map_err(|error| format!("invalid prediction CSV header: {error}"))?
         .clone();
-    let id_index = header_index(&headers, "wave_file_name", true)?.expect("required header index");
+    let (id_index, id_column) = header_alias_index(
+        &headers,
+        &["wav_file_name", "wave_file_name"],
+        "prediction item ID",
+        true,
+    )?
+    .expect("required prediction ID column");
     let score_index =
         header_index(&headers, "pred_score", true)?.expect("required prediction score header");
 
@@ -343,15 +405,16 @@ fn parse_predictions(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
                 row_index + 2
             )
         })?;
-        let id = field(&record, id_index, "wave_file_name", row_index + 2)?;
+        let id = field(&record, id_index, &id_column, row_index + 2)?;
         if id.trim().is_empty() {
             return Err(format!(
-                "empty prediction wave_file_name at row {}",
+                "empty prediction {} at row {}",
+                id_column,
                 row_index + 2
             ));
         }
         if !seen.insert(id.to_owned()) {
-            return Err(format!("duplicate prediction wave_file_name: {id}"));
+            return Err(format!("duplicate prediction {}: {id}", id_column));
         }
         let raw_score = field(&record, score_index, "pred_score", row_index + 2)?;
         let score = parse_score(raw_score, "pred_score", row_index + 2)?;
@@ -363,7 +426,10 @@ fn parse_predictions(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
     if predictions.is_empty() {
         return Err("prediction CSV contains no data rows".to_owned());
     }
-    Ok(predictions)
+    Ok(ParsedPredictions {
+        items: predictions,
+        id_column,
+    })
 }
 
 fn align_predictions<'a>(
@@ -692,6 +758,33 @@ fn field<'a>(
 
 fn optional_field(record: &csv::StringRecord, index: Option<usize>) -> Option<&str> {
     index.and_then(|index| record.get(index))
+}
+
+fn header_alias_index(
+    headers: &csv::StringRecord,
+    aliases: &[&str],
+    logical_name: &str,
+    required: bool,
+) -> Result<Option<(usize, String)>, String> {
+    let mut present = Vec::new();
+    for alias in aliases {
+        if let Some(index) = header_index(headers, alias, false)? {
+            present.push((index, (*alias).to_owned()));
+        }
+    }
+    if present.len() > 1 {
+        let names: Vec<&str> = present.iter().map(|(_, name)| name.as_str()).collect();
+        return Err(format!(
+            "CSV contains multiple columns for {logical_name}: {names:?}; keep exactly one"
+        ));
+    }
+    match present.into_iter().next() {
+        Some(column) => Ok(Some(column)),
+        None if required => Err(format!(
+            "CSV is missing {logical_name}; accepted column names: {aliases:?}"
+        )),
+        None => Ok(None),
+    }
 }
 
 fn header_index(
