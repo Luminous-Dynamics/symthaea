@@ -522,8 +522,8 @@ mod tests {
                 replicate_id: format!("cal-{index:03}"),
                 statistics: [
                     (index + 1) as f64 / 100.0,
-                    (index + 1) as f64 / 120.0,
-                    (index + 1) as f64 / 150.0,
+                    (index + 1) as f64 / 100.0 * 0.8,
+                    (index + 1) as f64 / 100.0 * 0.6,
                 ],
             })
             .collect()
