@@ -122,3 +122,18 @@ Symthaea proposes and selects. Symtropy replays scenarios. Mycelix retains immut
 ## Claim boundaries
 
 A 90% SPICE-call reduction on open analog circuits is not a 90% manufacturing-cycle-time reduction. A 20× circuit-simulation speedup is not 20× fab throughput. Surrogate-guided Pareto improvement is not fabricated-silicon performance, yield, process qualification or equipment readiness. Those claims require their own independent physical evidence.
+
+
+## Executable high-fidelity acquisition baseline
+
+The first Rust acquisition oracle for [SEMI-MF-OPT-001 #13175](https://github.com/Luminous-Dynamics/symthaea/issues/13175) is now in `crates/domains/symthaea-semiconductor/src/benchmark/mf_acquisition.rs`.
+
+For each candidate, the baseline score is:
+
+`risk_adjusted_expected_HV_gain + exploration_weight × calibrated_epistemic_stddev × frontier_relevance`
+
+It exactly enumerates feasible subsets for up to 18 candidates under an evaluation-cost budget. Input is bound to prediction-packet, model, uncertainty-calibration and objective-specification digests. Deterministic tie-break: maximum utility, then lower cost, then lexicographic candidate IDs.
+
+The synthetic known-answer fixture selects B/E under budget 13 with modeled utility 0.3115. This only verifies scheduler semantics; it does not run SPICE/TCAD/route or demonstrate a Pareto improvement. The next benchmark step is comparison against greedy gain/cost, random/DOE, uncertainty-only, diversity-only, constrained BO, and high-fidelity-only under matched simulation budgets.
+
+Hosted CI [#44989958104](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989958104): 43/43 Rust tests, 46/46 Python reference tests, fmt, Clippy and four Rust CLI report parity checks passed.
