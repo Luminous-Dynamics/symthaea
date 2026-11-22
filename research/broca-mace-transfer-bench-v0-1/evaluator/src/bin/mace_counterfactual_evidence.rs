@@ -1104,6 +1104,34 @@ mod tests {
             build_manifest(&original.memory, 0x1234, 8).unwrap(),
             build_manifest(&changed_hidden.memory, 0x1234, 8).unwrap()
         );
+        for mode in CandidateMode::ALL {
+            let original_candidate = run_candidate(
+                mode,
+                original.query,
+                original.decision_need,
+                &original.memory,
+            )
+            .unwrap();
+            let changed_candidate = run_candidate(
+                mode,
+                changed_hidden.query,
+                changed_hidden.decision_need,
+                &changed_hidden.memory,
+            )
+            .unwrap();
+            assert_eq!(
+                original_candidate.input_sha256,
+                changed_candidate.input_sha256
+            );
+            assert_eq!(
+                original_candidate.retrieved_event_ids,
+                changed_candidate.retrieved_event_ids
+            );
+            assert_eq!(
+                original_candidate.decision.action,
+                changed_candidate.decision.action
+            );
+        }
     }
 
     #[test]
