@@ -546,6 +546,91 @@
       ],
       "resource_review": "64,967 parameter count excludes offline generator and handcrafted feature extraction; full lifecycle and runtime components must be reported",
       "followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13149"
+    },
+    {
+      "id": "UCIe-4.0-System-Level-Chiplet-Standard-Release",
+      "title": "UCIe 4.0 Specification release and public technical announcement",
+      "official_release": "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf",
+      "press_release_date": "2026-11-12",
+      "normative_specification_request": "https://www.uciexpress.org/specifications",
+      "reported_parameters": {
+        "ucie_mem_data_efficiency_max": 0.9375,
+        "die_edge_bandwidth_density_tb_s_mm": 2.5,
+        "optional_64_gt_s_energy_efficiency_increase_percent": [
+          30,
+          80
+        ],
+        "shoreline_bandwidth_density_improvement_percent": 20,
+        "area_bandwidth_density_improvement_percent": 10
+      },
+      "capabilities": [
+        "on-package-memory-connectivity",
+        "trusted-reporting-of-chiplet-state",
+        "integrity-protected-management-channels",
+        "reset-management",
+        "error-notification",
+        "link-health-monitoring"
+      ],
+      "acquisition": {
+        "public_press_release_available": true,
+        "normative_specification": "available-by-request",
+        "raw_conformance_test_suite": "not-verified-publicly",
+        "raw_chiplet_test_data": "not-available-in-this-benchmark"
+      },
+      "evidence_class": "official-consortium-release-summary; specification conformance and measured product metrics not independently established"
+    },
+    {
+      "id": "Imec-CFET-DTCO-2026",
+      "title": "Advancing the CFET-based device roadmap: novel integration modules and standard cell configurations",
+      "part1": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell",
+      "part2": "https://www.imec-int.com/en/articles/advancing-cfet-based-device-roadmap-novel-integration-modules-and-standard-cell-2",
+      "reported_parameters": {
+        "bottom_pfET_access_resistance_ohm_um": {
+          "before": 1753,
+          "after": 378
+        },
+        "bottom_pfET_survival_yield": {
+          "before": 0.45,
+          "after": 0.85
+        },
+        "drive_current_relative_improvement": 5,
+        "sequential_cfet_layout_efficiency_max": 0.98,
+        "cfet_sram_5t1_area_reduction_vs_6t": 0.125,
+        "cfet_sram_write_speed_improvement_percent": [
+          7,
+          15
+        ],
+        "cpp_to_m1_gear_ratio_study": "2:1"
+      },
+      "acquisition": {
+        "public_technical_articles_available": true,
+        "raw_device_structure_and_measurement_data": "not-available-in-this-benchmark",
+        "fab_process_recipe": "not-accessed",
+        "rights_for_raw_data": "not-applicable-to-public-article; reproduction requires partner/model data"
+      },
+      "evidence_class": "industry-research-reported-2026-CFET/DTCO-results; not a Luminous reproduction or open dataset"
+    },
+    {
+      "id": "NIST-Physics-AI-Overlay-CD-Metrology-2026",
+      "title": "Overlay Metrology Using Physics and AI-Based Scanning Electron Microscopy",
+      "official_source": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
+      "created": "2026-09-03",
+      "updated": "2026-09-18",
+      "scope": [
+        "overlay",
+        "critical-dimension",
+        "defect-inspection",
+        "physics-based-image-simulation",
+        "3d-reconstruction",
+        "measurement-detection-limits"
+      ],
+      "acquisition": {
+        "project_description_public": true,
+        "raw_images_available": "not-verified",
+        "model_artifact_digests": "not-verified",
+        "distribution_rights": "not-established-by-project-description"
+      },
+      "evidence_class": "current-NIST-project-page; not a data licence or benchmark result"
     }
   ],
   "benchmark_reference_artifacts": {
