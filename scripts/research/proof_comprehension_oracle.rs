@@ -108,14 +108,14 @@ fn or_iff_right_without_hypothesis(a: bool, b: bool) -> bool {
     (a || b) == b
 }
 
-#[cfg(not(test))]
-
+#[cfg(test)]
 fn translation_count_cyclic(n: usize, t2: &[usize], target_column: usize) -> usize {
     (0..n)
         .filter(|translate| t2.iter().any(|z| (*translate + *z) % n == target_column))
         .count()
 }
 
+#[cfg(not(test))]
 fn main_report() {
     let counts = evaluate_tseitin_toy();
     println!("source_models={}", counts.source_models);
