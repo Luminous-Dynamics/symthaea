@@ -15,7 +15,8 @@ use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_policy::{
-    Action, EvidenceDigest256, Experience, IdentificationMethodV1, Objective, Regime, Scope,
+    Action, DecisionNeedV1, EvidenceDigest256, Experience, IdentificationMethodV1, Objective,
+    Regime, Scope,
 };
 use sha2::{Digest, Sha256};
 use symthaea_hdc_ltc::ContinuousHV;
@@ -115,6 +116,27 @@ impl SemanticExperienceQueryV1 {
         }
     }
 
+    /// Convert a candidate-visible DecisionNeed to a typed retrieval query.
+    /// The decision need supplies target outcome/unit/horizon/population via
+    /// its complete semantic-estimand descriptor and is never derived from
+    /// evaluator outcomes or the hidden Truth object.
+    pub fn from_decision_need(
+        need: DecisionNeedV1,
+        action: Action,
+    ) -> Result<Self, TypedContentError> {
+        if !need.is_valid() {
+            return Err(TypedContentError::InvalidDecisionNeed);
+        }
+        if !need.action_alternatives.contains(&action) {
+            return Err(TypedContentError::ActionNotInDecisionNeed);
+        }
+        let mut query = Self::qualified_transfer(need.scope, action);
+        query.identification_method = Some(need.identification_method);
+        let estimand_digest = need.semantic_estimand.canonical_digest();
+        query.estimand_digest = Some(estimand_digest);
+        Ok(query)
+    }
+
     /// Candidate-visible query profile corresponding to the current MACE
     /// causal-transfer admission predicates. Numeric overlap/balance limits
     /// remain exact policy gates after resolution; they are not RBF point targets.
@@ -148,6 +170,8 @@ pub enum TypedContentError {
     InvalidQueryPropensityBounds,
     InvalidQueryUtility,
     InvalidQueryMeasurementError,
+    InvalidDecisionNeed,
+    ActionNotInDecisionNeed,
 }
 
 impl fmt::Display for TypedContentError {
@@ -183,6 +207,12 @@ impl fmt::Display for TypedContentError {
             }
             Self::InvalidQueryMeasurementError => {
                 write!(f, "query target measurement-error bound is outside [0, 1]")
+            }
+            Self::InvalidDecisionNeed => {
+                write!(f, "candidate-visible DecisionNeed is incomplete or has an unsupported qualification profile")
+            }
+            Self::ActionNotInDecisionNeed => {
+                write!(f, "retrieval action is not declared in the candidate-visible DecisionNeed")
             }
         }
     }
@@ -681,6 +711,15 @@ fn encode_query(
             b"causal.estimand_digest",
             digest.as_bytes(),
         );
+        // In qualified MACE evidence, the receipt-bound estimand digest must
+        // equal the digest of the complete semantic descriptor. Bind both
+        // candidate fields to the same task-declared target identity.
+        push_category(
+            &mut features,
+            config,
+            b"causal.semantic_estimand_digest",
+            digest.as_bytes(),
+        );
     }
 
     for (tag, value) in [
@@ -1115,6 +1154,36 @@ mod tests {
         negative_control.target_interference_controlled = Some(false);
         let negative = index.retrieve(negative_control, 2).unwrap();
         assert_eq!(negative.candidates[0].event_id, 32);
+    }
+
+    #[test]
+    fn decision_need_builds_estimand_bound_candidate_query() {
+        use broca_mace_policy::{DecisionNeedV1, EvidenceDigest256, SemanticEstimandV1};
+
+        let target_scope = scope(Regime::Baseline, Objective::Quality);
+        let semantic = SemanticEstimandV1::new(
+            1,
+            EvidenceDigest256::from_bytes([1; 32]),
+            EvidenceDigest256::from_bytes([2; 32]),
+            EvidenceDigest256::from_bytes([3; 32]),
+            EvidenceDigest256::from_bytes([4; 32]),
+            EvidenceDigest256::from_bytes([5; 32]),
+            30_000,
+            EvidenceDigest256::from_bytes([6; 32]),
+            EvidenceDigest256::from_bytes([7; 32]),
+            EvidenceDigest256::from_bytes([8; 32]),
+        );
+        let need = DecisionNeedV1::new(target_scope, semantic).unwrap();
+        let query = SemanticExperienceQueryV1::from_decision_need(need, Action::A).unwrap();
+        assert_eq!(query.scope, target_scope);
+        assert_eq!(query.action, Action::A);
+        assert_eq!(query.estimand_digest, Some(semantic.canonical_digest()));
+        assert_eq!(
+            SemanticExperienceQueryV1::from_decision_need(need, Action::B)
+                .unwrap()
+                .estimand_digest,
+            query.estimand_digest
+        );
     }
 
     #[test]
