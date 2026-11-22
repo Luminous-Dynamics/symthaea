@@ -14,7 +14,6 @@
     "broad_loading",
     "localized_loading",
     "spatial_decay_length",
-    "rng_seed",
     "event_train_rule",
     "broad_events",
     "localized_events",
@@ -71,10 +70,6 @@
     "broad_loading": { "type": "number", "minimum": 0 },
     "localized_loading": { "type": "number", "minimum": 0 },
     "spatial_decay_length": { "type": "number", "exclusiveMinimum": 0 },
-    "rng_seed": {
-      "type": "string",
-      "pattern": "^0x[0-9a-f]{16}$"
-    },
     "event_train_rule": {
       "const": "amplitude_exp_negative_elapsed_over_decay_samples"
     },
