@@ -213,9 +213,9 @@ pub fn classify_validated_metrology_label_v1(
             "label.unit does not match classification semantics".into(),
         ));
     }
-    let value = label.value.ok_or_else(|| {
-        MetrologySemanticsError("validated label has no numeric value".into())
-    })?;
+    let value = label
+        .value
+        .ok_or_else(|| MetrologySemanticsError("validated label has no numeric value".into()))?;
     if !value.is_finite() {
         return Err(MetrologySemanticsError(
             "label.value: expected finite numeric value".into(),
@@ -225,9 +225,7 @@ pub fn classify_validated_metrology_label_v1(
         .events
         .iter()
         .find(|event| event.event_id == label.measurement_event_id)
-        .ok_or_else(|| {
-            MetrologySemanticsError("measurement_event_id does not resolve".into())
-        })?;
+        .ok_or_else(|| MetrologySemanticsError("measurement_event_id does not resolve".into()))?;
     if measurement_event.event_kind != ProcessEventKindV1::Metrology
         || measurement_event.subject_id.as_deref() != Some(label.subject_id.as_str())
     {
@@ -237,9 +235,7 @@ pub fn classify_validated_metrology_label_v1(
     }
 
     let graph_sha256 = validate_process_event_graph_v1(graph)
-        .map_err(|error| {
-            MetrologySemanticsError(format!("process event graph rejected: {error}"))
-        })?
+        .map_err(|error| MetrologySemanticsError(format!("process event graph rejected: {error}")))?
         .graph_sha256;
     let mut classification = ValidatedMetrologyClassificationV1 {
         schema: CLASSIFICATION_SCHEMA_V1.into(),
@@ -256,11 +252,7 @@ pub fn classify_validated_metrology_label_v1(
         threshold: semantics.threshold,
         positive_class_name: semantics.positive_class_name.clone(),
         negative_class_name: semantics.negative_class_name.clone(),
-        derived_positive: derive_positive(
-            value,
-            semantics.positive_condition,
-            semantics.threshold,
-        ),
+        derived_positive: derive_positive(value, semantics.positive_condition, semantics.threshold),
         graph_sha256,
         authority_ref: semantics.authority_ref.clone(),
         classification_sha256: String::new(),
@@ -273,17 +265,13 @@ pub fn classify_validated_metrology_label_v1(
 mod tests {
     use super::*;
     use crate::benchmark::process_event_graph::{
-        ClockBasisV1, MetrologyLabelV1, ProcessEventEdgeV1, ProcessEventGraphV1,
-        ProcessEventV1,
+        ClockBasisV1, MetrologyLabelV1, ProcessEventEdgeV1, ProcessEventGraphV1, ProcessEventV1,
     };
 
     const SOURCE_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const TRANSFORM_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
-    fn semantics(
-        condition: PositiveConditionV1,
-        threshold: f64,
-    ) -> BinaryMeasurandSemanticsV1 {
+    fn semantics(condition: PositiveConditionV1, threshold: f64) -> BinaryMeasurandSemanticsV1 {
         let mut rule = BinaryMeasurandSemanticsV1 {
             schema: SEMANTICS_SCHEMA_V1.into(),
             semantics_id: "film-thickness-defect-v1".into(),
@@ -396,15 +384,13 @@ mod tests {
     fn classification_receipt_binds_value_graph_and_semantics_digest() {
         let input = graph(10.5, "nm", MetrologyLabelStatusV1::Validated);
         let rule = semantics(PositiveConditionV1::GreaterThan, 10.0);
-        let first =
-            classify_validated_metrology_label_v1(&input, "label-17", &rule).unwrap();
+        let first = classify_validated_metrology_label_v1(&input, "label-17", &rule).unwrap();
         assert!(first.derived_positive);
         assert_eq!(first.semantics_sha256, rule.semantics_sha256);
         let mut changed = rule.clone();
         changed.threshold = 11.0;
         seal_binary_measurand_semantics_v1(&mut changed).unwrap();
-        let second =
-            classify_validated_metrology_label_v1(&input, "label-17", &changed).unwrap();
+        let second = classify_validated_metrology_label_v1(&input, "label-17", &changed).unwrap();
         assert!(!second.derived_positive);
         assert_ne!(first.classification_sha256, second.classification_sha256);
     }
