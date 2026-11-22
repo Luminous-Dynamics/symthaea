@@ -280,7 +280,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
                     event.monotonic_ns,
                     &trace.clock_domain_id,
                     trace.loopback_measurement.as_ref(),
-                    &mut decisions,
+                    &decisions,
                     &input_chunks,
                     &mut previous_output_sequence,
                 )?;
@@ -512,7 +512,7 @@ fn validate_output(
     event_time_ns: u64,
     clock_domain_id: &str,
     loopback: Option<&LoopbackMeasurementV1>,
-    decisions: &mut BTreeMap<String, DecisionRecord>,
+    decisions: &BTreeMap<String, DecisionRecord>,
     inputs: &BTreeMap<u64, (u64, u64)>,
     previous_output_sequence: &mut u64,
 ) -> Result<(), String> {
