@@ -23,6 +23,23 @@ Not yet built: Steward (sleep/save/introspect/audit) and Bench
 gateway already exposes what they'd need; they're just not wired into this
 UI yet.
 
+## Frontend evidence anchors
+
+The rendered interface exposes stable `data-sfeb-id` attributes for its main
+regions and interaction points (header, gateway status, telemetry, projections,
+conversation transcript and composer). These identifiers are consumed by the
+bounded layout probe in `symthaea-browser` to connect observed geometry to a
+named UI region without extracting arbitrary page text.
+
+The transcript uses a live log role, gateway state uses a status role, errors
+are announced as alerts, and the message input has an explicit accessible
+name. Keyboard focus indicators, a reduced-motion rule for the telemetry orb,
+and narrow-screen layout adjustments are defined in `style.css`.
+
+These are source-level changes; a browser-based accessibility and responsive
+acceptance run is still required before claiming that the rendered interface
+passes.
+
 ## Run it
 
 ```bash
