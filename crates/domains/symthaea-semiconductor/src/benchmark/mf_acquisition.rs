@@ -336,7 +336,10 @@ mod tests {
         let mut subject = known_answer();
         let expected = select_high_fidelity_candidates_v1(&subject).unwrap();
         subject.candidates.reverse();
-        assert_eq!(select_high_fidelity_candidates_v1(&subject).unwrap(), expected);
+        assert_eq!(
+            select_high_fidelity_candidates_v1(&subject).unwrap(),
+            expected
+        );
     }
 
     #[test]
