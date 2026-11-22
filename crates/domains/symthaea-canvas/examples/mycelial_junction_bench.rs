@@ -116,6 +116,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         contact_filtration.metrics.cycle_birth_count
     );
     println!(
+        "candidate_contact_conflict_groups: {}",
+        contact_filtration.metrics.contact_conflict_group_count
+    );
+    println!(
+        "candidate_conflicting_candidate_count: {}",
+        contact_filtration.metrics.conflicting_candidate_count
+    );
+    println!(
+        "contact_filtration_interpretation: all_candidate_union_upper_bound_not_jointly_accepted"
+    );
+    println!(
         "contact_filtration_threshold_snapshots: {}",
         contact_filtration.snapshots.len()
     );
