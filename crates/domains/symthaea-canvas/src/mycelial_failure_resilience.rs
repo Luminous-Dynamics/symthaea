@@ -980,7 +980,7 @@ fn rank_failure_entities(
                 let right_index = indexed.node_index[right];
                 degree[right_index]
                     .cmp(&degree[left_index])
-                    .then_with(|| left.cmp(right))
+                    .then_with(|| failure_entity_order(config.seed, 1, left, right))
             });
         }
         MycelialFailureAttackStrategy::LowestDegreeJunctions => {
@@ -2746,11 +2746,10 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(&spatial.ranked_entity_ids[..2], &["A", "B"]);
-        assert_eq!(
-            spatial.scenarios[1].failed_junction_ids,
-            vec!["A".to_string(), "B".to_string()]
-        );
+        assert_eq!(spatial.ranked_entity_ids[0], "A");
+        assert!(["B", "C"].contains(&spatial.ranked_entity_ids[1].as_str()));
+        assert_eq!(spatial.scenarios[1].failed_junction_ids[0], "A");
+        assert!(["B", "C"].contains(&spatial.scenarios[1].failed_junction_ids[1].as_str()));
     }
 
     #[test]
@@ -2782,10 +2781,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(&static_plan.ranked_entity_ids[..2], &["edge-ab", "edge-bc"]);
-        assert_eq!(&adaptive_plan.ranked_entity_ids[..2], &["edge-ab", "edge-ad"]);
+        assert_eq!(adaptive_plan.ranked_entity_ids[0], "edge-ab");
+        assert!(
+            ["edge-ad", "edge-cd"].contains(&adaptive_plan.ranked_entity_ids[1].as_str())
+        );
         assert_eq!(
             adaptive_plan.ranked_entity_ids_per_step[1][0],
-            "edge-ad"
+            adaptive_plan.ranked_entity_ids[1]
         );
         assert!(
             adaptive_plan.ranked_entity_ids_per_step[1]
@@ -2856,7 +2858,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(static_plan.ranked_entity_ids[0], "A");
-        assert_eq!(static_plan.ranked_entity_ids[1], "B");
+        assert!(["B", "C", "D", "E"].contains(&static_plan.ranked_entity_ids[1].as_str()));
         assert_eq!(adaptive_plan.ranked_entity_ids[0], "A");
         assert_eq!(adaptive_plan.ranked_entity_ids[1], "E");
         assert_eq!(adaptive_plan.ranked_entity_ids_per_step[1][0], "E");
