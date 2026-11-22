@@ -1,0 +1,102 @@
+{
+  "schema": "sfeb-search-filter-mutation-campaign-v1",
+  "task_id": "SFEB-L2-005",
+  "status": "design_authored_not_executed",
+  "mutations": [
+    {
+      "id": "MUT-SEARCH-001",
+      "severity": "high",
+      "change": "Make search case-sensitive.",
+      "expected_detection": "Case-fold golden and metamorphic control fail."
+    },
+    {
+      "id": "MUT-SEARCH-002",
+      "severity": "high",
+      "change": "Search only names, omitting SKU and description.",
+      "expected_detection": "SKU/description golden cases fail."
+    },
+    {
+      "id": "MUT-FILTER-003",
+      "severity": "critical",
+      "change": "Combine category and availability with OR.",
+      "expected_detection": "Sensors plus in-stock returns extra assets."
+    },
+    {
+      "id": "MUT-PRICE-004",
+      "severity": "high",
+      "change": "Treat inclusive bounds as exclusive.",
+      "expected_detection": "Price-boundary case fails."
+    },
+    {
+      "id": "MUT-SORT-005",
+      "severity": "high",
+      "change": "Use input order as tie-break.",
+      "expected_detection": "Stable tie-break and source-order relation fail."
+    },
+    {
+      "id": "MUT-PAGE-006",
+      "severity": "critical",
+      "change": "Paginate before filtering/sorting.",
+      "expected_detection": "Page 2 and page concatenation fail."
+    },
+    {
+      "id": "MUT-URL-007",
+      "severity": "high",
+      "change": "Omit fields from state URL.",
+      "expected_detection": "State round-trip fails."
+    },
+    {
+      "id": "MUT-PRICE-008",
+      "severity": "critical",
+      "change": "Silently swap reversed price bounds.",
+      "expected_detection": "Negative case must reject."
+    },
+    {
+      "id": "MUT-RENDER-009",
+      "severity": "high",
+      "change": "Interpret dataset strings as raw HTML.",
+      "expected_detection": "Escaped text invariant fails."
+    },
+    {
+      "id": "MUT-STATE-010",
+      "severity": "high",
+      "change": "Restore page but reset other fields.",
+      "expected_detection": "Deep link state restore fails."
+    }
+  ],
+  "positive_controls": [
+    {
+      "id": "POS-SEARCH-001",
+      "change": "Reorder dataset records.",
+      "expected_invariant": "Sorted result IDs are unchanged."
+    },
+    {
+      "id": "POS-SEARCH-002",
+      "change": "Change display currency formatting only.",
+      "expected_invariant": "Filtering and sorting in integer cents are unchanged."
+    },
+    {
+      "id": "POS-SEARCH-003",
+      "change": "Change ASCII search text casing.",
+      "expected_invariant": "Result IDs are unchanged."
+    },
+    {
+      "id": "POS-SEARCH-004",
+      "change": "Apply identical state by keyboard or pointer.",
+      "expected_invariant": "Same query state and result IDs."
+    },
+    {
+      "id": "POS-SEARCH-005",
+      "change": "Open a shared URL in a fresh session.",
+      "expected_invariant": "All query-state fields restore."
+    }
+  ],
+  "metamorphic_relations": [
+    "Changing the ASCII case of q preserves ordered result IDs.",
+    "Adding available_only cannot add results to a category-filtered result set.",
+    "Concatenating pages yields the full filtered/sorted result exactly once.",
+    "Equal prices are tied by ascending immutable asset ID.",
+    "Encoding then decoding query state preserves every field."
+  ],
+  "qualification_rule": "Do not claim oracle qualification until all mutations are caught, positives pass and independent replay succeeds."
+}

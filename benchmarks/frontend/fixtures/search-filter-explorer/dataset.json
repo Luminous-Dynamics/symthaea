@@ -1,0 +1,131 @@
+{
+  "schema": "sfeb-search-filter-dataset-v1",
+  "dataset_id": "SFEB-ASSET-CATALOG-001",
+  "version": "1.0.0",
+  "currency": "USD",
+  "price_unit": "integer cents",
+  "search_fields": [
+    "name",
+    "sku",
+    "description"
+  ],
+  "assets": [
+    {
+      "id": "AST-001",
+      "name": "Solar Pump Controller",
+      "sku": "PWR-SPC-24",
+      "category": "Power",
+      "description": "Variable-speed controller for field solar pumps",
+      "price_cents": 129900,
+      "stock_count": 7
+    },
+    {
+      "id": "AST-002",
+      "name": "Industrial Flow Sensor",
+      "sku": "SEN-FLOW-25",
+      "category": "Sensors",
+      "description": "Inline flow measurement sensor, nominal bore DN25",
+      "price_cents": 44900,
+      "stock_count": 18
+    },
+    {
+      "id": "AST-003",
+      "name": "Thermal Inspection Camera",
+      "sku": "INS-THERM-01",
+      "category": "Inspection",
+      "description": "Portable infrared camera for thermal surveys",
+      "price_cents": 249900,
+      "stock_count": 0
+    },
+    {
+      "id": "AST-004",
+      "name": "Backup Inverter 5 kW",
+      "sku": "PWR-INV-5K",
+      "category": "Power",
+      "description": "Hybrid inverter for field backup power",
+      "price_cents": 189900,
+      "stock_count": 4
+    },
+    {
+      "id": "AST-005",
+      "name": "Pressure Transducer",
+      "sku": "SEN-PRESS-10",
+      "category": "Sensors",
+      "description": "Pressure sensor for hydraulic lines, 0 to 10 bar",
+      "price_cents": 32900,
+      "stock_count": 0
+    },
+    {
+      "id": "AST-006",
+      "name": "Rugged Field Tablet",
+      "sku": "DEV-TAB-RUG",
+      "category": "Devices",
+      "description": "Dust-resistant tablet for technician work orders",
+      "price_cents": 79900,
+      "stock_count": 12
+    },
+    {
+      "id": "AST-007",
+      "name": "Solar Array Combiner",
+      "sku": "PWR-COMB-08",
+      "category": "Power",
+      "description": "Eight-input combiner box for solar arrays",
+      "price_cents": 59900,
+      "stock_count": 3
+    },
+    {
+      "id": "AST-008",
+      "name": "Vibration Monitor",
+      "sku": "SEN-VIB-04",
+      "category": "Sensors",
+      "description": "Bearing vibration sensor with local status display",
+      "price_cents": 119900,
+      "stock_count": 5
+    },
+    {
+      "id": "AST-009",
+      "name": "Safety Helmet",
+      "sku": "SAF-HELM-E",
+      "category": "Safety",
+      "description": "Class E electrical safety helmet",
+      "price_cents": 8900,
+      "stock_count": 42
+    },
+    {
+      "id": "AST-010",
+      "name": "Lockout Kit",
+      "sku": "SAF-LOCK-01",
+      "category": "Safety",
+      "description": "Electrical isolation and safety kit",
+      "price_cents": 15900,
+      "stock_count": 14
+    },
+    {
+      "id": "AST-011",
+      "name": "Thermal Label Printer",
+      "sku": "DEV-LABEL-THERM",
+      "category": "Devices",
+      "description": "Portable thermal printer for asset labels",
+      "price_cents": 54900,
+      "stock_count": 2
+    },
+    {
+      "id": "AST-012",
+      "name": "Battery Rack",
+      "sku": "PWR-BAT-RK",
+      "category": "Power",
+      "description": "LiFePO4 rack battery for local storage",
+      "price_cents": 349900,
+      "stock_count": 1
+    },
+    {
+      "id": "AST-013",
+      "name": "Digital Multimeter",
+      "sku": "DEV-DMM-7",
+      "category": "Devices",
+      "description": "True-RMS digital multimeter for commissioning",
+      "price_cents": 54900,
+      "stock_count": 7
+    }
+  ]
+}

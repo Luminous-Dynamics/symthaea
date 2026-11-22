@@ -1,0 +1,33 @@
+{
+  "schema": "sfeb-search-filter-service-contract-v1",
+  "service_id": "SFEB-ASSET-CATALOG-001",
+  "status": "offline_deterministic_reference_model_authored",
+  "execution_mode": "pure_local_model_no_network",
+  "dataset": "dataset.json",
+  "oracle_cases": "oracle-cases.json",
+  "query_fields": {
+    "q": "Trimmed ASCII-case-insensitive substring across name, SKU and description.",
+    "category": "Exact category; null means all.",
+    "available_only": "Keep stock_count > 0.",
+    "min_price_cents": "Inclusive min cents.",
+    "max_price_cents": "Inclusive max cents.",
+    "sort": "name_asc, price_asc, price_desc, stock_asc.",
+    "page": "One-based page.",
+    "page_size": "1..50; default 5."
+  },
+  "determinism": {
+    "currency": "USD",
+    "money_representation": "integer cents",
+    "sort_tie_break": "ascending immutable asset ID",
+    "pagination": "filter, sort, then paginate",
+    "query_state_url": "?state=<percent-encoded JSON QueryState>",
+    "invalid_price_range": "reject min_price_cents_exceeds_max_price_cents",
+    "unknown_sort": "reject unsupported_sort"
+  },
+  "security_and_privacy": {
+    "external_network": "none",
+    "credentials": "none",
+    "user_data": "synthetic assets only",
+    "html_content": "render text only, never interpret dataset values as HTML"
+  }
+}
