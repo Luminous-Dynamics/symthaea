@@ -1,9 +1,10 @@
 use jsonschema::validator_for;
 use serde_json::Value;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Component, Path};
+use sha1::Sha1;
 use std::process::ExitCode;
 use sha2::{Digest, Sha256};
 
@@ -265,11 +266,140 @@ fn run_task(schema_path: &str, task_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+
+const DEFAULT_PATTERN_SCHEMA: &str =
+    "benchmarks/frontend/knowledge/leptos-0.8/pattern-v1.schema.json";
+const DEFAULT_PATTERN_CORPUS: &str =
+    "benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json";
+
+/// Calculate the Git blob object SHA-1 (header + content), not the raw-file SHA-1.
+fn git_blob_sha1(bytes: &[u8]) -> String {
+    let header = format!("blob {}\0", bytes.len());
+    let mut digest = Sha1::new();
+    digest.update(header.as_bytes());
+    digest.update(bytes);
+    hex::encode(digest.finalize())
+}
+
+fn validate_relative_repo_path(raw: &str) -> Result<(), String> {
+    let path = Path::new(raw);
+    if raw.is_empty()
+        || path.is_absolute()
+        || path.components().any(|component| {
+            !matches!(component, Component::Normal(_))
+        })
+    {
+        return Err(format!("source path must be a normalized repository-relative path: {raw}"));
+    }
+    Ok(())
+}
+
+fn validate_pattern_corpus(
+    schema: &Value,
+    corpus: &Value,
+    repository_root: &Path,
+) -> Result<(usize, usize), String> {
+    let validator = validator_for(schema)
+        .map_err(|error| format!("invalid Leptos pattern schema: {error}"))?;
+    let errors: Vec<String> = validator
+        .iter_errors(corpus)
+        .map(|error| format!("{}: {error}", error.instance_path()))
+        .collect();
+    if !errors.is_empty() {
+        return Err(format!(
+            "Leptos pattern corpus does not satisfy its schema:\n{}",
+            errors.join("\n")
+        ));
+    }
+
+    let patterns = corpus
+        .get("patterns")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "corpus.patterns must be an array".to_string())?;
+    let mut pattern_ids = BTreeSet::new();
+    let mut source_digests = BTreeMap::<String, String>::new();
+
+    for pattern in patterns {
+        let pattern_id = pattern
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "every Leptos pattern requires an id".to_string())?;
+        if !pattern_ids.insert(pattern_id.to_string()) {
+            return Err(format!("duplicate Leptos pattern id: {pattern_id}"));
+        }
+
+        let source = pattern
+            .get("source")
+            .ok_or_else(|| format!("pattern {pattern_id} is missing source provenance"))?;
+        let raw_path = source
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("pattern {pattern_id} is missing source.path"))?;
+        validate_relative_repo_path(raw_path)?;
+        let expected_sha = source
+            .get("blob_sha")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("pattern {pattern_id} is missing source.blob_sha"))?
+            .to_ascii_lowercase();
+
+        if let Some(previous) = source_digests.get(raw_path) {
+            if previous != &expected_sha {
+                return Err(format!(
+                    "patterns referencing {raw_path} disagree on the source blob SHA"
+                ));
+            }
+            continue;
+        }
+
+        let full_path = repository_root.join(raw_path);
+        let bytes = std::fs::read(&full_path)
+            .map_err(|error| format!("failed to read pattern source {}: {error}", full_path.display()))?;
+        let actual_sha = git_blob_sha1(&bytes);
+        if actual_sha != expected_sha {
+            return Err(format!(
+                "stale source provenance for {pattern_id}: {raw_path} expected {expected_sha}, got {actual_sha}"
+            ));
+        }
+        source_digests.insert(raw_path.to_string(), actual_sha);
+    }
+
+    Ok((patterns.len(), source_digests.len()))
+}
+
+fn run_patterns(schema_path: &str, corpus_path: &str, repository_root: &str) -> Result<(), String> {
+    let schema = read_json(schema_path)?;
+    let corpus = read_json(corpus_path)?;
+    let root = Path::new(repository_root);
+    let (patterns, sources) = validate_pattern_corpus(&schema, &corpus, root)?;
+
+    let corpus_id = corpus
+        .get("corpus_id")
+        .and_then(Value::as_str)
+        .unwrap_or("<unnamed>");
+    let framework = corpus
+        .get("framework")
+        .and_then(|value| value.get("name"))
+        .and_then(Value::as_str)
+        .unwrap_or("<unknown>");
+    let api_family = corpus
+        .get("framework")
+        .and_then(|value| value.get("api_family"))
+        .and_then(Value::as_str)
+        .unwrap_or("<unknown>");
+
+    println!(
+        "Leptos knowledge corpus valid: {corpus_id} ({framework} {api_family}, patterns={patterns}, source_files={sources})"
+    );
+    println!("Git blob provenance: exact; no stale, duplicate or unsafe source paths.");
+    println!("Note: source provenance and schema validity do not imply compilation or browser verification.");
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest."
+            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example."
         );
         return Ok(());
     }
@@ -280,6 +410,16 @@ fn run() -> Result<(), String> {
         return run_task(
             args.get(1).map(String::as_str).unwrap_or(DEFAULT_TASK_SCHEMA),
             args.get(2).map(String::as_str).unwrap_or(DEFAULT_TASK),
+        );
+    }
+    if args.first().is_some_and(|arg| arg == "--patterns") {
+        if args.len() > 4 {
+            return Err("--patterns accepts at most schema, corpus and repository-root paths".to_string());
+        }
+        return run_patterns(
+            args.get(1).map(String::as_str).unwrap_or(DEFAULT_PATTERN_SCHEMA),
+            args.get(2).map(String::as_str).unwrap_or(DEFAULT_PATTERN_CORPUS),
+            args.get(3).map(String::as_str).unwrap_or("."),
         );
     }
     if args.len() > 3 {
@@ -360,6 +500,39 @@ mod tests {
     fn rejects_missing_or_unterminated_source_anchors() {
         assert!(extract_source_anchors("<main></main>").is_err());
         assert!(extract_source_anchors(r#"<main data-sfeb-id="unfinished>"#).is_err());
+    }
+
+    #[test]
+    fn git_blob_sha1_matches_known_git_object_vector() {
+        assert_eq!(
+            git_blob_sha1(b"test\n"),
+            "9daeafb9864cf43055ae93beb0afd6c7d144bfa4"
+        );
+    }
+
+    #[test]
+    fn checked_in_leptos_pattern_corpus_matches_schema_and_git_blobs() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/pattern-v1.schema.json"
+        ))
+        .expect("checked-in Leptos pattern schema is valid JSON");
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/patterns-v0.json"
+        ))
+        .expect("checked-in Leptos pattern corpus is valid JSON");
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+
+        let (patterns, sources) = validate_pattern_corpus(&schema, &corpus, &repository_root)
+            .expect("pattern corpus schema and Git blob provenance must match");
+        assert_eq!(patterns, 8);
+        assert_eq!(sources, 2);
+    }
+
+    #[test]
+    fn pattern_validator_rejects_unsafe_repository_paths() {
+        assert!(validate_relative_repo_path("../outside.rs").is_err());
+        assert!(validate_relative_repo_path("/etc/passwd").is_err());
+        assert!(validate_relative_repo_path("crates/../secret.rs").is_err());
     }
 
     #[test]
