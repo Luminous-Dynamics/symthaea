@@ -359,3 +359,97 @@ The SOTA scan confirms that an energy-label win alone is unlikely to be a durabl
 4. Can the fan and appliance measurement cell yield independent repeatability and laboratory correlation rather than merely producing plausible plots?
 
 No percentage superiority claim follows from this desk update.
+
+
+## 11. South African direct-PV water-heating incumbent frontier — 22 November 2026
+
+**Novelty correction:** direct-PV geyser conversion, MPPT control, AC backup, retrofit installation and basic remote monitoring are already commercial capabilities in South Africa. Luminous must not describe those features as novel.
+
+### Local incumbent evidence
+
+**Geyserwise PV Water Heating / PV2Heat**
+- Official product page describes conversion of existing geysers, PTC AC/DC elements and 100 L, 150 L and 200 L configurations.
+- Its MWS Controller page states MPPT maximum performance of 99% over 120–350 V DC.
+- Its Geyserwise Dual page describes AC/DC setpoint ranges, timer modes, fault codes and mechanical over-temperature cut-out.
+
+Manufacturer sources:
+- https://www.geyserwise.com/our-products/pv-water-heating-systems/
+- https://www.geyserwise.com/mws-controller/
+- https://www.geyserwise.com/our-products/geyserwise-electronic-thermostats/geyserwise-dual/
+
+**Microcare Hot Water Generator / Kushushu**
+- 2025.1 manual describes a local retrofit using 2, 3 or 4 kW geyser elements, PV and automatic AC mains override, thermistor control and existing thermostat/element compatibility.
+- Its manual says solar heating efficiency is greater than 95%; a separate August 2025 product datasheet claims greater than 96%. Keep these as two manufacturer-source claims; do not average them or treat either as independent testing.
+- The manual restricts installation/service to qualified registered electrical personnel and warns against unauthorised opening/modification.
+
+Sources:
+- https://microcare.co.za/wp-content/uploads/2025/09/Microcare-HWG-Manual-2025v1.1.pdf
+- https://microcare.co.za/wp-content/uploads/2025/08/Microcare-Solar-Geyser-SolutionData-Sheet.pdf
+
+**Apollo NeoPV MPPT**
+- Product page describes existing-geyser retrofit, MPPT and AC mains backup / bypass, optional app/cloud monitoring and listed 100/150 L (3 × 580 W), 200 L (4 × 580 W) and 300 L (5 × 580 W) configurations.
+- It states MPPT efficiency greater than 99% and advertises up to 60–90% water-heating bill savings.
+- These are manufacturer-published claims; the product page's two input-voltage / input-power configuration columns need exact SKU mapping, and no independent service result follows from the marketing figures.
+
+Source:
+https://apollotechnology.co.za/neo-pv/
+
+**Market maturity context**
+- The May 2024 South African Water Heating DSM study estimated more than 25,000 direct-PV geyser systems installed nationally and over 7,000 installed during 2022 alone. It placed a direct-PV system at an estimated R19,000 excluding the geyser and identified DC arcing due to incorrect installation as a fire risk. These are historical study estimates, not a current product census or price quote.
+  https://www.savingenergy.org.za/reports/June%202024/FINAL%20REPORT-%20South%20Africa%20Water%20Heating%20DSM%20Study%205.26.2024.pdf
+- The IEA SHC Task 69 market report dated 10 June 2026 says South Africa had experienced a flux of PV water-heating entrants, many exiting or rebranding, and names Elon and Geyserwise among the most prominent systems then available.
+  https://task69.iea-shc.org/Data/Sites/1/publications/IEA-SHC-Task69-A.1-Report-Dominant-Solar-Water-Heating.pdf
+
+These market sources establish that basic direct-PV water heating is not novel; they do not establish the current market share, service life, price competitiveness or performance ranking of these exact systems.
+
+### Controller standards frontier: IEC 63349
+
+IEC 63349-1:2025 (published 4 December 2025) now gives a directly relevant standard for photovoltaic direct-driven appliance controller functions and operational performance. It covers controllers coordinating power from PV, grid, storage and appliances (including water heaters, air conditioners, refrigerators and pumps) for systems up to 1,500 V DC or 1,000 V AC.
+
+Crucially, IEC 63349-1 explicitly does **not** cover safety or EMC requirements for the controller. It references separate safety requirements for converters and IEC 62093 for converter performance. It is not a product safety certificate or an appliance energy test.
+
+- IEC 63349-1:2025: https://webstore.iec.ch/en/publication/67424
+- IEC TS 63349-2:2022, operation modes and example graphic display: https://webstore.iec.ch/en/publication/67425
+
+### Revised HeatBank differentiation hypothesis
+
+Do not compete on the existence of a PV-geyser controller, MPPT, timer, AC backup or app. Compete on **independently verified accepted hot-water service and whole-system lifecycle performance**.
+
+Compare the exact Microcare, Geyserwise and Apollo local-market configurations against the conventional geyser, solar thermal and heat-pump alternatives. Record exact SKU, hardware/firmware, tank/element identity, panel/module datasheet, installed cost, installer, protection devices, warranty, service route and evidence class before physical comparison.
+
+The candidate controller/system should be evaluated on:
+- accepted mixed hot-water litres per declared temperature-time service band;
+- grid kWh, PV generated, PV accepted by heater, curtailed PV, element/converter/control losses and tank/distribution losses;
+- cold-draw litres, temperature, duration, recovery and unmet demand;
+- performance across irradiance ramps, partial shading, module mismatch, hot/cold ambient, inlet-water temperature and heavy morning/evening draw profiles;
+- source-transfer behaviour, DC disconnect/isolation, abnormal-state handling, fail-safe thermal limits and manual/offline fallback;
+- peak grid demand and service continuity through grid/PV disturbances;
+- maintenance/repair, component compatibility, parts lead time and verified post-repair thermal/service output.
+
+A manufacturer's MPPT efficiency claim of 95–99% is not a household seasonal service efficiency and cannot substitute for a whole-system measurement.
+
+## 12. Direct-PV paper/code provenance clarification
+
+The linked public repository's nine South African city configuration is consistent with a June 2026 SSRN preprint titled *Simulation-Based Assessment of Solar PV-Assisted Domestic Water Heating in South African Cities*, whose abstract describes a 1.68 kWp five-minute simulation across nine South African cities:
+https://papers.ssrn.com/sol3/Delivery.cfm/82011b4b-e1c6-4d6a-b907-e55e6f9fef0b-MECA.pdf?abstractid=6929312
+
+The October 2026 *Energy for Sustainable Development* paper is a subsequent journal publication titled *Assessment of solar PV-assisted domestic water heating in Sub-Saharan African cities* and its abstract describes seven cities (Cape Town, Johannesburg, Lusaka, Luanda, Kinshasa, Nairobi and Lagos):
+https://doi.org/10.1016/j.esd.2026.102053
+
+This probably explains why the currently retrieved public code lists nine South African cities while the journal abstract lists seven Sub-Saharan African cities. However, the repo-head commit, data files and result files must still be mapped to the exact preprint and journal-paper versions before either is said to be independently reproduced.
+
+The June 2026 preprint is a related research source, not proof that the current public repository exactly reproduces the later October journal publication.
+
+## 13. Research direction after the novelty correction
+
+The stronger opportunity is an open, standards-aware **household energy and thermal service controller** that can coordinate hot water with PV, grid availability, tariff periods and other household resources while preserving independent appliance safety and user control.
+
+The controller is only one layer. The qualification target is the physical service:
+- useful hot water at a named delivery boundary;
+- temperature/time and hygiene constraints;
+- whole-system electrical/thermal balance;
+- accepted service under cloudy weather and supply interruption;
+- repairability and service continuity;
+- independent reproduction across units, labs and households.
+
+The existing HeatBank, household utility coordination, metrology, evidence and manufacturing owners should compose this work; do not open a duplicate scheduler, evidence ledger, safety authority or manufacturing system.
