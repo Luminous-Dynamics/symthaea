@@ -149,7 +149,10 @@ impl fmt::Display for FactorialDoseResponseError {
             Self::EmptyMatrix => write!(f, "sweep input matrices must be non-empty"),
             Self::RaggedMatrix(name) => write!(f, "{name} must be rectangular"),
             Self::InsufficientMatrixShape => {
-                write!(f, "sweep inputs require at least three time points and two ROIs")
+                write!(
+                    f,
+                    "sweep inputs require at least three time points and two ROIs"
+                )
             }
             Self::DimensionMismatch(name) => write!(f, "sweep dimension mismatch: {name}"),
             Self::NonFiniteInput(name) => write!(f, "{name} contains non-finite values"),
@@ -157,7 +160,10 @@ impl fmt::Display for FactorialDoseResponseError {
                 write!(f, "signal scaling produced non-finite observations")
             }
             Self::FactorialInvariantFailure => {
-                write!(f, "factorial matched-component invariants were not preserved")
+                write!(
+                    f,
+                    "factorial matched-component invariants were not preserved"
+                )
             }
             Self::Factorial(error) => write!(f, "factorial cell construction failed: {error}"),
             Self::Calibration(error) => write!(f, "nuisance calibration failed: {error}"),
@@ -198,7 +204,12 @@ pub fn run_factorial_dose_response_sweep(
     validate_nuisance_fractions(&config.nuisance_component_variance_fractions)?;
     let (time_points, roi_count) = validate_matrix(clean_observations, "clean observations")?;
     validate_matching_matrix(raw_signal_component, time_points, roi_count, "raw signal")?;
-    validate_matching_matrix(raw_nuisance_component, time_points, roi_count, "raw nuisance")?;
+    validate_matching_matrix(
+        raw_nuisance_component,
+        time_points,
+        roi_count,
+        "raw nuisance",
+    )?;
 
     let raw_signal_fingerprint = matrix_fingerprint(raw_signal_component);
     let raw_nuisance_fingerprint = matrix_fingerprint(raw_nuisance_component);
@@ -210,19 +221,16 @@ pub fn run_factorial_dose_response_sweep(
         scaled_signals.push(scaled);
     }
 
-    let mut calibrated_nuisances = Vec::with_capacity(
-        config.nuisance_component_variance_fractions.len(),
-    );
-    let mut calibration_reports = Vec::with_capacity(
-        config.nuisance_component_variance_fractions.len(),
-    );
+    let mut calibrated_nuisances =
+        Vec::with_capacity(config.nuisance_component_variance_fractions.len());
+    let mut calibration_reports =
+        Vec::with_capacity(config.nuisance_component_variance_fractions.len());
     for &target_fraction in &config.nuisance_component_variance_fractions {
-        let (calibrated, calibration_report) =
-            calibrate_nuisance_matrix_to_component_fraction(
-                clean_observations,
-                raw_nuisance_component,
-                target_fraction,
-            )?;
+        let (calibrated, calibration_report) = calibrate_nuisance_matrix_to_component_fraction(
+            clean_observations,
+            raw_nuisance_component,
+            target_fraction,
+        )?;
         calibrated_nuisances.push(calibrated);
         calibration_reports.push(calibration_report);
     }
@@ -230,8 +238,11 @@ pub fn run_factorial_dose_response_sweep(
     let mut points = Vec::with_capacity(
         config.signal_scales.len() * config.nuisance_component_variance_fractions.len(),
     );
-    for (signal_index, (signal_scale, signal_matrix)) in
-        config.signal_scales.iter().zip(scaled_signals.iter()).enumerate()
+    for (signal_index, (signal_scale, signal_matrix)) in config
+        .signal_scales
+        .iter()
+        .zip(scaled_signals.iter())
+        .enumerate()
     {
         for (fraction_index, (target_fraction, nuisance_matrix)) in config
             .nuisance_component_variance_fractions
@@ -286,9 +297,7 @@ pub fn run_factorial_dose_response_sweep(
         time_points,
         roi_count,
         signal_scales: config.signal_scales.clone(),
-        nuisance_component_variance_fractions: config
-            .nuisance_component_variance_fractions
-            .clone(),
+        nuisance_component_variance_fractions: config.nuisance_component_variance_fractions.clone(),
         raw_signal_fingerprint,
         raw_nuisance_fingerprint,
         points,
@@ -299,7 +308,9 @@ fn validate_signal_scales(scales: &[f64]) -> Result<(), FactorialDoseResponseErr
     if scales.is_empty() {
         return Err(FactorialDoseResponseError::EmptySignalScaleGrid);
     }
-    if scales.iter().any(|value| !value.is_finite() || *value < 0.0)
+    if scales
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0)
         || scales.windows(2).any(|pair| pair[0] >= pair[1])
     {
         return Err(FactorialDoseResponseError::InvalidSignalScaleGrid);
@@ -409,10 +420,7 @@ fn render_point(point: &FactorialDoseResponsePoint) -> String {
                     "        \"fnv1a64_fingerprint\": \"{}\"\n",
                     "      }}"
                 ),
-                cell.cell_id,
-                cell.rms,
-                cell.max_absolute_value,
-                cell.fnv1a64_fingerprint
+                cell.cell_id, cell.rms, cell.max_absolute_value, cell.fnv1a64_fingerprint
             )
         })
         .collect::<Vec<_>>()
@@ -494,9 +502,7 @@ mod tests {
         (0..48)
             .map(|time| {
                 (0..4)
-                    .map(|roi| {
-                        0.08 * ((time as f64 + 2.0) * (roi as f64 + 1.0) * 0.043).sin()
-                    })
+                    .map(|roi| 0.08 * ((time as f64 + 2.0) * (roi as f64 + 1.0) * 0.043).sin())
                     .collect()
             })
             .collect()
@@ -583,10 +589,7 @@ mod tests {
                 .collect::<Vec<_>>();
             assert!(fingerprints.windows(2).all(|pair| pair[0] == pair[1]));
         }
-        assert_eq!(
-            report.raw_signal_fingerprint,
-            matrix_fingerprint(&signal())
-        );
+        assert_eq!(report.raw_signal_fingerprint, matrix_fingerprint(&signal()));
         assert_eq!(
             report.raw_nuisance_fingerprint,
             matrix_fingerprint(&nuisance())
@@ -639,10 +642,17 @@ mod tests {
         let clean = clean();
         let signal = signal();
         let nuisance = nuisance();
-        for scales in [vec![], vec![0.0, 1.0, 0.5], vec![-0.1, 0.5], vec![0.0, f64::NAN]] {
+        for scales in [
+            vec![],
+            vec![0.0, 1.0, 0.5],
+            vec![-0.1, 0.5],
+            vec![0.0, f64::NAN],
+        ] {
             let mut config = config();
             config.signal_scales = scales;
-            assert!(run_factorial_dose_response_sweep(&clean, &signal, &nuisance, &config).is_err());
+            assert!(
+                run_factorial_dose_response_sweep(&clean, &signal, &nuisance, &config).is_err()
+            );
         }
         for fractions in [
             vec![],
@@ -653,7 +663,9 @@ mod tests {
         ] {
             let mut config = config();
             config.nuisance_component_variance_fractions = fractions;
-            assert!(run_factorial_dose_response_sweep(&clean, &signal, &nuisance, &config).is_err());
+            assert!(
+                run_factorial_dose_response_sweep(&clean, &signal, &nuisance, &config).is_err()
+            );
         }
     }
 
@@ -668,7 +680,9 @@ mod tests {
         ));
         assert!(matches!(
             run_factorial_dose_response_sweep(&clean, &signal(), &nuisance()[..47], &config()),
-            Err(FactorialDoseResponseError::DimensionMismatch("raw nuisance"))
+            Err(FactorialDoseResponseError::DimensionMismatch(
+                "raw nuisance"
+            ))
         ));
     }
 
