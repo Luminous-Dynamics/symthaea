@@ -235,7 +235,7 @@ impl FrontendEvidenceContext {
     }
 }
 
-fn validate_png_header(bytes: &[u8]) -> Result<()> {
+fn validate_png_header(bytes: &[u8]) -> Result<(u32, u32)> {
     if bytes.len() > MAX_SCREENSHOT_BYTES {
         bail!("frontend screenshot exceeds the compressed artifact size limit");
     }
@@ -263,7 +263,7 @@ fn validate_png_header(bytes: &[u8]) -> Result<()> {
     {
         bail!("frontend screenshot dimensions are outside the supported range");
     }
-    Ok(())
+    Ok((width, height))
 }
 
 /// Content-addressed description of one persisted artifact.
@@ -322,7 +322,21 @@ impl FrontendEvidenceBundle {
     ) -> Result<Self> {
         context.validate()?;
         layout.validate()?;
-        validate_png_header(&screenshot_png)?;
+        let (png_width, png_height) = validate_png_header(&screenshot_png)?;
+        let expected_width =
+            (f64::from(layout.viewport.width) * layout.viewport.device_scale_factor).round();
+        let expected_height =
+            (f64::from(layout.viewport.height) * layout.viewport.device_scale_factor).round();
+        if f64::from(png_width) != expected_width
+            || f64::from(png_height) != expected_height
+        {
+            bail!(
+                "viewport screenshot dimensions {png_width}x{png_height} do not match declared viewport at device scale factor {} (expected {}x{})",
+                layout.viewport.device_scale_factor,
+                expected_width,
+                expected_height
+            );
+        }
 
         // Re-apply the observation boundary before serializing a durable
         // artifact: sensitive field values are redacted and page strings bounded.
@@ -534,8 +548,8 @@ mod tests {
         let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
         bytes.extend_from_slice(&13_u32.to_be_bytes());
         bytes.extend_from_slice(b"IHDR");
-        bytes.extend_from_slice(&1_u32.to_be_bytes());
-        bytes.extend_from_slice(&1_u32.to_be_bytes());
+        bytes.extend_from_slice(&1280_u32.to_be_bytes());
+        bytes.extend_from_slice(&800_u32.to_be_bytes());
         bytes.extend_from_slice(&[8, 6, 0, 0, 0]);
         bytes
     }
@@ -635,6 +649,15 @@ mod tests {
         let mut oversized = png_fixture();
         oversized[16..20].copy_from_slice(&(MAX_SCREENSHOT_DIMENSION + 1).to_be_bytes());
         assert!(validate_png_header(&oversized).is_err());
+    }
+
+    #[test]
+    fn rejects_screenshot_that_does_not_match_viewport_scale() {
+        let mut screenshot = png_fixture();
+        screenshot[16..20].copy_from_slice(&1279_u32.to_be_bytes());
+        let result =
+            FrontendEvidenceBundle::new(context(), observation(), layout(), screenshot);
+        assert!(result.is_err());
     }
 
     #[test]
