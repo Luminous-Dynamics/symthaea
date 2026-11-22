@@ -14,6 +14,7 @@ use std::io::{BufWriter, Write};
 use std::mem::size_of;
 use std::time::Instant;
 
+use broca_mace_ingress::EvidenceDependencySidecarV1;
 use broca_mace_hdc_retrieval::{
     experience_view_digest,
     typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
@@ -27,6 +28,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 mod mace_generated_stress;
+mod receipt_dependency;
+
+use receipt_dependency::ReceiptDependencyProjection;
 
 const SCHEMA_VERSION: &str = "mace_counterfactual_evidence_v0_1";
 const ABSTENTION_UTILITY: f64 = 0.0;
@@ -70,6 +74,10 @@ struct InterventionManifest {
     root_pair_count: usize,
     matched_random_count: usize,
     unmatched_random_target_count: usize,
+    dependency_sidecar_sha256: Option<String>,
+    dependency_sidecar_ingress_verified: Option<bool>,
+    lineage_incomplete_event_count: usize,
+    unresolved_parent_reference_count: usize,
     manifest_sha256: String,
 }
 
@@ -80,6 +88,9 @@ struct EvidenceDependencyIndex {
     families: BTreeMap<u16, BTreeSet<u32>>,
     unknown_root_ids: BTreeSet<u32>,
     unknown_family_ids: BTreeSet<u32>,
+    receipt_dependencies: Option<ReceiptDependencyProjection>,
+    lineage_incomplete_event_count: usize,
+    unresolved_parent_reference_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,6 +100,7 @@ enum IndexError {
     TypedIndexFailure(String),
     UnresolvedCandidateId(u32),
     CanonicalViewMismatch(u32),
+    InvalidDependencySidecar(String),
 }
 
 impl EvidenceDependencyIndex {
@@ -123,13 +135,62 @@ impl EvidenceDependencyIndex {
             }
         }
 
+        let lineage_incomplete_event_count = records.len();
         Ok(Self {
             records,
             roots,
             families,
             unknown_root_ids,
             unknown_family_ids,
+            receipt_dependencies: None,
+            lineage_incomplete_event_count,
+            unresolved_parent_reference_count: 0,
         })
+    }
+
+    fn build_with_sidecar(
+        memory: &[Experience],
+        sidecar: &EvidenceDependencySidecarV1,
+    ) -> Result<Self, IndexError> {
+        let mut index = Self::build(memory)?;
+        let projection = ReceiptDependencyProjection::build(memory, sidecar)
+            .map_err(|error| IndexError::InvalidDependencySidecar(format!("{error:?}")))?;
+        index.lineage_incomplete_event_count = projection.lineage_incomplete_event_count();
+        index.unresolved_parent_reference_count =
+            projection.unresolved_parent_reference_count();
+        index.receipt_dependencies = Some(projection);
+        Ok(index)
+    }
+
+    fn dependent_closure(&self, seeds: &[u32]) -> Vec<u32> {
+        match &self.receipt_dependencies {
+            Some(projection) => projection.dependent_closure(seeds.iter().copied()),
+            None => normalized_ids(seeds.to_vec()),
+        }
+    }
+
+    fn dependency_sidecar_sha256(&self) -> Option<&str> {
+        self.receipt_dependencies
+            .as_ref()
+            .map(ReceiptDependencyProjection::sidecar_sha256)
+    }
+
+    fn dependency_sidecar_ingress_verified(&self) -> Option<bool> {
+        self.receipt_dependencies
+            .as_ref()
+            .map(ReceiptDependencyProjection::ingress_receipts_verified)
+    }
+
+    fn receipt_lineage_complete(&self, ids: &[u32]) -> Option<bool> {
+        self.receipt_dependencies
+            .as_ref()
+            .map(|projection| projection.all_lineage_complete(ids))
+    }
+
+    fn has_ancestor_in(&self, event_id: u32, targets: &BTreeSet<u32>) -> bool {
+        self.receipt_dependencies
+            .as_ref()
+            .is_some_and(|projection| projection.depends_on_any(event_id, targets))
     }
 
     fn event_count(&self) -> usize {
@@ -160,6 +221,23 @@ impl EvidenceDependencyIndex {
         for (event_id, item) in &self.records {
             hasher.update(event_id.to_be_bytes());
             hasher.update(experience_view_digest(item));
+        }
+        match self.dependency_sidecar_sha256() {
+            Some(digest) => {
+                if self.dependency_sidecar_ingress_verified() == Some(true) {
+                    hasher.update(b"receipt-sidecar:ingress-verified:v1\\0");
+                } else {
+                    hasher.update(b"receipt-sidecar:integrity-only-untrusted:v1\\0");
+                }
+                hasher.update(digest.as_bytes());
+            }
+            None => {
+                // No sidecar means ancestry is unknown, never independent.
+                hasher.update(b"receipt-sidecar:unavailable:lineage-unknown:v1\\0");
+                hasher.update(
+                    (self.lineage_incomplete_event_count as u64).to_be_bytes(),
+                );
+            }
         }
         hex_digest(hasher.finalize().as_slice())
     }
@@ -234,23 +312,78 @@ fn normalized_ids(mut ids: Vec<u32>) -> Vec<u32> {
 
 /// Select a disjoint dropout with the same per-action removal counts as the
 /// target. A control is omitted if the candidate-visible pool cannot match it.
-fn matched_random_ids(
+fn evidence_strata(
     index: &EvidenceDependencyIndex,
-    target_ids: &[u32],
-    seed: u64,
-) -> Option<Vec<u32>> {
-    let target: BTreeSet<u32> = target_ids.iter().copied().collect();
-    let mut required = BTreeMap::<(Regime, Objective, Action, String), usize>::new();
-    for event_id in target_ids {
+    ids: &[u32],
+) -> Option<BTreeMap<(Regime, Objective, Action, String), usize>> {
+    let mut counts = BTreeMap::new();
+    for event_id in ids {
         let item = index.records.get(event_id)?;
-        let stratum = (
+        let key = (
             item.scope.regime,
             item.scope.objective,
             item.action,
             item.causal_identification.estimand_digest.to_hex(),
         );
-        *required.entry(stratum).or_default() += 1;
+        *counts.entry(key).or_insert(0) += 1;
     }
+    Some(counts)
+}
+
+fn provenance_group_counts(
+    index: &EvidenceDependencyIndex,
+    ids: &[u32],
+) -> Option<(usize, usize, usize, usize)> {
+    let mut roots = BTreeSet::new();
+    let mut families = BTreeSet::new();
+    let mut unknown_roots = 0_usize;
+    let mut unknown_families = 0_usize;
+    for event_id in ids {
+        let item = index.records.get(event_id)?;
+        if item.source_root_digest.is_known() {
+            roots.insert(item.source_root_digest);
+        } else {
+            unknown_roots += 1;
+        }
+        if item.source_family != 0 {
+            families.insert(item.source_family);
+        } else {
+            unknown_families += 1;
+        }
+    }
+    Some((
+        roots.len(),
+        families.len(),
+        unknown_roots,
+        unknown_families,
+    ))
+}
+
+/// Select a disjoint dropout matched on scope, action and estimand. After
+/// dependency closure, the intervention must still match the target's
+/// statistical strata and provenance-group counts or it is omitted.
+fn matched_random_ids(
+    index: &EvidenceDependencyIndex,
+    target_ids: &[u32],
+    seed: u64,
+) -> Option<Vec<u32>> {
+    let target = normalized_ids(target_ids.to_vec());
+    if index.receipt_lineage_complete(&target) == Some(false) {
+        return None;
+    }
+    let required = evidence_strata(index, &target)?;
+    let target_counts = provenance_group_counts(index, &target)?;
+    let target_roots: BTreeSet<SourceRootDigest> = target
+        .iter()
+        .filter_map(|id| index.records.get(id).map(|item| item.source_root_digest))
+        .filter(|root| root.is_known())
+        .collect();
+    let target_families: BTreeSet<u16> = target
+        .iter()
+        .filter_map(|id| index.records.get(id).map(|item| item.source_family))
+        .filter(|family| *family != 0)
+        .collect();
+    let target_set: BTreeSet<u32> = target.iter().copied().collect();
 
     let mut selected = Vec::new();
     for ((regime, objective, action, estimand), needed) in required {
@@ -262,7 +395,12 @@ fn matched_random_ids(
                     && item.scope.objective == objective
                     && item.action == action
                     && item.causal_identification.estimand_digest.to_hex() == estimand
-                    && !target.contains(&item.event_id)
+                    && !target_set.contains(&item.event_id)
+                    && (!item.source_root_digest.is_known()
+                        || !target_roots.contains(&item.source_root_digest))
+                    && (item.source_family == 0 || !target_families.contains(&item.source_family))
+                    && index.receipt_lineage_complete(&[item.event_id]) != Some(false)
+                    && !index.has_ancestor_in(item.event_id, &target_set)
             })
             .collect();
         eligible.sort_by_key(|item| {
@@ -274,7 +412,35 @@ fn matched_random_ids(
         selected.extend(eligible.into_iter().take(needed).map(|item| item.event_id));
     }
 
-    Some(normalized_ids(selected))
+    let selected = normalized_ids(selected);
+    let expanded = index.dependent_closure(&selected);
+    if expanded.iter().any(|id| target_set.contains(id)) {
+        return None;
+    }
+    // Closure expansion must not reintroduce the target's common-cause
+    // roots/families through a derived child. Count matching is not enough.
+    for id in &expanded {
+        let item = index.records.get(id)?;
+        if (item.source_root_digest.is_known()
+            && target_roots.contains(&item.source_root_digest))
+            || (item.source_family != 0 && target_families.contains(&item.source_family))
+        {
+            return None;
+        }
+    }
+    if evidence_strata(index, &expanded)? != evidence_strata(index, &target)? {
+        return None;
+    }
+    if index.receipt_lineage_complete(&expanded) == Some(false) {
+        return None;
+    }
+    if expanded.iter().any(|id| index.has_ancestor_in(*id, &target_set)) {
+        return None;
+    }
+    if provenance_group_counts(index, &expanded)? != target_counts {
+        return None;
+    }
+    Some(expanded)
 }
 
 fn push_intervention(
@@ -316,21 +482,37 @@ fn build_manifest(
     public_seed: u64,
     max_root_pairs: usize,
 ) -> Result<InterventionManifest, IndexError> {
-    let index = EvidenceDependencyIndex::build(memory)?;
+    build_manifest_with_sidecar(memory, None, public_seed, max_root_pairs)
+}
+
+fn build_manifest_with_sidecar(
+    memory: &[Experience],
+    sidecar: Option<&EvidenceDependencySidecarV1>,
+    public_seed: u64,
+    max_root_pairs: usize,
+) -> Result<InterventionManifest, IndexError> {
+    let index = match sidecar {
+        Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(memory, sidecar)?,
+        None => EvidenceDependencyIndex::build(memory)?,
+    };
     let baseline_evidence_sha256 = index.baseline_evidence_digest();
     let mut interventions = Vec::new();
 
     for event_id in index.records.keys() {
+        let closure = index.dependent_closure(&[*event_id]);
         push_intervention(
             &mut interventions,
             InterventionKind::Event,
             format!("event:{event_id}"),
-            vec![*event_id],
+            closure,
             None,
         );
     }
 
-    let root_groups: Vec<(String, Vec<u32>)> = index.root_groups().collect();
+    let root_groups: Vec<(String, Vec<u32>)> = index
+        .root_groups()
+        .map(|(key, ids)| (key, index.dependent_closure(&ids)))
+        .collect();
     for (key, ids) in &root_groups {
         push_intervention(
             &mut interventions,
@@ -355,7 +537,10 @@ fn build_manifest(
         }
     }
 
-    let family_groups: Vec<(String, Vec<u32>)> = index.family_groups().collect();
+    let family_groups: Vec<(String, Vec<u32>)> = index
+        .family_groups()
+        .map(|(key, ids)| (key, index.dependent_closure(&ids)))
+        .collect();
     for (key, ids) in &family_groups {
         push_intervention(
             &mut interventions,
@@ -385,7 +570,7 @@ fn build_manifest(
             &mut interventions,
             InterventionKind::UnknownRoot,
             "unknown_source_roots".to_string(),
-            index.unknown_root_ids.iter().copied().collect(),
+            index.dependent_closure(&index.unknown_root_ids.iter().copied().collect::<Vec<_>>()),
             None,
         );
     }
@@ -394,7 +579,7 @@ fn build_manifest(
             &mut interventions,
             InterventionKind::UnknownFamily,
             "unknown_source_families".to_string(),
-            index.unknown_family_ids.iter().copied().collect(),
+            index.dependent_closure(&index.unknown_family_ids.iter().copied().collect::<Vec<_>>()),
             None,
         );
     }
@@ -455,6 +640,9 @@ fn build_manifest(
         "root_pair_count": root_pair_count,
         "matched_random_count": matched_random_count,
         "unmatched_random_target_count": unmatched_random_target_count,
+        "dependency_sidecar_sha256": index.dependency_sidecar_sha256(),
+        "lineage_incomplete_event_count": index.lineage_incomplete_event_count,
+        "unresolved_parent_reference_count": index.unresolved_parent_reference_count,
         "interventions": &interventions
     }))
     .expect("candidate intervention manifest is serializable");
@@ -469,6 +657,10 @@ fn build_manifest(
         root_pair_count,
         matched_random_count,
         unmatched_random_target_count,
+        dependency_sidecar_sha256: index.dependency_sidecar_sha256().map(str::to_owned),
+        dependency_sidecar_ingress_verified: index.dependency_sidecar_ingress_verified(),
+        lineage_incomplete_event_count: index.lineage_incomplete_event_count,
+        unresolved_parent_reference_count: index.unresolved_parent_reference_count,
         manifest_sha256,
     })
 }
@@ -557,6 +749,10 @@ struct CandidateObservation {
     evidence_family_count: usize,
     unknown_root_event_count: usize,
     unknown_family_event_count: usize,
+    dependency_sidecar_sha256: Option<String>,
+    dependency_sidecar_ingress_verified: Option<bool>,
+    lineage_incomplete_event_count: usize,
+    unresolved_parent_reference_count: usize,
     latency_ns: u64,
 }
 
@@ -566,12 +762,25 @@ fn run_candidate(
     decision_need: DecisionNeedV1,
     memory: &[Experience],
 ) -> Result<CandidateObservation, IndexError> {
+    run_candidate_with_sidecar(mode, query, decision_need, memory, None)
+}
+
+fn run_candidate_with_sidecar(
+    mode: CandidateMode,
+    query: Query,
+    decision_need: DecisionNeedV1,
+    memory: &[Experience],
+    sidecar: Option<&EvidenceDependencySidecarV1>,
+) -> Result<CandidateObservation, IndexError> {
     let started = Instant::now();
     if !decision_need.is_valid() || decision_need.scope != query.scope {
         return Err(IndexError::InvalidDecisionNeed);
     }
 
-    let evidence_index = EvidenceDependencyIndex::build(memory)?;
+    let evidence_index = match sidecar {
+        Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(memory, sidecar)?,
+        None => EvidenceDependencyIndex::build(memory)?,
+    };
     let evidence_sha256 = evidence_index.baseline_evidence_digest();
     let input_sha256 = candidate_input_digest(decision_need, &evidence_sha256);
 
@@ -740,6 +949,10 @@ fn run_candidate(
         evidence_family_count: evidence_index.known_family_count(),
         unknown_root_event_count: evidence_index.unknown_root_event_count(),
         unknown_family_event_count: evidence_index.unknown_family_event_count(),
+        dependency_sidecar_sha256: evidence_index.dependency_sidecar_sha256().map(str::to_owned),
+        dependency_sidecar_ingress_verified: evidence_index.dependency_sidecar_ingress_verified(),
+        lineage_incomplete_event_count: evidence_index.lineage_incomplete_event_count,
+        unresolved_parent_reference_count: evidence_index.unresolved_parent_reference_count,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
     })
 }
@@ -804,15 +1017,43 @@ fn run() -> Result<(), String> {
         .map(|value| value.parse::<usize>().map_err(|error| error.to_string()))
         .transpose()?
         .unwrap_or(32);
+    let dependency_sidecar_path = args.get(5).map(String::as_str);
+    if dependency_sidecar_path.is_some() && clusters != 1 {
+        return Err(
+            "a pinned dependency sidecar currently requires clusters=1 so the evidence/sidecar binding is unambiguous"
+                .to_string(),
+        );
+    }
+    let dependency_sidecar = dependency_sidecar_path
+        .map(|path| {
+            let contents = std::fs::read_to_string(path)
+                .map_err(|error| format!("read dependency sidecar {path}: {error}"))?;
+            let value: Value = serde_json::from_str(&contents)
+                .map_err(|error| format!("parse dependency sidecar {path}: {error}"))?;
+            EvidenceDependencySidecarV1::from_json_value(&value)
+                .map_err(|error| format!("verify dependency sidecar {path}: {error}"))
+        })
+        .transpose()?;
 
     let cases = mace_generated_stress::generated_worlds(clusters);
-    let source_code_sha256 =
-        hex_digest(Sha256::digest(include_bytes!("mace_counterfactual_evidence.rs")).as_slice());
+    let mut evaluator_code_hasher = Sha256::new();
+    evaluator_code_hasher.update(include_bytes!("mace_counterfactual_evidence.rs"));
+    evaluator_code_hasher.update(include_bytes!(
+        "mace_counterfactual_evidence/receipt_dependency.rs"
+    ));
+    evaluator_code_hasher.update(include_bytes!("../../../ingress/src/lib.rs"));
+    let source_code_sha256 = hex_digest(evaluator_code_hasher.finalize().as_slice());
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
     let schema_sha256 = hex_digest(
         Sha256::digest(include_bytes!(
             "../../../../../data/schemas/mace_counterfactual_evidence_v0_1.schema.json"
+        ))
+        .as_slice(),
+    );
+    let dependency_sidecar_schema_sha256 = hex_digest(
+        Sha256::digest(include_bytes!(
+            "../../../../../data/schemas/mace_evidence_dependency_sidecar_v1.schema.json"
         ))
         .as_slice(),
     );
@@ -823,8 +1064,18 @@ fn run() -> Result<(), String> {
     {
         return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
     }
+    let sidecar_identity = dependency_sidecar
+        .as_ref()
+        .map(|sidecar| {
+            format!(
+                "{}:ingress_verified={}",
+                sidecar.canonical_digest(),
+                sidecar.has_verified_ingress_provenance()
+            )
+        })
+        .unwrap_or_else(|| "absent".to_string());
     let run_identity = format!(
-        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{}",
+        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{dependency_sidecar_schema_sha256}:{sidecar_identity}:{}",
         source_revision.as_deref().unwrap_or("unspecified")
     );
     let run_id = format!(
@@ -836,13 +1087,24 @@ fn run() -> Result<(), String> {
     let mut evaluator_records = Vec::new();
 
     for case in &cases {
-        let manifest = build_manifest(&case.memory, public_seed, max_root_pairs)
-            .map_err(|error| format!("dependency index failed: {error:?}"))?;
+        let manifest = build_manifest_with_sidecar(
+            &case.memory,
+            dependency_sidecar.as_ref(),
+            public_seed,
+            max_root_pairs,
+        )
+        .map_err(|error| format!("dependency index failed: {error:?}"))?;
         let baseline_observations: Vec<CandidateObservation> = CandidateMode::ALL
             .iter()
             .map(|mode| {
-                run_candidate(*mode, case.query, case.decision_need, &case.memory)
-                    .map_err(|error| format!("{} baseline failed: {error:?}", mode.name()))
+                run_candidate_with_sidecar(
+                    *mode,
+                    case.query,
+                    case.decision_need,
+                    &case.memory,
+                    dependency_sidecar.as_ref(),
+                )
+                .map_err(|error| format!("{} baseline failed: {error:?}", mode.name()))
             })
             .collect::<Result<_, _>>()?;
         let baseline_regrets: BTreeMap<CandidateMode, f64> = baseline_observations
@@ -867,6 +1129,11 @@ fn run() -> Result<(), String> {
             case.decision_need,
             &manifest.baseline_evidence_sha256,
         );
+        let manifest_evidence_index = match dependency_sidecar.as_ref() {
+            Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&case.memory, sidecar),
+            None => EvidenceDependencyIndex::build(&case.memory),
+        }
+        .map_err(|error| format!("manifest evidence index failed: {error:?}"))?;
         evaluator_records.push(json!({
             "schema_version": SCHEMA_VERSION,
             "record_type": "intervention_manifest",
@@ -881,20 +1148,26 @@ fn run() -> Result<(), String> {
             "root_pair_count": manifest.root_pair_count,
             "matched_random_count": manifest.matched_random_count,
             "unmatched_random_target_count": manifest.unmatched_random_target_count,
+            "dependency_sidecar_sha256": manifest.dependency_sidecar_sha256,
+            "dependency_sidecar_ingress_verified": manifest.dependency_sidecar_ingress_verified,
+            "lineage_incomplete_event_count": manifest.lineage_incomplete_event_count,
+            "unresolved_parent_reference_count": manifest.unresolved_parent_reference_count,
             "source_code_sha256": source_code_sha256,
             "fixture_sha256": fixture_sha256,
             "schema_sha256": schema_sha256,
+            "dependency_sidecar_schema_sha256": dependency_sidecar_schema_sha256,
             "source_revision": source_revision,
-            "known_root_count": EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?
-                .known_root_count(),
+            "known_root_count": manifest_evidence_index.known_root_count(),
             "candidate_validity": "diagnostic_only"
         }));
 
         for baseline in &baseline_observations {
-            let support = EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?
-                .support_closure_counts(&baseline.decision.evidence_ids);
+            let support_index = match dependency_sidecar.as_ref() {
+                Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&case.memory, sidecar),
+                None => EvidenceDependencyIndex::build(&case.memory),
+            }
+            .map_err(|error| format!("dependency index failed: {error:?}"))?;
+            let support = support_index.support_closure_counts(&baseline.decision.evidence_ids);
             let observation_id = candidate_observation_id(baseline);
             let candidate_record = json!({
                 "schema_version": SCHEMA_VERSION,
@@ -919,6 +1192,10 @@ fn run() -> Result<(), String> {
                 "available_known_family_count": baseline.evidence_family_count,
                 "unknown_root_event_count": baseline.unknown_root_event_count,
                 "unknown_family_event_count": baseline.unknown_family_event_count,
+                "dependency_sidecar_sha256": baseline.dependency_sidecar_sha256,
+                "dependency_sidecar_ingress_verified": baseline.dependency_sidecar_ingress_verified,
+                "lineage_incomplete_event_count": baseline.lineage_incomplete_event_count,
+                "unresolved_parent_reference_count": baseline.unresolved_parent_reference_count,
                 "index_bytes": baseline.index_bytes,
                 "latency_ns": baseline.latency_ns
             });
@@ -941,6 +1218,10 @@ fn run() -> Result<(), String> {
                 "intervention_kind": "reference",
                 "target_key": baseline.mode.name(),
                 "retrieved_event_ids": baseline.retrieved_event_ids,
+                "dependency_sidecar_sha256": baseline.dependency_sidecar_sha256,
+                "dependency_sidecar_ingress_verified": baseline.dependency_sidecar_ingress_verified,
+                "lineage_incomplete_event_count": baseline.lineage_incomplete_event_count,
+                "unresolved_parent_reference_count": baseline.unresolved_parent_reference_count,
                 "index_bytes": baseline.index_bytes,
                 "removed_event_ids": [],
                 "removed_event_count": 0,
@@ -967,21 +1248,31 @@ fn run() -> Result<(), String> {
         }
 
         for intervention in &manifest.interventions {
-            let index = EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?;
+            let index = match dependency_sidecar.as_ref() {
+                Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&case.memory, sidecar),
+                None => EvidenceDependencyIndex::build(&case.memory),
+            }
+            .map_err(|error| format!("dependency index failed: {error:?}"))?;
             let retained = index.retain_without(&intervention.removed_event_ids);
+            let retained_sidecar = dependency_sidecar
+                .as_ref()
+                .map(|sidecar| sidecar.retain_without_event_ids(&intervention.removed_event_ids));
 
             for mode in CandidateMode::ALL {
-                let candidate = run_candidate(
+                let candidate = run_candidate_with_sidecar(
                     mode,
                     case.query,
                     case.decision_need,
                     &retained,
+                    retained_sidecar.as_ref(),
                 )
                 .map_err(|error| format!("intervention candidate failed: {error:?}"))?;
-                let support = EvidenceDependencyIndex::build(&retained)
-                    .map_err(|error| format!("retained evidence index failed: {error:?}"))?
-                    .support_closure_counts(&candidate.decision.evidence_ids);
+                let retained_index = match retained_sidecar.as_ref() {
+                    Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&retained, sidecar),
+                    None => EvidenceDependencyIndex::build(&retained),
+                }
+                .map_err(|error| format!("retained evidence index failed: {error:?}"))?;
+                let support = retained_index.support_closure_counts(&candidate.decision.evidence_ids);
                 let observation_id = candidate_observation_id(&candidate);
 
                 let candidate_record = json!({
@@ -1007,6 +1298,10 @@ fn run() -> Result<(), String> {
                     "available_known_family_count": candidate.evidence_family_count,
                     "unknown_root_event_count": candidate.unknown_root_event_count,
                     "unknown_family_event_count": candidate.unknown_family_event_count,
+                    "dependency_sidecar_sha256": candidate.dependency_sidecar_sha256,
+                "dependency_sidecar_ingress_verified": candidate.dependency_sidecar_ingress_verified,
+                "lineage_incomplete_event_count": candidate.lineage_incomplete_event_count,
+                    "unresolved_parent_reference_count": candidate.unresolved_parent_reference_count,
                     "index_bytes": candidate.index_bytes,
                     "latency_ns": candidate.latency_ns
                 });
@@ -1031,6 +1326,10 @@ fn run() -> Result<(), String> {
                     "target_key": intervention.target_key,
                     "matched_to": intervention.matched_to,
                     "retrieved_event_ids": candidate.retrieved_event_ids,
+                    "dependency_sidecar_sha256": candidate.dependency_sidecar_sha256,
+                    "dependency_sidecar_ingress_verified": candidate.dependency_sidecar_ingress_verified,
+                    "lineage_incomplete_event_count": candidate.lineage_incomplete_event_count,
+                    "unresolved_parent_reference_count": candidate.unresolved_parent_reference_count,
                     "index_bytes": candidate.index_bytes,
                     "removed_event_ids": intervention.removed_event_ids,
                     "removed_event_count": intervention.removed_event_ids.len(),
@@ -1068,6 +1367,11 @@ fn run() -> Result<(), String> {
     );
     eprintln!("candidate stream: {candidate_path}");
     eprintln!("evaluator stream: {evaluator_path}");
+    if let Some(path) = dependency_sidecar_path {
+        eprintln!("sidecar JSON input: {path} (integrity checked only; importer marks issuer provenance unverified and lineage incomplete)");
+    } else {
+        eprintln!("receipt-backed sidecar input: absent (lineage remains unknown; diagnostic-only)");
+    }
     Ok(())
 }
 
@@ -1085,6 +1389,382 @@ mod tests {
 
     fn first_memory() -> Vec<Experience> {
         generated_worlds(1)[0].memory.clone()
+    }
+
+    fn sidecar_scope() -> broca_mace_policy::Scope {
+        broca_mace_policy::Scope {
+            regime: broca_mace_policy::Regime::Baseline,
+            objective: broca_mace_policy::Objective::Quality,
+        }
+    }
+
+    fn sidecar_semantic_estimand() -> broca_mace_policy::SemanticEstimandV1 {
+        use broca_mace_policy::{EvidenceDigest256, SemanticEstimandV1};
+        SemanticEstimandV1::new(
+            1,
+            EvidenceDigest256::from_bytes([20; 32]),
+            EvidenceDigest256::from_bytes([21; 32]),
+            EvidenceDigest256::from_bytes([22; 32]),
+            EvidenceDigest256::from_bytes([23; 32]),
+            EvidenceDigest256::from_bytes([24; 32]),
+            30_000,
+            EvidenceDigest256::from_bytes([25; 32]),
+            EvidenceDigest256::from_bytes([26; 32]),
+            EvidenceDigest256::from_bytes([27; 32]),
+        )
+    }
+
+    fn sidecar_causal_identification() -> broca_mace_policy::CausalIdentificationV1 {
+        use broca_mace_policy::{CausalIdentificationV1, EvidenceDigest256, IdentificationMethodV1};
+        let semantic = sidecar_semantic_estimand();
+        CausalIdentificationV1::new(
+            IdentificationMethodV1::RandomizedControlledTrial,
+            EvidenceDigest256::from_bytes([1; 32]),
+            semantic.canonical_digest(),
+            5_000,
+            5_000,
+            50_000,
+            true,
+        )
+        .with_semantic_estimand(semantic)
+    }
+
+    fn sidecar_raw(event_id: u32) -> broca_mace_ingress::RawInteractionV1 {
+        use broca_mace_ingress::RawInteractionV1;
+        RawInteractionV1 {
+            event_id,
+            session_id: format!("session-{event_id}"),
+            task_id: format!("task-{event_id}"),
+            payload_sha256: format!("{event_id:064x}"),
+            raw_event_receipt_id: format!("raw-{event_id}"),
+            scope: sidecar_scope(),
+            action: Action::A,
+            observed_utility: 0.87,
+            utility_unit: "normalized_utility".into(),
+            valid_from_ms: 100,
+            valid_until_ms: Some(300),
+            occurred_at_ms: 170,
+            prediction_registered_at_ms: Some(150),
+            action_dispatched_at_ms: Some(170),
+            outcome_observed_at_ms: 200,
+            lineage_receipt_id: format!("lineage-{event_id}"),
+            calibration_receipt_id: format!("calibration-{event_id}"),
+            causal_assessment_receipt_id: format!("causal-{event_id}"),
+            outcome_receipt_id: format!("outcome-{event_id}"),
+        }
+    }
+
+    struct SidecarTestVerifier {
+        cycle: bool,
+    }
+
+    impl broca_mace_ingress::EvidenceVerifier for SidecarTestVerifier {
+        fn verify_raw_event(
+            &self,
+            _receipt_id: &str,
+            raw: &broca_mace_ingress::RawInteractionV1,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedRawEvent> {
+            use broca_mace_ingress::{AuthorityStatus, VerifiedRawEvent};
+            Some(VerifiedRawEvent {
+                event_id: raw.event_id,
+                session_id: raw.session_id.clone(),
+                task_id: raw.task_id.clone(),
+                payload_sha256: raw.payload_sha256.clone(),
+                canonical_event_hash: "c".repeat(64),
+                authority_status: AuthorityStatus::ReceiptAttested,
+                authority_receipt_digest: "b".repeat(64),
+                valid_from_ms: raw.valid_from_ms,
+                valid_until_ms: raw.valid_until_ms,
+                occurred_at_ms: raw.occurred_at_ms,
+                received_at_ms: 220,
+                receipt_digest: format!("{:064x}", u64::from(raw.event_id) + 100),
+            })
+        }
+
+        fn verify_lineage(
+            &self,
+            _receipt_id: &str,
+            event_id: u32,
+            _scope: broca_mace_policy::Scope,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedLineage> {
+            use broca_mace_ingress::{
+                DependencyLineageStatusV1, SourceTrustStatus, VerifiedLineage,
+            };
+            let parents = if self.cycle {
+                if event_id == 42 { vec![43] } else { vec![42] }
+            } else if event_id == 43 {
+                vec![42]
+            } else {
+                Vec::new()
+            };
+            Some(VerifiedLineage {
+                source_family: u16::try_from(event_id).ok()?,
+                source_root_id: event_id,
+                source_root_digest: {
+                    let mut bytes = [0_u8; 32];
+                    bytes[..4].copy_from_slice(&event_id.to_be_bytes());
+                    broca_mace_policy::SourceRootDigest::from_bytes(bytes)
+                },
+                trust_status: SourceTrustStatus::TrustedForScope,
+                trust_policy_digest: "8".repeat(64),
+                acquisition_mode: "api".into(),
+                upstream_source_id: format!("synthetic-upstream-{event_id}"),
+                source_artifact_digest: format!("{:064x}", u64::from(event_id) + 10),
+                transformation_digest: format!("{:064x}", u64::from(event_id) + 20),
+                derived_from_event_ids: parents,
+                dependency_lineage_status: DependencyLineageStatusV1::Complete,
+                dependency_manifest_digest: Some("9".repeat(64)),
+                issuer_id: "did:key:test-source-ledger".into(),
+                receipt_digest: format!("{:064x}", u64::from(event_id) + 30),
+            })
+        }
+
+        fn verify_measurement(
+            &self,
+            _receipt_id: &str,
+            expected_unit: &str,
+            _scope: broca_mace_policy::Scope,
+            _observed_at_ms: i64,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedMeasurement> {
+            Some(broca_mace_ingress::VerifiedMeasurement {
+                absolute_error_bound: 0.02,
+                unit: expected_unit.into(),
+                instrument_id: "instrument-1".into(),
+                method_id: "method-1".into(),
+                calibration_revision: "cal-rev-1".into(),
+                valid_from_ms: 100,
+                valid_until_ms: Some(300),
+                calibration_digest: "1".repeat(64),
+            })
+        }
+
+        fn verify_causal_assessment(
+            &self,
+            _receipt_id: &str,
+            _event_id: u32,
+            _scope: broca_mace_policy::Scope,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedCausalAssessment> {
+            Some(broca_mace_ingress::VerifiedCausalAssessment {
+                intervention_confirmed: true,
+                prediction_pre_registered: true,
+                confounders_controlled: true,
+                delayed_horizon_complete: true,
+                identification: sidecar_causal_identification(),
+                assessment_digest: "2".repeat(64),
+            })
+        }
+
+        fn verify_outcome(
+            &self,
+            _receipt_id: &str,
+            _event_id: u32,
+            _observed_at_ms: i64,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::VerifiedOutcome> {
+            Some(broca_mace_ingress::VerifiedOutcome {
+                reconciled: true,
+                success: true,
+                observed_utility: 0.87,
+                utility_unit: "normalized_utility".into(),
+                outcome_digest: "3".repeat(64),
+            })
+        }
+
+        fn lifecycle_status_as_of(
+            &self,
+            _event_id: u32,
+            _known_at_ms: i64,
+        ) -> Option<broca_mace_ingress::SourceLifecycleStatus> {
+            Some(broca_mace_ingress::SourceLifecycleStatus::Active)
+        }
+    }
+
+    #[test]
+    fn receipt_lineage_drives_canonical_mace_dependency_knockouts() {
+        use broca_mace_ingress::{
+            build_consolidation_evidence_pack, ingest_batch_as_known, AsKnownQuery,
+        };
+
+        let as_known = AsKnownQuery {
+            valid_at_ms: 180,
+            known_at_ms: 250,
+        };
+        let batch = ingest_batch_as_known(
+            &[sidecar_raw(42), sidecar_raw(43)],
+            as_known,
+            &SidecarTestVerifier { cycle: false },
+        )
+        .expect("receipt-backed two-event session should ingest");
+        let pack = build_consolidation_evidence_pack(&batch, &[42, 43])
+            .expect("both source events should enter the evidence pack");
+        let sidecar = pack.dependency_sidecar();
+        assert!(sidecar.verify_integrity());
+        assert!(sidecar.has_verified_ingress_provenance());
+
+        // Export/import preserves the sidecar digest but cannot preserve the
+        // process-local ingress verification capability. Untrusted edges can
+        // still drive diagnostic closures, never complete-lineage qualification.
+        let exported = sidecar.to_json_value();
+        let imported = EvidenceDependencySidecarV1::from_json_value(&exported)
+            .expect("self-consistent sidecar JSON should decode");
+        assert_eq!(imported.canonical_digest(), sidecar.canonical_digest());
+        assert!(!imported.has_verified_ingress_provenance());
+
+        let memory: Vec<Experience> = pack
+            .events()
+            .iter()
+            .map(|event| event.experience())
+            .collect();
+        let unknown_index = EvidenceDependencyIndex::build(&memory).unwrap();
+        assert_eq!(unknown_index.lineage_incomplete_event_count, 2);
+
+        let index = EvidenceDependencyIndex::build_with_sidecar(&memory, &sidecar)
+            .expect("canonical evaluator should consume verifier-issued sidecar");
+        assert_eq!(index.lineage_incomplete_event_count, 0);
+        assert_eq!(index.unresolved_parent_reference_count, 0);
+        assert_eq!(index.dependent_closure(&[42]), vec![42, 43]);
+        let untrusted_index = EvidenceDependencyIndex::build_with_sidecar(&memory, &imported)
+            .expect("integrity-only JSON remains usable for diagnostic dependency closure");
+        assert_eq!(untrusted_index.dependency_sidecar_ingress_verified(), Some(false));
+        assert_eq!(untrusted_index.lineage_incomplete_event_count, 2);
+        assert_eq!(untrusted_index.dependent_closure(&[42]), vec![42, 43]);
+        let untrusted_manifest =
+            build_manifest_with_sidecar(&memory, Some(&imported), 1234, 8).unwrap();
+        assert_eq!(untrusted_manifest.dependency_sidecar_ingress_verified, Some(false));
+        assert_eq!(untrusted_manifest.lineage_incomplete_event_count, 2);
+        assert_eq!(untrusted_manifest.matched_random_count, 0);
+
+        let projection = index.receipt_dependencies.as_ref().unwrap();
+        assert!(projection.all_lineage_complete(&[42, 43]));
+        assert!(projection.depends_on_any(43, &BTreeSet::from([42])));
+
+        let manifest = build_manifest_with_sidecar(&memory, Some(&sidecar), 1234, 8)
+            .expect("manifest should use receipt-backed dependency closure");
+        assert_eq!(manifest.lineage_incomplete_event_count, 0);
+        assert_eq!(manifest.unresolved_parent_reference_count, 0);
+        assert_eq!(
+            manifest.dependency_sidecar_sha256.as_deref(),
+            Some(sidecar.canonical_digest())
+        );
+        let parent_knockout = manifest
+            .interventions
+            .iter()
+            .find(|item| {
+                item.kind == InterventionKind::Event && item.target_key == "event:42"
+            })
+            .expect("parent event knockout should be present");
+        assert_eq!(parent_knockout.removed_event_ids, vec![42, 43]);
+
+        let need = DecisionNeedV1::new(
+            sidecar_scope(),
+            sidecar_semantic_estimand(),
+        )
+        .expect("fixture estimand should define a valid task contract");
+        let without_sidecar = run_candidate(
+            CandidateMode::ExactScopeScan,
+            Query { scope: sidecar_scope() },
+            need,
+            &memory,
+        )
+        .unwrap();
+        let with_sidecar = run_candidate_with_sidecar(
+            CandidateMode::ExactScopeScan,
+            Query { scope: sidecar_scope() },
+            need,
+            &memory,
+            Some(&sidecar),
+        )
+        .unwrap();
+        let imported_candidate = run_candidate_with_sidecar(
+            CandidateMode::ExactScopeScan,
+            Query { scope: sidecar_scope() },
+            need,
+            &memory,
+            Some(&imported),
+        )
+        .unwrap();
+        assert_ne!(without_sidecar.input_sha256, with_sidecar.input_sha256);
+        assert_ne!(with_sidecar.input_sha256, imported_candidate.input_sha256);
+        assert_eq!(with_sidecar.lineage_incomplete_event_count, 0);
+        assert_eq!(imported_candidate.lineage_incomplete_event_count, 2);
+
+        // Remove only the parent. The child's receipt still declares that
+        // parent, so the reduced candidate pool must mark the lineage unknown.
+        let reduced_sidecar = sidecar.retain_without_event_ids(&[42]);
+        let reduced_memory: Vec<Experience> = pack
+            .events()
+            .iter()
+            .filter(|event| event.event_id() == 43)
+            .map(|event| event.experience())
+            .collect();
+        let reduced = run_candidate_with_sidecar(
+            CandidateMode::ExactScopeScan,
+            Query { scope: sidecar_scope() },
+            need,
+            &reduced_memory,
+            Some(&reduced_sidecar),
+        )
+        .unwrap();
+        assert_eq!(reduced.lineage_incomplete_event_count, 1);
+        assert_eq!(reduced.unresolved_parent_reference_count, 1);
+        let reduced_projection =
+            ReceiptDependencyProjection::build(&reduced_memory, &reduced_sidecar).unwrap();
+        assert!(!reduced_projection.all_lineage_complete(&[43]));
+        assert!(reduced_projection.depends_on_any(43, &BTreeSet::from([42])));
+    }
+
+    #[test]
+    fn receipt_dependency_projection_rejects_cycles_and_binding_mismatches() {
+        use broca_mace_ingress::{
+            build_consolidation_evidence_pack, ingest_batch_as_known, AsKnownQuery,
+        };
+        let as_known = AsKnownQuery {
+            valid_at_ms: 180,
+            known_at_ms: 250,
+        };
+        let cycle_batch = ingest_batch_as_known(
+            &[sidecar_raw(42), sidecar_raw(43)],
+            as_known,
+            &SidecarTestVerifier { cycle: true },
+        )
+        .expect("receipt verifier can attest a cyclic test fixture");
+        let cycle_pack = build_consolidation_evidence_pack(&cycle_batch, &[42, 43]).unwrap();
+        let cycle_sidecar = cycle_pack.dependency_sidecar();
+        let cycle_memory: Vec<Experience> = cycle_pack
+            .events()
+            .iter()
+            .map(|event| event.experience())
+            .collect();
+        assert_eq!(
+            EvidenceDependencyIndex::build_with_sidecar(&cycle_memory, &cycle_sidecar)
+                .unwrap_err(),
+            IndexError::InvalidDependencySidecar(
+                "DependencyCycle".to_string()
+            )
+        );
+
+        let valid_batch = ingest_batch_as_known(
+            &[sidecar_raw(42), sidecar_raw(43)],
+            as_known,
+            &SidecarTestVerifier { cycle: false },
+        )
+        .unwrap();
+        let valid_pack = build_consolidation_evidence_pack(&valid_batch, &[42, 43]).unwrap();
+        let valid_sidecar = valid_pack.dependency_sidecar();
+        let mut mismatched_memory: Vec<Experience> = valid_pack
+            .events()
+            .iter()
+            .map(|event| event.experience())
+            .collect();
+        mismatched_memory[0].source_family += 100;
+        assert!(matches!(
+            EvidenceDependencyIndex::build_with_sidecar(&mismatched_memory, &valid_sidecar),
+            Err(IndexError::InvalidDependencySidecar(_))
+        ));
     }
 
     #[test]

@@ -370,3 +370,255 @@ No retrieval gain, decision-utility improvement, official benchmark score, causa
 - MCB / Memory–Clarification Boundary: https://aclanthology.org/2026.nora-1.2/
 - Agentic Abstention, NeurIPS 2026: https://lhannnn.github.io/agentic-abstention/
 - MACE competitive-baseline reproduction issue: https://github.com/Luminous-Dynamics/symthaea/issues/13261
+
+
+---
+
+## 12. Receipt-backed dependency lineage integration (MACE sidecar v1, 2026-11-22)
+
+### Architecture decision
+
+The canonical mace_counterfactual_evidence evaluator and mace_counterfactual_aggregate reducer remain the only benchmark pipeline. The prior standalone knockout executable is not carried forward: event/root/family interventions are now extended in the canonical evaluator, so every retrieval method is evaluated against the same intervention manifest and cluster-first statistical reducer.
+
+MACE does not create a second persistent evidence graph. This is a bounded, run-local projection over ingress-verified lineage records. The canonical ownership remains:
+- #10410 — provider lineage and common-mode source dependencies;
+- #4918 — claim-relative independence and shared failure-domain semantics;
+- #6283 — measurement validity and benchmark-evidence graph principles;
+- #6430 — Mycelix DKG as the authoritative substrate, with deterministic acyclic evidence projections for replay.
+
+The MACE sidecar is a consumer view, not an authority or truth oracle.
+
+### Receipt-backed contract
+
+The ingress VerifiedLineage contract now includes:
+- canonical derived_from_event_ids;
+- a dependency completeness state (Complete, Partial, Unknown);
+- a digest for the exact dependency manifest when the state is Complete or Partial.
+
+Ingress rejects self-references, duplicate or unsorted parent IDs, zero IDs, missing manifest digests for declared dependencies, and contradictory Unknown declarations that carry parents or a digest. The verified fields are copied into EvidenceReceiptBundle, not reconstructed from a caller's Experience booleans.
+
+ConsolidationEvidencePackV1::dependency_sidecar() emits EvidenceDependencySidecarV1 with:
+- the exact (valid_at_ms, known_at_ms) query;
+- event ID, action and scope;
+- verified source family and root;
+- upstream source, artifact and transformation identities;
+- lineage and raw-event receipt digests;
+- the dependency declaration and manifest digest;
+- lifecycle status verified at the same as-known snapshot.
+
+The sidecar is deterministically ordered and has a canonical SHA-256 and JSON interchange representation, governed by data/schemas/mace_evidence_dependency_sidecar_v1.schema.json. Its hash detects content/order changes; it is not a signature. Authenticity and authority remain the responsibility of the actual Mycelix/ingress verifier and trust policy.
+
+### Canonical evaluator integration
+
+The main counterfactual evaluator now accepts an optional ingress sidecar when building its evidence index and candidate observation:
+- sidecar event/action/scope/root/family identities must match the candidate evidence exactly;
+- only receipt-declared, in-pool derived_from edges are followed;
+- event, root, family, unknown-root/family and root-pair interventions expand to known transitive derived descendants;
+- a candidate whose declared parent is outside the selected evidence pool is marked lineage-incomplete and the unresolved parent reference is retained;
+- candidate input/evidence digests bind the sidecar digest; the run identity also binds the sidecar schema digest;
+- matched random controls are stratified by scope/action/estimand, exclude target source roots/families, match post-closure root/family/unknown-identity counts, and are rejected if their expanded dependency closure overlaps or descends from the target knockout.
+
+A candidate without a verified sidecar is not treated as having a complete empty graph: every available event is counted as lineage-incomplete. The existing public generated-world runner has no receipt sidecar input yet, so its results remain diagnostic-only and explicitly lineage-incomplete. The receipt-backed path is exercised by authored synthetic ingress→consolidation→evaluator tests, not by the CLI's generated-world benchmark run.
+
+### Lifecycle boundary
+
+The sidecar records lifecycle status as known at one bitemporal snapshot. Ingress currently admits only records that are active at that snapshot; retracted/superseded records are not silently projected into the transferable candidate memory. A later as-known query must re-run lifecycle verification. The current dependency projection models derived_from closures; it does not infer or claim a complete supersession graph. Full historical lifecycle closure requires an explicit verifier-issued supersession edge/history contract, which is a follow-up integration, not something inferred from event order or a status enum.
+
+### Canonical CLI sidecar input (2026-11-22)
+
+The canonical evaluator now accepts an optional sixth positional argument after the existing cluster count, candidate JSONL path, evaluator JSONL path, seed and root-pair cap:
+
+```text
+mace_counterfactual_evidence 1 candidate.jsonl evaluator.jsonl 1234 32 dependency-sidecar.json
+```
+
+The input must be one canonical `mace_evidence_dependency_sidecar_v1` JSON object for the exact single-world evidence pool (`clusters=1`). The decoder rejects unknown fields, unsupported versions, malformed identities, noncanonical event/parent ordering, digest mismatch and non-active lifecycle records. It verifies the sidecar's canonical SHA-256 commitment; it does not authenticate who issued the receipts. That remains an ingress/Mycelix verifier responsibility.
+
+**Trust downgrade is enforced in code, not just documented:** `from_json_value` always produces an integrity-checked but issuer-unverified sidecar. The private in-process constructor used after ingress receipt admission is the only path that sets the process-local `ingress_receipts_verified` capability. JSON export/import intentionally loses it. An imported sidecar can still drive diagnostic dependency closures, but every event is marked lineage-incomplete, it cannot produce matched-random independence controls, the evidence digest binds the untrusted state, and candidate/evaluator records expose `dependency_sidecar_ingress_verified=false`. Only an ingress-produced object carries `true`; a production-grade verifier implementation is still required before this flag can represent cryptographic Mycelix authority.
+
+The sidecar is now threaded through baseline candidate observations, intervention planning, all five retrieval methods and each knockout. For each intervention, the exact retained event set is paired with `retain_without_event_ids`; a surviving child keeps its parent reference, so the removed parent becomes an unresolved dependency rather than a silent independence claim. The run identity now binds the sidecar digest and hashes the ingress source that defines the decoder. The CLI remains diagnostic-only and the generated-world corpus is not a live external Mycelix evaluation. Sidecar input is a strict integration seam, not proof of live deployment.
+
+The active-only schema, ingress parser, projection and candidate/evaluator output schema now agree on this trust distinction. A self-generated SHA-256 digest is never treated as issuer proof. The JSON parser currently validates shape, integrity and canonical ordering only; it has no signature-verification keyring or Mycelix receipt client.
+
+### Authored regression coverage
+
+The canonical evaluator test suite now includes a two-event synthetic chain:
+- ingress verifies event 43 as derived from event 42;
+- the consolidation pack exports the exact receipt-backed sidecar;
+- the canonical event-42 knockout removes both 42 and 43;
+- the sidecar digest changes the candidate input identity;
+- removing only event 42 leaves event 43 with an unresolved parent reference and marks it incomplete;
+- cyclic ancestry and sidecar/evidence scope/family/root/action mismatches fail closed.
+
+The sidecar adapter also tests incomplete declarations and receipt digest tampering in the ingress suite. At this handoff, the evaluator has 24 authored unit tests and ingress has 47 authored unit tests. No cargo/rustc/rustfmt is installed in the authoring environment, so these tests are authored, not executed; no compile, format, test, or benchmark pass is claimed.
+
+### Industry benchmark frontier and MACE positioning (2026-11-22)
+
+The Agent Memory Challenge Cycle 2 official results were published on November 19, 2026. The open-method leaders were Resurface (textual 61.22), InsightMem (coding 63.33% overall resolved), and Khipu (multimodal 43.26). MemoraX led the separate commercial/closed-source division (textual 69.26, coding 68.00% resolved, multimodal 53.68). These are separate task tracks and divisions, not a single capability score. AML requires participant-hosted public Add/Search APIs; it does not deploy repository-only submissions. MACE has not entered Cycle 2.
+
+Other distinct research anchors:
+- TimlMemBench (Findings EMNLP 2026): 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases; raw-native ingestion and governed activation matter in addition to canonical-pool retrieval.
+- FAMA (Findings ACL 2026) explicitly penalizes use of obsolete or invalidated memory. Stale-memory harm should be a separate score, not averaged away by recall.
+- StateMemBench has 234 multi-session state-tracking scenarios. Published same-backbone comparisons show current-state accuracy of 0.205→0.363 for one DeepSeek-V4-Flash setup and 0.149→0.233 for one Qwen-3.5-9B setup. These are protocol-specific results, not general model multipliers.
+- WorldMemArena evaluates 400 multi-session multimodal tasks across write, maintain, retrieve and use stages; good write/storage scores do not guarantee downstream action competence.
+- AMA-Agent reports 57.22% average accuracy on AMA-Bench with an 11.16-point gain over its strongest reported baseline in that paper's protocol.
+- MemoryArena shows why long-context recall cannot stand in for interdependent multi-session environment success.
+
+Sources: AML Cycle 2 results (https://agentmemoryleaderboard.ai/results/cycle-2/) and rules (https://agentmemories.ai/rules); TimlMemBench (https://aclanthology.org/2026.findings-emnlp.507/); FAMA (https://aclanthology.org/2026.findings-acl.1337/); StateMemBench (https://arxiv.org/abs/2608.19652); WorldMemArena (https://arxiv.org/abs/2605.29341); AMA-Bench (https://proceedings.mlr.press/v306/zhao26bs.html); MemoryArena (https://proceedings.mlr.press/v306/he26am.html).
+
+### Next qualification gates (targets, not results)
+
+| Evaluation | Target / claim threshold |
+|---|---|
+| AML textual, coding, multimodal | Enter a future cycle only with a hosted API; aim for ≥3-point improvement over the strongest reproduced open-method baseline on each separately matched track |
+| StateMemBench | ≥95% current-state accuracy on a preregistered subset; zero known-superseded answers on critical cases |
+| TimlMemBench | Zero unauthorized activation on known revoked, wrong-scope and unknown-trust cases; raw-native results reported separately |
+| FAMA | Zero known-invalid reuse on deterministic invalidation controls |
+| MemoryArena | ≥5 pp task-success lift over the strongest reproduced baseline with matched scaffold/model/tool budget |
+| WorldMemArena | No stage regression across write/maintain/retrieve/use; disclose multimodal and action-grounding costs |
+| MACE sufficiency | Upper 95% bound on added regret ≤ preregistered epsilon; paired lower 95% bound for memory-vs-no-memory utility >0 |
+| Dependency qualification | Zero false-independence acceptance on seeded shared-root/declared-ancestor attacks; unknown/partial ancestry never counts as complete |
+| Compression | ≥50% lower all-in storage/context cost with ≤1 pp task-success loss on a preregistered lane |
+
+The industry scores are not directly comparable with MACE's synthetic utility/regret. Keep separate scorecards. For rare integrity failures, publish one-sided exact upper confidence bounds and the independence assumptions; when samples share scenario/root templates, use cluster-level inference rather than counting every intervention row as an independent trial.
+
+### Remaining work
+
+1. Connect a real Mycelix verifier to the ingress trait; mock verifier receipts are not cryptographic attestations.
+2. Make the canonical CLI accept a pinned receipt-backed evidence fixture and sidecar manifest, while keeping the public generated-world lane separately labelled.
+3. Add explicit receipt-bound supersession history/edge semantics for lifecycle knockouts; do not infer them from current status.
+4. Move evaluator labels/seed custody out of the candidate repository and qualify the manifest under a separately held evaluator.
+5. Execute exact-head Rust formatting, compilation and tests on a real toolchain, then publish receipts. Skipped hosted checks remain skipped, not passes.
+
+
+## 13. New ICML 2026 memory paradigms and MACE comparator design (2026-11-22)
+
+Three recent ICML 2026 methods sharpen the research gap:
+
+1. **MRAgent — active memory reconstruction.** It rejects a rigid retrieve-then-reason pipeline and reconstructs memory paths dynamically as intermediate reasoning discovers new cues. The paper reports gains up to 23% over strong baselines on LoCoMo and LongMemEval with lower retrieval cost. MACE should include an active-reconstruction arm: evidence paths can be expanded, pruned or revised as the task contract is refined, while every resolved node still passes the same scope/provenance/lifecycle gates.
+2. **MemoPilot — learned memory update policy.** It treats memory updating as a multi-turn decision problem and uses multi-turn GRPO to optimize updates for downstream performance of a frozen agent. It reports first-place Elo of 1762 on Limit Texas Hold'em and 1590 on Rock-Paper-Scissors. Those game-specific metrics are not comparable to MACE or general memory benchmarks; the transferable research idea is explicit credit assignment for *when and how memory changes*.
+3. **Darwinian Memory — utility-driven pruning.** It decomposes long trajectories into reusable units and applies utility-driven selection/pruning, reporting mean gains of 18.0% in success rate and 33.9% in execution stability on its multi-app GUI evaluation, alongside reduced latency. MACE should test governed pruning as a baseline, but add hard anti-poisoning, source-lineage, revocation, and worst-family regret gates. Utility selection alone must not authorize promotion or forgetting.
+
+WorldMemArena independently motivates the same move from snapshot retrieval to a lifecycle: write, maintain, retrieve and use over action–world interaction. Its public benchmark describes 400 multimodal multi-session tasks and notes that recall/storage quality does not guarantee use-time correctness, with costly and brittle performance in harder agentic regimes.
+
+### How MACE should beat the frontier without making a misleading SOTA claim
+
+The target is not to claim one architecture wins all benchmark scores. It is to demonstrate a better *Pareto frontier* on a matched frozen backbone and resource budget:
+
+- **Quality:** downstream task success, decision utility, regret and calibration.
+- **Evidence validity:** false independence, stale/revoked use, wrong scope/estimand, unknown ancestry and unsupported causal claims.
+- **Adaptation:** useful active reconstruction, selective verification, re-observation and bounded experimentation.
+- **Lifecycle:** promote, compress, supersede, quarantine, forget-from-index and privacy erase as separate decisions with independent receipts.
+- **Economics:** all-in bytes, receipt/index/tombstone overhead, background consolidation compute, model/tool tokens, p50/p95/p99 latency, and energy/cost where measurable.
+- **Distribution shift:** per-family and worst-regime degradation, not only pooled means.
+
+The next baseline matrix under #8427 should include:
+- full-history and no-memory controls;
+- BM25, dense retrieval, hybrid retrieval and a strong reranker;
+- versioned key-value/file memory;
+- static HDC, HDC-LTC and typed-content HDC;
+- MRAgent-style active associative reconstruction;
+- MemoPilot-style learned memory update policy over a frozen backbone;
+- Darwinian-style utility pruning;
+- receipt-governed MACE consolidation/decision-sufficient memory;
+- oracle upper bounds clearly labelled evaluator-only.
+
+These are method comparators, not scores to average together. Reproduce the published systems under their own native evaluation protocols first; then run a separate matched-budget common suite where an exact adapter exists. MemoPilot's board-game Elo, Darwinian Memory's GUI success/stability percentages, MRAgent's LoCoMo/LongMemEval gains, AML's track scores and MACE's synthetic utility/regret must stay in different columns.
+
+### AML Cycle 2 submission implications
+
+Cycle 2 is closed. Its official results were published November 19, 2026. For a future cycle, repository publication is not enough: every entrant must host stable participant-operated Add and Search endpoints; the platform does not deploy a repository-only or Docker-only system. Open-source Methods also have declared embedding/LLM component restrictions, with rerankers treated separately in the current guide. Therefore, preserve an AML-compliant hosted adapter as a distinct integration profile rather than silently substituting the MACE HDC encoder into a component slot constrained by the next official rules. Re-check the next cycle's exact API/model rules when it opens.
+
+Sources: MRAgent (https://proceedings.mlr.press/v306/ji26d.html); MemoPilot (https://proceedings.mlr.press/v306/cai26b.html); Darwinian Memory (https://proceedings.mlr.press/v306/mi26b.html); WorldMemArena (https://worldmemarena-mem.github.io/); AML Cycle 2 results (https://agentmemoryleaderboard.ai/results/cycle-2/); AML participation/API rules (https://agentmemories.ai/rules).
+
+
+## 14. Agent Memory Challenge Cycle 2: capability-level gap analysis and next frontier (2026-11-22)
+
+### Official current open-method reference
+
+The official Agent Memory Challenge Cycle 2 results were published on 19 November 2026. They report nine separate leaderboards and 289 track entries across textual, multimodal and coding evaluation, with divisions for commercial products, open-source methods and closed-source methods. These divisions and task tracks must remain separate.
+
+| Track / division | Cycle 2 leader | Primary result | Capability-level signal |
+|---|---|---:|---|
+| Textual / open-source | Resurface | 61.22 overall | Fact 62.98; relational 58.94; temporal 57.76; governance 76.55; personalization/care 38.82; workflow 59.67; epistemic safety/privacy 68.59; streaming 49.65 |
+| Multimodal / open-source | Khipu | 43.26 overall | Retrieval 50.28; relational 45.82; temporal 34.23; continual learning 38.45; personalization 11.04; evidence governance 31.29 |
+| Coding / open-source | InsightMem | 63.33% resolved | New-feature resolution 74.51%; bug-fix resolution 57.58%; medium input/output tokens; verbose return; fast search; medium total time |
+| Textual / commercial products | MemoraX | 69.26 overall | Separate division; not an open-source baseline |
+| Multimodal / commercial products | MemoraX | 53.68 overall | Separate division; not an open-source baseline |
+| Coding / commercial products | MemoraX | 68.00% resolved | Separate division; not an open-source baseline |
+
+The official result page also lists MemoraX in the closed-source standings. Its commercial, closed-source and open-source values must not be merged into a single SOTA number. Cycle 2 is a retrieval/governance/task-performance reference, not a measure of causal decision sufficiency. MACE has not entered this competition and its synthetic utility/regret results are not comparable to these scores.
+
+Primary reference: https://agentmemoryleaderboard.ai/results/cycle-2/ (published 2026-11-19). The leaderboard's evaluation notes say that ranks are reported separately by track and division. Always cite the system name, track, division, version and metric when using a result.
+
+### What these scores tell us
+
+The open textual leader is strongest in governance (76.55) but has a material personalization/care gap (38.82) and streaming gap (49.65). The multimodal open leader has a still larger personalization (11.04) and evidence-governance (31.29) gap, while temporal reasoning is 34.23. The coding leader resolves 63.33% overall, with a visible new-feature/bug-fix split (74.51% vs 57.58%). Those differences argue against optimizing only a pooled recall score.
+
+MACE's differentiated contribution should be evidence-valid, decision-changing memory:
+- a retrieved item is not sufficient unless its scope, provenance, lifecycle and estimand match the current decision;
+- unknown or partial ancestry is not independence;
+- an obsolete/retracted/superseded item must not be reactivated by a summary or derived skill;
+- evidence gaps should cause targeted acquisition, clarification or abstention rather than confident guessing;
+- improvements must survive multi-session transfer under held-out source roots, regimes and objectives.
+
+### New paradigm: active evidence reconstruction and value-of-information memory
+
+Move beyond a one-shot \`retrieve → reason → answer\` pipeline. MACE should test a closed-loop process:
+
+\`\`\`text
+task contract
+  → retrieve a provisional evidence set
+  → detect missing / conflicting / stale / weakly identified evidence
+  → choose the highest-value evidence action
+  → acquire (retrieve another lineage path, inspect source, ask, measure, or intervene)
+  → verify and append the receipt
+  → revise the evidence set and decision
+  → stop, act, or abstain under a declared risk budget
+\`\`\`
+
+The evidence action is a first-class policy choice, not an untracked tool call. Each action records its cost, expected information gain, authority/scope, receipt, latency and resulting belief/decision change. A candidate value-of-information score can be operationalized as expected reduction in downstream decision regret minus acquisition cost and risk, subject to hard source, privacy and authorization constraints. It must not be trained or evaluated against oracle labels visible to the candidate.
+
+Required comparator arms:
+1. passive top-k retrieval;
+2. retrieve-then-rerank;
+3. MRAgent-style active memory reconstruction;
+4. active evidence acquisition with fixed heuristic value-of-information;
+5. learned acquisition policy over a frozen answer agent;
+6. full receipt-governed MACE policy;
+7. oracle evidence-acquisition policy (evaluator-only upper bound).
+
+The primary question is not “did retrieval find the right passage?” It is “did the agent acquire enough valid evidence to choose a better action, and did it stop when further search was not worth its cost?”
+
+### Proposed qualification targets (future targets, not measured results)
+
+For a future AML open-method entry, use Cycle 2 leaders only as versioned reference points; verify the next official rules and datasets before submission. Stretch targets against the current open-source leaders are:
+
+| Track | Cycle 2 open leader | Initial matched-protocol hurdle (+3) | Stretch target (+5, aligned with #13284) |
+|---|---:|---:|---:|
+| Textual overall | 61.22 | ≥64.22 | ≥66.22 |
+| Multimodal overall | 43.26 | ≥46.26 | ≥48.26 |
+| Coding resolved | 63.33% | ≥66.33% | ≥68.33% |
+
+Do not count these as achieved or directly infer them from MACE synthetic results. Per-capability targets should address the observed bottlenecks: textual personalization/care ≥45, streaming ≥55, governance ≥80 and epistemic safety/privacy ≥75; multimodal personalization ≥20, evidence governance ≥40 and temporal reasoning ≥40; coding bug-fix resolution ≥62% without losing new-feature performance. These thresholds are project targets, not official challenge thresholds.
+
+For the MACE-specific benchmark, maintain separate scorecards and preregister:
+- paired lower 95% confidence bound of memory-vs-no-memory decision utility greater than zero;
+- upper 95% confidence bound on added regret no greater than a preregistered epsilon;
+- zero accepted false-independence cases on deterministic shared-root and declared-ancestor attacks;
+- zero unauthorized activation of known revoked, wrong-scope, stale or unknown-trust evidence in the deterministic safety panel;
+- value-of-information policy improves task utility over passive retrieval at matched model/tool/observation budgets, with net acquisition cost reported;
+- under equal all-in memory cost, ≥5 percentage-point final-chain success improvement over the strongest reproduced non-oracle baseline as a stretch target;
+- compression target ≥50% lower all-in steady-state and maintenance cost with ≤1 percentage-point task-success loss on a preregistered lane.
+
+For rare integrity failures, report exact one-sided confidence bounds and independent scenario/root counts. Zero observed failures are not proof of zero risk: under independent trials the rough 95% upper bound is about 3/n, and correlated interventions must be clustered by source root/scenario rather than counted as independent samples.
+
+### Implementation sequence
+
+1. Finish the receipt-sidecar reader and exact candidate-pool binding; distinguish integrity hashing from issuer authentication.
+2. Add a genuine ingress-produced fixture to the evaluator path; the current CLI sidecar hook still runs the public generated-world corpus and is not a live Mycelix import.
+3. Add typed lifecycle history edges (\`supersedes\`, \`retracts\`, privacy erase) with issuer/receipt identity, valid-time, known-time and descendant propagation; do not infer history from status labels or timestamps.
+4. Add a value-of-information action schema and sealed evidence-acquisition scenarios, with acquisition receipts and a candidate-visible stop rule.
+5. Reproduce the public AML, TimlMemBench, FAMA, StateMemBench, MemoryArena, WorldMemArena and AMA-Bench protocols separately, then run matched-budget MACE extensions.
+6. Move hidden labels, seeds and primary evaluator custody outside the candidate implementation before confirmatory claims.
+
