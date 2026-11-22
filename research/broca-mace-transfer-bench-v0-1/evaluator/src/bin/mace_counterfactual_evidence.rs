@@ -605,8 +605,9 @@ fn run_candidate(
                         resolved.push(*item);
                     }
                 }
-                let bytes = memory.len().saturating_mul(size_of::<u32>()) as u64;
-                (resolved, ids, None, bytes)
+                // This arm uses the shared canonical event map and an
+                // event-ID ordering rule, not a separately retained index.
+                (resolved, ids, None, 0)
             }
             CandidateMode::StaticHdc | CandidateMode::HdcLtcZeroInput => {
                 if memory.is_empty() {
