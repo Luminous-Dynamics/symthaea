@@ -147,7 +147,9 @@ pub struct ConformalError(pub String);
 
 fn require_text(value: &str, field: &str) -> Result<(), ConformalError> {
     if value.trim().is_empty() {
-        Err(ConformalError(format!("{field}: expected non-empty string")))
+        Err(ConformalError(format!(
+            "{field}: expected non-empty string"
+        )))
     } else {
         Ok(())
     }
@@ -195,7 +197,9 @@ fn validate_unique_ids(
     for (index, id) in ids.into_iter().enumerate() {
         require_text(&id, &format!("{field}[{index}]"))?;
         if !unique.insert(id.clone()) {
-            return Err(ConformalError(format!("{field}[{index}]: duplicate identity")));
+            return Err(ConformalError(format!(
+                "{field}[{index}]: duplicate identity"
+            )));
         }
     }
     Ok(unique)
@@ -220,7 +224,11 @@ fn class_threshold(
     if nonconformity.is_empty() {
         return Err(ConformalError(format!(
             "calibration: class {} has no matured calibration samples",
-            if class_positive { "positive" } else { "negative" }
+            if class_positive {
+                "positive"
+            } else {
+                "negative"
+            }
         )));
     }
     nonconformity.sort_by(f64::total_cmp);
@@ -241,10 +249,7 @@ fn class_threshold(
     })
 }
 
-fn threshold_contains(
-    threshold: &ConformalClassThresholdV1,
-    nonconformity: f64,
-) -> bool {
+fn threshold_contains(threshold: &ConformalClassThresholdV1, nonconformity: f64) -> bool {
     match threshold.threshold {
         Some(value) => nonconformity <= value,
         None => true,
@@ -260,15 +265,21 @@ pub fn build_mondrian_conformal_sets_v1(
     maturity_snapshot: &InformationCutoffSnapshotV1,
 ) -> Result<ConformalReportV1, ConformalError> {
     if subject.schema != SUBJECT_SCHEMA_V1 {
-        return Err(ConformalError("subject.schema: unsupported or missing".into()));
+        return Err(ConformalError(
+            "subject.schema: unsupported or missing".into(),
+        ));
     }
     require_text(&subject.case_id, "case_id")?;
     if !valid_sha256(&subject.model_sha256) {
-        return Err(ConformalError("model_sha256: expected lowercase SHA-256".into()));
+        return Err(ConformalError(
+            "model_sha256: expected lowercase SHA-256".into(),
+        ));
     }
     finite(subject.alpha, "alpha")?;
     if !(0.0..1.0).contains(&subject.alpha) {
-        return Err(ConformalError("alpha: expected value strictly between 0 and 1".into()));
+        return Err(ConformalError(
+            "alpha: expected value strictly between 0 and 1".into(),
+        ));
     }
     if maturity_snapshot.schema != SNAPSHOT_SCHEMA_V1 {
         return Err(ConformalError(
@@ -276,7 +287,10 @@ pub fn build_mondrian_conformal_sets_v1(
         ));
     }
     require_text(&maturity_snapshot.graph_id, "maturity_snapshot.graph_id")?;
-    require_text(&maturity_snapshot.cutoff.cutoff_id, "maturity_snapshot.cutoff.cutoff_id")?;
+    require_text(
+        &maturity_snapshot.cutoff.cutoff_id,
+        "maturity_snapshot.cutoff.cutoff_id",
+    )?;
     if !valid_sha256(&maturity_snapshot.graph_sha256) {
         return Err(ConformalError(
             "maturity_snapshot.graph_sha256: expected lowercase SHA-256".into(),
@@ -291,10 +305,8 @@ pub fn build_mondrian_conformal_sets_v1(
         ));
     }
 
-    let training_ids = validate_unique_ids(
-        subject.training_sample_ids.clone(),
-        "training_sample_ids",
-    )?;
+    let training_ids =
+        validate_unique_ids(subject.training_sample_ids.clone(), "training_sample_ids")?;
     let calibration_ids = validate_unique_ids(
         subject
             .calibration_samples
@@ -326,7 +338,10 @@ pub fn build_mondrian_conformal_sets_v1(
         .collect();
     let mut calibration_label_ids = BTreeSet::new();
     for (index, sample) in subject.calibration_samples.iter().enumerate() {
-        require_text(&sample.label_id, &format!("calibration_samples[{index}].label_id"))?;
+        require_text(
+            &sample.label_id,
+            &format!("calibration_samples[{index}].label_id"),
+        )?;
         probability(sample.score, &format!("calibration_samples[{index}].score"))?;
         if !matured_ids.contains(sample.label_id.as_str()) {
             return Err(ConformalError(format!(
@@ -343,10 +358,8 @@ pub fn build_mondrian_conformal_sets_v1(
         probability(sample.score, &format!("prediction_samples[{index}].score"))?;
     }
 
-    let negative_threshold =
-        class_threshold(&subject.calibration_samples, false, subject.alpha)?;
-    let positive_threshold =
-        class_threshold(&subject.calibration_samples, true, subject.alpha)?;
+    let negative_threshold = class_threshold(&subject.calibration_samples, false, subject.alpha)?;
+    let positive_threshold = class_threshold(&subject.calibration_samples, true, subject.alpha)?;
 
     let mut ordered_predictions = subject.prediction_samples.clone();
     ordered_predictions.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
@@ -355,11 +368,10 @@ pub fn build_mondrian_conformal_sets_v1(
         .map(|sample| {
             let negative_nonconformity = sample.score;
             let positive_nonconformity = 1.0 - sample.score;
-            let negative_in_set =
-                threshold_contains(&negative_threshold, negative_nonconformity);
-            let positive_in_set =
-                threshold_contains(&positive_threshold, positive_nonconformity);
-            let set_size = usize::from(negative_in_set) + usize::from(positive_in_set);
+            let negative_in_set = threshold_contains(&negative_threshold, negative_nonconformity);
+            let positive_in_set = threshold_contains(&positive_threshold, positive_nonconformity);
+            let set_size = (if negative_in_set { 1 } else { 0 })
+                + (if positive_in_set { 1 } else { 0 });
             let decision = match (negative_in_set, positive_in_set) {
                 (true, false) => SelectiveDecisionV1::PredictNegative,
                 (false, true) => SelectiveDecisionV1::PredictPositive,
@@ -376,10 +388,10 @@ pub fn build_mondrian_conformal_sets_v1(
         })
         .collect();
 
-    let prediction_sets_sha256 = sha256_hex(
-        &serde_json::to_vec(&prediction_sets)
-            .map_err(|error| ConformalError(format!("prediction-set serialization failed: {error}")))?,
-    );
+    let prediction_sets_sha256 =
+        sha256_hex(&serde_json::to_vec(&prediction_sets).map_err(|error| {
+            ConformalError(format!("prediction-set serialization failed: {error}"))
+        })?);
     Ok(ConformalReportV1 {
         schema: REPORT_SCHEMA_V1.into(),
         case_id: subject.case_id.clone(),
@@ -535,9 +547,8 @@ pub fn evaluate_conformal_sets_v1(
         ));
     }
     let sample_count = report.prediction_sets.len();
-    let percentage = |numerator: usize, denominator: usize| -> f64 {
-        numerator as f64 / denominator as f64
-    };
+    let percentage =
+        |numerator: usize, denominator: usize| -> f64 { numerator as f64 / denominator as f64 };
     let positive = ConformalClassEvaluationV1 {
         sample_count: positive_support,
         covered_count: positive_covered,
@@ -694,7 +705,11 @@ mod tests {
         for sample in &mut input.calibration_samples {
             sample.positive = false;
         }
-        let ids: Vec<String> = input.calibration_samples.iter().map(|s| s.label_id.clone()).collect();
+        let ids: Vec<String> = input
+            .calibration_samples
+            .iter()
+            .map(|s| s.label_id.clone())
+            .collect();
         let ids_ref: Vec<&str> = ids.iter().map(String::as_str).collect();
         assert!(build_mondrian_conformal_sets_v1(&input, &snapshot(&ids_ref)).is_err());
     }
@@ -717,39 +732,61 @@ mod tests {
                 score: 0.8,
             },
         ];
-        let report = build_mondrian_conformal_sets_v1(
-            &input,
-            &snapshot(&["label-neg", "label-pos"]),
-        )
-        .unwrap();
+        let report =
+            build_mondrian_conformal_sets_v1(&input, &snapshot(&["label-neg", "label-pos"]))
+                .unwrap();
         assert!(report.negative_threshold.unbounded_threshold);
         assert!(report.positive_threshold.unbounded_threshold);
         assert!(report.prediction_sets.iter().all(|row| row.set_size == 2));
-        assert!(report.prediction_sets.iter().all(|row| matches!(row.decision, SelectiveDecisionV1::Abstain)));
+        assert!(
+            report
+                .prediction_sets
+                .iter()
+                .all(|row| matches!(row.decision, SelectiveDecisionV1::Abstain))
+        );
     }
 
     #[test]
     fn test_truth_changes_evaluation_not_prediction_set_digest() {
         let input = subject();
-        let label_ids: Vec<String> = (0..20)
-            .map(|i| format!("label-{i:02}"))
-            .collect();
+        let label_ids: Vec<String> = (0..20).map(|i| format!("label-{i:02}")).collect();
         let labels: Vec<&str> = label_ids.iter().map(String::as_str).collect();
         let report = build_mondrian_conformal_sets_v1(&input, &snapshot(&labels)).unwrap();
         let truth_a = vec![
-            ConformalTruthSampleV1 { sample_id: "test-a".into(), positive: true },
-            ConformalTruthSampleV1 { sample_id: "test-b".into(), positive: false },
-            ConformalTruthSampleV1 { sample_id: "test-c".into(), positive: true },
+            ConformalTruthSampleV1 {
+                sample_id: "test-a".into(),
+                positive: true,
+            },
+            ConformalTruthSampleV1 {
+                sample_id: "test-b".into(),
+                positive: false,
+            },
+            ConformalTruthSampleV1 {
+                sample_id: "test-c".into(),
+                positive: true,
+            },
         ];
         let truth_b = vec![
-            ConformalTruthSampleV1 { sample_id: "test-a".into(), positive: false },
-            ConformalTruthSampleV1 { sample_id: "test-b".into(), positive: true },
-            ConformalTruthSampleV1 { sample_id: "test-c".into(), positive: false },
+            ConformalTruthSampleV1 {
+                sample_id: "test-a".into(),
+                positive: false,
+            },
+            ConformalTruthSampleV1 {
+                sample_id: "test-b".into(),
+                positive: true,
+            },
+            ConformalTruthSampleV1 {
+                sample_id: "test-c".into(),
+                positive: false,
+            },
         ];
         let first = evaluate_conformal_sets_v1(&report, &truth_a).unwrap();
         let second = evaluate_conformal_sets_v1(&report, &truth_b).unwrap();
         assert_eq!(first.prediction_sets_sha256, second.prediction_sets_sha256);
-        assert_ne!(first.empirical_marginal_coverage, second.empirical_marginal_coverage);
+        assert_ne!(
+            first.empirical_marginal_coverage,
+            second.empirical_marginal_coverage
+        );
     }
 
     #[test]
