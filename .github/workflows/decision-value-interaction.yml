@@ -1,0 +1,35 @@
+name: Decision Value Interaction
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "research/decision-value-interaction-001/**"
+      - ".github/workflows/decision-value-interaction.yml"
+  push:
+    branches: ["research/compute-observation-regret-interaction-20261122"]
+    paths:
+      - "research/decision-value-interaction-001/**"
+      - ".github/workflows/decision-value-interaction.yml"
+
+concurrency:
+  group: decision-value-interaction-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference:
+    name: Deterministic reference (Rust 1.96)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/decision-value-interaction-001/Cargo.toml -- --check
+      - name: Test reference
+        run: cargo test --locked --manifest-path research/decision-value-interaction-001/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/decision-value-interaction-001/Cargo.toml --all-targets -- -D warnings
