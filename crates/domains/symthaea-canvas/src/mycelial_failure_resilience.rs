@@ -554,7 +554,7 @@ pub fn build_mycelial_failure_resilience_profile(
         &[],
         &[],
         graph.length_unit,
-    );
+    )?;
     let mut ordered_scenarios: Vec<_> = scenarios.iter().collect();
     ordered_scenarios.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
     let metrics = ordered_scenarios
@@ -569,7 +569,7 @@ pub fn build_mycelial_failure_resilience_profile(
                 graph.length_unit,
             )
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()?;
     let worst_case_weighted_reachability = metrics
         .iter()
         .filter_map(|metric| metric.weighted_reachability)
@@ -582,6 +582,7 @@ pub fn build_mycelial_failure_resilience_profile(
         schema_version: MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION,
         source_graph_digest,
         demand_digest,
+        demands: demands.to_vec(),
         baseline,
         scenarios: metrics,
         worst_case_weighted_reachability,
