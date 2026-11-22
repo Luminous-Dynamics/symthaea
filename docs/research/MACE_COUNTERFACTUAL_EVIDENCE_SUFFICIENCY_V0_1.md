@@ -424,6 +424,18 @@ A candidate without a verified sidecar is not treated as having a complete empty
 
 The sidecar records lifecycle status as known at one bitemporal snapshot. Ingress currently admits only records that are active at that snapshot; retracted/superseded records are not silently projected into the transferable candidate memory. A later as-known query must re-run lifecycle verification. The current dependency projection models derived_from closures; it does not infer or claim a complete supersession graph. Full historical lifecycle closure requires an explicit verifier-issued supersession edge/history contract, which is a follow-up integration, not something inferred from event order or a status enum.
 
+### Canonical CLI sidecar input (2026-11-22)
+
+The canonical evaluator now accepts an optional sixth positional argument after the existing cluster count, candidate JSONL path, evaluator JSONL path, seed and root-pair cap:
+
+```text
+mace_counterfactual_evidence 1 candidate.jsonl evaluator.jsonl 1234 32 dependency-sidecar.json
+```
+
+The input must be one canonical `mace_evidence_dependency_sidecar_v1` JSON object for the exact single-world evidence pool (`clusters=1`). The decoder rejects unknown fields, unsupported versions, malformed identities, noncanonical event/parent ordering, digest mismatch and non-active lifecycle records. It verifies the sidecar's canonical SHA-256 commitment; it does not authenticate who issued the receipts. That remains an ingress/Mycelix verifier responsibility.
+
+The sidecar is now threaded through baseline candidate observations, intervention planning, all five retrieval methods and each knockout. For each intervention, the exact retained event set is paired with `retain_without_event_ids`; a surviving child keeps its parent reference, so the removed parent becomes an unresolved dependency rather than a silent independence claim. The run identity now binds the sidecar digest and hashes the ingress source that defines the decoder. The CLI remains diagnostic-only and the generated-world corpus is not a live external Mycelix evaluation. Sidecar input is a strict integration seam, not proof of live deployment.
+
 ### Authored regression coverage
 
 The canonical evaluator test suite now includes a two-event synthetic chain:
