@@ -448,6 +448,15 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 forecast.forecast_id
             ));
         }
+        if !realization.events.is_empty()
+            && observation.output_evidence_sha256.as_deref()
+                != Some(realization.artifact_sha256.as_str())
+        {
+            return Err(format!(
+                "realization {} artifact digest does not match its observation closure",
+                realization.realization_id
+            ));
+        }
         if realization.started_at_ns < forecast.committed_at_ns
             || realization.completed_at_ns < realization.started_at_ns
         {
@@ -1322,6 +1331,13 @@ mod tests {
             "input_history_sha256":"9999999999999999999999999999999999999999999999999999999999999999"
         }));
         value["forecasts"].as_array_mut().unwrap().push(second);
+        let mut successor_closure = value["observation_closures"][0].clone();
+        successor_closure["forecast_id"] = serde_json::json!("forecast-2");
+        successor_closure["observation_receipt_sha256"] =
+            serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
+        successor_closure["output_evidence_sha256"] =
+            serde_json::json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        value["observation_closures"].as_array_mut().unwrap().push(successor_closure);
         let report = audit(&value).expect("superseded realization remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
         assert!(
@@ -1349,6 +1365,13 @@ mod tests {
             "input_history_sha256":"9999999999999999999999999999999999999999999999999999999999999999"
         }));
         value["forecasts"].as_array_mut().unwrap().push(second);
+        let mut successor_closure = value["observation_closures"][0].clone();
+        successor_closure["forecast_id"] = serde_json::json!("forecast-2");
+        successor_closure["observation_receipt_sha256"] =
+            serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
+        successor_closure["output_evidence_sha256"] =
+            serde_json::json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        value["observation_closures"].as_array_mut().unwrap().push(successor_closure);
         value["dispositions"][0]["action"] = serde_json::json!("steer");
         value["dispositions"][0]["acted_at_ns"] = serde_json::json!(950_000_000_u64);
         let report = audit(&value).expect("late steer remains reportable");
@@ -1436,6 +1459,86 @@ mod tests {
         assert_eq!(report.beat_index_match_rate, Some(0.0));
         assert_eq!(report.absolute_onset_error_beats, vec![0.04]);
         assert_eq!(report.event_findings[0].beat_index_match, Some(false));
+    }
+
+    #[test]
+    fn complete_capture_with_absent_event_is_scored_as_a_negative() {
+        let mut value = panel();
+        value["realizations"] = serde_json::json!([]);
+        let report = audit(&value).expect("complete capture can establish observed absence");
+        assert_eq!(report.unfulfilled_forecast_event_count, 1);
+        assert_eq!(report.unobserved_forecast_event_count, 0);
+        assert_eq!(report.observed_absent_event_count, 1);
+        assert_eq!(report.presence_scored_event_count, 1);
+        assert!(report.presence_calibration_complete);
+        assert_eq!(report.event_findings[0].presence_outcome_status, "absent");
+        assert_eq!(report.event_findings[0].presence_observed, Some(false));
+        assert!((report.event_findings[0].presence_brier_score.unwrap() - 0.9025).abs() < 1e-9);
+    }
+
+    #[test]
+    fn partial_capture_keeps_missing_event_unknown_and_out_of_brier_denominator() {
+        let mut value = panel();
+        value["realizations"] = serde_json::json!([]);
+        value["observation_closures"][0]["status"] = serde_json::json!("partial");
+        value["observation_closures"][0]["coverage_end_ns"] = serde_json::json!(1_200_000_000_u64);
+        value["observation_closures"][0]["observed_through_ns"] = serde_json::json!(1_200_000_000_u64);
+        let report = audit(&value).expect("partial output is reportable but not a negative");
+        assert_eq!(report.unfulfilled_forecast_event_count, 0);
+        assert_eq!(report.unobserved_forecast_event_count, 1);
+        assert_eq!(report.observed_absent_event_count, 0);
+        assert_eq!(report.presence_scored_event_count, 0);
+        assert!(!report.presence_calibration_complete);
+        assert_eq!(report.event_findings[0].presence_outcome_status, "unknown");
+        assert_eq!(report.event_findings[0].presence_observed, None);
+        assert_eq!(report.event_findings[0].presence_brier_score, None);
+        assert_eq!(report.conditional_presence_brier_score, None);
+    }
+
+    #[test]
+    fn complete_capture_must_cover_the_last_tick_of_the_target_window() {
+        let mut value = panel();
+        value["observation_closures"][0]["coverage_end_ns"] =
+            serde_json::json!(1_499_999_999_u64);
+        value["observation_closures"][0]["observed_through_ns"] =
+            serde_json::json!(1_499_999_999_u64);
+        let error = audit(&value).expect_err("a one-nanosecond short capture is not complete");
+        assert!(error.contains("does not cover the full target window"));
+    }
+
+    #[test]
+    fn unavailable_capture_cannot_be_scored_as_silence() {
+        let mut value = panel();
+        value["realizations"] = serde_json::json!([]);
+        value["observation_closures"][0]["status"] = serde_json::json!("unavailable");
+        value["observation_closures"][0]["coverage_start_ns"] =
+            serde_json::json!(1_000_000_000_u64);
+        value["observation_closures"][0]["coverage_end_ns"] =
+            serde_json::json!(1_000_000_000_u64);
+        value["observation_closures"][0]["observed_through_ns"] =
+            serde_json::json!(1_000_000_000_u64);
+        value["observation_closures"][0]["output_evidence_sha256"] = serde_json::Value::Null;
+        let report = audit(&value).expect("unavailable observation remains unknown");
+        assert_eq!(report.unobserved_forecast_event_count, 1);
+        assert_eq!(report.unfulfilled_forecast_event_count, 0);
+        assert_eq!(report.event_findings[0].presence_observed, None);
+    }
+
+    #[test]
+    fn missing_observation_closure_fails_closed() {
+        let mut value = panel();
+        value["observation_closures"] = serde_json::json!([]);
+        let error = audit(&value).expect_err("every forecast needs an explicit closure");
+        assert!(error.contains("observation_closures must be non-empty"));
+    }
+
+    #[test]
+    fn event_outside_capture_coverage_is_rejected() {
+        let mut value = panel();
+        value["realizations"][0]["completed_at_ns"] = serde_json::json!(1_700_000_000_u64);
+        value["realizations"][0]["events"][0]["onset_ns"] = serde_json::json!(1_600_000_000_u64);
+        let error = audit(&value).expect_err("unobserved event cannot extend past capture");
+        assert!(error.contains("outside available observation coverage"));
     }
 
     #[test]
