@@ -1812,6 +1812,35 @@ impl MycelialFailureDeliveryProfile {
                 ));
             }
         }
+        // Entity-keyed common random numbers make successful removals nested
+        // across the plan's budget prefixes for each trial.
+        for trial_index in 0..self.config.trials_per_scenario {
+            let mut previous_segments = BTreeSet::new();
+            let mut previous_junctions = BTreeSet::new();
+            for scenario_index in 0..plan.scenarios.len() {
+                let offset = scenario_index
+                    .saturating_mul(self.config.trials_per_scenario)
+                    .saturating_add(trial_index);
+                let trial = self.trials.get(offset).ok_or(
+                    MycelialFailureResilienceError::InvalidDeliveryProfile(
+                        "nested common-random-number trial is missing",
+                    ),
+                )?;
+                let current_segments: BTreeSet<_> =
+                    trial.realized_failed_segment_ids.iter().cloned().collect();
+                let current_junctions: BTreeSet<_> =
+                    trial.realized_failed_junction_ids.iter().cloned().collect();
+                if !previous_segments.is_subset(&current_segments)
+                    || !previous_junctions.is_subset(&current_junctions)
+                {
+                    return Err(MycelialFailureResilienceError::InvalidDeliveryProfile(
+                        "realized removals are not nested across attack budgets",
+                    ));
+                }
+                previous_segments = current_segments;
+                previous_junctions = current_junctions;
+            }
+        }
         Ok(())
     }
 
