@@ -153,6 +153,7 @@ pub enum FactorialExperimentError {
     InvalidIdentifier(&'static str),
     InvalidTargetVarianceFraction,
     EmptyMatrix,
+    InsufficientMatrixShape,
     RaggedMatrix(&'static str),
     DimensionMismatch(&'static str),
     NonFiniteInput(&'static str),
@@ -173,6 +174,7 @@ impl fmt::Display for FactorialExperimentError {
                 "target component-variance fraction must be finite and in [0, 1)"
             ),
             Self::EmptyMatrix => write!(f, "counterfactual matrices must be non-empty"),
+            Self::InsufficientMatrixShape => write!(f, "counterfactual matrices require at least three time points and two ROIs"),
             Self::RaggedMatrix(name) => write!(f, "{name} matrix must be rectangular"),
             Self::DimensionMismatch(reason) => write!(f, "factorial dimension mismatch: {reason}"),
             Self::NonFiniteInput(name) => write!(f, "{name} contains non-finite values"),
@@ -370,6 +372,9 @@ fn validate_matrix(
         return Err(FactorialExperimentError::EmptyMatrix);
     }
     let width = matrix[0].len();
+    if matrix.len() < 3 || width < 2 {
+        return Err(FactorialExperimentError::InsufficientMatrixShape);
+    }
     if matrix.iter().any(|row| row.len() != width) {
         return Err(FactorialExperimentError::RaggedMatrix(name));
     }
@@ -618,6 +623,30 @@ mod tests {
                 .unwrap();
         assert_eq!(experiment.report.target_component_variance_fraction, None);
         assert!(experiment.report.realized_component_variance_fraction >= 0.0);
+    }
+
+    #[test]
+    fn insufficient_time_or_roi_dimensions_fail_closed() {
+        let short_time = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
+        let full = vec![vec![0.0, 1.0]; 3];
+        assert!(matches!(
+            run_factorial_counterfactual_experiment(
+                &short_time,
+                &short_time,
+                &short_time,
+                &metadata()
+            ),
+            Err(FactorialExperimentError::InsufficientMatrixShape)
+        ));
+        assert!(matches!(
+            run_factorial_counterfactual_experiment(
+                &full,
+                &full,
+                &full.iter().map(|_| vec![0.0]).collect::<Vec<_>>(),
+                &metadata()
+            ),
+            Err(FactorialExperimentError::DimensionMismatch(_))
+        ));
     }
 
     #[test]
