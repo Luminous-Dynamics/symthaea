@@ -658,7 +658,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "# flux_columns,run,step,time,x_cutoff,v_cutoff,pulse_phi_x,pulse_phi_v,pulse_cumulative_phi_x,pulse_cumulative_phi_v,pulse_direct_loss_x,pulse_direct_loss_v,pulse_closure_x,pulse_closure_v,control_phi_x,control_phi_v,control_cumulative_phi_x,control_cumulative_phi_v,control_direct_loss_x,control_direct_loss_v,control_closure_x,control_closure_v"
     );
 
-    let common = |nx, nv, velocity_limit| VlasovPoissonConfig {
+    let common = |nx: usize, nv: usize, velocity_limit: f64| VlasovPoissonConfig {
         nx,
         nv,
         domain_length: 4.0 * std::f64::consts::PI,
