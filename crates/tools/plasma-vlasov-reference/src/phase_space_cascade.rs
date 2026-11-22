@@ -6,7 +6,62 @@
 //! is labelled the phase-mixing sector and k*s > 0 the phase-unmixing sector.
 //! These are directional spectral occupancies, not transfer rates or fluxes.
 
-use super::{Complex, SolverError, VlasovPoisson1d1v, fft, signed_mode};
+use super::{Complex, SolverError, VlasovPoisson1d1v, VlasovPoissonConfig, fft, signed_mode};
+
+/// Velocity-grid time scales for a registered spatial Fourier mode.
+///
+/// These are representation warnings, not predictions of a self-consistent
+/// electric-field maximum. The recurrence estimate follows the discrete
+/// free-streaming phase increment across adjacent velocity cells.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VelocitySamplingHorizon {
+    pub spatial_mode: usize,
+    pub physical_wave_number: f64,
+    pub velocity_spacing: f64,
+    pub nyquist_encounter_time: f64,
+    pub discrete_recurrence_time: f64,
+}
+
+impl VlasovPoissonConfig {
+    /// Estimate velocity-Fourier Nyquist and discrete recurrence times for
+    /// one nonzero, resolved positive spatial mode.
+    ///
+    /// For k = 2πm/Lx and velocity spacing dv:
+    /// t_N = π/(|k|dv), t_rec = 2π/(|k|dv).
+    pub fn velocity_sampling_horizon(
+        self,
+        spatial_mode: usize,
+    ) -> Result<VelocitySamplingHorizon, SolverError> {
+        self.validate()?;
+        if spatial_mode == 0 || spatial_mode >= self.nx / 2 {
+            return Err(SolverError::InvalidSpatialMode {
+                mode: spatial_mode,
+                maximum_exclusive: self.nx / 2,
+            });
+        }
+
+        let physical_wave_number = std::f64::consts::TAU * spatial_mode as f64 / self.domain_length;
+        let velocity_spacing = self.dv();
+        let phase_rate = physical_wave_number.abs() * velocity_spacing;
+        let nyquist_encounter_time = std::f64::consts::PI / phase_rate;
+        let discrete_recurrence_time = std::f64::consts::TAU / phase_rate;
+        if !physical_wave_number.is_finite()
+            || !velocity_spacing.is_finite()
+            || !nyquist_encounter_time.is_finite()
+            || !discrete_recurrence_time.is_finite()
+        {
+            return Err(SolverError::NonFiniteState);
+        }
+
+        Ok(VelocitySamplingHorizon {
+            spatial_mode,
+            physical_wave_number,
+            velocity_spacing,
+            nyquist_encounter_time,
+            discrete_recurrence_time,
+        })
+    }
+}
 
 /// Discrete quadratic-Casimir partition for a 1D1V distribution.
 ///
@@ -302,6 +357,228 @@ mod tests {
         assert_eq!(spectrum.signed_velocity_mode(255), Some(-1));
         assert_eq!(spectrum.mode_energy(64, 0), None);
         assert_eq!(spectrum.mode_energy(0, 256), None);
+    }
+
+    #[test]
+    fn free_streaming_matches_independent_continuous_characteristic_solution() {
+        let config = config();
+        let alpha = 1.0e-2;
+        let mode = 1usize;
+        let thermal_speed = 1.0;
+        let time = 2.375;
+        let initial = maxwellian_perturbation(config, alpha, mode, thermal_speed).unwrap();
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+
+        let mut maxwellian: Vec<f64> = (0..config.nv)
+            .map(|iv| {
+                let velocity = config.velocity(iv);
+                (-0.5 * (velocity / thermal_speed).powi(2)).exp()
+                    / (std::f64::consts::TAU.sqrt() * thermal_speed)
+            })
+            .collect();
+        let normalization = maxwellian.iter().sum::<f64>() * config.dv();
+        for value in &mut maxwellian {
+            *value /= normalization;
+        }
+
+        solver.advance_free_streaming(time).unwrap();
+        let wave_number = std::f64::consts::TAU * mode as f64 / config.domain_length;
+        let mut maximum_error = 0.0_f64;
+        let mut reference_scale = 0.0_f64;
+        for ix in 0..config.nx {
+            for (iv, maxwellian_value) in maxwellian.iter().copied().enumerate() {
+                let phase = wave_number * (config.x(ix) - config.velocity(iv) * time);
+                let expected = maxwellian_value * (1.0 + alpha * phase.cos());
+                let observed = solver.distribution[ix * config.nv + iv];
+                maximum_error = maximum_error.max((observed - expected).abs());
+                reference_scale = reference_scale.max(expected.abs());
+            }
+        }
+
+        let relative_error = maximum_error / reference_scale.max(f64::MIN_POSITIVE);
+        assert!(
+            relative_error < 1.0e-11,
+            "free-streaming characteristic relative error = {relative_error:e}"
+        );
+    }
+
+    #[test]
+    fn two_pulse_free_streaming_matches_characteristic_response_oracle() {
+        let config = VlasovPoissonConfig {
+            nx: 64,
+            nv: 512,
+            domain_length: 4.0 * std::f64::consts::PI,
+            velocity_min: -8.0,
+            velocity_max: 8.0,
+            charge_to_mass: -1.0,
+            permittivity: 1.0,
+            background_density: 1.0,
+        };
+        let alpha = 1.0e-2;
+        let thermal_speed = 1.0;
+        let first_mode = 1usize;
+        let second_mode = 2usize;
+        let first_time = 1.0;
+        let second_time = 1.0;
+        let final_time = 3.5;
+        let impulse_amplitude = 2.0e-2;
+
+        let initial = maxwellian_perturbation(config, alpha, first_mode, thermal_speed).unwrap();
+        let mut solver = VlasovPoisson1d1v::new(config, initial).unwrap();
+        solver.advance_free_streaming(first_time).unwrap();
+
+        let second_wave_number = std::f64::consts::TAU * second_mode as f64 / config.domain_length;
+        let impulses: Vec<f64> = (0..config.nx)
+            .map(|ix| impulse_amplitude * (second_wave_number * config.x(ix)).sin())
+            .collect();
+        solver.apply_velocity_impulse(&impulses).unwrap();
+        solver
+            .advance_free_streaming(final_time - second_time)
+            .unwrap();
+
+        let mut maxwellian: Vec<f64> = (0..config.nv)
+            .map(|iv| {
+                let velocity = config.velocity(iv);
+                (-0.5 * (velocity / thermal_speed).powi(2)).exp()
+                    / (std::f64::consts::TAU.sqrt() * thermal_speed)
+            })
+            .collect();
+        let normalization = maxwellian.iter().sum::<f64>() * config.dv();
+        for value in &mut maxwellian {
+            *value /= normalization;
+        }
+
+        let first_wave_number = std::f64::consts::TAU * first_mode as f64 / config.domain_length;
+        let post_pulse_elapsed = final_time - second_time;
+        let mut maximum_error = 0.0_f64;
+        let mut reference_scale = 0.0_f64;
+
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let x_at_pulse = config.x(ix) - config.velocity(iv) * post_pulse_elapsed;
+                let kick = impulse_amplitude * (second_wave_number * x_at_pulse).sin();
+                let pre_pulse_velocity = config.velocity(iv) - kick;
+                let initial_phase =
+                    first_wave_number * (x_at_pulse - pre_pulse_velocity * first_time);
+                let velocity_density = (-0.5 * (pre_pulse_velocity / thermal_speed).powi(2)).exp()
+                    / (std::f64::consts::TAU.sqrt() * thermal_speed * normalization);
+                let expected = velocity_density * (1.0 + alpha * initial_phase.cos());
+                let observed = solver.distribution[ix * config.nv + iv];
+                maximum_error = maximum_error.max((observed - expected).abs());
+                reference_scale = reference_scale.max(expected.abs());
+            }
+        }
+
+        let relative_error = maximum_error / reference_scale.max(f64::MIN_POSITIVE);
+        assert!(
+            relative_error < 2.0e-8,
+            "two-pulse characteristic relative error = {relative_error:e}"
+        );
+    }
+
+    #[test]
+    fn velocity_sampling_horizon_scales_with_mode_spacing_and_extent() {
+        let base = config();
+        let base_mode_one = base.velocity_sampling_horizon(1).unwrap();
+        let base_mode_two = base.velocity_sampling_horizon(2).unwrap();
+        assert!(
+            (base_mode_two.discrete_recurrence_time - 0.5 * base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (base_mode_one.discrete_recurrence_time - 2.0 * base_mode_one.nyquist_encounter_time)
+                .abs()
+                < 1.0e-12
+        );
+
+        let refined_velocity = VlasovPoissonConfig { nv: 512, ..base };
+        let refined_horizon = refined_velocity.velocity_sampling_horizon(1).unwrap();
+        assert!(
+            (refined_horizon.discrete_recurrence_time
+                - 2.0 * base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
+        );
+
+        let expanded_fixed_dv = VlasovPoissonConfig {
+            nv: 512,
+            velocity_min: -12.0,
+            velocity_max: 12.0,
+            ..base
+        };
+        let fixed_dv_horizon = expanded_fixed_dv.velocity_sampling_horizon(1).unwrap();
+        assert!((fixed_dv_horizon.velocity_spacing - base.dv()).abs() < 1.0e-14);
+        assert!(
+            (fixed_dv_horizon.discrete_recurrence_time - base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
+        );
+
+        let expanded_fixed_nv = VlasovPoissonConfig {
+            velocity_min: -12.0,
+            velocity_max: 12.0,
+            ..base
+        };
+        let expanded_horizon = expanded_fixed_nv.velocity_sampling_horizon(1).unwrap();
+        assert!(
+            (expanded_horizon.discrete_recurrence_time
+                - 0.5 * base_mode_one.discrete_recurrence_time)
+                .abs()
+                < 1.0e-12
+        );
+    }
+
+    #[test]
+    fn finite_velocity_grid_has_predicted_nyquist_encounter_and_recurrence() {
+        let config = config();
+        let mut solver = initial_solver();
+        let initial_distribution = solver.distribution().to_vec();
+        let initial_spectrum = solver.joint_phase_space_spectrum().unwrap();
+
+        let spatial_wave_number = std::f64::consts::TAU / config.domain_length;
+        let nyquist_time = std::f64::consts::PI / (spatial_wave_number * config.dv());
+        let recurrence_time = std::f64::consts::TAU / (spatial_wave_number * config.dv());
+        assert!((recurrence_time - 2.0 * nyquist_time).abs() < 1.0e-12);
+
+        solver.advance_free_streaming(nyquist_time).unwrap();
+        let nyquist_spectrum = solver.joint_phase_space_spectrum().unwrap();
+        let nyquist_fraction =
+            nyquist_spectrum.nyquist_f_strophy / nyquist_spectrum.spectral_f_strophy;
+        assert!(
+            nyquist_fraction > 0.10,
+            "Nyquist occupancy {nyquist_fraction:e} failed to rise above the declared threshold"
+        );
+        assert!(nyquist_spectrum.parseval_relative_residual < 1.0e-12);
+
+        solver
+            .advance_free_streaming(recurrence_time - nyquist_time)
+            .unwrap();
+        let recurrence_distribution = solver.distribution();
+        let maximum_error = recurrence_distribution
+            .iter()
+            .zip(initial_distribution.iter())
+            .map(|(observed, expected)| (observed - expected).abs())
+            .fold(0.0_f64, f64::max);
+        let distribution_scale = initial_distribution
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0_f64, f64::max)
+            .max(f64::MIN_POSITIVE);
+        let relative_recurrence_error = maximum_error / distribution_scale;
+        assert!(
+            relative_recurrence_error < 1.0e-10,
+            "discrete free-streaming recurrence error = {relative_recurrence_error:e}"
+        );
+
+        let recurrence_spectrum = solver.joint_phase_space_spectrum().unwrap();
+        let recurrence_nyquist_fraction =
+            recurrence_spectrum.nyquist_f_strophy / recurrence_spectrum.spectral_f_strophy;
+        assert!(
+            recurrence_nyquist_fraction
+                < initial_spectrum.nyquist_f_strophy / initial_spectrum.spectral_f_strophy + 1.0e-8,
+            "Nyquist occupancy did not return near its initial value: {recurrence_nyquist_fraction:e}"
+        );
     }
 
     #[test]

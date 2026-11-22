@@ -27,11 +27,19 @@ jobs:
       - name: Strict format check
         run: cargo fmt --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml -- --check
       - name: Unit tests
-        run: cargo test --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml
+        run: cargo test --all-targets --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --all-targets -- -D warnings
       - name: Create reproducible trajectory artifacts
         run: mkdir -p artifacts/plasma-vlasov-reference
+      - name: Record runner environment
+        run: |
+          {
+            uname -a
+            lscpu
+            rustc --version --verbose
+            cargo --version
+          } > artifacts/plasma-vlasov-reference/environment.txt
       - name: Run weak-Landau reference trajectory
         run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_reference > artifacts/plasma-vlasov-reference/landau-reference.csv
       - name: Run independent resolution and timestep probes
@@ -39,11 +47,13 @@ jobs:
       - name: Run matched Landau amplitude sweep
         run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_amplitude_sweep > artifacts/plasma-vlasov-reference/landau-amplitude-sweep.csv
       - name: Run self-consistent two-pulse echo pilot
-        run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example self_consistent_echo > artifacts/plasma-vlasov-reference/self-consistent-echo.csv
+        run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/self-consistent-echo-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example self_consistent_echo > artifacts/plasma-vlasov-reference/self-consistent-echo.csv
+      - name: Run finite-velocity recurrence sweep
+        run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/velocity-recurrence-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example velocity_recurrence_sweep > artifacts/plasma-vlasov-reference/velocity-recurrence-sweep.csv
       - name: Upload reproducible trajectory traces
         uses: actions/upload-artifact@v4
         with:
           name: plasma-vlasov-reference-${{ github.sha }}
-          path: artifacts/plasma-vlasov-reference/*.csv
+          path: artifacts/plasma-vlasov-reference/*
           if-no-files-found: error
           retention-days: 30

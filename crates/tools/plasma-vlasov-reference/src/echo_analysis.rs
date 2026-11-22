@@ -628,6 +628,19 @@ mod tests {
     }
 
     #[test]
+    fn wrong_second_pulse_mode_predicts_a_distinct_echo_branch_and_time() {
+        let prediction = predict_two_pulse_echo(EchoPulsePair {
+            first_mode: 1,
+            second_mode: 3,
+            first_time: 0.0,
+            second_time: 2.0,
+        })
+        .unwrap();
+        assert_eq!(prediction.echo_mode, 2);
+        assert!((prediction.echo_time - 3.0).abs() < 1.0e-14);
+    }
+
+    #[test]
     fn pulse_geometry_rejects_zero_and_equal_modes() {
         assert_eq!(
             predict_two_pulse_echo(EchoPulsePair {
