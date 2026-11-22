@@ -361,3 +361,12 @@ execution.
 
 The emitted qualification summary is validated against
 [`qualification-summary-v1.schema.json`](qualification/qualification-summary-v1.schema.json).
+
+
+## Trusted execution and causal repair
+
+The next assurance layer is specified in [attestation/](attestation/README.md):
+in-toto run statements, hash-chained browser observation traces, isolated
+execution requirements, independent oracle derivation and evidence-linked
+causal repair. These are authored schemas and design protocols, not an
+implemented executor or measured benchmark result.
