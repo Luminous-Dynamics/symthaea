@@ -75,7 +75,7 @@
           "target_component_variance_fraction": {
             "type": ["number", "null"],
             "minimum": 0,
-            "maximum": 1
+            "exclusiveMaximum": 1
           },
           "realized_component_variance_fraction": {
             "type": "number",
