@@ -32,6 +32,7 @@ pub mod mycelial_contact_persistence;
 pub mod mycelial_reference_networks;
 pub mod mycelial_reconstruction_metrics;
 pub mod mycelial_temporal_cycles;
+pub mod mycelial_failure_resilience;
 pub mod mycelial_mesh;
 pub mod mycelial_model;
 pub mod mycelial_network;
@@ -131,6 +132,15 @@ pub use mycelial_temporal_cycles::{
     TemporalMycelialSnapshotMetrics, TemporalWindowCoverage,
     build_temporal_mycelial_cycle_profile, temporal_snapshot_from_annotated_skeleton,
 };
+pub use mycelial_failure_resilience::{
+    MAX_FAILURE_DEMAND_PAIRS, MAX_FAILURE_DEMAND_SOURCES, MAX_FAILURE_ID_BYTES,
+    MAX_FAILURE_JUNCTIONS, MAX_FAILURE_SCENARIOS, MAX_FAILURE_SEGMENTS,
+    MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION, MycelialDemandPair, MycelialDemandPairOutcome,
+    MycelialFailureMetrics, MycelialFailureResilienceError, MycelialFailureResilienceProfile,
+    MycelialFailureScenario, build_mycelial_failure_resilience_profile,
+    build_single_failure_resilience_profile,
+};
+
 pub use mycelial_mesh::{
     FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
     TubeTessellationConfig, TubeTessellationError, tessellate_mycelial_model,
