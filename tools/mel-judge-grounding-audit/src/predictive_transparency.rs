@@ -16,7 +16,12 @@ struct ForecastPanelV1 {
     reference_time_map_kind: String,
     reference_time_map_clock_domain_id: String,
     reference_time_map_receipt_sha256: String,
+    time_alignment_source_clock_domain_id: String,
+    time_alignment_target_clock_domain_id: String,
     time_alignment_receipt_sha256: String,
+    time_alignment_valid_from_ns: u64,
+    time_alignment_valid_until_ns: u64,
+    time_alignment_max_uncertainty_ns: u64,
     input_snapshots: Vec<InputSnapshotV1>,
     policy: ForecastPolicyV1,
     forecasts: Vec<ForecastV1>,
@@ -123,6 +128,7 @@ pub struct EventForecastFinding {
     pub observed_onset_ns: Option<u64>,
     pub signed_onset_error_ns: Option<i128>,
     pub absolute_onset_error_beats: Option<f64>,
+    pub worst_case_absolute_onset_error_beats: Option<f64>,
     pub within_onset_tolerance: Option<bool>,
     pub presence_probability: f64,
     pub presence_observed: bool,
@@ -146,6 +152,11 @@ pub struct ForecastAuditReport {
     pub reference_time_map_version: String,
     pub reference_time_map_kind: String,
     pub reference_time_map_clock_domain_id: String,
+    pub time_alignment_source_clock_domain_id: String,
+    pub time_alignment_target_clock_domain_id: String,
+    pub time_alignment_valid_from_ns: u64,
+    pub time_alignment_valid_until_ns: u64,
+    pub time_alignment_max_uncertainty_ns: u64,
     pub forecast_count: usize,
     pub forecast_event_count: usize,
     pub display_count: usize,
@@ -557,6 +568,12 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 observed_onset_ns,
                 signed_onset_error_ns: signed_error_ns,
                 absolute_onset_error_beats: phase_error.map(f64::abs),
+                worst_case_absolute_onset_error_beats: realized.map(|_| {
+                    let signed_error_ns = signed_error_ns.expect("matched event has signed error");
+                    (signed_error_ns.unsigned_abs() as f64
+                        + panel.time_alignment_max_uncertainty_ns as f64)
+                        / predicted.local_beat_period_ns as f64
+                }),
                 within_onset_tolerance: within,
                 presence_probability: predicted.presence_probability,
                 presence_observed,
@@ -594,6 +611,11 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         reference_time_map_version: panel.reference_time_map_version.clone(),
         reference_time_map_kind: panel.reference_time_map_kind.clone(),
         reference_time_map_clock_domain_id: panel.reference_time_map_clock_domain_id.clone(),
+        time_alignment_source_clock_domain_id: panel.time_alignment_source_clock_domain_id.clone(),
+        time_alignment_target_clock_domain_id: panel.time_alignment_target_clock_domain_id.clone(),
+        time_alignment_valid_from_ns: panel.time_alignment_valid_from_ns,
+        time_alignment_valid_until_ns: panel.time_alignment_valid_until_ns,
+        time_alignment_max_uncertainty_ns: panel.time_alignment_max_uncertainty_ns,
         forecast_count: panel.forecasts.len(),
         forecast_event_count: forecast_events.len(),
         display_count: panel.displays.len(),
@@ -643,6 +665,22 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
         &panel.reference_time_map_clock_domain_id,
         "reference_time_map_clock_domain_id",
     )?;
+    require_text(
+        &panel.time_alignment_source_clock_domain_id,
+        "time_alignment_source_clock_domain_id",
+    )?;
+    require_text(
+        &panel.time_alignment_target_clock_domain_id,
+        "time_alignment_target_clock_domain_id",
+    )?;
+    if panel.time_alignment_source_clock_domain_id != panel.reference_time_map_clock_domain_id
+        || panel.time_alignment_target_clock_domain_id != panel.clock_domain_id
+    {
+        return Err("time alignment source/target domains do not match the canonical map and evaluator clock".to_owned());
+    }
+    if panel.time_alignment_valid_from_ns >= panel.time_alignment_valid_until_ns {
+        return Err("time alignment validity interval must have positive duration".to_owned());
+    }
     require_digest(
         &panel.reference_time_map_receipt_sha256,
         "canonical time-map receipt digest",
@@ -718,6 +756,14 @@ fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(
         ));
     }
     require_digest(&forecast.policy_sha256, "forecast policy digest")?;
+    if forecast.target_start_ns < panel.time_alignment_valid_from_ns
+        || forecast.target_end_ns > panel.time_alignment_valid_until_ns
+    {
+        return Err(format!(
+            "forecast {} target window is outside the time-alignment validity interval",
+            forecast.forecast_id
+        ));
+    }
     if forecast.revision == 0 || forecast.target_start_ns >= forecast.target_end_ns {
         return Err(format!(
             "forecast {} has invalid revision or target window",
@@ -957,6 +1003,40 @@ mod tests {
             serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
         let error = audit(&value).expect_err("yoked forecast must not appear contingent");
         assert!(error.contains("does not match its snapshot"));
+    }
+
+    #[test]
+    fn time_alignment_domain_mismatch_is_rejected() {
+        let mut value = panel();
+        value["time_alignment_target_clock_domain_id"] =
+            serde_json::json!("another-runner-clock");
+        let error = audit(&value).expect_err("clock domains must be bound explicitly");
+        assert!(error.contains("source/target domains"));
+    }
+
+    #[test]
+    fn forecast_window_must_fit_time_alignment_validity() {
+        let mut value = panel();
+        value["time_alignment_valid_until_ns"] = serde_json::json!(900_000_000_u64);
+        let error = audit(&value).expect_err("forecast may not outlive alignment fit");
+        assert!(error.contains("validity interval"));
+    }
+
+    #[test]
+    fn alignment_uncertainty_is_added_to_worst_case_phase_error() {
+        let mut value = panel();
+        value["time_alignment_max_uncertainty_ns"] = serde_json::json!(40_000_000_u64);
+        let report = audit(&value).expect("uncertainty should produce a scored finding");
+        assert!(!report.structurally_valid_anticipatory_trace);
+        assert_eq!(report.event_findings[0].within_onset_tolerance, Some(false));
+        assert!(
+            (report.event_findings[0]
+                .worst_case_absolute_onset_error_beats
+                .unwrap()
+                - 0.12)
+                .abs()
+                < 1e-9
+        );
     }
 
     #[test]
