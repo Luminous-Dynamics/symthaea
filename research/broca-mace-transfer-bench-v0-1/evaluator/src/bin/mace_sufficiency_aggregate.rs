@@ -516,9 +516,18 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             regret: mean.absolute_regret,
         })
         .collect();
-    let aggregation_source_sha256 = hex_digest(
-        Sha256::digest(include_bytes!("mace_sufficiency_aggregate.rs")).as_slice(),
+    let summary_schema_sha256 = hex_digest(
+        Sha256::digest(include_bytes!(
+            "../../../../../data/schemas/mace_sufficiency_aggregate_v0_1.schema.json"
+        ))
+        .as_slice(),
     );
+    let mut aggregation_hasher = Sha256::new();
+    aggregation_hasher.update(include_bytes!("mace_sufficiency_aggregate.rs"));
+    aggregation_hasher.update(include_bytes!(
+        "../../../../../data/schemas/mace_sufficiency_aggregate_v0_1.schema.json"
+    ));
+    let aggregation_source_sha256 = hex_digest(aggregation_hasher.finalize().as_slice());
     let mut output = Vec::new();
     for (index, (arm, mean, mean_utility_delta, mean_regret_delta, utility_ci, regret_ci, cluster_count))
         in summaries.iter().enumerate()
@@ -536,6 +545,7 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             "input_schema_sha256": provenance.schema_sha256,
             "input_evaluator_jsonl_sha256": input_evaluator_jsonl_sha256,
             "aggregation_source_sha256": aggregation_source_sha256,
+            "summary_schema_sha256": summary_schema_sha256,
             "bootstrap_seed": seed,
             "bootstrap_replicates": BOOTSTRAP_REPLICATES,
             "resampling_unit": "independent_world_cluster",
