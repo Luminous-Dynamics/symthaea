@@ -59,3 +59,41 @@ jobs:
             > "$RUNNER_TEMP/mel-sealed-evaluation-report.json"
           jq -e '.pair_count == 5 and .human_directional_pair_count == 4 and .judge_stable_directional_pair_count == 3 and .judge_order_inconsistent_pair_count == 1 and .judge_stable_tie_pair_count == 1 and .correct_directional_decision_count == 2 and .effective_accuracy == 0.5 and .temporal_order_assurance == "declared_metadata_only_external_attestation_unverified"' \
             "$RUNNER_TEMP/mel-sealed-evaluation-report.json" > /dev/null
+      - name: Assemble reproducibility evidence
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/mel-sealed-evidence"
+          mkdir -p "$evidence"
+          printf 'tested_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-revision.txt"
+          git rev-parse HEAD:tools/mel-sealed-evaluation/src/lib.rs > "$evidence/lib-blob.txt"
+          git rev-parse HEAD:tools/mel-sealed-evaluation/src/main.rs > "$evidence/main-blob.txt"
+          rustc +1.96.0 --version > "$evidence/rustc-version.txt" 2>&1 || true
+          cargo +1.96.0 --version > "$evidence/cargo-version.txt" 2>&1 || true
+          cp tools/mel-sealed-evaluation/Cargo.toml "$evidence/Cargo.toml"
+          cp tools/mel-sealed-evaluation/schema/mel-sealed-evaluation-v1.schema.json "$evidence/schema.json"
+          cp tools/mel-sealed-evaluation/fixtures/manifest-v1.json "$evidence/manifest.json"
+          cp tools/mel-sealed-evaluation/fixtures/predictions-v1.json "$evidence/predictions.json"
+          cp tools/mel-sealed-evaluation/fixtures/human-reference-v1.json "$evidence/human-reference.json"
+          cp tools/mel-sealed-evaluation/src/lib.rs "$evidence/lib.rs"
+          cp tools/mel-sealed-evaluation/src/main.rs "$evidence/main.rs"
+          if [[ -f tools/mel-sealed-evaluation/Cargo.lock ]]; then
+            cp tools/mel-sealed-evaluation/Cargo.lock "$evidence/Cargo.lock"
+          else
+            printf 'Cargo.lock was not generated\n' > "$evidence/Cargo.lock-unavailable.txt"
+          fi
+          if [[ -f "$RUNNER_TEMP/mel-sealed-evaluation-report.json" ]]; then
+            cp "$RUNNER_TEMP/mel-sealed-evaluation-report.json" "$evidence/report.json"
+          else
+            printf 'Known-answer report was not produced\n' > "$evidence/report-unavailable.txt"
+          fi
+          (cd "$evidence" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - name: Upload reproducibility evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-sealed-evaluation-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: \${{ runner.temp }}/mel-sealed-evidence/
+          if-no-files-found: error
+          retention-days: 90
