@@ -381,7 +381,8 @@ fn matched_random_control(
             .entry((action_key(node.action), node.payload_bytes))
             .or_default() += 1;
     }
-    let (target_root_count, target_family_count, _) = index.counts_for_ids(removed_ids);
+    let (target_root_count, target_family_count, target_unknown_root_count) =
+        index.counts_for_ids(removed_ids);
     let excluded_roots: BTreeSet<[u8; 32]> = removed_ids
         .iter()
         .filter_map(|id| index.nodes.get(id).map(|node| node.source_root))
@@ -416,8 +417,12 @@ fn matched_random_control(
                 .map(|node| node.event_id),
         );
     }
-    let (control_root_count, control_family_count, _) = index.counts_for_ids(&selected);
-    if control_root_count != target_root_count || control_family_count != target_family_count {
+    let (control_root_count, control_family_count, control_unknown_root_count) =
+        index.counts_for_ids(&selected);
+    if control_root_count != target_root_count
+        || control_family_count != target_family_count
+        || control_unknown_root_count != target_unknown_root_count
+    {
         return None;
     }
     Some(selected)
@@ -1111,6 +1116,7 @@ mod tests {
         let (control_roots, control_families, _) = index.counts_for_ids(&control);
         assert_eq!(control_roots, target_roots);
         assert_eq!(control_families, target_families);
+        assert_eq!(index.counts_for_ids(&control).2, index.counts_for_ids(&removed).2);
         for id in &control {
             assert_ne!(index.nodes.get(id).unwrap().source_root, root(1));
             assert_ne!(index.nodes.get(id).unwrap().source_root, root(4));
