@@ -597,7 +597,7 @@ fn evaluate_plan(
         "record_id": input_digest.clone(),
         "candidate_input_sha256": input_digest.clone(),
         "decision_need_sha256": case.decision_need.canonical_digest().to_hex(),
-        "memory_snapshot_sha256": input_digest,
+        "memory_snapshot_sha256": input_digest.clone(),
         "decision": action_name(decision.action),
         "decision_support_event_ids": decision.evidence_ids.clone(),
         "candidate_memory_event_count": candidate_ids.len(),
@@ -637,7 +637,7 @@ fn evaluate_plan(
         kind: plan.kind.clone(),
         target: plan.target.clone(),
         paired_plan_id: plan.paired_plan_id.clone(),
-        candidate_input_sha256: input_digest,
+        candidate_input_sha256: input_digest.clone(),
         removed_count: plan.removed_ids.len(),
         removed_roots,
         removed_families,
@@ -1107,6 +1107,14 @@ mod tests {
             .collect();
         assert_eq!(actions.iter().filter(|a| **a == Action::A).count(), 1);
         assert_eq!(actions.iter().filter(|a| **a == Action::B).count(), 1);
+        let (target_roots, target_families, _) = index.counts_for_ids(&removed);
+        let (control_roots, control_families, _) = index.counts_for_ids(&control);
+        assert_eq!(control_roots, target_roots);
+        assert_eq!(control_families, target_families);
+        for id in &control {
+            assert_ne!(index.nodes.get(id).unwrap().source_root, root(1));
+            assert_ne!(index.nodes.get(id).unwrap().source_root, root(4));
+        }
     }
 
     #[test]
