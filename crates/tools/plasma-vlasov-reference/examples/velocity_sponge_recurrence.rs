@@ -47,7 +47,8 @@ fn run_case(
     let mut periodic = VlasovPoisson1d1v::new(config, initial.clone())?;
     let mut sponge = VlasovPoisson1d1v::new(config, initial.clone())?;
     let initial_field = periodic.electric_mode_coefficient(spatial_mode)?;
-    let initial_casimir = sponge.quadratic_casimir_budget()?.total_casimir;
+    let initial_budget = sponge.quadratic_casimir_budget()?;
+    let initial_casimir = initial_budget.total_casimir;
     let dt = horizon.discrete_recurrence_time / STEPS_TO_RECURRENCE as f64;
     let mut removed_total_casimir = 0.0;
     let mut removed_fluctuation_f_strophy = 0.0;
@@ -133,7 +134,6 @@ fn run_case(
     let sponge_field_return_error = (sponge_final_field.real - initial_field.real)
         .hypot(sponge_final_field.imaginary - initial_field.imaginary)
         / initial_field.amplitude().max(f64::MIN_POSITIVE);
-    let initial_budget = sponge.quadratic_casimir_budget()?;
     let final_budget = sponge.quadratic_casimir_budget()?;
     let direct_casimir_drop = initial_casimir - final_budget.total_casimir;
     let casimir_accounting_error =
