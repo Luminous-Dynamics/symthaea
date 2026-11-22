@@ -56,19 +56,26 @@ L(w,a,t_a)-\min_{a'\in A_t(w)}L(w,a',t_a)
 
 The exact finite-world calculation composes #13152; randomized policies compose #13165. The candidate does not receive \(W_t\), hidden losses, future checkpoints, or evaluator bounds.
 
-For compute allocation, compare two policies over the same initial episode commitment:
-
-- \(a_0\): the action produced by the current checkpoint and applied through the real end-to-end path;
-- \(a_c\): the action produced after an additional compute allocation \(c\), applied through its real end-to-end path.
-
-The evaluator reports the regret contrast at the respective application states:
+For a hidden world \(w\), an action \(a\) applied at physical time \(t_a\) has realized regret:
 
 \[
-\Delta R(c)=R_{realized}(a_0,t_{a0})-R_{realized}(a_c,t_{ac}).
+r(w,a,t_a)=L(w(t_a),a,t_a)-\min_{a'\in A(w,t_a)}L(w(t_a),a',t_a).
 \]
 
-This is an episode-level outcome contrast, not a candidate-visible oracle signal. The candidate may predict \(\widehat{\Delta R}(c)\) from current authorized information, but it must not see the realized future value before selecting the compute action.
+For compute allocation, compare two policies over the same initial episode commitment:
 
+- \(a_0\): the action produced by the current checkpoint and applied through the real end-to-end path at \(t_{a0}\);
+- \(a_c\): the action produced after an additional compute allocation \(c\), applied through its real end-to-end path at \(t_{ac}\).
+
+For each evaluator world, the realized regret contrast is:
+
+\[
+\Delta r_w(c)=r(w,a_0,t_{a0})-r(w,a_c,t_{ac}).
+\]
+
+The evaluator reports paired per-world contrasts and their preregistered episode-level summaries. Positive values mean the additional compute produced a better decision at application time; negative values mean delay, state drift, or other costs made the result worse. The information-set minimax floor \(R(I_t,t_a)\) above is a separate bound and must not be conflated with the candidate action's realized regret.
+
+This is an evaluator-side episode contrast, not a candidate-visible oracle signal. The candidate may predict \(\widehat{\Delta r}(c)\) from current authorized information, but it must not see realized future loss, future state or continuation quality before selecting the compute action.
 The benchmark keeps the following in separate dimensions:
 - realized decision regret / task loss;
 - current and post-compute information-set regret bounds;
