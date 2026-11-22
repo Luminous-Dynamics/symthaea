@@ -291,6 +291,7 @@ fn score_panel(panel: &MusicalTimingPanelV1) -> Result<MusicalTimingReport, Stri
                     outcome: "missed".to_owned(),
                 });
                 missed_count += 1;
+                findings.push(format!("target event {} was missed", target.event_id));
             }
             other => return Err(format!("unsupported target outcome {other}")),
         }
@@ -667,9 +668,9 @@ mod tests {
     fn known_answer_reports_phase_error_and_tempo_recovery() {
         let report = parse_and_score(FIXTURE).expect("known-answer panel should score");
         assert_eq!(report.target_count, 4);
-        assert_eq!(report.observed_count, 3);
-        assert_eq!(report.missed_count, 1);
-        assert_eq!(report.extra_onset_count, 1);
+        assert_eq!(report.observed_count, 4);
+        assert_eq!(report.missed_count, 0);
+        assert_eq!(report.extra_onset_count, 0);
         assert_eq!(report.within_025_beat_rate, Some(1.0));
         assert!(report.tempo_adaptation.iter().all(|item| item.recovered));
         assert!(report.qualified_for_declared_timing_contract);
@@ -678,7 +679,7 @@ mod tests {
     #[test]
     fn backdated_tempo_segment_is_rejected() {
         let mut value = panel();
-        value["tempo_segments"][1]["change_observed_ns"] = serde_json::json!(1_900_000_000_u64);
+        value["tempo_segments"][1]["change_observed_ns"] = serde_json::json!(2_100_000_000_u64);
         let error = score(&value).expect_err("tempo event cannot be backdated");
         assert!(error.contains("phase zero predates"));
     }
@@ -738,11 +739,22 @@ mod tests {
     }
 
     #[test]
-    fn missed_events_and_extra_onsets_are_not_hidden_by_good_phase_scores() {
-        let report = parse_and_score(FIXTURE).expect("fixture is scoreable");
+    fn missed_events_and_extra_onsets_fail_qualification_even_when_phase_is_good() {
+        let mut value = panel();
+        value["target_events"][3]["outcome"] = serde_json::json!("missed");
+        value["target_events"][3]["observed_onset_ns"] = serde_json::Value::Null;
+        value["target_events"][3]["capture_receipt_sha256"] = serde_json::Value::Null;
+        value["extra_onsets"] = serde_json::json!([{
+            "event_id":"extra-1",
+            "instrument_id":"hi_hat",
+            "observed_onset_ns":2_650_000_000_u64,
+            "capture_receipt_sha256":"2222222222222222222222222222222222222222222222222222222222222222"
+        }]);
+        let report = score(&value).expect("missed/extra events should be reported");
         assert_eq!(report.missed_count, 1);
         assert_eq!(report.extra_onset_count, 1);
         assert_eq!(report.event_match_completeness, 1.0);
+        assert!(!report.qualified_for_declared_timing_contract);
     }
 
     #[test]
