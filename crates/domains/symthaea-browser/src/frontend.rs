@@ -13,6 +13,7 @@
 //! extract arbitrary element text. Captures are sequential rather than an
 //! atomic browser transaction; SFEB tasks must use deterministic fixtures.
 
+use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
@@ -153,16 +154,28 @@ impl FrontendLayoutSnapshot {
             bail!("frontend layout element count exceeds the capture limit");
         }
 
+        let mut seen_source_ids = BTreeSet::new();
         for element in &self.elements {
             if element.tag_name.is_empty()
                 || element.tag_name.len() > 32
+                || !element
+                    .tag_name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
                 || element.role.as_ref().is_some_and(|value| value.len() > 64)
-                || element
-                    .data_sfeb_id
-                    .as_ref()
-                    .is_some_and(|value| value.len() > 128)
             {
                 bail!("frontend layout element contains an invalid identifier");
+            }
+            if let Some(source_id) = &element.data_sfeb_id {
+                if source_id.is_empty()
+                    || source_id.len() > 128
+                    || !source_id.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')
+                    })
+                    || !seen_source_ids.insert(source_id)
+                {
+                    bail!("frontend source identifiers must be unique and use a safe token alphabet");
+                }
             }
             for value in [
                 element.rect.x,
@@ -330,21 +343,31 @@ impl FrontendEvidenceBundle {
 
     /// Verify every artifact against the receipt before evaluation or storage.
     pub fn verify_integrity(&self) -> bool {
+        if self.receipt.schema != "sfeb-frontend-evidence/v1"
+            || self.receipt.artifacts.len() != 3
+        {
+            return false;
+        }
         let expected = [
-            ("screenshot", &self.screenshot_png),
-            ("accessibility", &self.accessibility_json),
-            ("layout", &self.layout_json),
+            ("screenshot", "image/png", &self.screenshot_png),
+            (
+                "accessibility",
+                "application/json",
+                &self.accessibility_json,
+            ),
+            ("layout", "application/json", &self.layout_json),
         ];
-        expected.iter().all(|(kind, bytes)| {
+        expected.iter().all(|(kind, media_type, bytes)| {
             self.receipt
                 .artifacts
                 .iter()
                 .find(|artifact| artifact.kind == *kind)
                 .is_some_and(|artifact| {
-                    artifact.byte_length == bytes.len() as u64
+                    artifact.media_type == *media_type
+                        && artifact.byte_length == bytes.len() as u64
                         && artifact.sha256 == sha256_hex(bytes)
                 })
-        }) && self.receipt.artifacts.len() == expected.len()
+        })
     }
 }
 
@@ -496,6 +519,18 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_or_unsafe_source_anchors() {
+        let mut malformed = layout();
+        malformed.elements.push(malformed.elements[0].clone());
+        assert!(malformed.validate().is_err());
+
+        let mut malformed = layout();
+        malformed.elements[0].data_sfeb_id = Some("../component".into());
+        assert!(malformed.validate().is_err());
+    }
+
+
+    #[test]
     fn rejects_invalid_context_before_capture() {
         let mut malformed = context();
         malformed.source_commit = "not-a-commit".into();
@@ -536,6 +571,10 @@ mod tests {
         assert!(bundle.verify_integrity());
         assert_eq!(bundle.receipt.artifacts.len(), 3);
         assert_eq!(bundle.receipt.sha256().unwrap().len(), 64);
+
+        bundle.receipt.artifacts[0].media_type = "text/plain".into();
+        assert!(!bundle.verify_integrity());
+        bundle.receipt.artifacts[0].media_type = "image/png".into();
 
         bundle.screenshot_png.push(0);
         assert!(!bundle.verify_integrity());
