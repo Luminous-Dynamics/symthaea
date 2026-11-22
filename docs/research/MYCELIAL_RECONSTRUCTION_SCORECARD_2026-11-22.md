@@ -67,11 +67,22 @@ This is important because correspondence errors can dominate apparent segmentati
 | Position | mean/median/P95/maximum localization error |
 | Length | matched-segment MAE and mean absolute relative error |
 | Graph | junctions, segments, components, cycle rank |
+| Component attribution | false-merge count, false-split count, unmatched predicted/reference components |
 | Integrity | frame/image digest, units, graph digests, matching policy digest |
 
 An incorrect junction type does not erase successful junction detection: detection and class scores are separately reported. A false fusion can therefore be visible both as a class false positive and as an extra edge / topological cycle if it changes the graph.
 
 Hypha segments are matched after endpoint junction mapping using undirected endpoint pairs and multiplicity. Parallel hypha segments remain distinct; the evaluator does not collapse them into a simple graph.
+
+### Component-level false-merge / false-split attribution
+
+The evaluator also maps connected components through the explicit junction identity matches. Component identity is the lexicographically smallest stable junction ID in each component. For every predicted/reference component pair, it records the number of matched junctions. This yields:
+
+- **False merge:** one predicted connected component contains matched junctions from multiple disconnected ground-truth components. The count records each additional reference component merged into that prediction component.
+- **False split:** one ground-truth connected component is distributed across multiple disconnected predicted components. The count records each additional predicted component fragment.
+- **Unmatched components:** predicted components with no matched reference junctions and reference components with no matched predictions are reported separately.
+
+This is graph-component attribution, not a pixel/voxel instance-segmentation metric. The FISBe microscopy benchmark provides a useful cross-domain precedent: it reports false merges and false splits separately from clDice centerline overlap, alongside its aggregate score. FISBe is a neural-instance benchmark, not a fungal/mycelial benchmark, so its score values are not a direct comparator. We borrow the error-accounting discipline, not its leaderboard result.
 
 ## 3. Receipt and reproducibility
 
@@ -83,10 +94,11 @@ The score receipt binds:
 - the named matching policy and full one-to-one identity map;
 - independent count metrics and per-class scores;
 - topology summaries and deltas;
+- component correspondence rows and false-merge/false-split summaries;
 - coordinate and length error summaries;
 - matching tolerance and relative-error epsilon.
 
-The evaluator validates one-to-one matching, score count invariants, class-count totals, graph count totals, topology deltas and error-summary consistency before returning a receipt.
+The evaluator validates one-to-one matching, score count invariants, class-count totals, graph count totals, topology deltas, component-attribution totals, and error-summary consistency before returning a receipt. Negative tests cover a false merge, a false split, and unmatched components separately.
 
 ## 4. What is not implemented
 
@@ -120,6 +132,8 @@ These are aspirational research targets and must be measured on a frozen, matche
 | False fusion rate on crossing-only negatives | ≤0.5% |
 | False accepted connections on deterministic crossing conformance controls | 0 |
 | Graph topology exact agreement on synthetic fixtures | 100% |
+| False merges / false splits on deterministic graph conformance fixtures | 0 |
+| Unmatched component attribution agreement with an independent traversal oracle | 100% |
 | Coordinate localization P95 | ≤1 voxel-equivalent or predeclared physical tolerance |
 | Segment length mean absolute relative error | ≤5% on calibrated annotated data |
 
