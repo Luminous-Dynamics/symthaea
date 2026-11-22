@@ -37,6 +37,7 @@ pub enum MycelialFailureAttackStrategy {
     RandomSegments,
     RandomJunctions,
     HighestDegreeJunctions,
+    LowestDegreeJunctions,
     DemandPathLoadSegments,
     DemandPathLoadJunctions,
     SpatialClusterJunctions,
@@ -48,6 +49,7 @@ impl MycelialFailureAttackStrategy {
             Self::RandomSegments => "random-segments-v1",
             Self::RandomJunctions => "random-junctions-v1",
             Self::HighestDegreeJunctions => "highest-degree-junctions-v1",
+            Self::LowestDegreeJunctions => "lowest-degree-junctions-v1",
             Self::DemandPathLoadSegments => "demand-path-load-segments-v1",
             Self::DemandPathLoadJunctions => "demand-path-load-junctions-v1",
             Self::SpatialClusterJunctions => "spatial-cluster-junctions-v1",
@@ -858,6 +860,20 @@ fn rank_failure_entities(
                 let right_index = indexed.node_index[right];
                 degree[right_index]
                     .cmp(&degree[left_index])
+                    .then_with(|| left.cmp(right))
+            });
+        }
+        MycelialFailureAttackStrategy::LowestDegreeJunctions => {
+            let mut degree = vec![0usize; indexed.node_ids.len()];
+            for &(source, target, _) in &indexed.edge_endpoints {
+                degree[source] = degree[source].saturating_add(1);
+                degree[target] = degree[target].saturating_add(1);
+            }
+            ranked.sort_by(|left, right| {
+                let left_index = indexed.node_index[left];
+                let right_index = indexed.node_index[right];
+                degree[left_index]
+                    .cmp(&degree[right_index])
                     .then_with(|| left.cmp(right))
             });
         }
@@ -1833,6 +1849,55 @@ mod tests {
             spatial.scenarios[1].failed_junction_ids,
             vec!["A".to_string(), "B".to_string()]
         );
+    }
+
+    #[test]
+    fn lowest_degree_attack_prioritizes_peripheral_junctions() {
+        let mut graph = triangle_graph();
+        graph.source_model_digest = "d".repeat(64);
+        graph.source_filament_ids.push(4);
+        graph.junctions[0].incident_filament_ids.push(4);
+        graph.junctions[0].incident_filament_ids.sort_unstable();
+        graph.junctions.push(MycelialJunction {
+            id: "D".to_string(),
+            kind: JunctionKind::Tip,
+            position: SpatialPoint3 {
+                x: 0.0,
+                y: 0.0,
+                z: 2.0,
+            },
+            incident_filament_ids: vec![4],
+            terminal_filament_ids: vec![4],
+            anastomosis_ids: Vec::new(),
+        });
+        graph.segments.push(MycelialHyphaSegment {
+            id: "edge-ad".to_string(),
+            filament_id: 4,
+            t_start_micros: 0,
+            t_end_micros: PARAMETER_SCALE,
+            start_junction_id: "A".to_string(),
+            end_junction_id: "D".to_string(),
+            arc_length_model_units: 2.0,
+            start_junction_offset_model_units: 0.0,
+            end_junction_offset_model_units: 0.0,
+            radius_start_model_units: 1.0,
+            radius_end_model_units: 1.0,
+        });
+        graph.segments.sort_by(|left, right| left.id.cmp(&right.id));
+        graph.validate().unwrap();
+
+        let plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demands(),
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::LowestDegreeJunctions,
+                seed: 0,
+                maximum_failure_budget: 1,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(plan.ranked_entity_ids[0], "D");
     }
 
     #[test]
