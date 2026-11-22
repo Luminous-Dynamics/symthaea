@@ -645,9 +645,8 @@ fn fit_bradley_terry(item_count: usize, observations: &[BtObservation]) -> Optio
             gradient[observation.item_a] += residual;
             gradient[observation.item_b] -= residual;
         }
-        for index in 0..item_count {
-            gradient[index] = gradient[index] / denominator - ridge * strengths[index];
-            strengths[index] += learning_rate * gradient[index];
+        for (strength, gradient_value) in strengths.iter_mut().zip(gradient) {
+            *strength += learning_rate * (gradient_value / denominator - ridge * *strength);
         }
         let mean = strengths.iter().sum::<f64>() / item_count as f64;
         for strength in &mut strengths {
