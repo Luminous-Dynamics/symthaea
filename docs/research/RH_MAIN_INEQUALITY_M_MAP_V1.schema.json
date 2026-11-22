@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.schema.json",
+  "title": "RH main inequality M source map v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_identity",
+    "formal_scope",
+    "main_inequality",
+    "proof_bridge",
+    "explicit_non_used_or_ambiguous",
+    "remaining_obligations",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "dataset_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "source_inspected_composition_map_not_complete_reconstruction",
+        "expert_reviewed",
+        "complete_reconstruction"
+      ]
+    },
+    "source_identity": {
+      "type": "object",
+      "required": [
+        "repository",
+        "revision",
+        "revision_date",
+        "provenance",
+        "cited_exposition"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "revision_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "cited_exposition": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "formal_scope": {
+      "type": "object",
+      "required": [
+        "target",
+        "final_effect",
+        "not_a_claim"
+      ],
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "final_effect": {
+          "type": "string"
+        },
+        "not_a_claim": {
+          "type": "string"
+        }
+      }
+    },
+    "main_inequality": {
+      "type": "object",
+      "required": [
+        "paper_identity",
+        "statement_lhs",
+        "statement_rhs",
+        "normalized_error",
+        "normalization",
+        "parameter_orders_from_the_exposition",
+        "conceptual_role"
+      ],
+      "properties": {
+        "paper_identity": {
+          "type": "string"
+        },
+        "statement_lhs": {
+          "type": "string"
+        },
+        "statement_rhs": {
+          "type": "string"
+        },
+        "normalized_error": {
+          "type": "string"
+        },
+        "normalization": {
+          "type": "string"
+        },
+        "parameter_orders_from_the_exposition": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "conceptual_role": {
+          "type": "string"
+        }
+      }
+    },
+    "quantities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "meaning"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "meaning": {
+            "type": "string"
+          },
+          "paper_equation": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "proof_bridge": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "source_file",
+          "blob_sha",
+          "cited_pdf_reference",
+          "source_lines",
+          "declarations",
+          "observed_role",
+          "extraction_status"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "source_file": {
+            "type": "string"
+          },
+          "blob_sha": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "cited_pdf_reference": {
+            "type": "string"
+          },
+          "source_lines": {
+            "type": "object"
+          },
+          "declarations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_role": {
+            "type": "string"
+          },
+          "extraction_status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "explicit_non_used_or_ambiguous": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "declaration",
+          "reason"
+        ],
+        "properties": {
+          "declaration": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "remaining_obligations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
