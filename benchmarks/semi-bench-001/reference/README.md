@@ -433,3 +433,37 @@ cargo run -p symthaea-semiconductor --bin semi-secom-fold-preprocess -- \\
 \`\`\`
 
 This verifies fold-specific preprocessing and source binding; it does not train XGBoost or Random Forest. The 2026 paper's exact five seeds, full quantile-transform defaults and near-zero variance threshold are not fully disclosed in the accessible protocol, so direct numerical reproduction remains pending. Results from this stratified protocol must not be compared directly to the frozen chronological 940/313/314 results.
+
+
+## Native deterministic Random Forest on repeated stratified folds
+
+The Rust module \`benchmark::random_forest\` implements a deterministic bootstrap CART forest with a fresh \`mtry\` sample at each split. It exposes continuous scores from the unweighted positive-class frequency in each reached leaf, averaged over trees. It does not convert hard class labels into fabricated probabilities.
+
+The preregistered real-source runner uses:
+- 200 bootstrap trees per fold;
+- max depth 12;
+- minimum leaf size 4;
+- \`mtry = floor(sqrt(p))\` at every split;
+- fixed seed inherited from each reconstructed stratified repeat;
+- Gini split criterion;
+- two variants: unweighted split impurity and inverse-frequency class-balanced split impurity;
+- raw empirical leaf frequencies for scoring in both arms (therefore scores are not asserted to be calibrated).
+
+Class balancing modifies split selection only. The leaf score retains unweighted empirical positive frequency from bootstrap samples. Brier/ECE are evaluated rather than assumed to be valid posterior probabilities.
+
+Each fitted model binds training IDs, resolved mtry, parameters, bootstrap trees and their split structure into a model SHA-256. Each score report binds sorted sample IDs, source labels and scores into a score-vector SHA-256. Fit and inference milliseconds are recorded outside the model digest. The existing independent binary metric scorer computes AP, AUROC, threshold metrics, Brier, ECE, FPR at target recall and risk/coverage.
+
+Run on the digest-verified pinned source:
+
+\`\`\`sh
+cargo run --release -p symthaea-semiconductor --bin semi-secom-random-forest -- \\
+  data/secom.data \\
+  data/secom_labels.data \\
+  docs/research/semi-bench-001/secom-raw-expectations-v1.json \\
+  stratified-80-20-repeats.json \\
+  docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+\`\`\`
+
+The CLI reruns train-only preprocessing per repeat from #13238, then fits/evaluates both RF variants on Feature Set A. Feature Set B remains a separate Luminous missingness-indicator ablation. No hyperparameter or threshold is selected on test data.
+
+**Claim limit:** this is a native Rust Random Forest comparator, not an XGBoost substitute. It evaluates stratified interpolation on the historic SECOM mirror, not chronological or fab transfer. Leaf-frequency scores are not calibrated defect probabilities. The five seeds and preprocessing defaults are Luminous reconstructions because the cited article does not disclose every setting. For benchmark interpretation, keep these scores separate from the frozen source-clock chronological results.
