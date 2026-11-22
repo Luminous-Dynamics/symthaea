@@ -56,6 +56,8 @@ jobs:
         run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/velocity-sponge-echo-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example velocity_sponge_echo > artifacts/plasma-vlasov-reference/velocity-sponge-echo.csv
       - name: Run delayed echo across velocity Nyquist
         run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/delayed-echo-sponge-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example delayed_echo_recurrence_sponge > artifacts/plasma-vlasov-reference/delayed-echo-sponge.csv
+      - name: Run moment-neutral future-response susceptibility map
+        run: /usr/bin/time -v -o artifacts/plasma-vlasov-reference/kinetic-response-sensitivity-resource.txt cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example kinetic_response_sensitivity > artifacts/plasma-vlasov-reference/kinetic-response-sensitivity.csv
       - name: Upload reproducible trajectory traces
         uses: actions/upload-artifact@v4
         with:
