@@ -357,3 +357,7 @@ This audit qualifies the **reference fixture**, not the evaluated agent's
 rendered page. Runtime reflow, keyboard reachability, accessibility-tree
 behavior, network egress and actual screenshot geometry still require browser
 execution.
+
+
+The emitted qualification summary is validated against
+[`qualification-summary-v1.schema.json`](qualification/qualification-summary-v1.schema.json).
