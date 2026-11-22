@@ -44,3 +44,8 @@ These values are proposed gates. Determine transform-specific tolerances from a 
 ## Claim ceiling
 
 The fixture is synthetic. This evaluator validates supplied probe rows and digest-shaped identities; it does not open audio, independently verify that transforms preserve semantics, authenticate human labels, or prove the judge runtime lacked access to the human reference. Live musician and judge qualification requires the sealed release sequence and an independently controlled execution boundary.
+
+
+## Follow-on: absolute score invariance and transform qualification
+
+MEL-AUDIO-METAMORPH-001 (#13260) extends the nuisance-transform probe in two independent ways. First, it records the absolute score drift for candidate A and candidate B, and gates on both the maximum candidate-score drift and pair-margin drift. This prevents a common-mode shift in both scores from passing merely because their difference is unchanged. Second, it introduces a task-scoped transformation receipt that binds source/variant file hashes, transform implementation and parameter digests, task dimensions, rights/consent receipt digests, and a separate independent equivalence result. The equivalence confidence interval must fit wholly inside a preregistered margin using a listener/item-aware method. The follow-on fixture is synthetic; it does not report a live judge or completed listener study.
