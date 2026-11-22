@@ -916,14 +916,14 @@ mod tests {
         let old_points = packet.eta_points();
         let old_c2 = packet.quadratic_casimir();
         let old_min = packet.eta_min();
-        // For Lx=2pi and deta=2pi/12=pi/6, dt=pi/6 shifts mode k=1 by one bin.
+        // Lx=4pi gives k=1/2; deta=pi/6, so dt=pi/3 shifts one eta bin.
         packet
-            .advance_free_streaming(std::f64::consts::PI / 6.0)
+            .advance_free_streaming(std::f64::consts::PI / 3.0)
             .unwrap();
         assert!(packet.eta_points() > old_points);
         assert!(packet.eta_min() < old_min);
         assert!((packet.quadratic_casimir() - old_c2).abs() < 1.0e-10);
-        assert!((packet.time() - std::f64::consts::PI / 6.0).abs() < 1.0e-14);
+        assert!((packet.time() - std::f64::consts::PI / 3.0).abs() < 1.0e-14);
     }
 
     #[test]
