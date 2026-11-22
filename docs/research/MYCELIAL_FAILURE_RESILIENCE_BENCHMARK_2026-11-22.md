@@ -121,11 +121,11 @@ Implemented attack strategies:
 | Static betweenness junctions | Junctions | Descending unweighted Brandes node betweenness, log-domain shortest-path multiplicities | Static shortest-path bridge attack |
 | Adaptive highest-degree junctions | Junctions | Recompute degree on residual graph after every prior removal; seeded shared priority for ties | Adaptive hub-targeted attack with per-step rankings |
 | Lowest-degree junctions | Junctions | Ascending incident-segment count on original graph; seeded shared priority for ties | Peripheral/leaf-targeted negative comparator |
-| Demand-path-load segments | Hypha segments | Descending declared-demand weight on original shortest paths; stable ID tie-break | Static demand-conditioned edge load |
-| Demand-path-load junctions | Junctions | Weighted internal transit-node use on original shortest paths | Static demand-conditioned node load |
-| Adaptive demand-path-load segments | Hypha segments | Recompute declared-demand shortest-path load after each prior removal | Adaptive demand-conditioned edge load |
-| Adaptive demand-path-load junctions | Junctions | Recompute internal transit-node load after each prior removal | Adaptive demand-conditioned node load |
-| Spatial-cluster junctions | Junctions | Ascending Euclidean distance to a declared seed junction; stable ID tie-break | Localized correlated structural-damage proxy |
+| Demand-path-load segments | Hypha segments | Descending declared-demand weight on original shortest paths; shared seeded priority for ties | Static demand-conditioned edge load |
+| Demand-path-load junctions | Junctions | Weighted internal transit-node use on original shortest paths; shared seeded priority for ties | Static demand-conditioned node load |
+| Adaptive demand-path-load segments | Hypha segments | Recompute declared-demand shortest-path load after each prior removal; shared seeded priority for ties | Adaptive demand-conditioned edge load |
+| Adaptive demand-path-load junctions | Junctions | Recompute internal transit-node load after each prior removal; shared seeded priority for ties | Adaptive demand-conditioned node load |
+| Spatial-cluster junctions | Junctions | Ascending Euclidean distance to a declared seed junction; shared seeded priority for ties | Localized correlated structural-damage proxy |
 
 For each strategy, the plan contains budgets 1 through k, each budget being a nested prefix of the selected attack order. Scenario IDs encode the policy version, seed and budget. The plan retains both the selected sequence and the complete candidate ranking at every step. The plan validator re-computes the rankings from the source graph and demand set, including every residual-graph step for adaptive policies, then checks every scenario is exactly the matching prefix. A changed graph, demand, seed, per-step ranking or failed-identity list invalidates the plan. Attack plans use their own schema version, distinct from the downstream failure-profile schema.
 Centrality and demand-load ties use a deterministic seed-derived entity priority shared across ranking policies, with stable ID as the final fallback. This avoids relying on identifier order as the primary experimental tie-break and permits paired static/adaptive comparisons to use a common priority assignment.
@@ -133,6 +133,8 @@ Centrality and demand-load ties use a deterministic seed-derived entity priority
 ### Static versus adaptive degree
 
 The static highest-degree policy computes degree once on the original graph and never changes the order. The adaptive highest-degree policy removes previously selected junctions in a derived residual graph, removes their incident hypha edges, and recomputes degree before selecting the next junction. It records all remaining candidates and their deterministic order at every step, not just the winner.
+
+The static betweenness baseline is an unweighted Brandes node-betweenness calculation on junction adjacency. Shortest-path multiplicities are accumulated in the log domain to avoid integer overflow; parallel hypha segments remain edge-distinct shortest-path choices. This is a structural topology baseline, not weighted path-load and not measured flow.
 
 This separates two questions:
 - Does the original graph's hub ranking identify critical junctions?
