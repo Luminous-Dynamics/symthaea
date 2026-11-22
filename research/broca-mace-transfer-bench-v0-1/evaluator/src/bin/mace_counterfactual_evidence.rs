@@ -1362,7 +1362,7 @@ fn run() -> Result<(), String> {
     eprintln!("candidate stream: {candidate_path}");
     eprintln!("evaluator stream: {evaluator_path}");
     if let Some(path) = dependency_sidecar_path {
-        eprintln!("receipt-backed sidecar input: {path} (canonical digest verified; issuer authenticity remains an ingress responsibility)");
+        eprintln!("sidecar JSON input: {path} (integrity checked only; importer marks issuer provenance unverified and lineage incomplete)");
     } else {
         eprintln!("receipt-backed sidecar input: absent (lineage remains unknown; diagnostic-only)");
     }
