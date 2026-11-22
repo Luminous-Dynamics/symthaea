@@ -594,11 +594,11 @@ The primary question is not “did retrieval find the right passage?” It is �
 
 For a future AML open-method entry, use Cycle 2 leaders only as versioned reference points; verify the next official rules and datasets before submission. Stretch targets against the current open-source leaders are:
 
-| Track | Cycle 2 open leader | Target for a matched future protocol |
-|---|---:|---:|
-| Textual overall | 61.22 | ≥64.22 (+3.00 points) |
-| Multimodal overall | 43.26 | ≥46.26 (+3.00 points) |
-| Coding resolved | 63.33% | ≥66.33% (+3.00 points) |
+| Track | Cycle 2 open leader | Initial matched-protocol hurdle (+3) | Stretch target (+5, aligned with #13284) |
+|---|---:|---:|---:|
+| Textual overall | 61.22 | ≥64.22 | ≥66.22 |
+| Multimodal overall | 43.26 | ≥46.26 | ≥48.26 |
+| Coding resolved | 63.33% | ≥66.33% | ≥68.33% |
 
 Do not count these as achieved or directly infer them from MACE synthetic results. Per-capability targets should address the observed bottlenecks: textual personalization/care ≥45, streaming ≥55, governance ≥80 and epistemic safety/privacy ≥75; multimodal personalization ≥20, evidence governance ≥40 and temporal reasoning ≥40; coding bug-fix resolution ≥62% without losing new-feature performance. These thresholds are project targets, not official challenge thresholds.
 
