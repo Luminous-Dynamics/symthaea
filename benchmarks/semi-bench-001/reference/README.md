@@ -177,3 +177,10 @@ Frozen input/output:
 Eight Rust tests cover the known answer and adversarial cases (missing parents, disconnected digest edges, cycles, missing calibration, evidence-kind mismatch, missing model digest and malformed SHA-256). Hosted run [#44988500047](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047) passed all **32/32 Rust tests**, the 46-test Python reference suite, rustfmt, Clippy and both Rust CLI report reproductions.
 
 This is a provenance/lineage contract only. It does not validate physics, the accuracy of any model, a PDK, a fab process or fabricated silicon.
+
+
+## Rust DTCO lineage CLI
+
+The crate now provides `semi-dtco-lineage`, a standalone CLI that consumes a versioned DTCO lineage manifest and emits a canonical key-sorted JSON report. CI runs the CLI against `dtco-lineage-known-answer-v1.json` and checks the full output byte-for-byte.
+
+Hosted run [#44988794403](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403) passed 32 Rust tests, 46 Python reference tests, fmt, Clippy, and the binary-metric, SECOM raw-audit and DTCO-lineage CLI report checks.
