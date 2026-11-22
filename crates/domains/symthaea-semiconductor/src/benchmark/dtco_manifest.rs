@@ -170,7 +170,9 @@ pub fn validate_dtco_lineage_v1(
     require_text(&manifest.flow_profile_id, "flow_profile_id")?;
     require_sha256(&manifest.constraints_sha256, "constraints_sha256")?;
     if manifest.runs.is_empty() {
-        return Err(DtcoLineageError("runs: expected non-empty array".to_string()));
+        return Err(DtcoLineageError(
+            "runs: expected non-empty array".to_string(),
+        ));
     }
 
     let mut run_by_id = BTreeMap::new();
@@ -430,11 +432,9 @@ mod tests {
     fn cyclic_parent_graph_is_rejected() {
         let mut manifest = known_answer();
         manifest.runs[0].parent_run_ids = vec!["run-spice".to_string()];
-        manifest.runs[0].input_artifact_sha256 =
-            manifest.runs[1].output_artifact_sha256.clone();
+        manifest.runs[0].input_artifact_sha256 = manifest.runs[1].output_artifact_sha256.clone();
         manifest.runs[1].parent_run_ids = vec!["run-analytical".to_string()];
-        manifest.runs[1].input_artifact_sha256 =
-            manifest.runs[0].output_artifact_sha256.clone();
+        manifest.runs[1].input_artifact_sha256 = manifest.runs[0].output_artifact_sha256.clone();
         assert!(
             validate_dtco_lineage_v1(&manifest)
                 .unwrap_err()
