@@ -642,7 +642,8 @@ pub fn score_random_forest_predictions_v1(
         .zip(&ordered_truth)
         .enumerate()
     {
-        if truth_row.sample_id.trim().is_empty() || !seen_truth.insert(truth_row.sample_id.as_str()) {
+        if truth_row.sample_id.trim().is_empty() || !seen_truth.insert(truth_row.sample_id.as_str())
+        {
             return Err(RandomForestError(format!(
                 "truth[{index}].sample_id: empty or duplicate"
             )));
