@@ -130,13 +130,22 @@ impl fmt::Display for MycelialAnnotationTriageError {
         match self {
             Self::InvalidConfig => write!(f, "invalid annotation triage configuration"),
             Self::SourceGraphMismatch => {
-                write!(f, "calibration and prediction graph source identities differ")
+                write!(
+                    f,
+                    "calibration and prediction graph source identities differ"
+                )
             }
             Self::CalibrationGraphMismatch => {
-                write!(f, "calibration report does not bind the supplied prediction graph")
+                write!(
+                    f,
+                    "calibration report does not bind the supplied prediction graph"
+                )
             }
             Self::TooManyJunctions(count) => {
-                write!(f, "triage junction count {count} exceeds the configured maximum")
+                write!(
+                    f,
+                    "triage junction count {count} exceeds the configured maximum"
+                )
             }
             Self::InvalidTriageReport(reason) => {
                 write!(f, "invalid annotation triage report: {reason}")
@@ -210,15 +219,14 @@ fn signed_difference(after: usize, before: usize) -> i64 {
     after as i64 - before as i64
 }
 
-fn top_two(
-    probabilities: &[f64; 7],
-) -> (ReconstructionCalibrationClass, f64, f64) {
+fn top_two(probabilities: &[f64; 7]) -> (ReconstructionCalibrationClass, f64, f64) {
     let mut ranked: Vec<_> = ReconstructionCalibrationClass::ALL
         .into_iter()
         .map(|class| (class, probabilities[class.index()]))
         .collect();
     ranked.sort_by(|left, right| {
-        right.1
+        right
+            .1
             .total_cmp(&left.1)
             .then_with(|| left.0.index().cmp(&right.0.index()))
     });
@@ -270,7 +278,9 @@ pub fn build_mycelial_annotation_triage(
         || !(0.0..=1.0).contains(&config.uncertainty_confidence_threshold)
         || config.articulation_component_delta_threshold == 0
         || config.articulation_component_delta_threshold > MAX_MYCELIAL_ANNOTATION_TRIAGE_ITEMS
-        || !config.anastomosis_sensitive_probability_threshold.is_finite()
+        || !config
+            .anastomosis_sensitive_probability_threshold
+            .is_finite()
         || !(0.0..=1.0).contains(&config.anastomosis_sensitive_probability_threshold)
     {
         return Err(MycelialAnnotationTriageError::InvalidConfig);
@@ -299,25 +309,20 @@ pub fn build_mycelial_annotation_triage(
             .segments
             .iter()
             .filter(|segment| {
-                segment.start_junction_id == junction.id
-                    || segment.end_junction_id == junction.id
+                segment.start_junction_id == junction.id || segment.end_junction_id == junction.id
             })
             .map(|segment| segment.id.clone())
             .collect();
         let mut incident_segment_ids = incident_segment_ids;
         incident_segment_ids.sort_unstable();
         let after = topology_metrics(prediction, Some(&junction.id));
-        let component_delta = signed_difference(
-            after.connected_components,
-            before.connected_components,
-        );
-        let cycle_rank_loss = before
-            .cycle_rank
-            .saturating_sub(after.cycle_rank);
+        let component_delta =
+            signed_difference(after.connected_components, before.connected_components);
+        let cycle_rank_loss = before.cycle_rank.saturating_sub(after.cycle_rank);
         let anastomosis_probability =
             observation.probabilities[ReconstructionCalibrationClass::Anastomosis.index()];
-        let projected_crossing_probability = observation.probabilities
-            [ReconstructionCalibrationClass::ProjectedCrossing.index()];
+        let projected_crossing_probability =
+            observation.probabilities[ReconstructionCalibrationClass::ProjectedCrossing.index()];
         let uncertain_probability =
             observation.probabilities[ReconstructionCalibrationClass::Uncertain.index()];
         review_items.push(MycelialJunctionReviewItem {
@@ -452,8 +457,7 @@ impl MycelialAnnotationTriageReport {
                             item.top_label_confidence,
                             item.second_highest_probability,
                         )
-                    || (entropy(&item.probabilities) - item.predictive_entropy_nats).abs()
-                        > 1.0e-12
+                    || (entropy(&item.probabilities) - item.predictive_entropy_nats).abs() > 1.0e-12
                     || !item.top_label_confidence.is_finite()
                     || !(0.0..=1.0).contains(&item.top_label_confidence)
                     || !item.second_highest_probability.is_finite()
@@ -473,7 +477,10 @@ impl MycelialAnnotationTriageReport {
                     || !(0.0..=1.0).contains(&item.projected_crossing_probability)
                     || !item.uncertain_probability.is_finite()
                     || !(0.0..=1.0).contains(&item.uncertain_probability)
-                    || item.incident_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                    || item
+                        .incident_segment_ids
+                        .windows(2)
+                        .any(|pair| pair[0] >= pair[1])
                     || item.degree != item.incident_segment_ids.len()
                     || item.components_before_removal != self.topology_before.connected_components
                     || item.cycle_rank_before_removal != self.topology_before.cycle_rank
@@ -553,9 +560,7 @@ impl MycelialAnnotationTriageReport {
         Ok(())
     }
 
-    pub fn canonical_digest_hex(
-        &self,
-    ) -> Result<String, MycelialAnnotationTriageError> {
+    pub fn canonical_digest_hex(&self) -> Result<String, MycelialAnnotationTriageError> {
         self.validate()?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-mycelial-annotation-triage-v1");
@@ -569,7 +574,12 @@ impl MycelialAnnotationTriageReport {
             MycelialReviewOrderingPolicy::UncertaintyThenStructuralImpact => 1,
             MycelialReviewOrderingPolicy::AnastomosisProbabilityThenImpact => 2,
         }]);
-        hasher.update(&self.uncertainty_confidence_threshold.to_bits().to_le_bytes());
+        hasher.update(
+            &self
+                .uncertainty_confidence_threshold
+                .to_bits()
+                .to_le_bytes(),
+        );
         hasher.update(&(self.articulation_component_delta_threshold as u64).to_le_bytes());
         hasher.update(
             &self
@@ -662,10 +672,10 @@ mod tests {
         evaluate_mycelial_reconstruction_calibration,
     };
     use crate::mycelial_reconstruction_metrics::{
-        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind,
-        JunctionIdentityMatch, MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
-        ReconstructionDimensionality, ReconstructionEvaluationConfig,
-        ReconstructionLengthUnit, ReconstructionPoint3, evaluate_mycelial_reconstruction,
+        AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, JunctionIdentityMatch,
+        MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, ReconstructionDimensionality,
+        ReconstructionEvaluationConfig, ReconstructionLengthUnit, ReconstructionPoint3,
+        evaluate_mycelial_reconstruction,
     };
 
     fn skeleton(
@@ -806,10 +816,18 @@ mod tests {
             },
         )
         .unwrap();
-        let junction_b = report.review_items.iter().find(|item| item.junction_id == "B").unwrap();
+        let junction_b = report
+            .review_items
+            .iter()
+            .find(|item| item.junction_id == "B")
+            .unwrap();
         assert!(junction_b.is_articulation_critical);
         assert!(junction_b.component_delta > 0);
-        let junction_d = report.review_items.iter().find(|item| item.junction_id == "D").unwrap();
+        let junction_d = report
+            .review_items
+            .iter()
+            .find(|item| item.junction_id == "D")
+            .unwrap();
         assert!(junction_d.needs_uncertainty_review);
         assert!(junction_d.cycle_rank_loss > 0);
         report.validate_against(&graph, &calibration).unwrap();
@@ -825,7 +843,11 @@ mod tests {
                 node("C", AnnotatedJunctionKind::Tip, 2.0, 0.0),
                 node("D", AnnotatedJunctionKind::Tip, 1.0, 1.0),
             ],
-            vec![edge("ab", "A", "B"), edge("bc", "B", "C"), edge("bd", "B", "D")],
+            vec![
+                edge("ab", "A", "B"),
+                edge("bc", "B", "C"),
+                edge("bd", "B", "D"),
+            ],
         );
         let calibration = calibrated_report(&graph, Some("C"));
         let first = build_mycelial_annotation_triage(
@@ -847,7 +869,12 @@ mod tests {
             report
                 .review_items
                 .iter()
-                .map(|item| (item.junction_id.clone(), (item.degree, item.component_delta, item.cycle_rank_loss)))
+                .map(|item| {
+                    (
+                        item.junction_id.clone(),
+                        (item.degree, item.component_delta, item.cycle_rank_loss),
+                    )
+                })
                 .collect::<BTreeMap<_, _>>()
         };
         assert_eq!(by_id(&first), by_id(&second));
