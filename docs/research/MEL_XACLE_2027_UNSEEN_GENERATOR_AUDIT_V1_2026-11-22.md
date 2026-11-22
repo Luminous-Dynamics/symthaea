@@ -30,7 +30,7 @@ These scores are on the public 3,000-item labelled test split inherited from the
 
 The baseline's public evaluate.py performs an inner merge by filename. It does not reject duplicate identifiers or explicitly assert exact item coverage before computing metrics; missing or extra IDs can therefore disappear from the scored join. The MEL audit tool makes those integrity failures fatal and reports generator strata.
 
-The CSV schema also needs explicit reconciliation. The organizer's 2027 dataset README names its audio identifier `wave_file_name` and its average target `average_semantic_alignement_score` (that spelling is used in the published README). The released baseline's dataset loader and evaluator use a preprocessed dialect with `wav_file_name` and `average_score`; its inference script emits prediction CSVs with `wav_file_name,pred_score`. These are not one uniform schema. MEL-XACLE-AUDIT accepts either documented identifier alias and either documented target-score alias, but rejects a file containing both alternatives for the same logical field. Reports record the exact columns selected for metadata, target and prediction inputs. The blind evaluation manifest uses the organizer's `wave_file_name`; the baseline inference output uses `wav_file_name`.
+The CSV schema also needs explicit reconciliation. The organizer's 2027 dataset README names its audio identifier `wave_file_name` and its average target `average_semantic_alignement_score` (that spelling is used in the published README). The released baseline's dataset loader and evaluator expect `wav_file_name` and `average_score`; its inference script emits prediction CSVs with `wav_file_name,pred_score`. These are not one uniform schema. MEL-XACLE-AUDIT accepts either documented identifier alias and either documented target-score alias, but rejects a file containing both alternatives for the same logical field. Reports record the exact columns selected for metadata, target and prediction inputs. The blind evaluation manifest uses the organizer's `wave_file_name`; the baseline inference output uses `wav_file_name`.
 
 ## Reproducible audit contract
 
@@ -41,7 +41,7 @@ tools/mel-xacle-audit provides three modes:
 3. validate-submission: check the blind submission CSV against the evaluation manifest without expecting or inferring hidden labels.
 
 It validates:
-- unique and non-empty wave_file_name values;
+- unique and non-empty sample identifiers using one recognized metadata ID column;
 - exact ID coverage in both directions (no inner-join loss);
 - finite score values in [0,10];
 - ID-based joins independent of row ordering;
