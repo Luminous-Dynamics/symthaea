@@ -320,15 +320,13 @@ pub fn validate_trace(trace: &AgencyTraceV1) -> TraceReportV1 {
                 &format!("expected sequence {expected_sequence}, received {}", event.sequence),
             );
         }
-        if let Some(previous) = previous_time {
-            if event.monotonic_time_ns <= previous {
-                issue(
-                    &mut issues,
-                    "non_monotonic_event_time",
-                    Some(&event.event_id),
-                    "event monotonic time must increase strictly",
-                );
-            }
+        if previous_time.is_some_and(|previous| event.monotonic_time_ns <= previous) {
+            issue(
+                &mut issues,
+                "non_monotonic_event_time",
+                Some(&event.event_id),
+                "event monotonic time must increase strictly",
+            );
         }
         previous_time = Some(event.monotonic_time_ns);
 
