@@ -107,7 +107,35 @@ These are geometric graph quantities in the source graph's declared length unit.
 - Demand outcomes are stored individually and profile validation recomputes their counts, weights, reachability and directness aggregates.
 - The exact failed identity lists are part of the receipt digest.
 
-## 5. Bounds
+## 5. Reproducible attack families
+
+The module now generates versioned attack plans from a frozen source graph and demand inventory. A plan binds the source graph digest, demand digest, strategy, seed, maximum failure budget, full ranked entity order and exact nested scenarios.
+
+Implemented attack strategies:
+
+| Strategy | Target | Ranking policy | Interpretation |
+|---|---|---|---|
+| Random segments | Hypha segments | SplitMix64 shuffle of stable IDs | Unstructured segment disruption |
+| Random junctions | Junctions | SplitMix64 shuffle of stable IDs | Unstructured junction disruption |
+| Highest-degree junctions | Junctions | Descending incident-segment count; stable ID tie-break | Static degree-targeted attack |
+| Demand-path-load segments | Hypha segments | Descending declared-demand weight on deterministic shortest paths; stable ID tie-break | Demand-conditioned edge load, not generic all-pairs betweenness |
+| Demand-path-load junctions | Junctions | Weighted internal transit-node use on deterministic shortest paths | Demand-conditioned node load, not generic all-pairs betweenness |
+| Spatial-cluster junctions | Junctions | Ascending Euclidean distance to a declared seed junction; stable ID tie-break | Localized correlated structural-damage proxy |
+
+For each strategy, the plan contains budgets 1 through k, each budget being a nested prefix of the deterministic attack order. Scenario IDs encode the policy version, seed and budget. The plan validator re-computes the ranking from the source graph and demand set, then checks every scenario is exactly the matching prefix. A changed graph, demand, seed, ranking order or failed-identity list invalidates the plan.
+
+The demand-path-load strategy computes weighted shortest routes only for the supplied demand pairs. It must not be called global betweenness: it is explicitly demand-conditioned. Equal-cost route ties are resolved by stable node/edge ordering. The spatial-cluster policy uses source graph model coordinates and is currently a local geometric stress proxy; coordinates are not calibrated physical distances.
+
+### Research comparator and extension boundary
+
+Recent network-resilience work provides two important challenges to a centrality-only ranking:
+
+- A 2026 intermodal-freight study compares random failures with static and dynamically recalculated degree/betweenness, uses flow-weighted centralities and partial node degradation, and evaluates both giant-component size and flow-weighted network efficiency. This is a useful methodology comparator, not a direct fungal dataset. <https://doi.org/10.1177/03611981261437033>
+- A 2025 study of attack uncertainty reports that assuming every targeted attack succeeds can alter the ranking of attack strategies; its model suggests peripheral attacks can become more damaging when attack execution is uncertain. This motivates a separate attack-delivery uncertainty track instead of treating all interventions as certain. <https://doi.org/10.1016/j.ress.2025.111231>
+
+The present plans model **structural intervention outcomes conditional on successful removals**. They do not yet simulate partial edge degradation, probability of failure, cascades, repair, or adaptive attackers. Those require explicit calibrated parameters or clearly labelled synthetic stress models.
+
+## 6. Bounds
 
 | Contract | Bound |
 |---|---:|
@@ -170,10 +198,12 @@ Proposed, not achieved:
 | Network path accepted below Euclidean endpoint distance | 0 |
 | Source graph digest changes after derived failure evaluation | 0 |
 | Independent small-graph reachability oracle disagreement | 0 |
+| Attack plan replay/ranking agreement on frozen graph and demand inputs | 100% |
+| Nested budget violations or unexplained scenario omissions | 0 |
 
 ## 9. Claim boundaries
 
-This module currently evaluates structural reachability and geometric shortest paths. It does not yet simulate or measure:
+The attack-family benchmark currently evaluates structural reachability and geometric shortest paths after deterministic, fully enacted removals. It does not yet simulate or measure:
 - cytoplasmic flow;
 - pressure/flow conductance;
 - nutrient transport;
