@@ -909,7 +909,7 @@ mod tests {
     fn add_to_rejects_wrong_observation_dimensions() {
         let field = generate_spatial_nuisance_field(&path_graph(), &config(), None).unwrap();
         assert!(matches!(
-            field.add_to(&[vec![0.0; 5]; 128]),
+            field.add_to(&(0..128).map(|_| vec![0.0; 5]).collect::<Vec<_>>()),
             Err(SpatialNuisanceError::DimensionMismatch(_))
         ));
     }
@@ -917,16 +917,16 @@ mod tests {
     #[test]
     fn invalid_temporal_parameters_fail_closed() {
         let graph = path_graph();
-        let mut config = config();
-        config.temporal_ar1 = 1.0;
+        let mut invalid_ar1 = config();
+        invalid_ar1.temporal_ar1 = 1.0;
         assert!(matches!(
-            generate_spatial_nuisance_field(&graph, &config, None),
+            generate_spatial_nuisance_field(&graph, &invalid_ar1, None),
             Err(SpatialNuisanceError::InvalidConfig(_))
         ));
-        let mut config = config();
-        config.temporal_coherence = 1.01;
+        let mut invalid_coherence = config();
+        invalid_coherence.temporal_coherence = 1.01;
         assert!(matches!(
-            generate_spatial_nuisance_field(&graph, &config, None),
+            generate_spatial_nuisance_field(&graph, &invalid_coherence, None),
             Err(SpatialNuisanceError::InvalidConfig(_))
         ));
     }
