@@ -115,6 +115,27 @@ fn translation_count_cyclic(n: usize, t2: &[usize], target_column: usize) -> usi
         .count()
 }
 
+fn translation_count_product_group(
+    m: usize,
+    n: usize,
+    t2_mask: usize,
+    target_index: usize,
+) -> usize {
+    let target = (target_index / n, target_index % n);
+    (0..(m * n))
+        .filter(|u_index| {
+            let u = (*u_index / n, *u_index % n);
+            (0..(m * n)).any(|z_index| {
+                if (t2_mask & (1usize << z_index)) == 0 {
+                    return false;
+                }
+                let z = (z_index / n, z_index % n);
+                ((u.0 + z.0) % m, (u.1 + z.1) % n) == target
+            })
+        })
+        .count()
+}
+
 #[cfg(not(test))]
 fn main_report() {
     let counts = evaluate_tseitin_toy();
@@ -235,6 +256,38 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn translation_average_holds_for_small_product_cyclic_groups() {
+        // Exhaust every nonempty subset of C_m × C_n for several small
+        // products, including non-cyclic groups C_2 × C_2 and C_3 × C_3.
+        let mut group_target_cases = 0usize;
+        let mut row_indicator_cases = 0usize;
+
+        for (m, n) in [(2usize, 2usize), (2, 3), (2, 4), (3, 3), (2, 5), (3, 4)] {
+            let group_size = m * n;
+            for t2_mask in 1usize..(1usize << group_size) {
+                let t2_count = t2_mask.count_ones() as usize;
+                for target in 0..group_size {
+                    let selected_translates =
+                        translation_count_product_group(m, n, t2_mask, target);
+                    assert_eq!(selected_translates, t2_count);
+                    group_target_cases += 1;
+
+                    for chi_q in [-1i32, 1i32] {
+                        let row_selected = chi_q == 1;
+                        let lhs = 2 * if row_selected { selected_translates } else { 0 };
+                        let rhs = t2_count as i32 * (1 + chi_q);
+                        assert_eq!(lhs as i32, rhs);
+                        row_indicator_cases += 1;
+                    }
+                }
+            }
+        }
+
+        assert_eq!(group_target_cases, 66_447);
+        assert_eq!(row_indicator_cases, 132_894);
     }
 
     #[test]
