@@ -8,6 +8,8 @@
 //! privacy approval and deadline feasibility are hard admissibility gates;
 //! they are never converted into compensable scalar penalties.
 
+use sha2::Digest;
+
 const PROBABILITY_TOLERANCE: f64 = 1e-9;
 
 #[derive(Clone, Debug)]
@@ -450,11 +452,19 @@ pub(crate) fn reference_fixture_context() -> VoiContext {
                 outcomes: vec![
                     ObservationOutcome {
                         id: "irrelevant_signal_zero".into(),
-                        likelihood_by_hypothesis: vec![0.5, 0.5],
+                        likelihood_by_hypothesis: vec![0.25, 0.25],
                     },
                     ObservationOutcome {
                         id: "irrelevant_signal_one".into(),
-                        likelihood_by_hypothesis: vec![0.5, 0.5],
+                        likelihood_by_hypothesis: vec![0.25, 0.25],
+                    },
+                    ObservationOutcome {
+                        id: "irrelevant_signal_two".into(),
+                        likelihood_by_hypothesis: vec![0.25, 0.25],
+                    },
+                    ObservationOutcome {
+                        id: "irrelevant_signal_three".into(),
+                        likelihood_by_hypothesis: vec![0.25, 0.25],
                     },
                 ],
                 acquisition_cost: 0.01,
@@ -505,6 +515,16 @@ mod tests {
             plan.chosen_query_id.as_deref(),
             Some("independent_decision_relevant_measurement")
         );
+        assert_eq!(
+            plan.uncertainty_only_query_id.as_deref(),
+            Some("high_entropy_but_decision_irrelevant")
+        );
+        assert!(plan.random_control_query_id.is_some());
+        let relevant = plan
+            .evaluations
+            .iter()
+            .find(|item| item.query_id == "independent_decision_relevant_measurement")
+            .unwrap();
         let irrelevant = plan
             .evaluations
             .iter()
@@ -512,6 +532,10 @@ mod tests {
             .unwrap();
         assert_eq!(irrelevant.expected_risk_reduction, Some(0.0));
         assert!(irrelevant.net_evsi.unwrap() < 0.0);
+        assert!(irrelevant.predictive_outcome_entropy_bits.unwrap()
+            > relevant.predictive_outcome_entropy_bits.unwrap());
+        assert!(irrelevant.selected_by_uncertainty_only);
+        assert!(!irrelevant.selected);
     }
 
     #[test]
@@ -525,7 +549,13 @@ mod tests {
         assert!(!unauthorized.admissible);
         assert_eq!(unauthorized.rejection_reason.as_deref(), Some("source_not_authorized"));
         assert!(!unauthorized.selected);
+        assert!(!unauthorized.selected_by_uncertainty_only);
+        assert!(!unauthorized.selected_by_random_control);
         assert!(unauthorized.net_evsi.is_none());
+        assert!(plan.uncertainty_only_query_id.as_deref()
+            != Some("unauthorized_perfect_measurement"));
+        assert!(plan.random_control_query_id.as_deref()
+            != Some("unauthorized_perfect_measurement"));
     }
 
     #[test]
@@ -570,6 +600,8 @@ mod tests {
         }
         let reversed = plan_next_evidence(&reversed_context).unwrap();
         assert_eq!(plan.chosen_query_id, reversed.chosen_query_id);
+        assert_eq!(plan.uncertainty_only_query_id, reversed.uncertainty_only_query_id);
+        assert_eq!(plan.random_control_query_id, reversed.random_control_query_id);
         assert!((plan.risk_before - reversed.risk_before).abs() < PROBABILITY_TOLERANCE);
     }
 }
