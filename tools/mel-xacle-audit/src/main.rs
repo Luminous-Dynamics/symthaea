@@ -3,9 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::process::ExitCode;
 
-use mel_xacle_audit::{
-    compare_csv, score_csv, validate_submission_csv, DEFAULT_BOOTSTRAP_SAMPLES,
-};
+use mel_xacle_audit::{DEFAULT_BOOTSTRAP_SAMPLES, compare_csv, score_csv, validate_submission_csv};
 
 fn write_report(path: &str, report: &impl serde::Serialize) -> Result<(), String> {
     let json = serde_json::to_string_pretty(report)
