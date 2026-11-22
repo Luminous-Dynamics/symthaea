@@ -941,7 +941,34 @@
         "test-coverage-and-diagnostic-resolution"
       ],
       "research_target": "5-10-percent preregistered primary Pareto-objective improvement on held-out designs with hard-constraint and uncertainty guardrails; research target only",
-      "claim_ceiling": "open-PDK/compact-model experiments do not establish CFET fabrication, fabricated-silicon PPA, UCIe compliance, chiplet reliability or yield"
+      "claim_ceiling": "open-PDK/compact-model experiments do not establish CFET fabrication, fabricated-silicon PPA, UCIe compliance, chiplet reliability or yield",
+      "multi_fidelity_selection_followup": "https://github.com/Luminous-Dynamics/symthaea/issues/13175",
+      "comparison_methods": [
+        "random-search-DOE",
+        "high-fidelity-only",
+        "low-fidelity-only-surrogate",
+        "uncertainty-triggered-verification",
+        "trust-region-BO",
+        "multi-fidelity-BO-knowledge-gradient",
+        "ensemble-disagreement-diversity",
+        "NSGA-II/III",
+        "SPEA2",
+        "MOEA-D",
+        "trust-aware-LLM-with-independent-verifier"
+      ],
+      "research_targets_not_claims": {
+        "high_fidelity_spice_call_reduction": 0.9,
+        "normalized_high_fidelity_pareto_hypervolume_minimum": 0.99,
+        "asp_dac_sampling_efficiency_target": 5,
+        "stretch_spice_call_reduction": 0.965,
+        "stretch_total_simulation_speedup": 20,
+        "guardrails": [
+          "no-increase-in-false-safe-hard-constraint-predictions",
+          "every-reported-pareto-candidate-re-evaluated-at-final-fidelity",
+          "hold-out-complete-circuit-or-design-family"
+        ],
+        "claim_status": "research-targets-only"
+      }
     }
   ],
   "cross_cutting_protocol": {
@@ -1193,6 +1220,89 @@
         ]
       },
       "evidence_class": "vendor-partnership-press-release-reported-results; not independent benchmark"
+    },
+    "multifidelity_analog_optimization_2026": {
+      "title": "Multi-Fidelity Surrogate Models for Accelerated Multi-Objective Analog Circuit Design and Optimization",
+      "doi": "10.3390/electronics15010105",
+      "url": "https://www.mdpi.com/2079-9292/15/1/105",
+      "publication_date": "2025-12-25",
+      "volume_issue": "Electronics 15(1), 105 (2026)",
+      "topologies": 4,
+      "algorithms": [
+        "NSGA-II",
+        "NSGA-III",
+        "SPEA2",
+        "MOEA/D"
+      ],
+      "reported": {
+        "surrogate_guided_spice_call_reduction": 0.965,
+        "surrogate_guided_total_simulation_speedup": 20,
+        "adaptive_multifidelity_spice_call_reduction": 0.9
+      },
+      "evidence_class": "paper-reported-on-four-CMOS-opamp-topologies; not independently reproduced by Luminous"
+    },
+    "aspdac_ml_dtco_2026": {
+      "title": "ML-driven Design Technology Co-Optimization Framework for Advanced Technology Nodes",
+      "doi": "10.1109/ASP-DAC66049.2026.11420446",
+      "url": "https://doi.org/10.1109/ASP-DAC66049.2026.11420446",
+      "conference_dates": "2026-01-19/2026-01-22",
+      "reported_sampling_efficiency": 5,
+      "capabilities": [
+        "technology-parameter-option-exploration",
+        "automatic-standard-cell-library-generation",
+        "chip-and-block-PPA-exploration",
+        "CFET-standard-cells",
+        "multi-row-height-standard-cells"
+      ],
+      "evidence_class": "conference-paper-abstract-reported; full split/compute protocol review required before direct reproduction"
+    },
+    "trust_aware_llm_bo_2026": {
+      "title": "Trust-aware LLM-assisted Bayesian optimization for efficient design space exploration",
+      "doi": "10.1016/j.vlsi.2026.102782",
+      "url": "https://doi.org/10.1016/j.vlsi.2026.102782",
+      "publication_date": "2026-09",
+      "methods": [
+        "LLM-assisted-Bayesian-optimization",
+        "trust-control-mechanism",
+        "constrained-DSE"
+      ],
+      "evaluation_targets": [
+        "configurable-digital-baseband-generator",
+        "systolic-array-NPU"
+      ],
+      "evidence_class": "paper-reported-abstract; not direct TCAD/fab benchmark"
+    },
+    "semiconductor_equipment_multifidelity_2026": {
+      "title": "Design optimization of semiconductor manufacturing equipment using a novel multi-fidelity surrogate modeling approach",
+      "doi": "10.1007/s11081-025-10059-0",
+      "url": "https://doi.org/10.1007/s11081-025-10059-0",
+      "version_of_record": "2025-12-12",
+      "issue_date": "2026-06",
+      "evidence_class": "methodological reference; detailed comparable numeric protocol pending full-text review"
+    },
+    "transformer_multicircuit_bo_2026": {
+      "title": "Transformer-based surrogate modeling for multi-circuit analog sizing via Bayesian optimization",
+      "doi": "10.1016/j.vlsi.2026.102809",
+      "url": "https://doi.org/10.1016/j.vlsi.2026.102809",
+      "publication_date": "2026-11",
+      "methods": [
+        "multi-circuit-Transformer-surrogate",
+        "Bayesian-optimization",
+        "LTspice-verification-of-selected-candidates"
+      ],
+      "evidence_class": "abstract-reported; matched numerical protocol not established"
+    },
+    "robustness_aware_cim_dtco_2026": {
+      "title": "Robustness-Aware Multi-Objective Design Technology Co-Optimization Framework for Computing-in-Memory Using Surrogate-Assisted SPEA2",
+      "doi": "10.1109/ACCESS.2026.3703077",
+      "url": "https://doi.org/10.1109/ACCESS.2026.3703077",
+      "reported_simulation": {
+        "off_grid_normalized_error_below": 0.05,
+        "energy_efficiency_tops_per_w": 10361,
+        "throughput_tops": 12.05,
+        "cifar10_accuracy": 0.8908
+      },
+      "evidence_class": "paper-reported-simulation-specific-FeFET-CIM; not fabricated-silicon evidence"
     }
   },
   "reference_evaluator": {
@@ -1257,9 +1367,9 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047",
-      "run_id": 44988500047,
-      "tested_commit": "ab51ea5cc44076eb07cc863a3419b6940ef5fdee",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403",
+      "run_id": 44988794403,
+      "tested_commit": "c02f4a2e1a6927c1e2f3a557086375614aa3171f",
       "conclusion": "success",
       "python_reference_tests": 46,
       "rust_unit_tests": 32,
@@ -1273,9 +1383,10 @@
         "Python inspection-decision",
         "Python contrastive-pair-validation",
         "Rust binary-metrics",
-        "Rust SECOM raw-integrity-audit"
+        "Rust SECOM raw-integrity-audit",
+        "Rust DTCO lineage"
       ],
-      "note": "Hosted GitHub Actions verified 46 Python reference tests and 32 Rust tests on the current clean-base PR head. Rust checks run in a temporary minimal workspace because the root Cargo workspace on main currently references a missing crate manifest."
+      "note": "Hosted GitHub Actions verified 46 Python tests and 32 Rust tests on the tested clean-base executable head. Rust checks use a temporary isolated workspace due to an existing missing member in the root workspace on main."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -1468,9 +1579,11 @@
         "sha256-artifact-identities"
       ],
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403",
       "tested_commit": "ab51ea5cc44076eb07cc863a3419b6940ef5fdee",
-      "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model accuracy, PDK qualification or fabricated silicon"
+      "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model accuracy, PDK qualification or fabricated silicon",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-dtco-lineage.rs",
+      "cli_report_byte_for_byte": true
     }
   },
   "execution_followup_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13067",
@@ -1497,7 +1610,8 @@
     "fab_closed_loop_decision_support": "https://github.com/Luminous-Dynamics/symthaea/issues/13147",
     "cross_dataset_wafer_pseudolabel_alignment": "https://github.com/Luminous-Dynamics/symthaea/issues/13148",
     "deployable_model_pareto": "https://github.com/Luminous-Dynamics/symthaea/issues/13149",
-    "multi_fidelity_dtco_device_to_package": "https://github.com/Luminous-Dynamics/symthaea/issues/13172"
+    "multi_fidelity_dtco_device_to_package": "https://github.com/Luminous-Dynamics/symthaea/issues/13172",
+    "multi_fidelity_optimizer_efficiency": "https://github.com/Luminous-Dynamics/symthaea/issues/13175"
   },
   "new_research_updates": {
     "real_data_and_upstream_frontier": "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
@@ -1533,12 +1647,21 @@
     "ucie_4_0_release": "https://www.uciexpress.org/_files/ugd/0c1418_970201e6ba294a0fa690ae864082fc46.pdf",
     "ucie_4_0_specification_access": "https://www.uciexpress.org/specifications",
     "nist_overlay_metrology_project": "https://www.nist.gov/programs-projects/overlay-metrology-using-physics-and-ai-based-scanning-electron-microscopy",
-    "nvidia_tsmc_fab_ai_announcement": "https://nvidianews.nvidia.com/news/nvidia-and-tsmc-bring-ai-into-fabs-to-advance-semiconductor-design-and-manufacturing"
+    "nvidia_tsmc_fab_ai_announcement": "https://nvidianews.nvidia.com/news/nvidia-and-tsmc-bring-ai-into-fabs-to-advance-semiconductor-design-and-manufacturing",
+    "multifidelity_optimizer_frontier": "docs/research/semi-bench-001/2026-multifidelity-optimization-frontier.md",
+    "multi_fidelity_optimizer_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/13175",
+    "analog_multifidelity_2026": "https://doi.org/10.3390/electronics15010105",
+    "asp_dac_dtco_2026": "https://doi.org/10.1109/ASP-DAC66049.2026.11420446",
+    "trust_aware_llm_bo_2026": "https://doi.org/10.1016/j.vlsi.2026.102782",
+    "semiconductor_equipment_multifidelity_2026": "https://doi.org/10.1007/s11081-025-10059-0",
+    "transformer_multicircuit_bo_2026": "https://doi.org/10.1016/j.vlsi.2026.102809",
+    "robustness_aware_cim_dtco_2026": "https://doi.org/10.1109/ACCESS.2026.3703077"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
     "docs/research/semi-bench-001/2026-wafer-lot-and-multiview-frontier.md",
-    "docs/research/semi-bench-001/2026-dtco-ucie40-frontier.md"
+    "docs/research/semi-bench-001/2026-dtco-ucie40-frontier.md",
+    "docs/research/semi-bench-001/2026-multifidelity-optimization-frontier.md"
   ],
   "source_integrity_audits": [
     "docs/research/semi-bench-001/secom-source-integrity-audit-v0.1.json"
