@@ -341,5 +341,6 @@ The proof-to-concept reconstruction and human-transfer research programme is tra
 - [Pilot dataset](MATH_PROOF_COMPREHENSION_PILOT_V1.json)
 - [Pilot dataset schema](MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json)
 - [Evidence receipt schema](MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json)
+- [Lean-native dependency extraction contract](MATH_PROOF_COMPREHENSION_LEAN_EXTRACTION_V1.md) — source-grounded use of `Expr.getUsedConstants`, `ConstantInfo.getUsedConstantsAsSet` and `Lake.Check.runForUsedConsts`.
 
 The initial seed is source-pinned to Lean 4 core and is explicitly not expert-reviewed gold data or a Lean extraction result. The next stage is elaborated-environment extraction, independent annotation, and a Mathlib-scale dependency-rich pilot.
