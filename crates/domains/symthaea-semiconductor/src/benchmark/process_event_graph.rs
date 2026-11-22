@@ -377,34 +377,30 @@ fn validate_label(label: &MetrologyLabelV1, index: usize) -> Result<(), ProcessE
     if let Some(value) = label.value
         && !value.is_finite()
     {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.value: expected finite number"
-            )));
-        }
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.value: expected finite number"
+        )));
     }
     if let Some(uncertainty) = label.standard_uncertainty
         && (!uncertainty.is_finite() || uncertainty < 0.0)
     {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.standard_uncertainty: expected finite non-negative number"
-            )));
-        }
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.standard_uncertainty: expected finite non-negative number"
+        )));
     }
     if let Some(bound) = label.censoring_lower_bound
         && !bound.is_finite()
     {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.censoring_lower_bound: expected finite number"
-            )));
-        }
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.censoring_lower_bound: expected finite number"
+        )));
     }
     if let Some(bound) = label.censoring_upper_bound
         && !bound.is_finite()
     {
-            return Err(ProcessEventGraphError(format!(
-                "{prefix}.censoring_upper_bound: expected finite number"
-            )));
-        }
+        return Err(ProcessEventGraphError(format!(
+            "{prefix}.censoring_upper_bound: expected finite number"
+        )));
     }
     if let (Some(lower), Some(upper)) = (label.censoring_lower_bound, label.censoring_upper_bound)
         && lower > upper
