@@ -3,7 +3,6 @@
   "session_id": "synthetic-session-forecast-001",
   "case_id": "cadence-to-bass-entry-001",
   "clock_domain_id": "synthetic-runner-monotonic-v1",
-  "input_history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "policy": {
     "maximum_onset_error_beats": 0.1,
     "minimum_anticipation_lead_ns": 100000000
@@ -29,7 +28,8 @@
           "local_beat_period_ns": 500000000,
           "presence_probability": 0.95
         }
-      ]
+      ],
+      "input_snapshot_id": "snapshot-1"
     }
   ],
   "displays": [
@@ -73,5 +73,16 @@
     "display and disposition receipts are structurally validated but not cryptographically authenticated",
     "no live model, musician, display device, MIDI device or audio loopback was measured",
     "the presence Brier score is conditional on declared forecast event slots and is not a full event-recall/calibration study"
+  ],
+  "reference_time_map_id": "shared-muse-time-map",
+  "reference_time_map_version": "1.0.0",
+  "reference_time_map_kind": "performance_time",
+  "reference_time_map_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "input_snapshots": [
+    {
+      "input_snapshot_id": "snapshot-1",
+      "available_at_ns": 450000000,
+      "input_history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
   ]
 }
