@@ -159,6 +159,7 @@ pub enum OracleError {
     ResourceOverrun { run_id: u64, dimensions: Vec<ResourceDimension> },
     ObservationGapOverrun { run_id: u64, observed_us: u64, maximum_us: u64 },
     ExposureExceedsEpisode { total: u64, maximum: u64 },
+    InteractionReconstructionMismatch,
     ArithmeticOverflow,
 
 }
@@ -181,6 +182,7 @@ impl fmt::Display for OracleError {
             Self::ResourceOverrun { run_id, dimensions } => write!(f, "run {run_id} exceeds hard resource ceilings in {dimensions:?}"),
             Self::ObservationGapOverrun { run_id, observed_us, maximum_us } => write!(f, "run {run_id} observation gap {observed_us} exceeds {maximum_us}"),
             Self::ExposureExceedsEpisode { total, maximum } => write!(f, "exposure debt {total} exceeds episode duration {maximum}"),
+            Self::InteractionReconstructionMismatch => write!(f, "factorial interaction dividends do not reconstruct the full-joint contrast"),
             Self::ArithmeticOverflow => write!(f, "exact joint oracle arithmetic overflowed"),
         }
     }
@@ -499,7 +501,7 @@ pub fn decompose_exact_joint_interactions(
     if reconstructed_exposure != total_exposure_benefit_us
         || reconstructed_resources != total_resource_cost_delta
     {
-        return Err(OracleError::ArithmeticOverflow);
+        return Err(OracleError::InteractionReconstructionMismatch);
     }
 
     let factor_action_kinds = full.plan.actions.iter().map(|action| action.kind).collect();
