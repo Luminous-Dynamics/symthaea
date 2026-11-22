@@ -93,6 +93,55 @@ pub struct ExactJointOracleReport {
     pub pareto_plan_ids: Vec<u64>,
 }
 
+/// One exact factorial (Moebius) interaction term for a subset of joint actions.
+///
+/// Exposure dividends are expressed as reductions in debt relative to the
+/// empty-action baseline: positive values are synergy, negative values are
+/// antagonism. Resource dividends are incremental measured costs relative to
+/// that same baseline: positive values are additional cost, negative values
+/// are resource savings. Resource array order is ResourceDimension::ALL and
+/// ResourceVector::values().
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FactorialInteractionTerm {
+    pub subset_mask: u64,
+    pub interaction_order: u32,
+    /// Wrong-belief, abstention, missing-output exposure benefit dividends.
+    pub exposure_benefit_dividend_us: [i128; 3],
+    /// Twelve resource-cost dividends in ResourceDimension::ALL order.
+    pub resource_cost_dividend: [i128; 12],
+}
+
+/// Net higher-order contribution aggregated by interaction order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InteractionOrderSummary {
+    pub interaction_order: u32,
+    pub term_count: usize,
+    pub exposure_benefit_dividend_us: [i128; 3],
+    /// Resource-cost dividends in ResourceDimension::ALL order.
+    pub resource_cost_dividend: [i128; 12],
+}
+
+/// Exact decomposition of a complete binary factorial over evaluator-measured
+/// joint outcomes. The sum of all non-empty subset dividends reconstructs the
+/// full-joint effect relative to the empty-action baseline.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FactorialInteractionReport {
+    pub factor_action_ids: Vec<u64>,
+    pub factor_action_kinds: Vec<ActionKind>,
+    pub evaluated_subset_count: usize,
+    pub baseline_plan_id: u64,
+    pub full_joint_plan_id: u64,
+    pub baseline_debt: ExposureDebt,
+    pub full_joint_debt: ExposureDebt,
+    /// Baseline debt minus full-joint debt, by exposure axis.
+    pub total_exposure_benefit_us: [i128; 3],
+    /// Full-joint measured cost minus baseline measured cost, in resource-axis order.
+    pub total_resource_cost_delta: [i128; 12],
+    /// Includes first-order main effects and every higher-order interaction.
+    pub interaction_terms: Vec<FactorialInteractionTerm>,
+    pub interaction_order_summaries: Vec<InteractionOrderSummary>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OracleError {
     EmptyAlternatives,
@@ -111,6 +160,7 @@ pub enum OracleError {
     ObservationGapOverrun { run_id: u64, observed_us: u64, maximum_us: u64 },
     ExposureExceedsEpisode { total: u64, maximum: u64 },
     ArithmeticOverflow,
+
 }
 
 impl fmt::Display for OracleError {
@@ -272,6 +322,199 @@ pub fn qualify_exact_joint_oracle(
                 .saturating_sub(best_missing.realized_debt.missing_output_us),
         },
         pareto_plan_ids,
+    })
+}
+
+/// Decompose a fully enumerated joint-action experiment into exact
+/// main-effect and higher-order interaction dividends.
+///
+/// The input is first passed through the existing exact-oracle qualification:
+/// all 2^n subsets must be present exactly once, share an identical episode
+/// commitment, stay within measured resource ceilings, and have valid outcome
+/// debt. The decomposition then applies a subset-lattice Moebius transform to
+/// measured outcomes. It never consumes candidate-predicted benefits/costs.
+///
+/// For exposures, the value function is baseline debt minus subset debt, so
+/// positive dividends mean reduced temporal error debt. For resources, the
+/// value function is subset measured cost minus baseline measured cost, so
+/// positive dividends mean additional cost. All arithmetic is checked i128.
+pub fn decompose_exact_joint_interactions(
+    input: &ExactJointOracleInput,
+) -> Result<FactorialInteractionReport, OracleError> {
+    // Reuse the authoritative exact-oracle validation rather than weakening
+    // or duplicating its context, subset, budget and outcome checks.
+    qualify_exact_joint_oracle(input)?;
+
+    let factor_count = input.factor_action_ids.len();
+    let expected_count = 1_usize
+        .checked_shl(u32::try_from(factor_count).map_err(|_| OracleError::ArithmeticOverflow)?)
+        .ok_or(OracleError::ArithmeticOverflow)?;
+
+    // Canonicalize outcomes by factor mask. Input row order must not affect the
+    // reported interaction terms or their exact integer values.
+    let mut by_subset = vec![None; expected_count];
+    for alternative in &input.alternatives {
+        let mut mask = 0_usize;
+        for action in &alternative.plan.actions {
+            let index = input
+                .factor_action_ids
+                .binary_search(&action.action_id)
+                .map_err(|_| OracleError::UnknownFactorAction {
+                    action_id: action.action_id,
+                })?;
+            let bit = 1_usize
+                .checked_shl(u32::try_from(index).map_err(|_| OracleError::ArithmeticOverflow)?)
+                .ok_or(OracleError::ArithmeticOverflow)?;
+            mask |= bit;
+        }
+        if mask >= expected_count || by_subset[mask].replace(alternative).is_some() {
+            return Err(OracleError::DuplicateSubset {
+                mask: u64::try_from(mask).map_err(|_| OracleError::ArithmeticOverflow)?,
+            });
+        }
+    }
+    let by_subset = by_subset
+        .into_iter()
+        .enumerate()
+        .map(|(mask, alternative)| {
+            alternative.ok_or(OracleError::MissingSubset {
+                mask: u64::try_from(mask).map_err(|_| OracleError::ArithmeticOverflow)?,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let baseline = by_subset[0];
+    let full_mask = expected_count - 1;
+    let full = by_subset[full_mask];
+    let baseline_debt = baseline.realized_debt;
+    let full_joint_debt = full.realized_debt;
+    let baseline_debt_values = baseline_debt.values();
+    let baseline_cost_values = baseline.measured_cost.values();
+    let full_debt_values = full_joint_debt.values();
+    let full_cost_values = full.measured_cost.values();
+
+    // The first three dimensions are exposure benefit; the following twelve
+    // are incremental measured resource costs in ResourceVector::values order.
+    const AXIS_COUNT: usize = 15;
+    let mut lattice = vec![[0_i128; AXIS_COUNT]; expected_count];
+    for (mask, alternative) in by_subset.iter().enumerate() {
+        let debt = alternative.realized_debt.values();
+        let cost = alternative.measured_cost.values();
+        for axis in 0..3 {
+            lattice[mask][axis] =
+                i128::from(baseline_debt_values[axis]) - i128::from(debt[axis]);
+        }
+        for axis in 0..12 {
+            lattice[mask][3 + axis] =
+                i128::from(cost[axis]) - i128::from(baseline_cost_values[axis]);
+        }
+    }
+
+    // In-place subset Moebius transform:
+    // dividend[S] = value[S] - sum(dividend[T] for T proper subset of S).
+    for bit_index in 0..factor_count {
+        let bit = 1_usize
+            .checked_shl(u32::try_from(bit_index).map_err(|_| OracleError::ArithmeticOverflow)?)
+            .ok_or(OracleError::ArithmeticOverflow)?;
+        for mask in 0..expected_count {
+            if mask & bit != 0 {
+                let prior = lattice[mask ^ bit];
+                for axis in 0..AXIS_COUNT {
+                    lattice[mask][axis] = lattice[mask][axis]
+                        .checked_sub(prior[axis])
+                        .ok_or(OracleError::ArithmeticOverflow)?;
+                }
+            }
+        }
+    }
+
+    let mut interaction_terms = Vec::with_capacity(expected_count.saturating_sub(1));
+    let mut interaction_order_summaries = (1..=factor_count)
+        .map(|order| InteractionOrderSummary {
+            interaction_order: u32::try_from(order).unwrap_or(u32::MAX),
+            term_count: 0,
+            exposure_benefit_dividend_us: [0; 3],
+            resource_cost_dividend: [0; 12],
+        })
+        .collect::<Vec<_>>();
+
+    for mask in 1..expected_count {
+        let order = mask.count_ones();
+        let summary_index = usize::try_from(order - 1).map_err(|_| OracleError::ArithmeticOverflow)?;
+        let summary = interaction_order_summaries
+            .get_mut(summary_index)
+            .ok_or(OracleError::ArithmeticOverflow)?;
+        summary.term_count = summary
+            .term_count
+            .checked_add(1)
+            .ok_or(OracleError::ArithmeticOverflow)?;
+
+        let mut exposure = [0_i128; 3];
+        let mut resources = [0_i128; 12];
+        exposure.copy_from_slice(&lattice[mask][0..3]);
+        resources.copy_from_slice(&lattice[mask][3..15]);
+
+        for axis in 0..3 {
+            summary.exposure_benefit_dividend_us[axis] = summary.exposure_benefit_dividend_us[axis]
+                .checked_add(exposure[axis])
+                .ok_or(OracleError::ArithmeticOverflow)?;
+        }
+        for axis in 0..12 {
+            summary.resource_cost_dividend[axis] = summary.resource_cost_dividend[axis]
+                .checked_add(resources[axis])
+                .ok_or(OracleError::ArithmeticOverflow)?;
+        }
+
+        interaction_terms.push(FactorialInteractionTerm {
+            subset_mask: u64::try_from(mask).map_err(|_| OracleError::ArithmeticOverflow)?,
+            interaction_order: order,
+            exposure_benefit_dividend_us: exposure,
+            resource_cost_dividend: resources,
+        });
+    }
+
+    let total_exposure_benefit_us = std::array::from_fn(|axis| {
+        i128::from(baseline_debt_values[axis]) - i128::from(full_debt_values[axis])
+    });
+    let total_resource_cost_delta = std::array::from_fn(|axis| {
+        i128::from(full_cost_values[axis]) - i128::from(baseline_cost_values[axis])
+    });
+
+    // Internal reconstruction check: all main effects and interaction
+    // dividends together must exactly reconstruct the full-joint contrast.
+    let mut reconstructed_exposure = [0_i128; 3];
+    let mut reconstructed_resources = [0_i128; 12];
+    for term in &interaction_terms {
+        for axis in 0..3 {
+            reconstructed_exposure[axis] = reconstructed_exposure[axis]
+                .checked_add(term.exposure_benefit_dividend_us[axis])
+                .ok_or(OracleError::ArithmeticOverflow)?;
+        }
+        for axis in 0..12 {
+            reconstructed_resources[axis] = reconstructed_resources[axis]
+                .checked_add(term.resource_cost_dividend[axis])
+                .ok_or(OracleError::ArithmeticOverflow)?;
+        }
+    }
+    if reconstructed_exposure != total_exposure_benefit_us
+        || reconstructed_resources != total_resource_cost_delta
+    {
+        return Err(OracleError::ArithmeticOverflow);
+    }
+
+    let factor_action_kinds = full.plan.actions.iter().map(|action| action.kind).collect();
+    Ok(FactorialInteractionReport {
+        factor_action_ids: input.factor_action_ids.clone(),
+        factor_action_kinds,
+        evaluated_subset_count: expected_count,
+        baseline_plan_id: baseline.plan.plan_id,
+        full_joint_plan_id: full.plan.plan_id,
+        baseline_debt,
+        full_joint_debt,
+        total_exposure_benefit_us,
+        total_resource_cost_delta,
+        interaction_terms,
+        interaction_order_summaries,
     })
 }
 
