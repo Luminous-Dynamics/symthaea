@@ -427,7 +427,9 @@ mod tests {
         run_factorial_counterfactual_experiment, FactorialExperimentMetadata,
     };
 
-    fn time_series() -> (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>) {
+    type TimeSeriesFixture = (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
+
+    fn time_series() -> TimeSeriesFixture {
         let clean = (0..96)
             .map(|time| {
                 (0..4)
