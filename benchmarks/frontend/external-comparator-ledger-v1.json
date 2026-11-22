@@ -152,6 +152,280 @@
       "sources": [
         "https://openai.com/index/separating-signal-from-noise-coding-evaluations/"
       ]
+    },
+    {
+      "id": "arena-webdev-frontend",
+      "name": "Arena Code Arena — WebDev / Frontend",
+      "scope": "Live pairwise human-preference arena for frontend web-app generation; anonymous model outputs are compared and users vote for the response they prefer.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 897929,
+          "models": 162,
+          "leader": "Claude Opus 5.5 (Max)",
+          "leader_rating": 1864
+        },
+        {
+          "kind": "model_ranking",
+          "top_models": [
+            {
+              "rank": 1,
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1864
+            },
+            {
+              "rank": 2,
+              "model": "Claude Fable 5.2 (xHigh)"
+            },
+            {
+              "rank": 3,
+              "model": "Claude Sonnet 5.5 (xHigh)"
+            },
+            {
+              "rank": 4,
+              "model": "Gemini 4 Neon (High)"
+            },
+            {
+              "rank": 5,
+              "model": "Gemini 4 Carbon (High)"
+            },
+            {
+              "rank": 6,
+              "model": "GPT-6.2 Astra (Max)"
+            },
+            {
+              "rank": 7,
+              "model": "GPT-6 Astra (Max)"
+            },
+            {
+              "rank": 8,
+              "model": "Qwen4-Max (xHigh)"
+            },
+            {
+              "rank": 9,
+              "model": "GPT-6.2 Sol (Max)"
+            },
+            {
+              "rank": 10,
+              "model": "Claude Fable 5.1 (Max)"
+            }
+          ]
+        },
+        {
+          "kind": "cost_frontier",
+          "observed_rows": [
+            {
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1864,
+              "median_cost_usd": 9
+            },
+            {
+              "model": "Kimi K3.1 Pro (Max)",
+              "rating": 1700,
+              "median_cost_usd": 0.82
+            },
+            {
+              "model": "MiMo-V2.6-Flash",
+              "rating": 1654,
+              "median_cost_usd": 0.05
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "This is a human pairwise-preference rating, not a deterministic task-success rate or independent functional oracle.",
+        "Vote count is not the number of unique independent benchmark tasks; prompts, users and comparisons are drawn from Arena traffic.",
+        "Model configuration, reasoning budget and harness labels are part of the submission identity; do not attribute the score to the base model alone.",
+        "Cost frontier values exist only for submissions with cost data; 49 listed models were not plotted due to insufficient cost data.",
+        "Do not compare Elo/rating values directly with Vision2Web scores, SFEB task rates or browser-agent success percentages."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/frontend",
+        "https://arena.ai/how-it-works"
+      ]
+    },
+    {
+      "id": "arena-image-to-webdev",
+      "name": "Arena Code Arena — Image-to-WebDev",
+      "scope": "Human pairwise-preference arena for generating working web experiences from visual references.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 218511,
+          "models": 70,
+          "leader": "Claude Opus 5.5 (Max)",
+          "leader_rating": 1758,
+          "points_ahead_of_rank_2": 12
+        },
+        {
+          "kind": "cost_frontier",
+          "observed_rows": [
+            {
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1758,
+              "median_cost_usd": 7.55
+            },
+            {
+              "model": "Hy4",
+              "rating": 1619,
+              "median_cost_usd": 0.45
+            },
+            {
+              "model": "DeepSeek-V4.1-Flash-20260910 (Max)",
+              "rating": 1612,
+              "median_cost_usd": 0.06
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Human preference evaluates impressions of paired generated experiences, not requirement completeness or security invariants.",
+        "Ratings are specific to this Arena prompt distribution and model configuration; they are not comparable to the frontend WebDev or Vision2Web numeric scales.",
+        "Cost values are reported only for the displayed Pareto frontier submissions."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/image-to-webdev",
+        "https://arena.ai/how-it-works"
+      ]
+    },
+    {
+      "id": "arena-fullstack",
+      "name": "Arena Code Arena — Fullstack",
+      "scope": "Human pairwise-preference arena for end-to-end web applications with backend/database/authentication/integration/deployment capabilities.",
+      "task_count": null,
+      "snapshot_status": "current_live_snapshot",
+      "observations": [
+        {
+          "kind": "snapshot",
+          "observed_date": "2026-11-20",
+          "user_votes": 133241,
+          "models": 95,
+          "leader": "Claude Opus 5.5 (Max)",
+          "leader_rating": 1745,
+          "points_ahead_of_rank_2": 1
+        },
+        {
+          "kind": "ranked_models",
+          "top_models": [
+            {
+              "rank": 1,
+              "model": "Claude Opus 5.5 (Max)",
+              "rating": 1745
+            },
+            {
+              "rank": 2,
+              "model": "GPT-6 Astra (Max)"
+            },
+            {
+              "rank": 3,
+              "model": "Claude Fable 5.2 (xHigh)"
+            },
+            {
+              "rank": 4,
+              "model": "GPT-6.1 Sol (Max)"
+            },
+            {
+              "rank": 5,
+              "model": "Gemini 4 Neon (High)"
+            },
+            {
+              "rank": 6,
+              "model": "GPT-6.1 Terra (Max)"
+            },
+            {
+              "rank": 7,
+              "model": "Muse Wonder Full (Max)"
+            }
+          ]
+        },
+        {
+          "kind": "platform_scope",
+          "capabilities": [
+            "PostgreSQL database",
+            "authentication and row-level security",
+            "third-party API integrations",
+            "persistent dev server",
+            "bash and web-search tools",
+            "Vercel deployment"
+          ]
+        }
+      ],
+      "limitations": [
+        "Human pairwise preference is not a production-readiness, reliability, security or test-coverage guarantee.",
+        "No task-count denominator is exposed on the cited leaderboard page; vote count must not be treated as unique task count.",
+        "Model scores are not directly comparable with frontend WebDev or Vision2Web."
+      ],
+      "sources": [
+        "https://arena.ai/leaderboard/code/webdev/fullstack",
+        "https://arena.ai/blog/fullstack-code-arena"
+      ]
+    },
+    {
+      "id": "interaction-as-a-judge",
+      "name": "Interaction-as-a-Judge",
+      "scope": "Research method using computer-use agents to evaluate generated applications through interactions, alongside human preference and correctness labels.",
+      "task_count": 6579,
+      "snapshot_status": "methodology_only",
+      "observations": [
+        {
+          "kind": "dataset_preference",
+          "dataset": "ArenaWebdevPreferences",
+          "application_pairs": 6390,
+          "categories": 7,
+          "labels": "human preferences",
+          "includes_agent_traces": true
+        },
+        {
+          "kind": "dataset_correctness",
+          "dataset": "ArenaWebdevCorrectness",
+          "game_versions": 189,
+          "human_verified_requirements": 362,
+          "labels": [
+            "Broken",
+            "Working"
+          ]
+        },
+        {
+          "kind": "reported_result",
+          "method": "interaction-as-a-judge",
+          "human_preference_alignment_percent": 70.8
+        },
+        {
+          "kind": "reported_result",
+          "method": "requirement_defect_detection",
+          "code_only_percent": 63,
+          "interaction_judge_percent": 71.1
+        },
+        {
+          "kind": "reported_result",
+          "method": "iterative_repair",
+          "code_only_success_percent": 55.4,
+          "interaction_judge_success_percent": 75.5
+        },
+        {
+          "kind": "reported_result",
+          "method": "interaction_only_reward_model",
+          "base_model": "Qwen-3.5-9B",
+          "reported_arena_rating_uplift_points": 50
+        }
+      ],
+      "limitations": [
+        "These results belong to the authors' specific datasets, models, evaluators and protocols; they are not universal UI quality rates.",
+        "A computer-use judge can miss states, be manipulated by page content or misinterpret task intent; deterministic and human-calibrated checks remain necessary.",
+        "The human-preference dataset can train/calibrate a secondary judge, but cannot replace frozen executable acceptance oracles.",
+        "The correctness data focuses on game versions and human-verified requirements; transfer to enterprise websites requires validation."
+      ],
+      "sources": [
+        "https://arena.ai/blog/interaction-as-a-judge",
+        "https://arxiv.org/abs/2610.17895",
+        "https://arena.ai/how-it-works"
+      ]
     }
   ]
 }

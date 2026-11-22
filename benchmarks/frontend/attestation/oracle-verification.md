@@ -32,3 +32,20 @@ The qualification report v2 should consume this independently signed statement. 
 ## Implementation issue
 
 The evaluation engine, policy schema, result generation, signature verification and report-v2 migration are tracked separately in issue #13247. Execution attestation and trace integrity remain in #13228.
+
+## Interaction-as-a-Judge is a secondary evaluator, not the trust root
+
+The independent verifier should support a distinct interaction-diagnostic
+channel: a computer-use evaluator may traverse journeys, identify broken
+requirements, rank repair hypotheses and emit evidence-linked explanations.
+It must not be the sole acceptance oracle. Deterministic policy checks remain
+authoritative for security, identity, evidence integrity and explicit contract
+requirements. Human-calibrated preference outcomes remain a separate result
+family. Pin judge model/prompt/tool versions and calibration data; adversarial
+page instructions must never alter verdict policy.
+
+Arena's 2026-11-12 Interaction-as-a-Judge research reports improved
+broken-requirement detection (63.0% to 71.1%) and iterative repair (55.4% to
+75.5%) on its own experiments, with released ArenaWebdevPreferences and
+ArenaWebdevCorrectness data. Use these as research references and evaluate
+transferability; they are not SFEB results or proof of oracle correctness.

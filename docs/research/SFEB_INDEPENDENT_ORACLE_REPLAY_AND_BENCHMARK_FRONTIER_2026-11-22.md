@@ -31,11 +31,31 @@ A result is inconclusive—not accepted—when an oracle cannot be evaluated, th
 The machine-readable record is `benchmarks/frontend/external-comparator-ledger-v1.json`. Important distinctions:
 
 - Vision2Web is the closest broad website-development comparator: 193 tasks, 16 categories, 918 prototype images and 1,255 test cases across static, interactive and full-stack levels. Its S4-2026 historical row lists 82.3 overall, with 87.4 static, 83.2 interactive and 76.3 full-stack averages. The public page selected for the 2026-11-22 check displayed no results for that selected season, so that row is historical, not a current-season SOTA claim.
-- Design2Code evaluates 484 screenshot-conditioned real-world webpage reconstructions, with automatic rendering metrics complemented by human evaluation. It is a visual reconstruction comparator, not an end-to-end repair/security benchmark.
+- **Arena Code Arena WebDev/Frontend** is the current human-preference comparator for text-prompted frontend web-app generation. Its November 20, 2026 snapshot reports 897,929 votes across 162 models; Claude Opus 5.5 (Max) leads at 1,864. The cost frontier lists $9.00 median task cost for that submission, while Kimi K3.1 Pro is rated 1,700 at $0.82 and MiMo-V2.6-Flash 1,654 at $0.05. It is pairwise human preference over Arena traffic, not a deterministic task pass rate or independent functional/security oracle. Model configuration and harness are part of the submission identity. Source: https://arena.ai/leaderboard/code/webdev/frontend.
+- **Arena Image-to-WebDev** is the screenshot-conditioned companion: on November 20 it reports 218,511 votes across 70 models, with Claude Opus 5.5 (Max) at 1,758, 12 rating points above rank two. The leading cost-frontier row lists $7.55 median task cost. Its rating scale is separate from text WebDev. Source: https://arena.ai/leaderboard/code/image-to-webdev.
+- **Arena Fullstack Code Arena** has a separate Fullstack board (November 20: 133,241 votes, 95 models; Claude Opus 5.5 at 1,745, one point above rank two). The product environment covers PostgreSQL, authentication/RLS, third-party APIs, persistent dev servers, bash/web search and Vercel deployment. Vote count is not a unique task denominator. Source: https://arena.ai/leaderboard/code/webdev/fullstack and https://arena.ai/blog/fullstack-code-arena.
+- **Design2Code** evaluates 484 screenshot-conditioned real-world webpage reconstructions, with automatic rendering metrics complemented by human evaluation. It is a visual reconstruction comparator, not an end-to-end repair/security benchmark.
 - WebdriverIO's page exposes two model contexts and seven browser tools over a fixed 100-task sample. Its indexed October 9 snapshot lists 2,511 total agent runs and an aggregate WebdriverIO session row of 62% (103/165; 55–69% interval). A separate DeepSeek V4.1 Flash run reports 58/100 for WebdriverIO session. A direct page render on November 22 showed an empty run-log state. Therefore 62% is a historical, model-context-dependent aggregate—not a single-run score or a universal browser-tool lead. The benchmark warns about roughly ±10-point intervals at 100 tasks and WebJudge/human disagreement.
 - OpenAI's July 8, 2026 SWE-Bench Pro audit flagged 200/731 tasks automatically and 249/731 in human annotation. This is evidence for benchmark QA, not a claim about the defect rate of SFEB.
 
 Do not pool raw results. Reproduce each benchmark's original task set, model, prompt, harness, judge and scoring scripts before presenting an external comparison.
+
+## 3A. Interaction-as-a-Judge: the most important new research direction
+
+Arena's November 12, 2026 research uses computer-use agents to inspect generated applications through live interaction. It reports broken-requirement detection improving from 63.0% with a code-only judge to 71.1% with interaction, iterative repair improving from 55.4% to 75.5%, and a trained 9B reward model reaching 70.8% human-preference agreement. Its released data includes 6,390 application pairs with interaction traces and human preference labels, plus 189 game versions with 362 human-verified requirements. These are results under that study's own protocol, not general frontend accuracy rates.
+
+This changes SFEB's evaluation strategy:
+
+1. Use deterministic executable oracles for exact requirements, security, identity, accessibility invariants and evidence integrity.
+2. Add an Interaction-as-a-Judge lane to detect behavioral failures that static source inspection and screenshots miss.
+3. Calibrate the interaction judge against human labels and retain false-positive/false-negative rates by task family.
+4. Use interaction traces as diagnostics and repair rewards, never as the sole acceptance authority.
+5. Run adversarial page-content instructions against the judge to test manipulation susceptibility.
+6. Compare code-only judge, screenshot-only judge, code+screenshot judge, interaction judge and deterministic-oracle ensemble.
+
+The key paradigm is **interaction-grounded evaluation with independently bounded authority**: the judge explores and proposes explanations, while the trusted verifier controls verdict promotion. This can improve agent learning and repair loops without making a learned reward model the final arbiter.
+
+Sources: https://arena.ai/blog/interaction-as-a-judge and https://arxiv.org/abs/2610.17895.
 
 ## 4. What we should aim to beat
 
