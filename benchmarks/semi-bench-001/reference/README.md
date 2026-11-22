@@ -467,3 +467,21 @@ cargo run --release -p symthaea-semiconductor --bin semi-secom-random-forest -- 
 The CLI reruns train-only preprocessing per repeat from #13238, then fits/evaluates both RF variants on Feature Set A. Feature Set B remains a separate Luminous missingness-indicator ablation. No hyperparameter or threshold is selected on test data.
 
 **Claim limit:** this is a native Rust Random Forest comparator, not an XGBoost substitute. It evaluates stratified interpolation on the historic SECOM mirror, not chronological or fab transfer. Leaf-frequency scores are not calibrated defect probabilities. The five seeds and preprocessing defaults are Luminous reconstructions because the cited article does not disclose every setting. For benchmark interpretation, keep these scores separate from the frozen source-clock chronological results.
+
+
+### First exact-head five-repeat Random Forest result (run #45062680083)
+
+The full 200-tree real-source experiment passed exact-head CI with 88/88 Rust tests, format, strict Clippy, raw source audit, split/preprocessor verification and all ten model runs (five folds × unweighted/balanced).
+
+| Variant | AP mean ± SD | AUROC mean ± SD | Brier mean ± SD | ECE mean ± SD |
+|---|---:|---:|---:|---:|
+| RF 200 unweighted | 0.1459 ± 0.0386 | 0.7004 ± 0.0865 | 0.06119 ± 0.00261 | 0.02066 ± 0.01657 |
+| RF 200 balanced splits | 0.1967 ± 0.0807 | 0.7030 ± 0.0939 | 0.05981 ± 0.00237 | 0.01384 ± 0.00719 |
+
+For every fold, the training prevalence was 83/1,253 = 0.06624 and outer-test prevalence was 21/314 = 0.06688. A constant predictor using the train-fold prevalence has Brier 0.06241 on this test support. Both RF arms are modestly better on average; the balanced arm's mean Brier improvement is approximately 0.00259. This is a descriptive difference only; paired confidence intervals and repeated-fab evidence are not yet available.
+
+The balanced model's AP spans 0.1179–0.3021 across the five repeats (sample SD 0.0807). The AP result is therefore substantially more variable than the unweighted arm (0.0816–0.1803). At the fixed diagnostic threshold 0.5, both arms have TP=0 / FN=21 in every repeat. This demonstrates that ranking/probability diagnostics and operational threshold utility are different questions.
+
+The paper-reported 2026 Dong et al. SECOM RF AP is 0.431 ± 0.041; the local reconstruction remains materially below that published number. The original paper split seeds and complete preprocessing defaults are not disclosed, so these are not matched partitions and no SOTA claim is made. Park & Baek's distinct 2026 RF result is also a different split/imputation protocol. Preserve these as external comparators, not directly reproducible equivalence claims.
+
+Artifact #14769912968 (SHA-256 \`6c0590e4725f1507e5aece893e46196ea31241dce9bf81ccb6d9525509b14f8d\`) contains the archived run reports, including fold-level prediction scores and model digests.
