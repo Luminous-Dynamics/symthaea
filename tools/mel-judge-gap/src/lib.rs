@@ -798,7 +798,8 @@ mod tests {
     #[test]
     fn altered_sequence_is_rejected() {
         let mut input = fixture();
-        input.pairs[0].presentations[0].left_item_id = input.pairs[0].item_a_id.clone();
+        let wrong_left = input.pairs[0].item_a_id.clone();
+        input.pairs[0].presentations[0].left_item_id = wrong_left;
         let error = qualify(&input).expect_err("tampered sequence must fail");
         assert!(error.contains("precommitted swapped display order"));
     }
