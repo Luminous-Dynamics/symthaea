@@ -474,22 +474,39 @@ fn summarize(
         let positions = rank_positions(ranking);
         if query.is_positive {
             positive_count += 1;
-            let best_rank = query
-                .expected
+            let relevant_positions: Vec<usize> = ranking
                 .iter()
-                .filter_map(|id| positions.get(id).copied())
-                .min();
-            if let Some(rank) = best_rank {
+                .enumerate()
+                .filter_map(|(index, item)| {
+                    query.expected.contains(&item.id).then_some(index + 1)
+                })
+                .collect();
+            if let Some(rank) = relevant_positions.first().copied() {
                 reciprocal_rank_sum += 1.0 / rank as f64;
-                if rank <= 1 {
+                if rank == 1 {
                     hit_at_1 += 1;
                 }
-                if rank <= 3 {
-                    hit_at_3 += 1;
-                    ndcg_at_3_sum += 1.0 / ((rank as f64 + 1.0).log2());
-                    precision_at_3_sum += 1.0 / 3.0;
-                }
             }
+
+            let relevant_at_3 = relevant_positions.iter().filter(|rank| **rank <= 3).count();
+            if relevant_at_3 > 0 {
+                hit_at_3 += 1;
+            }
+            precision_at_3_sum += relevant_at_3 as f64 / 3.0;
+
+            let dcg = relevant_positions
+                .iter()
+                .filter(|rank| **rank <= 3)
+                .map(|rank| 1.0 / ((*rank as f64 + 1.0).log2()))
+                .sum::<f64>();
+            let ideal_relevant = query.expected.len().min(3);
+            let ideal_dcg = (1..=ideal_relevant)
+                .map(|rank| 1.0 / ((rank as f64 + 1.0).log2()))
+                .sum::<f64>();
+            if ideal_dcg > 0.0 {
+                ndcg_at_3_sum += dcg / ideal_dcg;
+            }
+
             if let Some(top) = ranking.first() {
                 positive_top_scores.push(top.score);
             }
