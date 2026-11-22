@@ -148,7 +148,7 @@ An invalid or unresolved ID must fail closed. Similarity cannot override a MACE 
 
 ## 7. Authored metamorphic tests
 
-The module now contains ten authored tests for:
+The module now contains eleven authored tests for:
 - ranking invariance under event-ID permutation when content is preserved;
 - ranking changes when utility content changes but event IDs remain fixed;
 - changed ranking when the target action/scope query changes;
@@ -157,7 +157,8 @@ The module now contains ten authored tests for:
 - profile digest sensitivity to dimension, seed, bandwidth and exact-filter policy;
 - duplicate-ID and non-finite input rejection;
 - query-time estimand/evidence-quality cues while preserving candidate-only authority;
-- the paired-runner typed arm uses the MACE qualification profile, exact scope/action prefilters and emits a typed retrieval-profile digest.
+- conversion from a valid DecisionNeedV1 and rejection of actions outside the declared alternatives;
+- the paired-runner typed arm uses the MACE qualification profile, exact scope/action prefilters and emits decision-need plus typed retrieval-profile digests.
 
 These tests are authored source, not executed passes. Cargo, rustc and rustfmt are unavailable in the present environment.
 
