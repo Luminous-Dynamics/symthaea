@@ -5,11 +5,12 @@ existing public Symthaea applications.
 
 ## Current status
 
-- `patterns-v0.json` contains eight source-grounded patterns.
+- `patterns-v0.json` contains seventeen source-grounded patterns across the Symthaea and Muse Leptos applications.
 - Every pattern records its exact source path and Git blob SHA.
 - Every pattern has an explicit evidence state; none is marked browser-verified.
-- The corpus is pinned to the Leptos 0.8 API family and the current repository
-  dependency requirement.
+- The corpus is pinned to the Leptos 0.8 API family. The repository's current
+  `Cargo.lock` resolves `leptos` to 0.8.20; this exact resolved version is the
+  baseline, even though upstream has since published 0.8.23.
 - The code examples are learning excerpts, not a standalone crate. They must
   compile against the exact Cargo.lock resolution before their status is
   promoted.
@@ -25,6 +26,30 @@ existing public Symthaea applications.
 7. Typed `NodeRef` for DOM-backed rendering.
 8. A narrow HTTP/WebSocket transport boundary between the WASM UI and the
    cognitive service.
+9. Declarative Router / Routes / Route composition and active links.
+10. Typed context provision and descendant retrieval without prop drilling.
+11. Derived state with `Memo` and a single source of truth.
+12. Programmatic navigation after a completed state transition.
+13. Pure reducer state machines with typed events and explicit effects.
+14. Persistent DOM resources placed outside route subtrees.
+15. Browser event adapters that dispatch epoch-tagged reducer events.
+16. Fail-closed authorization gating before a mutating import.
+17. Asynchronous component initialization with visible loading and failure states.
+
+The first eight patterns originate in `symthaea-ui`; the expanded set also
+uses the existing `symthaea-muse-ui` Router, shared playback store, pure
+playback reducer, composition page and private-import flow. Each Muse example
+records its exact source blob SHA, including related source files where the
+pattern spans multiple modules.
+
+## Framework version discipline
+
+As of 2026-11-22, upstream has published Leptos 0.8.23 as the latest stable
+0.8 release, with 0.9.0-rc1 as a prerelease. This repository's checked-in
+`Cargo.lock` currently resolves Leptos 0.8.20. The SFEB baseline must record
+and use 0.8.20 until an explicit 0.8.23 compatibility experiment updates the
+lockfile and passes compile, browser and regression gates. Do not silently mix
+the two versions in one benchmark result.
 
 ## Most important reactivity rule
 
@@ -66,9 +91,9 @@ revalidated.
 ## External API references
 
 - Leptos 0.8.20 `Effect`: https://docs.rs/leptos/0.8.20/leptos/prelude/struct.Effect.html
-- Leptos 0.8.22 `RwSignal`: https://docs.rs/leptos/0.8.22/leptos/prelude/struct.RwSignal.html
-- Leptos 0.8.22 `Memo`: https://docs.rs/leptos/0.8.22/leptos/prelude/struct.Memo.html
-- Leptos `Owner`: https://docs.rs/leptos/0.8.21/leptos/prelude/struct.Owner.html
+- Leptos 0.8.20 `RwSignal`: https://docs.rs/leptos/0.8.20/leptos/prelude/struct.RwSignal.html
+- Leptos 0.8.20 `Memo`: https://docs.rs/leptos/0.8.20/leptos/prelude/struct.Memo.html
+- Leptos 0.8.20 `Owner`: https://docs.rs/leptos/0.8.20/leptos/prelude/struct.Owner.html
 - gloo-net 0.5.0 `WebSocket`: https://docs.rs/gloo-net/0.5.0/gloo_net/websocket/futures/struct.WebSocket.html
 - gloo-net 0.5.0 WebSocket `State`: https://docs.rs/gloo-net/0.5.0/gloo_net/websocket/enum.State.html
 
@@ -91,7 +116,7 @@ The current browser implementation should follow the actual resolved versions in
 
 A first public pilot query set is available at
 `retrieval-queries-v0.json`, with its schema in
-`retrieval-v1.schema.json`. It contains 16 paraphrased positive queries and
+`retrieval-v1.schema.json`. It contains 34 paraphrased positive queries and
 eight hard negatives, so the system must retrieve the right entry when one
 exists and abstain when the corpus has no relevant pattern.
 
