@@ -59,7 +59,7 @@ pub struct ConformalClassThresholdV1 {
     pub unbounded_threshold: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SelectiveDecisionV1 {
     PredictNegative,
@@ -418,6 +418,33 @@ pub fn evaluate_conformal_sets_v1(
     if report.schema != REPORT_SCHEMA_V1 {
         return Err(ConformalError("conformal report schema unsupported".into()));
     }
+    if report.prediction_set_count != report.prediction_sets.len() {
+        return Err(ConformalError(
+            "prediction-set count does not match payload length".into(),
+        ));
+    }
+    let serialized_sets = serde_json::to_vec(&report.prediction_sets)
+        .map_err(|error| ConformalError(format!("prediction-set serialization failed: {error}")))?;
+    if sha256_hex(&serialized_sets) != report.prediction_sets_sha256 {
+        return Err(ConformalError(
+            "prediction-set digest does not match payload".into(),
+        ));
+    }
+    for (index, prediction) in report.prediction_sets.iter().enumerate() {
+        let expected_size = usize::from(prediction.negative_in_set)
+            + usize::from(prediction.positive_in_set);
+        let expected_decision = match (prediction.negative_in_set, prediction.positive_in_set) {
+            (true, false) => SelectiveDecisionV1::PredictNegative,
+            (false, true) => SelectiveDecisionV1::PredictPositive,
+            _ => SelectiveDecisionV1::Abstain,
+        };
+        if prediction.set_size != expected_size || prediction.decision != expected_decision {
+            return Err(ConformalError(format!(
+                "prediction_sets[{index}]: set size or decision contradicts membership flags"
+            )));
+        }
+        probability(prediction.score, &format!("prediction_sets[{index}].score"))?;
+    }
     let mut ordered_truth = truth.to_vec();
     ordered_truth.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
     if ordered_truth.len() != report.prediction_sets.len() {
@@ -465,10 +492,9 @@ pub fn evaluate_conformal_sets_v1(
         } else if prediction.set_size == 2 {
             doubleton_set_count += 1;
         }
-        let covered = if actual.positive {
+        if actual.positive {
             positive_support += 1;
-            let in_set = prediction.positive_in_set;
-            if in_set {
+            if prediction.positive_in_set {
                 positive_covered += 1;
                 marginal_covered += 1;
             }
@@ -478,11 +504,9 @@ pub fn evaluate_conformal_sets_v1(
                     positive_singleton_correct += 1;
                 }
             }
-            in_set
         } else {
             negative_support += 1;
-            let in_set = prediction.negative_in_set;
-            if in_set {
+            if prediction.negative_in_set {
                 negative_covered += 1;
                 marginal_covered += 1;
             }
@@ -492,8 +516,7 @@ pub fn evaluate_conformal_sets_v1(
                     negative_singleton_correct += 1;
                 }
             }
-            in_set
-        };
+        }
         if prediction.set_size == 1 {
             singleton_predictions += 1;
             let correct = match prediction.decision {
@@ -507,7 +530,6 @@ pub fn evaluate_conformal_sets_v1(
         } else {
             abstention_count += 1;
         }
-        let _ = covered;
     }
     if positive_support == 0 || negative_support == 0 {
         return Err(ConformalError(
@@ -711,12 +733,10 @@ mod tests {
     #[test]
     fn test_truth_changes_evaluation_not_prediction_set_digest() {
         let input = subject();
-        let labels: Vec<&str> = (0..20)
+        let label_ids: Vec<String> = (0..20)
             .map(|i| format!("label-{i:02}"))
-            .collect::<Vec<_>>()
-            .iter()
-            .map(|s| s.as_str())
             .collect();
+        let labels: Vec<&str> = label_ids.iter().map(String::as_str).collect();
         let report = build_mondrian_conformal_sets_v1(&input, &snapshot(&labels)).unwrap();
         let truth_a = vec![
             ConformalTruthSampleV1 { sample_id: "test-a".into(), positive: true },
