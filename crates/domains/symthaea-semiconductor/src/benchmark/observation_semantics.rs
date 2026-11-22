@@ -278,12 +278,12 @@ fn validate_observation(
             if let Some(value) = upper_bound {
                 finite(*value, &format!("{prefix}.upper_bound"))?;
             }
-            if let (Some(lower), Some(upper)) = (lower_bound, upper_bound) {
-                if lower > upper {
-                    return Err(SensorObservationError(format!(
-                        "{prefix}: lower_bound must not exceed upper_bound"
-                    )));
-                }
+            if let (Some(lower), Some(upper)) = (lower_bound, upper_bound)
+                && lower > upper
+            {
+                return Err(SensorObservationError(format!(
+                    "{prefix}: lower_bound must not exceed upper_bound"
+                )));
             }
             require_text(unit, &format!("{prefix}.unit"))?;
             require_text(censoring_basis, &format!("{prefix}.censoring_basis"))?;
