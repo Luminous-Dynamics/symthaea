@@ -54,7 +54,10 @@
         "selected",
         "observation_executed",
         "observation_receipt_sha256",
-        "scope"
+        "scope",
+        "predictive_outcome_entropy_bits",
+        "selected_by_uncertainty_only",
+        "selected_by_random_control"
       ],
       "properties": {
         "schema_version": {
@@ -128,6 +131,23 @@
         },
         "scope": {
           "const": "synthetic_policy_fixture_not_agent_benchmark"
+        },
+        "predictive_outcome_entropy_bits": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selected_by_uncertainty_only": {
+          "type": "boolean"
+        },
+        "selected_by_random_control": {
+          "type": "boolean"
         }
       }
     },
@@ -146,7 +166,10 @@
         "query_count",
         "observation_executed",
         "authority_or_execution_granted",
-        "scope"
+        "scope",
+        "uncertainty_only_query_id",
+        "random_control_query_id",
+        "no_acquisition_baseline"
       ],
       "properties": {
         "schema_version": {
@@ -200,6 +223,29 @@
         },
         "scope": {
           "const": "synthetic_policy_fixture_not_agent_benchmark"
+        },
+        "uncertainty_only_query_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "random_control_query_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "no_acquisition_baseline": {
+          "const": "stop_or_abstain"
         }
       }
     }
