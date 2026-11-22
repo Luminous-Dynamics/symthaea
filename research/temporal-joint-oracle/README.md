@@ -41,7 +41,7 @@ The evaluator also exposes `decompose_exact_joint_interactions()`. It uses the a
 
 Positive exposure dividends represent synergy; negative exposure dividends represent antagonism. Resource dividends use the opposite interpretation: positive means added cost, negative means savings. The transform does not establish causal effects unless the intervention design identifies them. It is limited to the declared finite binary factors and shares the oracle's 16-factor maximum.
 
-Fifteen Rust test functions are authored in the evaluator package, including hand-calculated pairwise, three-way and four-way controls plus a direct inclusion–exclusion reference implementation checked against the production transform. **None has been executed** in the current authoring environment.
+Fifteen Rust test functions are authored in the evaluator package, including hand-calculated pairwise, three-way and four-way controls, a direct inclusion–exclusion reference implementation checked against the production transform, and exact rational Shapley attribution controls. **None has been executed** in the current authoring environment.
 
 ## Local validation
 
@@ -52,3 +52,5 @@ cargo test --manifest-path research/temporal-joint-oracle/Cargo.toml
 ```
 
 The package has a path dependency on the candidate plan contract, but not vice versa. This research workspace does not yet contain a committed Cargo.lock; before confirmatory use, generate and commit the lockfile, then run with --locked. A successful test run is still required before any test is described as passing.
+
+The report also returns a standard Shapley allocation for each factor, derived by splitting each subset dividend equally among its members. It stores numerators over a shared `lcm(1..n)` denominator and verifies the efficiency/sum-to-total identity in integer arithmetic. Shapley (1953) is established prior art: https://doi.org/10.1515/9781400881970-018.
