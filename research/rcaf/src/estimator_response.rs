@@ -166,12 +166,16 @@ impl fmt::Display for EstimatorResponseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyObservationMatrix => write!(f, "factorial observations must be non-empty"),
-            Self::RaggedObservationMatrix => write!(f, "factorial observation matrix must be rectangular"),
+            Self::RaggedObservationMatrix => {
+                write!(f, "factorial observation matrix must be rectangular")
+            }
             Self::InsufficientObservationShape => write!(
                 f,
                 "Pearson connectivity requires at least three time points and two ROIs"
             ),
-            Self::NonFiniteObservation => write!(f, "factorial observations contain non-finite values"),
+            Self::NonFiniteObservation => {
+                write!(f, "factorial observations contain non-finite values")
+            }
             Self::ConstantRoi { roi_index } => {
                 write!(f, "ROI {roi_index} has zero or near-zero temporal variance")
             }
@@ -294,7 +298,11 @@ pub fn pearson_connectivity_matrix(
     if time_points < 3 || roi_count < 2 {
         return Err(EstimatorResponseError::InsufficientObservationShape);
     }
-    if observations.iter().flatten().any(|value| !value.is_finite()) {
+    if observations
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
         return Err(EstimatorResponseError::NonFiniteObservation);
     }
 
@@ -335,10 +343,7 @@ pub fn pearson_connectivity_matrix(
     Ok(matrix)
 }
 
-fn upper_triangle_delta(
-    after: &[Vec<f64>],
-    before: &[Vec<f64>],
-) -> Vec<f64> {
+fn upper_triangle_delta(after: &[Vec<f64>], before: &[Vec<f64>]) -> Vec<f64> {
     after
         .iter()
         .enumerate()
@@ -359,7 +364,10 @@ fn summarize_directional_recovery(
         return Err(EstimatorResponseError::InvalidConnectivityEstimate);
     }
     let signal_norm_squared = signal_delta.iter().map(|value| value * value).sum::<f64>();
-    let combined_norm_squared = combined_delta.iter().map(|value| value * value).sum::<f64>();
+    let combined_norm_squared = combined_delta
+        .iter()
+        .map(|value| value * value)
+        .sum::<f64>();
     let clean_signal_change_norm = signal_norm_squared.sqrt();
     let combined_signal_change_norm = combined_norm_squared.sqrt();
     if !clean_signal_change_norm.is_finite() || !combined_signal_change_norm.is_finite() {
@@ -469,7 +477,11 @@ mod tests {
         let response = evaluate_factorial_estimator_response(&factorial()).unwrap();
         assert_eq!(response.estimators.len(), 3);
         assert_eq!(
-            response.estimators.iter().map(|item| item.estimator_id).collect::<Vec<_>>(),
+            response
+                .estimators
+                .iter()
+                .map(|item| item.estimator_id)
+                .collect::<Vec<_>>(),
             vec![
                 "absolute_weighted_jaccard",
                 "signed_shift_weighted_jaccard",
@@ -530,11 +542,21 @@ mod tests {
         .unwrap();
         let response = evaluate_factorial_estimator_response(&experiment).unwrap();
         assert!(
-            (response.connectivity_direction.signal_projection_gain.unwrap() - 1.0).abs()
+            (response
+                .connectivity_direction
+                .signal_projection_gain
+                .unwrap()
+                - 1.0)
+                .abs()
                 < 1e-9
         );
         assert!(
-            (response.connectivity_direction.signal_directional_cosine.unwrap() - 1.0).abs()
+            (response
+                .connectivity_direction
+                .signal_directional_cosine
+                .unwrap()
+                - 1.0)
+                .abs()
                 < 1e-9
         );
         assert!(
