@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 pub mod collab_trace;
+pub mod event_universe;
 pub mod musical_timing;
 pub mod predictive_transparency;
 pub mod transform_qualification;
