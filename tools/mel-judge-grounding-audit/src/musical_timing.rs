@@ -139,6 +139,13 @@ pub struct EventTimingFinding {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ExtraOnsetFinding {
+    pub event_id: String,
+    pub instrument_id: String,
+    pub observed_onset_ns: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct MusicalTimingReport {
     pub schema_version: String,
     pub session_id: String,
@@ -151,6 +158,7 @@ pub struct MusicalTimingReport {
     pub observed_count: usize,
     pub missed_count: usize,
     pub extra_onset_count: usize,
+    pub extra_onsets: Vec<ExtraOnsetFinding>,
     pub target_accounting_completeness: f64,
     pub observed_target_coverage_rate: f64,
     pub signed_phase_error_beats: Distribution,
@@ -310,6 +318,15 @@ fn score_panel(panel: &MusicalTimingPanelV2) -> Result<MusicalTimingReport, Stri
             panel.extra_onsets.len()
         ));
     }
+    let extra_onset_findings = panel
+        .extra_onsets
+        .iter()
+        .map(|extra| ExtraOnsetFinding {
+            event_id: extra.event_id.clone(),
+            instrument_id: extra.instrument_id.clone(),
+            observed_onset_ns: extra.observed_onset_ns,
+        })
+        .collect();
 
     let signed: Vec<f64> = computed
         .iter()
@@ -400,6 +417,7 @@ fn score_panel(panel: &MusicalTimingPanelV2) -> Result<MusicalTimingReport, Stri
         observed_count,
         missed_count,
         extra_onset_count: panel.extra_onsets.len(),
+        extra_onsets: extra_onset_findings,
         target_accounting_completeness,
         observed_target_coverage_rate: if total_targets == 0 {
             0.0
@@ -565,9 +583,9 @@ fn validate_estimates<'a>(
     Ok(result)
 }
 
-fn score_tempo_adaptation<'a>(
+fn score_tempo_adaptation(
     panel: &MusicalTimingPanelV2,
-    estimates: &BTreeMap<&str, Vec<&'a TempoEstimateV2>>,
+    estimates: &BTreeMap<&str, Vec<&TempoEstimateV2>>,
 ) -> Vec<TempoAdaptationSummary> {
     let required = panel.policy.required_consecutive_stable_estimates;
     let tolerance = panel.policy.maximum_relative_period_error;
@@ -802,6 +820,8 @@ mod tests {
         let report = score(&value).expect("missed/extra events should be reported");
         assert_eq!(report.missed_count, 1);
         assert_eq!(report.extra_onset_count, 1);
+        assert_eq!(report.extra_onsets[0].event_id, "extra-1");
+        assert_eq!(report.extra_onsets[0].observed_onset_ns, 2_650_000_000);
         assert_eq!(report.target_accounting_completeness, 1.0);
         assert_eq!(report.observed_target_coverage_rate, 0.75);
         assert!(!report.qualified_for_declared_timing_contract);
