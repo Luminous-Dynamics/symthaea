@@ -307,7 +307,7 @@ Each lesson/example must have: version, runnable code, expected output, negative
 ### Increment B — runner and fixtures
 
 - Reuse `symthaea-browser::CdpSession` and `capture_frontend_evidence`; do not add another browser-control framework for the initial Chromium lane.
-- Create a Rust-owned SFEB runner/orchestrator and a pinned disposable Chromium environment.
+- Run the ignored `frontend_capture_smoke` test on a host with Chromium installed, then build the Rust-owned SFEB runner/orchestrator around the verified capture API and a pinned disposable Chromium environment.
 - Add fixed viewport and intermediate-width capture. The current layout probe records viewport, document overflow and bounded semantic element rectangles; `data-sfeb-id` anchors should be added to original fixture components.
 - Extend the receipt pipeline with exact source SHA, Cargo.lock digest, resolved Leptos version, browser build, OS image, font set, fixture revision, network policy and evaluator revision.
 - Record route/action traces, browser console, failed requests and performance observations alongside the three current capture artifacts.
@@ -334,7 +334,8 @@ Extend `symthaea-ui` with one bounded, reviewed feature from its README's deferr
 | Existing Leptos application surfaces inspected | **Verified** by source/manifests |
 | Existing `symthaea-browser` CDP substrate inspected | **Verified** by source |
 | Frontend layout/AX/screenshot evidence bundle | **Implemented in source**; compile/tests not run |
-| Bundle unit tests | **Authored**; not executed |
+| Source anchors and first UI accessibility/responsive refinements | **Implemented in source**; browser validation not run |
+| Bundle unit tests and ignored Chromium smoke test | **Authored**; not executed |
 | External benchmark landscape researched | **Sources reviewed**; benchmark protocols differ |
 | Programme and task inventory written | **Proposed** in this branch |
 | Runnable SFEB evaluator and fixtures | **Not implemented** |
