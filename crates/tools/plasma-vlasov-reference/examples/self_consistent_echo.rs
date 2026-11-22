@@ -138,11 +138,14 @@ fn run_resolution(
                 pulsed.time(),
                 pulse_budget.total_casimir,
                 control_budget.total_casimir,
-                (pulse_budget.total_casimir - initial_casimir).abs() / initial_casimir.max(f64::MIN_POSITIVE),
-                (control_budget.total_casimir - initial_casimir).abs() / initial_casimir.max(f64::MIN_POSITIVE),
+                (pulse_budget.total_casimir - initial_casimir).abs()
+                    / initial_casimir.max(f64::MIN_POSITIVE),
+                (control_budget.total_casimir - initial_casimir).abs()
+                    / initial_casimir.max(f64::MIN_POSITIVE),
                 pulse_budget.spatial_mean_casimir,
                 pulse_budget.fluctuation_f_strophy,
-                pulse_budget.fluctuation_f_strophy / pulse_budget.total_casimir.max(f64::MIN_POSITIVE),
+                pulse_budget.fluctuation_f_strophy
+                    / pulse_budget.total_casimir.max(f64::MIN_POSITIVE),
                 pulse_spectrum.phase_mixing_f_strophy / pulse_scale,
                 pulse_spectrum.phase_unmixing_f_strophy / pulse_scale,
                 pulse_spectrum.zero_axis_f_strophy / pulse_scale,
