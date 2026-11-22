@@ -1,0 +1,235 @@
+{
+  "schema": "symthaea.active_sensing_robust_decision_regret_voi",
+  "version": "0.1.0",
+  "tracking_issue": 9563,
+  "evaluator_package": "research/temporal-evaluator",
+  "evaluator_module": "research/temporal-evaluator/src/decision_regret_voi.rs",
+  "composes_with": {
+    "decision_observability_pr": 13152,
+    "information_channel_issue": 12567,
+    "decision_predictability_pr": 12551,
+    "common_temporal_benchmark_issue": 9954,
+    "joint_resource_programme": 9666,
+    "evaluator_isolation_issue": 9437
+  },
+  "status": "source_authored_not_executed",
+  "does_not_compute_expected_value": true,
+  "expected_posterior_voi_owner": 12551,
+  "information_channel_owner": 12567,
+  "probability_scale_ppm": null,
+  "decision_deadline_us": 100,
+  "sensor_model_sha256": "0404040404040404040404040404040404040404040404040404040404040404",
+  "support_evidence_sha256": "0505050505050505050505050505050505050505050505050505050505050505",
+  "worlds": [
+    {
+      "evaluator_world_id": 1,
+      "hidden_world_sha256": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "action_losses_ppm": {
+        "left": 0,
+        "right": 1000000
+      }
+    },
+    {
+      "evaluator_world_id": 2,
+      "hidden_world_sha256": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+      "action_losses_ppm": {
+        "left": 1000000,
+        "right": 0
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "perfect_on_time",
+      "description": "Each world has a distinct possible candidate-visible result available by the decision deadline.",
+      "possible_outcomes": [
+        {
+          "world_id": 1,
+          "candidate_visible_outcome_sha256": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+          "available_at_us": 100
+        },
+        {
+          "world_id": 2,
+          "candidate_visible_outcome_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "available_at_us": 100
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret_ppm": 1000000,
+        "post_observation_worst_case_regret_ppm": 0,
+        "guaranteed_regret_reduction_ppm": 1000000,
+        "outcome_possible_world_counts": [
+          1,
+          1
+        ],
+        "baseline_information_set_sufficient": false,
+        "post_observation_information_set_sufficient": true,
+        "outcome_information_set_sufficient": [
+          true,
+          true
+        ]
+      }
+    },
+    {
+      "id": "noisy_full_support",
+      "description": "Both worlds can produce both visible outcomes; robust support remains ambiguous even though #12567/#12551 may report positive expected value from qualified likelihoods.",
+      "possible_outcomes": [
+        {
+          "world_id": 1,
+          "candidate_visible_outcome_sha256": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+          "available_at_us": 50
+        },
+        {
+          "world_id": 1,
+          "candidate_visible_outcome_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "available_at_us": 50
+        },
+        {
+          "world_id": 2,
+          "candidate_visible_outcome_sha256": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+          "available_at_us": 50
+        },
+        {
+          "world_id": 2,
+          "candidate_visible_outcome_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "available_at_us": 50
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret_ppm": 1000000,
+        "post_observation_worst_case_regret_ppm": 1000000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "outcome_possible_world_counts": [
+          2,
+          2
+        ],
+        "baseline_information_set_sufficient": false,
+        "post_observation_information_set_sufficient": false,
+        "outcome_information_set_sufficient": [
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "id": "decision_irrelevant_variation",
+      "description": "Worlds differ but share the same optimal action; observation cannot reduce an already-zero regret floor.",
+      "action_losses_by_world": {
+        "1": {
+          "continue": 0,
+          "abstain": 100000
+        },
+        "2": {
+          "continue": 0,
+          "abstain": 200000
+        }
+      },
+      "possible_outcomes": [
+        {
+          "world_id": 1,
+          "candidate_visible_outcome_sha256": "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e",
+          "available_at_us": 40
+        },
+        {
+          "world_id": 2,
+          "candidate_visible_outcome_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+          "available_at_us": 40
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret_ppm": 0,
+        "post_observation_worst_case_regret_ppm": 0,
+        "guaranteed_regret_reduction_ppm": 0,
+        "outcome_possible_world_counts": [
+          1,
+          1
+        ],
+        "baseline_information_set_sufficient": true,
+        "post_observation_information_set_sufficient": true,
+        "outcome_information_set_sufficient": [
+          true,
+          true
+        ]
+      }
+    },
+    {
+      "id": "late_result",
+      "description": "Every result arrives after the deadline and therefore becomes the same no-result-by-deadline outcome.",
+      "possible_outcomes": [
+        {
+          "world_id": 1,
+          "candidate_visible_outcome_sha256": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+          "available_at_us": 101
+        },
+        {
+          "world_id": 2,
+          "candidate_visible_outcome_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "available_at_us": 101
+        }
+      ],
+      "expected": {
+        "visible_outcome": "no_result_by_deadline",
+        "baseline_worst_case_regret_ppm": 1000000,
+        "post_observation_worst_case_regret_ppm": 1000000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "outcome_possible_world_counts": [
+          2
+        ],
+        "baseline_information_set_sufficient": false,
+        "post_observation_information_set_sufficient": false,
+        "outcome_information_set_sufficient": [
+          false
+        ]
+      }
+    },
+    {
+      "id": "epsilon_nonzero_information_set",
+      "description": "A common action is not exactly optimal in all worlds but its worst-case regret is within a preregistered 100,000 PPM tolerance.",
+      "decision_regret_tolerance_ppm": 100000,
+      "action_losses_by_world": {
+        "1": {
+          "left": 0,
+          "right": 100000
+        },
+        "2": {
+          "left": 100000,
+          "right": 0
+        }
+      },
+      "possible_outcomes": [
+        {
+          "world_id": 1,
+          "candidate_visible_outcome_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+          "available_at_us": 50
+        },
+        {
+          "world_id": 2,
+          "candidate_visible_outcome_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+          "available_at_us": 50
+        }
+      ],
+      "expected": {
+        "baseline_worst_case_regret_ppm": 100000,
+        "post_observation_worst_case_regret_ppm": 100000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "baseline_information_set_sufficient": true,
+        "post_observation_information_set_sufficient": true,
+        "outcome_possible_world_counts": [
+          2
+        ],
+        "outcome_information_set_sufficient": [
+          true
+        ]
+      }
+    }
+  ],
+  "authored_rust_tests": 13,
+  "executed_rust_tests": 0,
+  "candidate_hidden_world_exposure": false,
+  "candidate_payload_contains_support_manifest": false,
+  "deterministic_robust_policy_contract": true,
+  "mixed_strategy_robust_contract": "delegated_to_pr_13165",
+  "expected_value_contract": "delegated_to_issues_12567_and_pr_12551",
+  "no_energy_or_sota_claim": true,
+  "decision_regret_tolerance_ppm": 0
+}

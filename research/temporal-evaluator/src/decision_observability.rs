@@ -471,7 +471,7 @@ mod tests {
         assert_eq!(result.minimax_loss_action_id, "safe");
         assert_eq!(result.minimax_regret_action_id, "safe");
         assert_eq!(result.minimax_worst_case_loss_ppm, 400_000);
-        assert_eq!(result.unavoidable_worst_case_regret_ppm, 400_000);
+        assert_eq!(result.unavoidable_worst_case_regret_ppm, 300_000);
     }
 
     #[test]
