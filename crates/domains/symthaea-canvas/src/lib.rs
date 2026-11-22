@@ -35,6 +35,7 @@ pub mod mycelial_model;
 pub mod mycelial_network;
 pub mod mycelial_presence;
 pub mod mycelial_reconstruction_metrics;
+pub mod mycelial_reconstruction_calibration;
 pub mod mycelial_reference_networks;
 pub mod mycelial_temporal_cycles;
 pub mod scene_features;
@@ -116,6 +117,16 @@ pub use mycelial_junction_graph::{
     MycelialJunction, MycelialJunctionGraphConfig, MycelialJunctionGraphError,
     MycelialJunctionGraphMetrics, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
     build_mycelial_junction_hypha_graph,
+};
+pub use mycelial_reconstruction_calibration::{
+    MAX_RECONSTRUCTION_CALIBRATION_BINS, MAX_RECONSTRUCTION_CALIBRATION_PREDICTIONS,
+    MYCELIAL_RECONSTRUCTION_CALIBRATION_SCHEMA_VERSION,
+    JunctionClassProbabilityPrediction, MycelialReconstructionCalibrationError,
+    MycelialReconstructionCalibrationReport, ReconstructionCalibrationBin,
+    ReconstructionCalibrationClass, ReconstructionCalibrationConfig,
+    ReconstructionCalibrationCounts, ReconstructionClassCalibration,
+    ReconstructionSelectiveRiskPoint, ReconstructionTopLabelCalibration,
+    evaluate_mycelial_reconstruction_calibration,
 };
 pub use mycelial_reconstruction_metrics::{
     AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
