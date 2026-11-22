@@ -10,7 +10,11 @@
     "source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
     "compile_status": "not_compiled_in_this_environment",
     "resolved_lockfile_version": "0.8.20",
-    "lockfile_blob_sha1": "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+    "lockfile_blob_sha1": "1d5b6c3dffb474fabef0f8237c6741b4f252bc62",
+    "upstream_latest_stable_as_of": "2026-11-22",
+    "upstream_latest_stable_version": "0.8.23",
+    "upstream_prerelease_version": "0.9.0-rc1",
+    "upgrade_policy": "Keep benchmarks pinned to Cargo.lock 0.8.20; evaluate 0.8.23 as a separately versioned compatibility experiment."
   },
   "scope": {
     "starter_surface": "crates/bridges/symthaea-ui",
@@ -21,7 +25,8 @@
       "Official API documentation must be matched to the resolved minor release before promotion.",
       "CSR source patterns must not be presented as SSR or hydration guidance.",
       "Browser lifecycle and cleanup behavior requires browser tests.",
-      "Routing, shared context, reducers, and authorization patterns are taken from the existing Muse UI and require independent compile/browser verification before promotion."
+      "Routing, shared context, reducers, and authorization patterns are taken from the existing Muse UI and require independent compile/browser verification before promotion.",
+      "The public Leptos 0.8 stable line has advanced to 0.8.23; this corpus describes repository code resolved to 0.8.20 and should not be treated as verified against 0.8.23 until compilation and browser checks run."
     ]
   },
   "patterns": [
