@@ -31,4 +31,4 @@ The qualification report v2 should consume this independently signed statement. 
 
 ## Implementation issue
 
-The evaluation engine, policy schema, result generation, signature verification and report-v2 migration are tracked separately in issue #13229. Execution attestation and trace integrity remain in #13228.
+The evaluation engine, policy schema, result generation, signature verification and report-v2 migration are tracked separately in issue #13247. Execution attestation and trace integrity remain in #13228.

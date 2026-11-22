@@ -415,7 +415,7 @@ As rechecked on 2026-11-22:
 
 - **Vision2Web** is the closest external end-to-end comparator found in this research. Its official benchmark describes 193 tasks across 16 categories, 918 prototype images and 1,255 test cases, with static, interactive and full-stack levels and verification combining workflow-driven GUI testing with VLM visual judging. The search-indexed S4-2026 leaderboard snapshot (refreshed 2026-10-01) showed 82.3 overall for Claude-Fable-5 + Claude Code on 2026-08-28, with level averages 87.4 static, 83.2 interactive and 76.3 full-stack. The live page's selected season displayed no rows when rechecked on 2026-11-22. These are dated historical reference scores, not a verified current leader or directly transferable SFEB targets.
 - **Design2Code** (2024/NAACL 2025 publication track) contains 484 real-world webpages and evaluates screenshot-to-code rendering with high-level CLIP similarity, block matching, text, position and color metrics, complemented by human pairwise judgments. Its analysis identifies visual-element recall and layout correctness as recurring weaknesses. Use it as a visual-reconstruction reference, subject to task/data license and reproducibility conditions.
-- **WebdriverIO's browser-agent benchmark** is a controlled tool comparison on a fixed random sample of Online-Mind2Web live-site tasks. It holds model, harness and prompt constant while swapping browser tools and uses an independent judge; its October 2026 page snapshot reported 62% for WebdriverIO session. This measures browser-operation performance, not frontend code generation. The methodology warns of roughly ±10-point intervals on its small sample, site instability and judge disagreement on about one in seven runs, so treat close scores as ties rather than a definitive SOTA ranking.
+- **WebdriverIO's browser-agent benchmark** is a controlled tool comparison on a fixed random sample of 100 Online-Mind2Web live-site tasks. Its indexed October 2026 snapshot includes an aggregated 62% WebdriverIO session row (103/165) for one of two model contexts; a separate DeepSeek V4.1 Flash run shows 58/100. A direct 2026-11-22 page render displayed an empty run log, so use the October results only as historical snapshots. This measures browser-operation performance, not frontend code generation. The methodology warns of roughly ±10-point intervals at 100 tasks, live-site instability and judge disagreement on about one in seven runs, so close results are ties rather than a definitive SOTA ranking.
 - **Leptos upstream** is the API authority. Pin and record the actual lockfile version rather than treating a semver requirement as a resolved version.
 
 External benchmarks measure different capabilities. Do not collapse visual generation, browser operation, software engineering, full-stack completion and framework expertise into one cross-benchmark ranking.
@@ -621,16 +621,21 @@ The current public field has several distinct evaluation surfaces:
   valuable for the visual-fidelity lane, but does not by itself measure the
   full interactive, runtime, security and maintenance loop SFEB targets.
   Source: https://aclanthology.org/2025.naacl-long.199/
-- **WebdriverIO Browser Agent Benchmark** fixes the model, harness and prompt
-  while swapping browser tools. Its page was updated October 9, 2026 and
-  currently lists 7 tools, 100 live-web tasks, 2 models and 2,511 total agent
-  runs. The displayed WebdriverIO session v10.0.2 row reports 62% success
-  (103/165; displayed 95% interval 55–69%), $0.013 median cost per task and
-  156 seconds median time per task. The benchmark explicitly warns that a
-  competing tool whose 95% interval overlaps the leader is not reliably worse.
-  Treat this as a browser-tool comparison, not a website-code-generation
-  leaderboard or evidence that one tool is significantly superior.
-  Source: https://benchmark.webdriver.io/
+- **WebdriverIO Browser Agent Benchmark** fixes model, harness and prompt
+  while swapping browser tools. Its indexed October 9, 2026 snapshot lists
+  7 tools, 100 sampled live-web tasks, 2 model contexts and 2,511 total agent
+  runs. One aggregated WebdriverIO session v10.0.2 row reports 62% (103/165;
+  55–69% interval), $0.013 median cost, 174k median tokens and 156 seconds.
+  This is an aggregated row in one model context, not a model-independent
+  62/100 result; a separate DeepSeek V4.1 Flash run reports 58/100 for the
+  WebdriverIO session. A direct page render on 2026-11-22 showed an empty
+  run-log state, so preserve October numbers as historical snapshots rather
+  than current live leaderboard status. The benchmark itself warns that
+  100-task intervals are roughly ±10 points and overlapping intervals do not
+  establish a reliable ranking. This measures browser tools, not code
+  generation.
+  Sources: https://benchmark.webdriver.io/ and
+  https://github.com/webdriverio/benchmark
 
 Do not compare raw scores across these benchmarks. Their task distributions,
 models, tools, judges, sites, environments and scoring functions differ. SFEB

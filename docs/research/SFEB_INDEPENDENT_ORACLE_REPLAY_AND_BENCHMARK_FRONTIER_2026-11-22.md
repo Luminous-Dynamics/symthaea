@@ -79,7 +79,7 @@ The resulting research contribution is not that an agent can write a page. It is
 - The independent oracle-result schema and comparator ledger are committed as contracts/data, not as a running evaluator.
 - The current report v1 still trusts runner-supplied oracle IDs and remains a legacy local adjudicator.
 - #13228 owns execution attestation, trace verification and isolated runner.
-- #13229 owns the independent oracle engine, verifier statement and qualification report v2.
+- #13247 owns the independent oracle engine, verifier statement and qualification report v2.
 
 ## Sources
 
