@@ -24,7 +24,8 @@ use symthaea_semiconductor::benchmark::split_manifest::{
 use symthaea_semiconductor::benchmark::stratified_repeat::StratifiedRepeatReportV1;
 use symthaea_semiconductor::benchmark::{
     ForestClassWeightingV1, RandomForestInputSampleV1, RandomForestParametersV1,
-    RandomForestPredictionReportV1, RandomForestTrainingSampleV1, fit_random_forest_v1,
+    RandomForestPredictionReportV1, RandomForestTrainingSampleV1, RandomForestTruthSampleV1,
+    fit_random_forest_v1,
     predict_random_forest_v1, prepare_secom_stratified_fold_v1, score_random_forest_predictions_v1,
 };
 
@@ -185,8 +186,15 @@ fn run() -> Result<(), String> {
             .iter()
             .map(|row| RandomForestInputSampleV1 {
                 sample_id: row.sample_id.clone(),
-                positive: row.positive,
                 features: row.feature_set_a.clone(),
+            })
+            .collect();
+        let truth: Vec<RandomForestTruthSampleV1> = prepared
+            .test
+            .iter()
+            .map(|row| RandomForestTruthSampleV1 {
+                sample_id: row.sample_id.clone(),
+                positive: row.positive,
             })
             .collect();
 
@@ -221,7 +229,7 @@ fn run() -> Result<(), String> {
                 )
             })?;
             let prediction_milliseconds = prediction_start.elapsed().as_millis() as u64;
-            let metrics = score_random_forest_predictions_v1(&prediction_report, 0.5, 10).map_err(
+            let metrics = score_random_forest_predictions_v1(&prediction_report, &truth, 0.5, 10).map_err(
                 |error| {
                     format!(
                         "repeat {} {model_id} metrics failed: {error}",
