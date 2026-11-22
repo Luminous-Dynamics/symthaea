@@ -156,6 +156,82 @@ pub enum EchoAnalysisError {
     },
 }
 
+impl std::fmt::Display for EchoAnalysisError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroPulseMode { pulse_index } => {
+                write!(formatter, "pulse {pulse_index} must use a nonzero mode")
+            }
+            Self::EqualPulseModes => write!(formatter, "the two pulse modes must differ"),
+            Self::ModeDifferenceOverflow => write!(formatter, "echo mode difference overflowed"),
+            Self::NonFinitePulseTime { pulse_index } => {
+                write!(formatter, "pulse {pulse_index} time must be finite")
+            }
+            Self::UnorderedPulseTimes => {
+                write!(formatter, "the second pulse must follow the first pulse")
+            }
+            Self::NonFutureEcho {
+                echo_time,
+                second_pulse_time,
+            } => write!(
+                formatter,
+                "echo time {echo_time} must be finite and after second pulse at {second_pulse_time}"
+            ),
+            Self::WrongEchoMode { expected, actual } => {
+                write!(formatter, "trace mode {actual} does not match expected echo mode {expected}")
+            }
+            Self::TooFewTraceSamples { actual } => {
+                write!(formatter, "echo trace has {actual} samples; at least three are required")
+            }
+            Self::NonFiniteTraceSample { index } => {
+                write!(formatter, "echo trace sample {index} contains a non-finite value")
+            }
+            Self::NonFiniteTraceInterval { index } => {
+                write!(formatter, "echo trace interval before sample {index} overflowed")
+            }
+            Self::NonFiniteEchoTime => write!(formatter, "predicted echo time must be finite"),
+            Self::ZeroPredictedEchoMode => write!(formatter, "predicted echo mode must be nonzero"),
+            Self::InvalidPeakMeasurement => {
+                write!(formatter, "echo peak measurement contains invalid values")
+            }
+            Self::NonIncreasingTraceTime { index } => {
+                write!(formatter, "echo trace time at sample {index} is not increasing")
+            }
+            Self::TraceDoesNotSpanEchoTime {
+                echo_time,
+                first_sample_time,
+                last_sample_time,
+            } => write!(
+                formatter,
+                "echo trace [{first_sample_time}, {last_sample_time}] does not span {echo_time}"
+            ),
+            Self::InvalidSignalFloor => {
+                write!(formatter, "echo signal floor must be finite and nonnegative")
+            }
+            Self::InvalidTimeTolerance => {
+                write!(formatter, "echo time tolerances must be finite and nonnegative")
+            }
+            Self::EchoNotDetected {
+                peak_amplitude,
+                minimum_peak_amplitude,
+            } => write!(
+                formatter,
+                "echo peak {peak_amplitude} does not exceed signal floor {minimum_peak_amplitude}"
+            ),
+            Self::EchoPeakTimeOutsideTolerance {
+                observed,
+                predicted,
+                allowed,
+            } => write!(
+                formatter,
+                "sampled echo peak at {observed} differs from {predicted} by more than {allowed}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for EchoAnalysisError {}
+
 /// Predict the signed echo mode and nominal time for two spatial Fourier pulses.
 ///
 /// For signed integer mode indices k1 and k2:
