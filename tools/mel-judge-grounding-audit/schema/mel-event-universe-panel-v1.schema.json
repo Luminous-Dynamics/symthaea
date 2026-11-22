@@ -70,7 +70,9 @@
         "opportunity_manifest_sha256",
         "label_protocol_sha256",
         "adjudication_receipt_sha256",
-        "slots"
+        "slots",
+        "time_alignment_source_clock_domain_id",
+        "time_alignment_target_clock_domain_id"
       ],
       "properties": {
         "universe_id": {
@@ -138,6 +140,14 @@
           "items": {
             "$ref": "#/$defs/slot"
           }
+        },
+        "time_alignment_source_clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_alignment_target_clock_domain_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
