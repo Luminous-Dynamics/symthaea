@@ -1336,7 +1336,7 @@ fn validate_qualification_report(
         },
         "positive_controls": {
             "false_rejections": positive_false_rejects,
-            "false_reject_rate": rate_summary(positive_total - positive_false_rejects, positive_total),
+            "false_reject_rate": rate_summary(positive_false_rejects, positive_total),
             "accepted_with_all_invariants": rate_summary(positive_passes, positive_total)
         },
         "metamorphic_relations": rate_summary(metamorphic_passes, metamorphic_total),
