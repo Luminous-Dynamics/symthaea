@@ -212,7 +212,7 @@
     ],
     "test_purpose": "prove_four_way_interaction_is_separate_from_all_proper_subsets"
   },
-  "tests_authored": 14,
+  "tests_authored": 15,
   "tests_executed": false,
   "benchmark_runs": false,
   "causal_claim_requires": "paired_randomized_interventions_or_a_controlled_replay_design_that_identifies_the_declared_factor_effects",
@@ -222,5 +222,14 @@
     "no causal identification from observationally confounded inputs",
     "no hardware or energy superiority claim",
     "no SOTA claim"
-  ]
+  ],
+  "independent_reference": {
+    "method": "direct_inclusion_exclusion_over_all_sub_subsets",
+    "compared_against": "in_place_subset_mobius_transform",
+    "fixture_factor_counts": [
+      3,
+      4
+    ],
+    "term_by_term_comparison": true
+  }
 }
