@@ -252,7 +252,12 @@ The current high-performing systems are not merely dense embedding databases:
 | StateMem | Explicit current state, supersession and relational dependencies | Compare a state-first view and bitemporal revision resolution |
 | CL-Bench controls | Naive in-context learning | Demonstrate that persistent memory adds value beyond a strong prompt/context baseline |
 
-**Baseline parity rule:** the current MACE Experience fixture is structured and contains no general natural-language trajectory field. A lexical BM25/dense system over this typed fixture would not reproduce Resurface, Khipu or InsightMem. Build a separate raw-trajectory Add/Search adapter for AML-style comparisons, while preserving the synthetic causal intervention lane as a distinct MACE evaluation. Do not blur the two.
+**Immutable competitor source snapshots inspected 2026-11-22:**
+- Resurface `2e56bdbc9908b3798b08fde87f03a17ef9e4bc7a` (AML textual leader; repository README modified 2026-11-20).
+- Khipu deployed MM branch `8cf40aaab0d66442ff25652da4e78a9866c6e514`; deployment commit explicitly declares the application unchanged from `d21d401a00a7afb3410a6a64a7e16e66f9e0b1e0`. Freeze both deployment config and app-code commit; do not assume `main` is the multimodal leader.
+- InsightMem `b34b7c00f1994ea042b83bee318d2a1b33f6cdec` (AML coding leader).
+
+**Baseline parity rule:** the current MACE Experience fixture is structured and contains no general natural-language trajectory field. A lexical BM25/dense system over this typed fixture would not reproduce Resurface, Khipu or InsightMem. Build a separate raw-trajectory Add/Search adapter for AML-style comparisons, while preserving the synthetic causal intervention lane as a distinct MACE evaluation. Each external baseline must pin repository commit, container/dependencies, encoder/reranker/tokenizer, prompts, split and checksums, reader/judge, Add/Search contract, token budget, top-k, RRF weights, neighbor expansion, context packing, concurrency, latency and full storage/compute costs. Do not blur the two.
 
 For fair comparisons pin the competitor's public commit, data, encoder/model, tokenizer, reader/judge, prompts, retrieval parameters, token accounting and resource budget. Compare not only output score but index size, source bytes, context size, p50/p95/p99 latency, update/replay cost and verification overhead. Reproduce methods rather than copying their reported leaderboard numbers.
 
