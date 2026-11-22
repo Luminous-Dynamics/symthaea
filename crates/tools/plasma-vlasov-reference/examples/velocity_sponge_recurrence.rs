@@ -139,12 +139,18 @@ fn run_case(
     let mass_relative_delta = (final_diagnostics.total_mass - initial_diagnostics.total_mass)
         / initial_diagnostics.total_mass.abs().max(f64::MIN_POSITIVE);
     let momentum_delta = final_diagnostics.momentum - initial_diagnostics.momentum;
-    let kinetic_energy_relative_delta =
-        (final_diagnostics.kinetic_energy - initial_diagnostics.kinetic_energy)
-            / initial_diagnostics.kinetic_energy.abs().max(f64::MIN_POSITIVE);
-    let field_energy_relative_delta =
-        (final_diagnostics.field_energy - initial_diagnostics.field_energy)
-            / initial_diagnostics.field_energy.abs().max(f64::MIN_POSITIVE);
+    let kinetic_energy_relative_delta = (final_diagnostics.kinetic_energy
+        - initial_diagnostics.kinetic_energy)
+        / initial_diagnostics
+            .kinetic_energy
+            .abs()
+            .max(f64::MIN_POSITIVE);
+    let field_energy_relative_delta = (final_diagnostics.field_energy
+        - initial_diagnostics.field_energy)
+        / initial_diagnostics
+            .field_energy
+            .abs()
+            .max(f64::MIN_POSITIVE);
     let minimum_f_before = initial_diagnostics.minimum_distribution;
     let minimum_f_after = final_diagnostics.minimum_distribution;
     let nx = config.nx;
