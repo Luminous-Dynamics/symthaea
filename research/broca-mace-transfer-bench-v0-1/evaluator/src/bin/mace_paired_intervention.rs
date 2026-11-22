@@ -294,6 +294,8 @@ fn execute_arm(
         Ok(ids) => retrieved_ids = ids,
         Err(message) => error = Some(message),
     }
+    let mut seen_candidate_ids = BTreeSet::new();
+    retrieved_ids.retain(|id| seen_candidate_ids.insert(*id));
 
     let resolved_result = if error.is_none() {
         resolve_ids(&retrieved_ids, &memory)
@@ -346,7 +348,6 @@ fn execute_arm(
             .saturating_mul(size_of::<Experience>() as u64)
     };
 
-    let had_execution_error = error.is_some();
     let abstention_reason = error.or_else(|| {
         if decision.action.is_none() {
             Some("no admissible decision-support evidence".to_string())
@@ -356,11 +357,7 @@ fn execute_arm(
     });
     CandidateRun {
         decision,
-        retrieved_ids: if had_execution_error {
-            Vec::new()
-        } else {
-            retrieved_ids
-        },
+        retrieved_ids,
         memory_digest: experience_list_digest(&resolved),
         resolved,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
@@ -498,10 +495,8 @@ fn evaluate_arm(
             }
         }
     }
-    let false_causal_claim_count = u64::from(
-        candidate.decision.causal_claim.is_some()
-            && candidate.decision.causal_claim != case.truth.causal_action,
-    );
+    let false_causal_claim_count = (candidate.decision.causal_claim.is_some()
+        && candidate.decision.causal_claim != case.truth.causal_action) as u64;
     ScoredArm {
         arm,
         cluster: case.cluster,
@@ -674,7 +669,7 @@ fn contrast_record(
                 - i64::try_from(base.latency_ns).unwrap_or(i64::MAX),
         );
         contrast.memory_deltas.push(treat.memory_bytes - base.memory_bytes);
-        contrast.harmful_count += usize::from(treat.utility_micros < base.utility_micros);
+        contrast.harmful_count += (treat.utility_micros < base.utility_micros) as usize;
         contrast.pair_count += 1;
         contrast.invalid_use += treat.invalid_evidence_use_count;
         contrast.stale_use += treat.stale_evidence_use_count;
@@ -683,9 +678,9 @@ fn contrast_record(
             .family_success
             .entry(family)
             .or_insert((0, 0, 0, 0));
-        entry.0 += usize::from(base.task_success);
+        entry.0 += base.task_success as usize;
         entry.1 += 1;
-        entry.2 += usize::from(treat.task_success);
+        entry.2 += treat.task_success as usize;
         entry.3 += 1;
     }
 
