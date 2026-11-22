@@ -111,6 +111,7 @@
         "source_revision",
         "schema_sha256",
         "dependency_sidecar_sha256",
+        "dependency_sidecar_ingress_verified",
         "lineage_incomplete_event_count",
         "unresolved_parent_reference_count",
         "dependency_sidecar_schema_sha256"
@@ -207,6 +208,12 @@
         },
         "dependency_sidecar_schema_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "dependency_sidecar_ingress_verified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       }
     },
@@ -239,6 +246,7 @@
         "retrieved_event_ids",
         "index_bytes",
         "dependency_sidecar_sha256",
+        "dependency_sidecar_ingress_verified",
         "lineage_incomplete_event_count",
         "unresolved_parent_reference_count"
       ],
@@ -350,6 +358,12 @@
         "unresolved_parent_reference_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "dependency_sidecar_ingress_verified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       }
     },
@@ -386,6 +400,7 @@
         "index_bytes",
         "regret_gap_vs_full_method",
         "dependency_sidecar_sha256",
+        "dependency_sidecar_ingress_verified",
         "lineage_incomplete_event_count",
         "unresolved_parent_reference_count"
       ],
@@ -504,6 +519,12 @@
         "unresolved_parent_reference_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "dependency_sidecar_ingress_verified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       }
     },
