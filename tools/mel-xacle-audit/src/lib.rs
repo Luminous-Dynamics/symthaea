@@ -690,7 +690,7 @@ fn field<'a>(
         .ok_or_else(|| format!("missing {name} at CSV row {row_number}"))
 }
 
-fn optional_field<'a>(record: &'a csv::StringRecord, index: Option<usize>) -> Option<&'a str> {
+fn optional_field(record: &csv::StringRecord, index: Option<usize>) -> Option<&str> {
     index.and_then(|index| record.get(index))
 }
 
