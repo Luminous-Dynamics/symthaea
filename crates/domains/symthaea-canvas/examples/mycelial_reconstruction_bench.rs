@@ -58,6 +58,8 @@ fn skeleton(
     AnnotatedMycelialSkeleton {
         schema_version: 1,
         frame_id: "synthetic-frame-0001".to_string(),
+        coordinate_frame_id: "synthetic-image-plane-v1".to_string(),
+        calibration_digest: "c".repeat(64),
         source_observation_digest: "b".repeat(64),
         dimensionality: ReconstructionDimensionality::TwoD,
         length_unit: ReconstructionLengthUnit::Micrometer,
