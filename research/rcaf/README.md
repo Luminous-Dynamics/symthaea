@@ -11,6 +11,7 @@ A dependency-free Rust research crate for repeatability-calibrated comparison of
 - Participant-level bootstrap confidence intervals and exact two-sided sign tests.
 - Direct edge-polarity transition counts, including neutral-band transitions.
 - Synthetic Gaussian-factor null/injection calibration plus a shared observation-only common-mode nuisance challenge in `src/simulation.rs`.
+- Separate graph-Laplacian spatial nuisance generators in `src/spatial_nuisance.rs`: graph-smooth low-rank fields and localized heat-kernel fields, with deterministic per-mode RNG substreams and optional target-process coupling.
 - Matched signal-plus-nuisance dose response, with the same deterministic innovation stream as its nuisance-only counterfactual and separate direction-aware recovery outputs.
 - Draft 2020-12 schemas and semantic validation for RCAF result receipts.
 
@@ -32,6 +33,7 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_injection_reco
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_tournament
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose_response_tournament
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_common_mode_nuisance_sweep
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisance
 ```
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
@@ -142,3 +144,24 @@ The `rcaf_common_mode_nuisance_sweep` example evaluates nuisance strengths `[0.0
 ### Shared observation-only nuisance challenge
 
 The current generator adds an independent AR(1) common-mode factor to one observed repeat while leaving the participant's latent global/module loadings unchanged. Its rejection rate and median paired gap are reported separately from the exact same-observation null and the known latent module injection. This is the first nuisance family only; it does not model all physiology, motion, scanner drift, censoring or missingness. The output field `nuisance_only_rejection_rate` measures artifact-only rejection relative to latent truth, not conventional Type-I error under identical observed-data distributions.
+
+
+## Spatial nuisance field generators
+
+The separate `spatial_nuisance` module operates on an explicit weighted, undirected ROI graph. It does not infer spatial relationships from ROI ordering and does not depend on an anatomical atlas.
+
+The first implementation provides:
+- graph-smooth low-rank nuisance from non-constant low-frequency Laplacian modes;
+- localized nuisance from heat-kernel diffusion seeded at declared ROI indices;
+- an independent deterministic random substream per spatial mode;
+- stationary AR(1) independent temporal factors and optional mixing with supplied target processes;
+- exact reuse of one generated field across nuisance-only and signal-plus-nuisance counterfactuals;
+- rejection of invalid graph weights/labels, invalid time parameters, degenerate bases and rank cuts through repeated Laplacian eigenvalues.
+
+Run the synthetic generator smoke example:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisance
+```
+
+The output contract is `spatial-nuisance-field.schema.json`. Its path-graph fixture is a toy topology, not an anatomical atlas. The current `dose` parameter is an additive loading, not a calibrated nuisance variance fraction. The module generates nuisance fields only; it does not perform preprocessing, estimate connectivity, determine causality, or qualify biological claims. The spatial simulator must still be crossed with the four matched counterfactual cells and calibrated against empirical acquisition data before any biological robustness claim is supported.
