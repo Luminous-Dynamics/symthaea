@@ -175,8 +175,8 @@ pub struct EvaluationReport {
     pub coverage_of_human_directional_pairs: Option<f64>,
     pub conditional_accuracy: Option<f64>,
     pub effective_accuracy: Option<f64>,
-    pub brier_score_a_probability: Option<f64>,
-    pub brier_pair_count: usize,
+    pub reference_probability_mse: Option<f64>,
+    pub reference_probability_pair_count: usize,
     pub gap_bins: Vec<GapBinReport>,
     pub claim_ceiling: Vec<String>,
 }
@@ -345,8 +345,8 @@ pub fn evaluate(
     let mut judge_order_inconsistent_pair_count = 0usize;
     let mut judge_incomplete_pair_count = 0usize;
     let mut correct_directional_decision_count = 0usize;
-    let mut brier_sum = 0.0_f64;
-    let mut brier_pair_count = 0usize;
+    let mut reference_probability_squared_error_sum = 0.0_f64;
+    let mut reference_probability_pair_count = 0usize;
 
     for pair in &manifest.pairs {
         let predicted = predictions_by_pair
@@ -424,8 +424,8 @@ pub fn evaluate(
 
         if let Some(probability_a) = predicted.probability_a {
             let human_probability_a = logistic(gap);
-            brier_sum += (probability_a - human_probability_a).powi(2);
-            brier_pair_count += 1;
+            reference_probability_squared_error_sum += (probability_a - human_probability_a).powi(2);
+            reference_probability_pair_count += 1;
         }
     }
 
@@ -486,12 +486,12 @@ pub fn evaluate(
             correct_directional_decision_count,
             human_directional_pair_count,
         ),
-        brier_score_a_probability: if brier_pair_count == 0 {
+        reference_probability_mse: if reference_probability_pair_count == 0 {
             None
         } else {
-            Some(brier_sum / brier_pair_count as f64)
+            Some(reference_probability_squared_error_sum / reference_probability_pair_count as f64)
         },
-        brier_pair_count,
+        reference_probability_pair_count,
         gap_bins,
         claim_ceiling,
     })
@@ -801,12 +801,25 @@ fn is_canonical_utc_timestamp(value: &str) -> bool {
             return false;
         }
     }
+
+    let year = value[0..4].parse::<u32>().unwrap_or(0);
     let month = value[5..7].parse::<u32>().unwrap_or(0);
     let day = value[8..10].parse::<u32>().unwrap_or(0);
     let hour = value[11..13].parse::<u32>().unwrap_or(99);
     let minute = value[14..16].parse::<u32>().unwrap_or(99);
     let second = value[17..19].parse::<u32>().unwrap_or(99);
-    month > 0 && month <= 12 && day > 0 && day <= 31 && hour < 24 && minute < 60 && second < 60
+
+    let leap_year = year.is_multiple_of(4)
+        && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    let maximum_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+
+    year > 0 && day > 0 && day <= maximum_day && hour < 24 && minute < 60 && second < 60
 }
 
 fn validate_claim_ceiling(claims: &[String], source: &str) -> Result<(), String> {
@@ -871,6 +884,19 @@ mod tests {
     const HUMAN_REFERENCE: &str = include_str!("../fixtures/human-reference-v1.json");
 
     #[test]
+    fn timestamp_validation_checks_calendar_days_and_leap_years() {
+        assert!(is_canonical_utc_timestamp("2024-02-29T23:59:59Z"));
+        assert!(is_canonical_utc_timestamp("2000-02-29T00:00:00Z"));
+        assert!(is_canonical_utc_timestamp("2026-11-22T15:00:00Z"));
+        assert!(!is_canonical_utc_timestamp("2023-02-29T12:00:00Z"));
+        assert!(!is_canonical_utc_timestamp("1900-02-29T12:00:00Z"));
+        assert!(!is_canonical_utc_timestamp("2026-04-31T12:00:00Z"));
+        assert!(!is_canonical_utc_timestamp("2026-02-30T12:00:00Z"));
+        assert!(!is_canonical_utc_timestamp("2026-13-01T12:00:00Z"));
+        assert!(!is_canonical_utc_timestamp("2026-11-22T24:00:00Z"));
+    }
+
+    #[test]
     fn separated_fixture_scores_only_after_prediction_freeze() {
         let report = evaluate(MANIFEST, PREDICTIONS, HUMAN_REFERENCE)
             .expect("synthetic sealed fixture should replay");
@@ -888,7 +914,7 @@ mod tests {
             report.temporal_order_assurance,
             "declared_metadata_only_external_attestation_unverified"
         );
-        assert_eq!(report.brier_pair_count, 5);
+        assert_eq!(report.reference_probability_pair_count, 5);
     }
 
     #[test]
