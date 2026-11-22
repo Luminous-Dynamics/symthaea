@@ -76,6 +76,23 @@ struct CandidateRun {
     abstention_reason: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct CandidateTask<'a> {
+    cluster: u64,
+    family: &'a str,
+    memory: &'a [Experience],
+    query: Query,
+}
+
+fn candidate_task(case: &stress::Case) -> CandidateTask<'_> {
+    CandidateTask {
+        cluster: case.cluster,
+        family: case.family,
+        memory: &case.memory,
+        query: case.query,
+    }
+}
+
 #[derive(Clone, Debug)]
 struct ScoredArm {
     arm: Arm,
@@ -111,8 +128,8 @@ fn utility_micros(value: f64) -> i64 {
 
 fn source_memory_for_arm(
     arm: Arm,
-    case: &stress::Case,
-    all_cases: &[stress::Case],
+    case: &CandidateTask<'_>,
+    sibling_tasks: &[CandidateTask<'_>],
 ) -> Vec<Experience> {
     match arm {
         Arm::NoMemory => Vec::new(),
@@ -120,7 +137,7 @@ fn source_memory_for_arm(
             // A real, candidate-visible sibling-task episode from the same
             // generated world cluster and same scope. This is a structural
             // placebo, not a text/embedding-level semantic placebo.
-            let sibling = all_cases
+            let sibling = sibling_tasks
                 .iter()
                 .filter(|candidate| {
                     candidate.cluster == case.cluster
@@ -133,13 +150,13 @@ fn source_memory_for_arm(
                     candidate.memory.len().abs_diff(case.memory.len())
                 });
             let mut memory = sibling
-                .map(|candidate| candidate.memory.clone())
+                .map(|candidate| candidate.memory.to_vec())
                 .unwrap_or_default();
             memory.sort_by_key(|item| item.event_id);
             memory.truncate(case.memory.len());
             memory
         }
-        _ => case.memory.clone(),
+        _ => case.memory.to_vec(),
     }
 }
 
@@ -229,11 +246,11 @@ fn hdc_hits(
 
 fn execute_arm(
     arm: Arm,
-    case: &stress::Case,
-    all_cases: &[stress::Case],
+    case: &CandidateTask<'_>,
+    sibling_tasks: &[CandidateTask<'_>],
 ) -> CandidateRun {
     let started = Instant::now();
-    let memory = source_memory_for_arm(arm, case, all_cases);
+    let memory = source_memory_for_arm(arm, case, sibling_tasks);
     let mut index_bytes = 0_u64;
     let mut retrieved_ids = Vec::new();
     let mut expected_view_digests = BTreeMap::new();
@@ -388,7 +405,7 @@ fn action_utility(truth: stress::Truth, action: Option<Action>) -> f64 {
     truth.utility(action.unwrap_or(Action::B))
 }
 
-fn candidate_input_digest(case: &stress::Case) -> String {
+fn candidate_input_digest(case: &CandidateTask<'_>) -> String {
     sha256(
         format!(
             "mace-candidate-input-v1|cluster={}|family={}|regime={:?}|objective={:?}",
@@ -398,7 +415,7 @@ fn candidate_input_digest(case: &stress::Case) -> String {
     )
 }
 
-fn initial_state_digest(case: &stress::Case) -> String {
+fn initial_state_digest(case: &CandidateTask<'_>) -> String {
     sha256(format!("mace-agent-state-v1|cluster={}", case.cluster).as_bytes())
 }
 
@@ -414,7 +431,7 @@ fn candidate_policy_digest(arm: Arm) -> String {
 
 fn candidate_record(
     run_id: &str,
-    case: &stress::Case,
+    case: &CandidateTask<'_>,
     arm: Arm,
     result: &CandidateRun,
 ) -> Value {
@@ -772,6 +789,26 @@ fn parse_source_revision() -> Result<String, String> {
     Ok(value)
 }
 
+fn randomized_arm_order(case: &CandidateTask<'_>) -> Vec<Arm> {
+    let seed_text = format!(
+        "mace-arm-order-v1|cluster={}|family={}",
+        case.cluster, case.family
+    );
+    let seed = u64::from_str_radix(&sha256(seed_text.as_bytes())[..16], 16)
+        .unwrap_or(0x9E37_79B9_7F4A_7C15);
+    let mut state = seed;
+    let mut arms = Arm::ALL.to_vec();
+    for index in (1..arms.len()).rev() {
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
+        let random = state.wrapping_mul(0x2545_F491_4F6C_DD1D);
+        let selected = (random as usize) % (index + 1);
+        arms.swap(index, selected);
+    }
+    arms
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     let clusters = args
@@ -823,20 +860,26 @@ fn run() -> Result<(), String> {
         "independent_world_cluster_count": cluster_count,
         "pair_block_count": pair_count,
         "arms": Arm::ALL.iter().map(|arm| arm.name()).collect::<Vec<_>>(),
-        "randomization": "deterministic_replay",
+        "randomization": "within_pair_block_order",
         "common_random_numbers": true,
         "model_revision": "deterministic-rust-policy-no-llm-v1"
     });
 
+    let candidate_tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
     let mut candidate_records = vec![manifest];
     let mut evaluator_records = Vec::new();
     let mut scores: BTreeMap<(u64, String, Arm), ScoredArm> = BTreeMap::new();
 
-    for case in &cases {
+    for (case, candidate_case) in cases.iter().zip(candidate_tasks.iter()) {
+        let sibling_tasks: Vec<CandidateTask<'_>> = candidate_tasks
+            .iter()
+            .copied()
+            .filter(|candidate| candidate.cluster == candidate_case.cluster)
+            .collect();
         let mut arm_results = BTreeMap::new();
-        for arm in Arm::ALL {
-            let result = execute_arm(arm, case, &cases);
-            candidate_records.push(candidate_record(&run_id, case, arm, &result));
+        for arm in randomized_arm_order(candidate_case) {
+            let result = execute_arm(arm, candidate_case, &sibling_tasks);
+            candidate_records.push(candidate_record(&run_id, candidate_case, arm, &result));
             arm_results.insert(arm, result);
         }
         let baseline_action = arm_results
@@ -911,8 +954,9 @@ mod tests {
     #[test]
     fn true_no_memory_arm_has_no_prior_memory_or_evidence() {
         let cases = stress::generated_worlds(1);
-        let case = &cases[0];
-        let result = execute_arm(Arm::NoMemory, case, &cases);
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        let task = &tasks[0];
+        let result = execute_arm(Arm::NoMemory, task, &tasks);
         assert!(result.retrieved_ids.is_empty());
         assert!(result.resolved.is_empty());
         assert!(result.decision.evidence_ids.is_empty());
@@ -922,22 +966,24 @@ mod tests {
     #[test]
     fn candidate_input_digest_is_identical_across_memory_arms() {
         let cases = stress::generated_worlds(1);
-        let case = &cases[0];
-        let digest = candidate_input_digest(case);
-        for arm in Arm::ALL {
-            let result = execute_arm(arm, case, &cases);
-            let record = candidate_record("test-run", case, arm, &result);
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        let task = &tasks[0];
+        let digest = candidate_input_digest(task);
+        for arm in randomized_arm_order(task) {
+            let result = execute_arm(arm, task, &tasks);
+            let record = candidate_record("test-run", task, arm, &result);
             assert_eq!(record["candidate_input_sha256"], digest);
-            assert_eq!(record["initial_agent_state_sha256"], initial_state_digest(case));
+            assert_eq!(record["initial_agent_state_sha256"], initial_state_digest(task));
         }
     }
 
     #[test]
     fn candidate_stream_never_contains_evaluator_truth_or_utility_fields() {
         let cases = stress::generated_worlds(1);
-        let case = &cases[0];
-        let result = execute_arm(Arm::HdcLtc, case, &cases);
-        let record = candidate_record("test-run", case, Arm::HdcLtc, &result);
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        let task = &tasks[0];
+        let result = execute_arm(Arm::HdcLtc, task, &tasks);
+        let record = candidate_record("test-run", task, Arm::HdcLtc, &result);
         let serialized = record.to_string();
         for forbidden in [
             "utility_a",
@@ -955,17 +1001,18 @@ mod tests {
     #[test]
     fn placebo_source_never_crosses_world_cluster_and_is_not_same_task() {
         let cases = stress::generated_worlds(2);
-        let case = &cases[0];
-        let placebo = source_memory_for_arm(Arm::SemanticPlacebo, case, &cases);
-        let target_ids: BTreeSet<u32> = case.memory.iter().map(|item| item.event_id).collect();
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        let task = &tasks[0];
+        let placebo = source_memory_for_arm(Arm::SemanticPlacebo, task, &tasks);
+        let target_ids: BTreeSet<u32> = task.memory.iter().map(|item| item.event_id).collect();
         assert!(placebo.iter().all(|item| !target_ids.contains(&item.event_id)));
         let sibling = cases
             .iter()
             .find(|candidate| {
-                candidate.cluster == case.cluster
-                    && candidate.family != case.family
-                    && candidate.query.scope.regime == case.query.scope.regime
-                    && candidate.query.scope.objective == case.query.scope.objective
+                candidate.cluster == task.cluster
+                    && candidate.family != task.family
+                    && candidate.query.scope.regime == task.query.scope.regime
+                    && candidate.query.scope.objective == task.query.scope.objective
             });
         assert!(sibling.is_some());
     }
