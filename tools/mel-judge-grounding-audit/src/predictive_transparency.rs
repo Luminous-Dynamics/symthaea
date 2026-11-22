@@ -28,6 +28,7 @@ struct ForecastPanelV1 {
     displays: Vec<ForecastDisplayV1>,
     dispositions: Vec<ForecastDispositionV1>,
     realizations: Vec<ForecastRealizationV1>,
+    observation_closures: Vec<ForecastObservationClosureV1>,
     claim_ceiling: Vec<String>,
 }
 
@@ -106,6 +107,20 @@ struct ForecastRealizationV1 {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct ForecastObservationClosureV1 {
+    forecast_id: String,
+    observation_kind: String,
+    status: String,
+    clock_domain_id: String,
+    coverage_start_ns: u64,
+    coverage_end_ns: u64,
+    observed_through_ns: u64,
+    output_evidence_sha256: Option<String>,
+    observation_receipt_sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RealizedEventV1 {
     event_id: String,
     forecast_event_id: Option<String>,
@@ -131,8 +146,9 @@ pub struct EventForecastFinding {
     pub worst_case_absolute_onset_error_beats: Option<f64>,
     pub within_onset_tolerance: Option<bool>,
     pub presence_probability: f64,
-    pub presence_observed: bool,
-    pub presence_brier_score: f64,
+    pub presence_outcome_status: String,
+    pub presence_observed: Option<bool>,
+    pub presence_brier_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -167,6 +183,11 @@ pub struct ForecastAuditReport {
     pub realized_event_count: usize,
     pub matched_forecast_event_count: usize,
     pub unfulfilled_forecast_event_count: usize,
+    pub unobserved_forecast_event_count: usize,
+    pub observed_present_event_count: usize,
+    pub observed_absent_event_count: usize,
+    pub presence_scored_event_count: usize,
+    pub presence_calibration_complete: bool,
     pub unforecasted_realized_event_count: usize,
     pub role_match_rate: Option<f64>,
     pub beat_index_match_rate: Option<f64>,
@@ -229,6 +250,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     }
 
     let series_summaries = validate_series(&mut series_members, &forecast_ids)?;
+    let closures_by_forecast = validate_observation_closures(panel, &forecast_ids)?;
     let latest_by_series: BTreeMap<&str, &ForecastV1> = series_members
         .iter()
         .filter_map(|(series_id, members)| {
@@ -416,6 +438,16 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 )
             })?;
         require_digest(&realization.artifact_sha256, "realization artifact digest")?;
+        let observation = closures_by_forecast
+            .get(forecast.forecast_id.as_str())
+            .copied()
+            .expect("every forecast has one validated observation closure");
+        if observation.status == "unavailable" && !realization.events.is_empty() {
+            return Err(format!(
+                "unavailable observation for forecast {} cannot contain realized events",
+                forecast.forecast_id
+            ));
+        }
         if realization.started_at_ns < forecast.committed_at_ns
             || realization.completed_at_ns < realization.started_at_ns
         {
@@ -492,6 +524,15 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                     event.event_id
                 ));
             }
+            if observation.status == "unavailable"
+                || event.onset_ns < observation.coverage_start_ns
+                || event.onset_ns >= observation.coverage_end_ns
+            {
+                return Err(format!(
+                    "realized event {} falls outside available observation coverage",
+                    event.event_id
+                ));
+            }
             realized_event_count += 1;
             match event.forecast_event_id.as_deref() {
                 Some(forecast_event_id) => {
@@ -536,6 +577,9 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
     let mut beat_index_matches = 0usize;
     let mut matched_count = 0usize;
     let mut unfulfilled_count = 0usize;
+    let mut unobserved_count = 0usize;
+    let mut observed_present_count = 0usize;
+    let mut observed_absent_count = 0usize;
     let mut onset_errors = Vec::new();
 
     for forecast in &panel.forecasts {
@@ -570,14 +614,29 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                     Some(phase),
                 )
             } else {
-                unfulfilled_count += 1;
                 (None, None, None, None, None, None, None)
             };
-            let presence_observed = realized.is_some();
-            let observed_probability = if presence_observed { 1.0 } else { 0.0 };
-            let brier = (predicted.presence_probability - observed_probability).powi(2);
-            brier_sum += brier;
-            brier_count += 1;
+            let closure = closures_by_forecast
+                .get(forecast.forecast_id.as_str())
+                .expect("every forecast has one validated observation closure");
+            let (presence_outcome_status, presence_observed) = if realized.is_some() {
+                observed_present_count += 1;
+                ("present", Some(true))
+            } else if closure.status == "complete" {
+                observed_absent_count += 1;
+                unfulfilled_count += 1;
+                ("absent", Some(false))
+            } else {
+                unobserved_count += 1;
+                ("unknown", None)
+            };
+            let brier = presence_observed.map(|observed| {
+                let observed_probability = if observed { 1.0 } else { 0.0 };
+                let score = (predicted.presence_probability - observed_probability).powi(2);
+                brier_sum += score;
+                brier_count += 1;
+                score
+            });
             let worst_case_phase_error = signed_error_ns.map(|signed| {
                 (signed.unsigned_abs() as f64 + panel.time_alignment_max_uncertainty_ns as f64)
                     / predicted.local_beat_period_ns as f64
@@ -606,6 +665,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                 worst_case_absolute_onset_error_beats: worst_case_phase_error,
                 within_onset_tolerance: within,
                 presence_probability: predicted.presence_probability,
+                presence_outcome_status: presence_outcome_status.to_owned(),
                 presence_observed,
                 presence_brier_score: brier,
             });
@@ -656,6 +716,11 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         realized_event_count,
         matched_forecast_event_count: matched_count,
         unfulfilled_forecast_event_count: unfulfilled_count,
+        unobserved_forecast_event_count: unobserved_count,
+        observed_present_event_count: observed_present_count,
+        observed_absent_event_count: observed_absent_count,
+        presence_scored_event_count: brier_count,
+        presence_calibration_complete: unobserved_count == 0,
         unforecasted_realized_event_count,
         role_match_rate: rate(role_matches, matched_count),
         beat_index_match_rate: rate(beat_index_matches, matched_count),
@@ -671,6 +736,129 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         event_findings,
         claim_ceiling: panel.claim_ceiling.clone(),
     })
+}
+
+fn validate_observation_closures<'a>(
+    panel: &'a ForecastPanelV1,
+    forecasts: &BTreeMap<&'a str, &'a ForecastV1>,
+) -> Result<BTreeMap<&'a str, &'a ForecastObservationClosureV1>, String> {
+    let mut closures = BTreeMap::new();
+    for closure in &panel.observation_closures {
+        let forecast = forecasts
+            .get(closure.forecast_id.as_str())
+            .copied()
+            .ok_or_else(|| format!("observation closure references unknown forecast {}", closure.forecast_id))?;
+        require_text(&closure.forecast_id, "observation closure forecast_id")?;
+        require_text(&closure.clock_domain_id, "observation closure clock_domain_id")?;
+        require_digest(
+            &closure.observation_receipt_sha256,
+            "observation receipt digest",
+        )?;
+        if closure.clock_domain_id != panel.clock_domain_id {
+            return Err(format!(
+                "observation closure for {} uses a different clock domain",
+                closure.forecast_id
+            ));
+        }
+        if !matches!(
+            closure.observation_kind.as_str(),
+            "symbolic_score" | "midi_event_log" | "audio_capture"
+        ) {
+            return Err(format!(
+                "observation closure for {} has unsupported observation kind",
+                closure.forecast_id
+            ));
+        }
+        if closure.coverage_end_ns < closure.coverage_start_ns
+            || closure.observed_through_ns != closure.coverage_end_ns
+        {
+            return Err(format!(
+                "observation closure for {} has invalid coverage bounds",
+                closure.forecast_id
+            ));
+        }
+        if closure.coverage_start_ns < panel.time_alignment_valid_from_ns
+            || closure.coverage_end_ns > panel.time_alignment_valid_until_ns
+        {
+            return Err(format!(
+                "observation closure for {} is outside time-alignment validity",
+                closure.forecast_id
+            ));
+        }
+        match closure.status.as_str() {
+            "complete" => {
+                let evidence = closure.output_evidence_sha256.as_deref().ok_or_else(|| {
+                    format!(
+                        "complete observation closure for {} lacks output evidence",
+                        closure.forecast_id
+                    )
+                })?;
+                require_digest(evidence, "output observation evidence digest")?;
+                if closure.coverage_start_ns > forecast.target_start_ns
+                    || closure.coverage_end_ns < forecast.target_end_ns
+                {
+                    return Err(format!(
+                        "complete observation closure for {} does not cover the full target window",
+                        closure.forecast_id
+                    ));
+                }
+            }
+            "partial" => {
+                let evidence = closure.output_evidence_sha256.as_deref().ok_or_else(|| {
+                    format!(
+                        "partial observation closure for {} lacks output evidence",
+                        closure.forecast_id
+                    )
+                })?;
+                require_digest(evidence, "output observation evidence digest")?;
+                if closure.coverage_start_ns >= closure.coverage_end_ns {
+                    return Err(format!(
+                        "partial observation closure for {} has empty coverage",
+                        closure.forecast_id
+                    ));
+                }
+                if closure.coverage_start_ns <= forecast.target_start_ns
+                    && closure.coverage_end_ns >= forecast.target_end_ns
+                {
+                    return Err(format!(
+                        "partial observation closure for {} covers the full target window; use complete",
+                        closure.forecast_id
+                    ));
+                }
+            }
+            "unavailable" => {
+                if closure.coverage_start_ns != closure.coverage_end_ns
+                    || closure.output_evidence_sha256.is_some()
+                {
+                    return Err(format!(
+                        "unavailable observation closure for {} must not claim captured output",
+                        closure.forecast_id
+                    ));
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "observation closure for {} has unsupported status",
+                    closure.forecast_id
+                ));
+            }
+        }
+        if closures.insert(closure.forecast_id.as_str(), closure).is_some() {
+            return Err(format!(
+                "duplicate observation closure for forecast {}",
+                closure.forecast_id
+            ));
+        }
+    }
+    for forecast_id in forecasts.keys() {
+        if !closures.contains_key(forecast_id) {
+            return Err(format!(
+                "forecast {} is missing an observation closure",
+                forecast_id
+            ));
+        }
+    }
+    Ok(closures)
 }
 
 fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
@@ -737,6 +925,9 @@ fn validate_header(panel: &ForecastPanelV1) -> Result<(), String> {
     }
     if panel.forecasts.is_empty() {
         return Err("forecasts must be non-empty".to_owned());
+    }
+    if panel.observation_closures.is_empty() {
+        return Err("observation_closures must be non-empty".to_owned());
     }
     if !panel.policy.maximum_onset_error_beats.is_finite()
         || panel.policy.maximum_onset_error_beats <= 0.0
