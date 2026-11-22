@@ -34,7 +34,7 @@ The candidate model fits a mean interaction per relation class. It rejects dupli
 
 Report independently:
 - downstream utility and regret against the evaluator oracle;
-- paired utility lift over additive exact with a cluster-bootstrap 95% interval;
+- paired utility lift over additive exact with a hierarchical seed/world-cluster-bootstrap 95% interval;
 - actual redundant-value loss retained;
 - actual complementary synergy captured;
 - false synergy: predicted positive lower bound but realized interaction is non-positive;
@@ -57,13 +57,15 @@ Five deterministic seeds are run. For each seed:
 
 The task-family-3 conformal holdout uses the same stable relation-generation distribution and the same bounded interaction-noise distribution (uniform integer perturbation in [-2, 2]) as calibration, but fresh clusters and roots; it is the only split for which the exchangeability premise is intended. Task-family-4 and shifted task-family-5 are separate out-of-distribution diagnostics.
 
+Each of the five model-fit seeds now uses a globally disjoint numeric namespace for training, calibration and test cluster IDs. Derived source-root IDs are checked for global disjointness across seeds as well as within each fit. Paired uncertainty is computed with a two-level bootstrap: resample model-fit seeds first, then held-out world clusters within each selected seed. This accounts for multiple worlds sharing one fitted model. The report prints per-seed paired means alongside the pooled mean. There are still only five independent model-fit seeds, so the between-seed component is low-resolution and must be interpreted cautiously.
+
 The relation model is fitted only on training outcomes; its split-conformal residual quantile uses calibration outcomes; no held-out outcome is passed into candidate selection. Interval coverage is reported separately for the same-family conformal holdout, stable task-family OOD and shifted-regime holdout, and against evaluator-owned true relation classes, independently of candidate relation labels. Relation-label errors and unknown labels are counted as separate feature-quality diagnostics. Training/calibration clusters and roots are disjoint; calibration/test cluster and root IDs are also disjoint.
 
 
 ## Qualification targets (not results)
 
 1. Exact agreement with the evaluator oracle on all tiny enumerated fixture worlds when supplied oracle interactions, as a unit-test control.
-2. Positive paired held-out lift over additive exact with cluster-bootstrap 95% lower bound above zero.
+2. Positive paired held-out lift over additive exact with hierarchical seed/world-cluster-bootstrap 95% lower bound above zero.
 3. At most 5% average selection regret versus the held-out oracle on the stable regime.
 4. Zero pairwise-model activation on the deliberately shifted regime or unknown relation features.
 5. Publish false-synergy and false-redundancy rates, even if the pairwise policy loses to additive.
@@ -83,4 +85,4 @@ Next:
 
 ## Source verification status
 
-The implementation contains **17 authored Rust unit tests** by source count. These tests have not been executed in the current environment: `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, emitted-output, CI or benchmark run pass is claimed. The authored count is not an executed-test count.
+The implementation contains **18 authored Rust unit tests** by source count. These tests have not been executed in the current environment: `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, emitted-output, CI or benchmark run pass is claimed. The authored count is not an executed-test count.

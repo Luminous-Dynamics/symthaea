@@ -732,19 +732,38 @@ fn mean(value: i64, count: usize) -> f64 {
     value as f64 / count.max(1) as f64
 }
 
-fn bootstrap_ci(differences: &[i64], samples: usize, seed: u64) -> Option<(f64, f64)> {
-    if differences.is_empty() || samples == 0 {
+/// Hierarchical paired bootstrap: first resample independent model-fit seeds,
+/// then resample world-cluster outcomes within each selected seed. This avoids
+/// treating all held-out worlds as independent of their shared fitted model.
+fn hierarchical_bootstrap_ci(
+    seed_differences: &[Vec<i64>],
+    samples: usize,
+    seed: u64,
+) -> Option<(f64, f64)> {
+    if seed_differences.is_empty()
+        || samples == 0
+        || seed_differences.iter().any(Vec::is_empty)
+    {
         return None;
     }
     let mut rng = Rng::new(seed);
     let mut means = Vec::with_capacity(samples);
     for _ in 0..samples {
-        let mut total = 0_i64;
-        for _ in 0..differences.len() {
-            let index = (rng.next() % differences.len() as u64) as usize;
-            total = total.checked_add(differences[index])?;
+        let mut seed_mean_total = 0.0_f64;
+        for _ in 0..seed_differences.len() {
+            let seed_index = (rng.next() % seed_differences.len() as u64) as usize;
+            let cluster_differences = &seed_differences[seed_index];
+            let mut cluster_total = 0_i64;
+            for _ in 0..cluster_differences.len() {
+                let cluster_index =
+                    (rng.next() % cluster_differences.len() as u64) as usize;
+                cluster_total =
+                    cluster_total.checked_add(cluster_differences[cluster_index])?;
+            }
+            seed_mean_total +=
+                cluster_total as f64 / cluster_differences.len() as f64;
         }
-        means.push(total as f64 / differences.len() as f64);
+        means.push(seed_mean_total / seed_differences.len() as f64);
     }
     means.sort_by(|left, right| left.total_cmp(right));
     let lower = ((samples as f64) * 0.025).floor() as usize;
@@ -755,13 +774,35 @@ fn bootstrap_ci(differences: &[i64], samples: usize, seed: u64) -> Option<(f64, 
     ))
 }
 
+#[derive(Clone, Copy, Debug)]
+struct SeedNamespace {
+    training_start: u64,
+    calibration_start: u64,
+    test_start: u64,
+}
+
+fn seed_namespace(seed: u64) -> Option<SeedNamespace> {
+    let offset = seed.checked_mul(10_000)?;
+    Some(SeedNamespace {
+        training_start: offset.checked_add(1_000)?,
+        calibration_start: offset.checked_add(2_000)?,
+        test_start: offset.checked_add(3_000)?,
+    })
+}
+
 fn run_seed(
     seed: u64,
 ) -> Option<(ArmMetrics, ArmMetrics, Vec<i64>, usize, IntervalMetrics)> {
-    let training = training_split(seed + 101, 1_000 + seed * 1_000, TRAIN_CLUSTERS, &[1, 2]);
+    let namespace = seed_namespace(seed)?;
+    let training = training_split(
+        seed + 101,
+        namespace.training_start,
+        TRAIN_CLUSTERS,
+        &[1, 2],
+    );
     let calibration = training_split(
         seed + 202,
-        2_000 + seed * 1_000,
+        namespace.calibration_start,
         CALIBRATION_CLUSTERS,
         &[3],
     );
@@ -772,7 +813,6 @@ fn run_seed(
     let mut differences = Vec::new();
     let mut interval_metrics = IntervalMetrics::default();
     let mut cases = 0_usize;
-    let mut unknown_abstentions = 0_usize;
 
     let stable_total = CONFORMAL_TEST_CLUSTERS + OOD_STABLE_TEST_CLUSTERS;
     let total_test_clusters = stable_total + SHIFTED_TEST_CLUSTERS;
@@ -786,7 +826,7 @@ fn run_seed(
         } else {
             5
         };
-        let cluster_id = 3_000 + seed * 1_000 + offset;
+        let cluster_id = namespace.test_start + offset;
         let case = generate_case(
             cluster_id,
             task_family,
@@ -811,7 +851,6 @@ fn run_seed(
             .clone()
             .unwrap_or_else(|| additive_selection.clone());
         if pairwise_prediction.is_none() {
-            unknown_abstentions += 1;
             pairwise.pairwise_abstentions += 1;
         }
 
@@ -843,7 +882,6 @@ fn run_seed(
         cases += 1;
     }
 
-    let _ = unknown_abstentions;
     Some((additive, pairwise, differences, cases, interval_metrics))
 }
 
@@ -881,7 +919,7 @@ fn report() {
 
     let mut additive_total = ArmMetrics::default();
     let mut pairwise_total = ArmMetrics::default();
-    let mut paired = Vec::new();
+    let mut paired_by_seed: Vec<Vec<i64>> = Vec::new();
     let mut interval_total = IntervalMetrics::default();
     let mut cases = 0_usize;
     for seed in 1..=5 {
@@ -905,7 +943,7 @@ fn report() {
         pairwise_total.false_synergy += pairwise.false_synergy;
         pairwise_total.false_redundancy += pairwise.false_redundancy;
         pairwise_total.pairwise_abstentions += pairwise.pairwise_abstentions;
-        paired.extend(differences);
+        paired_by_seed.push(differences);
         interval_total.conformal_evaluated_pairs +=
             intervals.conformal_evaluated_pairs;
         interval_total.conformal_covered_pairs += intervals.conformal_covered_pairs;
@@ -938,14 +976,23 @@ fn report() {
     print_arm("pairwise_conservative", &pairwise_total);
 
     let oracle_regret = mean(pairwise_total.regret_sum, cases);
-    let average_difference = paired.iter().sum::<i64>() as f64 / paired.len().max(1) as f64;
-    let ci = bootstrap_ci(&paired, BOOTSTRAP_RESAMPLES, 0xC0FF_EE11);
+    let total_paired_differences = paired_by_seed.iter().map(Vec::len).sum::<usize>();
+    let average_difference = paired_by_seed
+        .iter()
+        .flat_map(|items| items.iter())
+        .sum::<i64>() as f64
+        / total_paired_differences.max(1) as f64;
+    for (index, differences) in paired_by_seed.iter().enumerate() {
+        let seed_mean = differences.iter().sum::<i64>() as f64 / differences.len().max(1) as f64;
+        println!("seed_{}_paired_mean_micros={:.3}", index + 1, seed_mean);
+    }
+    let ci = hierarchical_bootstrap_ci(&paired_by_seed, BOOTSTRAP_RESAMPLES, 0xC0FF_EE11);
     println!(
         "paired_pairwise_minus_additive_mean_micros={:.3}",
         average_difference
     );
     if let Some((lower, upper)) = ci {
-        println!("paired_cluster_bootstrap_95pct_ci_micros={:.3},{:.3}", lower, upper);
+        println!("paired_hierarchical_seed_cluster_bootstrap_95pct_ci_micros={:.3},{:.3}", lower, upper);
     }
     println!("pairwise_mean_regret_vs_evaluator_oracle_micros={:.3}", oracle_regret);
     println!(
@@ -1137,12 +1184,70 @@ mod tests {
     }
 
     #[test]
-    fn bootstrap_interval_is_deterministic_and_ordered() {
-        let differences = [3, -1, 5, 7, -2, 4];
-        let first = bootstrap_ci(&differences, 500, 77).unwrap();
-        let second = bootstrap_ci(&differences, 500, 77).unwrap();
+    fn hierarchical_bootstrap_is_deterministic_and_preserves_seed_groups() {
+        let differences = vec![
+            vec![3, -1, 5, 7, -2, 4],
+            vec![1, 2, 2, 1, 3, 2],
+            vec![-8, -7, -9, -6, -8, -7],
+        ];
+        let first = hierarchical_bootstrap_ci(&differences, 500, 77).unwrap();
+        let second = hierarchical_bootstrap_ci(&differences, 500, 77).unwrap();
         assert_eq!(first, second);
         assert!(first.0 <= first.1);
+        assert!(hierarchical_bootstrap_ci(&[], 500, 77).is_none());
+        assert!(hierarchical_bootstrap_ci(&[vec![]], 500, 77).is_none());
+    }
+
+    #[test]
+    fn model_fit_seed_namespaces_are_globally_disjoint() {
+        let mut all_clusters = BTreeSet::new();
+        let mut all_roots = BTreeSet::new();
+        for seed in 1..=5 {
+            let namespace = seed_namespace(seed).unwrap();
+            let training = training_split(
+                seed + 101,
+                namespace.training_start,
+                TRAIN_CLUSTERS,
+                &[1, 2],
+            );
+            let calibration = training_split(
+                seed + 202,
+                namespace.calibration_start,
+                CALIBRATION_CLUSTERS,
+                &[3],
+            );
+            let test_count = CONFORMAL_TEST_CLUSTERS
+                + OOD_STABLE_TEST_CLUSTERS
+                + SHIFTED_TEST_CLUSTERS;
+            let mut seed_clusters = BTreeSet::new();
+            let mut seed_roots = BTreeSet::new();
+
+            for row in training.iter().chain(calibration.iter()) {
+                assert!(seed_clusters.insert(row.cluster_id));
+                assert!(seed_roots.insert(row.source_root_id));
+            }
+            for offset in 0..test_count {
+                let cluster_id = namespace.test_start + offset;
+                assert!(seed_clusters.insert(cluster_id));
+                let family = if offset < CONFORMAL_TEST_CLUSTERS {
+                    3
+                } else if offset < CONFORMAL_TEST_CLUSTERS + OOD_STABLE_TEST_CLUSTERS {
+                    4
+                } else {
+                    5
+                };
+                let regime = if family == 5 { Regime::Shifted } else { Regime::Stable };
+                let case = generate_case(cluster_id, family, regime, seed * 7_919 + offset);
+                for item in case.candidate.items {
+                    assert!(seed_roots.insert(item.source_root_id));
+                }
+            }
+
+            assert!(all_clusters.is_disjoint(&seed_clusters));
+            assert!(all_roots.is_disjoint(&seed_roots));
+            all_clusters.extend(seed_clusters);
+            all_roots.extend(seed_roots);
+        }
     }
 
     #[test]
