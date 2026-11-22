@@ -54,3 +54,13 @@ The collaboration trace auditor validates causal input availability, event/decis
       tools/mel-judge-grounding-audit/fixtures/valid-collab-trace-v1.json report.json
 
 The fixture is synthetic and MIDI-style. It proves only deterministic evaluator behavior, not actual real-time performance. See docs/research/MEL_COLLAB_TRACE_AUDITOR_V1_2026-11-22.md for the contract and claim boundaries.
+
+
+## Beat-phase and tempo-adaptation audit
+
+The musical timing evaluator scores signed/absolute beat-phase error, error distributions and per-instrument strata, target/missed/extra event accounting, descriptive phase drift and recovery after tempo changes using consecutive stable estimates. Each estimate binds the end of the evidence window; future evidence is rejected.
+
+    cargo run --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-musical-timing-audit -- score \
+      tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v1.json report.json
+
+Its MIDI-style fixture is synthetic. No real timing or performance claim follows from the example output.
