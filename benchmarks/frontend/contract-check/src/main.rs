@@ -298,6 +298,58 @@ fn validate_relative_repo_path(raw: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn verify_pattern_source_blob(
+    repository_root: &Path,
+    raw_path: &str,
+    expected_sha: &str,
+    pattern_id: &str,
+    source_digests: &mut BTreeMap<String, String>,
+) -> Result<(), String> {
+    validate_relative_repo_path(raw_path)?;
+    let expected_sha = expected_sha.to_ascii_lowercase();
+
+    if let Some(previous) = source_digests.get(raw_path) {
+        if previous != &expected_sha {
+            return Err(format!(
+                "patterns referencing {raw_path} disagree on the source blob SHA"
+            ));
+        }
+        return Ok(());
+    }
+
+    let canonical_root = repository_root
+        .canonicalize()
+        .map_err(|error| format!(
+            "failed to resolve repository root {}: {error}",
+            repository_root.display()
+        ))?;
+    let joined_path = canonical_root.join(raw_path);
+    let full_path = joined_path
+        .canonicalize()
+        .map_err(|error| format!(
+            "failed to resolve pattern source {}: {error}",
+            joined_path.display()
+        ))?;
+    if !full_path.starts_with(&canonical_root) {
+        return Err(format!(
+            "pattern source resolves outside the repository root: {raw_path}"
+        ));
+    }
+    let bytes = std::fs::read(&full_path)
+        .map_err(|error| format!(
+            "failed to read pattern source {}: {error}",
+            full_path.display()
+        ))?;
+    let actual_sha = git_blob_sha1(&bytes);
+    if actual_sha != expected_sha {
+        return Err(format!(
+            "stale source provenance for {pattern_id}: {raw_path} expected {expected_sha}, got {actual_sha}"
+        ));
+    }
+    source_digests.insert(raw_path.to_string(), actual_sha);
+    Ok(())
+}
+
 fn validate_pattern_corpus(
     schema: &Value,
     corpus: &Value,
@@ -311,8 +363,8 @@ fn validate_pattern_corpus(
         .collect();
     if !errors.is_empty() {
         return Err(format!(
-            "Leptos pattern corpus does not satisfy its schema:\n{}",
-            errors.join("\n")
+            "Leptos pattern corpus does not satisfy its schema:\\n{}",
+            errors.join("\\n")
         ));
     }
 
@@ -339,43 +391,41 @@ fn validate_pattern_corpus(
             .get("path")
             .and_then(Value::as_str)
             .ok_or_else(|| format!("pattern {pattern_id} is missing source.path"))?;
-        validate_relative_repo_path(raw_path)?;
         let expected_sha = source
             .get("blob_sha")
             .and_then(Value::as_str)
-            .ok_or_else(|| format!("pattern {pattern_id} is missing source.blob_sha"))?
-            .to_ascii_lowercase();
+            .ok_or_else(|| format!("pattern {pattern_id} is missing source.blob_sha"))?;
+        verify_pattern_source_blob(
+            repository_root,
+            raw_path,
+            expected_sha,
+            pattern_id,
+            &mut source_digests,
+        )?;
 
-        if let Some(previous) = source_digests.get(raw_path) {
-            if previous != &expected_sha {
-                return Err(format!(
-                    "patterns referencing {raw_path} disagree on the source blob SHA"
-                ));
+        if let Some(related) = source.get("related_sources").and_then(Value::as_array) {
+            for related_source in related {
+                let related_path = related_source
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| format!(
+                        "pattern {pattern_id} has a related source without a path"
+                    ))?;
+                let related_sha = related_source
+                    .get("blob_sha")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| format!(
+                        "pattern {pattern_id} has a related source without a blob SHA"
+                    ))?;
+                verify_pattern_source_blob(
+                    repository_root,
+                    related_path,
+                    related_sha,
+                    pattern_id,
+                    &mut source_digests,
+                )?;
             }
-            continue;
         }
-
-        let canonical_root = repository_root
-            .canonicalize()
-            .map_err(|error| format!("failed to resolve repository root {}: {error}", repository_root.display()))?;
-        let joined_path = canonical_root.join(raw_path);
-        let full_path = joined_path
-            .canonicalize()
-            .map_err(|error| format!("failed to resolve pattern source {}: {error}", joined_path.display()))?;
-        if !full_path.starts_with(&canonical_root) {
-            return Err(format!(
-                "pattern source resolves outside the repository root: {raw_path}"
-            ));
-        }
-        let bytes = std::fs::read(&full_path)
-            .map_err(|error| format!("failed to read pattern source {}: {error}", full_path.display()))?;
-        let actual_sha = git_blob_sha1(&bytes);
-        if actual_sha != expected_sha {
-            return Err(format!(
-                "stale source provenance for {pattern_id}: {raw_path} expected {expected_sha}, got {actual_sha}"
-            ));
-        }
-        source_digests.insert(raw_path.to_string(), actual_sha);
     }
 
     Ok((patterns.len(), source_digests.len()))
