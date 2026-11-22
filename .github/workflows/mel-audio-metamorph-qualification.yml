@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           python -m json.tool tools/mel-judge-grounding-audit/schema/mel-judge-grounding-probe-panel-v1.schema.json > /dev/null
           python -m json.tool tools/mel-judge-grounding-audit/schema/mel-audio-transform-qualification-v1.schema.json > /dev/null
-          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml -- \
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-judge-grounding-audit/Cargo.toml --bin mel-judge-grounding-audit -- \
             audit tools/mel-judge-grounding-audit/fixtures/valid-probe-panel-v1.json \
             "$RUNNER_TEMP/mel-judge-grounding-report.json"
           jq -e '.case_count == 1 and .total_probe_count == 5 and .baseline_human_reference_accuracy == 1 and .nuisance_transform.pass_rate == 1 and .nuisance_transform.mean_maximum_absolute_score_drift <= 0.2' \
