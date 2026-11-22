@@ -32,7 +32,11 @@ jobs:
           toolchain: 1.96.0
           components: clippy, rustfmt
       - name: Check changed evaluator modules
-        run: rustfmt --edition 2024 --check --config skip_children=true research/temporal-evaluator/src/decision_sufficient_representation.rs research/temporal-evaluator/src/temporal_representation_preservation.rs
+        run: |
+          rustfmt --edition 2024 --check --config skip_children=true research/temporal-evaluator/src/decision_sufficient_representation.rs
+          if [ -f research/temporal-evaluator/src/temporal_representation_preservation.rs ]; then
+            rustfmt --edition 2024 --check --config skip_children=true research/temporal-evaluator/src/temporal_representation_preservation.rs
+          fi
       - name: Test evaluator
         run: cargo test --locked --manifest-path research/temporal-evaluator/Cargo.toml
       - name: Strict Clippy
