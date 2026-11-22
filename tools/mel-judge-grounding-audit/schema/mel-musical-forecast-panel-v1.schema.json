@@ -18,8 +18,10 @@
     "reference_time_map_id",
     "reference_time_map_version",
     "reference_time_map_kind",
+    "reference_time_map_clock_domain_id",
     "reference_time_map_receipt_sha256",
-    "input_snapshots"
+    "input_snapshots",
+    "time_alignment_receipt_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -96,6 +98,13 @@
       "items": {
         "$ref": "#/$defs/inputSnapshot"
       }
+    },
+    "reference_time_map_clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "time_alignment_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
