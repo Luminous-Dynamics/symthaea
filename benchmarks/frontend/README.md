@@ -38,7 +38,8 @@ Do not add a parallel browser-control dependency for the initial Chromium lane.
 - a redacted accessibility-tree JSON artifact;
 - a bounded layout JSON artifact with viewport, document overflow and semantic
   element rectangles;
-- a viewport PNG screenshot;
+- a viewport PNG screenshot whose IHDR pixel dimensions are checked against the
+  recorded CSS viewport multiplied by `window.devicePixelRatio`;
 - a receipt with source/task/fixture identity, environment-manifest digest,
   capture time, final redacted URL, viewport and SHA-256 artifact digests.
 
@@ -105,7 +106,8 @@ The first original task is:
 `contract-check` is intentionally outside the main Symthaea workspace and
 does not add dependencies to production crates. It validates JSON Schema
 conformance, duplicate/missing source anchors, task fixture digest, fixture
-region mapping, duplicate assertion IDs and a fixture-only resource policy.
+region mapping, duplicate assertion IDs, fixture-only resource policy, Git
+blob provenance for knowledge examples, and retrieval-query gold-ID integrity.
 
 From the repository root:
 
@@ -118,6 +120,9 @@ cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml
 
 # Validate the SFEB task schema, fixture digest and required region anchors.
 cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task
+
+# Validate the Leptos pattern retrieval query set and gold pattern IDs.
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval
 ```
 
 The commands are authored but have not been executed in this environment
@@ -178,6 +183,13 @@ embeddings, HDC associative retrieval and a hybrid. Report recall@1/3, MRR,
 nDCG@3, precision@3, negative abstention accuracy, p50/p95 latency, memory
 and cost under the same corpus and hardware. Do not claim a Symthaea retrieval
 advantage until a private holdout query set has been evaluated.
+
+The first Leptos target (`symthaea-ui`) now exposes four separate
+telemetry status labels—disconnected, connecting, connected and reconnecting.
+The live status region reports the same state that colors the indicator.
+The connected state is entered only after the browser WebSocket reaches
+`State::Open`; a handshake timeout or closed stream returns to the
+bounded retry path.
 
 ## Task lifecycle
 
