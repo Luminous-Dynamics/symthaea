@@ -85,3 +85,36 @@ observations cannot be inferred from static HTML/CSS alone.
 A qualification report is valid only for its exact campaign bytes, source
 revision and environment manifest. Changing any of those creates a new
 qualification run.
+
+
+## Adjudicator trust boundary
+
+The adjudicator recomputes the raw SHA-256 of the campaign, receipt files and
+all three captured artifacts. It verifies the receipt binds the exact run,
+task, fixture identifier, source commit and environment digest; it also checks
+that PNG pixel dimensions, accessibility JSON and layout viewport agree with
+the receipt. Artifact paths must remain under the report's artifact root after
+canonical path resolution.
+
+It does **not** cryptographically authenticate who produced the JSON report,
+the disposition or observed-oracle identifiers. A self-authored report could
+still lie about which oracle fired while pointing to valid browser artifacts.
+Before using qualification results for external claims, the executor must run
+inside a trusted isolated workflow and emit a verifiable signed attestation
+(e.g. a workflow identity-bound artifact provenance statement). The verifier
+must validate that attestation against an explicit trust root. Until that
+signature-verification layer and the real browser mutation executor exist,
+the report is a local integrity/adjudication format, not a third-party proof.
+
+## New adjudicator command
+
+```bash
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- \
+  --qualification-report \
+  benchmarks/frontend/qualification/qualification-report-v1.schema.json \
+  benchmarks/frontend/qualification/mutation-campaign-v1.json \
+  path/to/qualification-report.json
+```
+
+The command prints a JSON summary. It returns a non-zero exit code when the
+report is structurally invalid or when any qualification hard gate fails.
