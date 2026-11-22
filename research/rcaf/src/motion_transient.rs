@@ -89,7 +89,7 @@ impl std::error::Error for MotionTransientError {}
 /// The broad component is spatially constant. The localized component is a graph-distance
 /// exponential field from each event's seed ROI. For a node r and seed s:
 ///
-///     q_r = exp(-d_graph(s, r) / spatial_decay_length)
+/// `q_r = exp(-d_graph(s, r) / spatial_decay_length)`
 ///
 /// Edge traversal cost is the inverse adjacency weight; disconnected nodes have zero localized
 /// loading. Each event train is amplitude * exp(-(t-onset)/decay_samples) for t >= onset.
