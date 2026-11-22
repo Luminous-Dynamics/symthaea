@@ -410,11 +410,131 @@ fn run_patterns(schema_path: &str, corpus_path: &str, repository_root: &str) -> 
     Ok(())
 }
 
+
+const DEFAULT_RETRIEVAL_SCHEMA: &str =
+    "benchmarks/frontend/knowledge/leptos-0.8/retrieval-v1.schema.json";
+const DEFAULT_RETRIEVAL_SET: &str =
+    "benchmarks/frontend/knowledge/leptos-0.8/retrieval-queries-v0.json";
+const DEFAULT_RETRIEVAL_CORPUS: &str =
+    "benchmarks/frontend/knowledge/leptos-0.8/patterns-v0.json";
+
+fn validate_retrieval_set(
+    schema: &Value,
+    retrieval: &Value,
+    pattern_corpus: &Value,
+) -> Result<(usize, usize), String> {
+    let validator = validator_for(schema)
+        .map_err(|error| format!("invalid retrieval schema: {error}"))?;
+    let errors: Vec<String> = validator
+        .iter_errors(retrieval)
+        .map(|error| format!("{}: {error}", error.instance_path()))
+        .collect();
+    if !errors.is_empty() {
+        return Err(format!(
+            "retrieval set does not satisfy its schema:\n{}",
+            errors.join("\n")
+        ));
+    }
+
+    let known_ids: BTreeSet<String> = pattern_corpus
+        .get("patterns")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "pattern corpus must contain a patterns array".to_string())?
+        .iter()
+        .filter_map(|pattern| pattern.get("id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect();
+    if known_ids.is_empty() {
+        return Err("pattern corpus contains no pattern identifiers".to_string());
+    }
+
+    let queries = retrieval
+        .get("queries")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "retrieval.queries must be an array".to_string())?;
+    let mut query_ids = BTreeSet::new();
+    let mut positive = 0;
+    let mut negatives = 0;
+
+    for query in queries {
+        let id = query
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "every retrieval query requires an id".to_string())?;
+        if !query_ids.insert(id.to_string()) {
+            return Err(format!("duplicate retrieval query id: {id}"));
+        }
+
+        let kind = query
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("retrieval query {id} requires kind"))?;
+        let expected = query
+            .get("expected_pattern_ids")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("retrieval query {id} requires expected_pattern_ids"))?;
+
+        match kind {
+            "positive" => {
+                if expected.is_empty() {
+                    return Err(format!("positive query {id} has no expected pattern IDs"));
+                }
+                positive += 1;
+            }
+            "hard_negative" => {
+                if !expected.is_empty() {
+                    return Err(format!("hard-negative query {id} must have an empty expected set"));
+                }
+                negatives += 1;
+            }
+            _ => return Err(format!("retrieval query {id} has unsupported kind {kind}")),
+        }
+
+        for expected_id in expected {
+            let expected_id = expected_id
+                .as_str()
+                .ok_or_else(|| format!("query {id} contains a non-string pattern ID"))?;
+            if !known_ids.contains(expected_id) {
+                return Err(format!(
+                    "query {id} references unknown Leptos pattern ID: {expected_id}"
+                ));
+            }
+        }
+    }
+
+    if positive == 0 || negatives == 0 {
+        return Err("retrieval set must include both positive queries and hard negatives".to_string());
+    }
+    Ok((positive, negatives))
+}
+
+fn run_retrieval(
+    schema_path: &str,
+    retrieval_path: &str,
+    corpus_path: &str,
+) -> Result<(), String> {
+    let schema = read_json(schema_path)?;
+    let retrieval = read_json(retrieval_path)?;
+    let corpus = read_json(corpus_path)?;
+    let (positive, negatives) = validate_retrieval_set(&schema, &retrieval, &corpus)?;
+    let total = positive + negatives;
+    let exposure = retrieval
+        .get("exposure")
+        .and_then(Value::as_str)
+        .unwrap_or("<unknown>");
+    println!(
+        "Leptos retrieval set valid: queries={total}, positive={positive}, hard_negatives={negatives}, exposure={exposure}"
+    );
+    println!("Gold pattern references: all resolve to the versioned corpus.");
+    println!("Note: this validates the evaluation set, not retrieval quality.");
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example."
+            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus."
         );
         return Ok(());
     }
@@ -435,6 +555,16 @@ fn run() -> Result<(), String> {
             args.get(1).map(String::as_str).unwrap_or(DEFAULT_PATTERN_SCHEMA),
             args.get(2).map(String::as_str).unwrap_or(DEFAULT_PATTERN_CORPUS),
             args.get(3).map(String::as_str).unwrap_or("."),
+        );
+    }
+    if args.first().is_some_and(|arg| arg == "--retrieval") {
+        if args.len() > 4 {
+            return Err("--retrieval accepts at most schema, query-set and pattern-corpus paths".to_string());
+        }
+        return run_retrieval(
+            args.get(1).map(String::as_str).unwrap_or(DEFAULT_RETRIEVAL_SCHEMA),
+            args.get(2).map(String::as_str).unwrap_or(DEFAULT_RETRIEVAL_SET),
+            args.get(3).map(String::as_str).unwrap_or(DEFAULT_RETRIEVAL_CORPUS),
         );
     }
     if args.len() > 3 {
@@ -515,6 +645,47 @@ mod tests {
     fn rejects_missing_or_unterminated_source_anchors() {
         assert!(extract_source_anchors("<main></main>").is_err());
         assert!(extract_source_anchors(r#"<main data-sfeb-id="unfinished>"#).is_err());
+    }
+
+    #[test]
+    fn checked_in_retrieval_set_resolves_to_pattern_corpus() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/retrieval-v1.schema.json"
+        ))
+        .expect("checked-in retrieval schema is valid JSON");
+        let retrieval: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/retrieval-queries-v0.json"
+        ))
+        .expect("checked-in retrieval set is valid JSON");
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/patterns-v0.json"
+        ))
+        .expect("checked-in pattern corpus is valid JSON");
+
+        let (positive, negatives) = validate_retrieval_set(&schema, &retrieval, &corpus)
+            .expect("retrieval set must match schema and corpus gold IDs");
+        assert_eq!(positive, 16);
+        assert_eq!(negatives, 8);
+    }
+
+    #[test]
+    fn retrieval_validator_rejects_unknown_pattern_ids() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/retrieval-v1.schema.json"
+        ))
+        .expect("checked-in retrieval schema is valid JSON");
+        let mut retrieval: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/retrieval-queries-v0.json"
+        ))
+        .expect("checked-in retrieval set is valid JSON");
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../knowledge/leptos-0.8/patterns-v0.json"
+        ))
+        .expect("checked-in pattern corpus is valid JSON");
+        retrieval["queries"][0]["expected_pattern_ids"][0] =
+            Value::String("UNKNOWN-PATTERN".into());
+
+        assert!(validate_retrieval_set(&schema, &retrieval, &corpus).is_err());
     }
 
     #[test]
