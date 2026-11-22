@@ -17,9 +17,12 @@ use std::time::Instant;
 
 use symthaea_canvas::{
     AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
-    JunctionIdentityMatch, MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH, MycelialReconstructionError,
-    ReconstructionDimensionality, ReconstructionEvaluationConfig, ReconstructionLengthUnit,
-    ReconstructionPoint3, evaluate_mycelial_reconstruction, match_junctions_hungarian,
+    JunctionClassProbabilityPrediction, JunctionIdentityMatch,
+    MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH, MycelialReconstructionError,
+    ReconstructionCalibrationClass, ReconstructionCalibrationConfig, ReconstructionDimensionality,
+    ReconstructionEvaluationConfig, ReconstructionLengthUnit, ReconstructionPoint3,
+    evaluate_mycelial_reconstruction, evaluate_mycelial_reconstruction_calibration,
+    match_junctions_hungarian,
 };
 
 const DEFAULT_SAMPLES: usize = 100;
@@ -61,6 +64,19 @@ fn skeleton(
         producer_version: "synthetic-v1".to_string(),
         junctions,
         segments,
+    }
+}
+
+fn class_probability_prediction(
+    junction: &AnnotatedJunction,
+) -> JunctionClassProbabilityPrediction {
+    let predicted_class = ReconstructionCalibrationClass::from_junction_kind(junction.kind);
+    let mut probabilities = [0.0; 7];
+    probabilities[predicted_class.index()] = 0.99;
+    probabilities[ReconstructionCalibrationClass::NoObject.index()] = 0.01;
+    JunctionClassProbabilityPrediction {
+        predicted_junction_id: junction.id.clone(),
+        probabilities,
     }
 }
 
@@ -186,6 +202,64 @@ fn evaluate_case(
         score.component_attributions.len()
     );
     println!("score_receipt_digest: {}", score.canonical_digest_hex()?);
+
+    // The class probabilities are synthetic fixture outputs. The false-fusion
+    // negative control is deliberately overconfident to expose selective risk.
+    let probability_predictions: Vec<_> = prediction
+        .junctions
+        .iter()
+        .map(|junction| {
+            let mut item = class_probability_prediction(junction);
+            if junction.kind == AnnotatedJunctionKind::Anastomosis {
+                item.probabilities[ReconstructionCalibrationClass::Anastomosis.index()] = 0.999;
+                item.probabilities[ReconstructionCalibrationClass::NoObject.index()] = 0.001;
+            }
+            item
+        })
+        .collect();
+    let calibration = evaluate_mycelial_reconstruction_calibration(
+        truth,
+        prediction,
+        &score,
+        "synthetic-seven-class-confidence-v1",
+        &probability_predictions,
+        ReconstructionCalibrationConfig::default(),
+    )?;
+    println!(
+        "top_label_calibration_brier: {:?}",
+        calibration.top_label_calibration.brier_score
+    );
+    println!(
+        "top_label_expected_calibration_error: {:?}",
+        calibration.top_label_calibration.expected_calibration_error
+    );
+    println!(
+        "top_label_negative_log_likelihood: {:?}",
+        calibration.top_label_calibration.negative_log_likelihood
+    );
+    println!(
+        "calibration_false_anastomosis_predictions: {}",
+        calibration.counts.false_anastomosis_prediction_count
+    );
+    println!(
+        "calibration_false_anastomosis_rate: {:?}",
+        calibration
+            .selective_risk_curve
+            .last()
+            .and_then(|point| point.false_anastomosis_rate)
+    );
+    println!(
+        "selective_risk_points: {}",
+        calibration.selective_risk_curve.len()
+    );
+    println!(
+        "calibration_probability_inventory_digest: {}",
+        calibration.probability_inventory_digest
+    );
+    println!(
+        "calibration_receipt_digest: {}",
+        calibration.canonical_digest_hex()?
+    );
     Ok(())
 }
 
@@ -225,7 +299,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for _ in 0..WARMUP_RUNS {
         let matches = match_junctions_hungarian(&truth, &prediction, MATCH_DISTANCE)?;
-        black_box(evaluate_mycelial_reconstruction(
+        let score = evaluate_mycelial_reconstruction(
             &truth,
             &prediction,
             "hungarian-max-cardinality-min-distance-v1",
@@ -234,6 +308,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 maximum_junction_match_distance: MATCH_DISTANCE,
                 ..ReconstructionEvaluationConfig::default()
             },
+        )?;
+        let probabilities: Vec<_> = prediction
+            .junctions
+            .iter()
+            .map(class_probability_prediction)
+            .collect();
+        black_box(evaluate_mycelial_reconstruction_calibration(
+            &truth,
+            &prediction,
+            &score,
+            "synthetic-seven-class-confidence-v1",
+            &probabilities,
+            ReconstructionCalibrationConfig::default(),
         )?);
     }
 
@@ -251,7 +338,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ..ReconstructionEvaluationConfig::default()
             },
         )?;
-        black_box(score.canonical_digest_hex()?);
+        let probabilities: Vec<_> = prediction
+            .junctions
+            .iter()
+            .map(class_probability_prediction)
+            .collect();
+        let calibration = evaluate_mycelial_reconstruction_calibration(
+            &truth,
+            &prediction,
+            &score,
+            "synthetic-seven-class-confidence-v1",
+            &probabilities,
+            ReconstructionCalibrationConfig::default(),
+        )?;
+        black_box((score.canonical_digest_hex()?, calibration.canonical_digest_hex()?));
         durations_ns.push(started.elapsed().as_nanos());
     }
     durations_ns.sort_unstable();
