@@ -136,12 +136,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut coarse_control = VlasovPoisson1d1v::new(coarse_config, coarse_initial)?;
     let mut fine_pulse = VlasovPoisson1d1v::new(fine_config, fine_initial.clone())?;
     let mut fine_control = VlasovPoisson1d1v::new(fine_config, fine_initial.clone())?;
-    let mut sponge_pulse = VlasovPoisson1d1v::new(coarse_config, fine_initial_from_coarse(&fine_initial, fine_config, coarse_config)?)?;
-    let mut sponge_control = VlasovPoisson1d1v::new(coarse_config, fine_initial_from_coarse(&fine_initial, fine_config, coarse_config)?)?;
+    let mut sponge_pulse = VlasovPoisson1d1v::new(coarse_config, coarse_initial.clone())?;
+    let mut sponge_control = VlasovPoisson1d1v::new(coarse_config, coarse_initial.clone())?;
 
     let initial_c2 = sponge_pulse.quadratic_casimir_budget()?.total_casimir;
     let mut sponge_removed_c2 = 0.0;
+    let mut sponge_control_removed_c2 = 0.0;
     let mut sponge_removed_f_strophy = 0.0;
+    let mut sponge_control_removed_f_strophy = 0.0;
     let initial_field_coarse = coarse_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
     let initial_field_fine = fine_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
     let initial_field_sponge = sponge_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
@@ -229,10 +231,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 SPONGE_DAMPING,
                 2,
             )?;
-            sponge_removed_c2 +=
-                first_half.removed_total_casimir + control_first_half.removed_total_casimir;
-            sponge_removed_f_strophy += first_half.removed_fluctuation_f_strophy
-                + control_first_half.removed_fluctuation_f_strophy;
+            sponge_removed_c2 += first_half.removed_total_casimir;
+            sponge_control_removed_c2 += control_first_half.removed_total_casimir;
+            sponge_removed_f_strophy += first_half.removed_fluctuation_f_strophy;
+            sponge_control_removed_f_strophy += control_first_half.removed_fluctuation_f_strophy;
             sponge_pulse.step(DT)?;
             sponge_control.step(DT)?;
             let second_half = sponge_pulse.apply_velocity_fourier_sponge(
@@ -247,10 +249,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 SPONGE_DAMPING,
                 2,
             )?;
-            sponge_removed_c2 += second_half.removed_total_casimir
-                + control_second_half.removed_total_casimir;
-            sponge_removed_f_strophy += second_half.removed_fluctuation_f_strophy
-                + control_second_half.removed_fluctuation_f_strophy;
+            sponge_removed_c2 += second_half.removed_total_casimir;
+            sponge_control_removed_c2 += control_second_half.removed_total_casimir;
+            sponge_removed_f_strophy += second_half.removed_fluctuation_f_strophy;
+            sponge_control_removed_f_strophy += control_second_half.removed_fluctuation_f_strophy;
         }
     }
 
@@ -288,6 +290,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         sponge_removed_c2 / initial_c2.abs().max(f64::MIN_POSITIVE),
         c2_closure_error,
         sponge_removed_f_strophy,
+        sponge_control_removed_c2 / initial_c2.abs().max(f64::MIN_POSITIVE),
+        sponge_control_removed_f_strophy,
         initial_field_coarse.amplitude(),
         initial_field_fine.amplitude(),
         initial_field_sponge.amplitude(),
@@ -295,20 +299,3 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn fine_initial_from_coarse(
-    fine: &[f64],
-    fine_config: VlasovPoissonConfig,
-    coarse_config: VlasovPoissonConfig,
-) -> Result<Vec<f64>, Box<dyn Error>> {
-    let mut result = Vec::with_capacity(coarse_config.nx * coarse_config.nv);
-    for row in fine.chunks_exact(fine_config.nv) {
-        let coarse_row = plasma_vlasov_reference::velocity_refinement::zero_pad_periodic_real_line(
-            row,
-            1,
-        );
-        let _ = coarse_row;
-    }
-    let coarse = maxwellian_perturbation(coarse_config, INITIAL_AMPLITUDE, FIRST_MODE, 1.0)?;
-    result.extend(coarse);
-    Ok(result)
-}
