@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sfeb/task-oracle-v1.schema.json",
+  "title": "SFEB Task and Oracle Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_version", "task_id", "status", "level", "title", "objective", "product_brief", "implementation_constraints", "environment", "reference_fixture", "required_regions", "viewports", "acceptance_journeys", "assertions", "hard_gates", "evidence", "budget"],
+  "properties": {
+    "task_version": {"const": "1.0.0"},
+    "task_id": {"type": "string", "pattern": "^SFEB-L[0-4]-[0-9]{3}$"},
+    "status": {"enum": ["specification_only", "fixture_ready", "oracle_reviewed", "runnable", "baseline_measured", "holdout_qualified"]},
+    "level": {"type": "integer", "minimum": 0, "maximum": 4},
+    "title": {"type": "string", "minLength": 1},
+    "objective": {"type": "string", "minLength": 1},
+    "product_brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["users", "user_goal", "content_hierarchy", "visual_direction", "interaction_requirements"],
+      "properties": {
+        "users": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "user_goal": {"type": "string", "minLength": 1},
+        "content_hierarchy": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "visual_direction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mood", "palette", "typography", "layout_principles"],
+          "properties": {
+            "mood": {"type": "string"},
+            "palette": {"type": "array", "minItems": 3, "items": {"type": "object", "additionalProperties": false, "required": ["token", "value", "purpose"], "properties": {"token": {"type": "string"}, "value": {"type": "string"}, "purpose": {"type": "string"}}}},
+            "typography": {"type": "string"},
+            "layout_principles": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+          }
+        },
+        "interaction_requirements": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "implementation_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framework", "framework_family", "language", "allowed_dependencies", "disallowed_techniques"],
+      "properties": {
+        "framework": {"type": "string"},
+        "framework_family": {"type": "string"},
+        "language": {"type": "string"},
+        "allowed_dependencies": {"type": "array", "items": {"type": "string"}},
+        "disallowed_techniques": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["browser", "viewport_matrix", "device_scale_factor", "network_policy", "font_policy"],
+      "properties": {
+        "browser": {"type": "string"},
+        "viewport_matrix": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/viewport"}},
+        "device_scale_factor": {"type": "number", "minimum": 0.5, "maximum": 4},
+        "network_policy": {"type": "string"},
+        "font_policy": {"type": "string"}
+      }
+    },
+    "reference_fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "purpose"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+        "purpose": {"type": "string"}
+      }
+    },
+    "required_regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}},
+    "viewports": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/viewport"}},
+    "acceptance_journeys": {"type": "array", "items": {"$ref": "#/$defs/journey"}},
+    "assertions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/assertion"}},
+    "hard_gates": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "evidence": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wall_time_minutes", "max_tool_calls", "max_repair_cycles"],
+      "properties": {
+        "wall_time_minutes": {"type": "integer", "minimum": 1},
+        "max_tool_calls": {"type": "integer", "minimum": 1},
+        "max_repair_cycles": {"type": "integer", "minimum": 0}
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "width", "height"],
+      "properties": {
+        "name": {"type": "string"},
+        "width": {"type": "integer", "minimum": 240, "maximum": 7680},
+        "height": {"type": "integer", "minimum": 320, "maximum": 4320}
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "accessible_name", "required"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "role": {"type": "string", "minLength": 1},
+        "accessible_name": {"type": ["string", "null"]},
+        "required": {"type": "boolean"}
+      }
+    },
+    "journey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "goal", "steps", "oracle"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "goal": {"type": "string"},
+        "steps": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "oracle": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "evaluator", "target", "operator", "expected", "hard_gate"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "evaluator": {"enum": ["dom", "accessibility", "layout", "computed_style", "interaction", "performance", "human_review"]},
+        "target": {"type": "string", "minLength": 1},
+        "operator": {"enum": ["exists", "equals", "count_equals", "greater_than_or_equal", "less_than_or_equal", "within", "absent", "manual_pass"]},
+        "expected": {},
+        "tolerance": {"type": "number", "minimum": 0},
+        "hard_gate": {"type": "boolean"},
+        "rationale": {"type": "string"}
+      }
+    }
+  }
+}
+
