@@ -25,7 +25,13 @@ const DEFAULT_SAMPLES: usize = 100;
 const WARMUP_RUNS: usize = 5;
 const MAX_SAMPLES: usize = 10_000;
 
-fn segment(id: &str, filament_id: u32, start: &str, end: &str, length: f64) -> MycelialHyphaSegment {
+fn segment(
+    id: &str,
+    filament_id: u32,
+    start: &str,
+    end: &str,
+    length: f64,
+) -> MycelialHyphaSegment {
     MycelialHyphaSegment {
         id: id.to_string(),
         filament_id,
@@ -53,7 +59,11 @@ fn fixture_graph() -> MycelialJunctionHyphaGraph {
             MycelialJunction {
                 id: "A".to_string(),
                 kind: JunctionKind::Branch,
-                position: SpatialPoint3 { x: 0.0, y: 0.0, z: 0.0 },
+                position: SpatialPoint3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
                 incident_filament_ids: vec![1, 3],
                 terminal_filament_ids: Vec::new(),
                 anastomosis_ids: Vec::new(),
@@ -61,7 +71,11 @@ fn fixture_graph() -> MycelialJunctionHyphaGraph {
             MycelialJunction {
                 id: "B".to_string(),
                 kind: JunctionKind::Tip,
-                position: SpatialPoint3 { x: 1.0, y: 0.0, z: 0.0 },
+                position: SpatialPoint3 {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
                 incident_filament_ids: vec![1, 2],
                 terminal_filament_ids: vec![1],
                 anastomosis_ids: Vec::new(),
@@ -69,7 +83,11 @@ fn fixture_graph() -> MycelialJunctionHyphaGraph {
             MycelialJunction {
                 id: "C".to_string(),
                 kind: JunctionKind::Anastomosis,
-                position: SpatialPoint3 { x: 0.5, y: 1.0, z: 0.0 },
+                position: SpatialPoint3 {
+                    x: 0.5,
+                    y: 1.0,
+                    z: 0.0,
+                },
                 incident_filament_ids: vec![2, 3],
                 terminal_filament_ids: vec![2],
                 anastomosis_ids: vec![7],
@@ -121,7 +139,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let graph = fixture_graph();
     let demands = demand_pairs();
-    if demands.iter().map(|demand| u128::from(demand.weight)).sum::<u128>()
+    if demands
+        .iter()
+        .map(|demand| u128::from(demand.weight))
+        .sum::<u128>()
         > MAX_FAILURE_TOTAL_DEMAND_WEIGHT
     {
         return Err("fixture demand weight exceeds exact accumulation bound".into());
@@ -129,10 +150,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     graph.validate()?;
 
     for _ in 0..WARMUP_RUNS {
-        black_box(build_single_failure_resilience_profile(
-            &graph,
-            &demands,
-        )?);
+        black_box(build_single_failure_resilience_profile(&graph, &demands)?);
     }
     let mut durations_ns = Vec::with_capacity(samples);
     let mut final_profile = None;
@@ -151,12 +169,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("junction_count: {}", graph.junctions.len());
     println!("hypha_segment_count: {}", graph.segments.len());
     println!("demand_pair_count: {}", demands.len());
-    println!("total_demand_weight: {}", profile.baseline.total_demand_weight);
-    println!("baseline_components: {}", profile.baseline.connected_components);
+    println!(
+        "total_demand_weight: {}",
+        profile.baseline.total_demand_weight
+    );
+    println!(
+        "baseline_components: {}",
+        profile.baseline.connected_components
+    );
     println!("baseline_cycle_rank: {}", profile.baseline.cycle_rank);
-    println!("baseline_weighted_reachability: {:?}", profile.baseline.weighted_reachability);
-    println!("baseline_weighted_directness: {:?}", profile.baseline.weighted_mean_directness);
-    println!("baseline_weighted_path_length: {:?}", profile.baseline.weighted_mean_network_path_length);
+    println!(
+        "baseline_weighted_reachability: {:?}",
+        profile.baseline.weighted_reachability
+    );
+    println!(
+        "baseline_weighted_directness: {:?}",
+        profile.baseline.weighted_mean_directness
+    );
+    println!(
+        "baseline_weighted_path_length: {:?}",
+        profile.baseline.weighted_mean_network_path_length
+    );
     println!("single_failure_scenarios: {}", profile.scenarios.len());
     for scenario in &profile.scenarios {
         println!(
@@ -171,16 +204,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             scenario.weighted_mean_network_path_length
         );
     }
-    println!("worst_case_weighted_reachability: {:?}", profile.worst_case_weighted_reachability);
-    println!("worst_case_weighted_directness_among_reachable: {:?}", profile.worst_case_weighted_directness);
+    println!(
+        "worst_case_weighted_reachability: {:?}",
+        profile.worst_case_weighted_reachability
+    );
+    println!(
+        "worst_case_weighted_directness_among_reachable: {:?}",
+        profile.worst_case_weighted_directness
+    );
     println!("profile_digest: {}", profile.canonical_digest_hex()?);
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
-    println!("single_failure_profile_time_ns_p50: {}", percentile(&durations_ns, 50));
-    println!("single_failure_profile_time_ns_p95: {}", percentile(&durations_ns, 95));
+    println!(
+        "single_failure_profile_time_ns_p50: {}",
+        percentile(&durations_ns, 50)
+    );
+    println!(
+        "single_failure_profile_time_ns_p95: {}",
+        percentile(&durations_ns, 95)
+    );
     println!("platform_os: {}", std::env::consts::OS);
     println!("platform_arch: {}", std::env::consts::ARCH);
     println!("length_unit: organism_local_model_unit");
-    println!("claim_boundary: structural reachability and geometric paths only; no biology, flow, transport or repair claims");
+    println!(
+        "claim_boundary: structural reachability and geometric paths only; no biology, flow, transport or repair claims"
+    );
     Ok(())
 }
