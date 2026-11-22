@@ -184,3 +184,17 @@ This is a provenance/lineage contract only. It does not validate physics, the ac
 The crate now provides `semi-dtco-lineage`, a standalone CLI that consumes a versioned DTCO lineage manifest and emits a canonical key-sorted JSON report. CI runs the CLI against `dtco-lineage-known-answer-v1.json` and checks the full output byte-for-byte.
 
 Hosted run [#44988794403](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403) passed 32 Rust tests, 46 Python reference tests, fmt, Clippy, and the binary-metric, SECOM raw-audit and DTCO-lineage CLI report checks.
+
+
+## DTCO lineage gate — uncertainty, stage direction and root identity
+
+The current Rust contract has been strengthened beyond parent/output digest matching:
+- model-prediction evidence requires both a model digest and a prediction-uncertainty artifact digest;
+- a child may not name a later-fidelity stage as its parent;
+- each root run must bind the declared immutable design-input digest;
+- the declared design-constraint digest must be consumed by at least one run;
+- physical measurements still require instrument, calibration and measurement-uncertainty references.
+
+The frozen DTCO fixture now carries the design and constraint digests as root-run inputs (seven distinct artifacts). Eleven DTCO-specific tests cover the known answer and adversarial lineage, stage, uncertainty and binding cases.
+
+Hosted run [#44989349728](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728) passed **35/35 Rust tests** and **46/46 Python reference tests**, Rust fmt and Clippy, plus byte-for-byte output comparisons for Python binary/inspection/pair reports and Rust binary/SECOM/DTCO CLI reports. The root workspace limitation remains isolated from this crate-level run.
