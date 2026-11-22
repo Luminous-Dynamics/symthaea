@@ -11,6 +11,8 @@ A dependency-free Rust research crate for repeatability-calibrated comparison of
 - Participant-level bootstrap confidence intervals and exact two-sided sign tests.
 - Direct edge-polarity transition counts, including neutral-band transitions.
 - Synthetic Gaussian-factor null/injection calibration plus a shared observation-only common-mode nuisance challenge in `src/simulation.rs`.
+- A separate graph-based spatial nuisance generator in `src/spatial_nuisance.rs`, covering graph-smooth low-rank and localized heat-kernel fields.
+- A finite-dimensional preprocessing projection-composition reference kernel in `src/operator_composition.rs`, measuring nuisance re-entry when sequential orthogonal projections are reordered.
 - Matched signal-plus-nuisance dose response, with the same deterministic innovation stream as its nuisance-only counterfactual and separate direction-aware recovery outputs.
 - Draft 2020-12 schemas and semantic validation for RCAF result receipts.
 
@@ -142,3 +144,18 @@ The `rcaf_common_mode_nuisance_sweep` example evaluates nuisance strengths `[0.0
 ### Shared observation-only nuisance challenge
 
 The current generator adds an independent AR(1) common-mode factor to one observed repeat while leaving the participant's latent global/module loadings unchanged. Its rejection rate and median paired gap are reported separately from the exact same-observation null and the known latent module injection. This is the first nuisance family only; it does not model all physiology, motion, scanner drift, censoring or missingness. The output field `nuisance_only_rejection_rate` measures artifact-only rejection relative to latent truth, not conventional Type-I error under identical observed-data distributions.
+
+
+## Preprocessing projection composition reference
+
+The `operator_composition` module is a small mathematical reference for finite-dimensional temporal projection operators. It compares nuisance-then-filter, filter-then-nuisance, and one-shot joint projection, then measures the energy that remains in each declared design subspace after the complete sequence.
+
+Run its synthetic projection fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_projection_order
+```
+
+The output contract is `projection-order.schema.json`. The fixture is designed to demonstrate that a second projection can reintroduce variance in a nuisance subspace removed by the first. The joint projection is an oracle for the union of the two declared subspaces; it is not an instruction to remove arbitrary signal-bearing frequencies.
+
+This kernel does **not** implement a general band-pass filter, censoring/interpolation, motion correction, physiological correction, ICA, run-boundary handling, or fMRIPrep/XCP-D/CONN. Those operations need explicit models, boundary rules and endpoint-specific signal-preservation tests before their composition can be qualified. The synthetic result is a mathematical software check, not empirical fMRI validation.
