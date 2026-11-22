@@ -650,6 +650,7 @@ fn run() -> Result<(), String> {
             "removed_event_count": 0,
             "removed_experience_struct_bytes": 0,
             "decision": action_name(baseline.decision.action),
+            "full_evidence_decision": action_name(baseline.decision.action),
             "utility": truth_utility(case.truth, baseline.decision.action),
             "regret": baseline_regret,
             "full_evidence_regret": baseline_regret,
