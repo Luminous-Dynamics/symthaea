@@ -3,7 +3,7 @@
 **Tracking:** NEURO-SILICON-009 / #9666  
 **Base implementation:** #9828 (`research/temporal-joint-resource-control-20261101`)  
 **Interaction extension:** `research/temporal-factorial-interactions-20261122`  
-**Status:** candidate allocator and evaluator exact-oracle source authored; 15 Rust tests are authored for the oracle (none executed); no Rust compilation, benchmark runs, hardware measurements or security deployment are claimed.
+**Status:** candidate allocator and evaluator exact-oracle source authored; 16 Rust tests are authored for the oracle (none executed); no Rust compilation, benchmark runs, hardware measurements or security deployment are claimed.
 
 ## 1. Research thesis
 
@@ -112,11 +112,25 @@ Interpretation is intentionally axis-specific:
 
 The report contains every non-empty subset term, its factor bitmask and interaction order, all three exposure dividends, all twelve resource-cost dividends, and summaries aggregated by interaction order. It also reports the direct full-joint contrast and checks that the dividends reconstruct it exactly.
 
+### Exact per-factor attribution
+
+The same dividends yield a standard Shapley allocation to each action factor:
+
+\[
+\phi_i=\sum_{S\ni i}\frac{\Delta v(S)}{|S|}
+\]
+
+Each coalition interaction is shared equally among the factors that participate in that coalition. This converts the non-additive interaction surface into an additive factor attribution while preserving the full-joint total.
+
+The implementation computes a common denominator \(L=\operatorname{lcm}(1,\ldots,n)\) and stores each attribution as an integer numerator over \(L\). For the current maximum of 16 factors, \(L=720720\). It verifies the Shapley efficiency identity in checked integer arithmetic for all 15 outcome/resource axes.
+
+Shapley allocation is established cooperative-game theory, originating in Shapley's 1953 work; this PR uses it as an exact attribution layer over the evaluator's measured factorial dividends, not as a novel attribution algorithm. https://doi.org/10.1515/9781400881970-018
+
 The computation is integer-only after outcome intake and uses checked `i128` arithmetic. For \(n\) binary factors, the transform costs \(O(15n2^n)\) arithmetic operations across the three exposure and twelve resource axes, with \(2^n-1\) non-empty terms. The existing hard limit of 16 factors therefore yields at most 65,535 terms.
 
 **Important causal boundary:** exact decomposition explains the finite factorial response surface supplied to it. It does not make observationally confounded real-world data causal. A real campaign still needs valid paired interventions/randomization or a controlled replay design, an identical episode commitment, measured resource costs and evaluator-only outcomes. It covers binary factor presence/absence; graded doses, sequential adaptive policies and unenumerated actions need separate designs.
 
-The new hand-calculated controls use a known three-factor surface with an AB synergy of +7 µs and an ABC antagonism of −5 µs, plus distinct resource-cost interactions. A separate four-factor control isolates the sensing × memory × compute × verification term from every proper subset. A test-only direct inclusion–exclusion implementation independently computes every subset dividend and is compared term-by-term with the production in-place transform on both three- and four-factor fixtures. Input-row permutation must not change the report; omitted subsets fail closed.
+The new hand-calculated controls use a known three-factor surface with an AB synergy of +7 µs and an ABC antagonism of −5 µs, plus distinct resource-cost interactions. A separate four-factor control isolates the sensing × memory × compute × verification term from every proper subset. A test-only direct inclusion–exclusion implementation independently computes every subset dividend and is compared term-by-term with the production in-place transform on both three- and four-factor fixtures. Exact Shapley numerators are checked against hand-computed rational attributions and must sum to the full-joint effect. Input-row permutation must not change the report; omitted subsets fail closed.
 
 
 ## 5. The paradigm shift: measure the value of not remaining ignorant
