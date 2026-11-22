@@ -30,7 +30,7 @@ The v0.1 contract requires exact model/baseline/task/scope/as-known/budget ident
 
 Pair matrices must be complete and canonical. Missing interactions are rejected, not assumed to be zero. Every pair is reduced by its absolute error bound before optimization.
 
-For portfolios with at least three distinct events, the receipt additionally requires at least 32 held-out multi-event samples and a higher-order residual within a preregistered tolerance. If the model cannot explain the joint effect beyond pair terms, the verifier rejects the model. Selected terms are rechecked against the exact verified proposal; rehashing a mutated plan is insufficient.
+For portfolios with at least three distinct events, the receipt additionally requires at least 32 held-out multi-event samples and a higher-order residual within a preregistered tolerance. If the model cannot explain the joint effect beyond pair terms, the verifier rejects the model. Selected terms are rechecked against the exact verified proposal; rehashing a mutated plan is insufficient. The verified interaction set retains the exact verified option records. Admission rechecks every selected option digest, event ID, representation-plan digest, disposition, net value and resource-accounting field against those records; it also rechecks the selected plan's scope, `(valid_at, known_at)`, budget and authority-scope digest against the verified proposal. The authority-scope digest is bound into the proposal and calibration-receipt identity. Rehashing a self-consistent plan after changing these fields is not sufficient for admission.
 
 A digest is not a signature. Fixture verifiers do not authenticate production issuers or independently prove calibration and split lineage.
 
