@@ -1,4 +1,4 @@
-wave_file_name,text,average_score,model_id,model_name
+wave_file_name,text,average_semantic_alignement_score,model_id,model_name
 a0.wav,soft piano,0,m1,Generator One
 a1.wav,slow strings,1,m1,Generator One
 a2.wav,ambient guitar,2,m1,Generator One
