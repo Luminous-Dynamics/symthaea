@@ -728,6 +728,30 @@ mod tests {
     }
 
     #[test]
+    fn b2_ignores_mask_when_imputed_value_is_identical_but_b3_uses_it() {
+        let base = String::from_utf8(FEATURES.to_vec())
+            .unwrap()
+            .replace("1.2 2.2", "1.05 2.05");
+        let changed_mask = base.replace("1.05 2.05", "NaN 2.05");
+        let original = evaluate(base.as_bytes(), LABELS);
+        let changed = evaluate(changed_mask.as_bytes(), LABELS);
+
+        let original_b2 = &original.baselines["B2"].held_out["validation"].scores[0];
+        let changed_b2 = &changed.baselines["B2"].held_out["validation"].scores[0];
+        assert_eq!(
+            original_b2.failure_probability,
+            changed_b2.failure_probability
+        );
+
+        let original_b3 = &original.baselines["B3"].held_out["validation"].scores[0];
+        let changed_b3 = &changed.baselines["B3"].held_out["validation"].scores[0];
+        assert_ne!(
+            original_b3.failure_probability,
+            changed_b3.failure_probability
+        );
+    }
+
+    #[test]
     fn held_out_label_changes_do_not_change_any_fitted_model_digest() {
         let changed_labels = String::from_utf8(LABELS.to_vec())
             .unwrap()
