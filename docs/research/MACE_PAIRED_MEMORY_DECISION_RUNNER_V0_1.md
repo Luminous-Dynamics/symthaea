@@ -59,6 +59,8 @@ corrected_vs_stale is intentionally omitted. The runner does not yet replay a re
 
 The generated fixture currently produces 21 scenario families per world cluster. The default run uses 256 world clusters (5,376 pair blocks; 32,256 candidate/evaluator arm rows each).
 
+Arm execution order is pseudo-randomized within each pair block using a deterministic hash of the world-cluster/task identity. The permutation is replayable from the source revision and task identity; all arms still receive the same projected candidate task and no arm learns from another arm.
+
 For each contrast:
 
 1. Compute treatment-minus-baseline utility and regret within each pair block.
