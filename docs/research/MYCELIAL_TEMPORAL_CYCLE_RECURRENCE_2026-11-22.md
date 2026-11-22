@@ -92,7 +92,8 @@ Bounds:
 - 128 nodes and 512 edges per window;
 - 2,048 simple cycles per window;
 - 32,768 distinct cycle records per sequence;
-- 1,000,000 cycle-window observations per profile.
+- 1,000,000 cycle-window observations per profile;
+- 1,000,000 edge-window observations retained in the detached profile receipt.
 
 This is a bounded small/medium-graph method, not a scalable general graph persistence engine. If cycle enumeration exceeds the limit, the profile fails instead of returning a silently truncated cycle set.
 
@@ -153,15 +154,17 @@ The profile contains:
 
 - sequence digest;
 - sorted union of source node IDs;
-- stable edge-evidence inventory and per-kind observation counts;
-- per-window nodes, edges, components, cycle rank and simple-cycle count;
+- stable edge-evidence inventory with canonical endpoints and per-kind observation counts;
+- per-window node-ID and edge-ID inventories, coverage state, duration, components, cycle rank and simple-cycle count;
 - full cycle records and present/absent/unknown observations;
 - persistent cycle hyperedges over participating nodes;
 - node-level TCN, TCR (or explicit unknown), degree exposure and persistent-cycle count;
 - total, complete and partial observation duration;
 - exact recurrence thresholds and synthetic-evidence opt-in.
 
-The canonical digest binds the source sequence digest, coordinate/calibration identities, edge-evidence inventory, all window metrics, cycles, observation states, hyperedges and node-level metrics.
+The canonical digest binds the source sequence digest, coordinate/calibration/scope identities, edge-evidence inventory including edge endpoints, full per-window node/edge inventories, all window metrics, cycles, observation states, hyperedges and node-level metrics.
+
+The detached profile validator independently rechecks that each reported cycle's edges form one connected degree-two multigraph over exactly its node identity set; each window's Present/Absent/Unknown value agrees with its stored edge inventory and coverage flag; all source nodes and edges are accounted for; and TCN/TCR/degree-exposure totals agree with the retained inventories. This means a serialized profile does not rely only on trusting its producer's in-memory calculation.
 
 Synthetic edge records require `allow_synthetic_evidence=true`. The default is false. The profile retains synthetic observation counts so a conformance run cannot masquerade as an empirical observation.
 
