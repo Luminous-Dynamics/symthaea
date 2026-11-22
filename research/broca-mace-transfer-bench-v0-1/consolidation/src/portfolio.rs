@@ -331,6 +331,8 @@ pub struct MemoryPortfolioSelectedItemV1 {
     pub context_tokens: u32,
     pub reobservation_calls: u32,
     pub latency_work_ms: u64,
+    pub estimated_cost_micros: u64,
+    pub expected_failure_loss_micros: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -379,13 +381,95 @@ impl MemoryPortfolioPlanV1 {
                 item.context_tokens.to_string(),
                 item.reobservation_calls.to_string(),
                 item.latency_work_ms.to_string(),
+                item.estimated_cost_micros.to_string(),
+                item.expected_failure_loss_micros.to_string(),
             ]);
         }
         digest_fields(b"mace:memory-portfolio-plan:v1\0", &fields)
     }
 
     pub fn is_canonical(&self) -> bool {
-        is_lower_sha256(&self.plan_sha256) && self.plan_sha256 == self.canonical_digest()
+        if !is_lower_sha256(&self.plan_sha256)
+            || self.plan_sha256 != self.canonical_digest()
+            || !self.budget.is_valid()
+        {
+            return false;
+        }
+        if matches!(
+            self.strategy,
+            PortfolioStrategyV1::ExactBounded | PortfolioStrategyV1::ParetoFrontier
+        ) && self.search_nodes == 0
+        {
+            return false;
+        }
+        if self.strategy == PortfolioStrategyV1::GreedyHighestNetValue
+            && self.search_nodes != 0
+        {
+            return false;
+        }
+
+        let mut event_ids = BTreeSet::new();
+        let mut option_digests = BTreeSet::new();
+        let mut totals = MemoryPortfolioMetricsV1::default();
+        let mut value = 0_i64;
+        for item in &self.selected {
+            if item.event_id == 0
+                || item.net_value_micros <= 0
+                || item.context_tokens == 0
+                || !is_lower_sha256(&item.option_sha256)
+                || !is_lower_sha256(&item.representation_plan_sha256)
+                || !event_ids.insert(item.event_id)
+                || !option_digests.insert(item.option_sha256.clone())
+            {
+                return false;
+            }
+            let Some(next_context) = totals
+                .context_tokens
+                .checked_add(u64::from(item.context_tokens))
+            else {
+                return false;
+            };
+            let Some(next_calls) = totals
+                .reobservation_calls
+                .checked_add(u64::from(item.reobservation_calls))
+            else {
+                return false;
+            };
+            let Some(next_latency) = totals.latency_work_ms.checked_add(item.latency_work_ms)
+            else {
+                return false;
+            };
+            let Some(next_cost) = totals
+                .estimated_cost_micros
+                .checked_add(item.estimated_cost_micros)
+            else {
+                return false;
+            };
+            let Some(next_failure) = totals
+                .expected_failure_loss_micros
+                .checked_add(item.expected_failure_loss_micros)
+            else {
+                return false;
+            };
+            let Some(next_value) = value.checked_add(item.net_value_micros) else {
+                return false;
+            };
+            totals = MemoryPortfolioMetricsV1 {
+                context_tokens: next_context,
+                reobservation_calls: next_calls,
+                latency_work_ms: next_latency,
+                estimated_cost_micros: next_cost,
+                expected_failure_loss_micros: next_failure,
+            };
+            value = next_value;
+        }
+        totals == self.metrics
+            && value == self.total_net_value_micros
+            && totals.context_tokens <= u64::from(self.budget.context_tokens)
+            && totals.reobservation_calls <= u64::from(self.budget.reobservation_calls)
+            && totals.latency_work_ms <= self.budget.latency_work_ms
+            && totals.estimated_cost_micros <= self.budget.estimated_cost_micros
+            && totals.expected_failure_loss_micros <= self.budget.expected_failure_loss_micros
     }
 }
 
@@ -421,10 +505,49 @@ impl MemoryPortfolioFrontierV1 {
     }
 
     pub fn is_canonical(&self) -> bool {
-        !self.plans.is_empty()
-            && self.plans.iter().all(MemoryPortfolioPlanV1::is_canonical)
-            && is_lower_sha256(&self.frontier_sha256)
-            && self.frontier_sha256 == self.canonical_digest()
+        if !self.budget.is_valid()
+            || self.plans.is_empty()
+            || self.plans.len() > MAX_PORTFOLIO_FRONTIER
+            || self.search_nodes == 0
+            || !is_lower_sha256(&self.frontier_sha256)
+            || self.frontier_sha256 != self.canonical_digest()
+        {
+            return false;
+        }
+
+        let Some(first) = self.plans.first() else {
+            return false;
+        };
+        if self.plans.iter().any(|plan| {
+            !plan.is_canonical()
+                || plan.strategy != PortfolioStrategyV1::ParetoFrontier
+                || plan.budget != self.budget
+                || plan.scope != first.scope
+                || plan.as_known != first.as_known
+                || plan.authority_scope_sha256 != first.authority_scope_sha256
+                || plan.search_nodes != self.search_nodes
+        }) {
+            return false;
+        }
+        if self
+            .plans
+            .windows(2)
+            .any(|pair| frontier_plan_cmp(&pair[0], &pair[1]).is_gt())
+        {
+            return false;
+        }
+
+        for left in 0..self.plans.len() {
+            for right in (left + 1)..self.plans.len() {
+                if self.plans[left].plan_sha256 == self.plans[right].plan_sha256
+                    || plan_dominates(&self.plans[left], &self.plans[right])
+                    || plan_dominates(&self.plans[right], &self.plans[left])
+                {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
@@ -665,6 +788,8 @@ fn make_plan(
                 context_tokens: option.context_tokens,
                 reobservation_calls: option.reobservation_calls,
                 latency_work_ms: option.latency_work_ms,
+                estimated_cost_micros: option.estimated_cost_micros,
+                expected_failure_loss_micros: option.expected_failure_loss_micros,
             }
         })
         .collect();
@@ -734,7 +859,7 @@ pub fn optimize_memory_portfolio_exact_with_limit(
         max_search_nodes,
     )?;
 
-    Ok(make_plan(
+    let mut result = make_plan(
         PortfolioStrategyV1::ExactBounded,
         prepared,
         options,
@@ -743,7 +868,10 @@ pub fn optimize_memory_portfolio_exact_with_limit(
         best.value_micros,
         budget,
         nodes,
-    ))
+    );
+    result.search_nodes = nodes;
+    result.plan_sha256 = result.canonical_digest();
+    Ok(result)
 }
 
 /// Diagnostic baseline: choose the highest individual net-value option first.
@@ -941,14 +1069,19 @@ fn search_frontier(
     Ok(())
 }
 
+fn frontier_plan_cmp(
+    left: &MemoryPortfolioPlanV1,
+    right: &MemoryPortfolioPlanV1,
+) -> std::cmp::Ordering {
+    right
+        .total_net_value_micros
+        .cmp(&left.total_net_value_micros)
+        .then_with(|| resource_vector(left.metrics).cmp(&resource_vector(right.metrics)))
+        .then_with(|| plan_selected_key(left).cmp(&plan_selected_key(right)))
+}
+
 fn sort_frontier(plans: &mut [MemoryPortfolioPlanV1]) {
-    plans.sort_by(|left, right| {
-        right
-            .total_net_value_micros
-            .cmp(&left.total_net_value_micros)
-            .then_with(|| resource_vector(left.metrics).cmp(&resource_vector(right.metrics)))
-            .then_with(|| plan_selected_key(left).cmp(&plan_selected_key(right)))
-    });
+    plans.sort_by(frontier_plan_cmp);
 }
 
 pub fn optimize_memory_portfolio_frontier(
@@ -993,6 +1126,10 @@ pub fn optimize_memory_portfolio_frontier_with_limits(
         max_search_nodes,
         max_frontier,
     )?;
+    for plan in &mut frontier {
+        plan.search_nodes = nodes;
+        plan.plan_sha256 = plan.canonical_digest();
+    }
     sort_frontier(&mut frontier);
 
     let mut result = MemoryPortfolioFrontierV1 {
@@ -1170,6 +1307,31 @@ mod tests {
             exact.selected.iter().map(|item| item.event_id).collect::<Vec<_>>(),
             vec![2, 3]
         );
+    }
+
+    #[test]
+    fn rehashed_plan_with_forged_resource_totals_is_not_canonical() {
+        let options = vec![option(
+            1,
+            "one",
+            ReobservationDispositionV1::PersistKnowledge,
+            50,
+            4,
+            0,
+            0,
+            5,
+            1,
+        )];
+        let mut plan = optimize_memory_portfolio_exact(
+            &options,
+            budget(8, 1, 10, 20, 5),
+        )
+        .unwrap();
+        assert!(plan.is_canonical());
+
+        plan.metrics.estimated_cost_micros = 0;
+        plan.plan_sha256 = plan.canonical_digest();
+        assert!(!plan.is_canonical());
     }
 
     #[test]
@@ -1489,6 +1651,48 @@ mod tests {
         assert!(values.contains(&75));
         assert!(values.contains(&70));
         assert!(!values.contains(&20));
+    }
+
+    #[test]
+    fn rehashed_frontier_with_dominated_plan_is_not_semantically_canonical() {
+        let options = vec![
+            option(
+                1,
+                "high",
+                ReobservationDispositionV1::PersistKnowledge,
+                100,
+                10,
+                0,
+                0,
+                1,
+                0,
+            ),
+            option(
+                1,
+                "compact",
+                ReobservationDispositionV1::StoreLocator,
+                75,
+                4,
+                1,
+                10,
+                1,
+                1,
+            ),
+        ];
+        let mut frontier = optimize_memory_portfolio_frontier(
+            &options,
+            budget(12, 1, 20, 100, 10),
+        )
+        .unwrap();
+        assert!(frontier.is_canonical());
+
+        let mut dominated = frontier.plans[0].clone();
+        dominated.total_net_value_micros =
+            dominated.total_net_value_micros.saturating_sub(1);
+        dominated.plan_sha256 = dominated.canonical_digest();
+        frontier.plans.push(dominated);
+        frontier.frontier_sha256 = frontier.canonical_digest();
+        assert!(!frontier.is_canonical());
     }
 
     #[test]
