@@ -6,8 +6,7 @@ use cetb_rcaf::motion_transient::{
 };
 use cetb_rcaf::spatial_calibration::calibrate_spatial_nuisance_to_component_fraction;
 use cetb_rcaf::spatial_nuisance::{
-    generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig,
-    SpatialNuisanceFamily,
+    generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig, SpatialNuisanceFamily,
 };
 use std::error::Error;
 use std::fs;
@@ -30,9 +29,7 @@ fn target_signal(time_points: usize, roi_count: usize) -> Vec<Vec<f64>> {
     (0..time_points)
         .map(|time| {
             (0..roi_count)
-                .map(|roi| {
-                    0.08 * ((time as f64 + 2.0) * (roi as f64 + 1.0) * 0.073).sin()
-                })
+                .map(|roi| 0.08 * ((time as f64 + 2.0) * (roi as f64 + 1.0) * 0.073).sin())
                 .collect()
         })
         .collect()
