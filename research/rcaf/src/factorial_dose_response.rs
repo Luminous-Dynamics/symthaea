@@ -126,6 +126,7 @@ pub enum FactorialDoseResponseError {
     DimensionMismatch(&'static str),
     NonFiniteInput(&'static str),
     NonFiniteScaledSignal,
+    FactorialInvariantFailure,
     Factorial(FactorialExperimentError),
     Calibration(SpatialVarianceCalibrationError),
 }
@@ -154,6 +155,9 @@ impl fmt::Display for FactorialDoseResponseError {
             Self::NonFiniteInput(name) => write!(f, "{name} contains non-finite values"),
             Self::NonFiniteScaledSignal => {
                 write!(f, "signal scaling produced non-finite observations")
+            }
+            Self::FactorialInvariantFailure => {
+                write!(f, "factorial matched-component invariants were not preserved")
             }
             Self::Factorial(error) => write!(f, "factorial cell construction failed: {error}"),
             Self::Calibration(error) => write!(f, "nuisance calibration failed: {error}"),
@@ -249,7 +253,7 @@ pub fn run_factorial_dose_response_sweep(
                 &metadata,
             )?;
             if !experiment.report.invariants.all_invariants_within_tolerance {
-                return Err(FactorialDoseResponseError::NonFiniteScaledSignal);
+                return Err(FactorialDoseResponseError::FactorialInvariantFailure);
             }
             let calibration = &calibration_reports[fraction_index];
             points.push(FactorialDoseResponsePoint {
