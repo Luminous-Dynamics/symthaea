@@ -192,6 +192,39 @@ jobs:
             '/tmp/secom-real/secom_labels.data' \
             | sha256sum --check -
 
+
+      - name: Generate five deterministic stratified SECOM 80/20 manifests
+        run: |
+          EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
+          SNAPSHOT=/tmp/semi-rust-work/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-stratified-splits -- \
+            /tmp/secom-real/secom.data \
+            /tmp/secom-real/secom_labels.data \
+            "$EXPECTATIONS" \
+            "$SNAPSHOT" \
+            > /tmp/secom-real/stratified-80-20-repeats.json
+
+          jq -e '
+            .schema == "luminous.semi-bench.stratified-repeat-report.v1" and
+            .dataset_id == "UCI-SECOM-179@Be1an001/semiconductor-pass-fail-prediction-python@0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3" and
+            .total_samples == 1567 and
+            .total_positive == 104 and
+            .total_negative == 1463 and
+            .repeat_count == 5 and
+            (.repeats | length == 5) and
+            all(.repeats[];
+              .train.samples == 1253 and .train.positive == 83 and .train.negative == 1170 and
+              .test.samples == 314 and .test.positive == 21 and .test.negative == 293
+            ) and
+            .claim_limits.temporal_independence_not_established == true and
+            .claim_limits.group_or_lot_independence_not_established == true and
+            .claim_limits.seeds_are_reconstruction_not_authors_original_seeds == true
+          ' /tmp/secom-real/stratified-80-20-repeats.json > /dev/null
+
+          echo "Five-repeat stratified 80/20 split manifests created:"
+          jq -r '.repeats[] | [.repeat_index,.seed,.split_manifest_sha256,.train.samples,.train.positive,.test.samples,.test.positive] | @tsv' \
+            /tmp/secom-real/stratified-80-20-repeats.json
+
       - name: Run Rust B0/B1 and observation drift on the full pinned SECOM chronology
         run: |
           EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
@@ -373,4 +406,5 @@ jobs:
             /tmp/secom-real/observation-drift-report.json
             /tmp/secom-real/tabular-baselines-report.json
             /tmp/secom-real/logistic-report.json
+            /tmp/secom-real/stratified-80-20-repeats.json
           if-no-files-found: error
