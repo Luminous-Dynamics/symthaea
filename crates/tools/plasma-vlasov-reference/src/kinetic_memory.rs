@@ -881,6 +881,48 @@ mod tests {
         VlasovPoisson1d1v::new(config, initial).unwrap()
     }
 
+    fn solver_with_velocity_filament() -> VlasovPoisson1d1v {
+        let config = config();
+        let mut initial = maxwellian_perturbation(config, 0.03, 1, 1.0).unwrap();
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let phase = TAU * 16.0 * iv as f64 / config.nv as f64;
+                initial[ix * config.nv + iv] *= 1.0 + 0.2 * phase.cos();
+            }
+        }
+        VlasovPoisson1d1v::new(config, initial).unwrap()
+    }
+
+    fn assert_active_plus_packet_matches(
+        reference: &VlasovPoisson1d1v,
+        active: &VlasovPoisson1d1v,
+        packet: &KineticMemoryPacket,
+        tolerance: f64,
+    ) {
+        let config = config();
+        let velocities: Vec<f64> = (0..config.nv).map(|iv| config.velocity(iv)).collect();
+        let reconstruction = packet.reconstruct_at_velocities(&velocities).unwrap();
+        assert!(reconstruction.relative_imaginary_residual < tolerance);
+        let scale = reference
+            .distribution()
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0_f64, f64::max)
+            .max(f64::MIN_POSITIVE);
+        let maximum_error = reference
+            .distribution()
+            .iter()
+            .zip(active.distribution().iter())
+            .zip(reconstruction.values.iter())
+            .map(|((expected, active), vaulted)| (expected - active - vaulted).abs())
+            .fold(0.0_f64, f64::max);
+        assert!(
+            maximum_error / scale < tolerance,
+            "active-plus-vault relative reconstruction error = {:e}",
+            maximum_error / scale
+        );
+    }
+
     #[test]
     fn capture_and_restore_preserves_distribution_c2_and_field() {
         let mut solver = solver();
@@ -945,6 +987,50 @@ mod tests {
             assert!((actual.real - expected.real).abs() < 1.0e-10);
             assert!((actual.imaginary - expected.imaginary).abs() < 1.0e-10);
         }
+    }
+
+    #[test]
+    fn vaulted_filament_matches_unforked_streaming_and_velocity_pulse() {
+        let mut reference = solver_with_velocity_filament();
+        let mut active = solver_with_velocity_filament();
+        let config = config();
+        let capture_time = 8.0 * std::f64::consts::PI / 3.0;
+        reference.advance_free_streaming(capture_time).unwrap();
+        active.advance_free_streaming(capture_time).unwrap();
+
+        let original_casimir = reference.quadratic_casimir_budget().unwrap().total_casimir;
+        let mut packet =
+            KineticMemoryPacket::capture_high_velocity_modes(&mut active, 21, 4, 1.0e-9)
+                .unwrap();
+        assert!(
+            packet.quadratic_casimir() / original_casimir > 1.0e-5,
+            "fixture did not put meaningful f-strophy into the vaulted band"
+        );
+        assert_active_plus_packet_matches(&reference, &active, &packet, 1.0e-9);
+
+        // For Lx=4pi, k1=1/2 and deta=pi/6, dt=pi/3 is an exact one-bin shift.
+        let aligned_dt = std::f64::consts::PI / 3.0;
+        reference.advance_free_streaming(aligned_dt).unwrap();
+        active.advance_free_streaming(aligned_dt).unwrap();
+        packet.advance_free_streaming(aligned_dt).unwrap();
+        assert_active_plus_packet_matches(&reference, &active, &packet, 1.0e-8);
+
+        // A spatially varying impulse mixes the stored high-eta packet back
+        // into the registered spatial modes without changing its C2.
+        let impulse: Vec<f64> = (0..config.nx)
+            .map(|ix| 0.04 * (TAU * 2.0 * config.x(ix) / config.domain_length).sin())
+            .collect();
+        let packet_casimir_before = packet.quadratic_casimir();
+        reference.apply_velocity_impulse(&impulse).unwrap();
+        active.apply_velocity_impulse(&impulse).unwrap();
+        packet.apply_velocity_impulse(&impulse).unwrap();
+        assert!((packet.quadratic_casimir() - packet_casimir_before).abs() < 1.0e-10);
+        assert_active_plus_packet_matches(&reference, &active, &packet, 1.0e-8);
+
+        reference.advance_free_streaming(aligned_dt).unwrap();
+        active.advance_free_streaming(aligned_dt).unwrap();
+        packet.advance_free_streaming(aligned_dt).unwrap();
+        assert_active_plus_packet_matches(&reference, &active, &packet, 1.0e-8);
     }
 
     #[test]
