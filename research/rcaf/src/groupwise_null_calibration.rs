@@ -617,12 +617,6 @@ fn proportion_json(value: &ProportionInterval) -> String {
     )
 }
 
-fn optional_rate_json(value: Option<&ProportionInterval>) -> String {
-    value
-        .map(proportion_json)
-        .unwrap_or_else(|| "null".to_string())
-}
-
 fn worst_rate_json(value: Option<&WorstStratumRate>) -> String {
     value
         .map(|item| {
