@@ -1084,6 +1084,16 @@ impl MycelialReconstructionScore {
                 || length_is_empty != self.segment_length_error.p95_absolute_error.is_none())
             || !length_values_valid
             || self.topology_delta != expected_topology_delta
+            || summarize_component_attributions(&self.component_attributions)
+                .as_ref() != Some(&self.component_error_summary)
+            || self.component_error_summary.matched_junction_count
+                != self.identity_matches.len()
+            || self.component_error_summary.matched_prediction_component_count
+                + self.component_error_summary.unmatched_prediction_component_count
+                != self.prediction_topology.connected_components
+            || self.component_error_summary.matched_ground_truth_component_count
+                + self.component_error_summary.unmatched_ground_truth_component_count
+                != self.ground_truth_topology.connected_components
         {
             return Err(MycelialReconstructionError::InvalidGraph(
                 "reconstruction score receipt is internally inconsistent",
@@ -1131,6 +1141,22 @@ impl MycelialReconstructionScore {
         hasher.update(&(self.unmatched_prediction_edge_count as u64).to_le_bytes());
         hash_topology(&mut hasher, &self.ground_truth_topology);
         hash_topology(&mut hasher, &self.prediction_topology);
+        for value in [
+            self.component_error_summary.matched_junction_count,
+            self.component_error_summary.matched_prediction_component_count,
+            self.component_error_summary.matched_ground_truth_component_count,
+            self.component_error_summary.false_merge_count,
+            self.component_error_summary.false_split_count,
+            self.component_error_summary.unmatched_prediction_component_count,
+            self.component_error_summary.unmatched_ground_truth_component_count,
+        ] {
+            hasher.update(&(value as u64).to_le_bytes());
+        }
+        for attribution in &self.component_attributions {
+            hash_optional_string(&mut hasher, attribution.predicted_component_id.as_deref());
+            hash_optional_string(&mut hasher, attribution.ground_truth_component_id.as_deref());
+            hasher.update(&(attribution.matched_junction_count as u64).to_le_bytes());
+        }
         hash_error_summary(&mut hasher, &self.localization_error);
         hash_option_f64(&mut hasher, self.segment_length_error.mean_absolute_error);
         hash_option_f64(
@@ -1423,6 +1449,93 @@ fn component_attribution(
     )
 }
 
+fn summarize_component_attributions(
+    rows: &[ReconstructionComponentAttribution],
+) -> Option<ReconstructionComponentErrorSummary> {
+    let mut truth_by_prediction = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut prediction_by_truth = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut unmatched_predictions = BTreeSet::new();
+    let mut unmatched_truth = BTreeSet::new();
+    let mut matched_junction_count = 0usize;
+    let mut relation_pairs = BTreeSet::new();
+
+    for row in rows {
+        match (
+            row.predicted_component_id.as_deref(),
+            row.ground_truth_component_id.as_deref(),
+        ) {
+            (Some(predicted), Some(truth)) => {
+                if !valid_id(predicted)
+                    || !valid_id(truth)
+                    || row.matched_junction_count == 0
+                    || !relation_pairs.insert((predicted.to_string(), truth.to_string()))
+                {
+                    return None;
+                }
+                truth_by_prediction
+                    .entry(predicted.to_string())
+                    .or_default()
+                    .insert(truth.to_string());
+                prediction_by_truth
+                    .entry(truth.to_string())
+                    .or_default()
+                    .insert(predicted.to_string());
+                matched_junction_count =
+                    matched_junction_count.checked_add(row.matched_junction_count)?;
+            }
+            (Some(predicted), None) => {
+                if !valid_id(predicted)
+                    || row.matched_junction_count != 0
+                    || !unmatched_predictions.insert(predicted.to_string())
+                {
+                    return None;
+                }
+            }
+            (None, Some(truth)) => {
+                if !valid_id(truth)
+                    || row.matched_junction_count != 0
+                    || !unmatched_truth.insert(truth.to_string())
+                {
+                    return None;
+                }
+            }
+            (None, None) => return None,
+        }
+    }
+    if rows.windows(2).any(|pair| {
+        (
+            pair[0].predicted_component_id.as_deref(),
+            pair[0].ground_truth_component_id.as_deref(),
+        ) >= (
+            pair[1].predicted_component_id.as_deref(),
+            pair[1].ground_truth_component_id.as_deref(),
+        )
+    }) || unmatched_predictions
+        .iter()
+        .any(|id| truth_by_prediction.contains_key(id))
+        || unmatched_truth
+            .iter()
+            .any(|id| prediction_by_truth.contains_key(id))
+    {
+        return None;
+    }
+    Some(ReconstructionComponentErrorSummary {
+        matched_junction_count,
+        matched_prediction_component_count: truth_by_prediction.len(),
+        matched_ground_truth_component_count: prediction_by_truth.len(),
+        false_merge_count: truth_by_prediction
+            .values()
+            .map(|components| components.len().saturating_sub(1))
+            .sum(),
+        false_split_count: prediction_by_truth
+            .values()
+            .map(|components| components.len().saturating_sub(1))
+            .sum(),
+        unmatched_prediction_component_count: unmatched_predictions.len(),
+        unmatched_ground_truth_component_count: unmatched_truth.len(),
+    })
+}
+
 fn point_distance(
     left: ReconstructionPoint3,
     right: ReconstructionPoint3,
@@ -1491,6 +1604,18 @@ fn junction_kind_index(kind: AnnotatedJunctionKind) -> usize {
         AnnotatedJunctionKind::Anastomosis => 3,
         AnnotatedJunctionKind::ProjectedCrossing => 4,
         AnnotatedJunctionKind::Uncertain => 5,
+    }
+}
+
+fn hash_optional_string(hasher: &mut blake3::Hasher, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            hash_string(hasher, value);
+        }
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 
