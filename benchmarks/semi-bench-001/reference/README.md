@@ -465,3 +465,31 @@ A validated numeric target requires a finite point value, unit and standard unce
 **Critical invariant:** an old measurement event is not a usable training target until its result is available. Training and evaluation must never backfill a later lab result into an earlier model snapshot. Unaligned clock domains are excluded rather than guessed.
 
 Rust tests cover event/availability separation, delayed labels, late-arriving event exclusion, clock-domain mismatch, future timestamps, unresolved graph edges, label/subject consistency and immutable revision lineage. The graph validator establishes schema/time/identity integrity only; it does not prove sensor accuracy, physical causality, VM calibration, transfer or process-control authority.
+
+
+## Adaptive metrology with randomized audit and selection-corrected inference
+
+The Rust module \`benchmark::metrology_audit\` implements a two-lane sampling design:
+
+- **Exploit lane:** deterministic ranking by a declared weighted combination of defect risk, epistemic uncertainty and expected value of information, divided by measurement cost. Selected exploit candidates have inclusion probability \(\pi_i=1\).
+- **Audit lane:** fixed-count simple random sampling without replacement from the remaining candidates in every source-defined stratum. Each residual candidate receives \(\pi_i=n_h/N_h>0\), whether selected or not.
+
+The policy input fixes separate exploit/audit cost budgets, per-stratum audit quotas, a seed, model/prediction/config digests, class-semantics digest and every candidate's source-defined stratum. Audit budget is checked conservatively using the maximum measurement cost in each stratum times its fixed quota. The PRNG seed is combined with the stratum identity; candidate ordering is canonicalized by candidate ID.
+
+The selection report records **every candidate**, selected or not, with inclusion probability, selected flag, selection reason, stratum, source subject identity, measurand, prediction probability, priority score and cost. This makes it possible to reconstruct the selection design and detect positivity failures.
+
+The population estimator rebuilds the process-event graph's information-cutoff snapshot. Every selected candidate must have exactly one outcome whose label:
+- is present in the matured validated label set;
+- resolves to a validated graph label;
+- matches subject and target measurand;
+- carries the same versioned binary-class semantics reference and SHA-256.
+
+It computes Horvitz–Thompson totals for defect count and Brier loss. Deterministic exploit outcomes contribute as a census. Randomized audit outcomes estimate the residual stratum totals using SRSWOR. It reports a Hájek ratio estimate as a diagnostic, effective sample size and stratified finite-population variance/standard errors where at least two randomized audit outcomes are available in each non-census residual stratum. Missing or immature outcomes reject; they are never assumed to be passes.
+
+### Evaluation protocol
+
+Compare fixed-frequency random sampling, deterministic top-risk, uncertainty-only, EVSI-only, OGP-style uncertainty sampling, randomized audit only, exploit+audit and conformal-abstention+exploit+audit. Use identical synthetic population streams with known truth, then shadow-mode fab outcomes. Report not only measurements saved but also population defect-prevalence error, Brier estimation error, excursion detection/delay, false alarms, effective sample size, design effect and subgroup/tool/chamber/recipe representativeness.
+
+Aspirational target: 20–30% fewer measurements without exceeding a pre-registered escape-defect non-inferiority margin, while maintaining bounded population-estimation error and coverage across strata. This is not established by SECOM.
+
+**Claim ceiling:** inverse-propensity estimates are valid for the declared randomized design and observed population under the documented assumptions; they do not correct unmeasured confounding, an incorrect class-semantics mapping or missing outcomes after selection. The sampler is a benchmark/scheduling primitive, not a production measurement command or APC/hold/release authority.
