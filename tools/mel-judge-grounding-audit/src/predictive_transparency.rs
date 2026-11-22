@@ -143,7 +143,7 @@ pub struct ForecastAuditReport {
     pub within_onset_tolerance_rate: Option<f64>,
     pub median_anticipation_lead_ns: Option<u64>,
     pub series: Vec<ForecastSeriesSummary>,
-    pub qualified_for_anticipatory_use: bool,
+    pub structurally_valid_anticipatory_trace: bool,
     pub qualification_findings: Vec<String>,
     pub event_findings: Vec<EventForecastFinding>,
     pub claim_ceiling: Vec<String>,
@@ -188,7 +188,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         }
     }
 
-    let series = validate_series(&mut series_members, &forecast_ids, &mut findings)?;
+    let series = validate_series(&mut series_members, &forecast_ids)?;
     let latest_by_series: BTreeMap<&str, &ForecastV1> = series_members
         .iter()
         .filter_map(|(series_id, members)| {
@@ -477,7 +477,8 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
                     (None, None, None, None, None)
                 };
             let presence_observed = realized.is_some();
-            let brier = (predicted.presence_probability - f64::from(presence_observed)).powi(2);
+            let observed_probability = if presence_observed { 1.0 } else { 0.0 };
+            let brier = (predicted.presence_probability - observed_probability).powi(2);
             brier_sum += brier;
             brier_count += 1;
             let within = phase_error.map(|value| value.abs() <= panel.policy.maximum_onset_error_beats);
@@ -504,6 +505,11 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         .iter()
         .filter(|forecast| !displays_by_forecast.contains_key(forecast.forecast_id.as_str()))
         .count();
+    if forecasts_without_display > 0 {
+        findings.push(format!(
+            "{forecasts_without_display} forecast(s) were never rendered to the collaborator"
+        ));
+    }
 
     let mut absolute_sorted = onset_errors.clone();
     absolute_sorted.sort_by(f64::total_cmp);
@@ -525,7 +531,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         })
         .collect();
 
-    let qualified = findings.is_empty();
+    let structurally_valid = findings.is_empty();
     Ok(ForecastAuditReport {
         schema_version: "mel-musical-forecast-report-v1".to_owned(),
         session_id: panel.session_id.clone(),
@@ -549,7 +555,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         within_onset_tolerance_rate: rate(within_count, onset_observed_count),
         median_anticipation_lead_ns: percentile_u64(&mut lead_times, 50),
         series: series_summaries,
-        qualified_for_anticipatory_use: qualified,
+        structurally_valid_anticipatory_trace: structurally_valid,
         qualification_findings: findings,
         event_findings,
         claim_ceiling: panel.claim_ceiling.clone(),
@@ -643,7 +649,6 @@ fn validate_forecast(forecast: &ForecastV1, panel: &ForecastPanelV1) -> Result<(
 fn validate_series(
     series: &mut BTreeMap<&str, Vec<&ForecastV1>>,
     forecast_ids: &BTreeMap<&str, &ForecastV1>,
-    findings: &mut Vec<String>,
 ) -> Result<Vec<ForecastSeriesSummary>, String> {
     let mut summaries = Vec::new();
     for (series_id, members) in series.iter_mut() {
@@ -777,7 +782,7 @@ mod tests {
     #[test]
     fn known_answer_forecast_is_visible_before_realization_and_well_calibrated() {
         let report = parse_and_audit(FIXTURE).expect("forecast fixture should validate");
-        assert!(report.qualified_for_anticipatory_use);
+        assert!(report.structurally_valid_anticipatory_trace);
         assert_eq!(report.forecast_count, 1);
         assert_eq!(report.displayed_before_target_count, 1);
         assert_eq!(report.matched_forecast_event_count, 1);
@@ -805,8 +810,10 @@ mod tests {
     #[test]
     fn stale_forecast_realization_is_not_qualified() {
         let mut value = panel();
-        value["forecasts"][0]["expires_at_ns"] = serde_json::json!(1_000_000_001_u64);
-        value["forecasts"][0]["target_end_ns"] = serde_json::json!(1_000_000_001_u64);
+        value["forecasts"][0]["expires_at_ns"] = serde_json::json!(1_100_000_000_u64);
+        value["forecasts"][0]["target_end_ns"] = serde_json::json!(1_100_000_000_u64);
+        value["realizations"][0]["started_at_ns"] = serde_json::json!(1_200_000_000_u64);
+        value["realizations"][0]["completed_at_ns"] = serde_json::json!(1_230_000_000_u64);
         let error = audit(&value).expect_err("expiry must cover the target window");
         assert!(error.contains("expires before"));
     }
@@ -829,8 +836,12 @@ mod tests {
         second["supersedes_forecast_id"] = serde_json::json!("forecast-1");
         second["committed_at_ns"] = serde_json::json!(900_000_000_u64);
         value["forecasts"].as_array_mut().unwrap().push(second);
-        let error = audit(&value).expect_err("latest revision committed after target starts");
-        assert!(error.to_string().contains("post-hoc") || error.to_string().contains("revision"));
+        let report = audit(&value).expect("superseded realization remains reportable");
+        assert!(!report.structurally_valid_anticipatory_trace);
+        assert!(report
+            .qualification_findings
+            .iter()
+            .any(|finding| finding.contains("superseded forecast")));
     }
 
     #[test]
