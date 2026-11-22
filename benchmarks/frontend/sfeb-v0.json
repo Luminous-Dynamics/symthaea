@@ -536,6 +536,48 @@
       "positive_control_false_reject_rate_max": 0
     },
     "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --mutations",
-    "validator_status": "source_authored_not_executed"
+    "validator_status": "source_authored_not_executed",
+    "report_schema_path": "benchmarks/frontend/qualification/qualification-report-v1.schema.json",
+    "execution_protocol_path": "benchmarks/frontend/qualification/EXECUTION.md",
+    "adjudicator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --qualification-report benchmarks/frontend/qualification/qualification-report-v1.schema.json benchmarks/frontend/qualification/mutation-campaign-v1.json path/to/qualification-report.json",
+    "adjudicator_status": "source_and_tests_authored_not_executed",
+    "adjudicator_capabilities": [
+      "bind exact campaign file SHA-256",
+      "require complete mutation/positive/metamorphic case coverage",
+      "enforce baseline/candidate fixture and environment pairing",
+      "verify receipt identity and receipt byte SHA-256",
+      "re-read screenshot/accessibility/layout files and recompute SHA-256 and lengths",
+      "verify PNG dimensions against receipt viewport and layout viewport consistency",
+      "compute per-class mutation kill rates and Wilson 95% intervals",
+      "adjudicate positive and metamorphic semantic equivalence"
+    ],
+    "trust_boundary": "Report integrity and evidence-byte verification are implemented in source. Cryptographic authentication of the report producer and truth of observed oracle IDs are not implemented; a trusted isolated executor and verifiable runner attestation are still required."
+  },
+  "comparative_evaluation": {
+    "status": "protocol_designed_not_executed",
+    "design_path": "benchmarks/frontend/comparative-evaluation-v1.json",
+    "schema_path": "benchmarks/frontend/comparative-evaluation-v1.schema.json",
+    "comparison_arms": [
+      "A0_matched_base_agent",
+      "A1_documentation_retrieval",
+      "A2_interface_contract",
+      "A3_browser_evidence_and_repair",
+      "A4_full_symthaea",
+      "H0_human_engineer_reference"
+    ],
+    "task_targets": {
+      "public_pilot": 30,
+      "comparative": 150,
+      "publication_minimum": 500
+    },
+    "statistical_methods": [
+      "paired_task_blocks",
+      "exact_McNemar_for_binary_outcomes",
+      "task_cluster_bootstrap_for_continuous_metrics",
+      "Wilson_95_intervals_for_proportions",
+      "Holm_correction_for_secondary_comparisons"
+    ],
+    "primary_contrast": "A4 minus A0",
+    "success_rule": "positive paired 95% interval excluding zero with all hard gates, or noninferiority within 2 percentage points and >=30% lower cost per accepted task"
   }
 }
