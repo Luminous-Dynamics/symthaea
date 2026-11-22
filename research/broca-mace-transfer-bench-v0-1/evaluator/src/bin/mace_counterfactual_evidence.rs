@@ -559,7 +559,7 @@ fn run() -> Result<(), String> {
             "baseline_evidence_sha256": manifest.baseline_evidence_sha256,
             "public_seed": manifest.seed,
             "intervention_count": manifest.interventions.len(),
-            "interventions": manifest.interventions,
+            "interventions": &manifest.interventions,
             "known_root_count": EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
                 .known_root_count(),
@@ -609,9 +609,11 @@ fn run() -> Result<(), String> {
             "target_key": "full_evidence_reference",
             "removed_event_ids": [],
             "removed_event_count": 0,
+            "removed_experience_struct_bytes_lower_bound": 0,
             "decision": action_name(baseline.decision.action),
             "utility": truth_utility(case.truth, baseline.decision.action),
             "regret": baseline_regret,
+            "full_evidence_regret": baseline_regret,
             "regret_gap_vs_full_evidence": 0.0,
             "decision_is_optimal": baseline.decision.action == Some(case.truth.optimal_action()),
             "abstained": baseline.decision.action.is_none(),
