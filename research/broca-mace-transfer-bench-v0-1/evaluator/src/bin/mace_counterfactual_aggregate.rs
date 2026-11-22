@@ -503,7 +503,7 @@ fn reduce(
     }
     let provenance = input_provenance
         .ok_or_else(|| "evaluator stream has no run provenance".to_string())?;
-    let manifest_set_payload = manifest_shas.iter().cloned().collect::<Vec<_>>().join("\\n");
+    let manifest_set_payload = manifest_shas.iter().cloned().collect::<Vec<_>>().join("\n");
     let input_manifest_set_sha256 =
         hex_digest(Sha256::digest(manifest_set_payload.as_bytes()).as_slice());
     let aggregation_code_sha256 = hex_digest(
