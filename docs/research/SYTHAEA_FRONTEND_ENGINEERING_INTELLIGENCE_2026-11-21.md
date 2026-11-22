@@ -824,3 +824,32 @@ A credible SOTA advance must show more than a high static screenshot score:
    cost, retries and benchmark exposure.
 
 No performance results or SOTA superiority are claimed by this protocol.
+
+
+## 14. Public reference-fixture self-audit
+
+A review of the first SFEB task showed a useful gap between validating a fixture
+digest and checking that the reference itself actually matches its declared
+product brief. The standalone Rust task validator now includes a static
+service-dashboard reference audit:
+
+- exactly one `main` landmark and one level-one heading with the required name;
+- a skip-to-main anchor plus focus CSS;
+- named workspace, summary, activity and schedule regions;
+- exactly three separately identified metric cards;
+- explicit desktop three-column and narrow-screen one-column CSS declarations;
+- no script tags, remote URLs, CSS imports or external CSS asset references.
+
+Regression tests mutate the heading and responsive breakpoint while recomputing
+the fixture digest; both should be rejected by the static semantic audit. A
+separate independent source-content preflight against the checked-in HTML/CSS
+found all ten static conditions present. That preflight is not a Rust test run.
+
+This is deliberately a **reference-fixture sanity check**, not a browser oracle
+for an agent implementation. It cannot prove the browser's computed layout,
+keyboard behavior, accessibility tree, breakpoint rendering, network egress or
+human usability. Those remain responsibilities of the isolated Chromium
+runner and must not be promoted from source-level status.
+
+The standalone contract checker now contains 27 authored unit tests. None have
+been executed because the current environment has no Rust toolchain.
