@@ -21,7 +21,9 @@ use broca_mace_hdc_retrieval::{
     typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
     CandidateIndex, CandidateHit, IndexConfig, RepresentationProfile,
 };
-use broca_mace_policy::{decide, is_qualified, Action, Decision, Experience, Policy, Query};
+use broca_mace_policy::{
+    decide, is_qualified, Action, Decision, DecisionNeedV1, Experience, Policy, Query,
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -90,6 +92,7 @@ struct CandidateTask<'a> {
     family: &'a str,
     memory: &'a [Experience],
     query: Query,
+    decision_need: DecisionNeedV1,
 }
 
 fn candidate_task(case: &stress::Case) -> CandidateTask<'_> {
@@ -98,6 +101,7 @@ fn candidate_task(case: &stress::Case) -> CandidateTask<'_> {
         family: case.family,
         memory: &case.memory,
         query: case.query,
+        decision_need: case.decision_need,
     }
 }
 
@@ -254,7 +258,7 @@ fn hdc_hits(
 
 fn typed_content_hits(
     memory: &[Experience],
-    query: Query,
+    decision_need: DecisionNeedV1,
 ) -> Result<(Vec<CandidateHit>, u64, String), String> {
     let config = TypedContentConfigV1 {
         dimension: HDC_DIMENSION,
@@ -266,9 +270,12 @@ fn typed_content_hits(
     let profile_digest = index.profile_digest().to_string();
 
     let mut hits = Vec::new();
-    for action in [Action::A, Action::B] {
-        let candidate_query =
-            SemanticExperienceQueryV1::qualified_transfer(query.scope, action);
+    if !decision_need.is_valid() {
+        return Err("candidate-visible DecisionNeed failed canonical validation".to_string());
+    }
+    for action in decision_need.action_alternatives {
+        let candidate_query = SemanticExperienceQueryV1::from_decision_need(decision_need, action)
+            .map_err(|error| error.to_string())?;
         let result = index
             .retrieve(candidate_query, TOP_K)
             .map_err(|error| error.to_string())?;
@@ -338,7 +345,7 @@ fn execute_arm(
             }
             ids
         }),
-        Arm::TypedContentHdc => typed_content_hits(&memory, case.query)
+        Arm::TypedContentHdc => typed_content_hits(&memory, case.decision_need)
             .map(|(hits, bytes, profile_digest)| {
                 index_bytes = bytes;
                 retrieval_profile_digest = Some(profile_digest);
@@ -461,18 +468,29 @@ fn action_utility(truth: stress::Truth, action: Option<Action>) -> f64 {
     truth.utility(action.unwrap_or(Action::B))
 }
 
-fn pair_block_id(cluster: u64, family: &str, query: Query) -> String {
+fn pair_block_id(
+    cluster: u64,
+    family: &str,
+    query: Query,
+    decision_need: DecisionNeedV1,
+) -> String {
     format!(
-        "cluster-{cluster}:{family}:{:?}:{:?}",
-        query.scope.regime, query.scope.objective
+        "cluster-{cluster}:{family}:{:?}:{:?}:need-{}",
+        query.scope.regime,
+        query.scope.objective,
+        decision_need.canonical_digest().to_hex()
     )
 }
 
 fn candidate_input_digest(case: &CandidateTask<'_>) -> String {
     sha256(
         format!(
-            "mace-candidate-input-v1|cluster={}|family={}|regime={:?}|objective={:?}",
-            case.cluster, case.family, case.query.scope.regime, case.query.scope.objective
+            "mace-candidate-input-v2|cluster={}|family={}|regime={:?}|objective={:?}|decision_need={}",
+            case.cluster,
+            case.family,
+            case.query.scope.regime,
+            case.query.scope.objective,
+            case.decision_need.canonical_digest().to_hex()
         )
         .as_bytes(),
     )
@@ -505,11 +523,13 @@ fn candidate_record(
     arm: Arm,
     result: &CandidateRun,
 ) -> Value {
-    let block_id = pair_block_id(case.cluster, case.family, case.query);
+    let decision_need_digest = case.decision_need.canonical_digest().to_hex();
+    let block_id = pair_block_id(case.cluster, case.family, case.query, case.decision_need);
     let query_id = format!("query-{}", sha256(block_id.as_bytes())[..16].to_string());
     let decision_support_ids = result.decision.evidence_ids.clone();
     let trace_digest = json_sha256(&json!({
         "pair_block_id": block_id,
+        "decision_need_sha256": decision_need_digest,
         "arm": arm.name(),
         "decision": action_name(result.decision.action),
         "retrieved_event_ids": result.retrieved_ids,
@@ -530,6 +550,7 @@ fn candidate_record(
         "arm": arm.name(),
         "initial_agent_state_sha256": initial_state_digest(case),
         "candidate_input_sha256": candidate_input_digest(case),
+        "decision_need_sha256": decision_need_digest,
         "candidate_policy_sha256": candidate_policy_digest(arm),
         "memory_snapshot_sha256": result.memory_digest,
         "decision": action_name(result.decision.action),
@@ -595,7 +616,12 @@ fn evaluate_arm(
             "{}:{:?}:{:?}",
             case.family, case.query.scope.regime, case.query.scope.objective
         ),
-        pair_block_id: pair_block_id(case.cluster, case.family, case.query),
+        pair_block_id: pair_block_id(
+            case.cluster,
+            case.family,
+            case.query,
+            case.decision_need,
+        ),
         decision: action,
         utility_micros: utility,
         regret_micros: regret,
@@ -1062,6 +1088,8 @@ mod tests {
             let result = execute_arm(arm, task, &tasks);
             let record = candidate_record("test-run", task, arm, &result);
             assert_eq!(record["candidate_input_sha256"].as_str(), Some(digest.as_str()));
+            let expected_need = task.decision_need.canonical_digest().to_hex();
+            assert_eq!(record["decision_need_sha256"].as_str(), Some(expected_need.as_str()));
             let expected_state = initial_state_digest(task);
             assert_eq!(record["initial_agent_state_sha256"].as_str(), Some(expected_state.as_str()));
         }
@@ -1082,6 +1110,28 @@ mod tests {
     }
 
     #[test]
+    fn hidden_outcome_mutation_does_not_change_candidate_decision_need_or_input_digest() {
+        let cases = stress::generated_worlds(1);
+        let original = &cases[0];
+        let mut changed_outcome = original.clone();
+        changed_outcome.truth.utility_a = 0.001;
+        changed_outcome.truth.utility_b = 0.999;
+        changed_outcome.truth.causal_action = Some(Action::B);
+        changed_outcome.truth.invalid_a = !changed_outcome.truth.invalid_a;
+
+        let original_task = candidate_task(original);
+        let changed_task = candidate_task(&changed_outcome);
+        assert_eq!(
+            original_task.decision_need.canonical_digest(),
+            changed_task.decision_need.canonical_digest()
+        );
+        assert_eq!(
+            candidate_input_digest(&original_task),
+            candidate_input_digest(&changed_task)
+        );
+    }
+
+    #[test]
     fn candidate_stream_never_contains_evaluator_truth_or_utility_fields() {
         let cases = stress::generated_worlds(1);
         let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
@@ -1097,6 +1147,10 @@ mod tests {
             "net_utility_micros",
             "regret_micros",
             "task_success",
+            "utility_a",
+            "utility_b",
+            "causal_action",
+            "optimal_action",
         ] {
             assert!(!serialized.contains(forbidden), "candidate leaked {forbidden}");
         }
