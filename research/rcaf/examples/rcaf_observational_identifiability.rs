@@ -17,8 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let temporal = (0..12)
         .map(|time| (time as f64 * 0.23).sin())
         .collect::<Vec<_>>();
-    let pair =
-        construct_observationally_equivalent_pair(&clean, &spatial, &temporal, 0.3)?;
+    let pair = construct_observationally_equivalent_pair(&clean, &spatial, &temporal, 0.3)?;
     let equivalent = assess_observational_identifiability(
         &pair.target_change_world,
         &pair.artifact_only_world,
@@ -27,11 +26,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut distinct_world = pair.artifact_only_world.clone();
     distinct_world[0][0] += 0.01;
-    let distinct = assess_observational_identifiability(
-        &pair.target_change_world,
-        &distinct_world,
-        1e-6,
-    )?;
+    let distinct =
+        assess_observational_identifiability(&pair.target_change_world, &distinct_world, 1e-6)?;
 
     let rendered = format!(
         concat!(
