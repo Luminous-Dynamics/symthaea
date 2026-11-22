@@ -1,4 +1,4 @@
-use crate::{canonical_token, hash_field, ManufacturingContractError};
+use crate::{ManufacturingContractError, canonical_token, hash_field};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use symthaea_manufacturing_process::ProcessDefinitionId;
