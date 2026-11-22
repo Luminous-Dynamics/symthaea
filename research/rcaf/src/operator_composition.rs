@@ -37,7 +37,9 @@ pub enum ProjectionCompositionError {
 impl fmt::Display for ProjectionCompositionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidObservation(reason) => write!(f, "invalid projection observation: {reason}"),
+            Self::InvalidObservation(reason) => {
+                write!(f, "invalid projection observation: {reason}")
+            }
             Self::InvalidDesign(reason) => write!(f, "invalid projection design: {reason}"),
             Self::DimensionMismatch(reason) => write!(f, "projection dimension mismatch: {reason}"),
             Self::ZeroRankDesign(reason) => write!(f, "projection design has zero rank: {reason}"),
@@ -86,10 +88,8 @@ pub fn run_projection_order_challenge(
         residualize(&residualize(observations, &nuisance_basis), &filter_basis);
     let filter_then_nuisance =
         residualize(&residualize(observations, &filter_basis), &nuisance_basis);
-    let joint_basis = orthonormal_basis(&concatenate_designs(
-        nuisance_design,
-        removed_filter_design,
-    ))?;
+    let joint_basis =
+        orthonormal_basis(&concatenate_designs(nuisance_design, removed_filter_design))?;
     let joint_output = residualize(observations, &joint_basis);
     let original_norm = frobenius_norm(observations).max(1e-30);
 
@@ -123,10 +123,8 @@ pub fn run_projection_order_challenge(
         ),
         joint_nuisance_leakage: projected_energy_fraction(&joint_output, &nuisance_basis),
         joint_filter_leakage: projected_energy_fraction(&joint_output, &filter_basis),
-        order_difference_ratio: frobenius_difference(
-            &nuisance_then_filter,
-            &filter_then_nuisance,
-        ) / original_norm,
+        order_difference_ratio: frobenius_difference(&nuisance_then_filter, &filter_then_nuisance)
+            / original_norm,
         nuisance_then_filter_vs_joint_ratio: frobenius_difference(
             &nuisance_then_filter,
             &joint_output,
@@ -138,9 +136,7 @@ pub fn run_projection_order_challenge(
     })
 }
 
-fn validate_observations(
-    observations: &[Vec<f64>],
-) -> Result<(), ProjectionCompositionError> {
+fn validate_observations(observations: &[Vec<f64>]) -> Result<(), ProjectionCompositionError> {
     if observations.len() < 3 {
         return Err(ProjectionCompositionError::InvalidObservation(
             "at least three time points are required",
@@ -152,7 +148,11 @@ fn validate_observations(
             "observations must be a non-empty rectangular matrix",
         ));
     }
-    if observations.iter().flatten().any(|value| !value.is_finite()) {
+    if observations
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
         return Err(ProjectionCompositionError::InvalidObservation(
             "observations must be finite",
         ));
@@ -184,9 +184,7 @@ fn validate_design(
 }
 
 /// Modified Gram-Schmidt with re-orthogonalization. Dependent columns are counted and dropped.
-fn orthonormal_basis(
-    design: &[Vec<f64>],
-) -> Result<OrthonormalBasis, ProjectionCompositionError> {
+fn orthonormal_basis(design: &[Vec<f64>]) -> Result<OrthonormalBasis, ProjectionCompositionError> {
     let rows = design.len();
     let columns = design.first().map_or(0, Vec::len);
     if rows == 0 || columns == 0 {
@@ -229,10 +227,7 @@ fn orthonormal_basis(
     })
 }
 
-fn residualize(
-    observations: &[Vec<f64>],
-    basis: &OrthonormalBasis,
-) -> Vec<Vec<f64>> {
+fn residualize(observations: &[Vec<f64>], basis: &OrthonormalBasis) -> Vec<Vec<f64>> {
     let mut residual = observations.to_vec();
     for direction in &basis.columns {
         let width = residual[0].len();
@@ -251,10 +246,7 @@ fn residualize(
     residual
 }
 
-fn projected_energy_fraction(
-    observations: &[Vec<f64>],
-    basis: &OrthonormalBasis,
-) -> f64 {
+fn projected_energy_fraction(observations: &[Vec<f64>], basis: &OrthonormalBasis) -> f64 {
     let total = observations.iter().flatten().map(|x| x * x).sum::<f64>();
     if total <= 1e-30 {
         return 0.0;
@@ -378,11 +370,19 @@ mod tests {
             Err(ProjectionCompositionError::DimensionMismatch(_))
         ));
         assert!(matches!(
-            run_projection_order_challenge(&observations, &col(&[1.0, f64::NAN, 0.0, 0.0]), &nuisance),
+            run_projection_order_challenge(
+                &observations,
+                &col(&[1.0, f64::NAN, 0.0, 0.0]),
+                &nuisance
+            ),
             Err(ProjectionCompositionError::InvalidDesign(_))
         ));
         assert!(matches!(
-            run_projection_order_challenge(&col(&[1.0, 0.0, f64::INFINITY, 1.0]), &nuisance, &nuisance),
+            run_projection_order_challenge(
+                &col(&[1.0, 0.0, f64::INFINITY, 1.0]),
+                &nuisance,
+                &nuisance
+            ),
             Err(ProjectionCompositionError::InvalidObservation(_))
         ));
     }
