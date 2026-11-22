@@ -101,6 +101,8 @@ pub struct ProbeFinding {
     pub candidate_a_absolute_score_drift: Option<f64>,
     pub candidate_b_absolute_score_drift: Option<f64>,
     pub maximum_absolute_score_drift: Option<f64>,
+    pub pair_margin_absolute_drift: Option<f64>,
+    pub maximum_margin_shift_threshold: Option<f64>,
     pub reason: String,
 }
 
@@ -267,6 +269,8 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                             candidate_a_absolute_score_drift: None,
                             candidate_b_absolute_score_drift: None,
                             maximum_absolute_score_drift: None,
+                            pair_margin_absolute_drift: None,
+                            maximum_margin_shift_threshold: None,
                             reason:
                                 "baseline pair margin is below the configured evaluability floor"
                                     .to_owned(),
@@ -372,6 +376,8 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                     probe_finding.candidate_a_absolute_score_drift = Some(candidate_a_drift);
                     probe_finding.candidate_b_absolute_score_drift = Some(candidate_b_drift);
                     probe_finding.maximum_absolute_score_drift = Some(maximum_score_drift);
+                    probe_finding.pair_margin_absolute_drift = Some(shift);
+                    probe_finding.maximum_margin_shift_threshold = Some(margin_tolerance);
                     findings.push(probe_finding);
                 }
                 "semantic_mismatch" => {
@@ -762,6 +768,8 @@ fn finding(
         candidate_a_absolute_score_drift: None,
         candidate_b_absolute_score_drift: None,
         maximum_absolute_score_drift: None,
+        pair_margin_absolute_drift: None,
+        maximum_margin_shift_threshold: None,
         reason: reason.to_owned(),
     }
 }
@@ -941,6 +949,18 @@ mod tests {
         assert!((nuisance_finding.candidate_a_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
         assert!((nuisance_finding.candidate_b_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
         assert!((report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn nuisance_finding_preserves_both_margin_and_absolute_score_drift() {
+        let report = report();
+        let nuisance_finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.kind == "nuisance_transform")
+            .expect("nuisance finding is present");
+        assert!(nuisance_finding.pair_margin_absolute_drift.unwrap().abs() < 1e-9);
+        assert_eq!(nuisance_finding.maximum_margin_shift_threshold, Some(0.2));
     }
 
     #[test]
