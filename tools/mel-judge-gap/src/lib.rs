@@ -330,22 +330,23 @@ pub fn qualify(input: &QualificationV1) -> Result<QualificationReport, String> {
             counter.incomplete_count += 1;
         }
 
-        if gold_directional {
-            if let (Some(gold_winner), Some(judge_winner_id)) = (gold_winner_index, stable_winner) {
-                let judge_winner = *item_indices
-                    .get(&judge_winner_id)
-                    .expect("selected candidate must be one of the pair's known items");
-                counter.stable_directional_count += 1;
-                stable_directional_decision_count += 1;
-                bt_observations.push(BtObservation {
-                    item_a: item_a_index,
-                    item_b: item_b_index,
-                    winner: judge_winner,
-                });
-                if gold_winner == judge_winner {
-                    counter.correct_count += 1;
-                    gold_agreement_count += 1;
-                }
+        if gold_directional
+            && let (Some(gold_winner), Some(judge_winner_id)) =
+                (gold_winner_index, stable_winner)
+        {
+            let judge_winner = *item_indices
+                .get(&judge_winner_id)
+                .expect("selected candidate must be one of the pair's known items");
+            counter.stable_directional_count += 1;
+            stable_directional_decision_count += 1;
+            bt_observations.push(BtObservation {
+                item_a: item_a_index,
+                item_b: item_b_index,
+                winner: judge_winner,
+            });
+            if gold_winner == judge_winner {
+                counter.correct_count += 1;
+                gold_agreement_count += 1;
             }
         }
     }
