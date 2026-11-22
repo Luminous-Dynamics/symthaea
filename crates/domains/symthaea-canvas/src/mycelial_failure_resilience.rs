@@ -1000,6 +1000,24 @@ impl MycelialFailureAttackPlan {
             maximum_failure_budget: self.maximum_failure_budget,
             spatial_seed_junction_id: self.spatial_seed_junction_id.clone(),
         };
+        match (
+            config.strategy,
+            config.spatial_seed_junction_id.as_deref(),
+        ) {
+            (MycelialFailureAttackStrategy::SpatialClusterJunctions, Some(id))
+                if valid_id(id) => {}
+            (MycelialFailureAttackStrategy::SpatialClusterJunctions, _) => {
+                return Err(MycelialFailureResilienceError::InvalidAttackPlan(
+                    "spatial-cluster plan lacks a valid seed junction",
+                ));
+            }
+            (_, None) => {}
+            (_, Some(_)) => {
+                return Err(MycelialFailureResilienceError::InvalidAttackPlan(
+                    "non-spatial attack plan contains a spatial seed",
+                ));
+            }
+        }
         if self.schema_version != MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION
             || self.source_graph_digest != graph.canonical_digest_hex()?
             || self.demand_digest != canonical_demand_digest(demands)
@@ -1047,11 +1065,14 @@ impl MycelialFailureAttackPlan {
     pub fn canonical_digest_hex(
         &self,
     ) -> Result<String, MycelialFailureResilienceError> {
-        if self.scenarios.len() != self.maximum_failure_budget
+        if self.maximum_failure_budget == 0
+            || self.maximum_failure_budget > MAX_FAILURE_SCENARIOS
+            || self.scenarios.len() != self.maximum_failure_budget
             || self.ranked_entity_ids.len() < self.maximum_failure_budget
             || !valid_digest(&self.source_graph_digest)
             || !valid_digest(&self.demand_digest)
             || self.ranked_entity_ids.iter().any(|id| !valid_id(id))
+            || self.spatial_seed_junction_id.as_deref().is_some_and(|id| !valid_id(id))
             || self.ranked_entity_ids.iter().collect::<BTreeSet<_>>().len()
                 != self.ranked_entity_ids.len()
         {
