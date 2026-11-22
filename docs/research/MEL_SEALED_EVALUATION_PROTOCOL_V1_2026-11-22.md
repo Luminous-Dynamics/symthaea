@@ -29,7 +29,7 @@ The evaluator reports:
 - total pairs and human-directional pairs;
 - stable directional, stable tie, order-inconsistent and incomplete judge outcomes;
 - gold-reference coverage, conditional accuracy and effective accuracy;
-- Brier score when judge probabilities are supplied;
+- mean-squared error between judge-supplied pair probabilities and the logistic transform of the fitted human Bradley–Terry strength gap, reported as a *reference-probability MSE* (not a conventional Brier score from raw binary human outcomes);
 - near/medium/far results using pre-registered human-reference logit-gap bins;
 - the source digests and claim ceilings carried by every input.
 
@@ -43,7 +43,7 @@ The protocol also treats the evaluation instrument as part of the experimental s
 
 ## Threat model and limitations
 
-The byte-level guarantees in v1 are deliberately scoped. The evaluator recomputes SHA-256 over the three raw JSON documents and verifies the cross-document links. Audio, prompt, generator configuration, rights receipt, protocol, judge response and external cohort/estimator digest fields are currently validated as 64-character digest references; this crate does not open those underlying assets or receipts and recompute their hashes. Likewise, timestamp strings are syntax/order checked, not validated against a trusted timestamp authority. The workflow evidence bundle preserves the exact JSON inputs, source files, resolved Cargo.lock and known-answer report, with a SHA-256 manifest for those run artifacts.
+The byte-level guarantees in v1 are deliberately scoped. The evaluator recomputes SHA-256 over the three raw JSON documents and verifies the cross-document links. Audio, prompt, generator configuration, rights receipt, protocol, judge response and external cohort/estimator digest fields are currently validated as 64-character digest references; this crate does not open those underlying assets or receipts and recompute their hashes. UTC timestamp strings are checked for syntax and calendar validity (including month lengths and leap years), and their declared ordering is checked; they are still not validated against a trusted timestamp authority. The workflow evidence bundle preserves the exact JSON inputs, source files, resolved Cargo.lock and known-answer report, with a SHA-256 manifest for those run artifacts.
 
 The validator can check file hashes, identity equality, candidate/pair coverage, seed commitments, swapped-order conformance, response digests, and declared timestamp ordering. It cannot prove that a judge process never accessed a separate copy of the human labels, that audio was actually played, that a human heard it, or that a timestamp receipt is authentic. The current receipt fields are digest references only. Timestamp strings are declared metadata.
 
@@ -71,7 +71,7 @@ These are targets, not achieved Melothaea results.
 | Conditional accuracy on directional held-out pairs | ≥90% | ≥95% |
 | Coverage of human-directional pairs | ≥90% | ≥95% |
 | Spearman correlation to human Bradley–Terry ranking | ≥0.85 | ≥0.90 |
-| Brier score and calibration | Report with uncertainty | Improve over CMI-RM and strong multimodal baselines on the same split |
+| Reference-probability MSE and calibration | Report with uncertainty | Improve over CMI-RM and strong multimodal baselines on the same split |
 | Cross-generator and cross-genre transfer | Report every stratum | No material subgroup collapse |
 | Gold leakage / unauthorized reference access | 0 | 0 |
 
@@ -89,4 +89,4 @@ The five-pair fixture intentionally contains two correct stable directional judg
 
 ## Claim ceiling
 
-A successful validator run means that the supplied files satisfy this v1 reference contract. It does not establish real listener preference, musical quality, judge superiority, rights clearance, a trusted timestamp, sealed runtime isolation, proof of human playback or production integration. No external benchmark result is inferred from the synthetic fixture.
+A successful validator run means that the supplied files satisfy this v1 reference contract. The optional probability metric is a reference-probability MSE against fitted Bradley–Terry soft targets, not a conventional Brier score against independently observed binary votes. It does not establish real listener preference, musical quality, judge superiority, rights clearance, a trusted timestamp, sealed runtime isolation, proof of human playback or production integration. No external benchmark result is inferred from the synthetic fixture.
