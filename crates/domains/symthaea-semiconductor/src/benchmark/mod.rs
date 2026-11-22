@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod inspection_decision;
+pub mod inspection_evsi;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod secom_logistic;
@@ -16,6 +17,8 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use inspection_evsi::{EvsiBudgetV1, EvsiCandidateV1, EvsiError, EvsiReportV1, EvsiSubjectV1, evaluate_evsi_v1};
+
 pub use inspection_decision::{
     InspectionDecisionError, InspectionDecisionReportV1, InspectionDecisionSubjectV1,
     evaluate_inspection_decision_v1,
