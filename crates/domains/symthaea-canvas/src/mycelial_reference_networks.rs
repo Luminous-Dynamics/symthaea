@@ -38,11 +38,52 @@ pub struct MycelialMinimumSpanningForestReport {
     pub root_directed_geometric_efficiency: GeometricEfficiencyReport,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpatialReferenceDimensionality {
+    TwoD,
+    ThreeD,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialEuclideanMstEdge {
+    pub source_junction_id: String,
+    pub target_junction_id: String,
+    pub euclidean_length_model_units: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpatialReferenceEfficiencyReport {
+    pub eligible_pairs: usize,
+    pub reachable_pairs: usize,
+    pub unreachable_pairs: usize,
+    /// Connected pairs whose direct and network distances are both zero.
+    /// They are excluded from directness rather than dividing 0/0.
+    pub coincident_zero_path_pairs: usize,
+    pub scored_pairs: usize,
+    pub mean_directness: Option<f64>,
+    pub mean_network_path_length_model_units: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialEuclideanMstReport {
+    pub source_graph_digest: String,
+    pub dimensionality: SpatialReferenceDimensionality,
+    pub length_unit: JunctionLengthUnit,
+    pub selected_edges: Vec<MycelialEuclideanMstEdge>,
+    pub selected_edge_count: usize,
+    pub connected_components: usize,
+    pub total_euclidean_cost_model_units_microunits: u64,
+    pub global_geometric_efficiency: SpatialReferenceEfficiencyReport,
+    pub root_directed_geometric_efficiency: SpatialReferenceEfficiencyReport,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum MycelialReferenceNetworkError {
     InvalidSourceGraph(String),
     TooManyJunctions(usize),
     UnknownRootJunction(String),
+    NonPlanarJunction { junction_id: String, z: f32 },
     InvalidReferenceGraph(&'static str),
 }
 
@@ -60,6 +101,9 @@ impl fmt::Display for MycelialReferenceNetworkError {
             }
             Self::UnknownRootJunction(id) => {
                 write!(f, "unknown declared root junction {id}")
+            }
+            Self::NonPlanarJunction { junction_id, z } => {
+                write!(f, "junction {junction_id} has z={z}, but the Euclidean reference is explicitly 2D")
             }
             Self::InvalidReferenceGraph(reason) => {
                 write!(f, "invalid minimum-spanning-forest reference: {reason}")
@@ -180,6 +224,292 @@ pub fn build_observed_network_minimum_spanning_forest(
         traversal_cost_model_units_microunits: quantize_nonnegative(total_traversal_length),
         global_geometric_efficiency,
         root_directed_geometric_efficiency,
+    })
+}
+
+/// Build a Euclidean minimum-spanning tree over all junction positions.
+///
+/// Unlike the observed-network minimum-spanning forest, this reference creates
+/// straight-line spatial links that need not correspond to any observed hypha.
+/// It is therefore a geometric lower-cost reference, not a physically accepted
+/// network. The caller must explicitly choose 2D or 3D distance. A 2D projection
+/// fails if any input junction has non-zero z rather than silently flattening
+/// a volumetric graph.
+pub fn build_euclidean_minimum_spanning_tree(
+    graph: &MycelialJunctionHyphaGraph,
+    root_junction_ids: &[String],
+    dimensionality: SpatialReferenceDimensionality,
+) -> Result<MycelialEuclideanMstReport, MycelialReferenceNetworkError> {
+    graph
+        .validate()
+        .map_err(|error| MycelialReferenceNetworkError::InvalidSourceGraph(error.to_string()))?;
+    let count = graph.junctions.len();
+    if count > MAX_REFERENCE_NETWORK_JUNCTIONS {
+        return Err(MycelialReferenceNetworkError::TooManyJunctions(count));
+    }
+    if dimensionality == SpatialReferenceDimensionality::TwoD {
+        for junction in &graph.junctions {
+            if junction.position.z.abs() > 1.0e-6 {
+                return Err(MycelialReferenceNetworkError::NonPlanarJunction {
+                    junction_id: junction.id.clone(),
+                    z: junction.position.z,
+                });
+            }
+        }
+    }
+
+    let source_graph_digest = graph
+        .canonical_digest_hex()
+        .map_err(|error| MycelialReferenceNetworkError::InvalidSourceGraph(error.to_string()))?;
+    let mut junctions: Vec<_> = graph.junctions.iter().collect();
+    junctions.sort_by(|left, right| left.id.cmp(&right.id));
+
+    let mut selected_edges = Vec::with_capacity(count.saturating_sub(1));
+    let mut adjacency = vec![Vec::<(usize, f64)>::new(); count];
+    let mut total_cost = 0.0f64;
+    if count > 0 {
+        let mut in_tree = vec![false; count];
+        let mut best_distance = vec![f64::INFINITY; count];
+        let mut best_parent = vec![None::<usize>; count];
+        best_distance[0] = 0.0;
+
+        for _ in 0..count {
+            let next = (0..count)
+                .filter(|index| !in_tree[*index])
+                .min_by(|left, right| {
+                    best_distance[*left]
+                        .total_cmp(&best_distance[*right])
+                        .then_with(|| junctions[*left].id.cmp(&junctions[*right].id))
+                })
+                .ok_or(MycelialReferenceNetworkError::InvalidReferenceGraph(
+                    "Euclidean Prim traversal lost an unvisited junction",
+                ))?;
+            if !best_distance[next].is_finite() {
+                return Err(MycelialReferenceNetworkError::InvalidReferenceGraph(
+                    "complete Euclidean candidate graph became disconnected",
+                ));
+            }
+            in_tree[next] = true;
+            if let Some(parent) = best_parent[next] {
+                let distance = best_distance[next];
+                let (source, target) = if junctions[parent].id <= junctions[next].id {
+                    (parent, next)
+                } else {
+                    (next, parent)
+                };
+                selected_edges.push(MycelialEuclideanMstEdge {
+                    source_junction_id: junctions[source].id.clone(),
+                    target_junction_id: junctions[target].id.clone(),
+                    euclidean_length_model_units: distance,
+                });
+                adjacency[parent].push((next, distance));
+                adjacency[next].push((parent, distance));
+                total_cost += distance;
+            }
+            for candidate in 0..count {
+                if in_tree[candidate] {
+                    continue;
+                }
+                let distance = spatial_distance(
+                    junctions[next].position,
+                    junctions[candidate].position,
+                    dimensionality,
+                );
+                let replace = distance < best_distance[candidate]
+                    || (distance == best_distance[candidate]
+                        && best_parent[candidate].is_none_or(|current_parent| {
+                            junctions[next].id < junctions[current_parent].id
+                        }));
+                if replace {
+                    best_distance[candidate] = distance;
+                    best_parent[candidate] = Some(next);
+                }
+            }
+        }
+    }
+    selected_edges.sort_by(|left, right| {
+        left.source_junction_id
+            .cmp(&right.source_junction_id)
+            .then_with(|| left.target_junction_id.cmp(&right.target_junction_id))
+            .then_with(|| {
+                left.euclidean_length_model_units
+                    .total_cmp(&right.euclidean_length_model_units)
+            })
+    });
+    for neighbours in &mut adjacency {
+        neighbours.sort_by(|left, right| {
+            left.0
+                .cmp(&right.0)
+                .then_with(|| left.1.total_cmp(&right.1))
+        });
+    }
+
+    let connected_components = if count > 0 { 1 } else { 0 };
+    if selected_edges.len() != count.saturating_sub(connected_components) {
+        return Err(MycelialReferenceNetworkError::InvalidReferenceGraph(
+            "Euclidean MST edge count is not |V|-1",
+        ));
+    }
+    let global_geometric_efficiency =
+        euclidean_global_efficiency(&junctions, &adjacency, dimensionality)?;
+    let root_directed_geometric_efficiency =
+        euclidean_root_efficiency(&junctions, &adjacency, root_junction_ids, dimensionality)?;
+
+    Ok(MycelialEuclideanMstReport {
+        source_graph_digest,
+        dimensionality,
+        length_unit: graph.length_unit,
+        selected_edge_count: selected_edges.len(),
+        selected_edges,
+        connected_components,
+        total_euclidean_cost_model_units_microunits: quantize_nonnegative(total_cost),
+        global_geometric_efficiency,
+        root_directed_geometric_efficiency,
+    })
+}
+
+fn spatial_distance(
+    left: crate::mycelial_model::SpatialPoint3,
+    right: crate::mycelial_model::SpatialPoint3,
+    dimensionality: SpatialReferenceDimensionality,
+) -> f64 {
+    let dx = f64::from(left.x) - f64::from(right.x);
+    let dy = f64::from(left.y) - f64::from(right.y);
+    let mut squared = dx * dx + dy * dy;
+    if dimensionality == SpatialReferenceDimensionality::ThreeD {
+        let dz = f64::from(left.z) - f64::from(right.z);
+        squared += dz * dz;
+    }
+    squared.sqrt()
+}
+
+fn euclidean_global_efficiency(
+    junctions: &[&crate::mycelial_junction_graph::MycelialJunction],
+    adjacency: &[Vec<(usize, f64)>],
+    dimensionality: SpatialReferenceDimensionality,
+) -> Result<SpatialReferenceEfficiencyReport, MycelialReferenceNetworkError> {
+    let count = junctions.len();
+    let eligible_pairs = count.saturating_mul(count.saturating_sub(1)) / 2;
+    let mut sum_directness = 0.0f64;
+    let mut sum_path_length = 0.0f64;
+    let mut reachable_pairs = 0usize;
+    let mut coincident_zero_path_pairs = 0usize;
+    let mut scored_pairs = 0usize;
+    for source in 0..count {
+        let distances = shortest_path_distances(adjacency, source);
+        for target in (source + 1)..count {
+            let path_length = distances[target];
+            if !path_length.is_finite() {
+                continue;
+            }
+            reachable_pairs += 1;
+            let direct = spatial_distance(
+                junctions[source].position,
+                junctions[target].position,
+                dimensionality,
+            );
+            if path_length <= 1.0e-12 && direct <= 1.0e-12 {
+                coincident_zero_path_pairs += 1;
+                continue;
+            }
+            if path_length <= 0.0 || direct > path_length + 1.0e-6 {
+                return Err(MycelialReferenceNetworkError::InvalidReferenceGraph(
+                    "Euclidean distance exceeds Euclidean-MST path length",
+                ));
+            }
+            sum_directness += direct / path_length;
+            sum_path_length += path_length;
+            scored_pairs += 1;
+        }
+    }
+    Ok(SpatialReferenceEfficiencyReport {
+        eligible_pairs,
+        reachable_pairs,
+        unreachable_pairs: eligible_pairs.saturating_sub(reachable_pairs),
+        coincident_zero_path_pairs,
+        scored_pairs,
+        mean_directness: (scored_pairs > 0).then_some(sum_directness / scored_pairs as f64),
+        mean_network_path_length_model_units: (scored_pairs > 0)
+            .then_some(sum_path_length / scored_pairs as f64),
+    })
+}
+
+fn euclidean_root_efficiency(
+    junctions: &[&crate::mycelial_junction_graph::MycelialJunction],
+    adjacency: &[Vec<(usize, f64)>],
+    root_junction_ids: &[String],
+    dimensionality: SpatialReferenceDimensionality,
+) -> Result<SpatialReferenceEfficiencyReport, MycelialReferenceNetworkError> {
+    let index_by_id: HashMap<_, _> = junctions
+        .iter()
+        .enumerate()
+        .map(|(index, junction)| (junction.id.as_str(), index))
+        .collect();
+    let mut roots = BTreeSet::new();
+    for root_id in root_junction_ids {
+        let root = index_by_id
+            .get(root_id.as_str())
+            .copied()
+            .ok_or_else(|| MycelialReferenceNetworkError::UnknownRootJunction(
+                root_id.clone(),
+            ))?;
+        roots.insert(root);
+    }
+    let terminals: Vec<_> = junctions
+        .iter()
+        .enumerate()
+        .filter(|(_, junction)| !junction.terminal_filament_ids.is_empty())
+        .map(|(index, _)| index)
+        .collect();
+    let mut sum_directness = 0.0f64;
+    let mut sum_path_length = 0.0f64;
+    let mut reachable_pairs = 0usize;
+    let mut coincident_zero_path_pairs = 0usize;
+    let mut scored_pairs = 0usize;
+    for terminal in &terminals {
+        let distances = shortest_path_distances(adjacency, *terminal);
+        let nearest = roots
+            .iter()
+            .filter_map(|root| {
+                let distance = distances[*root];
+                distance.is_finite().then_some((*root, distance))
+            })
+            .min_by(|left, right| {
+                left.1
+                    .total_cmp(&right.1)
+                    .then_with(|| junctions[left.0].id.cmp(&junctions[right.0].id))
+            });
+        if let Some((root, path_length)) = nearest {
+            reachable_pairs += 1;
+            let direct = spatial_distance(
+                junctions[*terminal].position,
+                junctions[root].position,
+                dimensionality,
+            );
+            if path_length <= 1.0e-12 && direct <= 1.0e-12 {
+                coincident_zero_path_pairs += 1;
+                continue;
+            }
+            if path_length <= 0.0 || direct > path_length + 1.0e-6 {
+                return Err(MycelialReferenceNetworkError::InvalidReferenceGraph(
+                    "direct tip-to-root distance exceeds Euclidean-MST path length",
+                ));
+            }
+            sum_directness += direct / path_length;
+            sum_path_length += path_length;
+            scored_pairs += 1;
+        }
+    }
+    let eligible_pairs = terminals.len();
+    Ok(SpatialReferenceEfficiencyReport {
+        eligible_pairs,
+        reachable_pairs,
+        unreachable_pairs: eligible_pairs.saturating_sub(reachable_pairs),
+        coincident_zero_path_pairs,
+        scored_pairs,
+        mean_directness: (scored_pairs > 0).then_some(sum_directness / scored_pairs as f64),
+        mean_network_path_length_model_units: (scored_pairs > 0)
+            .then_some(sum_path_length / scored_pairs as f64),
     })
 }
 
