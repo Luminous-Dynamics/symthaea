@@ -99,7 +99,9 @@
         "truth_status": "absent",
         "actual_alternative": null
       }
-    ]
+    ],
+    "time_alignment_source_clock_domain_id": "muse-performance-time-v1",
+    "time_alignment_target_clock_domain_id": "runner-monotonic-v1"
   },
   "candidate": {
     "model_id": "synthetic-forecast-candidate",
