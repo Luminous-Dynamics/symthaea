@@ -83,11 +83,13 @@ impl SpatialGraph {
     fn laplacian(&self) -> Vec<Vec<f64>> {
         let n = self.roi_labels.len();
         let mut laplacian = vec![vec![0.0; n]; n];
-        for i in 0..n {
-            laplacian[i][i] = self.adjacency[i].iter().sum();
-            for j in 0..n {
+        for (i, (lap_row, adjacency_row)) in
+            laplacian.iter_mut().zip(self.adjacency.iter()).enumerate()
+        {
+            lap_row[i] = adjacency_row.iter().sum();
+            for (j, weight) in adjacency_row.iter().enumerate() {
                 if i != j {
-                    laplacian[i][j] = -self.adjacency[i][j];
+                    lap_row[j] = -*weight;
                 }
             }
         }
@@ -399,10 +401,10 @@ fn symmetric_eigendecomposition(matrix: &[Vec<f64>]) -> Result<EigenSystem, Spat
         let mut p = 0usize;
         let mut q = 1usize;
         let mut largest = 0.0f64;
-        for i in 0..n {
-            for j in (i + 1)..n {
-                if diagonalized[i][j].abs() > largest {
-                    largest = diagonalized[i][j].abs();
+        for (i, row) in diagonalized.iter().enumerate() {
+            for (j, value) in row.iter().enumerate().skip(i + 1) {
+                if value.abs() > largest {
+                    largest = value.abs();
                     p = i;
                     q = j;
                 }
@@ -420,17 +422,26 @@ fn symmetric_eigendecomposition(matrix: &[Vec<f64>]) -> Result<EigenSystem, Spat
         let cosine = angle.cos();
         let sine = angle.sin();
 
-        for k in 0..n {
-            if k != p && k != q {
-                let akp = diagonalized[k][p];
-                let akq = diagonalized[k][q];
-                let new_kp = cosine * akp - sine * akq;
-                let new_kq = sine * akp + cosine * akq;
-                diagonalized[k][p] = new_kp;
-                diagonalized[p][k] = new_kp;
-                diagonalized[k][q] = new_kq;
-                diagonalized[q][k] = new_kq;
-            }
+        let row_updates = diagonalized
+            .iter()
+            .enumerate()
+            .filter_map(|(k, row)| {
+                (k != p && k != q).then(|| {
+                    let akp = row[p];
+                    let akq = row[q];
+                    (
+                        k,
+                        cosine * akp - sine * akq,
+                        sine * akp + cosine * akq,
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        for (k, new_kp, new_kq) in row_updates {
+            diagonalized[k][p] = new_kp;
+            diagonalized[p][k] = new_kp;
+            diagonalized[k][q] = new_kq;
+            diagonalized[q][k] = new_kq;
         }
         diagonalized[p][p] = cosine * cosine * app - 2.0 * sine * cosine * apq + sine * sine * aqq;
         diagonalized[q][q] = sine * sine * app + 2.0 * sine * cosine * apq + cosine * cosine * aqq;
@@ -532,9 +543,9 @@ fn graph_smooth_basis(
     let mut squared_norm = 0.0;
     for (mode, &index) in modes.iter().take(rank).enumerate() {
         let attenuation = (-diffusion_time * eigen.values[index]).exp();
-        for roi in 0..graph.roi_labels.len() {
-            let value = eigen.vectors[roi][index] * attenuation;
-            basis[roi][mode] = value;
+        for (basis_row, eigen_row) in basis.iter_mut().zip(eigen.vectors.iter()) {
+            let value = eigen_row[index] * attenuation;
+            basis_row[mode] = value;
             squared_norm += value * value;
         }
     }
@@ -580,8 +591,8 @@ fn heat_kernel_basis(
         for &mode in &modes {
             let attenuation = (-diffusion_time * eigen.values[mode]).exp();
             let seed_component = eigen.vectors[seed][mode];
-            for roi in 0..n {
-                basis[roi][column] += attenuation * eigen.vectors[roi][mode] * seed_component;
+            for (basis_row, eigen_row) in basis.iter_mut().zip(eigen.vectors.iter()) {
+                basis_row[column] += attenuation * eigen_row[mode] * seed_component;
             }
         }
     }
@@ -603,8 +614,8 @@ fn orthonormalize_columns(basis: &mut [Vec<f64>]) -> Result<(), SpatialNuisanceE
             let projection: f64 = (0..rows)
                 .map(|row| basis[row][column] * basis[row][previous])
                 .sum();
-            for row in 0..rows {
-                basis[row][column] -= projection * basis[row][previous];
+            for basis_row in basis.iter_mut() {
+                basis_row[column] -= projection * basis_row[previous];
             }
         }
         let norm = (0..rows)
@@ -614,8 +625,8 @@ fn orthonormalize_columns(basis: &mut [Vec<f64>]) -> Result<(), SpatialNuisanceE
         if !norm.is_finite() || norm <= 1e-10 {
             return Err(SpatialNuisanceError::DegenerateSpatialBasis);
         }
-        for row in 0..rows {
-            basis[row][column] /= norm;
+        for basis_row in basis.iter_mut() {
+            basis_row[column] /= norm;
         }
         let pivot = (0..rows)
             .max_by(|left, right| {
@@ -869,9 +880,9 @@ mod tests {
         config.temporal_coherence = 1.0;
         let targets = targets(2, config.time_points);
         let field = generate_spatial_nuisance_field(&graph, &config, Some(&targets)).unwrap();
-        for mode in 0..2 {
-            let expected = standardize(&targets[mode]).unwrap();
-            assert_eq!(field.factor_series[mode], expected);
+        for (mode, (target, factor)) in targets.iter().zip(field.factor_series.iter()).enumerate() {
+            let expected = standardize(target).unwrap();
+            assert_eq!(factor, &expected);
             assert!((field.realized_temporal_coherence[mode].unwrap() - 1.0).abs() < 1e-12);
         }
     }
