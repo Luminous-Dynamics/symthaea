@@ -19,8 +19,10 @@ pub const MACE_REQUIRE_UNIQUE_EVENT_IDS: bool = true;
 pub const MACE_MIN_INDEPENDENT_SOURCE_ROOTS: usize = 2;
 pub const MACE_MIN_INDEPENDENT_SOURCE_FAMILIES: usize = 2;
 pub const MACE_MIN_SOURCE_EVENTS_PER_ACTION: usize = 2;
+pub const MACE_MIN_TARGET_WITNESSES_PER_ACTION: usize = 1;
 pub const MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES: bool = true;
 pub const MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS: bool = true;
+pub const MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_REGIMES: bool = true;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Action {
@@ -383,8 +385,10 @@ pub fn transfer_qualification_profile_digest() -> EvidenceDigest256 {
     hasher.update((MACE_MIN_INDEPENDENT_SOURCE_ROOTS as u64).to_be_bytes());
     hasher.update((MACE_MIN_INDEPENDENT_SOURCE_FAMILIES as u64).to_be_bytes());
     hasher.update((MACE_MIN_SOURCE_EVENTS_PER_ACTION as u64).to_be_bytes());
+    hasher.update((MACE_MIN_TARGET_WITNESSES_PER_ACTION as u64).to_be_bytes());
     hasher.update([u8::from(MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES)]);
     hasher.update([u8::from(MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS)]);
+    hasher.update([u8::from(MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_REGIMES)]);
     hasher.update([0_u8, 1_u8]); // observed utility and measurement bound in [0, 1]
     let digest = hasher.finalize();
     let mut bytes = [0_u8; 32];
@@ -779,7 +783,7 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
 
     let mut groups: BTreeMap<(Regime, Action), QualifiedGroup> = BTreeMap::new();
     for item in memory.iter().filter(|item| {
-        event_frequency.get(&item.event_id) == Some(&1)
+        (!MACE_REQUIRE_UNIQUE_EVENT_IDS || event_frequency.get(&item.event_id) == Some(&1))
             && is_transfer_qualified(item, query)
     }) {
         groups
@@ -797,7 +801,9 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
     let Some(target_b) = groups.get(&(query.scope.regime, Action::B)) else {
         return Decision::abstain();
     };
-    if target_a.count == 0 || target_b.count == 0 {
+    if target_a.count < MACE_MIN_TARGET_WITNESSES_PER_ACTION
+        || target_b.count < MACE_MIN_TARGET_WITNESSES_PER_ACTION
+    {
         return Decision::abstain();
     }
     let Some(target_estimand) = target_a.estimand_digest.filter(|_| {
@@ -805,9 +811,10 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
     }) else {
         return Decision::abstain();
     };
-    if target_b.estimand_digest != Some(target_estimand)
-        || target_b.semantic_estimand != target_a.semantic_estimand
-        || target_b.mixed_estimands
+    if MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS
+        && (target_b.estimand_digest != Some(target_estimand)
+            || target_b.semantic_estimand != target_a.semantic_estimand
+            || target_b.mixed_estimands)
     {
         return Decision::abstain();
     }
@@ -857,11 +864,14 @@ fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
             return Decision::abstain();
         };
         if source_a.mixed_estimands
-            || source_b.estimand_digest != Some(source_estimand)
-            || source_b.semantic_estimand != source_a.semantic_estimand
-            || source_a.semantic_estimand != target_a.semantic_estimand
-            || source_b.mixed_estimands
-            || source_estimand != target_estimand
+            || (MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_ACTIONS
+                && (source_b.estimand_digest != Some(source_estimand)
+                    || source_b.semantic_estimand != source_a.semantic_estimand
+                    || source_b.mixed_estimands))
+            || (MACE_REQUIRE_MATCHED_ESTIMAND_ACROSS_REGIMES
+                && (source_a.semantic_estimand != target_a.semantic_estimand
+                    || source_b.semantic_estimand != target_a.semantic_estimand
+                    || source_estimand != target_estimand))
         {
             return Decision::abstain();
         }
