@@ -10,12 +10,12 @@ pub mod estimator_response;
 pub mod factorial_counterfactual;
 pub mod factorial_dose_response;
 pub mod groupwise_null_calibration;
-pub mod weighted_covariate_shift;
 pub mod held_out_null_calibration;
 pub mod motion_transient;
 pub mod simulation;
 pub mod spatial_calibration;
 pub mod spatial_nuisance;
+pub mod weighted_covariate_shift;
 
 use std::fmt;
 
