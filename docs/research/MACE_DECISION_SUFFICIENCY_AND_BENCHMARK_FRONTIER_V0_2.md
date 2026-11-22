@@ -191,6 +191,7 @@ These are separate track/division metrics. They must not be averaged together. A
 - **TimlMemBench** contains 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. Its raw-native evaluation requires systems to ingest raw sessions, exposing lifecycle/scope/provenance failures that a prebuilt canonical memory pool can hide.
 - **FAMA** (from the ACL 2026 Memora benchmark) explicitly penalizes reliance on obsolete or invalidated memories. It complements MACE's known-retraction and current-at-use controls.
 - **CL-Bench** comprises 500 expert-created contexts, 1,899 tasks and 31,607 verification rubrics across six domains. Its evaluation finds that naive in-context learning can outperform dedicated memory systems; one public leaderboard snapshot reports a 27.9% top overall solve rate. MACE must therefore retain a strong ICL baseline and measure experience gain, not just memory-agent task accuracy.
+- **LongMemEval-V2** evaluates memory over multimodal web-agent trajectories with a fixed reader, measuring both answer accuracy and query latency. Its public results report AgentRunbook-C at 74.9% on the small split (108.3 s query latency) and 70.1% on medium (139.9 s); Codex is 69.9%/177.2 s and 68.7%/185.8 s respectively. This is a useful stronger agentic/file-memory baseline than basic RAG, but the scores are specific to its reader, data and harness and must not be pooled with AML, Memora or MACE utility.
 - **MCB** uses 140 primary scenarios, 70 evidence-flip contrasts and a 36-item dialogue-derived extension. The paper reports verification recall exceeding clarification recall in all 12 label conditions, but only three contrasts surviving an exploratory Holm correction; a category oracle also obtains 0.800 accuracy. Treat this as a useful but limited diagnostic, not an enormous definitive leaderboard.
 - **Agentic Abstention** studies 28K+ instructions across WebShop, Terminal-Bench and QA. Its NeurIPS 2026 site reports timely-abstention improvement from 26.7% to 57.4% for one CONVOLVE/Llama-3.3-70B WebShop held-out configuration. This is a setup-specific result.
 
@@ -257,6 +258,8 @@ No official benchmark score, production readiness or SOTA superiority is claimed
 - MemoryArena (ICML 2026): https://proceedings.mlr.press/v306/he26am.html
 - WorldMemArena (2026): https://arxiv.org/abs/2605.29341
 - MemoryAgentBench (2025): https://arxiv.org/abs/2507.05257
+- LongMemEval-V2 official repository: https://github.com/xiaowu0162/LongMemEval-V2
+- LongMemEval-V2 benchmark and results: https://xiaowu0162.github.io/longmemeval-v2/
 - StateMemBench (2026): https://arxiv.org/abs/2608.19652
 - TimlMemBench (Findings EMNLP 2026): https://aclanthology.org/2026.findings-emnlp.507/
 - FAMA / From Recall to Forgetting (Findings ACL 2026): https://aclanthology.org/2026.findings-acl.1337/
