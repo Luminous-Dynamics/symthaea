@@ -443,6 +443,14 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
     if expected_families.values().any(BTreeSet::is_empty) {
         return Err("no_memory baseline has an empty scenario-family block".into());
     }
+    let canonical_family_set = expected_families
+        .values()
+        .next()
+        .cloned()
+        .ok_or("no_memory baseline has no scenario-family set")?;
+    if expected_families.values().any(|families| *families != canonical_family_set) {
+        return Err("world clusters do not share the same scenario-family set".into());
+    }
 
     for (arm, cluster_map) in &rows {
         if cluster_map.keys().copied().collect::<BTreeSet<_>>() != clusters {
@@ -468,7 +476,15 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
     }
 
     let baseline_means = cluster_means(&rows, &baseline_arm)?;
-    let mut summaries = Vec::<(ArmBudget, PointMetrics, (f64, f64), (f64, f64), usize)>::new();
+    let mut summaries = Vec::<(
+        ArmBudget,
+        PointMetrics,
+        f64,
+        f64,
+        (f64, f64),
+        (f64, f64),
+        usize,
+    )>::new();
     for arm in rows.keys() {
         let means = cluster_means(&rows, arm)?;
         let mut utility_deltas = Vec::with_capacity(clusters.len());
@@ -490,12 +506,22 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             &regret_deltas,
             stable_seed(seed, &arm.method, arm.per_action_top_k, "regret_delta_vs_no_memory"),
         );
-        summaries.push((arm.clone(), mean, utility_ci, regret_ci, clusters.len()));
+        let mean_utility_delta = utility_deltas.iter().sum::<f64>() / clusters.len() as f64;
+        let mean_regret_delta = regret_deltas.iter().sum::<f64>() / clusters.len() as f64;
+        summaries.push((
+            arm.clone(),
+            mean,
+            mean_utility_delta,
+            mean_regret_delta,
+            utility_ci,
+            regret_ci,
+            clusters.len(),
+        ));
     }
 
     let costs: Vec<ParetoCost> = summaries
         .iter()
-        .map(|(_, mean, _, _, _)| ParetoCost {
+        .map(|(_, mean, _, _, _, _, _)| ParetoCost {
             selected_bytes: mean.selected_bytes_lower_bound,
             index_bytes: mean.index_bytes_lower_bound,
             latency_ns: mean.measured_latency_ns,
@@ -503,7 +529,14 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
         })
         .collect();
     let mut output = Vec::new();
-    for (index, (arm, mean, utility_ci, regret_ci, cluster_count)) in summaries.iter().enumerate() {
+    let evaluator_jsonl_sha256 = hex_digest(input_sha.finalize().as_slice());
+    let aggregation_source_sha256 = hex_digest(
+        Sha256::digest(include_bytes!("mace_sufficiency_aggregate.rs")).as_slice(),
+    );
+    let mut output = Vec::new();
+    for (index, (arm, mean, mean_utility_delta, mean_regret_delta, utility_ci, regret_ci, cluster_count))
+        in summaries.iter().enumerate()
+    {
         let frontier = !(0..costs.len()).any(|other| other != index && dominates(costs[other], costs[index]));
         let baseline = arm.method == NO_MEMORY && arm.per_action_top_k.is_none();
         output.push(json!({
@@ -515,8 +548,8 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             "input_source_code_sha256": provenance.source_code_sha256,
             "input_fixture_sha256": provenance.fixture_sha256,
             "input_schema_sha256": provenance.schema_sha256,
-            "input_evaluator_jsonl_sha256": hex_digest(input_sha.finalize().as_slice()),
-            "aggregation_source_sha256": hex_digest(Sha256::digest(include_bytes!("mace_sufficiency_aggregate.rs")).as_slice()),
+            "input_evaluator_jsonl_sha256": evaluator_jsonl_sha256,
+            "aggregation_source_sha256": aggregation_source_sha256,
             "bootstrap_seed": seed,
             "bootstrap_replicates": BOOTSTRAP_REPLICATES,
             "resampling_unit": "independent_world_cluster",
@@ -534,8 +567,8 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             "mean_selected_experience_struct_bytes_lower_bound": mean.selected_bytes_lower_bound,
             "mean_index_payload_bytes_lower_bound": mean.index_bytes_lower_bound,
             "mean_index_and_selection_latency_ns": mean.measured_latency_ns,
-            "mean_utility_delta_vs_no_memory": utility_deltas[index],
-            "mean_regret_delta_vs_no_memory": regret_deltas[index],
+            "mean_utility_delta_vs_no_memory": mean_utility_delta,
+            "mean_regret_delta_vs_no_memory": mean_regret_delta,
             "utility_delta_vs_no_memory_cluster_bootstrap_95pct_ci": [utility_ci.0, utility_ci.1],
             "regret_delta_vs_no_memory_cluster_bootstrap_95pct_ci": [regret_ci.0, regret_ci.1],
             "paired_contrast_baseline": "no_memory",
