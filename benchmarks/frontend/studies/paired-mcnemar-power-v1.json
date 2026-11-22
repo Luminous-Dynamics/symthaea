@@ -1,0 +1,158 @@
+{
+  "schema": "sfeb-paired-mcnemar-power-v1",
+  "method": "exact two-sided McNemar power; conditional binomial test summed over Binomial(n,q) discordant counts",
+  "alpha_two_sided": 0.05,
+  "paired_success_difference": 0.05,
+  "interpretation": "q is P(A4 and A0 outcomes disagree); the sign of the difference is assumed to favor A4.",
+  "rows": [
+    {
+      "discordant_pair_rate": 0.05,
+      "effect_pp": 5,
+      "improvement_only_probability": 0.05,
+      "regression_only_probability": 0,
+      "improvement_fraction_of_discordant": 1,
+      "n_30_exact_power": 0.0032824855950018147,
+      "n_150_exact_power": 0.7655644954653611,
+      "n_500_exact_power": 0.9999990818191512,
+      "targets": [
+        {
+          "target_power": 0.8,
+          "exact_minimum_task_pairs": 157,
+          "exact_power_at_n": 0.8016818677520117,
+          "normal_approx_n": 150
+        },
+        {
+          "target_power": 0.9,
+          "exact_minimum_task_pairs": 184,
+          "exact_power_at_n": 0.9018142534243241,
+          "normal_approx_n": 200
+        },
+        {
+          "target_power": 0.95,
+          "exact_minimum_task_pairs": 208,
+          "exact_power_at_n": 0.9507748042007819,
+          "normal_approx_n": 247
+        }
+      ]
+    },
+    {
+      "discordant_pair_rate": 0.1,
+      "effect_pp": 5,
+      "improvement_only_probability": 0.075,
+      "regression_only_probability": 0.025,
+      "improvement_fraction_of_discordant": 0.75,
+      "n_30_exact_power": 0.01200776914015785,
+      "n_150_exact_power": 0.40491248315226525,
+      "n_500_exact_power": 0.941259852245653,
+      "targets": [
+        {
+          "target_power": 0.8,
+          "exact_minimum_task_pairs": 337,
+          "exact_power_at_n": 0.8007388604765767,
+          "normal_approx_n": 307
+        },
+        {
+          "target_power": 0.9,
+          "exact_minimum_task_pairs": 431,
+          "exact_power_at_n": 0.9003191722296644,
+          "normal_approx_n": 410
+        },
+        {
+          "target_power": 0.95,
+          "exact_minimum_task_pairs": 521,
+          "exact_power_at_n": 0.9500532612119557,
+          "normal_approx_n": 507
+        }
+      ]
+    },
+    {
+      "discordant_pair_rate": 0.2,
+      "effect_pp": 5,
+      "improvement_only_probability": 0.125,
+      "regression_only_probability": 0.075,
+      "improvement_fraction_of_discordant": 0.625,
+      "n_30_exact_power": 0.03013537045106347,
+      "n_150_exact_power": 0.21418538565306314,
+      "n_500_exact_power": 0.6763677649822429,
+      "targets": [
+        {
+          "target_power": 0.8,
+          "exact_minimum_task_pairs": 658,
+          "exact_power_at_n": 0.8006133243697089,
+          "normal_approx_n": 621
+        },
+        {
+          "target_power": 0.9,
+          "exact_minimum_task_pairs": 867,
+          "exact_power_at_n": 0.9002486329574582,
+          "normal_approx_n": 831
+        },
+        {
+          "target_power": 0.95,
+          "exact_minimum_task_pairs": 1062,
+          "exact_power_at_n": 0.9500417078112261,
+          "normal_approx_n": 1027
+        }
+      ]
+    },
+    {
+      "discordant_pair_rate": 0.3,
+      "effect_pp": 5,
+      "improvement_only_probability": 0.175,
+      "regression_only_probability": 0.125,
+      "improvement_fraction_of_discordant": 0.5833333333333334,
+      "n_30_exact_power": 0.03653047671073299,
+      "n_150_exact_power": 0.16357458974981579,
+      "n_500_exact_power": 0.502317759926949,
+      "targets": [
+        {
+          "target_power": 0.8,
+          "exact_minimum_task_pairs": 975,
+          "exact_power_at_n": 0.8002243604090836,
+          "normal_approx_n": 935
+        },
+        {
+          "target_power": 0.9,
+          "exact_minimum_task_pairs": 1291,
+          "exact_power_at_n": 0.9001074013976018,
+          "normal_approx_n": 1251
+        },
+        {
+          "target_power": 0.95,
+          "exact_minimum_task_pairs": 1587,
+          "exact_power_at_n": 0.9500249339791201,
+          "normal_approx_n": 1547
+        }
+      ]
+    }
+  ],
+  "zero_miss_mutation_sensitivity": {
+    "interval": "one-sided exact 95% Clopper-Pearson upper bound after zero accepted mutants",
+    "upper_bound_by_sample": [
+      {
+        "independent_mutants": 20,
+        "upper_95_false_acceptance_rate": 0.13910834066826516
+      },
+      {
+        "independent_mutants": 60,
+        "upper_95_false_acceptance_rate": 0.04870291331009746
+      },
+      {
+        "independent_mutants": 100,
+        "upper_95_false_acceptance_rate": 0.029513049607039932
+      },
+      {
+        "independent_mutants": 299,
+        "upper_95_false_acceptance_rate": 0.009969146792899286
+      }
+    ],
+    "independent_mutants_needed_for_upper_bound_below_1_percent": 299,
+    "caveat": "This binomial bound applies only to an independently sampled representative mutant population; a hand-curated mutation suite is a diagnostic challenge set, not a random sample of production defects."
+  },
+  "limitations": [
+    "Power is conditional on the declared discordance rate and +5 percentage-point paired effect.",
+    "The 150-task figure is treated as 150 independent task-level pairs after trial aggregation, not 450 repeated task-trial rows.",
+    "This does not account for task-family sampling, unequal cluster weights, missing/inconclusive outcomes, multiplicity beyond the single primary contrast, or drift in model/tool versions.",
+    "The final sample size must be locked from a blinded pilot estimate of discordance and task-level variability before opening the holdout."
+  ]
+}
