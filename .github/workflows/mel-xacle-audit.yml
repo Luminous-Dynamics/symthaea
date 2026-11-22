@@ -34,8 +34,12 @@ jobs:
           components: rustfmt, clippy
       - name: Check formatting
         run: cargo +1.96.0 fmt --check --manifest-path tools/mel-xacle-audit/Cargo.toml
-      - name: Resolve dependency lock
-        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-xacle-audit/Cargo.toml
+      - name: Verify committed dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch tools/mel-xacle-audit/Cargo.lock > /dev/null
+          test -f tools/mel-xacle-audit/Cargo.lock
       - name: Run tests
         run: cargo +1.96.0 test --locked --manifest-path tools/mel-xacle-audit/Cargo.toml
       - name: Warnings-denied Clippy
