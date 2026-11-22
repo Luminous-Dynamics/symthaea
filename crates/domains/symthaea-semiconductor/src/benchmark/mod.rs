@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod dtco_manifest;
 pub mod mf_acquisition;
+pub mod observation_semantics;
 pub mod pair_manifest;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -15,6 +16,15 @@ pub use binary_metrics::{
     BinaryClassCounts, BinaryMetricReportV1, BinaryMetricsError, BinaryScoreSampleV1,
     BinaryScoreSubjectV1, score_binary_subject_v1,
 };
+pub use observation_semantics::{
+    MeasurementUncertaintyV1, ObservationStateCountsV1, SensorObservationError,
+    SensorObservationFrameV1, SensorObservationReportV1, SensorObservationStateV1,
+    SensorObservationV1, SensorCorrespondenceManifestV1, SensorCorrespondenceReportV1,
+    SensorCorrespondenceStatusV1, SensorCorrespondenceV1, SensorUnitTransformV1,
+    adapt_secom_row_to_observation_frame_v1, validate_sensor_correspondence_manifest_v1,
+    validate_sensor_observation_frame_v1,
+};
+
 pub use pair_manifest::{
     ContrastivePairManifestV1, PairManifestError, PairValidationReportV1, validate_pair_manifest_v1,
 };
