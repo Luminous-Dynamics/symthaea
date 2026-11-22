@@ -76,7 +76,7 @@ The **Interface Contract Compiler** starts with a versioned JSON contract:
 Contract status is explicit: `source_observed` is not `browser_verified`.
 A contract may describe current implementation, proposed behavior or reviewed
 requirements, but browser-verified status requires independent runner receipts.
-The sample records six journeys, 16 named source regions and the current
+The sample records six journeys, 17 named source regions and the current
 telemetry handshake/retry behavior. It deliberately calls out that changing
 the gateway URL does not terminate an already-open WebSocket immediately.
 
