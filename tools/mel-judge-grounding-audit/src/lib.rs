@@ -542,8 +542,6 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
             if probe.expected_candidate.is_some()
                 || probe.maximum_margin_shift.is_some()
                 || probe.maximum_score_drift.is_some()
-                || probe.maximum_score_drift.is_some()
-                || probe.maximum_score_drift.is_some()
                 || probe.minimum_score_drop.is_some()
             {
                 return Err(format!(
@@ -565,6 +563,7 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
             require_same_text_context(case, probe)?;
             if probe.expected_candidate.is_some()
                 || probe.maximum_margin_shift.is_some()
+                || probe.maximum_score_drift.is_some()
                 || probe.minimum_score_drop.is_some()
             {
                 return Err(format!(
@@ -587,6 +586,7 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
             }
             if probe.expected_candidate.is_some()
                 || probe.maximum_margin_shift.is_some()
+                || probe.maximum_score_drift.is_some()
                 || probe.minimum_score_drop.is_some()
             {
                 return Err(format!(
