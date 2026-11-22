@@ -36,6 +36,10 @@
     "mean_index_and_selection_latency_ns",
     "mean_utility_delta_vs_no_memory",
     "mean_regret_delta_vs_no_memory",
+    "worst_family_regret_delta_vs_no_memory",
+    "worst_family_regret_delta_family",
+    "worst_family_utility_delta_vs_no_memory",
+    "worst_family_utility_delta_family",
     "utility_delta_vs_no_memory_cluster_bootstrap_95pct_ci",
     "regret_delta_vs_no_memory_cluster_bootstrap_95pct_ci",
     "paired_contrast_baseline",
@@ -228,6 +232,22 @@
     },
     "baseline_arm": {
       "type": "boolean"
+    },
+    "worst_family_regret_delta_vs_no_memory": {
+      "type": "number"
+    },
+    "worst_family_regret_delta_family": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "worst_family_utility_delta_vs_no_memory": {
+      "type": "number"
+    },
+    "worst_family_utility_delta_family": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
     }
   }
 }
