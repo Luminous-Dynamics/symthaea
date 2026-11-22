@@ -49,8 +49,10 @@ pub struct JointPhaseSpaceSpectrum {
     pub phase_mixing_f_strophy: f64,
     /// Directional occupancy for k*s > 0 under the documented FFT convention.
     pub phase_unmixing_f_strophy: f64,
-    /// Occupancy for k=0 or s=0 modes (counted once).
+    /// Occupancy for k=0 or s=0 modes (counted once), excluding Nyquist bins.
     pub zero_axis_f_strophy: f64,
+    /// Occupancy of bins touching either Nyquist axis; direction is ambiguous.
+    pub nyquist_f_strophy: f64,
     /// Marginal f-strophy indexed by the standard FFT x-mode index.
     pub by_x_mode: Vec<f64>,
     /// Marginal f-strophy indexed by the standard FFT velocity-mode index.
@@ -176,6 +178,7 @@ impl VlasovPoisson1d1v {
         let mut phase_mixing_f_strophy = 0.0;
         let mut phase_unmixing_f_strophy = 0.0;
         let mut zero_axis_f_strophy = 0.0;
+        let mut nyquist_f_strophy = 0.0;
 
         for kx_index in 0..nx {
             for sv_index in 0..nv {
@@ -199,10 +202,17 @@ impl VlasovPoisson1d1v {
                 by_velocity_mode[sv_index] += energy;
                 spectral_f_strophy += energy;
 
-                match (signed_k * signed_s).cmp(&0) {
-                    std::cmp::Ordering::Less => phase_mixing_f_strophy += energy,
-                    std::cmp::Ordering::Greater => phase_unmixing_f_strophy += energy,
-                    std::cmp::Ordering::Equal => zero_axis_f_strophy += energy,
+                if kx_index == nx / 2 || sv_index == nv / 2 {
+                    // A real FFT Nyquist bin is self-conjugate: its sign is
+                    // not physically distinguishable, so do not infer a
+                    // mixing/unmixing direction from it.
+                    nyquist_f_strophy += energy;
+                } else {
+                    match (signed_k * signed_s).cmp(&0) {
+                        std::cmp::Ordering::Less => phase_mixing_f_strophy += energy,
+                        std::cmp::Ordering::Greater => phase_unmixing_f_strophy += energy,
+                        std::cmp::Ordering::Equal => zero_axis_f_strophy += energy,
+                    }
                 }
             }
         }
@@ -217,6 +227,7 @@ impl VlasovPoisson1d1v {
             || !phase_mixing_f_strophy.is_finite()
             || !phase_unmixing_f_strophy.is_finite()
             || !zero_axis_f_strophy.is_finite()
+            || !nyquist_f_strophy.is_finite()
             || !parseval_relative_residual.is_finite()
         {
             return Err(SolverError::NonFiniteState);
@@ -232,6 +243,7 @@ impl VlasovPoisson1d1v {
             phase_mixing_f_strophy,
             phase_unmixing_f_strophy,
             zero_axis_f_strophy,
+            nyquist_f_strophy,
             by_x_mode,
             by_velocity_mode,
             joint_strophy,
@@ -279,6 +291,7 @@ mod tests {
             (spectrum.phase_mixing_f_strophy
                 + spectrum.phase_unmixing_f_strophy
                 + spectrum.zero_axis_f_strophy
+                + spectrum.nyquist_f_strophy
                 - spectrum.spectral_f_strophy)
                 .abs()
                 <= 1.0e-12 * scale
