@@ -176,7 +176,7 @@
       }
     }
   ],
-  "authored_rust_tests": 10,
+  "authored_rust_tests": 11,
   "executed_rust_tests": 0,
   "candidate_hidden_world_exposure": false,
   "candidate_visible_payload_contains_likelihoods": false,
