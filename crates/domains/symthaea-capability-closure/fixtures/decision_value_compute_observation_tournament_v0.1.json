@@ -13,9 +13,10 @@
     "exact_factorial_interaction_pr": 13176,
     "deterministic_decision_regret_pr": 13152,
     "mixed_strategy_decision_regret_pr": 13165,
-    "evaluator_isolation_issue": 9437
+    "evaluator_isolation_issue": 9437,
+    "paired_decision_regret_interaction_issue": 13279
   },
-  "status": "protocol_and_fixture_authored_not_executed",
+  "status": "protocol_fixture_and_rust_reference_authored_not_executed",
   "factors": [
     {
       "id": "additional_compute",
@@ -277,6 +278,11 @@
     "benchmark_executed": false,
     "sota_improvement": false,
     "physical_energy_advantage": false,
-    "deployment_qualification": false
-  }
+    "deployment_qualification": false,
+    "signed_paired_decision_regret_reference_implemented": true,
+    "rust_reference_tested": false
+  },
+  "rust_reference_path": "research/decision-value-interaction-001/",
+  "authored_rust_tests": 11,
+  "executed_rust_tests": 0
 }
