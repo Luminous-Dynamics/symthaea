@@ -6,14 +6,14 @@ on:
       - research/mel-collab-trace-audit-stack-v1-20261122
     paths:
       - "tools/mel-judge-grounding-audit/**"
-      - "docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V1_2026-11-22.md"
+      - "docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V2_2026-11-22.md"
       - ".github/workflows/mel-musical-timing-qualification.yml"
   push:
     branches:
       - research/mel-tempo-phase-audit-v1-20261122
     paths:
       - "tools/mel-judge-grounding-audit/**"
-      - "docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V1_2026-11-22.md"
+      - "docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V2_2026-11-22.md"
       - ".github/workflows/mel-musical-timing-qualification.yml"
 
 permissions:
@@ -75,7 +75,7 @@ jobs:
           cp tools/mel-judge-grounding-audit/src/bin/mel-musical-timing-audit.rs "$evidence/"
           cp tools/mel-judge-grounding-audit/schema/mel-musical-timing-panel-v2.schema.json "$evidence/"
           cp tools/mel-judge-grounding-audit/fixtures/valid-musical-timing-v2.json "$evidence/"
-          cp docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V1_2026-11-22.md "$evidence/"
+          cp docs/research/MEL_MUSICAL_TIMING_EVALUATOR_V2_2026-11-22.md "$evidence/"
           if [[ -f "$RUNNER_TEMP/mel-musical-timing-report.json" ]]; then
             cp "$RUNNER_TEMP/mel-musical-timing-report.json" "$evidence/"
           fi
