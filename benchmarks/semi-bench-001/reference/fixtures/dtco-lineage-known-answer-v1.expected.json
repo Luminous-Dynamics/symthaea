@@ -1,13 +1,33 @@
 {
   "candidate_id": "candidate-0001",
-  "claim_limits": {},
+  "claim_limits": {
+    "does_not_establish_fabricated_silicon_performance_or_yield": true,
+    "does_not_establish_pdk_or_process_qualification": true,
+    "does_not_validate_physics_or_model_accuracy": true,
+    "validates_evidence_lineage_only": true
+  },
   "design_id": "synthetic-inverter-design-v1",
-  "guarantees": {},
+  "guarantees": {
+    "all_parent_runs_exist": true,
+    "each_parent_output_is_bound_to_child_input": true,
+    "lineage_is_acyclic": true,
+    "modeled_evidence_is_not_mislabeled_as_physical_measurement": true,
+    "physical_measurements_have_instrument_calibration_uncertainty": true,
+    "unique_run_identity": true
+  },
   "parent_edge_count": 2,
   "physical_measurement_count": 1,
   "run_count": 3,
-  "runs_by_evidence_kind": {},
-  "runs_by_stage": {},
+  "runs_by_evidence_kind": {
+    "analytical_estimate": 1,
+    "physical_measurement": 1,
+    "tool_simulation": 1
+  },
+  "runs_by_stage": {
+    "analytical": 1,
+    "physical_measurement": 1,
+    "spice": 1
+  },
   "schema": "luminous.semi-bench.dtco-lineage-validation.v1",
   "unique_artifact_count": 7
 }
