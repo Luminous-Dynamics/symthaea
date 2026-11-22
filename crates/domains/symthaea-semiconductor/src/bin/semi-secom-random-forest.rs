@@ -25,8 +25,8 @@ use symthaea_semiconductor::benchmark::stratified_repeat::StratifiedRepeatReport
 use symthaea_semiconductor::benchmark::{
     ForestClassWeightingV1, RandomForestInputSampleV1, RandomForestParametersV1,
     RandomForestPredictionReportV1, RandomForestTrainingSampleV1, RandomForestTruthSampleV1,
-    fit_random_forest_v1,
-    predict_random_forest_v1, prepare_secom_stratified_fold_v1, score_random_forest_predictions_v1,
+    fit_random_forest_v1, predict_random_forest_v1, prepare_secom_stratified_fold_v1,
+    score_random_forest_predictions_v1,
 };
 
 #[derive(Serialize)]
