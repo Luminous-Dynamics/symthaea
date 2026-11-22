@@ -247,7 +247,7 @@ original design task, rather than only a benchmark outline.
   machines, data sources, responsive constraints, accessibility, security and
   independent acceptance journeys.
 - `benchmarks/frontend/contracts/symthaea-ui-v0.json` describes the source
-  observed Converse/Observe application: 16 named regions and six journeys.
+  observed Converse/Observe application: 17 named regions and six journeys.
   It remains `source_observed`, not `browser_verified`.
 - `benchmarks/frontend/task-oracle-v1.schema.json` defines the SFEB task and
   assertion contract.
@@ -273,7 +273,7 @@ gate therefore remains blocked, not passed. The task stays
 `specification_only` in the SFEB index until its screenshot baselines,
 independent oracles and browser runs exist.
 
-The first Leptos implementation also received 16 stable `data-sfeb-id` anchors,
+The first Leptos implementation also received 17 stable `data-sfeb-id` anchors,
 semantic live/status/alert regions, responsive adjustments, visible focus and
 reduced-motion behavior. Its telemetry indicator now waits for the actual
 gloo-net 0.5 `WebSocket::state() == State::Open` state, has a bounded 10-second
