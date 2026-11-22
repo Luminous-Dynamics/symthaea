@@ -214,9 +214,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         "observed_network_mst_source_graph_digest: {}",
         mst_report.source_graph_digest
     );
-    println!("euclidean_mst_reference_kind: straight_line_complete_point_set_mst_not_observed_hypha");
+    println!(
+        "euclidean_mst_reference_kind: straight_line_complete_point_set_mst_not_observed_hypha"
+    );
     println!("euclidean_mst_dimensionality: 3d");
-    println!("euclidean_mst_selected_edges: {}", euclidean_mst.selected_edge_count);
+    println!(
+        "euclidean_mst_selected_edges: {}",
+        euclidean_mst.selected_edge_count
+    );
     println!(
         "euclidean_mst_total_cost_model_units_microunits: {}",
         euclidean_mst.total_euclidean_cost_model_units_microunits
@@ -231,11 +236,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!(
         "euclidean_mst_global_coincident_zero_path_pairs: {}",
-        euclidean_mst.global_geometric_efficiency.coincident_zero_path_pairs
+        euclidean_mst
+            .global_geometric_efficiency
+            .coincident_zero_path_pairs
     );
     println!(
         "euclidean_mst_root_directness: {:?}",
-        euclidean_mst.root_directed_geometric_efficiency.mean_directness
+        euclidean_mst
+            .root_directed_geometric_efficiency
+            .mean_directness
     );
     println!(
         "euclidean_mst_source_graph_digest: {}",
