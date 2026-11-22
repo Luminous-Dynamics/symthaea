@@ -203,7 +203,10 @@
         "available_known_family_count",
         "unknown_root_event_count",
         "unknown_family_event_count",
-        "latency_ns"
+        "latency_ns",
+        "method",
+        "retrieved_event_ids",
+        "index_bytes"
       ],
       "properties": {
         "schema_version": {
@@ -282,6 +285,19 @@
         "available_experience_struct_bytes": {
           "type": "integer",
           "minimum": 0
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "retrieved_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retrieval_profile_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -312,7 +328,11 @@
         "decision_is_optimal",
         "abstained",
         "evaluation_validity",
-        "invalidity_reason"
+        "invalidity_reason",
+        "method",
+        "retrieved_event_ids",
+        "index_bytes",
+        "regret_gap_vs_full_method"
       ],
       "properties": {
         "schema_version": {
@@ -395,8 +415,31 @@
         "removed_experience_struct_bytes": {
           "type": "integer",
           "minimum": 0
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "retrieved_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "regret_gap_vs_full_method": {
+          "type": "number"
+        },
+        "retrieval_profile_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "exact_scope_scan",
+        "typed_content_hdc"
+      ]
     }
   }
 }
