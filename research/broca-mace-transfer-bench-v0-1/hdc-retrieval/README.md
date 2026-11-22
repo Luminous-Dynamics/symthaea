@@ -54,5 +54,5 @@ The current policy `Query` only exposes regime/objective. The paired runner now 
 
 Regime/objective and action are retained as exact partition keys and applied as hard prefilters before approximate HDC ranking. A high-similarity wrong-scope or wrong-action item cannot consume a top-k slot for the current query. This behavior is bound into typed profile v1.1, and the payload estimate includes the exact partition keys.
 
-The typed index is structured semantic retrieval, **not natural-language understanding** and not proof that HDC-LTC has learned temporal dynamics. It is static typed HDC v1.1; event-driven LTC and irregular-time streams remain separate follow-on work.
+The typed index is structured semantic retrieval, **not natural-language understanding** and not proof that HDC-LTC has learned temporal dynamics. It is static typed HDC v1.1; the module now has ten authored tests and the paired runner has seven authored tests (not executed). Event-driven LTC and irregular-time streams remain separate follow-on work.
 
