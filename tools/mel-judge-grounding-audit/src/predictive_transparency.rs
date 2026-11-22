@@ -405,6 +405,14 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
             if !realized_event_ids.insert(event.event_id.as_str()) {
                 return Err(format!("duplicate realized event_id: {}", event.event_id));
             }
+            if event.onset_ns < realization.started_at_ns
+                || event.onset_ns > realization.completed_at_ns
+            {
+                return Err(format!(
+                    "realized event {} falls outside its realization interval",
+                    event.event_id
+                ));
+            }
             realized_event_count += 1;
             match event.forecast_event_id.as_deref() {
                 Some(forecast_event_id) => {
@@ -801,8 +809,14 @@ mod tests {
         value["forecasts"][0]["target_end_ns"] = serde_json::json!(1_100_000_000_u64);
         value["realizations"][0]["started_at_ns"] = serde_json::json!(1_200_000_000_u64);
         value["realizations"][0]["completed_at_ns"] = serde_json::json!(1_230_000_000_u64);
-        let error = audit(&value).expect_err("expiry must cover the target window");
-        assert!(error.contains("expires before"));
+        value["realizations"][0]["events"][0]["onset_ns"] =
+            serde_json::json!(1_220_000_000_u64);
+        let report = audit(&value).expect("stale output remains reportable");
+        assert!(!report.structurally_valid_anticipatory_trace);
+        assert!(report
+            .qualification_findings
+            .iter()
+            .any(|finding| finding.contains("stale forecast")));
     }
 
     #[test]
@@ -810,7 +824,7 @@ mod tests {
         let mut value = panel();
         value["displays"][0]["displayed_at_ns"] = serde_json::json!(1_000_000_001_u64);
         let report = audit(&value).expect("late display should produce an audit finding");
-        assert!(!report.qualified_for_anticipatory_use);
+        assert!(!report.structurally_valid_anticipatory_trace);
         assert!(report.qualification_findings.iter().any(|x| x.contains("displayed too late")));
     }
 
@@ -820,7 +834,7 @@ mod tests {
         let mut second = value["forecasts"][0].clone();
         second["forecast_id"] = serde_json::json!("forecast-2");
         second["revision"] = serde_json::json!(2);
-        second["supersedes_forecast_id"] = serde_json::json!("forecast-1");
+        second["supersedes_forecast_id"] = serde_json::json!("forecast-001");
         second["committed_at_ns"] = serde_json::json!(900_000_000_u64);
         value["forecasts"].as_array_mut().unwrap().push(second);
         let report = audit(&value).expect("superseded realization remains reportable");
@@ -836,7 +850,7 @@ mod tests {
         let mut value = panel();
         value["dispositions"][0]["action"] = serde_json::json!("veto");
         let report = audit(&value).expect("veto violation is an audit finding");
-        assert!(!report.qualified_for_anticipatory_use);
+        assert!(!report.structurally_valid_anticipatory_trace);
         assert!(report.qualification_findings.iter().any(|x| x.contains("vetoed forecast")));
     }
 
@@ -845,7 +859,7 @@ mod tests {
         let mut value = panel();
         value["realizations"][0]["events"][0]["forecast_event_id"] = serde_json::Value::Null;
         let report = audit(&value).expect("unforecasted contribution is allowed");
-        assert!(report.qualified_for_anticipatory_use);
+        assert!(report.structurally_valid_anticipatory_trace);
         assert_eq!(report.unforecasted_realized_event_count, 1);
         assert_eq!(report.matched_forecast_event_count, 0);
     }
@@ -855,7 +869,7 @@ mod tests {
         let mut value = panel();
         value["dispositions"][0]["action"] = serde_json::json!("steer");
         let report = audit(&value).expect("missing steer revision remains reportable");
-        assert!(!report.qualified_for_anticipatory_use);
+        assert!(!report.structurally_valid_anticipatory_trace);
         assert!(report.qualification_findings.iter().any(|x| x.contains("steer disposition")));
     }
 
