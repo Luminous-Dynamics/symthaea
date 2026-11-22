@@ -55,7 +55,7 @@ Five deterministic seeds are run. For each seed:
 - 32 stable-regime out-of-family clusters in task family 4;
 - 32 shifted-regime negative-control clusters in task family 5.
 
-The task-family-3 conformal holdout uses the same stable relation-generation distribution as calibration but fresh clusters and roots; it is the only split for which the exchangeability premise is intended. Task-family-4 and shifted task-family-5 are separate out-of-distribution diagnostics.
+The task-family-3 conformal holdout uses the same stable relation-generation distribution and the same bounded interaction-noise distribution (uniform integer perturbation in [-2, 2]) as calibration, but fresh clusters and roots; it is the only split for which the exchangeability premise is intended. Task-family-4 and shifted task-family-5 are separate out-of-distribution diagnostics.
 
 The relation model is fitted only on training outcomes; its split-conformal residual quantile uses calibration outcomes; no held-out outcome is passed into candidate selection. Interval coverage is reported separately for the same-family conformal holdout, stable task-family OOD and shifted-regime holdout, and only on correctly classified known relation labels. Relation-label errors and unknown labels are counted separately. Training/calibration clusters and roots are disjoint; calibration/test cluster and root IDs are also disjoint.
 

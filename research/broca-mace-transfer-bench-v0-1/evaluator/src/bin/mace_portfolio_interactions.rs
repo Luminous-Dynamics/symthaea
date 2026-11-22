@@ -456,7 +456,7 @@ fn generate_case(
             }
             pair_relations.insert((left, right), candidate_relation);
             true_relations.insert((left, right), actual_relation);
-            let actual = base_interaction(actual_relation, regime) + rng.signed(1);
+            let actual = base_interaction(actual_relation, regime) + rng.signed(2);
             pair_values.insert((left, right), actual);
         }
     }
