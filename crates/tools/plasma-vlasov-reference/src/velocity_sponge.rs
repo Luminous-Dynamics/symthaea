@@ -920,6 +920,30 @@ mod tests {
     }
 
     #[test]
+    fn wide_truncated_maxwellian_tail_undershoot_is_rejected_without_mutation() {
+        let config = VlasovPoissonConfig {
+            nx: 64,
+            nv: 256,
+            domain_length: 4.0 * std::f64::consts::PI,
+            velocity_min: -60.0,
+            velocity_max: 60.0,
+            charge_to_mass: -1.0,
+            permittivity: 1.0,
+            background_density: 1.0,
+        };
+        let initial = crate::maxwellian_perturbation(config, 1.0e-3, 1, 1.0).unwrap();
+        let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
+        let result =
+            solver.apply_moment_constrained_velocity_fourier_sponge(0.1, 0.5, 0.25, 2, 0.0);
+        assert!(matches!(
+            result,
+            Err(VelocityFourierSpongeError::PositivityFloorViolation { .. })
+        ));
+        assert_eq!(solver.distribution(), initial.as_slice());
+        assert_eq!(solver.time(), 0.0);
+    }
+
+    #[test]
     fn zero_strength_moment_constrained_sponge_is_exact_identity() {
         let config = config();
         let initial = distribution(true);
