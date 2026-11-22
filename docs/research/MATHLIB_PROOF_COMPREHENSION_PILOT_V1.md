@@ -43,7 +43,7 @@ This tests whether a model can explain not just the theorem but why the domain c
 s.\mathrm{Countable}\land t.\mathrm{Countable}.
 ]
 
-The source is a one-line `simp [union_eq_iUnion, and_comm]`. The surrounding file contains the more general `countable_iUnion` theorem.
+The source is a one-line `simp [union_eq_iUnion, and_comm]`. The surrounding file contains the more general `countable_iUnion` theorem at lines 212–216.
 
 This task must be scored carefully. A good system may explain the conceptual mechanism—encode a two-set union as a countable indexed union—but it must mark the exact simp-generated dependency path as unresolved until a trace or elaborated dependency extraction has been run.
 
