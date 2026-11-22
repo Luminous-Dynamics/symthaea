@@ -587,7 +587,6 @@ jobs:
               "$RUNNER_TEMP/rcaf-spatial-variance-calibration.json" \
               "$RUNNER_TEMP/rcaf-factorial-counterfactual.json" \
               "$RUNNER_TEMP/rcaf-factorial-dose-response.json" \
-              "$RUNNER_TEMP/rcaf-held-out-null-calibration.json" \
               "$RUNNER_TEMP/rcaf-held-out-null-calibration.json"
           python - <<'PY'
           import json
@@ -622,7 +621,6 @@ jobs:
             ${{ runner.temp }}/rcaf-spatial-variance-calibration.json
             ${{ runner.temp }}/rcaf-factorial-counterfactual.json
             ${{ runner.temp }}/rcaf-factorial-dose-response.json
-            ${{ runner.temp }}/rcaf-held-out-null-calibration.json
             ${{ runner.temp }}/rcaf-held-out-null-calibration.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
