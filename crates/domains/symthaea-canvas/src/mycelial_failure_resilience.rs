@@ -1067,6 +1067,79 @@ mod tests {
         assert_eq!(profile.scenarios[0].connected_components, 1);
     }
 
+    fn bfs_reachable(
+        graph: &MycelialJunctionHyphaGraph,
+        demand: &MycelialDemandPair,
+        failed_segments: &[String],
+        failed_junctions: &[String],
+    ) -> bool {
+        let failed_segments: BTreeSet<_> =
+            failed_segments.iter().map(String::as_str).collect();
+        let failed_junctions: BTreeSet<_> =
+            failed_junctions.iter().map(String::as_str).collect();
+        if failed_junctions.contains(demand.source_junction_id.as_str())
+            || failed_junctions.contains(demand.target_junction_id.as_str())
+        {
+            return false;
+        }
+        let mut adjacency = BTreeMap::<&str, Vec<&str>>::new();
+        for junction in &graph.junctions {
+            adjacency.insert(junction.id.as_str(), Vec::new());
+        }
+        for segment in &graph.segments {
+            if failed_segments.contains(segment.id.as_str())
+                || failed_junctions.contains(segment.start_junction_id.as_str())
+                || failed_junctions.contains(segment.end_junction_id.as_str())
+            {
+                continue;
+            }
+            adjacency
+                .get_mut(segment.start_junction_id.as_str())
+                .unwrap()
+                .push(segment.end_junction_id.as_str());
+            adjacency
+                .get_mut(segment.end_junction_id.as_str())
+                .unwrap()
+                .push(segment.start_junction_id.as_str());
+        }
+        let mut visited = BTreeSet::from([demand.source_junction_id.as_str()]);
+        let mut queue = VecDeque::from([demand.source_junction_id.as_str()]);
+        while let Some(current) = queue.pop_front() {
+            if current == demand.target_junction_id {
+                return true;
+            }
+            for neighbour in &adjacency[current] {
+                if !failed_junctions.contains(*neighbour) && visited.insert(*neighbour) {
+                    queue.push_back(neighbour);
+                }
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn single_failure_sweep_matches_independent_bfs_reachability_oracle() {
+        let graph = triangle_graph();
+        let demands = demands();
+        let profile = build_single_failure_resilience_profile(&graph, &demands).unwrap();
+        for metric in std::iter::once(&profile.baseline).chain(profile.scenarios.iter()) {
+            for (demand, outcome) in demands.iter().zip(&metric.demand_pair_outcomes) {
+                let expected = bfs_reachable(
+                    &graph,
+                    demand,
+                    &metric.failed_segment_ids,
+                    &metric.failed_junction_ids,
+                );
+                let measured = outcome.network_path_length_model_units.is_some();
+                assert_eq!(
+                    measured, expected,
+                    "scenario={} demand={}",
+                    metric.scenario_id, demand.id
+                );
+            }
+        }
+    }
+
     #[test]
     fn single_failure_sweep_is_deterministic_and_covers_every_edge_and_junction() {
         let graph = triangle_graph();
