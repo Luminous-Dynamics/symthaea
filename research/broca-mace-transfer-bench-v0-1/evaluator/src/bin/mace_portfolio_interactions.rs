@@ -120,6 +120,9 @@ enum FitError {
     TaskFamilyLeakage,
     InsufficientRelationSupport,
     UnknownTrainingRelation,
+    InvalidIdentity,
+    DuplicateObservation,
+    MissingClusterRelation,
     ValueOverflow,
 }
 
@@ -131,25 +134,56 @@ fn fit_pairwise_model(
         return Err(FitError::EmptySplit);
     }
 
-    let train_clusters = training.iter().map(|row| row.cluster_id).collect::<BTreeSet<_>>();
-    let calibration_clusters =
-        calibration.iter().map(|row| row.cluster_id).collect::<BTreeSet<_>>();
+    let validate_split = |rows: &[TrainingPair]| -> Result<
+        (BTreeSet<u64>, BTreeSet<u64>, BTreeSet<u8>),
+        FitError,
+    > {
+        let mut clusters = BTreeSet::new();
+        let mut roots = BTreeSet::new();
+        let mut families = BTreeSet::new();
+        let mut seen_pairs = BTreeSet::new();
+        let mut cluster_families = BTreeMap::new();
+        for row in rows {
+            if row.cluster_id == 0 || row.source_root_id == 0 || row.task_family == 0 {
+                return Err(FitError::InvalidIdentity);
+            }
+            if row.relation == Relation::Unknown {
+                return Err(FitError::UnknownTrainingRelation);
+            }
+            if !roots.insert(row.source_root_id)
+                || !seen_pairs.insert((row.cluster_id, row.relation))
+            {
+                return Err(FitError::DuplicateObservation);
+            }
+            if cluster_families
+                .insert(row.cluster_id, row.task_family)
+                .is_some_and(|prior| prior != row.task_family)
+            {
+                return Err(FitError::InvalidIdentity);
+            }
+            clusters.insert(row.cluster_id);
+            families.insert(row.task_family);
+        }
+        for cluster in &clusters {
+            for relation in Relation::all() {
+                if !seen_pairs.contains(&(*cluster, relation)) {
+                    return Err(FitError::MissingClusterRelation);
+                }
+            }
+        }
+        Ok((clusters, roots, families))
+    };
+
+    let (train_clusters, train_roots, train_families) = validate_split(training)?;
+    let (calibration_clusters, calibration_roots, calibration_families) =
+        validate_split(calibration)?;
     if !train_clusters.is_disjoint(&calibration_clusters) {
         return Err(FitError::ClusterLeakage);
     }
-
-    let train_roots = training.iter().map(|row| row.source_root_id).collect::<BTreeSet<_>>();
-    let calibration_roots =
-        calibration.iter().map(|row| row.source_root_id).collect::<BTreeSet<_>>();
     if !train_roots.is_disjoint(&calibration_roots) {
         return Err(FitError::RootLeakage);
     }
 
-    let train_families = training.iter().map(|row| row.task_family).collect::<BTreeSet<_>>();
-    let calibration_families = calibration
-        .iter()
-        .map(|row| row.task_family)
-        .collect::<BTreeSet<_>>();
     if !train_families.is_disjoint(&calibration_families) {
         return Err(FitError::TaskFamilyLeakage);
     }
@@ -416,6 +450,7 @@ fn generate_case(
 
 fn candidate_is_eligible(candidate: &CandidatePortfolio, model: &PairwiseModel) -> bool {
     candidate.regime == Regime::Stable
+        && model.model_sha256 == model_digest(model)
         && !model.train_families.contains(&candidate.task_family)
         && !model.calibration_families.contains(&candidate.task_family)
         && !model.train_clusters.contains(&candidate.cluster_id)
@@ -786,6 +821,27 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn duplicate_training_observations_cannot_inflate_pair_support() {
+        let mut train = training_split(10, 1_000, 64, &[1, 2]);
+        let calibration = training_split(11, 2_000, 32, &[3]);
+        train.push(train[0].clone());
+        assert_eq!(
+            fit_pairwise_model(&train, &calibration).unwrap_err(),
+            FitError::DuplicateObservation
+        );
+    }
+
+    #[test]
+    fn a_mutated_pairwise_model_fails_its_digest_check() {
+        let train = training_split(10, 1_000, 96, &[1, 2]);
+        let calibration = training_split(11, 2_000, 48, &[3]);
+        let mut model = fit_pairwise_model(&train, &calibration).unwrap();
+        model.estimates.get_mut(&Relation::Complementary).unwrap().mean_micros += 1;
+        let heldout = generate_case(3_000, 4, Regime::Stable, 99);
+        assert!(select_pairwise(&heldout.candidate, &model).is_none());
+    }
 
     #[test]
     fn train_and_calibration_splits_reject_cluster_leakage() {

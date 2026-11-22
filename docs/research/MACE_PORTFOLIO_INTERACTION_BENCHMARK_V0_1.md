@@ -28,7 +28,7 @@ The current synthetic world has six candidate items, a four-token budget, and on
 
 Training and calibration use distinct cluster IDs, source-root IDs and task-family IDs. Held-out candidate records also carry source-root IDs, and the candidate selector rejects a test root reused from either training or calibration. Held-out stable-regime tasks use another family and distinct clusters/roots. A shifted regime changes the underlying pair effects; the pairwise selector must abstain and fall back to the additive arm. Unknown relation features also force abstention rather than assuming zero interaction.
 
-The candidate model fits a mean interaction per relation class. It calibrates an empirical residual envelope on the calibration split, then uses the lower bound (mean minus radius) in selection. This is intentionally conservative but **not** a statistical confidence interval or proof of coverage. Held-out evaluation reports false-synergy and false-redundancy counts.
+The candidate model fits a mean interaction per relation class. It rejects duplicate cluster/relation observations, zero or reused source roots, missing per-cluster relation support, and mixed task-family identity within a cluster. It calibrates an empirical residual envelope on the calibration split, then uses the lower bound (mean minus radius) in selection. The selector rechecks the fitted-model digest before applying it. This is intentionally conservative but **not** a statistical confidence interval or proof of coverage. Held-out evaluation reports false-synergy and false-redundancy counts.
 
 ## Metrics
 
