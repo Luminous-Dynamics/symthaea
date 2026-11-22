@@ -135,5 +135,171 @@
     "universal_optimal_stopping": false,
     "physical_energy_advantage": false,
     "deployment_qualification": false
-  }
+  },
+  "golden_regret_controls": [
+    {
+      "id": "compute_resolves_opposed_actions",
+      "epsilon_regret_ppm": 0,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "left": 0,
+            "right": 1000000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "left": 1000000,
+            "right": 0
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1"
+        ],
+        [
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 1000000,
+        "after_worst_case_minimax_regret_ppm": 0,
+        "guaranteed_regret_reduction_ppm": 1000000,
+        "before_epsilon_sufficient": false,
+        "after_epsilon_sufficient": true
+      }
+    },
+    {
+      "id": "more_confidence_no_decision_value",
+      "epsilon_regret_ppm": 0,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "continue": 0,
+            "stop": 100000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "continue": 0,
+            "stop": 200000
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1"
+        ],
+        [
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 0,
+        "after_worst_case_minimax_regret_ppm": 0,
+        "guaranteed_regret_reduction_ppm": 0,
+        "before_epsilon_sufficient": true,
+        "after_epsilon_sufficient": true
+      }
+    },
+    {
+      "id": "late_compute_checkpoint",
+      "epsilon_regret_ppm": 0,
+      "deadline_us": 100,
+      "checkpoint_available_at_us": 101,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "left": 0,
+            "right": 1000000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "left": 1000000,
+            "right": 0
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 1000000,
+        "after_worst_case_minimax_regret_ppm": 1000000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "before_epsilon_sufficient": false,
+        "after_epsilon_sufficient": false,
+        "visible_checkpoint": "no_result_by_decision_deadline"
+      }
+    },
+    {
+      "id": "epsilon_sufficient_without_exact_identifiability",
+      "epsilon_regret_ppm": 100000,
+      "worlds": [
+        {
+          "id": "w1",
+          "loss": {
+            "left": 0,
+            "right": 100000
+          }
+        },
+        {
+          "id": "w2",
+          "loss": {
+            "left": 100000,
+            "right": 0
+          }
+        }
+      ],
+      "before_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "after_information_sets": [
+        [
+          "w1",
+          "w2"
+        ]
+      ],
+      "expected": {
+        "before_minimax_regret_ppm": 100000,
+        "after_worst_case_minimax_regret_ppm": 100000,
+        "guaranteed_regret_reduction_ppm": 0,
+        "before_epsilon_sufficient": true,
+        "after_epsilon_sufficient": true,
+        "exact_common_optimal_action": false
+      }
+    }
+  ]
 }
