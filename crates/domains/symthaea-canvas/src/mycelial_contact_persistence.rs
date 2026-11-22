@@ -291,9 +291,13 @@ pub fn build_mycelial_contact_filtration(
             fusion.target_filament_id,
             parameter_micros(fusion.target_t),
         );
+        let (left_contact, right_contact) = if source_contact <= target_contact {
+            (source_contact, target_contact)
+        } else {
+            (target_contact, source_contact)
+        };
         if source_contact == target_contact
-            || !seen_contacts.insert(source_contact)
-            || !seen_contacts.insert(target_contact)
+            || !seen_contacts.insert((left_contact, right_contact, fusion.kind))
             || !anchor_error.is_finite()
             || anchor_error > CONTACT_DISTANCE_ABSOLUTE_EPSILON
         {
@@ -634,11 +638,6 @@ impl MycelialContactFiltration {
                     "component merge candidate has no admission order",
                 ),
             )?;
-            let admission_order = candidate.admission_order.ok_or(
-                MycelialContactFiltrationError::InvalidFiltration(
-                    "cycle candidate has no admission order",
-                ),
-            )?;
             if !candidate.admitted_within_maximum_tolerance
                 || candidate.source_filament_id != event.source_filament_id
                 || candidate.target_filament_id != event.target_filament_id
@@ -661,6 +660,11 @@ impl MycelialContactFiltration {
                 .ok_or(MycelialContactFiltrationError::InvalidFiltration(
                     "cycle birth has no candidate observation",
                 ))?;
+            let admission_order = candidate.admission_order.ok_or(
+                MycelialContactFiltrationError::InvalidFiltration(
+                    "cycle candidate has no admission order",
+                ),
+            )?;
             if !candidate.admitted_within_maximum_tolerance
                 || candidate.source_filament_id != event.source_filament_id
                 || candidate.target_filament_id != event.target_filament_id
@@ -674,6 +678,12 @@ impl MycelialContactFiltration {
                     pair[0].to_filament_id != pair[1].from_filament_id
                 })
                 || event.witness_path.iter().any(|step| {
+                    if step.from_filament_id == step.to_filament_id
+                        || !source_ids.contains(&step.from_filament_id)
+                        || !source_ids.contains(&step.to_filament_id)
+                    {
+                        return true;
+                    }
                     let pair = if step.from_filament_id <= step.to_filament_id {
                         (step.from_filament_id, step.to_filament_id)
                     } else {
