@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod dtco_manifest;
 pub mod pair_manifest;
 pub mod secom_raw;
 pub mod split_manifest;
@@ -18,4 +19,8 @@ pub use split_manifest::{
 
 pub use secom_raw::{
     SecomRawDataError, SecomRawExpectationsV1, SecomRawIntegrityReportV1, audit_secom_raw_v1,
+};
+
+pub use dtco_manifest::{
+    DtcoLineageManifestV1, DtcoLineageError, DtcoLineageReportV1, validate_dtco_lineage_v1,
 };
