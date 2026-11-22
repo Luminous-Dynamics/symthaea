@@ -93,6 +93,11 @@ pub struct AnnotatedHyphaSegment {
 pub struct AnnotatedMycelialSkeleton {
     pub schema_version: u16,
     pub frame_id: String,
+    /// Coordinate axes/origin used by all junction positions in this frame.
+    pub coordinate_frame_id: String,
+    /// Digest of the immutable calibration manifest (pixel scale, voxel spacing,
+    /// coordinate transform, distortion correction and uncertainty model).
+    pub calibration_digest: String,
     /// Digest of the acquired image, volume or immutable source observation.
     pub source_observation_digest: String,
     pub dimensionality: ReconstructionDimensionality,
@@ -196,6 +201,8 @@ impl Default for ReconstructionEvaluationConfig {
 pub struct MycelialReconstructionScore {
     pub schema_version: u16,
     pub frame_id: String,
+    pub coordinate_frame_id: String,
+    pub calibration_digest: String,
     pub source_observation_digest: String,
     pub dimensionality: ReconstructionDimensionality,
     pub length_unit: ReconstructionLengthUnit,
@@ -229,6 +236,8 @@ pub enum MycelialReconstructionError {
     MissingSegmentEndpoint { segment_id: String, junction_id: String },
     InvalidSegment(String),
     FrameMismatch,
+    CoordinateFrameMismatch,
+    CalibrationMismatch,
     SourceObservationMismatch,
     DimensionalityMismatch,
     LengthUnitMismatch,
@@ -266,6 +275,12 @@ impl fmt::Display for MycelialReconstructionError {
             }
             Self::InvalidSegment(id) => write!(f, "segment {id} has invalid geometry or length"),
             Self::FrameMismatch => write!(f, "ground truth and prediction frame IDs differ"),
+            Self::CoordinateFrameMismatch => {
+                write!(f, "ground truth and prediction coordinate-frame IDs differ")
+            }
+            Self::CalibrationMismatch => {
+                write!(f, "ground truth and prediction calibration manifests differ")
+            }
             Self::SourceObservationMismatch => {
                 write!(f, "ground truth and prediction source-observation digests differ")
             }
@@ -320,9 +335,9 @@ impl AnnotatedMycelialSkeleton {
                 self.schema_version,
             ));
         }
-        if self.frame_id.is_empty()
-            || self.frame_id.len() > MAX_RECONSTRUCTION_ID_BYTES
-            || self.frame_id.chars().any(char::is_control)
+        if !valid_id(&self.frame_id)
+            || !valid_id(&self.coordinate_frame_id)
+            || !valid_digest(&self.calibration_digest)
             || self.producer_id.is_empty()
             || self.producer_id.len() > MAX_RECONSTRUCTION_ID_BYTES
             || self.producer_id.chars().any(char::is_control)
@@ -396,6 +411,8 @@ impl AnnotatedMycelialSkeleton {
         hasher.update(b"symthaea-annotated-mycelial-skeleton-v1");
         hasher.update(&self.schema_version.to_le_bytes());
         hash_string(&mut hasher, &self.frame_id);
+        hash_string(&mut hasher, &self.coordinate_frame_id);
+        hasher.update(self.calibration_digest.as_bytes());
         hasher.update(self.source_observation_digest.as_bytes());
         hasher.update(&[match self.dimensionality {
             ReconstructionDimensionality::TwoD => 0,
@@ -457,6 +474,12 @@ pub fn match_junctions_hungarian(
     prediction.validate()?;
     if ground_truth.frame_id != prediction.frame_id {
         return Err(MycelialReconstructionError::FrameMismatch);
+    }
+    if ground_truth.coordinate_frame_id != prediction.coordinate_frame_id {
+        return Err(MycelialReconstructionError::CoordinateFrameMismatch);
+    }
+    if ground_truth.calibration_digest != prediction.calibration_digest {
+        return Err(MycelialReconstructionError::CalibrationMismatch);
     }
     if ground_truth.source_observation_digest != prediction.source_observation_digest {
         return Err(MycelialReconstructionError::SourceObservationMismatch);
@@ -642,6 +665,12 @@ pub fn evaluate_mycelial_reconstruction(
     if ground_truth.frame_id != prediction.frame_id {
         return Err(MycelialReconstructionError::FrameMismatch);
     }
+    if ground_truth.coordinate_frame_id != prediction.coordinate_frame_id {
+        return Err(MycelialReconstructionError::CoordinateFrameMismatch);
+    }
+    if ground_truth.calibration_digest != prediction.calibration_digest {
+        return Err(MycelialReconstructionError::CalibrationMismatch);
+    }
     if ground_truth.source_observation_digest != prediction.source_observation_digest {
         return Err(MycelialReconstructionError::SourceObservationMismatch);
     }
@@ -812,6 +841,8 @@ pub fn evaluate_mycelial_reconstruction(
     let score = MycelialReconstructionScore {
         schema_version: MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION,
         frame_id: ground_truth.frame_id.clone(),
+        coordinate_frame_id: ground_truth.coordinate_frame_id.clone(),
+        calibration_digest: ground_truth.calibration_digest.clone(),
         source_observation_digest: ground_truth.source_observation_digest.clone(),
         dimensionality: ground_truth.dimensionality,
         length_unit: ground_truth.length_unit,
@@ -918,6 +949,8 @@ impl MycelialReconstructionScore {
         let length_is_empty = self.segment_length_error.matched_segment_count == 0;
         if self.schema_version != MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION
             || !valid_id(&self.frame_id)
+            || !valid_id(&self.coordinate_frame_id)
+            || !valid_digest(&self.calibration_digest)
             || !valid_digest(&self.source_observation_digest)
             || !valid_id(&self.matching_policy_id)
             || !self.maximum_junction_match_distance.is_finite()
@@ -990,6 +1023,8 @@ impl MycelialReconstructionScore {
         hasher.update(b"symthaea-mycelial-reconstruction-score-v1");
         hasher.update(&self.schema_version.to_le_bytes());
         hash_string(&mut hasher, &self.frame_id);
+        hash_string(&mut hasher, &self.coordinate_frame_id);
+        hasher.update(self.calibration_digest.as_bytes());
         hasher.update(self.source_observation_digest.as_bytes());
         hasher.update(&[match self.dimensionality {
             ReconstructionDimensionality::TwoD => 0,
@@ -1299,6 +1334,8 @@ mod tests {
         AnnotatedMycelialSkeleton {
             schema_version: MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION,
             frame_id: "frame:001".to_string(),
+            coordinate_frame_id: "image-frame:001".to_string(),
+            calibration_digest: "c".repeat(64),
             source_observation_digest: source_digest(),
             dimensionality: ReconstructionDimensionality::ThreeD,
             length_unit: ReconstructionLengthUnit::Micrometer,
