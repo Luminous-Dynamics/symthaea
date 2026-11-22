@@ -136,7 +136,44 @@ Recent network-resilience work provides two important challenges to a centrality
 
 The present plans model **structural intervention outcomes conditional on successful removals**. They do not yet simulate partial edge degradation, probability of failure, cascades, repair, or adaptive attackers. Those require explicit calibrated parameters or clearly labelled synthetic stress models.
 
-## 6. Bounds
+## 6. Attack-delivery uncertainty simulation
+
+The current deterministic attack plans specify which entities an attacker attempts to remove. The new optional delivery profile distinguishes an attempted removal from a successfully enacted removal.
+
+API:
+- `MycelialFailureDeliveryConfig`
+- `build_mycelial_failure_delivery_profile(graph, demands, plan, config)`
+
+Configuration:
+- trial count per attack scenario;
+- fixed-point per-entity removal-success probability from 0 to 1,000,000;
+- deterministic seed.
+
+For each scenario and trial, each attempted segment/junction removal is independently enacted with the configured probability. A versioned SplitMix64 draw is derived from the profile seed, scenario ID and trial index. Every trial stores its exact realized failed segment/junction IDs plus its structural/demand results. Per-scenario summaries include mean realized failure count, probability of at least one enacted failure, weighted reachability mean/P05/P50/P95/min/max and directness/path-length means among trials where demand remains reachable.
+
+The profile validator:
+- checks every scenario has the configured number of trials;
+- recomputes the exact realized failed-ID lists from the PRNG and declared seed;
+- checks the trial ordering and uniqueness;
+- recomputes all distribution summaries from the stored trials;
+- binds source graph, demand inventory, attack-plan digest and probability/seed configuration.
+
+Bounds:
+- at most 1,000 trials per scenario;
+- at most 10,000 total scenario-trial evaluations per profile.
+
+### Conformance boundary
+
+- 0% success probability must realize no removals and reproduce baseline reachability.
+- 100% success probability must enact each attempted removal and match the deterministic attack evaluation.
+- intermediate probabilities are a **simulation assumption**, not an empirical estimate, unless calibrated from observed delivery/failure data.
+- current draws are independent across attempted entities; common-cause or correlated intervention delivery is not implemented.
+- this profile models attack enactment uncertainty, not stochastic biological failure, organism survival or physical transport.
+- a high failure probability setting does not mean a hypha has that probability of breaking; it means the hypothetical intervention has that chance of being enacted in the model.
+
+The synthetic benchmark runs a fixed 0%, 25%, 50%, 75% and 100% delivery grid under common seed/plan inputs. The deterministic 100%-success arm remains the reference baseline.
+
+## 7. Bounds
 
 | Contract | Bound |
 |---|---:|
@@ -145,6 +182,8 @@ The present plans model **structural intervention outcomes conditional on succes
 | Demand pairs | 256 |
 | Distinct demand sources | 32 |
 | Failure scenarios | 768 |
+| Attack-delivery trials per scenario | 1,000 |
+| Attack-delivery scenario-trial evaluations per profile | 10,000 |
 | Total integer demand weight | (2^{53}) |
 | ID length | 128 bytes |
 
@@ -204,7 +243,7 @@ Proposed, not achieved:
 
 ## 9. Claim boundaries
 
-The attack-family benchmark currently evaluates structural reachability and geometric shortest paths after deterministic, fully enacted removals. It does not yet simulate or measure:
+The deterministic attack-family benchmark evaluates structural reachability and geometric shortest paths after fully enacted removals. The optional delivery-uncertainty profile evaluates simulated intervention-success uncertainty. Neither mode measures an actual biological failure probability. The programme does not yet simulate or measure:
 - cytoplasmic flow;
 - pressure/flow conductance;
 - nutrient transport;
