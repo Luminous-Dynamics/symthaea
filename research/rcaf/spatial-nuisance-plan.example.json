@@ -1,0 +1,94 @@
+{
+  "schema_version": "rcaf.spatial-nuisance-plan/0.1.0",
+  "plan_id": "rcaf-spatial-nuisance-identifiability-v1",
+  "status": "proposed",
+  "geometry": {
+    "representation": "weighted_undirected_graph",
+    "source": "synthetic_fixture_graph",
+    "interpretation_scope": "synthetic_topology_only",
+    "roi_labels": [
+      "roi-01", "roi-02", "roi-03", "roi-04",
+      "roi-05", "roi-06", "roi-07", "roi-08",
+      "roi-09", "roi-10", "roi-11", "roi-12"
+    ],
+    "constant_mode_policy": "excluded_in_spatial_v1",
+    "graph_digest_required_at_execution": true
+  },
+  "target": {
+    "roi_labels": ["roi-05", "roi-06", "roi-09", "roi-10"],
+    "expected_direction": "positive",
+    "minimally_meaningful_effect": 0.30
+  },
+  "counterfactual_cells": [
+    "clean_null",
+    "signal_only",
+    "nuisance_only",
+    "signal_plus_nuisance"
+  ],
+  "seed_policy": {
+    "development_seed": 271828,
+    "confirmatory_seed": 314159,
+    "pilot_replicates": 200,
+    "screening_replicates": 1000,
+    "critical_null_replicates": 10000,
+    "matched_nuisance_innovations": true,
+    "separate_seed_substreams": true,
+    "exact_zero_dose_equivalence": true
+  },
+  "dose_grid": {
+    "nuisance_variance_fractions": [0.0, 0.025, 0.05, 0.10, 0.20],
+    "spatial_alignment": [0.0, 0.25, 0.5, 0.75, 1.0],
+    "temporal_coherence": [0.0, 0.25, 0.5, 0.75, 1.0],
+    "temporal_ar1_coefficients": [-0.3, 0.0, 0.3, 0.6],
+    "target_effect_sizes": [0.0, 0.15, 0.30, 0.45],
+    "participant_response_fractions": [0.0, 0.5, 1.0]
+  },
+  "nuisance_families": [
+    {
+      "family_id": "graph-smooth-low-rank-v1",
+      "kind": "graph_smooth_low_rank",
+      "rank_points": [1, 2, 3],
+      "spatial_scale_points": [0.15, 0.35, 0.60]
+    },
+    {
+      "family_id": "heat-kernel-localized-v1",
+      "kind": "heat_kernel_localized",
+      "rank_points": [1, 2],
+      "spatial_scale_points": [0.25, 0.75, 1.50]
+    }
+  ],
+  "identifiability_boundary": {
+    "spatial_alignment": 1.0,
+    "temporal_coherence": 1.0,
+    "expected_disposition": "not_identifiable_abstain"
+  },
+  "required_outputs": [
+    "classical_null_calibration",
+    "nuisance_only_operational_false_alarm",
+    "clean_directional_recovery",
+    "signal_plus_nuisance_directional_recovery",
+    "wrong_direction_rejection",
+    "effect_bias",
+    "effect_rmse",
+    "interval_coverage",
+    "interval_width",
+    "effect_drift",
+    "artifact_amplification",
+    "correct_abstention",
+    "false_abstention",
+    "data_sufficiency",
+    "participant_attrition",
+    "runtime",
+    "memory",
+    "transportability",
+    "execution_receipt"
+  ],
+  "claim_limits": [
+    "This is a proposed spatial nuisance plan, not an executed simulation result.",
+    "The synthetic fixture graph is a toy topology and is not anatomical.",
+    "The graph digest and exact geometry must be recorded at execution.",
+    "Nuisance-only and signal-plus-nuisance cells preserve the declared latent target except for the explicitly planted signal intervention.",
+    "An observationally equivalent artifact/target pair must be labelled not_identifiable_abstain.",
+    "No synthetic result establishes biological validity, consciousness inference, causal attribution, clinical utility, or superiority over an industry pipeline."
+  ]
+}
