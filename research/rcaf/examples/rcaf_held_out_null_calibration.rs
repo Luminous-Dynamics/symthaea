@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let evaluation = (0..100)
         .map(|index| {
             let base = (index + 1) as f64 / 100.0;
-            let signal = 0.90 + index as f64 / 1000.0;
+            let signal = 0.899 + index as f64 * 0.0011;
             HeldOutEvaluationObservation {
                 replicate_id: format!("eval-{index:03}"),
                 null_statistics: [base, base * 0.8, base * 0.6],
