@@ -1150,10 +1150,12 @@ mod tests {
         value["dispositions"][0]["acted_at_ns"] = serde_json::json!(950_000_000_u64);
         let report = audit(&value).expect("late steer remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
-        assert!(report
-            .qualification_findings
-            .iter()
-            .any(|finding| finding.contains("successor was already committed")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("successor was already committed"))
+        );
     }
 
     #[test]
@@ -1161,14 +1163,15 @@ mod tests {
         let mut value = panel();
         value["realizations"][0]["started_at_ns"] = serde_json::json!(1_550_000_000_u64);
         value["realizations"][0]["completed_at_ns"] = serde_json::json!(1_560_000_000_u64);
-        value["realizations"][0]["events"][0]["onset_ns"] =
-            serde_json::json!(1_555_000_000_u64);
+        value["realizations"][0]["events"][0]["onset_ns"] = serde_json::json!(1_555_000_000_u64);
         let report = audit(&value).expect("late realization remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
-        assert!(report
-            .qualification_findings
-            .iter()
-            .any(|finding| finding.contains("target window ended")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("target window ended"))
+        );
     }
 
     #[test]
