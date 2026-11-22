@@ -248,7 +248,9 @@ fn fit_model_v1(
     // Canonical identity ordering makes floating-point accumulation independent
     // of manifest row order while preserving feature/label/sample alignment.
     training_indices.sort_by(|&left, &right| {
-        assignments[left].sample_id.cmp(&assignments[right].sample_id)
+        assignments[left]
+            .sample_id
+            .cmp(&assignments[right].sample_id)
     });
     if training_indices.is_empty() {
         return Err(SecomTabularBaselineError(
