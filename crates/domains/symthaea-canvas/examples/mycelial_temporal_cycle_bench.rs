@@ -15,10 +15,9 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    MAX_TEMPORAL_CYCLE_SEARCH_STEPS, MycelialTemporalCycleConfig,
-    TemporalEdgeEvidence, TemporalMycelialEdge, TemporalMycelialSequence,
-    TemporalMycelialSnapshot, TemporalWindowCoverage,
-    build_temporal_mycelial_cycle_profile,
+    MAX_TEMPORAL_CYCLE_SEARCH_STEPS, MycelialTemporalCycleConfig, TemporalEdgeEvidence,
+    TemporalMycelialEdge, TemporalMycelialSequence, TemporalMycelialSnapshot,
+    TemporalWindowCoverage, build_temporal_mycelial_cycle_profile,
 };
 
 const DEFAULT_SAMPLES: usize = 100;
