@@ -92,21 +92,6 @@ impl PointMetrics {
         }
     }
 
-    fn is_finite(self) -> bool {
-        [
-            self.utility,
-            self.absolute_regret,
-            self.regret_gap_vs_full_scope,
-            self.decision_sufficient_by_regret_only,
-            self.oracle_optimal,
-            self.agrees_with_full_scope,
-            self.selected_bytes_lower_bound,
-            self.index_bytes_lower_bound,
-            self.measured_latency_ns,
-        ]
-        .iter()
-        .all(|value| value.is_finite())
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -115,19 +100,6 @@ struct ParetoCost {
     index_bytes: f64,
     latency_ns: f64,
     regret: f64,
-}
-
-#[derive(Clone, Debug)]
-struct SummaryPoint {
-    arm: ArmBudget,
-    mean: PointMetrics,
-    mean_utility_delta_vs_no_memory: f64,
-    mean_regret_delta_vs_no_memory: f64,
-    utility_delta_ci: (f64, f64),
-    regret_delta_ci: (f64, f64),
-    world_cluster_count: usize,
-    scenario_family_count: usize,
-    pareto_frontier_member: bool,
 }
 
 fn required_string<'a>(record: &'a Value, field: &str) -> Result<&'a str, String> {
@@ -388,21 +360,19 @@ fn write_jsonl(path: &str, records: &[Value]) -> Result<(), String> {
 }
 
 fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> {
-    let input = File::open(input_path).map_err(|error| format!("open {input_path}: {error}"))?;
-    let reader = BufReader::new(input);
-    let mut input_sha = Sha256::new();
+    let input_contents = std::fs::read_to_string(input_path)
+        .map_err(|error| format!("read {input_path}: {error}"))?;
+    let input_evaluator_jsonl_sha256 =
+        hex_digest(Sha256::digest(input_contents.as_bytes()).as_slice());
     let mut provenance: Option<RunProvenance> = None;
     let mut rows: BTreeMap<ArmBudget, BTreeMap<u64, BTreeMap<String, PointMetrics>>> =
         BTreeMap::new();
 
-    for (index, line) in reader.lines().enumerate() {
-        let line = line.map_err(|error| format!("read line {}: {error}", index + 1))?;
+    for (index, line) in input_contents.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
-        input_sha.update(line.as_bytes());
-        input_sha.update(b"\n");
-        let record: Value = serde_json::from_str(&line)
+        let record: Value = serde_json::from_str(line)
             .map_err(|error| format!("parse line {}: {error}", index + 1))?;
         let current_provenance = parse_provenance(&record)?;
         if let Some(expected) = &provenance {
@@ -448,7 +418,7 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
         .next()
         .cloned()
         .ok_or("no_memory baseline has no scenario-family set")?;
-    if expected_families.values().any(|families| *families != canonical_family_set) {
+    if expected_families.values().any(|families| families != &canonical_family_set) {
         return Err("world clusters do not share the same scenario-family set".into());
     }
 
@@ -528,8 +498,6 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             regret: mean.absolute_regret,
         })
         .collect();
-    let mut output = Vec::new();
-    let evaluator_jsonl_sha256 = hex_digest(input_sha.finalize().as_slice());
     let aggregation_source_sha256 = hex_digest(
         Sha256::digest(include_bytes!("mace_sufficiency_aggregate.rs")).as_slice(),
     );
@@ -548,7 +516,7 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             "input_source_code_sha256": provenance.source_code_sha256,
             "input_fixture_sha256": provenance.fixture_sha256,
             "input_schema_sha256": provenance.schema_sha256,
-            "input_evaluator_jsonl_sha256": evaluator_jsonl_sha256,
+            "input_evaluator_jsonl_sha256": input_evaluator_jsonl_sha256,
             "aggregation_source_sha256": aggregation_source_sha256,
             "bootstrap_seed": seed,
             "bootstrap_replicates": BOOTSTRAP_REPLICATES,
