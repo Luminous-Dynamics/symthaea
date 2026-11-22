@@ -73,7 +73,7 @@
           "roi_count": { "const": 8 },
           "compared_values": { "const": 768 },
           "target_component_variance_fraction": {
-            "type": ["number", "null"],
+            "type": "number",
             "minimum": 0,
             "exclusiveMaximum": 1
           },
