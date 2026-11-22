@@ -34,8 +34,12 @@ jobs:
           components: rustfmt, clippy
       - name: Check formatting
         run: cargo +1.96.0 fmt --check --manifest-path tools/mel-sealed-evaluation/Cargo.toml
-      - name: Resolve isolated lockfile
-        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-sealed-evaluation/Cargo.toml
+      - name: Verify committed dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch tools/mel-sealed-evaluation/Cargo.lock > /dev/null
+          test -f tools/mel-sealed-evaluation/Cargo.lock
       - name: Run deterministic tests
         run: cargo +1.96.0 test --locked --manifest-path tools/mel-sealed-evaluation/Cargo.toml
       - name: Run warnings-denied Clippy
