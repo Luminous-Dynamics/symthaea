@@ -43,7 +43,7 @@ For a predicted future-use value V:
 - Snapshot net value: V minus (snapshot tokens multiplied by token cost).
 - Locator net value: V minus re-observation cost, latency penalty and locator-token cost.
 
-A locator is eligible only when it can return before the declared decision deadline and its independent receipt remains valid through that deadline. A current-state snapshot is eligible only when its verified validity interval covers the decision deadline. Stable facts may be retained as knowledge without a transient-state expiry, or represented by a cheaper verified locator. Learned rules, procedures and preferences are not replaced with a live-state locator merely because some source can be queried.
+A locator is eligible only when it can return before the declared decision deadline, its independent receipt remains valid strictly beyond that deadline, and its calibrated success probability justifies the expected failure penalty. A receipt expiry equal to the deadline is expired because validity intervals are half-open. A current-state snapshot is eligible only when its verified validity interval covers the decision deadline. Stable facts may be retained as knowledge without a transient-state expiry, or represented by a cheaper verified locator. Learned rules, procedures and preferences are not replaced with a live-state locator merely because some source can be queried.
 
 This is a per-item representation decision. A future global optimizer should jointly allocate context tokens, re-observation calls, latency and privacy budgets across a candidate set; it must preserve the exact salience selector as a matched baseline.
 
@@ -75,7 +75,7 @@ Report separately:
 - downstream utility and decision regret;
 - stale-state activation after snapshot expiry;
 - redundant snapshot tokens for cheaply re-observable state;
-- successful re-observation rate and re-observation-to-decision latency;
+- calibrated re-observation success probability, expected failure loss, actual success rate and re-observation-to-decision latency;
 - learned-rule retention and later task success;
 - locator failure / stale locator use;
 - context tokens, tool calls, query cost, storage and CPU;

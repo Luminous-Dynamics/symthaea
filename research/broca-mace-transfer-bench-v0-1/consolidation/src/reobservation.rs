@@ -47,6 +47,10 @@ pub struct ReobservationProposalV1 {
     pub as_known: AsKnownQuery,
     pub object_kind: MemoryObjectKindV1,
     pub availability: ReobservationAvailabilityV1,
+    /// Verifier-calibrated probability that a scheduled re-observation succeeds.
+    pub availability_success_probability_bps: u16,
+    /// Consequence cost if the locator cannot provide current state by the deadline.
+    pub reobservation_failure_penalty_micros: u32,
     pub reobservation_latency_ms: u32,
     pub reobservation_cost_micros: u32,
     pub snapshot_context_tokens: u32,
@@ -77,6 +81,8 @@ impl ReobservationProposalV1 {
             availability.to_owned(),
             available_at,
             locator,
+            self.availability_success_probability_bps.to_string(),
+            self.reobservation_failure_penalty_micros.to_string(),
             self.reobservation_latency_ms.to_string(),
             self.reobservation_cost_micros.to_string(),
             self.snapshot_context_tokens.to_string(),
@@ -210,6 +216,8 @@ pub fn verify_reobservation_profile(
         } => {
             if *available_at_ms < as_known.known_at_ms
                 || !is_lower_sha256(locator_sha256)
+                || proposal.availability_success_probability_bps == 0
+                || u32::from(proposal.availability_success_probability_bps) > 10_000
             {
                 return Err(ReobservationReject::InvalidAvailabilityTime);
             }
@@ -217,6 +225,8 @@ pub fn verify_reobservation_profile(
         ReobservationAvailabilityV1::Unavailable => {
             if proposal.reobservation_latency_ms != 0
                 || proposal.reobservation_cost_micros != 0
+                || proposal.availability_success_probability_bps != 0
+                || proposal.reobservation_failure_penalty_micros != 0
             {
                 return Err(ReobservationReject::InvalidAvailabilityTime);
             }
@@ -297,6 +307,7 @@ pub struct ReobservationPlanV1 {
     pub reason: ReobservationReasonV1,
     pub context_tokens_reserved: u32,
     pub estimated_cost_micros: u64,
+    pub expected_failure_loss_micros: i64,
     pub expected_value_micros: i64,
     pub net_value_micros: i64,
     pub locator_sha256: Option<String>,
@@ -316,6 +327,7 @@ impl ReobservationPlanV1 {
             reason_code(self.reason).to_owned(),
             self.context_tokens_reserved.to_string(),
             self.estimated_cost_micros.to_string(),
+            self.expected_failure_loss_micros.to_string(),
             self.expected_value_micros.to_string(),
             self.net_value_micros.to_string(),
             self.locator_sha256.clone().unwrap_or_default(),
@@ -331,7 +343,7 @@ fn usable_locator(
     profile: &VerifiedReobservationProfileV1,
     policy: ReobservationPolicyV1,
 ) -> Option<(String, u64)> {
-    if profile.receipt().valid_until_ms < policy.decision_deadline_ms
+    if profile.receipt().valid_until_ms <= policy.decision_deadline_ms
         || policy.locator_context_tokens > policy.context_budget_tokens
     {
         return None;
@@ -361,6 +373,21 @@ fn usable_locator(
         locator_sha256.clone(),
         total_reobservation_cost.saturating_add(locator_storage_cost),
     ))
+}
+
+fn expected_success_value(value_micros: i64, success_probability_bps: u16) -> i64 {
+    let product = i128::from(value_micros) * i128::from(success_probability_bps);
+    (product / 10_000).clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
+}
+
+fn expected_failure_loss(
+    failure_penalty_micros: u32,
+    success_probability_bps: u16,
+) -> i64 {
+    let failure_probability_bps = 10_000_u32.saturating_sub(u32::from(success_probability_bps));
+    i64::from(
+        failure_probability_bps.saturating_mul(failure_penalty_micros) / 10_000,
+    )
 }
 
 pub fn plan_memory_representation(
@@ -406,6 +433,7 @@ pub fn plan_memory_representation(
     let mut reason = ReobservationReasonV1::NoPositiveNetValue;
     let mut context_tokens = 0_u32;
     let mut estimated_cost = 0_u64;
+    let mut expected_failure_loss = 0_i64;
     let mut locator = None;
     let mut snapshot_expiry = None;
     let mut net = i64::MIN;
@@ -415,7 +443,7 @@ pub fn plan_memory_representation(
     let snapshot_fits = proposal.snapshot_context_tokens <= policy.context_budget_tokens;
     let snapshot_valid = proposal
         .snapshot_valid_until_ms
-        .is_some_and(|expiry| expiry >= policy.decision_deadline_ms);
+        .is_some_and(|expiry| expiry > policy.decision_deadline_ms);
     let snapshot_net = if snapshot_fits && snapshot_valid {
         expected.saturating_sub(i64::try_from(snapshot_cost).unwrap_or(i64::MAX))
     } else {
@@ -445,8 +473,18 @@ pub fn plan_memory_representation(
         }
         MemoryObjectKindV1::StableFact => {
             let locator_option = usable_locator(profile, policy);
+            let locator_failure_loss = expected_failure_loss(
+                proposal.reobservation_failure_penalty_micros,
+                proposal.availability_success_probability_bps,
+            );
+            let locator_success_value = expected_success_value(
+                expected,
+                proposal.availability_success_probability_bps,
+            );
             let locator_net = locator_option.as_ref().map_or(i64::MIN, |(_, cost)| {
-                expected.saturating_sub(i64::try_from(*cost).unwrap_or(i64::MAX))
+                locator_success_value
+                    .saturating_sub(locator_failure_loss)
+                    .saturating_sub(i64::try_from(*cost).unwrap_or(i64::MAX))
             });
             if locator_net > stable_knowledge_net
                 && locator_net > policy.minimum_net_value_micros
@@ -456,6 +494,7 @@ pub fn plan_memory_representation(
                 context_tokens = policy.locator_context_tokens;
                 estimated_cost = locator_option.as_ref().map_or(0, |(_, cost)| *cost);
                 locator = locator_option.map(|(digest, _)| digest);
+                expected_failure_loss = locator_failure_loss;
                 net = locator_net;
             } else if stable_knowledge_net > policy.minimum_net_value_micros {
                 disposition = ReobservationDispositionV1::PersistKnowledge;
@@ -469,8 +508,18 @@ pub fn plan_memory_representation(
         }
         MemoryObjectKindV1::CurrentState => {
             let locator_option = usable_locator(profile, policy);
+            let locator_failure_loss = expected_failure_loss(
+                proposal.reobservation_failure_penalty_micros,
+                proposal.availability_success_probability_bps,
+            );
+            let locator_success_value = expected_success_value(
+                expected,
+                proposal.availability_success_probability_bps,
+            );
             let locator_net = locator_option.as_ref().map_or(i64::MIN, |(_, cost)| {
-                expected.saturating_sub(i64::try_from(*cost).unwrap_or(i64::MAX))
+                locator_success_value
+                    .saturating_sub(locator_failure_loss)
+                    .saturating_sub(i64::try_from(*cost).unwrap_or(i64::MAX))
             });
 
             if locator_net > policy.minimum_net_value_micros {
@@ -479,6 +528,7 @@ pub fn plan_memory_representation(
                 context_tokens = policy.locator_context_tokens;
                 estimated_cost = locator_option.as_ref().map_or(0, |(_, cost)| *cost);
                 locator = locator_option.map(|(digest, _)| digest);
+                expected_failure_loss = locator_failure_loss;
                 net = locator_net;
             } else if snapshot_net > policy.minimum_net_value_micros {
                 disposition = ReobservationDispositionV1::CacheSnapshot;
@@ -513,6 +563,7 @@ pub fn plan_memory_representation(
         reason,
         context_tokens_reserved: context_tokens,
         estimated_cost_micros: estimated_cost,
+        expected_failure_loss_micros: expected_failure_loss,
         expected_value_micros: expected,
         net_value_micros: net,
         locator_sha256: locator,
@@ -723,6 +774,8 @@ mod tests {
             as_known: as_known(),
             object_kind: kind,
             availability,
+            availability_success_probability_bps: if latency == 0 { 0 } else { 9_900 },
+            reobservation_failure_penalty_micros: if latency == 0 { 0 } else { 20_000 },
             reobservation_latency_ms: latency,
             reobservation_cost_micros: cost,
             snapshot_context_tokens: 100,
@@ -1004,6 +1057,77 @@ mod tests {
         ));
         let plan = plan_memory_representation(&prediction(0, 1), &profile, policy()).unwrap();
         assert_eq!(plan.disposition, ReobservationDispositionV1::Discard);
+    }
+
+    #[test]
+    fn low_reobservation_reliability_can_make_a_fresh_snapshot_better() {
+        let mut item = proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("fragile-live-source"),
+            },
+            Some(800),
+        );
+        item.availability_success_probability_bps = 2_000;
+        item.reobservation_failure_penalty_micros = 80_000;
+        let profile = verified(item);
+        let plan = plan_memory_representation(&prediction(50_000, 1_000), &profile, policy())
+            .unwrap();
+        assert_eq!(plan.disposition, ReobservationDispositionV1::CacheSnapshot);
+        assert_eq!(plan.expected_failure_loss_micros, 0);
+        assert!(plan.locator_sha256.is_none());
+    }
+
+    #[test]
+    fn locator_and_snapshot_receipts_expiring_exactly_at_deadline_are_invalid() {
+        let item = proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("deadline-source"),
+            },
+            Some(500),
+        );
+        let profile = verify_reobservation_profile(
+            item,
+            scope(),
+            as_known(),
+            &FixtureVerifier {
+                corrupt_receipt: false,
+                valid_for_ms: 300,
+            },
+        )
+        .unwrap();
+        let plan = plan_memory_representation(&prediction(50_000, 1_000), &profile, policy())
+            .unwrap();
+        assert_eq!(plan.disposition, ReobservationDispositionV1::Discard);
+        assert_eq!(plan.expected_failure_loss_micros, 0);
+    }
+
+    #[test]
+    fn malformed_availability_probability_is_rejected() {
+        let mut item = proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("live-source"),
+            },
+            Some(1_000),
+        );
+        item.availability_success_probability_bps = 0;
+        assert_eq!(
+            verify_reobservation_profile(
+                item,
+                scope(),
+                as_known(),
+                &FixtureVerifier {
+                    corrupt_receipt: false,
+                    valid_for_ms: 10_000,
+                },
+            ),
+            Err(ReobservationReject::InvalidAvailabilityTime)
+        );
     }
 
     #[test]
