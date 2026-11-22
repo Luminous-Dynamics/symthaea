@@ -15,7 +15,6 @@ use std::mem::size_of;
 use std::time::Instant;
 
 use broca_mace_ingress::EvidenceDependencySidecarV1;
-use broca_mace_ingress::EvidenceDependencySidecarV1;
 use broca_mace_hdc_retrieval::{
     experience_view_digest,
     typed_content::{SemanticExperienceQueryV1, TypedContentConfigV1, TypedContentIndexV1},
@@ -29,9 +28,6 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 mod mace_generated_stress;
-mod receipt_dependency;
-
-use receipt_dependency::ReceiptDependencyProjection;
 mod receipt_dependency;
 
 use receipt_dependency::ReceiptDependencyProjection;
@@ -1007,6 +1003,23 @@ fn run() -> Result<(), String> {
         .map(|value| value.parse::<usize>().map_err(|error| error.to_string()))
         .transpose()?
         .unwrap_or(32);
+    let dependency_sidecar_path = args.get(5).map(String::as_str);
+    if dependency_sidecar_path.is_some() && clusters != 1 {
+        return Err(
+            "a pinned dependency sidecar currently requires clusters=1 so the evidence/sidecar binding is unambiguous"
+                .to_string(),
+        );
+    }
+    let dependency_sidecar = dependency_sidecar_path
+        .map(|path| {
+            let contents = std::fs::read_to_string(path)
+                .map_err(|error| format!("read dependency sidecar {path}: {error}"))?;
+            let value: Value = serde_json::from_str(&contents)
+                .map_err(|error| format!("parse dependency sidecar {path}: {error}"))?;
+            EvidenceDependencySidecarV1::from_json_value(&value)
+                .map_err(|error| format!("verify dependency sidecar {path}: {error}"))
+        })
+        .transpose()?;
 
     let cases = mace_generated_stress::generated_worlds(clusters);
     let mut evaluator_code_hasher = Sha256::new();
@@ -1014,6 +1027,7 @@ fn run() -> Result<(), String> {
     evaluator_code_hasher.update(include_bytes!(
         "mace_counterfactual_evidence/receipt_dependency.rs"
     ));
+    evaluator_code_hasher.update(include_bytes!("../../../ingress/src/lib.rs"));
     let source_code_sha256 = hex_digest(evaluator_code_hasher.finalize().as_slice());
     let fixture_sha256 =
         hex_digest(Sha256::digest(include_bytes!("mace_generated_stress.rs")).as_slice());
@@ -1049,13 +1063,24 @@ fn run() -> Result<(), String> {
     let mut evaluator_records = Vec::new();
 
     for case in &cases {
-        let manifest = build_manifest(&case.memory, public_seed, max_root_pairs)
-            .map_err(|error| format!("dependency index failed: {error:?}"))?;
+        let manifest = build_manifest_with_sidecar(
+            &case.memory,
+            dependency_sidecar.as_ref(),
+            public_seed,
+            max_root_pairs,
+        )
+        .map_err(|error| format!("dependency index failed: {error:?}"))?;
         let baseline_observations: Vec<CandidateObservation> = CandidateMode::ALL
             .iter()
             .map(|mode| {
-                run_candidate(*mode, case.query, case.decision_need, &case.memory)
-                    .map_err(|error| format!("{} baseline failed: {error:?}", mode.name()))
+                run_candidate_with_sidecar(
+                    *mode,
+                    case.query,
+                    case.decision_need,
+                    &case.memory,
+                    dependency_sidecar.as_ref(),
+                )
+                .map_err(|error| format!("{} baseline failed: {error:?}", mode.name()))
             })
             .collect::<Result<_, _>>()?;
         let baseline_regrets: BTreeMap<CandidateMode, f64> = baseline_observations
@@ -1102,16 +1127,17 @@ fn run() -> Result<(), String> {
             "schema_sha256": schema_sha256,
             "dependency_sidecar_schema_sha256": dependency_sidecar_schema_sha256,
             "source_revision": source_revision,
-            "known_root_count": EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?
-                .known_root_count(),
+            "known_root_count": support_index.known_root_count(),
             "candidate_validity": "diagnostic_only"
         }));
 
         for baseline in &baseline_observations {
-            let support = EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?
-                .support_closure_counts(&baseline.decision.evidence_ids);
+            let support_index = match dependency_sidecar.as_ref() {
+                Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&case.memory, sidecar),
+                None => EvidenceDependencyIndex::build(&case.memory),
+            }
+            .map_err(|error| format!("dependency index failed: {error:?}"))?;
+            let support = support_index.support_closure_counts(&baseline.decision.evidence_ids);
             let observation_id = candidate_observation_id(baseline);
             let candidate_record = json!({
                 "schema_version": SCHEMA_VERSION,
@@ -1190,21 +1216,31 @@ fn run() -> Result<(), String> {
         }
 
         for intervention in &manifest.interventions {
-            let index = EvidenceDependencyIndex::build(&case.memory)
-                .map_err(|error| format!("dependency index failed: {error:?}"))?;
+            let index = match dependency_sidecar.as_ref() {
+                Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&case.memory, sidecar),
+                None => EvidenceDependencyIndex::build(&case.memory),
+            }
+            .map_err(|error| format!("dependency index failed: {error:?}"))?;
             let retained = index.retain_without(&intervention.removed_event_ids);
+            let retained_sidecar = dependency_sidecar
+                .as_ref()
+                .map(|sidecar| sidecar.retain_without_event_ids(&intervention.removed_event_ids));
 
             for mode in CandidateMode::ALL {
-                let candidate = run_candidate(
+                let candidate = run_candidate_with_sidecar(
                     mode,
                     case.query,
                     case.decision_need,
                     &retained,
+                    retained_sidecar.as_ref(),
                 )
                 .map_err(|error| format!("intervention candidate failed: {error:?}"))?;
-                let support = EvidenceDependencyIndex::build(&retained)
-                    .map_err(|error| format!("retained evidence index failed: {error:?}"))?
-                    .support_closure_counts(&candidate.decision.evidence_ids);
+                let retained_index = match retained_sidecar.as_ref() {
+                    Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&retained, sidecar),
+                    None => EvidenceDependencyIndex::build(&retained),
+                }
+                .map_err(|error| format!("retained evidence index failed: {error:?}"))?;
+                let support = retained_index.support_closure_counts(&candidate.decision.evidence_ids);
                 let observation_id = candidate_observation_id(&candidate);
 
                 let candidate_record = json!({
@@ -1297,6 +1333,11 @@ fn run() -> Result<(), String> {
     );
     eprintln!("candidate stream: {candidate_path}");
     eprintln!("evaluator stream: {evaluator_path}");
+    if let Some(path) = dependency_sidecar_path {
+        eprintln!("receipt-backed sidecar input: {path} (canonical digest verified; issuer authenticity remains an ingress responsibility)");
+    } else {
+        eprintln!("receipt-backed sidecar input: absent (lineage remains unknown; diagnostic-only)");
+    }
     Ok(())
 }
 
