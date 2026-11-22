@@ -15,6 +15,13 @@ pub const MACE_FORBID_RETRACTED_SOURCE: bool = true;
 pub const MACE_REQUIRE_INTERFERENCE_CONTROL: bool = true;
 pub const MACE_REQUIRE_CONFOUNDER_CONTROL: bool = true;
 pub const MACE_REQUIRE_COMPLETED_DELAYED_HORIZON: bool = true;
+pub const MACE_REQUIRE_RCT_IDENTIFICATION: bool = true;
+pub const MACE_REQUIRE_KNOWN_DESIGN_RECEIPT: bool = true;
+pub const MACE_REQUIRE_KNOWN_ESTIMAND_DIGEST: bool = true;
+pub const MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND: bool = true;
+pub const MACE_REQUIRE_ESTIMAND_DIGEST_MATCH: bool = true;
+pub const MACE_REQUIRE_NONZERO_SOURCE_FAMILY: bool = true;
+pub const MACE_REQUIRE_KNOWN_SOURCE_ROOT: bool = true;
 pub const MACE_REQUIRE_UNIQUE_EVENT_IDS: bool = true;
 pub const MACE_MIN_INDEPENDENT_SOURCE_ROOTS: usize = 2;
 pub const MACE_MIN_INDEPENDENT_SOURCE_FAMILIES: usize = 2;
@@ -319,11 +326,13 @@ impl CausalIdentificationV1 {
     /// Only randomized designs with a complete, digest-matched semantic
     /// estimand qualify in this tranche.
     pub fn qualifies_for_transfer(self) -> bool {
-        self.method == IdentificationMethodV1::RandomizedControlledTrial
-            && self.design_digest.is_known()
-            && self.estimand_digest.is_known()
-            && self.semantic_estimand.is_complete()
-            && self.semantic_estimand.canonical_digest() == self.estimand_digest
+        (!MACE_REQUIRE_RCT_IDENTIFICATION
+            || self.method == IdentificationMethodV1::RandomizedControlledTrial)
+            && (!MACE_REQUIRE_KNOWN_DESIGN_RECEIPT || self.design_digest.is_known())
+            && (!MACE_REQUIRE_KNOWN_ESTIMAND_DIGEST || self.estimand_digest.is_known())
+            && (!MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND || self.semantic_estimand.is_complete())
+            && (!MACE_REQUIRE_ESTIMAND_DIGEST_MATCH
+                || self.semantic_estimand.canonical_digest() == self.estimand_digest)
             && self.propensity_min_bps >= MACE_TRANSFER_MIN_PROPENSITY_BPS
             && self.propensity_min_bps <= self.propensity_max_bps
             && self.propensity_max_bps <= MACE_TRANSFER_MAX_PROPENSITY_BPS
@@ -381,6 +390,13 @@ pub fn transfer_qualification_profile_digest() -> EvidenceDigest256 {
     hasher.update([u8::from(MACE_REQUIRE_INTERFERENCE_CONTROL)]);
     hasher.update([u8::from(MACE_REQUIRE_CONFOUNDER_CONTROL)]);
     hasher.update([u8::from(MACE_REQUIRE_COMPLETED_DELAYED_HORIZON)]);
+    hasher.update([u8::from(MACE_REQUIRE_RCT_IDENTIFICATION)]);
+    hasher.update([u8::from(MACE_REQUIRE_KNOWN_DESIGN_RECEIPT)]);
+    hasher.update([u8::from(MACE_REQUIRE_KNOWN_ESTIMAND_DIGEST)]);
+    hasher.update([u8::from(MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND)]);
+    hasher.update([u8::from(MACE_REQUIRE_ESTIMAND_DIGEST_MATCH)]);
+    hasher.update([u8::from(MACE_REQUIRE_NONZERO_SOURCE_FAMILY)]);
+    hasher.update([u8::from(MACE_REQUIRE_KNOWN_SOURCE_ROOT)]);
     hasher.update([u8::from(MACE_REQUIRE_UNIQUE_EVENT_IDS)]);
     hasher.update((MACE_MIN_INDEPENDENT_SOURCE_ROOTS as u64).to_be_bytes());
     hasher.update((MACE_MIN_INDEPENDENT_SOURCE_FAMILIES as u64).to_be_bytes());
@@ -431,9 +447,10 @@ impl DecisionNeedV1 {
     pub fn is_valid(self) -> bool {
         self.schema_version == 1
             && self.action_alternatives == [Action::A, Action::B]
-            && self.semantic_estimand.is_complete()
+            && (!MACE_REQUIRE_COMPLETE_SEMANTIC_ESTIMAND || self.semantic_estimand.is_complete())
             && self.qualification_profile_digest == transfer_qualification_profile_digest()
-            && self.identification_method == IdentificationMethodV1::RandomizedControlledTrial
+            && (!MACE_REQUIRE_RCT_IDENTIFICATION
+                || self.identification_method == IdentificationMethodV1::RandomizedControlledTrial)
     }
 
     /// Domain-separated digest of the candidate-visible task requirements.
@@ -613,8 +630,8 @@ fn scope_aware_policy(memory: &[Experience], query: Query) -> Decision {
 
 pub fn is_qualified(item: &Experience, query: Query) -> bool {
     item.scope == query.scope
-        && item.source_family != 0
-        && item.source_root_digest.is_known()
+        && (!MACE_REQUIRE_NONZERO_SOURCE_FAMILY || item.source_family != 0)
+        && (!MACE_REQUIRE_KNOWN_SOURCE_ROOT || item.source_root_digest.is_known())
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
@@ -757,8 +774,8 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
 /// separately by the invariant-transport policy.
 pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
     item.scope.objective == query.scope.objective
-        && item.source_family != 0
-        && item.source_root_digest.is_known()
+        && (!MACE_REQUIRE_NONZERO_SOURCE_FAMILY || item.source_family != 0)
+        && (!MACE_REQUIRE_KNOWN_SOURCE_ROOT || item.source_root_digest.is_known())
         && item.observed_utility.is_finite()
         && (0.0..=1.0).contains(&item.observed_utility)
         && item.measurement_error_bound.is_finite()
