@@ -10,6 +10,7 @@
 
 pub mod sensing;
 pub mod decision_observability;
+pub mod decision_regret_voi;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
