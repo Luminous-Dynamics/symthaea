@@ -1079,6 +1079,40 @@ mod tests {
     }
 
     #[test]
+    fn profile_validator_recomputes_weighted_reachability_from_pair_outcomes() {
+        let graph = triangle_graph();
+        let scenario = MycelialFailureScenario {
+            scenario_id: "remove-edge-ab".to_string(),
+            failed_segment_ids: vec!["edge-ab".to_string()],
+            failed_junction_ids: Vec::new(),
+        };
+        let mut profile =
+            build_mycelial_failure_resilience_profile(&graph, &demands(), &[scenario]).unwrap();
+        profile.scenarios[0].reachable_demand_weight -= 1;
+        assert!(matches!(
+            profile.validate(),
+            Err(MycelialFailureResilienceError::InvalidProfile(_))
+        ));
+    }
+
+    #[test]
+    fn profile_validator_binds_exact_failed_identity_lists() {
+        let graph = triangle_graph();
+        let scenario = MycelialFailureScenario {
+            scenario_id: "remove-edge-ab".to_string(),
+            failed_segment_ids: vec!["edge-ab".to_string()],
+            failed_junction_ids: Vec::new(),
+        };
+        let mut profile =
+            build_mycelial_failure_resilience_profile(&graph, &demands(), &[scenario]).unwrap();
+        profile.scenarios[0].failed_segment_ids.clear();
+        assert!(matches!(
+            profile.validate(),
+            Err(MycelialFailureResilienceError::InvalidProfile(_))
+        ));
+    }
+
+    #[test]
     fn invalid_or_ambiguous_demand_scenarios_fail_closed() {
         let graph = triangle_graph();
         let mut bad_demands = demands();
