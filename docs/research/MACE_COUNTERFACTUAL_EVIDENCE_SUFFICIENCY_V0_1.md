@@ -307,7 +307,7 @@ This follow-on turns part of the v0.1 intervention specification into an executa
 - Each intervention is passed through the unchanged CausalQualified policy. Evaluator-only records score utility, absolute regret, regret added versus full evidence, decision flips, invalid evidence use, and remaining event/root/family counts.
 - Candidate decisions and evaluator scores are written to separate JSONL files. Candidate records contain the digest of the actual candidate-visible evidence set and task DecisionNeed; they omit intervention kind/target and scenario-family labels. Evaluator rows carry the same candidate-input digest for offline pairing.
 - The JSON Schema defines the manifest, candidate, evaluator, rejected-block and summary records.
-- Authored unit tests cover transitive closure, same-root aliases with different family labels, family closures, supersession closure, root coalitions, unknown roots, duplicate IDs, missing links, cycles, matched-control determinism/identity balance, candidate-input digest changes, and candidate/evaluator separation.
+- Authored unit tests cover transitive closure, same-root aliases with different family labels, family closures, supersession closure, preservation of a replacement under ordinary event knockout, root coalitions, unknown roots, duplicate IDs, missing links, cycles, matched-control determinism/identity balance, candidate-input digest changes, and candidate/evaluator separation (17 tests total).
 
 ### Critical lineage limitation
 
