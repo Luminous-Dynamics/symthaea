@@ -1,72 +1,57 @@
-//! Evaluator-side value of an observation measured as decision-regret reduction.
+//! Evaluator-side robust value of an observation under decision regret.
 //!
 //! This module composes the finite hidden-world/action-loss contract in
-//! decision_observability.rs. It does not create another loss oracle, sensor
-//! policy, calibration service, or acquisition executor.
+//! decision_observability.rs. It adds no candidate sensor policy, probability
+//! calibrator, expected-value oracle, or acquisition executor.
 //!
-//! For every evaluator-owned world, a frozen sensor model supplies a discrete
-//! candidate-visible outcome likelihood and an availability time. Outcomes
-//! delivered after the decision deadline are collapsed into the single
-//! candidate-visible "no result by deadline" class.
+//! A support manifest enumerates every possible candidate-visible outcome for
+//! each hidden world. Outcomes available after the decision deadline collapse
+//! into one no-result class. The evaluator then calculates the worst-case
+//! minimax-regret floor over every possible visible outcome.
 //!
-//! Two non-interchangeable quantities are reported:
-//! - robust value: reduction in the deterministic minimax-regret floor under
-//!   the worst possible candidate-visible outcome;
-//! - expected value: reduction in Bayes expected regret under evaluator-owned,
-//!   externally qualified world priors and sensor likelihoods.
+//! Probabilistic posterior and expected Bayes-risk calculations belong to the
+//! information-channel owner (#12567 / #12551). This module reports only the
+//! complementary robust support bound. A noisy full-support sensor can have
+//! positive expected value while providing zero worst-case guarantee.
 //!
-//! A noisy sensor can have positive expected value and zero robust value.
-//! Hidden worlds, likelihoods, priors and loss tables are evaluator-only.
+//! Hidden worlds, outcome support, and action losses are evaluator-only.
 //! Package separation is not an OS isolation boundary; #9437 remains required.
 
 use crate::decision_observability::{
-    ActionLoss, CounterfactualWorld, DecisionObservabilityError,
-    ObservationalEquivalenceClass, evaluate_decision_observability,
+    CounterfactualWorld, DecisionObservabilityError, ObservationalEquivalenceClass,
+    evaluate_decision_observability,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-pub const DECISION_REGRET_VOI_PPM: u32 = 1_000_000;
-const PPM_U128: u128 = 1_000_000;
-const EXPECTED_REGRET_DENOMINATOR: u128 = PPM_U128 * PPM_U128;
+pub const ROBUST_OBSERVATION_VOI_PPM: u32 = 1_000_000;
 const MAX_OUTCOME_ROWS: usize = 65_536;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WorldPrior {
+pub struct SensorOutcomeSupport {
     /// Evaluator-only world identity from the base equivalence class.
     pub evaluator_world_id: u64,
-    /// Externally qualified prior mass in parts per million; must be nonzero.
-    pub prior_ppm: u32,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SensorOutcomeLikelihood {
-    /// Evaluator-only world identity.
-    pub evaluator_world_id: u64,
-    /// SHA-256 of the complete candidate-visible transcript after this result
-    /// is appended, including the delivered measurement, masks, status and
-    /// availability timestamp. Identical visible transcripts must share a
-    /// digest across worlds.
+    /// SHA-256 of the complete candidate-visible transcript after appending
+    /// the result, including event and availability times, status and masks.
+    /// Identical transcripts must have identical digests across worlds.
     pub candidate_visible_outcome_sha256: [u8; 32],
-    /// Conditional likelihood of this outcome in this world, in PPM.
-    pub likelihood_ppm: u32,
-    /// Absolute timestamp in the episode clock. None means no result is
-    /// available. Results strictly after the deadline are also unavailable.
+    /// Absolute episode-clock time when the complete result is accessible to
+    /// the candidate policy. None means no result is available.
     pub available_at_us: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ObservationModel {
-    /// Stable identity of the exact sensor model and configuration.
+pub struct ObservationSupportModel {
+    /// Stable identity of the exact sensor model/configuration.
     pub sensor_model_sha256: [u8; 32],
-    /// Commitment to the separately qualified prior/probability artifact.
-    /// A nonzero commitment binds provenance; it does not itself prove
-    /// calibration. Expected-value claims still require the calibration owner.
-    pub prior_commitment_sha256: [u8; 32],
-    /// Decision deadline on the same absolute episode clock as availability.
+    /// Commitment to a separately reviewed complete possible-outcome support
+    /// artifact. Nonzero binding does not itself prove support completeness.
+    pub support_evidence_sha256: [u8; 32],
+    /// Deadline on the same clock as candidate-visible availability.
     pub decision_deadline_us: u64,
-    pub world_priors: Vec<WorldPrior>,
-    pub outcome_likelihoods: Vec<SensorOutcomeLikelihood>,
+    /// Rows enumerate possible outcomes, not probabilities. Probabilities and
+    /// posterior qualification remain owned by #12567/#12551.
+    pub possible_outcomes: Vec<SensorOutcomeSupport>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -79,87 +64,60 @@ enum CandidateVisibleOutcome {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ObservationOutcomeCertificate {
+pub struct ObservationOutcomeRegretBound {
     /// None denotes the single candidate-visible no-result-by-deadline class.
     pub candidate_visible_outcome_sha256: Option<[u8; 32]>,
-    /// The candidate-visible availability time; None denotes no result by deadline.
+    /// Complete candidate-visible availability time; None means no result.
     pub available_at_us: Option<u64>,
     pub possible_world_count: u64,
-    /// Evaluator-only worst-case-regret-optimal action for this outcome.
+    /// Evaluator-only minimax-regret-optimal action after this visible outcome.
     pub minimax_regret_action_id: String,
     pub worst_case_regret_ppm: u32,
-    /// Evaluator-only Bayes-regret-optimal action for this outcome.
-    pub bayes_regret_action_id: String,
-    /// Joint probability mass in PPM squared (prior x likelihood).
-    pub joint_probability_mass_ppm_squared: u128,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DecisionRegretObservationCertificate {
+pub struct RobustDecisionRegretObservationCertificate {
     pub equivalence_class_id: u64,
     pub sensor_model_sha256: [u8; 32],
-    pub prior_commitment_sha256: [u8; 32],
+    pub support_evidence_sha256: [u8; 32],
     pub decision_deadline_us: u64,
     pub baseline_worst_case_regret_ppm: u32,
     pub post_observation_worst_case_regret_ppm: u32,
-    /// Guaranteed reduction across every possible candidate-visible outcome.
+    /// Guaranteed reduction across every outcome in the declared support.
     pub guaranteed_regret_reduction_ppm: u32,
-    /// Exact expected-regret numerators use EXPECTED_REGRET_DENOMINATOR.
-    pub expected_regret_denominator: u128,
-    pub baseline_expected_regret_numerator: u128,
-    pub post_observation_expected_regret_numerator: u128,
-    pub expected_regret_reduction_numerator: u128,
-    /// Conservative integer lower bound on expected regret reduction in PPM.
-    pub expected_regret_reduction_floor_ppm: u32,
-    pub outcomes: Vec<ObservationOutcomeCertificate>,
+    pub outcomes: Vec<ObservationOutcomeRegretBound>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DecisionRegretVoiError {
+pub enum RobustObservationVoiError {
     EmptySensorModelIdentity,
-    EmptyPriorCommitment,
-    EmptyPriorSet,
-    DuplicatePriorWorld { world_id: u64 },
-    PriorWorldSetMismatch,
-    ZeroPriorProbability { world_id: u64 },
-    PriorProbabilityOutOfRange { world_id: u64, probability_ppm: u32 },
-    PriorMassNotOneMillion { actual_ppm: u64 },
+    EmptySupportEvidenceCommitment,
     TooManyOutcomeRows,
     OutcomeWorldUnknown { world_id: u64 },
-    OutcomeLikelihoodOutOfRange { world_id: u64, likelihood_ppm: u32 },
-    OutcomeLikelihoodMassNotOneMillion { world_id: u64, actual_ppm: u64 },
+    WorldHasNoPossibleOutcome { world_id: u64 },
     EmptyDeliveredOutcomeDigest { world_id: u64 },
-    ExpectedRegretIncreased,
     ArithmeticOverflow,
     DecisionObservability(DecisionObservabilityError),
 }
 
-impl fmt::Display for DecisionRegretVoiError {
+impl fmt::Display for RobustObservationVoiError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptySensorModelIdentity => write!(formatter, "sensor-model digest must be nonzero"),
-            Self::EmptyPriorCommitment => write!(formatter, "prior commitment digest must be nonzero"),
-            Self::EmptyPriorSet => write!(formatter, "world-prior set must not be empty"),
-            Self::DuplicatePriorWorld { world_id } => write!(formatter, "duplicate prior world ID {world_id}"),
-            Self::PriorWorldSetMismatch => write!(formatter, "prior world IDs must exactly match the base equivalence class"),
-            Self::ZeroPriorProbability { world_id } => write!(formatter, "world {world_id} has zero prior mass; remove it from the expected-value support or assign qualified positive mass"),
-            Self::PriorProbabilityOutOfRange { world_id, probability_ppm } => write!(formatter, "world {world_id} prior {probability_ppm} exceeds one million PPM"),
-            Self::PriorMassNotOneMillion { actual_ppm } => write!(formatter, "world priors sum to {actual_ppm} PPM rather than one million"),
+            Self::EmptySupportEvidenceCommitment => write!(formatter, "outcome-support evidence digest must be nonzero"),
             Self::TooManyOutcomeRows => write!(formatter, "sensor outcome rows exceed the bounded evaluator limit"),
             Self::OutcomeWorldUnknown { world_id } => write!(formatter, "sensor outcome references unknown world {world_id}"),
-            Self::OutcomeLikelihoodOutOfRange { world_id, likelihood_ppm } => write!(formatter, "world {world_id} likelihood {likelihood_ppm} exceeds one million PPM"),
-            Self::OutcomeLikelihoodMassNotOneMillion { world_id, actual_ppm } => write!(formatter, "sensor outcome likelihoods for world {world_id} sum to {actual_ppm} PPM rather than one million"),
+            Self::WorldHasNoPossibleOutcome { world_id } => write!(formatter, "world {world_id} has no declared possible sensor outcome"),
             Self::EmptyDeliveredOutcomeDigest { world_id } => write!(formatter, "delivered outcome for world {world_id} has an empty candidate-visible transcript digest"),
-            Self::ExpectedRegretIncreased => write!(formatter, "exact expected regret increased after conditioning on the supplied observation model"),
-            Self::ArithmeticOverflow => write!(formatter, "decision-regret VOI arithmetic overflowed"),
+            Self::ArithmeticOverflow => write!(formatter, "robust observation-regret arithmetic overflowed"),
             Self::DecisionObservability(error) => write!(formatter, "base decision-observability qualification failed: {error}"),
         }
     }
 }
 
-impl std::error::Error for DecisionRegretVoiError {}
+impl std::error::Error for RobustObservationVoiError {}
 
-impl From<DecisionObservabilityError> for DecisionRegretVoiError {
+impl From<DecisionObservabilityError> for RobustObservationVoiError {
     fn from(value: DecisionObservabilityError) -> Self {
         Self::DecisionObservability(value)
     }
@@ -169,83 +127,14 @@ fn is_zero_digest(digest: &[u8; 32]) -> bool {
     digest.iter().all(|byte| *byte == 0)
 }
 
-fn checked_add(total: u128, value: u128) -> Result<u128, DecisionRegretVoiError> {
-    total.checked_add(value).ok_or(DecisionRegretVoiError::ArithmeticOverflow)
-}
-
-fn checked_mul(left: u128, right: u128) -> Result<u128, DecisionRegretVoiError> {
-    left.checked_mul(right).ok_or(DecisionRegretVoiError::ArithmeticOverflow)
-}
-
-fn action_regrets(world: &CounterfactualWorld) -> Result<BTreeMap<String, u32>, DecisionRegretVoiError> {
-    let best_loss = world
-        .action_losses
-        .iter()
-        .map(|loss: &ActionLoss| loss.loss_ppm)
-        .min()
-        .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-    Ok(world
-        .action_losses
-        .iter()
-        .map(|loss| (loss.action_id.clone(), loss.loss_ppm.saturating_sub(best_loss)))
-        .collect())
-}
-
-fn validate_priors(
-    class: &ObservationalEquivalenceClass,
-    priors: &[WorldPrior],
-) -> Result<BTreeMap<u64, u32>, DecisionRegretVoiError> {
-    if priors.is_empty() {
-        return Err(DecisionRegretVoiError::EmptyPriorSet);
-    }
-
-    let world_ids: BTreeSet<u64> = class
-        .alternatives
-        .iter()
-        .map(|world| world.evaluator_world_id)
-        .collect();
-    let mut weights = BTreeMap::new();
-    let mut total = 0_u64;
-
-    for prior in priors {
-        if prior.prior_ppm == 0 {
-            return Err(DecisionRegretVoiError::ZeroPriorProbability {
-                world_id: prior.evaluator_world_id,
-            });
-        }
-        if prior.prior_ppm > DECISION_REGRET_VOI_PPM {
-            return Err(DecisionRegretVoiError::PriorProbabilityOutOfRange {
-                world_id: prior.evaluator_world_id,
-                probability_ppm: prior.prior_ppm,
-            });
-        }
-        if weights.insert(prior.evaluator_world_id, prior.prior_ppm).is_some() {
-            return Err(DecisionRegretVoiError::DuplicatePriorWorld {
-                world_id: prior.evaluator_world_id,
-            });
-        }
-        total = total
-            .checked_add(u64::from(prior.prior_ppm))
-            .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-    }
-
-    if weights.keys().copied().collect::<BTreeSet<_>>() != world_ids {
-        return Err(DecisionRegretVoiError::PriorWorldSetMismatch);
-    }
-    if total != u64::from(DECISION_REGRET_VOI_PPM) {
-        return Err(DecisionRegretVoiError::PriorMassNotOneMillion { actual_ppm: total });
-    }
-    Ok(weights)
-}
-
 fn normalize_visible_outcome(
-    row: &SensorOutcomeLikelihood,
+    row: &SensorOutcomeSupport,
     deadline_us: u64,
-) -> Result<CandidateVisibleOutcome, DecisionRegretVoiError> {
+) -> Result<CandidateVisibleOutcome, RobustObservationVoiError> {
     match row.available_at_us {
         Some(available_at_us) if available_at_us <= deadline_us => {
             if is_zero_digest(&row.candidate_visible_outcome_sha256) {
-                return Err(DecisionRegretVoiError::EmptyDeliveredOutcomeDigest {
+                return Err(RobustObservationVoiError::EmptyDeliveredOutcomeDigest {
                     world_id: row.evaluator_world_id,
                 });
             }
@@ -258,15 +147,15 @@ fn normalize_visible_outcome(
     }
 }
 
-fn validate_likelihoods(
+fn validate_and_partition_support(
     class: &ObservationalEquivalenceClass,
-    model: &ObservationModel,
+    model: &ObservationSupportModel,
 ) -> Result<
-    BTreeMap<u64, BTreeMap<CandidateVisibleOutcome, u32>>,
-    DecisionRegretVoiError,
+    BTreeMap<CandidateVisibleOutcome, BTreeSet<u64>>,
+    RobustObservationVoiError,
 > {
-    if model.outcome_likelihoods.len() > MAX_OUTCOME_ROWS {
-        return Err(DecisionRegretVoiError::TooManyOutcomeRows);
+    if model.possible_outcomes.len() > MAX_OUTCOME_ROWS {
+        return Err(RobustObservationVoiError::TooManyOutcomeRows);
     }
 
     let world_ids: BTreeSet<u64> = class
@@ -274,158 +163,50 @@ fn validate_likelihoods(
         .iter()
         .map(|world| world.evaluator_world_id)
         .collect();
-    let mut by_world: BTreeMap<u64, BTreeMap<CandidateVisibleOutcome, u32>> = BTreeMap::new();
-    let mut totals: BTreeMap<u64, u64> = BTreeMap::new();
+    let mut per_world: BTreeMap<u64, BTreeSet<CandidateVisibleOutcome>> =
+        BTreeMap::new();
 
-    for row in &model.outcome_likelihoods {
+    for row in &model.possible_outcomes {
         if !world_ids.contains(&row.evaluator_world_id) {
-            return Err(DecisionRegretVoiError::OutcomeWorldUnknown {
+            return Err(RobustObservationVoiError::OutcomeWorldUnknown {
                 world_id: row.evaluator_world_id,
             });
         }
-        if row.likelihood_ppm > DECISION_REGRET_VOI_PPM {
-            return Err(DecisionRegretVoiError::OutcomeLikelihoodOutOfRange {
-                world_id: row.evaluator_world_id,
-                likelihood_ppm: row.likelihood_ppm,
+        let outcome = normalize_visible_outcome(row, model.decision_deadline_us)?;
+        per_world
+            .entry(row.evaluator_world_id)
+            .or_default()
+            .insert(outcome);
+    }
+
+    let mut by_outcome: BTreeMap<CandidateVisibleOutcome, BTreeSet<u64>> =
+        BTreeMap::new();
+    for world_id in world_ids {
+        let outcomes = per_world
+            .get(&world_id)
+            .ok_or(RobustObservationVoiError::WorldHasNoPossibleOutcome {
+                world_id,
+            })?;
+        if outcomes.is_empty() {
+            return Err(RobustObservationVoiError::WorldHasNoPossibleOutcome {
+                world_id,
             });
         }
-
-        let visible = normalize_visible_outcome(row, model.decision_deadline_us)?;
-        let world_rows = by_world.entry(row.evaluator_world_id).or_default();
-        let current = world_rows.get(&visible).copied().unwrap_or(0);
-        let combined = current
-            .checked_add(row.likelihood_ppm)
-            .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-        world_rows.insert(visible, combined);
-
-        let total = totals.entry(row.evaluator_world_id).or_default();
-        *total = total
-            .checked_add(u64::from(row.likelihood_ppm))
-            .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-    }
-
-    for world_id in &world_ids {
-        let total = totals.get(world_id).copied().unwrap_or(0);
-        if total != u64::from(DECISION_REGRET_VOI_PPM) {
-            return Err(DecisionRegretVoiError::OutcomeLikelihoodMassNotOneMillion {
-                world_id: *world_id,
-                actual_ppm: total,
-            });
+        for outcome in outcomes {
+            by_outcome
+                .entry(*outcome)
+                .or_default()
+                .insert(world_id);
         }
     }
 
-    Ok(by_world)
+    Ok(by_outcome)
 }
 
-fn baseline_expected_regret_numerator(
-    class: &ObservationalEquivalenceClass,
-    priors: &BTreeMap<u64, u32>,
-) -> Result<u128, DecisionRegretVoiError> {
-    let first = class
-        .alternatives
-        .first()
-        .ok_or(DecisionRegretVoiError::EmptyPriorSet)?;
-    let actions: BTreeSet<String> = first
-        .action_losses
-        .iter()
-        .map(|item| item.action_id.clone())
-        .collect();
-    let mut by_action: BTreeMap<String, u128> =
-        actions.iter().map(|action| (action.clone(), 0)).collect();
-
-    for world in &class.alternatives {
-        let prior = u128::from(
-            *priors
-                .get(&world.evaluator_world_id)
-                .ok_or(DecisionRegretVoiError::PriorWorldSetMismatch)?,
-        );
-        let regrets = action_regrets(world)?;
-        for action in &actions {
-            let regret = u128::from(
-                *regrets
-                    .get(action)
-                    .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?,
-            );
-            let contribution = checked_mul(prior, regret)?;
-            let current = by_action.get(action).copied().unwrap_or(0);
-            by_action.insert(action.clone(), checked_add(current, contribution)?);
-        }
-    }
-
-    let best_before = by_action
-        .values()
-        .copied()
-        .min()
-        .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-    // Convert the prior-weighted PPM numerator (denominator 1e6) to the common
-    // prior-times-likelihood denominator (1e12).
-    checked_mul(best_before, PPM_U128)
-}
-
-fn bayes_action_for_outcome(
-    class: &ObservationalEquivalenceClass,
-    priors: &BTreeMap<u64, u32>,
-    likelihoods: &BTreeMap<u64, BTreeMap<CandidateVisibleOutcome, u32>>,
-    outcome: CandidateVisibleOutcome,
-) -> Result<(String, u128, u64), DecisionRegretVoiError> {
-    let first = class
-        .alternatives
-        .first()
-        .ok_or(DecisionRegretVoiError::EmptyPriorSet)?;
-    let actions: BTreeSet<String> = first
-        .action_losses
-        .iter()
-        .map(|item| item.action_id.clone())
-        .collect();
-    let mut action_sums: BTreeMap<String, u128> =
-        actions.iter().map(|action| (action.clone(), 0)).collect();
-    let mut possible_world_count = 0_u64;
-
-    for world in &class.alternatives {
-        let likelihood = likelihoods
-            .get(&world.evaluator_world_id)
-            .and_then(|items| items.get(&outcome))
-            .copied()
-            .unwrap_or(0);
-        if likelihood == 0 {
-            continue;
-        }
-        possible_world_count = possible_world_count
-            .checked_add(1)
-            .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-        let joint_mass = checked_mul(
-            u128::from(
-                *priors
-                    .get(&world.evaluator_world_id)
-                    .ok_or(DecisionRegretVoiError::PriorWorldSetMismatch)?,
-            ),
-            u128::from(likelihood),
-        )?;
-        let regrets = action_regrets(world)?;
-        for action in &actions {
-            let regret = u128::from(
-                *regrets
-                    .get(action)
-                    .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?,
-            );
-            let contribution = checked_mul(joint_mass, regret)?;
-            let current = action_sums.get(action).copied().unwrap_or(0);
-            action_sums.insert(action.clone(), checked_add(current, contribution)?);
-        }
-    }
-
-    let (best_action, best_sum) = action_sums
-        .iter()
-        .min_by(|left, right| left.1.cmp(right.1).then_with(|| left.0.cmp(right.0)))
-        .map(|(action, sum)| (action.clone(), *sum))
-        .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
-    Ok((best_action, best_sum, possible_world_count))
-}
-
-fn robust_outcome_certificate(
+fn evaluate_outcome_regret_floor(
     class: &ObservationalEquivalenceClass,
     possible_worlds: &BTreeSet<u64>,
-) -> Result<(String, u32), DecisionRegretVoiError> {
+) -> Result<(String, u32), RobustObservationVoiError> {
     let reduced = ObservationalEquivalenceClass {
         equivalence_class_id: class.equivalence_class_id,
         alternatives: class
@@ -433,7 +214,7 @@ fn robust_outcome_certificate(
             .iter()
             .filter(|world| possible_worlds.contains(&world.evaluator_world_id))
             .cloned()
-            .collect(),
+            .collect::<Vec<CounterfactualWorld>>(),
     };
     let certificate = evaluate_decision_observability(&reduced)?;
     Ok((
@@ -442,115 +223,68 @@ fn robust_outcome_certificate(
     ))
 }
 
-/// Evaluate the robust and expected decision value of one sensor model.
+/// Compute the finite-support robust value of one sensor observation.
 ///
-/// The base class must already be evaluator-qualified. Priors and likelihoods
-/// are evaluator-only inputs; prior_commitment_sha256 must identify a separate
-/// calibration/provenance artifact before expected-value claims are made.
-pub fn evaluate_decision_regret_observation(
+/// The support artifact must conservatively enumerate every candidate-visible
+/// outcome with nonzero possibility in each hidden world. If support is
+/// incomplete or unknown, this finite-set certificate is not a valid
+/// worst-case guarantee. Probability calibration and expected-value analysis
+/// are intentionally delegated to #12567/#12551.
+pub fn evaluate_robust_decision_regret_observation(
     class: &ObservationalEquivalenceClass,
-    model: &ObservationModel,
-) -> Result<DecisionRegretObservationCertificate, DecisionRegretVoiError> {
+    model: &ObservationSupportModel,
+) -> Result<RobustDecisionRegretObservationCertificate, RobustObservationVoiError> {
     if is_zero_digest(&model.sensor_model_sha256) {
-        return Err(DecisionRegretVoiError::EmptySensorModelIdentity);
+        return Err(RobustObservationVoiError::EmptySensorModelIdentity);
     }
-    if is_zero_digest(&model.prior_commitment_sha256) {
-        return Err(DecisionRegretVoiError::EmptyPriorCommitment);
+    if is_zero_digest(&model.support_evidence_sha256) {
+        return Err(RobustObservationVoiError::EmptySupportEvidenceCommitment);
     }
 
     let baseline = evaluate_decision_observability(class)?;
-    let priors = validate_priors(class, &model.world_priors)?;
-    let likelihoods = validate_likelihoods(class, model)?;
-
-    let baseline_common_numerator =
-        baseline_expected_regret_numerator(class, &priors)?;
-    let mut after_expected_numerator = 0_u128;
-
-    let mut worlds_by_outcome: BTreeMap<CandidateVisibleOutcome, BTreeSet<u64>> =
-        BTreeMap::new();
-    let mut mass_by_outcome: BTreeMap<CandidateVisibleOutcome, u128> = BTreeMap::new();
-    for (world_id, outcomes) in &likelihoods {
-        let prior = u128::from(
-            *priors
-                .get(world_id)
-                .ok_or(DecisionRegretVoiError::PriorWorldSetMismatch)?,
-        );
-        for (outcome, likelihood) in outcomes {
-            if *likelihood == 0 {
-                continue;
-            }
-            worlds_by_outcome
-                .entry(outcome.clone())
-                .or_default()
-                .insert(*world_id);
-            let joint_mass = checked_mul(prior, u128::from(*likelihood))?;
-            let current = mass_by_outcome.get(outcome).copied().unwrap_or(0);
-            mass_by_outcome.insert(outcome.clone(), checked_add(current, joint_mass)?);
-        }
-    }
+    let partitions = validate_and_partition_support(class, model)?;
 
     let mut post_worst_case_regret = 0_u32;
-    let mut outcome_certificates = Vec::with_capacity(worlds_by_outcome.len());
-    for (outcome, possible_worlds) in worlds_by_outcome {
+    let mut outcome_bounds = Vec::with_capacity(partitions.len());
+
+    for (outcome, possible_worlds) in partitions {
         let (minimax_action, worst_case_regret) =
-            robust_outcome_certificate(class, &possible_worlds)?;
+            evaluate_outcome_regret_floor(class, &possible_worlds)?;
         post_worst_case_regret = post_worst_case_regret.max(worst_case_regret);
 
-        let (bayes_action, expected_numerator, expected_world_count) =
-            bayes_action_for_outcome(class, &priors, &likelihoods, outcome)?;
+        let (candidate_visible_outcome_sha256, available_at_us) = match outcome {
+            CandidateVisibleOutcome::Delivered {
+                transcript_sha256,
+                available_at_us,
+            } => (Some(transcript_sha256), Some(available_at_us)),
+            CandidateVisibleOutcome::NoResultByDeadline => (None, None),
+        };
         let possible_world_count = u64::try_from(possible_worlds.len())
-            .map_err(|_| DecisionRegretVoiError::ArithmeticOverflow)?;
-        if expected_world_count != possible_world_count {
-            return Err(DecisionRegretVoiError::ArithmeticOverflow);
-        }
-        after_expected_numerator =
-            checked_add(after_expected_numerator, expected_numerator)?;
+            .map_err(|_| RobustObservationVoiError::ArithmeticOverflow)?;
 
-        outcome_certificates.push(ObservationOutcomeCertificate {
-            candidate_visible_outcome_sha256: match outcome {
-                CandidateVisibleOutcome::Delivered { transcript_sha256, .. } => Some(transcript_sha256),
-                CandidateVisibleOutcome::NoResultByDeadline => None,
-            },
-            available_at_us: match outcome {
-                CandidateVisibleOutcome::Delivered { available_at_us, .. } => Some(available_at_us),
-                CandidateVisibleOutcome::NoResultByDeadline => None,
-            },
+        outcome_bounds.push(ObservationOutcomeRegretBound {
+            candidate_visible_outcome_sha256,
+            available_at_us,
             possible_world_count,
             minimax_regret_action_id: minimax_action,
             worst_case_regret_ppm: worst_case_regret,
-            bayes_regret_action_id: bayes_action,
-            joint_probability_mass_ppm_squared: mass_by_outcome
-                .get(&outcome)
-                .copied()
-                .unwrap_or(0),
         });
     }
 
-    if after_expected_numerator > baseline_common_numerator {
-        return Err(DecisionRegretVoiError::ExpectedRegretIncreased);
-    }
-
-    let expected_reduction = baseline_common_numerator - after_expected_numerator;
-    let guaranteed_reduction = baseline
+    let guaranteed_regret_reduction_ppm = baseline
         .unavoidable_worst_case_regret_ppm
         .checked_sub(post_worst_case_regret)
-        .ok_or(DecisionRegretVoiError::ArithmeticOverflow)?;
+        .ok_or(RobustObservationVoiError::ArithmeticOverflow)?;
 
-    Ok(DecisionRegretObservationCertificate {
+    Ok(RobustDecisionRegretObservationCertificate {
         equivalence_class_id: class.equivalence_class_id,
         sensor_model_sha256: model.sensor_model_sha256,
-        prior_commitment_sha256: model.prior_commitment_sha256,
+        support_evidence_sha256: model.support_evidence_sha256,
         decision_deadline_us: model.decision_deadline_us,
         baseline_worst_case_regret_ppm: baseline.unavoidable_worst_case_regret_ppm,
         post_observation_worst_case_regret_ppm: post_worst_case_regret,
-        guaranteed_regret_reduction_ppm: guaranteed_reduction,
-        expected_regret_denominator: EXPECTED_REGRET_DENOMINATOR,
-        baseline_expected_regret_numerator: baseline_common_numerator,
-        post_observation_expected_regret_numerator: after_expected_numerator,
-        expected_regret_reduction_numerator: expected_reduction,
-        expected_regret_reduction_floor_ppm: u32::try_from(expected_reduction / EXPECTED_REGRET_DENOMINATOR)
-            .map_err(|_| DecisionRegretVoiError::ArithmeticOverflow)?,
-        outcomes: outcome_certificates,
+        guaranteed_regret_reduction_ppm,
+        outcomes: outcome_bounds,
     })
 }
 
@@ -584,7 +318,7 @@ mod tests {
             candidate_action_id: candidate_action.to_owned(),
             action_losses: losses
                 .iter()
-                .map(|(action, loss)| ActionLoss {
+                .map(|(action, loss)| crate::decision_observability::ActionLoss {
                     action_id: (*action).to_owned(),
                     loss_ppm: *loss,
                 })
@@ -602,78 +336,63 @@ mod tests {
         }
     }
 
-    fn model(rows: Vec<SensorOutcomeLikelihood>, deadline: u64) -> ObservationModel {
-        ObservationModel {
+    fn model(rows: Vec<SensorOutcomeSupport>, deadline: u64) -> ObservationSupportModel {
+        ObservationSupportModel {
             sensor_model_sha256: digest(4),
-            prior_commitment_sha256: digest(5),
+            support_evidence_sha256: digest(5),
             decision_deadline_us: deadline,
-            world_priors: vec![
-                WorldPrior {
-                    evaluator_world_id: 1,
-                    prior_ppm: 500_000,
-                },
-                WorldPrior {
-                    evaluator_world_id: 2,
-                    prior_ppm: 500_000,
-                },
-            ],
-            outcome_likelihoods: rows,
+            possible_outcomes: rows,
         }
     }
 
     fn row(
         world_id: u64,
         outcome_digest: u8,
-        likelihood_ppm: u32,
         available_at_us: Option<u64>,
-    ) -> SensorOutcomeLikelihood {
-        SensorOutcomeLikelihood {
+    ) -> SensorOutcomeSupport {
+        SensorOutcomeSupport {
             evaluator_world_id: world_id,
             candidate_visible_outcome_sha256: digest(outcome_digest),
-            likelihood_ppm,
             available_at_us,
         }
     }
 
     #[test]
-    fn perfect_observation_removes_decision_relevant_ambiguity() {
+    fn perfect_on_time_observation_removes_decision_relevant_ambiguity() {
         let class = opposed_worlds();
         let model = model(
-            vec![row(1, 10, 1_000_000, Some(100)), row(2, 20, 1_000_000, Some(100))],
+            vec![row(1, 10, Some(100)), row(2, 20, Some(100))],
             100,
         );
-        let result = evaluate_decision_regret_observation(&class, &model).unwrap();
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert_eq!(result.baseline_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 0);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 1_000_000);
-        assert_eq!(result.expected_regret_reduction_floor_ppm, 500_000);
-        assert_eq!(result.expected_regret_denominator, 1_000_000_000_000);
         assert_eq!(result.outcomes.len(), 2);
     }
 
     #[test]
-    fn noisy_full_support_sensor_has_expected_value_but_no_worst_case_guarantee() {
+    fn full_support_noisy_sensor_has_zero_worst_case_guarantee() {
         let class = opposed_worlds();
         let model = model(
             vec![
-                row(1, 10, 800_000, Some(50)),
-                row(1, 20, 200_000, Some(50)),
-                row(2, 10, 200_000, Some(50)),
-                row(2, 20, 800_000, Some(50)),
+                row(1, 10, Some(50)),
+                row(1, 20, Some(50)),
+                row(2, 10, Some(50)),
+                row(2, 20, Some(50)),
             ],
             100,
         );
-        let result = evaluate_decision_regret_observation(&class, &model).unwrap();
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert_eq!(result.baseline_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
-        assert_eq!(result.expected_regret_reduction_floor_ppm, 300_000);
-        assert_eq!(result.baseline_expected_regret_numerator, 500_000_000_000_000_000);
-        assert_eq!(result.post_observation_expected_regret_numerator, 200_000_000_000_000_000);
+        assert_eq!(result.outcomes.len(), 2);
+        assert!(result.outcomes.iter().all(|outcome| outcome.possible_world_count == 2));
     }
 
     #[test]
-    fn decision_irrelevant_sensor_outcomes_have_zero_value() {
+    fn decision_irrelevant_hidden_variation_has_zero_regret_value() {
         let class = ObservationalEquivalenceClass {
             equivalence_class_id: 78,
             alternatives: vec![
@@ -682,133 +401,124 @@ mod tests {
             ],
         };
         let model = model(
-            vec![row(1, 30, 1_000_000, Some(40)), row(2, 40, 1_000_000, Some(40))],
+            vec![row(1, 30, Some(40)), row(2, 40, Some(40))],
             100,
         );
-        let result = evaluate_decision_regret_observation(&class, &model).unwrap();
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert_eq!(result.baseline_worst_case_regret_ppm, 0);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 0);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
-        assert_eq!(result.expected_regret_reduction_floor_ppm, 0);
     }
 
     #[test]
-    fn late_observation_is_the_same_candidate_view_at_the_deadline() {
+    fn late_observations_collapse_to_no_result_by_deadline() {
         let class = opposed_worlds();
         let model = model(
-            vec![row(1, 10, 1_000_000, Some(101)), row(2, 20, 1_000_000, Some(101))],
+            vec![row(1, 10, Some(101)), row(2, 20, Some(101))],
             100,
         );
-        let result = evaluate_decision_regret_observation(&class, &model).unwrap();
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert_eq!(result.outcomes.len(), 1);
         assert_eq!(result.outcomes[0].candidate_visible_outcome_sha256, None);
         assert_eq!(result.post_observation_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 0);
-        assert_eq!(result.expected_regret_reduction_floor_ppm, 0);
     }
 
     #[test]
-    fn delivery_exactly_at_the_deadline_is_available() {
+    fn delivery_exactly_at_deadline_is_candidate_visible() {
         let class = opposed_worlds();
         let model = model(
-            vec![row(1, 10, 1_000_000, Some(100)), row(2, 20, 1_000_000, Some(100))],
+            vec![row(1, 10, Some(100)), row(2, 20, Some(100))],
             100,
         );
-        let result = evaluate_decision_regret_observation(&class, &model).unwrap();
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert_eq!(result.post_observation_worst_case_regret_ppm, 0);
+        assert!(result.outcomes.iter().all(|outcome| outcome.available_at_us == Some(100)));
     }
 
     #[test]
-    fn missing_observation_is_an_explicit_outcome_not_silent_exclusion() {
+    fn absent_observation_is_an_explicit_outcome() {
         let class = opposed_worlds();
-        let model = model(
-            vec![row(1, 0, 1_000_000, None), row(2, 0, 1_000_000, None)],
-            100,
-        );
-        let result = evaluate_decision_regret_observation(&class, &model).unwrap();
+        let model = model(vec![row(1, 0, None), row(2, 0, None)], 100);
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert_eq!(result.outcomes.len(), 1);
         assert_eq!(result.outcomes[0].candidate_visible_outcome_sha256, None);
         assert_eq!(result.outcomes[0].possible_world_count, 2);
     }
 
     #[test]
-    fn rejects_unqualified_prior_probability_mass() {
-        let class = opposed_worlds();
-        let mut model = model(
-            vec![row(1, 10, 1_000_000, Some(50)), row(2, 20, 1_000_000, Some(50))],
-            100,
-        );
-        model.world_priors[1].prior_ppm = 400_000;
-        assert_eq!(
-            evaluate_decision_regret_observation(&class, &model),
-            Err(DecisionRegretVoiError::PriorMassNotOneMillion {
-                actual_ppm: 900_000
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_incomplete_sensor_likelihood_mass_per_world() {
-        let class = opposed_worlds();
-        let model = model(
-            vec![row(1, 10, 1_000_000, Some(50)), row(2, 20, 900_000, Some(50))],
-            100,
-        );
-        assert_eq!(
-            evaluate_decision_regret_observation(&class, &model),
-            Err(DecisionRegretVoiError::OutcomeLikelihoodMassNotOneMillion {
-                world_id: 2,
-                actual_ppm: 900_000
-            })
-        );
-    }
-
-    #[test]
-    fn aggregates_latent_outcomes_with_identical_visible_transcripts() {
+    fn duplicate_rows_with_same_visible_transcript_are_deduplicated() {
         let class = opposed_worlds();
         let model = model(
             vec![
-                row(1, 10, 400_000, Some(50)),
-                row(1, 10, 600_000, Some(50)),
-                row(2, 20, 1_000_000, Some(50)),
+                row(1, 10, Some(50)),
+                row(1, 10, Some(50)),
+                row(2, 20, Some(50)),
+                row(2, 20, Some(50)),
             ],
             100,
         );
-        let result = evaluate_decision_regret_observation(&class, &model).unwrap();
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
         assert_eq!(result.outcomes.len(), 2);
         assert_eq!(result.guaranteed_regret_reduction_ppm, 1_000_000);
     }
 
     #[test]
-    fn rejects_outcomes_for_worlds_outside_the_base_class() {
+    fn same_digest_with_distinct_available_times_remains_distinct() {
         let class = opposed_worlds();
         let model = model(
-            vec![row(1, 10, 1_000_000, Some(50)), row(3, 20, 1_000_000, Some(50))],
+            vec![row(1, 10, Some(40)), row(2, 10, Some(80))],
             100,
         );
+        let result = evaluate_robust_decision_regret_observation(&class, &model).unwrap();
+        assert_eq!(result.outcomes.len(), 2);
         assert_eq!(
-            evaluate_decision_regret_observation(&class, &model),
-            Err(DecisionRegretVoiError::OutcomeWorldUnknown { world_id: 3 })
+            result.outcomes.iter().map(|outcome| outcome.available_at_us).collect::<Vec<_>>(),
+            vec![Some(40), Some(80)]
+        );
+        assert_eq!(result.guaranteed_regret_reduction_ppm, 1_000_000);
+    }
+
+    #[test]
+    fn rejects_unknown_world_ids() {
+        let class = opposed_worlds();
+        let model = model(vec![row(1, 10, Some(50)), row(3, 20, Some(50))], 100);
+        assert_eq!(
+            evaluate_robust_decision_regret_observation(&class, &model),
+            Err(RobustObservationVoiError::OutcomeWorldUnknown { world_id: 3 })
         );
     }
 
     #[test]
-    fn rejects_missing_model_and_prior_provenance_commitments() {
+    fn rejects_worlds_without_declared_outcomes() {
         let class = opposed_worlds();
-        let mut model = model(
-            vec![row(1, 10, 1_000_000, Some(50)), row(2, 20, 1_000_000, Some(50))],
-            100,
+        let model = model(vec![row(1, 10, Some(50))], 100);
+        assert_eq!(
+            evaluate_robust_decision_regret_observation(&class, &model),
+            Err(RobustObservationVoiError::WorldHasNoPossibleOutcome { world_id: 2 })
         );
+    }
+
+    #[test]
+    fn rejects_empty_sensor_or_support_commitments_and_delivered_digests() {
+        let class = opposed_worlds();
+        let mut model = model(vec![row(1, 10, Some(50)), row(2, 20, Some(50))], 100);
         model.sensor_model_sha256 = [0; 32];
         assert_eq!(
-            evaluate_decision_regret_observation(&class, &model),
-            Err(DecisionRegretVoiError::EmptySensorModelIdentity)
+            evaluate_robust_decision_regret_observation(&class, &model),
+            Err(RobustObservationVoiError::EmptySensorModelIdentity)
         );
         model.sensor_model_sha256 = digest(4);
-        model.prior_commitment_sha256 = [0; 32];
+        model.support_evidence_sha256 = [0; 32];
         assert_eq!(
-            evaluate_decision_regret_observation(&class, &model),
-            Err(DecisionRegretVoiError::EmptyPriorCommitment)
+            evaluate_robust_decision_regret_observation(&class, &model),
+            Err(RobustObservationVoiError::EmptySupportEvidenceCommitment)
+        );
+        model.support_evidence_sha256 = digest(5);
+        model.possible_outcomes[0].candidate_visible_outcome_sha256 = [0; 32];
+        assert_eq!(
+            evaluate_robust_decision_regret_observation(&class, &model),
+            Err(RobustObservationVoiError::EmptyDeliveredOutcomeDigest { world_id: 1 })
         );
     }
 }
