@@ -161,6 +161,26 @@ fn evaluate_case(
         score.segment_length_error.mean_absolute_relative_error
     );
     println!("cycle_rank_delta: {}", score.topology_delta.cycle_rank);
+    println!(
+        "component_false_merge_count: {}",
+        score.component_error_summary.false_merge_count
+    );
+    println!(
+        "component_false_split_count: {}",
+        score.component_error_summary.false_split_count
+    );
+    println!(
+        "unmatched_prediction_component_count: {}",
+        score.component_error_summary.unmatched_prediction_component_count
+    );
+    println!(
+        "unmatched_ground_truth_component_count: {}",
+        score.component_error_summary.unmatched_ground_truth_component_count
+    );
+    println!(
+        "component_identity_attributions: {}",
+        score.component_attributions.len()
+    );
     println!("score_receipt_digest: {}", score.canonical_digest_hex()?);
     Ok(())
 }
