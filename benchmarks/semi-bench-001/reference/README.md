@@ -332,3 +332,15 @@ cargo run -p symthaea-semiconductor --bin semi-secom-logistic -- \\
 \`\`\`
 
 B5 is a strong discriminative challenger to B2–B4, but it is still a linear model over anonymous sensor columns. Class weighting changes the training objective; the prior correction restores the training class prior under the ideal weighted-likelihood identity, but does not guarantee calibration under covariate/observation shift. Validate Brier/log-loss and high-confidence errors in addition to AUROC/AP. Do not tune the frozen epoch count, regularization or thresholds on the final chronological test.
+
+
+### Sparse Elastic-Net B6 extension
+
+The same CLI now also evaluates two B6 variants using a frozen FTRL elastic-net setting:
+
+- **B6 sparse:** unweighted FTRL-Proximal with L1 = 0.01 and L2 = 1.0.
+- **B6 sparse-balanced:** inverse-frequency class-weighted FTRL with the same L1/L2 penalty and training-prior correction.
+
+B5 retains L1 = 0 and L2 = 1.0. B6 reports the count of coefficients whose absolute value exceeds \`1e-12\`, so sparsity is measurable rather than inferred from the selected algorithm name. The synthetic and full pinned-source workflow checks assert both B6 variants and their declared L1 configuration.
+
+B6 is a fixed research comparator, not a validation-selected hyperparameter winner. The L1 penalty has not been tuned on the final chronological test. Feature selection/zero coefficients do not establish physical sensor importance because the public SECOM mirror does not carry interpretable sensor semantics.
