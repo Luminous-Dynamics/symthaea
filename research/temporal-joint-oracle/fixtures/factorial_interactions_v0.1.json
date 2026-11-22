@@ -210,9 +210,34 @@
       61,
       53
     ],
-    "test_purpose": "prove_four_way_interaction_is_separate_from_all_proper_subsets"
+    "test_purpose": "prove_four_way_interaction_is_separate_from_all_proper_subsets",
+    "shapley": {
+      "common_denominator": 12,
+      "exposure_benefit_scaled_numerators": {
+        "wrong_belief_us": [
+          240,
+          240,
+          240,
+          240
+        ],
+        "abstention_us": [
+          195,
+          195,
+          195,
+          195
+        ],
+        "missing_output_us": [
+          219,
+          159,
+          159,
+          159
+        ]
+      },
+      "interpretation": "each_factor_receives_its_main_effect_plus_one_quarter_of_the_four_way_dividend",
+      "efficiency_check": "sum_factor_numerators_equals_full_joint_effect_times_12"
+    }
   },
-  "tests_authored": 16,
+  "tests_authored": 17,
   "tests_executed": false,
   "benchmark_runs": false,
   "causal_claim_requires": "paired_randomized_interventions_or_a_controlled_replay_design_that_identifies_the_declared_factor_effects",
