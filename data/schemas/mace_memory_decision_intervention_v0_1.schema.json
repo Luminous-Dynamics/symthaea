@@ -164,6 +164,7 @@
         "arm",
         "initial_agent_state_sha256",
         "candidate_input_sha256",
+        "decision_need_sha256",
         "candidate_policy_sha256",
         "decision",
         "retrieved_event_ids",
@@ -257,6 +258,9 @@
           "minimum": 0
         },
         "retrieval_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_need_sha256": {
           "$ref": "#/$defs/sha256"
         }
       },
