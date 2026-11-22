@@ -103,9 +103,9 @@ Optional query cues include:
 - target maximum standardized mean difference;
 - identification method;
 - exact estimand digest;
-- required intervention / pre-registration / outcome-reconciliation / source-trust / non-retraction / confounder-control / delayed-horizon flags.
+- target intervention / pre-registration / outcome-reconciliation / source-trust / retraction / confounder-control / delayed-horizon values.
 
-Optional numeric targets mean similarity to a declared reference value under the matching RBF bandwidth. They are not threshold predicates. Optional evidence-quality booleans are candidate-ranking cues, not admission gates.
+Optional numeric targets mean similarity to a declared reference value under the matching RBF bandwidth. They are not threshold predicates. Optional evidence-quality boolean targets are exact-match ranking cues, not admission gates; either true or false can be queried for positive controls and negative controls.
 
 **Current integration limitation:** the existing MACE policy Query has scope only. It does not expose a candidate-visible target utility, desired estimand or richer decision-state descriptor. A paired runner must not invent these fields or populate them from Truth/oracle state. End-to-end evaluation needs an independently candidate-visible DecisionNeed derived from the actual current task observation. Until that exists, this module supports representation-level and controlled typed-query tests only.
 
