@@ -2137,4 +2137,41 @@ mod tests {
         assert!(plan["judging"]["interaction_as_a_judge"].is_object());
     }
 
+
+    #[test]
+    fn task_family_blueprint_matches_schema_and_keeps_planned_tasks_non_runnable() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../task-family-plan-v1.schema.json"
+        )).expect("task family schema JSON");
+        let plan: Value = serde_json::from_str(include_str!(
+            "../../task-family-plan-v1.json"
+        )).expect("task family plan JSON");
+        let validator = validator_for(&schema).expect("task family schema compiles");
+        let errors: Vec<String> = validator.iter_errors(&plan)
+            .map(|error| format!("{}: {error}", error.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "task family plan errors: {errors:?}");
+
+        let tasks = plan["tasks"].as_array().expect("candidate tasks");
+        assert_eq!(tasks.len(), 30);
+        assert_eq!(
+            tasks.iter().filter(|task| task["level"] == "static_visual").count(),
+            10
+        );
+        assert_eq!(
+            tasks.iter().filter(|task| task["level"] == "interactive_multiroute").count(),
+            10
+        );
+        assert_eq!(
+            tasks.iter().filter(|task| task["level"] == "fullstack_maintenance").count(),
+            10
+        );
+        assert_eq!(plan["runnable_task_count"], 0);
+        assert!(tasks.iter().all(|task| {
+            task["fixture_status"] == "not_authored"
+                && task["oracle_status"] == "not_authored"
+                && task["promotion_status"] == "planned_not_runnable"
+        }));
+    }
+
 }
