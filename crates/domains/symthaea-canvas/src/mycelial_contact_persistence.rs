@@ -766,6 +766,16 @@ impl MycelialContactFiltration {
                     "cycle birth does not match a unique candidate or has an invalid witness path",
                 ));
             }
+            let mut witness_vertices = BTreeSet::from([event.source_filament_id]);
+            if event
+                .witness_path
+                .iter()
+                .any(|step| !witness_vertices.insert(step.to_filament_id))
+            {
+                return Err(MycelialContactFiltrationError::InvalidFiltration(
+                    "cycle witness path is not a simple path",
+                ));
+            }
             if previous_cycle_order.is_some_and(|previous| admission_order <= previous) {
                 return Err(MycelialContactFiltrationError::InvalidFiltration(
                     "cycle-birth events are not in deterministic admission order",
