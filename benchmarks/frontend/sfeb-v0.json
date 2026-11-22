@@ -530,6 +530,8 @@
       "high_severity_mutation_kill_rate_min": 0.95,
       "overall_mutation_kill_rate_min": 0.9,
       "positive_control_false_reject_rate_max": 0
-    }
+    },
+    "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --mutations",
+    "validator_status": "source_authored_not_executed"
   }
 }
