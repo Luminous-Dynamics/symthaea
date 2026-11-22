@@ -225,9 +225,8 @@ pub fn select_high_fidelity_candidates_v1(
 
     let mut scores = Vec::with_capacity(candidates.len());
     for candidate in &candidates {
-        let exploration_bonus = subject.exploration_weight
-            * candidate.epistemic_stddev
-            * candidate.frontier_relevance;
+        let exploration_bonus =
+            subject.exploration_weight * candidate.epistemic_stddev * candidate.frontier_relevance;
         let utility = candidate.expected_feasible_hv_gain + exploration_bonus;
         scores.push((exploration_bonus, utility));
     }
