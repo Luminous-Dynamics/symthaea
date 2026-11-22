@@ -2,17 +2,12 @@ use std::error::Error;
 use std::time::Instant;
 
 use plasma_vlasov_reference::phase_space_cascade::JointPhaseSpaceSpectrum;
-use plasma_vlasov_reference::{
-    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
-};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 const STEPS_TO_RECURRENCE: usize = 4096;
 const NYQUIST_GUARD_FRACTION: f64 = 0.9;
 
-fn target_mode_guardband_fraction(
-    spectrum: &JointPhaseSpaceSpectrum,
-    spatial_mode: usize,
-) -> f64 {
+fn target_mode_guardband_fraction(spectrum: &JointPhaseSpaceSpectrum, spatial_mode: usize) -> f64 {
     let negative_x_mode = (spectrum.nx - spatial_mode) % spectrum.nx;
     let mut total = 0.0;
     let mut guardband = 0.0;
@@ -42,8 +37,7 @@ fn run_case(
     let started = Instant::now();
     let spatial_mode = 1usize;
     let horizon = config.velocity_sampling_horizon(spatial_mode)?;
-    let initial =
-        maxwellian_perturbation(config, 1.0e-2, spatial_mode, 1.0)?;
+    let initial = maxwellian_perturbation(config, 1.0e-2, spatial_mode, 1.0)?;
     let mut periodic = VlasovPoisson1d1v::new(config, initial.clone())?;
     let mut sponge = VlasovPoisson1d1v::new(config, initial.clone())?;
     let initial_field = periodic.electric_mode_coefficient(spatial_mode)?;
@@ -78,8 +72,7 @@ fn run_case(
         removed_total_casimir +=
             first_half.removed_total_casimir + second_half.removed_total_casimir;
         removed_fluctuation_f_strophy +=
-            first_half.removed_fluctuation_f_strophy
-                + second_half.removed_fluctuation_f_strophy;
+            first_half.removed_fluctuation_f_strophy + second_half.removed_fluctuation_f_strophy;
 
         if step == STEPS_TO_RECURRENCE / 2 {
             let periodic_spectrum = periodic.joint_phase_space_spectrum()?;
@@ -96,10 +89,9 @@ fn run_case(
                 .electric_mode_coefficient(spatial_mode)?
                 .amplitude()
                 / initial_field.amplitude().max(f64::MIN_POSITIVE);
-            sponge_nyquist_field_ratio = sponge
-                .electric_mode_coefficient(spatial_mode)?
-                .amplitude()
-                / initial_field.amplitude().max(f64::MIN_POSITIVE);
+            sponge_nyquist_field_ratio =
+                sponge.electric_mode_coefficient(spatial_mode)?.amplitude()
+                    / initial_field.amplitude().max(f64::MIN_POSITIVE);
         }
     }
 
@@ -136,13 +128,10 @@ fn run_case(
         / initial_field.amplitude().max(f64::MIN_POSITIVE);
     let final_budget = sponge.quadratic_casimir_budget()?;
     let direct_casimir_drop = initial_casimir - final_budget.total_casimir;
-    let casimir_accounting_error =
-        (removed_total_casimir - direct_casimir_drop).abs()
-            / initial_casimir.max(f64::MIN_POSITIVE);
-    let removed_casimir_fraction =
-        removed_total_casimir / initial_casimir.max(f64::MIN_POSITIVE);
-    let direct_casimir_drop_fraction =
-        direct_casimir_drop / initial_casimir.max(f64::MIN_POSITIVE);
+    let casimir_accounting_error = (removed_total_casimir - direct_casimir_drop).abs()
+        / initial_casimir.max(f64::MIN_POSITIVE);
+    let removed_casimir_fraction = removed_total_casimir / initial_casimir.max(f64::MIN_POSITIVE);
+    let direct_casimir_drop_fraction = direct_casimir_drop / initial_casimir.max(f64::MIN_POSITIVE);
     let final_f_strophy_fraction = final_budget.fluctuation_f_strophy
         / initial_budget.fluctuation_f_strophy.max(f64::MIN_POSITIVE);
     let nx = config.nx;
