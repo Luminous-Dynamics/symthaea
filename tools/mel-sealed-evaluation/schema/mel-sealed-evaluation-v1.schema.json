@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-sealed-evaluation-v1.schema.json",
+  "title": "MEL Sealed Evaluation v1 Input Contracts",
+  "description": "Three disjoint JSON documents: frozen manifest, post-inference predictions, and separately released human reference. The manifest deliberately has no human-label fields.",
+  "oneOf": [
+    {"$ref": "#/$defs/manifest"},
+    {"$ref": "#/$defs/predictions"},
+    {"$ref": "#/$defs/human_reference"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["judge_id", "judge_version", "adapter_sha256", "prompt_sha256", "settings_sha256"],
+      "properties": {
+        "judge_id": {"type": "string", "minLength": 1},
+        "judge_version": {"type": "string", "minLength": 1},
+        "adapter_sha256": {"$ref": "#/$defs/sha256"},
+        "prompt_sha256": {"$ref": "#/$defs/sha256"},
+        "settings_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "experiment_id", "frozen_at_utc", "split", "judge", "protocol", "assignment", "minimum_directional_gap_logit", "confidence_z", "difficulty_bins", "candidates", "pairs", "claim_ceiling"],
+      "properties": {
+        "schema_version": {"const": "mel-sealed-evaluation-v1"},
+        "experiment_id": {"type": "string", "minLength": 1},
+        "frozen_at_utc": {"type": "string", "format": "date-time"},
+        "split": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["split_id", "split_kind", "dataset_commitment_sha256"],
+          "properties": {
+            "split_id": {"type": "string", "minLength": 1},
+            "split_kind": {"const": "held_out"},
+            "dataset_commitment_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "judge": {"$ref": "#/$defs/judge"},
+        "protocol": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["comparison_protocol_sha256", "audio_delivery_sha256", "normalization_sha256", "presentation_ui_sha256"],
+          "properties": {
+            "comparison_protocol_sha256": {"$ref": "#/$defs/sha256"},
+            "audio_delivery_sha256": {"$ref": "#/$defs/sha256"},
+            "normalization_sha256": {"$ref": "#/$defs/sha256"},
+            "presentation_ui_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "assignment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["algorithm", "seed_commitment_sha256"],
+          "properties": {
+            "algorithm": {"const": "sha256-pair-order-v1"},
+            "seed_commitment_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "minimum_directional_gap_logit": {"type": "number", "minimum": 0},
+        "confidence_z": {"type": "number", "exclusiveMinimum": 0},
+        "difficulty_bins": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "minimum_gap_logit", "maximum_gap_logit_exclusive"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "minimum_gap_logit": {"type": "number", "minimum": 0},
+              "maximum_gap_logit_exclusive": {"type": ["number", "null"], "exclusiveMinimum": 0}
+            }
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["item_id", "asset_ref", "audio_sha256", "prompt_sha256", "generator_id", "generator_version", "generation_config_sha256", "rights_receipt_sha256", "modality", "genre"],
+            "properties": {
+              "item_id": {"type": "string", "minLength": 1},
+              "asset_ref": {"type": "string", "minLength": 1},
+              "audio_sha256": {"$ref": "#/$defs/sha256"},
+              "prompt_sha256": {"$ref": "#/$defs/sha256"},
+              "generator_id": {"type": "string", "minLength": 1},
+              "generator_version": {"type": "string", "minLength": 1},
+              "generation_config_sha256": {"$ref": "#/$defs/sha256"},
+              "rights_receipt_sha256": {"$ref": "#/$defs/sha256"},
+              "modality": {"type": "string", "minLength": 1},
+              "genre": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "pairs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pair_id", "item_a_id", "item_b_id"],
+            "properties": {
+              "pair_id": {"type": "string", "minLength": 1},
+              "item_a_id": {"type": "string", "minLength": 1},
+              "item_b_id": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "claim_ceiling": {"$ref": "#/$defs/claim_ceiling"}
+      }
+    },
+    "predictions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "experiment_id", "manifest_sha256", "frozen_at_utc", "order_seed_revealed", "freeze_receipt_sha256", "judge", "pairs", "claim_ceiling"],
+      "properties": {
+        "schema_version": {"const": "mel-sealed-predictions-v1"},
+        "experiment_id": {"type": "string", "minLength": 1},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "frozen_at_utc": {"type": "string", "format": "date-time"},
+        "order_seed_revealed": {"$ref": "#/$defs/sha256"},
+        "freeze_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "judge": {"$ref": "#/$defs/judge"},
+        "pairs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pair_id", "presentations"],
+            "properties": {
+              "pair_id": {"type": "string", "minLength": 1},
+              "probability_a": {"type": "number", "minimum": 0, "maximum": 1},
+              "presentations": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["presentation_id", "ordinal", "left_item_id", "choice", "response_sha256"],
+                  "properties": {
+                    "presentation_id": {"type": "string", "minLength": 1},
+                    "ordinal": {"enum": [1, 2]},
+                    "left_item_id": {"type": "string", "minLength": 1},
+                    "choice": {"enum": ["left", "right", "tie", "abstain"]},
+                    "response_sha256": {"$ref": "#/$defs/sha256"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "claim_ceiling": {"$ref": "#/$defs/claim_ceiling"}
+      }
+    },
+    "human_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "experiment_id", "manifest_sha256", "predictions_sha256", "reference_id", "cohort_sha256", "estimator_sha256", "released_at_utc", "release_receipt_sha256", "item_strengths", "pair_uncertainty", "claim_ceiling"],
+      "properties": {
+        "schema_version": {"const": "mel-sealed-human-reference-v1"},
+        "experiment_id": {"type": "string", "minLength": 1},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "predictions_sha256": {"$ref": "#/$defs/sha256"},
+        "reference_id": {"type": "string", "minLength": 1},
+        "cohort_sha256": {"$ref": "#/$defs/sha256"},
+        "estimator_sha256": {"$ref": "#/$defs/sha256"},
+        "released_at_utc": {"type": "string", "format": "date-time"},
+        "release_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "item_strengths": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["item_id", "strength_logit"],
+            "properties": {
+              "item_id": {"type": "string", "minLength": 1},
+              "strength_logit": {"type": "number"}
+            }
+          }
+        },
+        "pair_uncertainty": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pair_id", "gap_standard_error_logit"],
+            "properties": {
+              "pair_id": {"type": "string", "minLength": 1},
+              "gap_standard_error_logit": {"type": "number", "minimum": 0}
+            }
+          }
+        },
+        "claim_ceiling": {"$ref": "#/$defs/claim_ceiling"}
+      }
+    }
+  }
+}

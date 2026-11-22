@@ -1,0 +1,61 @@
+name: MEL sealed evaluation protocol
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mel-sealed-evaluation/**"
+      - "docs/research/MEL_SEALED_EVALUATION_PROTOCOL_V1_2026-11-22.md"
+      - ".github/workflows/mel-sealed-evaluation.yml"
+  push:
+    branches:
+      - research/mel-sealed-evaluation-v1-20261122
+    paths:
+      - "tools/mel-sealed-evaluation/**"
+      - "docs/research/MEL_SEALED_EVALUATION_PROTOCOL_V1_2026-11-22.md"
+      - ".github/workflows/mel-sealed-evaluation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sealed-evaluation:
+    name: Sealed evaluation reference qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-sealed-evaluation/Cargo.toml
+      - name: Resolve isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-sealed-evaluation/Cargo.toml
+      - name: Run deterministic tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-sealed-evaluation/Cargo.toml
+      - name: Run warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-sealed-evaluation/Cargo.toml --all-targets -- -D warnings
+      - name: Parse contracts and fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-sealed-evaluation/schema/mel-sealed-evaluation-v1.schema.json > /dev/null
+          python -m json.tool tools/mel-sealed-evaluation/fixtures/manifest-v1.json > /dev/null
+          python -m json.tool tools/mel-sealed-evaluation/fixtures/predictions-v1.json > /dev/null
+          python -m json.tool tools/mel-sealed-evaluation/fixtures/human-reference-v1.json > /dev/null
+      - name: Replay known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-sealed-evaluation/Cargo.toml -- \
+            tools/mel-sealed-evaluation/fixtures/manifest-v1.json \
+            tools/mel-sealed-evaluation/fixtures/predictions-v1.json \
+            tools/mel-sealed-evaluation/fixtures/human-reference-v1.json \
+            > "$RUNNER_TEMP/mel-sealed-evaluation-report.json"
+          jq -e '.pair_count == 5 and .human_directional_pair_count == 4 and .judge_stable_directional_pair_count == 3 and .judge_order_inconsistent_pair_count == 1 and .judge_stable_tie_pair_count == 1 and .correct_directional_decision_count == 2 and .effective_accuracy == 0.5 and .temporal_order_assurance == "declared_metadata_only_external_attestation_unverified"' \
+            "$RUNNER_TEMP/mel-sealed-evaluation-report.json" > /dev/null

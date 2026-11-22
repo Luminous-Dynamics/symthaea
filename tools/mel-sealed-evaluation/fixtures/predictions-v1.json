@@ -1,0 +1,121 @@
+{
+  "claim_ceiling": [
+    "synthetic judge output only",
+    "prediction freeze timestamp is declared metadata unless independently verified"
+  ],
+  "experiment_id": "mel-sealed-demo-2026-11-22",
+  "freeze_receipt_sha256": "46c1a8043e1ef17a490f9874aff4bd540ab8eab33272ccb65482291aa244c88d",
+  "frozen_at_utc": "2026-11-22T13:40:00Z",
+  "judge": {
+    "adapter_sha256": "500a1c85be65cd25299f186341516248fb1ed999aca7de483d07257a9022cc1e",
+    "judge_id": "fixture-judge",
+    "judge_version": "0.0.1",
+    "prompt_sha256": "7e197c93cd23e42bb7abcacaf65a21c79d31fbf631e939c6838a7a7afc393be3",
+    "settings_sha256": "4d96e3c10f702cd315eed6a3665e507fae65a1eca90b235163c74662cbf55459"
+  },
+  "manifest_sha256": "e206926019ee624cd0db7f026fb1911fdb54118d99b8982cce49b9e5f4bb167e",
+  "order_seed_revealed": "9999999999999999999999999999999999999999999999999999999999999999",
+  "pairs": [
+    {
+      "pair_id": "p01",
+      "presentations": [
+        {
+          "choice": "right",
+          "left_item_id": "c2",
+          "ordinal": 1,
+          "presentation_id": "p01-view-1",
+          "response_sha256": "f01aa32488a59b4eb79b5d6d487e44d227a80c4ca8e071ba07f127d55db54fb6"
+        },
+        {
+          "choice": "left",
+          "left_item_id": "c1",
+          "ordinal": 2,
+          "presentation_id": "p01-view-2",
+          "response_sha256": "9953da1d213f464d1d5163e0d2eb4e492e9ae57b94aac00f2417bd4d5f0a61ec"
+        }
+      ],
+      "probability_a": 0.9
+    },
+    {
+      "pair_id": "p02",
+      "presentations": [
+        {
+          "choice": "right",
+          "left_item_id": "c2",
+          "ordinal": 1,
+          "presentation_id": "p02-view-1",
+          "response_sha256": "da35300d2d490ce18d084620b6a9b27e7bf72256564e6f7158ae3edcea7f83ae"
+        },
+        {
+          "choice": "left",
+          "left_item_id": "c3",
+          "ordinal": 2,
+          "presentation_id": "p02-view-2",
+          "response_sha256": "a51a98ae423b2bb83e71753c065dc4d819044dd0552d022483d0df3eba9af790"
+        }
+      ],
+      "probability_a": 0.2
+    },
+    {
+      "pair_id": "p03",
+      "presentations": [
+        {
+          "choice": "right",
+          "left_item_id": "c3",
+          "ordinal": 1,
+          "presentation_id": "p03-view-1",
+          "response_sha256": "d99f42b431aaf1fa1553707cd1fa8c07d740b5159b358820bfeff18bf055e486"
+        },
+        {
+          "choice": "right",
+          "left_item_id": "c1",
+          "ordinal": 2,
+          "presentation_id": "p03-view-2",
+          "response_sha256": "66b687803c3b2bd8403251db5b92ea9c13c0f91f8f4514025d403a4775f257bc"
+        }
+      ],
+      "probability_a": 0.7
+    },
+    {
+      "pair_id": "p04",
+      "presentations": [
+        {
+          "choice": "tie",
+          "left_item_id": "c4",
+          "ordinal": 1,
+          "presentation_id": "p04-view-1",
+          "response_sha256": "dc66b6b646c0fd9be234308ba8bb9d46d184fd89f8a0896b37c0242d15eccc45"
+        },
+        {
+          "choice": "tie",
+          "left_item_id": "c3",
+          "ordinal": 2,
+          "presentation_id": "p04-view-2",
+          "response_sha256": "879a62b4be392acdf9212d6eba83e0b64f6ce8c2d735257e39bc710743928267"
+        }
+      ],
+      "probability_a": 0.5
+    },
+    {
+      "pair_id": "p05",
+      "presentations": [
+        {
+          "choice": "left",
+          "left_item_id": "c1",
+          "ordinal": 1,
+          "presentation_id": "p05-view-1",
+          "response_sha256": "339231377262bd159c94ce36afc0fb648a796c1dd6ad735e49690b095bd03fd3"
+        },
+        {
+          "choice": "right",
+          "left_item_id": "c4",
+          "ordinal": 2,
+          "presentation_id": "p05-view-2",
+          "response_sha256": "dcacdad28f442a14f75533e005eb8597098ccce678877c7986325c97fcbf270a"
+        }
+      ],
+      "probability_a": 0.85
+    }
+  ],
+  "schema_version": "mel-sealed-predictions-v1"
+}

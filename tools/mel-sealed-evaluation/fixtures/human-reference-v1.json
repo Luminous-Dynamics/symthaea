@@ -1,0 +1,29 @@
+{
+  "claim_ceiling": [
+    "synthetic human-reference fixture only",
+    "reference strengths are not real musician ratings",
+    "release receipt digest is not proof of trusted external timestamp"
+  ],
+  "cohort_sha256": "dfb159cfbac855c51423bbeffaf3da0105c44a260e6607948029663df9334303",
+  "estimator_sha256": "cb00a4312e6cbd9f56e8108009f2d0ab9496e00f078b5dc9d3bf934f0569b43b",
+  "experiment_id": "mel-sealed-demo-2026-11-22",
+  "item_strengths": [
+    {"item_id": "c1", "strength_logit": 0.9},
+    {"item_id": "c2", "strength_logit": 0.0},
+    {"item_id": "c3", "strength_logit": -1.8},
+    {"item_id": "c4", "strength_logit": -1.5}
+  ],
+  "manifest_sha256": "e206926019ee624cd0db7f026fb1911fdb54118d99b8982cce49b9e5f4bb167e",
+  "pair_uncertainty": [
+    {"gap_standard_error_logit": 0.05, "pair_id": "p01"},
+    {"gap_standard_error_logit": 0.1, "pair_id": "p02"},
+    {"gap_standard_error_logit": 0.08, "pair_id": "p03"},
+    {"gap_standard_error_logit": 0.2, "pair_id": "p04"},
+    {"gap_standard_error_logit": 0.08, "pair_id": "p05"}
+  ],
+  "predictions_sha256": "d8604b7def40d9c42beef9484b3b2868514d5c64ee7726f41869650a38949f95",
+  "reference_id": "fixture-human-reference",
+  "release_receipt_sha256": "97d2e238ea129e7d4fd57b3331a6888c5d02e3aaddce99fb8dfa01f90c4476d1",
+  "released_at_utc": "2026-11-22T14:10:00Z",
+  "schema_version": "mel-sealed-human-reference-v1"
+}

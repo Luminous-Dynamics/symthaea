@@ -1,0 +1,129 @@
+{
+  "assignment": {
+    "algorithm": "sha256-pair-order-v1",
+    "seed_commitment_sha256": "06dcb600d5beaa7a4dbbbbda6b1247b2dfd5a68cd16312bd588783332f3dc57b"
+  },
+  "candidates": [
+    {
+      "asset_ref": "fixture://c1.wav",
+      "audio_sha256": "f966399b396af165644e76d9bcba8c3a8bcff0418484fd5d486c66daf916dc96",
+      "generation_config_sha256": "a83df24a3b3477ea0653ca5a61e1f2736149beb1c621e6662de64582967f05fa",
+      "generator_id": "fixture-generator",
+      "generator_version": "0.0.1",
+      "genre": "ambient",
+      "item_id": "c1",
+      "modality": "instrumental",
+      "prompt_sha256": "c05ee7d8889682b44d0b992e47d38172ecc9da34cf025d9df820aee2c3b4cc3c",
+      "rights_receipt_sha256": "4929ab761e485df4ba4ae76f5a630d052b55931137bf947dea81a0c7f8bbc308"
+    },
+    {
+      "asset_ref": "fixture://c2.wav",
+      "audio_sha256": "5fbf3cf9a7a646ad218a3bf8b0943e49efca6f78fe44d39b1bb0341d89c31ec6",
+      "generation_config_sha256": "a83df24a3b3477ea0653ca5a61e1f2736149beb1c621e6662de64582967f05fa",
+      "generator_id": "fixture-generator",
+      "generator_version": "0.0.1",
+      "genre": "ambient",
+      "item_id": "c2",
+      "modality": "instrumental",
+      "prompt_sha256": "c05ee7d8889682b44d0b992e47d38172ecc9da34cf025d9df820aee2c3b4cc3c",
+      "rights_receipt_sha256": "a82c2a0501d8a92c5f3811b12bef7d18cf162fc989a49fa137d075f9da13c0f6"
+    },
+    {
+      "asset_ref": "fixture://c3.wav",
+      "audio_sha256": "1b4f5fd39b9bf3c2c3495d3861c696d5eaf49f5c08a040c1dc58c9de6a9bee8b",
+      "generation_config_sha256": "a83df24a3b3477ea0653ca5a61e1f2736149beb1c621e6662de64582967f05fa",
+      "generator_id": "fixture-generator",
+      "generator_version": "0.0.1",
+      "genre": "jazz",
+      "item_id": "c3",
+      "modality": "instrumental",
+      "prompt_sha256": "c05ee7d8889682b44d0b992e47d38172ecc9da34cf025d9df820aee2c3b4cc3c",
+      "rights_receipt_sha256": "cddd1cb3090119eb0cdca040bb263bc1ebae45604f86fb1fb6cca73ad7129000"
+    },
+    {
+      "asset_ref": "fixture://c4.wav",
+      "audio_sha256": "b72c7d4722f21dc49217fc021a5a69b396698de62f464d031950c3f26f8f75e5",
+      "generation_config_sha256": "a83df24a3b3477ea0653ca5a61e1f2736149beb1c621e6662de64582967f05fa",
+      "generator_id": "fixture-generator",
+      "generator_version": "0.0.1",
+      "genre": "jazz",
+      "item_id": "c4",
+      "modality": "instrumental",
+      "prompt_sha256": "c05ee7d8889682b44d0b992e47d38172ecc9da34cf025d9df820aee2c3b4cc3c",
+      "rights_receipt_sha256": "98124ef3e4ade2028bdc0e7d8aefab7cdf3404b3195aca326cf554fa58354d74"
+    }
+  ],
+  "claim_ceiling": [
+    "synthetic conformance fixture only",
+    "not a human preference result or generator quality score",
+    "timestamp receipt digests are references and are not verified as trusted signatures",
+    "the scorer does not prove the judge lacked external access to human reference data"
+  ],
+  "confidence_z": 1.96,
+  "difficulty_bins": [
+    {
+      "maximum_gap_logit_exclusive": 0.75,
+      "minimum_gap_logit": 0.0,
+      "name": "near"
+    },
+    {
+      "maximum_gap_logit_exclusive": 1.5,
+      "minimum_gap_logit": 0.75,
+      "name": "medium"
+    },
+    {
+      "maximum_gap_logit_exclusive": null,
+      "minimum_gap_logit": 1.5,
+      "name": "far"
+    }
+  ],
+  "experiment_id": "mel-sealed-demo-2026-11-22",
+  "frozen_at_utc": "2026-11-22T13:00:00Z",
+  "judge": {
+    "adapter_sha256": "500a1c85be65cd25299f186341516248fb1ed999aca7de483d07257a9022cc1e",
+    "judge_id": "fixture-judge",
+    "judge_version": "0.0.1",
+    "prompt_sha256": "7e197c93cd23e42bb7abcacaf65a21c79d31fbf631e939c6838a7a7afc393be3",
+    "settings_sha256": "4d96e3c10f702cd315eed6a3665e507fae65a1eca90b235163c74662cbf55459"
+  },
+  "minimum_directional_gap_logit": 0.25,
+  "pairs": [
+    {
+      "item_a_id": "c1",
+      "item_b_id": "c2",
+      "pair_id": "p01"
+    },
+    {
+      "item_a_id": "c2",
+      "item_b_id": "c3",
+      "pair_id": "p02"
+    },
+    {
+      "item_a_id": "c1",
+      "item_b_id": "c3",
+      "pair_id": "p03"
+    },
+    {
+      "item_a_id": "c3",
+      "item_b_id": "c4",
+      "pair_id": "p04"
+    },
+    {
+      "item_a_id": "c1",
+      "item_b_id": "c4",
+      "pair_id": "p05"
+    }
+  ],
+  "protocol": {
+    "audio_delivery_sha256": "c3f3cd6760e3d8a760c6864c0c9f774cbc5d62a22a3072dc60efd8b9583d2068",
+    "comparison_protocol_sha256": "a460cddd234d7633a51894dbe820a79a974f36df565521814f7b4a397396af0c",
+    "normalization_sha256": "ba4ae54580817dffe5ea28891b706be38ad14dedf766df4c9b802c8ea0c2efa2",
+    "presentation_ui_sha256": "2c6478eab34dcc0dd708e8a0177b0ce3e8e0b54a5403b5604a9bd92ad9531ae6"
+  },
+  "schema_version": "mel-sealed-evaluation-v1",
+  "split": {
+    "dataset_commitment_sha256": "43c2cfe0eb35de759fcdae4424f174db7787f31340c79b05d1c6d0a5813f9a67",
+    "split_id": "mel-holdout-0001",
+    "split_kind": "held_out"
+  }
+}
