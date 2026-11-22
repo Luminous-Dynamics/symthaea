@@ -117,13 +117,24 @@ Implemented attack strategies:
 |---|---|---|---|
 | Random segments | Hypha segments | SplitMix64 shuffle of stable IDs | Unstructured segment disruption |
 | Random junctions | Junctions | SplitMix64 shuffle of stable IDs | Unstructured junction disruption |
-| Highest-degree junctions | Junctions | Descending incident-segment count; stable ID tie-break | Static hub-targeted attack |
-| Lowest-degree junctions | Junctions | Ascending incident-segment count; stable ID tie-break | Peripheral/leaf-targeted negative comparator |
+| Highest-degree junctions | Junctions | Descending incident-segment count on original graph; stable ID tie-break | Static hub-targeted attack |
+| Adaptive highest-degree junctions | Junctions | Recompute degree on residual graph after every prior removal; stable ID tie-break | Adaptive hub-targeted attack with per-step rankings |
+| Lowest-degree junctions | Junctions | Ascending incident-segment count on original graph; stable ID tie-break | Peripheral/leaf-targeted negative comparator |
 | Demand-path-load segments | Hypha segments | Descending declared-demand weight on deterministic shortest paths; stable ID tie-break | Demand-conditioned edge load, not generic all-pairs betweenness |
 | Demand-path-load junctions | Junctions | Weighted internal transit-node use on deterministic shortest paths | Demand-conditioned node load, not generic all-pairs betweenness |
 | Spatial-cluster junctions | Junctions | Ascending Euclidean distance to a declared seed junction; stable ID tie-break | Localized correlated structural-damage proxy |
 
-For each strategy, the plan contains budgets 1 through k, each budget being a nested prefix of the deterministic attack order. Scenario IDs encode the policy version, seed and budget. The plan validator re-computes the ranking from the source graph and demand set, then checks every scenario is exactly the matching prefix. A changed graph, demand, seed, ranking order or failed-identity list invalidates the plan.
+For each strategy, the plan contains budgets 1 through k, each budget being a nested prefix of the selected attack order. Scenario IDs encode the policy version, seed and budget. The plan retains both the selected sequence and the complete candidate ranking at every step. The plan validator re-computes the rankings from the source graph and demand set, then checks every scenario is exactly the matching prefix. A changed graph, demand, seed, per-step ranking or failed-identity list invalidates the plan.
+
+### Static versus adaptive degree
+
+The static highest-degree policy computes degree once on the original graph and never changes the order. The adaptive highest-degree policy removes previously selected junctions in a derived residual graph, removes their incident hypha edges, and recomputes degree before selecting the next junction. It records all remaining candidates and their deterministic order at every step, not just the winner.
+
+This separates two questions:
+- Does the original graph's hub ranking identify critical junctions?
+- Does an adaptive attacker find a different vulnerability after earlier hubs have been removed?
+
+The current dynamic policy adapts degree only. Dynamic demand-path load, recalculated betweenness, articulation/min-cut recomputation and partial-capacity attacks remain separate future strategies. The current adaptive intervention is still a sequence of fully enacted structural removals; probability-of-delivery is a separate optional simulation profile.
 
 The demand-path-load strategy computes weighted shortest routes only for the supplied demand pairs. It must not be called global betweenness: it is explicitly demand-conditioned. Equal-cost route ties are resolved by stable node/edge ordering. The spatial-cluster policy uses source graph model coordinates and is currently a local geometric stress proxy; coordinates are not calibrated physical distances.
 
@@ -134,7 +145,7 @@ Recent network-resilience work provides two important challenges to a centrality
 - A 2026 intermodal-freight study compares random failures with static and dynamically recalculated degree/betweenness, uses flow-weighted centralities and partial node degradation, and evaluates both giant-component size and flow-weighted network efficiency. This is a useful methodology comparator, not a direct fungal dataset. <https://doi.org/10.1177/03611981261437033>
 - A 2025 study of attack uncertainty reports that assuming every targeted attack succeeds can alter the ranking of attack strategies; its model suggests peripheral attacks can become more damaging when attack execution is uncertain. This motivates a separate attack-delivery uncertainty track instead of treating all interventions as certain. <https://doi.org/10.1016/j.ress.2025.111231>
 
-The present plans model **structural intervention outcomes conditional on successful removals**. They do not yet simulate partial edge degradation, probability of failure, cascades, repair, or adaptive attackers. Those require explicit calibrated parameters or clearly labelled synthetic stress models.
+The deterministic plans model **structural intervention outcomes conditional on successful removals**. The implemented adaptive arm recalculates degree after each successful junction removal. The optional delivery profile models the probability that an attempted removal is enacted, but only as a synthetic per-attempt simulation parameter. Partial edge-capacity degradation, cascades, repair, adversarial learning and dynamically recalculated path-load/betweenness are not implemented. Those require explicit calibrated parameters or clearly labelled synthetic stress models.
 
 ## 6. Attack-delivery uncertainty simulation
 
