@@ -317,3 +317,18 @@ This validates the qualification campaign schema, unique IDs, expected dispositi
 minimum case counts and non-weakenable 100% critical/security/evidence-integrity
 targets. It validates the plan only; it does not execute seeded mutants, run a browser,
 or certify oracle quality. These commands are authored but remain unexecuted here.
+
+
+## Paired qualification report adjudicator
+
+The standalone Rust contract checker now also has a
+`--qualification-report` mode. It validates a completed 30-case report against
+the frozen campaign and report schema, verifies exact receipt bytes and the
+screenshot/accessibility/layout artifact bytes, checks receipt identity and
+fixture/environment pairing, then emits mutation kill rates with 95% Wilson
+intervals and positive/metamorphic-control outcomes.
+
+See [the execution protocol](qualification/EXECUTION.md). This is an evidence
+adjudicator, not the browser mutation executor. It does not run Chromium, create
+mutations, or cryptographically authenticate the runner's reported oracle IDs.
+The current SFEB benchmark remains `specification_only`.
