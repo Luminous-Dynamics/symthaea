@@ -1045,6 +1045,25 @@ impl TemporalMycelialCycleProfile {
         for node_id in &self.source_node_ids {
             hash_string(&mut hasher, node_id);
         }
+        hasher.update(&(self.edge_evidence_inventory.len() as u64).to_le_bytes());
+        for edge in &self.edge_evidence_inventory {
+            hash_string(&mut hasher, &edge.edge_id);
+            hasher.update(&[match edge.evidence {
+                TemporalEdgeEvidence::DirectlyObservedHypha => 0,
+                TemporalEdgeEvidence::AcceptedParentBranch => 1,
+                TemporalEdgeEvidence::AcceptedAnastomosis => 2,
+                TemporalEdgeEvidence::SyntheticFixture => 3,
+            }]);
+        }
+        for value in [
+            self.edge_evidence_counts.total_edge_observations,
+            self.edge_evidence_counts.directly_observed_hypha_observations,
+            self.edge_evidence_counts.accepted_parent_branch_observations,
+            self.edge_evidence_counts.accepted_anastomosis_observations,
+            self.edge_evidence_counts.synthetic_fixture_observations,
+        ] {
+            hasher.update(&(value as u64).to_le_bytes());
+        }
         for snapshot in &self.snapshot_metrics {
             hash_string(&mut hasher, &snapshot.snapshot_id);
             hasher.update(&(snapshot.node_count as u64).to_le_bytes());
@@ -1193,6 +1212,31 @@ mod tests {
             minimum_known_duration_fraction: 0.5,
             tcr_epsilon: 1.0e-12,
         }
+    }
+
+    #[test]
+    fn synthetic_edge_evidence_is_rejected_without_explicit_fixture_opt_in() {
+        let cycle_edges = vec![
+            edge("e-ab", "A", "B"),
+            edge("e-ac", "A", "C"),
+            edge("e-bc", "B", "C"),
+        ];
+        let input = sequence(vec![
+            snapshot(
+                "w1",
+                0,
+                10,
+                TemporalWindowCoverage::CompleteWithinDeclaredScope,
+                cycle_edges,
+            ),
+        ]);
+        assert!(matches!(
+            build_temporal_mycelial_cycle_profile(
+                &input,
+                TemporalMycelialCycleConfig::default()
+            ),
+            Err(MycelialTemporalCycleError::SyntheticEvidenceNotAllowed(3))
+        ));
     }
 
     #[test]
