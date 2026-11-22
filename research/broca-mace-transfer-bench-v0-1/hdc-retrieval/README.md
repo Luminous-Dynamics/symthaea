@@ -52,7 +52,5 @@ Categorical features use deterministic role/value binding. Continuous values use
 
 The current policy `Query` only exposes regime/objective. The paired runner now integrates a restricted typed-content arm using that scope/action plus the MACE policy's fixed categorical qualification requirements. Scope/action are exact prefilters—not approximate vector cues—so wrong-scope candidates cannot crowd out applicable evidence. The profile digest binds this filter semantics (typed profile v1.1). The optional numeric target and estimand fields are still not populated from a task-level source. Do not fabricate them from evaluator truth. A broader agent-level comparison needs a candidate-visible `DecisionNeed` derived from the actual observation and task.
 
-Regime/objective and action are retained as exact partition keys and applied as hard prefilters before approximate HDC ranking. A high-similarity wrong-scope or wrong-action item cannot consume a top-k slot for the current query. This behavior is bound into typed profile v1.1, and the payload estimate includes the exact partition keys.
-
 The typed index is structured semantic retrieval, **not natural-language understanding** and not proof that HDC-LTC has learned temporal dynamics. It is static typed HDC v1.1; the module now has ten authored tests and the paired runner has seven authored tests (not executed). Event-driven LTC and irregular-time streams remain separate follow-on work.
 
