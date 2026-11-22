@@ -1,9 +1,10 @@
 //! Repeatability-calibrated similarity metrics for CETB research.
 //!
-//! This crate deliberately contains no data loader, correlation estimator or clinical
-//! classifier. It operates on already-computed correlation matrices and participant-level
-//! within-/between-condition similarities. Participant-level inference is performed only
-//! after repeated segment measurements have been reduced within participant.
+//! This crate contains no data loader or clinical classifier. It includes explicit reference
+//! Pearson connectivity and matrix-similarity implementations for synthetic fixtures and
+//! qualification harnesses; empirical comparisons must pin and identify the upstream connectivity
+//! estimator and preprocessing pipeline. Participant-level inference is performed only after
+//! repeated segment measurements have been reduced within participant.
 
 pub mod estimator_response;
 pub mod held_out_null_calibration;
