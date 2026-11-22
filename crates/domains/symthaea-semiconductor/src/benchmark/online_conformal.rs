@@ -519,10 +519,8 @@ pub fn initialize_online_conformal_v1(
         config.residual_window_per_class,
         |row| row.positive,
     );
-    let (positive_count, negative_count, _, _) = {
-        let positive = residuals.iter().filter(|row| row.positive).count();
-        (positive, residuals.len() - positive, 0, 0)
-    };
+    let positive_count = residuals.iter().filter(|row| row.positive).count();
+    let negative_count = residuals.len() - positive_count;
     if positive_count < config.minimum_residual_support_per_class
         || negative_count < config.minimum_residual_support_per_class
     {
@@ -949,7 +947,7 @@ mod tests {
     const TRANSFORM_SHA: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
     fn graph(label_ids: &[(&str, &str, u64, Option<&str>)]) -> ProcessEventGraphV1 {
-        let mut events = vec![ProcessEventV1 {
+        let events = vec![ProcessEventV1 {
             event_id: "met-event".into(),
             event_kind: ProcessEventKindV1::Metrology,
             subject_id: Some("wafer-100".into()),
@@ -1004,7 +1002,6 @@ mod tests {
         }
         // The graph only needs one metrology event; all labels are revisions/
         // repeat validations of this subject's measured target.
-        events.shrink_to_fit();
         ProcessEventGraphV1 {
             schema: crate::benchmark::process_event_graph::GRAPH_SCHEMA_V1.into(),
             graph_id: "online-graph-100".into(),
@@ -1171,6 +1168,7 @@ mod tests {
                 prediction_id: "prediction-1".into(),
                 sample_id: "wafer-100".into(),
                 subject_id: "wafer-100".into(),
+                target_measurand_id: "defect-rate".into(),
                 score: 0.9,
                 issued_at: "2026-11-22T10:05:00".into(),
                 clock_domain_id: "fab-local".into(),
@@ -1233,6 +1231,7 @@ mod tests {
                 positive: true,
                 target_measurand_id: "defect-rate".into(),
                 class_semantics_ref: "defect-threshold-v1".into(),
+                class_semantics_sha256: TRANSFORM_SHA.into(),
                 revision: 1,
                 supersedes_label_id: None,
             },
