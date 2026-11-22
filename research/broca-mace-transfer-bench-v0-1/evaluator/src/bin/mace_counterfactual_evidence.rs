@@ -996,6 +996,12 @@ fn run() -> Result<(), String> {
         ))
         .as_slice(),
     );
+    let dependency_sidecar_schema_sha256 = hex_digest(
+        Sha256::digest(include_bytes!(
+            "../../../../../data/schemas/mace_evidence_dependency_sidecar_v1.schema.json"
+        ))
+        .as_slice(),
+    );
     let source_revision = env::var("MACE_SOURCE_REVISION").ok();
     if source_revision
         .as_deref()
@@ -1004,7 +1010,7 @@ fn run() -> Result<(), String> {
         return Err("MACE_SOURCE_REVISION must be a 40- or 64-character lowercase Git SHA".to_string());
     }
     let run_identity = format!(
-        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{}",
+        "{clusters}:{public_seed}:{SCHEMA_VERSION}:{source_code_sha256}:{fixture_sha256}:{schema_sha256}:{dependency_sidecar_schema_sha256}:{}",
         source_revision.as_deref().unwrap_or("unspecified")
     );
     let run_id = format!(
@@ -1067,6 +1073,7 @@ fn run() -> Result<(), String> {
             "source_code_sha256": source_code_sha256,
             "fixture_sha256": fixture_sha256,
             "schema_sha256": schema_sha256,
+            "dependency_sidecar_schema_sha256": dependency_sidecar_schema_sha256,
             "source_revision": source_revision,
             "known_root_count": EvidenceDependencyIndex::build(&case.memory)
                 .map_err(|error| format!("dependency index failed: {error:?}"))?
