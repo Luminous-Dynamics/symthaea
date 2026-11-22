@@ -18,8 +18,8 @@ use crate::benchmark::conformal_abstention::{
     ConformalSubjectV1, SelectiveDecisionV1, SUBJECT_SCHEMA_V1,
 };
 use crate::benchmark::process_event_graph::{
-    ClockBasisV1, InformationCutoffSnapshotV1, MetrologyLabelStatusV1, PredictionInformationCutoffV1,
-    ProcessEventGraphV1, SNAPSHOT_SCHEMA_V1, build_information_cutoff_snapshot_v1,
+    ClockBasisV1, MetrologyLabelStatusV1, PredictionInformationCutoffV1, ProcessEventGraphV1,
+    SNAPSHOT_SCHEMA_V1, build_information_cutoff_snapshot_v1,
 };
 
 pub const ONLINE_STATE_SCHEMA_V1: &str = "luminous.semi-bench.online-conformal-state.v1";
@@ -564,7 +564,7 @@ pub fn predict_online_conformal_v1(
         (false, true) => SelectiveDecisionV1::PredictPositive,
         _ => SelectiveDecisionV1::Abstain,
     };
-    if matches!(state.coverage_state, OnlineCoverageStateV1::CoverageDegraded) {
+    if matches!(&state.coverage_state, OnlineCoverageStateV1::CoverageDegraded) {
         negative_in_set = true;
         positive_in_set = true;
         decision = SelectiveDecisionV1::Abstain;
@@ -1039,7 +1039,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.model_sha256, MODEL_SHA);
-        assert_eq!(receipt.calibration_state_sha256, receipt.prediction_set.sample_id.as_str().ne("").then_some(receipt.calibration_state_sha256.as_str()).unwrap());
+        assert!(valid_sha256(&receipt.calibration_state_sha256));
         assert!(matches!(receipt.coverage_state, OnlineCoverageStateV1::Qualified));
         assert!(verify_state(&state).is_ok());
     }
