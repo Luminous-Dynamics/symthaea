@@ -17,7 +17,8 @@ use std::time::Instant;
 use symthaea_canvas::{
     EmbodimentSnapshot, MycelialContactFiltrationConfig, MycelialJunctionGraphConfig,
     MycelialNetworkConfig, PresenceMode, build_mycelial_contact_filtration,
-    build_mycelial_junction_hypha_graph, build_mycelial_model, detect_anastomosis_candidates,
+    build_mycelial_junction_hypha_graph, build_mycelial_model,
+    build_observed_network_minimum_spanning_forest, detect_anastomosis_candidates,
 };
 
 const DEFAULT_SAMPLES: usize = 100;
@@ -86,6 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let metrics = graph.metrics()?;
     let global = graph.global_geometric_efficiency()?;
     let root = graph.root_directed_geometric_efficiency(&root_ids)?;
+    let mst_report = build_observed_network_minimum_spanning_forest(&graph, &root_ids)?;
     let digest = graph.canonical_digest_hex()?;
 
     println!("benchmark: mycelial-junction-hypha-v1");
@@ -156,6 +158,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!("source_geometry_digest: {}", graph.source_geometry_digest);
     println!("junction_graph_digest: {digest}");
+    println!("observed_network_mst_selected_segments: {}", mst_report.selected_segment_count);
+    println!("observed_network_mst_components: {}", mst_report.connected_components);
+    println!(
+        "observed_network_mst_arc_cost_model_units_microunits: {}",
+        mst_report.hypha_arc_cost_model_units_microunits
+    );
+    println!(
+        "observed_network_mst_traversal_cost_model_units_microunits: {}",
+        mst_report.traversal_cost_model_units_microunits
+    );
+    println!(
+        "observed_network_mst_global_directness: {:?}",
+        mst_report.global_geometric_efficiency.mean_directness
+    );
+    println!(
+        "observed_network_mst_root_directness: {:?}",
+        mst_report.root_directed_geometric_efficiency.mean_directness
+    );
+    println!("observed_network_mst_source_graph_digest: {}", mst_report.source_graph_digest);
     println!("warmup_runs: {WARMUP_RUNS}");
     println!("samples: {samples}");
     println!(
