@@ -1,0 +1,83 @@
+name: Math Proof Comprehension Pilot
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/research/proof_comprehension_oracle.rs"
+      - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
+      - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
+      - "docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.*"
+      - ".github/workflows/math-proof-comprehension-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  finite-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Record exact execution identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "HEAD=$(git rev-parse HEAD)"
+          rustc --version
+          rustfmt --version
+
+      - name: Check Rust formatting
+        run: rustfmt --edition 2021 --check scripts/research/proof_comprehension_oracle.rs
+
+      - name: Compile and run dependency-free finite oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/proof-comprehension-oracle"
+          rustc --edition=2021 --test -D warnings scripts/research/proof_comprehension_oracle.rs -o "$bin"
+          "$bin"
+
+      - name: Parse and assert frozen pilot fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.json
+            docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.schema.json
+            docs/research/MATH_PROOF_COMPREHENSION_RECEIPT_V1.schema.json
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json
+            docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.json
+          )
+          for file in "${files[@]}"; do
+            jq -e . "$file" >/dev/null
+          done
+
+          jq -e '.task_count == (.tasks | length) and .task_count == 6 and .status == "source_pinned_seed_not_gold"' \
+            docs/research/MATH_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
+
+          jq -e '.task_count == (.tasks | length) and .task_count == 4 and .status == "source_pinned_seed_not_gold"' \
+            docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json >/dev/null
+
+          jq -e '.finite_oracle.source_satisfying_assignments == 5
+            and .finite_oracle.correct_encoded_satisfying_assignments == 5
+            and .finite_oracle.mutated_encoded_satisfying_assignments == 6
+            and .finite_oracle.decision_equivalence_correct == true
+            and .finite_oracle.decision_equivalence_mutated == true
+            and .finite_oracle.unique_extension_correct == true
+            and .finite_oracle.unique_extension_mutated == false' \
+            docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.json >/dev/null
+
+          echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
