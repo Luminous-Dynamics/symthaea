@@ -2,6 +2,8 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
+pub mod transform_qualification;
+
 const SCHEMA_VERSION: &str = "mel-judge-grounding-probe-panel-v1";
 
 #[derive(Debug, Deserialize)]
@@ -71,6 +73,7 @@ struct ProbeV1 {
     audio_b_sha256: Option<String>,
     expected_candidate: Option<String>,
     maximum_margin_shift: Option<f64>,
+    maximum_score_drift: Option<f64>,
     minimum_score_drop: Option<f64>,
 }
 
@@ -81,6 +84,7 @@ pub struct ProbeSummary {
     pub passed_count: usize,
     pub pass_rate: Option<f64>,
     pub mean_absolute_margin_shift: Option<f64>,
+    pub mean_maximum_absolute_score_drift: Option<f64>,
     pub mean_margin_ratio: Option<f64>,
     pub mean_expected_candidate_score_drop: Option<f64>,
 }
@@ -94,6 +98,9 @@ pub struct ProbeFinding {
     pub passed: Option<bool>,
     pub observed_value: Option<f64>,
     pub threshold: Option<f64>,
+    pub candidate_a_absolute_score_drift: Option<f64>,
+    pub candidate_b_absolute_score_drift: Option<f64>,
+    pub maximum_absolute_score_drift: Option<f64>,
     pub reason: String,
 }
 
@@ -128,6 +135,8 @@ struct SummaryAccumulator {
     margin_ratio_count: usize,
     score_drop_sum: f64,
     score_drop_count: usize,
+    maximum_absolute_score_drift_sum: f64,
+    maximum_absolute_score_drift_count: usize,
 }
 
 impl SummaryAccumulator {
@@ -155,6 +164,11 @@ impl SummaryAccumulator {
         }
     }
 
+    fn add_maximum_absolute_score_drift(&mut self, value: f64) {
+        self.maximum_absolute_score_drift_sum += value;
+        self.maximum_absolute_score_drift_count += 1;
+    }
+
     fn skip(&mut self) {
         self.probes += 1;
     }
@@ -168,6 +182,10 @@ impl SummaryAccumulator {
             mean_absolute_margin_shift: mean(
                 self.absolute_margin_shift_sum,
                 self.margin_shift_count,
+            ),
+            mean_maximum_absolute_score_drift: mean(
+                self.maximum_absolute_score_drift_sum,
+                self.maximum_absolute_score_drift_count,
             ),
             mean_margin_ratio: mean(self.margin_ratio_sum, self.margin_ratio_count),
             mean_expected_candidate_score_drop: mean(self.score_drop_sum, self.score_drop_count),
@@ -246,6 +264,9 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                             passed: None,
                             observed_value: None,
                             threshold: Some(panel.policy.maximum_prompt_only_margin_ratio),
+                            candidate_a_absolute_score_drift: None,
+                            candidate_b_absolute_score_drift: None,
+                            maximum_absolute_score_drift: None,
                             reason:
                                 "baseline pair margin is below the configured evaluability floor"
                                     .to_owned(),
@@ -275,6 +296,9 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                             passed: None,
                             observed_value: None,
                             threshold: None,
+                            candidate_a_absolute_score_drift: None,
+                            candidate_b_absolute_score_drift: None,
+                            maximum_absolute_score_drift: None,
                             reason:
                                 "baseline pair margin is below the configured evaluability floor"
                                     .to_owned(),
@@ -324,20 +348,31 @@ fn audit_panel(panel: &ProbePanelV1) -> Result<GroundingReport, String> {
                     }
                 }
                 "nuisance_transform" => {
-                    let tolerance = probe
+                    let margin_tolerance = probe
                         .maximum_margin_shift
-                        .expect("validated nuisance transform requires tolerance");
+                        .expect("validated nuisance transform requires margin tolerance");
+                    let score_tolerance = probe
+                        .maximum_score_drift
+                        .expect("validated nuisance transform requires score tolerance");
                     let shift = (baseline_margin - probe_margin).abs();
-                    let passed = shift <= tolerance;
+                    let candidate_a_drift = (case.baseline.score_a - probe.score_a).abs();
+                    let candidate_b_drift = (case.baseline.score_b - probe.score_b).abs();
+                    let maximum_score_drift = candidate_a_drift.max(candidate_b_drift);
+                    let passed = shift <= margin_tolerance && maximum_score_drift <= score_tolerance;
                     nuisance.add(passed, Some(shift), MetricKind::MarginShift);
-                    findings.push(finding(
+                    nuisance.add_maximum_absolute_score_drift(maximum_score_drift);
+                    let mut probe_finding = finding(
                         case,
                         probe,
                         passed,
-                        Some(shift),
-                        Some(tolerance),
-                        "absolute pair-margin drift",
-                    ));
+                        Some(maximum_score_drift),
+                        Some(score_tolerance),
+                        "both absolute candidate-score drift and pair-margin drift",
+                    );
+                    probe_finding.candidate_a_absolute_score_drift = Some(candidate_a_drift);
+                    probe_finding.candidate_b_absolute_score_drift = Some(candidate_b_drift);
+                    probe_finding.maximum_absolute_score_drift = Some(maximum_score_drift);
+                    findings.push(probe_finding);
                 }
                 "semantic_mismatch" => {
                     let expected_candidate = probe
@@ -506,6 +541,9 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
             require_same_text_context(case, probe)?;
             if probe.expected_candidate.is_some()
                 || probe.maximum_margin_shift.is_some()
+                || probe.maximum_score_drift.is_some()
+                || probe.maximum_score_drift.is_some()
+                || probe.maximum_score_drift.is_some()
                 || probe.minimum_score_drop.is_some()
             {
                 return Err(format!(
@@ -576,8 +614,16 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
                     probe.probe_id
                 )
             })?;
+            let score_tolerance = probe.maximum_score_drift.ok_or_else(|| {
+                format!(
+                    "nuisance probe {} needs maximum_score_drift",
+                    probe.probe_id
+                )
+            })?;
             if !tolerance.is_finite()
                 || tolerance < 0.0
+                || !score_tolerance.is_finite()
+                || score_tolerance < 0.0
                 || probe.minimum_score_drop.is_some()
                 || probe.expected_candidate.is_some()
             {
@@ -627,7 +673,11 @@ fn validate_probe_shape(case: &ProbeCaseV1, probe: &ProbeV1) -> Result<(), Strin
                     probe.probe_id
                 )
             })?;
-            if !minimum.is_finite() || minimum < 0.0 || probe.maximum_margin_shift.is_some() {
+            if !minimum.is_finite()
+                || minimum < 0.0
+                || probe.maximum_margin_shift.is_some()
+                || probe.maximum_score_drift.is_some()
+            {
                 return Err(format!(
                     "semantic-mismatch probe {} has invalid threshold/fields",
                     probe.probe_id
@@ -709,6 +759,9 @@ fn finding(
         passed: Some(passed),
         observed_value: observed,
         threshold,
+        candidate_a_absolute_score_drift: None,
+        candidate_b_absolute_score_drift: None,
+        maximum_absolute_score_drift: None,
         reason: reason.to_owned(),
     }
 }
@@ -857,6 +910,37 @@ mod tests {
         panel["cases"][0]["probes"][3]["score_b"] = serde_json::json!(3.0);
         let report = parse_and_audit(&panel.to_string()).expect("probe structure is valid");
         assert_eq!(report.nuisance_transform.pass_rate, Some(0.0));
+    }
+
+    #[test]
+    fn nuisance_transform_rejects_common_mode_score_shift_even_when_margin_is_unchanged() {
+        let mut panel = value();
+        panel["cases"][0]["probes"][3]["score_a"] = serde_json::json!(8.8);
+        panel["cases"][0]["probes"][3]["score_b"] = serde_json::json!(3.8);
+        let report = parse_and_audit(&panel.to_string()).expect("probe structure is valid");
+        assert_eq!(report.nuisance_transform.pass_rate, Some(0.0));
+        assert!((report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.8).abs() < 1e-9);
+        let nuisance_finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.kind == "nuisance_transform")
+            .expect("nuisance finding is present");
+        assert!((nuisance_finding.candidate_a_absolute_score_drift.unwrap() - 0.8).abs() < 1e-9);
+        assert!((nuisance_finding.candidate_b_absolute_score_drift.unwrap() - 0.8).abs() < 1e-9);
+        assert!((nuisance_finding.maximum_absolute_score_drift.unwrap() - 0.8).abs() < 1e-9);
+    }
+
+    #[test]
+    fn nuisance_transform_reports_both_candidate_drifts_separately() {
+        let report = report();
+        let nuisance_finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.kind == "nuisance_transform")
+            .expect("nuisance finding is present");
+        assert!((nuisance_finding.candidate_a_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
+        assert!((nuisance_finding.candidate_b_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
+        assert!((report.nuisance_transform.mean_maximum_absolute_score_drift.unwrap() - 0.05).abs() < 1e-9);
     }
 
     #[test]
