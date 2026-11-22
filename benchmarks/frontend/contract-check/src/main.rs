@@ -398,4 +398,38 @@ mod tests {
         assert_eq!(regions, 8);
         assert_eq!(assertions, 11);
     }
+
+    #[test]
+    fn task_validator_rejects_fixture_digest_tampering() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../task-oracle-v1.schema.json"
+        ))
+        .expect("checked-in task schema is valid JSON");
+        let task: Value = serde_json::from_str(include_str!(
+            "../../tasks/sfeb-l1-service-dashboard-v1.json"
+        ))
+        .expect("checked-in task is valid JSON");
+        let html = include_bytes!("../../fixtures/service-dashboard/reference.html");
+        let mut css = include_bytes!("../../fixtures/service-dashboard/style.css").to_vec();
+        css.push(b' ');
+
+        assert!(validate_task_instance(&schema, &task, html, &css).is_err());
+    }
+
+    #[test]
+    fn task_validator_rejects_uncontracted_regions() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../task-oracle-v1.schema.json"
+        ))
+        .expect("checked-in task schema is valid JSON");
+        let mut task: Value = serde_json::from_str(include_str!(
+            "../../tasks/sfeb-l1-service-dashboard-v1.json"
+        ))
+        .expect("checked-in task is valid JSON");
+        let html = include_bytes!("../../fixtures/service-dashboard/reference.html");
+        let css = include_bytes!("../../fixtures/service-dashboard/style.css");
+        task["required_regions"][0]["id"] = Value::String("missing.region".into());
+
+        assert!(validate_task_instance(&schema, &task, html, css).is_err());
+    }
 }
