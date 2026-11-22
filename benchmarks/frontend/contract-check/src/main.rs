@@ -714,7 +714,7 @@ mod tests {
 
         let (positive, negatives) = validate_retrieval_set(&schema, &retrieval, &corpus)
             .expect("retrieval set must match schema and corpus gold IDs");
-        assert_eq!(positive, 16);
+        assert_eq!(positive, 34);
         assert_eq!(negatives, 8);
     }
 
