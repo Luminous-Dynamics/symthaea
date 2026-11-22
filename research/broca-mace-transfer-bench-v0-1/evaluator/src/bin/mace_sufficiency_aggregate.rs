@@ -357,6 +357,64 @@ fn paired_cluster_deltas(
     Ok((utility_deltas, regret_deltas))
 }
 
+fn worst_family_paired_deltas(
+    treatment: &BTreeMap<u64, BTreeMap<String, PointMetrics>>,
+    baseline: &BTreeMap<u64, BTreeMap<String, PointMetrics>>,
+) -> Result<(String, f64, String, f64), String> {
+    if treatment.keys().copied().collect::<BTreeSet<_>>()
+        != baseline.keys().copied().collect::<BTreeSet<_>>()
+    {
+        return Err("worst-family contrast requires identical world-cluster sets".into());
+    }
+    let mut per_family: BTreeMap<String, (f64, f64, usize)> = BTreeMap::new();
+    for (cluster, treatment_families) in treatment {
+        let baseline_families = baseline
+            .get(cluster)
+            .ok_or_else(|| format!("no_memory family block missing for cluster {cluster}"))?;
+        if treatment_families.keys().collect::<BTreeSet<_>>()
+            != baseline_families.keys().collect::<BTreeSet<_>>()
+        {
+            return Err(format!("worst-family contrast has incomplete family coverage in cluster {cluster}"));
+        }
+        for (family, treatment_point) in treatment_families {
+            let baseline_point = baseline_families
+                .get(family)
+                .ok_or_else(|| format!("no_memory family {family} missing in cluster {cluster}"))?;
+            let entry = per_family.entry(family.clone()).or_insert((0.0, 0.0, 0));
+            entry.0 += treatment_point.utility - baseline_point.utility;
+            entry.1 += treatment_point.absolute_regret - baseline_point.absolute_regret;
+            entry.2 += 1;
+        }
+    }
+    let family_means: BTreeMap<String, (f64, f64)> = per_family
+        .into_iter()
+        .map(|(family, (utility_sum, regret_sum, count))| {
+            (family, (utility_sum / count as f64, regret_sum / count as f64))
+        })
+        .collect();
+    if family_means.is_empty() {
+        return Err("cannot compute worst-family contrasts over an empty family set".into());
+    }
+    let worst_regret = family_means
+        .iter()
+        .max_by(|(left_name, left), (right_name, right)| {
+            left.1.total_cmp(&right.1).then_with(|| right_name.cmp(left_name))
+        })
+        .ok_or("worst-family regret selection failed")?;
+    let worst_utility = family_means
+        .iter()
+        .min_by(|(left_name, left), (right_name, right)| {
+            left.0.total_cmp(&right.0).then_with(|| left_name.cmp(right_name))
+        })
+        .ok_or("worst-family utility selection failed")?;
+    Ok((
+        worst_regret.0.clone(),
+        worst_regret.1.1,
+        worst_utility.0.clone(),
+        worst_utility.1.0,
+    ))
+}
+
 fn dominates(left: ParetoCost, right: ParetoCost) -> bool {
     let no_worse = left.selected_bytes <= right.selected_bytes
         && left.index_bytes <= right.index_bytes
@@ -534,6 +592,11 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
     {
         let frontier = !(0..costs.len()).any(|other| other != index && dominates(costs[other], costs[index]));
         let baseline = arm.method == NO_MEMORY && arm.per_action_top_k.is_none();
+        let (worst_regret_family, worst_regret_delta, worst_utility_family, worst_utility_delta) =
+            worst_family_paired_deltas(
+                rows.get(arm).ok_or("treatment arm missing from source rows")?,
+                rows.get(&baseline_arm).ok_or("no_memory rows missing")?,
+            )?;
         output.push(json!({
             "schema_version": OUTPUT_SCHEMA,
             "record_type": "cluster_paired_frontier_summary",
@@ -565,6 +628,10 @@ fn reduce(input_path: &str, output_path: &str, seed: u64) -> Result<(), String> 
             "mean_index_and_selection_latency_ns": mean.measured_latency_ns,
             "mean_utility_delta_vs_no_memory": mean_utility_delta,
             "mean_regret_delta_vs_no_memory": mean_regret_delta,
+            "worst_family_regret_delta_vs_no_memory": worst_regret_delta,
+            "worst_family_regret_delta_family": worst_regret_family,
+            "worst_family_utility_delta_vs_no_memory": worst_utility_delta,
+            "worst_family_utility_delta_family": worst_utility_family,
             "utility_delta_vs_no_memory_cluster_bootstrap_95pct_ci": [utility_ci.0, utility_ci.1],
             "regret_delta_vs_no_memory_cluster_bootstrap_95pct_ci": [regret_ci.0, regret_ci.1],
             "paired_contrast_baseline": "no_memory",
@@ -670,6 +737,36 @@ mod tests {
             PointMetrics { utility: 0.8, absolute_regret: 0.2, ..PointMetrics::default() },
         )]);
         assert!(paired_cluster_deltas(&unmatched, &baseline).is_err());
+    }
+
+    #[test]
+    fn worst_family_paired_delta_does_not_hide_a_pooled_gain() {
+        let treatment = BTreeMap::from([
+            (1, BTreeMap::from([
+                ("safe".to_string(), metric(0.1, 0.9)),
+                ("failure".to_string(), metric(0.9, 0.1)),
+            ])),
+            (2, BTreeMap::from([
+                ("safe".to_string(), metric(0.2, 0.8)),
+                ("failure".to_string(), metric(1.0, 0.0)),
+            ])),
+        ]);
+        let baseline = BTreeMap::from([
+            (1, BTreeMap::from([
+                ("safe".to_string(), metric(0.5, 0.5)),
+                ("failure".to_string(), metric(0.5, 0.5)),
+            ])),
+            (2, BTreeMap::from([
+                ("safe".to_string(), metric(0.5, 0.5)),
+                ("failure".to_string(), metric(0.5, 0.5)),
+            ])),
+        ]);
+        let (regret_family, regret_delta, utility_family, utility_delta) =
+            worst_family_paired_deltas(&treatment, &baseline).unwrap();
+        assert_eq!(regret_family, "failure");
+        assert!((regret_delta - 0.45).abs() < 1e-12);
+        assert_eq!(utility_family, "failure");
+        assert!((utility_delta + 0.45).abs() < 1e-12);
     }
 
     #[test]
