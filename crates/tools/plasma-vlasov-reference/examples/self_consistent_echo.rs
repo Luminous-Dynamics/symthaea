@@ -139,6 +139,25 @@ fn low_velocity_f_strophy(spectrum: &JointPhaseSpaceSpectrum, cutoff: usize) -> 
         .sum()
 }
 
+fn integrate_quadratic_flux_triplet(
+    start_time: f64,
+    middle_time: f64,
+    end_time: f64,
+    start_rate: f64,
+    middle_rate: f64,
+    end_rate: f64,
+) -> f64 {
+    let first_interval = middle_time - start_time;
+    let second_interval = end_time - middle_time;
+    let span = first_interval + second_interval;
+    let start_weight = span * (2.0 * first_interval - second_interval)
+        / (6.0 * first_interval);
+    let middle_weight = span.powi(3) / (6.0 * first_interval * second_interval);
+    let end_weight = span * (2.0 * second_interval - first_interval)
+        / (6.0 * second_interval);
+    start_weight * start_rate + middle_weight * middle_rate + end_weight * end_rate
+}
+
 fn run_resolution(
     label: &str,
     config: VlasovPoissonConfig,
@@ -168,7 +187,12 @@ fn run_resolution(
     let mut pulse_cumulative_flux_v = 0.0;
     let mut control_cumulative_flux_x = 0.0;
     let mut control_cumulative_flux_v = 0.0;
-    let mut previous_flux_sample: Option<(f64, f64, f64, f64, f64)> = None;
+    // Composite three-point quadratic integration avoids the 1-2% bias
+    // observed with trapezoidal integration at 0.2-time-unit flux cadence.
+    // Rebase at the t2+ impulse boundary and integrate non-overlapping pairs.
+    type FluxSample = (f64, f64, f64, f64, f64);
+    let mut flux_pair_start: Option<FluxSample> = None;
+    let mut flux_pair_middle: Option<FluxSample> = None;
 
     let second_kick: Vec<f64> = (0..config.nx)
         .map(|ix| {
@@ -292,6 +316,14 @@ fn run_resolution(
             // The instantaneous impulse at t2 is a discontinuous intervention,
             // not a continuous Vlasov flux. Rebaseline both trajectories at t2+
             // so the integrated flux closes the smooth post-intervention leg.
+            let current_flux_sample = (
+                flux_time,
+                pulse_flux.flux_out_of_low_x_modes,
+                pulse_flux.flux_out_of_low_velocity_modes,
+                control_flux.flux_out_of_low_x_modes,
+                control_flux.flux_out_of_low_velocity_modes,
+            );
+
             if step == pulse_step {
                 pulse_flux_baseline_x = pulse_low_x;
                 pulse_flux_baseline_v = pulse_low_v;
@@ -301,35 +333,50 @@ fn run_resolution(
                 pulse_cumulative_flux_v = 0.0;
                 control_cumulative_flux_x = 0.0;
                 control_cumulative_flux_v = 0.0;
-            } else if let Some((
-                previous_time,
-                previous_pulse_x,
-                previous_pulse_v,
-                previous_control_x,
-                previous_control_v,
-            )) = previous_flux_sample
+                flux_pair_start = Some(current_flux_sample);
+                flux_pair_middle = None;
+            } else if let (Some(start), Some(middle)) =
+                (flux_pair_start, flux_pair_middle)
             {
-                let elapsed = flux_time - previous_time;
-                if elapsed > 0.0 {
-                    pulse_cumulative_flux_x +=
-                        0.5 * (previous_pulse_x + pulse_flux.flux_out_of_low_x_modes) * elapsed;
-                    pulse_cumulative_flux_v += 0.5
-                        * (previous_pulse_v + pulse_flux.flux_out_of_low_velocity_modes)
-                        * elapsed;
-                    control_cumulative_flux_x +=
-                        0.5 * (previous_control_x + control_flux.flux_out_of_low_x_modes) * elapsed;
-                    control_cumulative_flux_v += 0.5
-                        * (previous_control_v + control_flux.flux_out_of_low_velocity_modes)
-                        * elapsed;
-                }
+                pulse_cumulative_flux_x += integrate_quadratic_flux_triplet(
+                    start.0,
+                    middle.0,
+                    flux_time,
+                    start.1,
+                    middle.1,
+                    pulse_flux.flux_out_of_low_x_modes,
+                );
+                pulse_cumulative_flux_v += integrate_quadratic_flux_triplet(
+                    start.0,
+                    middle.0,
+                    flux_time,
+                    start.2,
+                    middle.2,
+                    pulse_flux.flux_out_of_low_velocity_modes,
+                );
+                control_cumulative_flux_x += integrate_quadratic_flux_triplet(
+                    start.0,
+                    middle.0,
+                    flux_time,
+                    start.3,
+                    middle.3,
+                    control_flux.flux_out_of_low_x_modes,
+                );
+                control_cumulative_flux_v += integrate_quadratic_flux_triplet(
+                    start.0,
+                    middle.0,
+                    flux_time,
+                    start.4,
+                    middle.4,
+                    control_flux.flux_out_of_low_velocity_modes,
+                );
+                flux_pair_start = Some(current_flux_sample);
+                flux_pair_middle = None;
+            } else if flux_pair_start.is_some() {
+                flux_pair_middle = Some(current_flux_sample);
+            } else {
+                flux_pair_start = Some(current_flux_sample);
             }
-            previous_flux_sample = Some((
-                flux_time,
-                pulse_flux.flux_out_of_low_x_modes,
-                pulse_flux.flux_out_of_low_velocity_modes,
-                control_flux.flux_out_of_low_x_modes,
-                control_flux.flux_out_of_low_velocity_modes,
-            ));
             let pulse_direct_loss_x = pulse_flux_baseline_x - pulse_low_x;
             let pulse_direct_loss_v = pulse_flux_baseline_v - pulse_low_v;
             let control_direct_loss_x = control_flux_baseline_x - control_low_x;
