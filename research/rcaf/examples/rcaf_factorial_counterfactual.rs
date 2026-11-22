@@ -1,6 +1,9 @@
 use cetb_rcaf::factorial_counterfactual::{
     run_factorial_counterfactual_experiment, FactorialExperimentMetadata,
 };
+use cetb_rcaf::motion_transient::{
+    generate_motion_transient_field, LocalizedMotionEvent, MotionEvent, MotionTransientConfig,
+};
 use cetb_rcaf::spatial_calibration::calibrate_spatial_nuisance_to_component_fraction;
 use cetb_rcaf::spatial_nuisance::{
     generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig,
@@ -138,6 +141,36 @@ fn main() -> Result<(), Box<dyn Error>> {
         None,
     )?;
 
+    let transient_config = MotionTransientConfig {
+        time_points,
+        dose: 0.25,
+        broad_loading: 0.15,
+        localized_loading: 0.85,
+        spatial_decay_length: 2.0,
+        broad_events: vec![MotionEvent {
+            onset: 24,
+            amplitude: 1.0,
+            decay_samples: 5.0,
+        }],
+        localized_events: vec![LocalizedMotionEvent {
+            event: MotionEvent {
+                onset: 57,
+                amplitude: -0.6,
+                decay_samples: 6.0,
+            },
+            seed_roi_index: 5,
+        }],
+    };
+    let transient_field = generate_motion_transient_field(&graph, &transient_config)?;
+    let motion_transient = run_family(
+        "motion_transient",
+        "transient-onset-24-57-seed-roi-05",
+        &clean,
+        &signal,
+        &transient_field.values,
+        None,
+    )?;
+
     let report = format!(
         concat!(
             "{{\n",
@@ -145,13 +178,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             "  \"source_status\": \"synthetic_fixture\",\n",
             "  \"time_points\": {},\n",
             "  \"roi_count\": {},\n",
-            "  \"experiment_count\": 3,\n",
+            "  \"experiment_count\": 4,\n",
             "  \"nuisance_families\": [\n",
             "    \"common_mode\",\n",
             "    \"graph_smooth_low_rank\",\n",
-            "    \"heat_kernel_localized\"\n",
+            "    \"heat_kernel_localized\",\n",
+            "    \"motion_transient\"\n",
             "  ],\n",
-            "  \"experiments\": [\n{},\n{},\n{}\n  ],\n",
+            "  \"experiments\": [\n{},\n{},\n{},\n{}\n  ],\n",
             "  \"claim_limits\": [\n",
             "    \"synthetic matched counterfactuals only; no empirical neuroimaging data analysed\",\n",
             "    \"all cells in an experiment reuse the same exact target and nuisance component matrices\",\n",
@@ -166,6 +200,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         indent_json(&common_mode),
         indent_json(&graph_smooth),
         indent_json(&heat_kernel),
+        indent_json(&motion_transient),
     );
 
     if let Some(path) = std::env::args_os().nth(1) {
