@@ -79,6 +79,9 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
         if !value.is_finite() {
             return Err(E::custom("non-finite number is not valid I-JSON"));
         }
+        if value.fract() == 0.0 && value.abs() > MAX_SAFE_INTEGER as f64 {
+            return Err(E::custom("integral floating-point value exceeds the RFC 8785 safe range; encode it as a string"));
+        }
         let number = serde_json::Number::from_f64(value)
             .ok_or_else(|| E::custom("number cannot be represented as JSON"))?;
         Ok(StrictValue(Value::Number(number)))
@@ -437,6 +440,12 @@ mod tests {
     #[test]
     fn rejects_integers_outside_the_jcs_safe_range() {
         let result = parse_strict_json_line(b"9007199254740992", 1);
+        assert!(result.unwrap_err().contains("safe range"));
+    }
+
+    #[test]
+    fn rejects_large_integral_floats_outside_the_jcs_safe_range() {
+        let result = parse_strict_json_line(b"9.007199254740992e15", 1);
         assert!(result.unwrap_err().contains("safe range"));
     }
 

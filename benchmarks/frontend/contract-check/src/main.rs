@@ -2067,4 +2067,32 @@ mod tests {
         assert!(validate_mutation_campaign(&schema, &campaign).is_err());
     }
 
+
+    #[test]
+    fn external_comparator_ledger_matches_its_schema() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../external-comparator-ledger-v1.schema.json"
+        )).expect("external comparator schema JSON");
+        let ledger: Value = serde_json::from_str(include_str!(
+            "../../external-comparator-ledger-v1.json"
+        )).expect("external comparator ledger JSON");
+        let validator = validator_for(&schema).expect("external comparator schema compiles");
+        let errors: Vec<String> = validator.iter_errors(&ledger)
+            .map(|error| format!("{}: {error}", error.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "external comparator ledger errors: {errors:?}");
+    }
+
+    #[test]
+    fn oracle_verification_predicate_schema_compiles() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../attestation/sfeb-oracle-verification-predicate-v1.schema.json"
+        )).expect("oracle verification schema JSON");
+        validator_for(&schema).expect("oracle verification schema compiles");
+        assert_eq!(
+            schema["properties"]["predicateType"]["const"],
+            "https://luminousdynamics.io/attestations/sfeb-oracle-verification/v1"
+        );
+    }
+
 }
