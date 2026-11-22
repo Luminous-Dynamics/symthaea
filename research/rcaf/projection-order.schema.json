@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rcaf/projection-order.schema.json",
+  "title": "RCAF preprocessing projection-order report",
+  "description": "Synthetic projection-order reference result only; not an empirical preprocessing qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_status",
+    "time_points",
+    "signal_columns",
+    "nuisance_design_columns",
+    "filter_design_columns",
+    "nuisance_design_rank",
+    "filter_design_rank",
+    "joint_design_rank",
+    "dependent_columns_dropped",
+    "projection_operator_commutator_ratio",
+    "nuisance_then_filter_nuisance_leakage",
+    "filter_then_nuisance_nuisance_leakage",
+    "nuisance_then_filter_filter_leakage",
+    "filter_then_nuisance_filter_leakage",
+    "joint_nuisance_leakage",
+    "joint_filter_leakage",
+    "order_difference_ratio",
+    "nuisance_then_filter_vs_joint_ratio",
+    "filter_then_nuisance_vs_joint_ratio",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rcaf.projection-order/0.1.0"
+    },
+    "source_status": {
+      "const": "synthetic_projection_fixture"
+    },
+    "time_points": {
+      "const": 4
+    },
+    "signal_columns": {
+      "const": 2
+    },
+    "nuisance_design_columns": {
+      "const": 1
+    },
+    "filter_design_columns": {
+      "const": 1
+    },
+    "nuisance_design_rank": {
+      "const": 1
+    },
+    "filter_design_rank": {
+      "const": 1
+    },
+    "joint_design_rank": {
+      "const": 2
+    },
+    "dependent_columns_dropped": {
+      "const": 0
+    },
+    "projection_operator_commutator_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "nuisance_then_filter_nuisance_leakage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "filter_then_nuisance_nuisance_leakage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nuisance_then_filter_filter_leakage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "filter_then_nuisance_filter_leakage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "joint_nuisance_leakage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "joint_filter_leakage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "order_difference_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "nuisance_then_filter_vs_joint_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "filter_then_nuisance_vs_joint_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "claim_limits": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
