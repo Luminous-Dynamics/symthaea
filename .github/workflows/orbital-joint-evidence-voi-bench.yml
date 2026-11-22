@@ -172,7 +172,7 @@ jobs:
             .scenarios[2].adaptive_campaign.policy.branches.VALID.branches.PASS.branches.INDICATION.decision == "REJECT" and
             ((.scenarios[2].adaptive_campaign.expected_resources.engineering_hours - 1.25) | fabs) < 0.000000001 and
             ((.scenarios[2].adaptive_campaign.expected_resources.facility_hours - 1.215) | fabs) < 0.000000001 and
-            ((.scenarios[2].adaptive_campaign.expected_resources.specimen_count - 0.95) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_campaign.expected_resources.specimen_count - 1.75) | fabs) < 0.000000001 and
             ((.scenarios[2].adaptive_campaign.expected_resources.review_hours - 0.235) | fabs) < 0.000000001 and
             ((.scenarios[2].adaptive_campaign.expected_resources.external_cost_units - 0.5275) | fabs) < 0.000000001
           ' /tmp/sequential-campaign-a.json
@@ -209,7 +209,7 @@ jobs:
             .scenarios[2].adaptive_policy.branches.VALID.branches.PASS.branches.INDICATION.decision == "REJECT" and
             ((.scenarios[2].adaptive_expected_resources.engineering_hours - 1.25) | fabs) < 0.000000001 and
             ((.scenarios[2].adaptive_expected_resources.facility_hours - 1.215) | fabs) < 0.000000001 and
-            ((.scenarios[2].adaptive_expected_resources.specimen_count - 0.95) | fabs) < 0.000000001 and
+            ((.scenarios[2].adaptive_expected_resources.specimen_count - 1.75) | fabs) < 0.000000001 and
             ((.scenarios[2].adaptive_expected_resources.review_hours - 0.235) | fabs) < 0.000000001 and
             ((.scenarios[2].adaptive_expected_resources.external_cost_units - 0.5275) | fabs) < 0.000000001
           ' /tmp/sequential-campaign-oracle.json
