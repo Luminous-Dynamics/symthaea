@@ -62,6 +62,12 @@
       "severity": "high",
       "change": "Restore page but reset other fields.",
       "expected_detection": "Deep link state restore fails."
+    },
+    {
+      "id": "MUT-RESPONSIVE-011",
+      "severity": "high",
+      "change": "Remove width:100%;min-width:0 from the reference and candidate filter input/select rules.",
+      "expected_detection": "Continuous viewport sweep detects document-level horizontal overflow or a filter control extending beyond the viewport; the baseline must remain clean at every integer width from 320px through 1440px."
     }
   ],
   "positive_controls": [
