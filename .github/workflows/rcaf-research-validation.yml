@@ -279,6 +279,34 @@ jobs:
           print("PASS: RCAF graph-smooth and heat-kernel spatial nuisance generators")
           PY
 
+      - name: Run spatial nuisance variance-fraction calibration
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_variance_calibration -- "$RUNNER_TEMP/rcaf-spatial-variance-calibration.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/spatial-variance-calibration.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-spatial-variance-calibration.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["source_status"] == "synthetic_fixture"
+          assert report["target_component_variance_fraction"] == 0.10
+          assert {item["family_id"] for item in report["families"]} == {
+              "graph_smooth_low_rank",
+              "heat_kernel_localized",
+          }
+          for item in report["families"]:
+              assert abs(item["realized_component_variance_fraction"] - 0.10) <= 1e-12
+              assert item["clean_component_variance"] > 0.0
+              assert item["nuisance_component_variance"] > 0.0
+              assert item["combined_observed_variance"] >= 0.0
+              assert item["applied_scale_multiplier"] > 0.0
+          print("PASS: RCAF spatial nuisance variance-fraction calibration and covariance report")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -290,7 +318,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
               "$RUNNER_TEMP/rcaf-estimator-dose-surface.json" \
               "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json" \
-              "$RUNNER_TEMP/rcaf-spatial-nuisance.json"
+              "$RUNNER_TEMP/rcaf-spatial-nuisance.json" \
+              "$RUNNER_TEMP/rcaf-spatial-variance-calibration.json"
           python - <<'PY'
           import json
           import os
@@ -305,7 +334,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 6
+          assert len(receipt["simulation_reports"]) == 7
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -321,6 +350,7 @@ jobs:
             ${{ runner.temp }}/rcaf-estimator-dose-surface.json
             ${{ runner.temp }}/rcaf-common-mode-nuisance-sweep.json
             ${{ runner.temp }}/rcaf-spatial-nuisance.json
+            ${{ runner.temp }}/rcaf-spatial-variance-calibration.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
