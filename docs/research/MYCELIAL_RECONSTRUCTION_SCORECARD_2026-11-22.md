@@ -40,9 +40,15 @@ The validator rejects invalid digests, duplicate IDs, missing endpoints, self-se
 
 ### Explicit identity matching
 
-The score function takes a named matching-policy ID and a one-to-one mapping from predicted junction IDs to ground-truth IDs.
+The score function takes a named matching-policy ID and a one-to-one mapping from predicted junction IDs to ground-truth IDs. The metric does not silently choose its own matching rule.
 
-It deliberately does **not** hide a nearest-neighbour or assignment method inside the metric. A caller can supply annotation-ID matching, Hungarian assignment, an image-derived tracking correspondence, or another versioned approach. Every supplied match must satisfy a configured coordinate-distance tolerance. The matching policy and complete mapping are retained in the receipt.
+A bounded Hungarian matcher is implemented as an explicit option:
+
+`match_junctions_hungarian(ground_truth, prediction, maximum_distance)`
+
+It sorts IDs before assignment, allows only pairs within the declared localization radius, and uses a lexicographic objective: **maximize admissible match cardinality first, then minimize total Euclidean localization error**. Its unmatched penalty dominates the maximum possible aggregate distance change, so a higher-cardinality assignment cannot lose to a lower-cardinality but shorter-distance assignment. The implementation is capped at 128 junctions per graph (at most a 256×256 padded assignment matrix). Larger graphs require a separately qualified sparse or spatially partitioned matcher.
+
+The matching-policy ID remains explicit in the score receipt, for example `hungarian-max-cardinality-min-distance-v1`. Annotation-ID matching, Hungarian assignment, image-tracked correspondence or another versioned policy can therefore be compared. Every supplied match must satisfy the configured coordinate-distance tolerance. The complete mapping and matching thresholds are retained in the receipt.
 
 This is important because correspondence errors can dominate apparent segmentation quality. Matching method, tolerance and split policy must be identical when comparing approaches.
 
@@ -80,7 +86,7 @@ The evaluator validates one-to-one matching, score count invariants, class-count
 ## 4. What is not implemented
 
 - Image segmentation or z-stack reconstruction itself.
-- Automatic 2D/3D junction matching; the matching algorithm is an explicit input.
+- Automatic matching beyond the bounded 128-junction Hungarian policy; larger graphs need a separately qualified sparse/partitioned matcher.
 - Annotation tooling or inter-annotator agreement analysis.
 - Physical coordinate calibration from microscope metadata.
 - Confidence intervals over independent biological replicates.
@@ -88,6 +94,14 @@ The evaluator validates one-to-one matching, score count invariants, class-count
 - Transport/flow or conductance measurement.
 
 This scorecard tests graph annotations after a matching step. It is not yet an end-to-end image-to-graph benchmark and no microscopy data have been run through it.
+
+The deterministic CLI example `mycelial_reconstruction_bench.rs` exercises a clean synthetic reconstruction and a deliberately injected false-fusion negative control. Run it with:
+
+```bash
+cargo run -p symthaea-canvas --example mycelial_reconstruction_bench -- 100
+```
+
+The example reports score receipts and matching/scoring P50/P95 latency. Its synthetic coordinates and declared micrometre unit are test fixtures, not biological measurements.
 
 ## 5. Proposed targets (not achieved)
 
