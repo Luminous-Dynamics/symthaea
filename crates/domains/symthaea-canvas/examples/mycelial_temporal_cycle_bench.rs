@@ -45,6 +45,7 @@ fn snapshot(
         snapshot_id: id.to_string(),
         window_start_ns: start_ns,
         window_end_ns: end_ns,
+        observation_scope_id: "synthetic-whole-domain-v1".to_string(),
         source_observation_digest: "a".repeat(64),
         coverage,
         node_ids: vec!["A".to_string(), "B".to_string(), "C".to_string()],
