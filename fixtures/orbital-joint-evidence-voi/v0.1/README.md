@@ -54,21 +54,21 @@ The weights are synthetic and used only to calculate expected cost; the terminal
 
 ## AER-01 inspection and structural evidence campaign (SEQ-003)
 
-The third sequential scenario is an explicitly synthetic, article-bound AER-01 workflow with four latent states: healthy, delamination, joint-retention defect and common-cause instrument drift. All actions share the same physical-unit reference, configuration and ICD revision.
+The third sequential scenario is an explicitly synthetic, article-bound AER-01 workflow with four latent states: healthy, delamination, joint-retention defect and common-cause instrument drift. All actions bind to the same coupon-set physical-unit reference, configuration and ICD revision; the load and NDE actions consume separate specimens from that set.
 
 The exact finite-horizon policy is:
 
 1. Run an independent calibration-chain audit. If invalid, stop at **HOLD**; downstream readings are not trusted.
-2. If valid, run a non-destructive combined-load proof screen on the identified coupon. A **FAIL** creates an outcome-specific rejection basis and stops at **REJECT**.
-3. If the load screen **PASSES**, run fixed-target ultrasonic inspection on the same coupon. **CLEAR** completes the calibration, load and NDE obligations required for **ACCEPT**; an **INDICATION** creates a rejection basis and leads to **REJECT**.
+2. If valid, run a non-destructive combined-load proof screen on the load coupon. A **FAIL** creates an outcome-specific rejection basis and stops at **REJECT**.
+3. If the load screen **PASSES**, run fixed-target ultrasonic inspection on the separate NDE coupon. **CLEAR** completes the calibration, load and NDE obligations required for **ACCEPT**; an **INDICATION** creates a rejection basis and leads to **REJECT**.
 
-No single test improves the baseline worst-case regret: HOLD and the myopic one-step stop rule both have regret 2. The full fixed campaign and the adaptive three-step policy both reach regret 0. The adaptive policy stops early on invalid calibration or a load failure and does not count the same physical coupon twice when the NDE is performed on the already-counted article.
+No single test improves the baseline worst-case regret: HOLD and the myopic one-step stop rule both have regret 2. The full fixed campaign and the adaptive three-step policy both reach regret 0. The adaptive policy stops early on invalid calibration or a load failure and avoids the NDE specimen cost when the earlier calibration or load result already determines the disposition.
 
 | Resource | Fixed campaign | Adaptive policy | Expected reduction |
 |---|---:|---:|---:|
 | Engineering hours | 1.40 | 1.25 | 10.7% |
 | Facility hours | 1.40 | 1.215 | 13.2% |
-| Specimen count | 1.00 | 0.95 | 5.0% |
+| Specimen count | 2.00 | 1.75 | 12.5% |
 | Review hours | 0.270 | 0.235 | 13.0% |
 | External cost units | 0.600 | 0.5275 | 12.1% |
 
@@ -91,7 +91,7 @@ The scenario catalogue separates:
 - pre-registered test obligations from general information gain;
 - planned actions from actual execution outcomes.
 
-The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. Rust also deserializes the strict proposal/outcome examples: an attempted outcome requires actual cost and external execution authority, while a proposal is permanently non-actuating and carries no authority. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. Proposal and outcome records are also validated as a pair: the outcome binds the proposal ID, revision, exact proposal-byte SHA-256 and four-part decision context. An outcome cannot be replayed against a different serial/configuration or altered method/resource proposal; an aborted/non-successful result cannot be promoted to `VERIFIED_WITHIN_SCOPE`. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The sequential evaluator tests two exact finite-horizon frequency variants against fixed and myopic baselines; a broad multi-step matched-budget tournament remains unimplemented. No solver or physical test is called.
+The Rust preflight and Python oracle audit the scenario catalogue's admissibility, component-wise resource budgets, exact claim and article/configuration/ICD context matching, owner-native change-frontier completeness, targeted requalification coverage and dependency overlap, critical-obligation coverage, robust regret and the explicit EVSI known answer. Rust also deserializes the strict proposal/outcome examples: an attempted outcome requires actual cost and external execution authority, while a proposal is permanently non-actuating and carries no authority. They now retain actual resource totals for attempted actions, distinguish planned estimates from actual consumption, and flag action-level and aggregate budget overruns. An execution state without an actual-cost record (or actual cost without an execution state) is rejected; actual overruns are recorded, not discarded. Proposal and outcome records are also validated as a pair: the outcome binds the proposal ID, revision, exact proposal-byte SHA-256 and four-part decision context. An outcome cannot be replayed against a different serial/configuration or altered method/resource proposal; an aborted/non-successful result cannot be promoted to `VERIFIED_WITHIN_SCOPE`. The audit now selects the highest decision-value eligible action under hard gates. Equal-value options are resolved only by resource-vector Pareto dominance; incomparable resource plans return `HUMAN_REVIEW_REQUIRED_RESOURCE_PARETO_TIE` for human review rather than a fabricated scalar cost score. The sequential evaluator tests two frequency variants of the original joint campaign and one AER-01 calibration/load/NDE campaign against fixed and myopic baselines; a broad multi-step held-out matched-budget tournament remains unimplemented. No solver or physical test is called.
 
 
 ## Finite-horizon sequential campaign proof-of-concept
