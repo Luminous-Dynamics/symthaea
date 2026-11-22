@@ -1,4 +1,4 @@
-use crate::{canonical_token, hash_field, validate_digest, ManufacturingContractError};
+use crate::{ManufacturingContractError, canonical_token, hash_field, validate_digest};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use symthaea_manufacturing_process::ProcessDefinitionId;
@@ -128,22 +128,13 @@ pub struct RecipeCommitmentV1 {
 impl RecipeCommitmentV1 {
     pub fn validate(&self) -> Result<(), ManufacturingContractError> {
         validate_digest("recipe_commitment.recipe_id", &self.recipe_id)?;
-        validate_digest(
-            "recipe_commitment.content_blake3",
-            &self.content_blake3,
-        )?;
+        validate_digest("recipe_commitment.content_blake3", &self.content_blake3)?;
         canonical_token(
             "recipe_commitment.schema_profile_id",
             &self.schema_profile_id,
         )?;
-        canonical_token(
-            "recipe_commitment.owner_issuer_id",
-            &self.owner_issuer_id,
-        )?;
-        canonical_token(
-            "recipe_commitment.semantic_version",
-            &self.semantic_version,
-        )?;
+        canonical_token("recipe_commitment.owner_issuer_id", &self.owner_issuer_id)?;
+        canonical_token("recipe_commitment.semantic_version", &self.semantic_version)?;
         match &self.disclosure {
             RecipeDisclosureV1::PublicInline | RecipeDisclosureV1::CommitmentOnly => {}
             RecipeDisclosureV1::PrivateEncryptedRef => {
@@ -171,10 +162,7 @@ impl RecipeCommitmentV1 {
     }
 }
 
-fn validate_unique(
-    field: &'static str,
-    refs: &[String],
-) -> Result<(), ManufacturingContractError> {
+fn validate_unique(field: &'static str, refs: &[String]) -> Result<(), ManufacturingContractError> {
     let mut seen = BTreeSet::new();
     for value in refs {
         canonical_token(field, value)?;
