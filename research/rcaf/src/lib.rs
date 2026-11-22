@@ -7,6 +7,7 @@
 
 pub mod simulation;
 pub mod spatial_nuisance;
+pub mod observational_identifiability;
 
 use std::fmt;
 
