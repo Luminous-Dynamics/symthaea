@@ -580,11 +580,164 @@ fn run_retrieval(
     Ok(())
 }
 
+const DEFAULT_MUTATION_SCHEMA: &str =
+    "benchmarks/frontend/qualification/mutation-campaign-v1.schema.json";
+const DEFAULT_MUTATION_CAMPAIGN: &str =
+    "benchmarks/frontend/qualification/mutation-campaign-v1.json";
+
+/// Validate the qualification plan itself. This does not execute mutants.
+fn validate_mutation_campaign(
+    schema: &Value,
+    campaign: &Value,
+) -> Result<(usize, usize, usize), String> {
+    let validator = validator_for(schema)
+        .map_err(|error| format!("invalid mutation campaign schema: {error}"))?;
+    let errors: Vec<String> = validator
+        .iter_errors(campaign)
+        .map(|error| format!("{}: {error}", error.instance_path()))
+        .collect();
+    if !errors.is_empty() {
+        return Err(format!(
+            "mutation campaign does not satisfy its schema:\n{}",
+            errors.join("\n")
+        ));
+    }
+
+    let mutations = campaign
+        .get("mutations")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "campaign.mutations must be an array".to_string())?;
+    let positives = campaign
+        .get("positive_controls")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "campaign.positive_controls must be an array".to_string())?;
+    let relations = campaign
+        .get("metamorphic_relations")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "campaign.metamorphic_relations must be an array".to_string())?;
+
+    if mutations.len() < 20 || positives.len() < 5 || relations.len() < 5 {
+        return Err(format!(
+            "qualification campaign is incomplete: mutations={}, positive_controls={}, metamorphic_relations={}",
+            mutations.len(),
+            positives.len(),
+            relations.len()
+        ));
+    }
+
+    let mut mutation_ids = BTreeSet::new();
+    let mut critical_mutations = 0usize;
+    let mut security_mutations = 0usize;
+    let mut evidence_mutations = 0usize;
+    for mutation in mutations {
+        let id = mutation
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "every mutation requires an id".to_string())?;
+        if !mutation_ids.insert(id.to_string()) {
+            return Err(format!("duplicate mutation id: {id}"));
+        }
+        if mutation.get("expected_disposition").and_then(Value::as_str) != Some("reject") {
+            return Err(format!("mutation {id} must expect rejection"));
+        }
+        let category = mutation
+            .get("category")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("mutation {id} is missing category"))?;
+        let severity = mutation
+            .get("severity")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("mutation {id} is missing severity"))?;
+        if severity == "critical" {
+            critical_mutations += 1;
+        }
+        if category == "security" {
+            security_mutations += 1;
+        }
+        if category == "evidence_integrity" {
+            evidence_mutations += 1;
+        }
+    }
+
+    let mut positive_ids = BTreeSet::new();
+    for control in positives {
+        let id = control
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "every positive control requires an id".to_string())?;
+        if !positive_ids.insert(id.to_string()) {
+            return Err(format!("duplicate positive-control id: {id}"));
+        }
+        if control.get("expected_disposition").and_then(Value::as_str) != Some("accept") {
+            return Err(format!("positive control {id} must expect acceptance"));
+        }
+    }
+
+    let mut relation_ids = BTreeSet::new();
+    for relation in relations {
+        let id = relation
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "every metamorphic relation requires an id".to_string())?;
+        if !relation_ids.insert(id.to_string()) {
+            return Err(format!("duplicate metamorphic-relation id: {id}"));
+        }
+    }
+
+    let targets = campaign
+        .get("acceptance_targets")
+        .ok_or_else(|| "campaign.acceptance_targets is required".to_string())?;
+    for key in [
+        "critical_mutation_kill_rate_min",
+        "security_mutation_kill_rate_min",
+        "evidence_integrity_mutation_kill_rate_min",
+    ] {
+        let value = targets
+            .get(key)
+            .and_then(Value::as_f64)
+            .ok_or_else(|| format!("acceptance target {key} must be numeric"))?;
+        if (value - 1.0).abs() > f64::EPSILON {
+            return Err(format!("{key} must remain a hard 100% gate"));
+        }
+    }
+
+    if critical_mutations == 0 || security_mutations == 0 || evidence_mutations == 0 {
+        return Err(
+            "qualification campaign must include critical, security and evidence-integrity mutants"
+                .to_string(),
+        );
+    }
+
+    Ok((mutations.len(), positives.len(), relations.len()))
+}
+
+fn run_mutations(schema_path: &str, campaign_path: &str) -> Result<(), String> {
+    let schema = read_json(schema_path)?;
+    let campaign = read_json(campaign_path)?;
+    let (mutations, positives, relations) =
+        validate_mutation_campaign(&schema, &campaign)?;
+    let campaign_id = campaign
+        .get("campaign_id")
+        .and_then(Value::as_str)
+        .unwrap_or("<unnamed>");
+    let status = campaign
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("<unknown>");
+
+    println!(
+        "SFEB qualification plan valid: {campaign_id} (mutations={mutations}, positive_controls={positives}, metamorphic_relations={relations}, status={status})"
+    );
+    println!("Critical, security and evidence-integrity kill-rate targets remain hard 100% gates.");
+    println!("Note: this validates the campaign definition only; it does not execute mutants or qualify the browser oracles.");
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus."
+            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus. --mutations validates the oracle-qualification campaign definition only; it does not execute the campaign."
         );
         return Ok(());
     }
@@ -615,6 +768,15 @@ fn run() -> Result<(), String> {
             args.get(1).map(String::as_str).unwrap_or(DEFAULT_RETRIEVAL_SCHEMA),
             args.get(2).map(String::as_str).unwrap_or(DEFAULT_RETRIEVAL_SET),
             args.get(3).map(String::as_str).unwrap_or(DEFAULT_RETRIEVAL_CORPUS),
+        );
+    }
+    if args.first().is_some_and(|arg| arg == "--mutations") {
+        if args.len() > 3 {
+            return Err("--mutations accepts at most a schema path and campaign path".to_string());
+        }
+        return run_mutations(
+            args.get(1).map(String::as_str).unwrap_or(DEFAULT_MUTATION_SCHEMA),
+            args.get(2).map(String::as_str).unwrap_or(DEFAULT_MUTATION_CAMPAIGN),
         );
     }
     if args.len() > 3 {
@@ -861,4 +1023,54 @@ mod tests {
 
         assert!(validate_task_instance(&schema, &task, html, css).is_err());
     }
+    #[test]
+    fn checked_in_mutation_campaign_matches_schema_and_qualification_gates() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.schema.json"
+        ))
+        .expect("checked-in mutation campaign schema is valid JSON");
+        let campaign: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.json"
+        ))
+        .expect("checked-in mutation campaign is valid JSON");
+
+        let (mutations, positives, relations) =
+            validate_mutation_campaign(&schema, &campaign)
+                .expect("mutation campaign must satisfy its schema and fail-closed gates");
+        assert_eq!(mutations, 20);
+        assert_eq!(positives, 5);
+        assert_eq!(relations, 5);
+    }
+
+    #[test]
+    fn mutation_campaign_rejects_duplicate_mutation_ids() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.schema.json"
+        ))
+        .expect("checked-in mutation campaign schema is valid JSON");
+        let mut campaign: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.json"
+        ))
+        .expect("checked-in mutation campaign is valid JSON");
+        campaign["mutations"][1]["id"] = campaign["mutations"][0]["id"].clone();
+
+        assert!(validate_mutation_campaign(&schema, &campaign).is_err());
+    }
+
+    #[test]
+    fn mutation_campaign_cannot_lower_critical_hard_gates() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.schema.json"
+        ))
+        .expect("checked-in mutation campaign schema is valid JSON");
+        let mut campaign: Value = serde_json::from_str(include_str!(
+            "../../qualification/mutation-campaign-v1.json"
+        ))
+        .expect("checked-in mutation campaign is valid JSON");
+        campaign["acceptance_targets"]["security_mutation_kill_rate_min"] =
+            Value::from(0.99);
+
+        assert!(validate_mutation_campaign(&schema, &campaign).is_err());
+    }
+
 }
