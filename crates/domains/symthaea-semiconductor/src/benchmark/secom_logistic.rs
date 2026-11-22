@@ -766,6 +766,12 @@ mod tests {
         assert!(report.models.contains_key("B5-balanced"));
         assert!(report.models.contains_key("B6"));
         assert!(report.models.contains_key("B6-balanced"));
+        assert_eq!(report.models["B5"].config.l1, 0.0);
+        assert_eq!(report.models["B6"].config.l1, FTRL_L1_SPARSE);
+        assert_eq!(
+            report.models["B6-balanced"].config.l1,
+            FTRL_L1_SPARSE
+        );
         for model in report.models.values() {
             for split in ["validation", "test"] {
                 assert_eq!(model.held_out[split].rows, 2);
@@ -785,7 +791,7 @@ mod tests {
             .replace("1 \"19/07/2008 12:20:00\"", "-1 \"19/07/2008 12:20:00\"");
         let original = evaluate(FEATURES, LABELS);
         let modified = evaluate(FEATURES, changed.as_bytes());
-        for key in ["B5", "B5-balanced"] {
+        for key in ["B5", "B5-balanced", "B6", "B6-balanced"] {
             assert_eq!(
                 original.models[key].model_sha256,
                 modified.models[key].model_sha256
