@@ -155,3 +155,104 @@ jobs:
             .held_out.validation.missingness_only_metrics.ranking_metrics.auroc == 1.0 and
             .held_out.test.missingness_only_metrics.ranking_metrics.auroc == 1.0
           ' /tmp/semi-rust-secom-missingness.json > /dev/null
+
+      - name: Run Rust SECOM observation drift report on synthetic known answer
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-observation-drift -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-features-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-labels-v1.data \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-expectations-v1.json \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/secom-missingness-mini-split-v1.json \
+            > /tmp/semi-rust-secom-observation-drift.json
+          jq -e '
+            .schema == "luminous.semi-bench.secom-observation-drift-report.v1" and
+            .training_profile.rows == 4 and
+            .held_out_profiles.validation.rows == 2 and
+            .held_out_profiles.test.rows == 2 and
+            .drift_vs_training.validation.mean_feature_js_divergence_bits == 0 and
+            .drift_vs_training.test.mean_feature_js_divergence_bits == 0 and
+            .drift_vs_training.validation.row_missing_count_js_divergence_bits == 0 and
+            .drift_vs_training.test.row_missing_count_js_divergence_bits == 0 and
+            .claim_limits.drift_does_not_use_labels == true
+          ' /tmp/semi-rust-secom-observation-drift.json > /dev/null
+
+      - name: Acquire pinned SECOM mirror and verify raw file identities
+        run: |
+          mkdir -p /tmp/secom-real
+          curl --fail --location --silent --show-error --retry 3 \
+            https://raw.githubusercontent.com/Be1an001/semiconductor-pass-fail-prediction-python/0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3/data/secom.data \
+            -o /tmp/secom-real/secom.data
+          curl --fail --location --silent --show-error --retry 3 \
+            https://raw.githubusercontent.com/Be1an001/semiconductor-pass-fail-prediction-python/0d27427a418f59a09a33ceb0d5e40dad5c8fc9a3/data/secom_labels.data \
+            -o /tmp/secom-real/secom_labels.data
+          printf '%s  %s\n' \
+            '4503bdb42e63687d1c7586bdc1796df9a7cb5ae9cc9c0443d84957a446de3aaf' \
+            '/tmp/secom-real/secom.data' \
+            '2fb2e8b5dfe77ba96ecf0960ff00f2ba9311795383a8342d4588a7cb37c816ef' \
+            '/tmp/secom-real/secom_labels.data' \
+            | sha256sum --check -
+
+      - name: Run Rust B0/B1 and observation drift on the full pinned SECOM chronology
+        run: |
+          EXPECTATIONS=/tmp/semi-rust-work/docs/research/semi-bench-001/secom-raw-expectations-v1.json
+          SPLIT=/tmp/semi-rust-work/docs/research/semi-bench-001/splits/uci-secom-mirror-0d27427a/chronological-60-20-20-v0.1.json
+
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-missingness -- \
+            /tmp/secom-real/secom.data \
+            /tmp/secom-real/secom_labels.data \
+            "$EXPECTATIONS" \
+            "$SPLIT" \
+            > /tmp/secom-real/missingness-report.json
+
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-secom-observation-drift -- \
+            /tmp/secom-real/secom.data \
+            /tmp/secom-real/secom_labels.data \
+            "$EXPECTATIONS" \
+            "$SPLIT" \
+            > /tmp/secom-real/observation-drift-report.json
+
+          jq -e '
+            .schema == "luminous.semi-bench.secom-missingness-report.v1" and
+            .feature_count == 590 and
+            .training_rows == 940 and
+            .training_failures == 76 and
+            .training_passes == 864 and
+            .held_out.validation.observation_profile.rows == 313 and
+            .held_out.validation.observation_profile.failures == 11 and
+            .held_out.test.observation_profile.rows == 314 and
+            .held_out.test.observation_profile.failures == 17
+          ' /tmp/secom-real/missingness-report.json > /dev/null
+
+          jq -e '
+            .schema == "luminous.semi-bench.secom-observation-drift-report.v1" and
+            .feature_count == 590 and
+            .training_profile.rows == 940 and
+            .held_out_profiles.validation.rows == 313 and
+            .held_out_profiles.test.rows == 314 and
+            .claim_limits.drift_does_not_use_labels == true
+          ' /tmp/secom-real/observation-drift-report.json > /dev/null
+
+          echo "B0/B1 held-out predictive diagnostics (pinned public mirror):"
+          jq -r '
+            ["split","B1 AUROC","B1 average precision","B1 Brier","B0 AUROC"],
+            ["validation",(.held_out.validation.missingness_only_metrics.ranking_metrics.auroc|tostring),(.held_out.validation.missingness_only_metrics.ranking_metrics.average_precision|tostring),(.held_out.validation.missingness_only_metrics.probability_metrics.brier_score|tostring),(.held_out.validation.prevalence_only_metrics.ranking_metrics.auroc|tostring)],
+            ["test",(.held_out.test.missingness_only_metrics.ranking_metrics.auroc|tostring),(.held_out.test.missingness_only_metrics.ranking_metrics.average_precision|tostring),(.held_out.test.missingness_only_metrics.probability_metrics.brier_score|tostring),(.held_out.test.prevalence_only_metrics.ranking_metrics.auroc|tostring)]
+            | @tsv
+          ' /tmp/secom-real/missingness-report.json
+
+          echo "Train-to-held-out observation-mask drift:"
+          jq -r '
+            ["split","pooled missingness delta","mean feature JSD bits","max feature JSD bits","row-count JSD bits","features >=5pp shift"],
+            ["validation",(.drift_vs_training.validation.pooled_missing_fraction_delta|tostring),(.drift_vs_training.validation.mean_feature_js_divergence_bits|tostring),(.drift_vs_training.validation.maximum_feature_js_divergence_bits|tostring),(.drift_vs_training.validation.row_missing_count_js_divergence_bits|tostring),(.drift_vs_training.validation.features_with_rate_delta_at_least_5pp|tostring)],
+            ["test",(.drift_vs_training.test.pooled_missing_fraction_delta|tostring),(.drift_vs_training.test.mean_feature_js_divergence_bits|tostring),(.drift_vs_training.test.maximum_feature_js_divergence_bits|tostring),(.drift_vs_training.test.row_missing_count_js_divergence_bits|tostring),(.drift_vs_training.test.features_with_rate_delta_at_least_5pp|tostring)]
+            | @tsv
+          ' /tmp/secom-real/observation-drift-report.json
+
+      - name: Archive real-source SECOM diagnostic reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: semi-secom-observation-reports
+          path: |
+            /tmp/secom-real/missingness-report.json
+            /tmp/secom-real/observation-drift-report.json
+          if-no-files-found: error
