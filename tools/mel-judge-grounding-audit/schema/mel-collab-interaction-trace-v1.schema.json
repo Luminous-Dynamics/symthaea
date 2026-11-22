@@ -8,6 +8,11 @@
     "schema_version",
     "session_id",
     "case_id",
+    "musician_pseudonym",
+    "instrument_id",
+    "agent_role",
+    "task_family",
+    "evaluation_consent_receipt_sha256",
     "track",
     "clock_domain_id",
     "hardware_profile_id",
@@ -81,6 +86,31 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "musician_pseudonym": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_family": {
+      "enum": [
+        "call_response",
+        "adaptive_accompaniment",
+        "phrase_continuation",
+        "structural_transition",
+        "silence_restraint",
+        "recovery"
+      ]
+    },
+    "evaluation_consent_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
