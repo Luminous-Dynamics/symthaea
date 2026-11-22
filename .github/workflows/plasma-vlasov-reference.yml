@@ -38,6 +38,8 @@ jobs:
         run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example refinement_probe > artifacts/plasma-vlasov-reference/refinement-probe.csv
       - name: Run matched Landau amplitude sweep
         run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example landau_amplitude_sweep > artifacts/plasma-vlasov-reference/landau-amplitude-sweep.csv
+      - name: Run self-consistent two-pulse echo pilot
+        run: cargo run --release --locked --manifest-path crates/tools/plasma-vlasov-reference/Cargo.toml --example self_consistent_echo > artifacts/plasma-vlasov-reference/self-consistent-echo.csv
       - name: Upload reproducible trajectory traces
         uses: actions/upload-artifact@v4
         with:
