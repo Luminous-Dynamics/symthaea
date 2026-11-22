@@ -1,0 +1,76 @@
+name: MEL agency transaction trace qualification
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-agency-trace/**"
+      - "docs/research/MEL_AGENCY_TRANSACTION_TRACE_V1_2026-11-22.md"
+      - ".github/workflows/mel-agency-transaction-trace.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agency-trace-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_AGENCY_TRACE_REVISION=$actual" >> "$GITHUB_ENV"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format isolated reference crate
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-agency-trace/Cargo.toml
+      - name: Generate isolated dependency lock
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-agency-trace/Cargo.toml
+      - name: Run lifecycle and adversarial tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-agency-trace/Cargo.toml
+      - name: Run warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-agency-trace/Cargo.toml -- -D warnings
+      - name: Parse schema and fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool tools/mel-agency-trace/schema/mel-agency-transaction-trace-v1.schema.json > /dev/null
+          python -m json.tool tools/mel-agency-trace/fixtures/apply-approved-undo-v1.json > /dev/null
+          python -m json.tool tools/mel-agency-trace/fixtures/suggest-only-v1.json > /dev/null
+      - name: Replay known-answer fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-agency-trace/Cargo.toml -- tools/mel-agency-trace/fixtures/apply-approved-undo-v1.json > "$RUNNER_TEMP/apply-undo-report.json"
+          cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-agency-trace/Cargo.toml -- tools/mel-agency-trace/fixtures/suggest-only-v1.json > "$RUNNER_TEMP/suggest-only-report.json"
+          python -m json.tool "$RUNNER_TEMP/apply-undo-report.json" > /dev/null
+          python -m json.tool "$RUNNER_TEMP/suggest-only-report.json" > /dev/null
+      - name: Record source and dependency identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mel-agency-trace-evidence"
+          cp tools/mel-agency-trace/Cargo.lock "$RUNNER_TEMP/mel-agency-trace-evidence/Cargo.lock"
+          cp "$RUNNER_TEMP/apply-undo-report.json" "$RUNNER_TEMP/mel-agency-trace-evidence/"
+          cp "$RUNNER_TEMP/suggest-only-report.json" "$RUNNER_TEMP/mel-agency-trace-evidence/"
+          sha256sum tools/mel-agency-trace/src/lib.rs > "$RUNNER_TEMP/mel-agency-trace-evidence/source.sha256"
+          sha256sum tools/mel-agency-trace/Cargo.lock > "$RUNNER_TEMP/mel-agency-trace-evidence/lock.sha256"
+          printf 'tested_revision=%s\n' "$MEL_AGENCY_TRACE_REVISION" > "$RUNNER_TEMP/mel-agency-trace-evidence/revision.txt"
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-agency-trace-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-agency-trace-evidence/
+          if-no-files-found: error
+          retention-days: 90
