@@ -560,3 +560,8 @@ This is internal consistency and semantic validation, **not** authenticity. A pu
 ### Hosted AML service prerequisite
 
 Cycle 2 results are useful reference baselines, but the current MACE adapter remains contract-only. Deployment, durable Add/visibility, tenant isolation, hosted HTTPS, smoke testing and next-cycle operational qualification are tracked in [#13188](https://github.com/Luminous-Dynamics/symthaea/issues/13188). The official platform owns Answer/Eval; MACE should provide provider-neutral Add/Search only.
+
+
+## 9. Portfolio-level non-additive memory utility
+
+The additive optimizer remains the baseline. New MACE interaction work introduces pairwise terms `delta(i,j) = U({i,j}) - U({i}) - U({j}) + U(empty)`, allowing redundancy and complementarity to be represented. A conservative exact selector uses complete pair matrices, held-out calibration, a positive paired cluster-bootstrap lower bound and a held-out higher-order residual gate for portfolios with at least three events. It is a bounded second-order model, not a Shapley or submodular guarantee. See [MACE Portfolio Interaction-Aware Allocation v0.1](./MACE_PORTFOLIO_INTERACTION_AWARE_ALLOCATION_V0_1.md). Authored fixtures are not executed results; independent evaluator custody and live Mycelix receipts remain qualification gates.

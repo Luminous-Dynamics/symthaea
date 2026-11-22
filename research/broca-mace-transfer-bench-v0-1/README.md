@@ -582,6 +582,19 @@ This is analogous in spirit—not an implementation reuse—to Sol-Atlas's bound
 The frontier does not solve non-additive memory utility. It still assumes per-item net values add across distinct evidence payloads. Interaction-aware marginal value is tracked separately in #13184.
 
 
+## Pairwise interaction-aware memory portfolio (MACE v0.19 research)
+
+The additive portfolio optimizer remains the baseline. The new `consolidation::portfolio::interaction` module adds a receipt-gated second-order model: positive pair terms represent complementarity; negative terms represent redundancy/interference. A deterministic bounded branch-and-bound selector optimizes singleton net values plus conservative pair terms under the same five resource/risk budgets.
+
+Admission binds exact option/model/baseline/task/scope/as-known/budget identity; disjoint train/calibration/held-out data, task families and source roots; minimum pair sample counts and independent seeds; calibration and held-out MAE improvements; and a positive paired cluster-bootstrap 95% lower bound. Pair coverage must be complete and each estimate is reduced by its absolute error bound.
+
+For portfolios with at least three events, the receipt requires at least 32 held-out multi-event samples and a higher-order residual inside a preregistered tolerance. The selector rejects missing pairs, poor held-out calibration, excessive higher-order residual or search exhaustion. Plan admissibility checks selected terms against the exact verified proposal; a rehashed mutated plan is insufficient.
+
+An evaluator integration fixture builds three options through raw ingress, calibrated salience and verified source profiles, then compares additive and pairwise choices against evaluator-owned hidden whole-portfolio utility. Candidate-module controls cover redundancy, complementarity, uncertainty, split leakage, held-out calibration, higher-order residuals, search limits, deterministic ordering and tampered plans.
+
+This remains a bounded pairwise prototype—not Shapley optimization, a general submodular guarantee, a measured SOTA result or live Mycelix verification. See [MACE Portfolio Interaction-Aware Allocation v0.1](../../docs/research/MACE_PORTFOLIO_INTERACTION_AWARE_ALLOCATION_V0_1.md).
+
+
 ## Cross-system evidence and authority bridge
 
 See [MACE cross-system evidence and authority bridge v0.1](../../docs/research/MACE_CROSS_SYSTEM_EVIDENCE_BRIDGE_V0_1.md) for the Mycelix signed-event/authority-receipt mapping, Sol-Atlas federated evidence/rights contract, Symtropy execution/outcome boundary and provider-neutral MACE projection. This is a contract and source mapping, not a live cryptographic connector.
