@@ -4,7 +4,10 @@ use cetb_rcaf::factorial_counterfactual::{
 use cetb_rcaf::motion_transient::{
     generate_motion_transient_field, LocalizedMotionEvent, MotionEvent, MotionTransientConfig,
 };
-use cetb_rcaf::spatial_calibration::calibrate_spatial_nuisance_to_component_fraction;
+use cetb_rcaf::spatial_calibration::{
+    calibrate_nuisance_matrix_to_component_fraction,
+    calibrate_spatial_nuisance_to_component_fraction,
+};
 use cetb_rcaf::spatial_nuisance::{
     generate_spatial_nuisance_field, SpatialGraph, SpatialNuisanceConfig, SpatialNuisanceFamily,
 };
@@ -129,13 +132,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(0.10),
     )?;
 
+    let (calibrated_common_mode, _common_mode_calibration) =
+        calibrate_nuisance_matrix_to_component_fraction(&clean, &common_mode, 0.10)?;
     let common_mode = run_family(
         "common_mode",
-        "common-mode-sinusoid-v1",
+        "common-mode-sinusoid-calibrated-10pct-v1",
         &clean,
         &signal,
-        &common_mode,
-        None,
+        &calibrated_common_mode,
+        Some(0.10),
     )?;
 
     let transient_config = MotionTransientConfig {
@@ -159,13 +164,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         }],
     };
     let transient_field = generate_motion_transient_field(&graph, &transient_config)?;
+    let (calibrated_transient, _transient_calibration) =
+        calibrate_nuisance_matrix_to_component_fraction(
+            &clean,
+            &transient_field.values,
+            0.10,
+        )?;
     let motion_transient = run_family(
         "motion_transient",
-        "transient-onset-24-57-seed-roi-05",
+        "transient-onset-24-57-seed-roi-05-calibrated-10pct",
         &clean,
         &signal,
-        &transient_field.values,
-        None,
+        &calibrated_transient,
+        Some(0.10),
     )?;
 
     let report = format!(
