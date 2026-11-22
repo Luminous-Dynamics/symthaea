@@ -177,7 +177,6 @@ struct EventHashInput<'a> {
 struct InputStateV1 {
     event_id: String,
     time_ns: u64,
-    artifact_sha256: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -190,7 +189,6 @@ enum LifecycleV1 {
 #[derive(Debug, Clone)]
 struct ForecastStateV1 {
     issued: ForecastIssuedV1,
-    issue_event_id: String,
     issued_at_ns: u64,
     input_time_ns: u64,
     displayed_at_ns: Option<u64>,
@@ -421,7 +419,6 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                         InputStateV1 {
                             event_id: event.event_id.clone(),
                             time_ns: event.monotonic_time_ns,
-                            artifact_sha256: payload.input_artifact_sha256.clone(),
                         },
                     );
                 }
@@ -543,7 +540,6 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                     payload.forecast_id.clone(),
                     ForecastStateV1 {
                         issued: payload.clone(),
-                        issue_event_id: event.event_id.clone(),
                         issued_at_ns: event.monotonic_time_ns,
                         input_time_ns: input.time_ns,
                         displayed_at_ns: None,
@@ -683,6 +679,9 @@ pub fn validate_trace(trace: &ForecastTraceV1) -> ForecastReportV1 {
                         Some(&payload.forecast_id),
                         "v1 allows one disposition per forecast",
                     );
+                }
+                if payload.disposition == PartnerDispositionV1::Vetoed {
+                    forecast.lifecycle = LifecycleV1::Invalidated;
                 }
             }
             EventKindV1::ForecastInvalidated(payload) => {
