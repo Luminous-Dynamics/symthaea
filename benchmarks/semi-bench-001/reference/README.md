@@ -301,3 +301,12 @@ cargo run -p symthaea-semiconductor --bin semi-secom-tabular-baselines -- \\
 \`\`\`
 
 B2–B4 use Gaussian/Bernoulli conditional-independence assumptions and are deliberately transparent statistical comparators, not production models or claims of SOTA. B3/B4's mask likelihood can be miscalibrated when sensor missingness is strongly correlated; judge calibration and transfer on held-out domains, not accuracy alone. The 17 failures in the current chronological test require support counts and uncertainty intervals before ranking. No feature has known physical semantics in the public SECOM mirror, and no association establishes root cause.
+
+
+### B2–B4 comparability and interpretation
+
+All three baselines share the exact same frozen rows and binary scoring contract. The Gaussian likelihoods operate on values standardized by training-only population mean/scale; per-class variance uses training-only MLE variance with an explicit floor of \`1e-6\`. B3/B4 add independent Bernoulli missingness likelihoods with symmetric Laplace smoothing \`alpha=1\`. These assumptions are exposed in the fitted-model digest/report so they can be reproduced or replaced by a new model schema.
+
+For comparison, report B0/B1/B2/B3/B4 side by side. The prevalence-only AP reference equals the positive prevalence on the scored split; a B1 AP below this reference is not useful ranking performance. A high B1 score with poor held-out calibration must be treated as a failure, not converted into a threshold recommendation.
+
+The B2/B3/B4 chronological test has only 17 failures. Before leaderboard claims, add lot/tool/time groups from a source that actually carries those identities, multiple independent time periods, confidence intervals and a second independent dataset. The anonymous SECOM mirror cannot establish fab transfer.
