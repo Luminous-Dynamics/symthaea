@@ -139,3 +139,145 @@ The next high-value task is a bounded reconstruction of the `ASK / MAIN → each
 ## 7. Claim boundary
 
 This is a source-grounded mapping of part of the formal architecture around (M). It is not a reconstruction of the full proof of (M), not a claim that every file named in the exposition is in the theorem's kernel closure, and not an independent proof of RH.
+
+
+## 8. The missing conceptual bridge: why the log-weight appears in M
+
+The most useful part of Part II §5.1 is that it derives the main term (M) from ordinary prime summation, rather than treating the expression as an unexplained formal target.
+
+Fix one table (t) and one cell (i=(v,s)). Define
+
+[
+S_i(y)=sum_{r\in i} c(r)(y/r-1)_+,
+qquad
+Psi_i(z)=sum_{substack{r\in i\\r\le z}}c(r).
+]
+
+Integrating the step function (Psi_i) gives
+
+[
+rac{S_i(y)}{y}=int_1^y Psi_i(z)rac{dz}{z^2}.
+]
+
+For fixed moduli, among primes not dividing (2qd), a given cell receives a raw density (1/(4n)): one half are nonsquares modulo (d), one half have the specified sign modulo (q), and (1/n) have the specified residue-pair column. The Chinese remainder theorem makes these conditions independent among invertible residue classes. The coefficient (c(r)=(1-chi_d(r))log p) equals (2log p) on the ordinary contributing primes, doubling the density in the weighted counting function. Hence the cell main density is
+
+[
+mu=rac{1}{2n}.
+]
+
+The fixed-modulus prime number theorem in progressions yields
+
+[
+Psi_i(z)=mu z+	ext{error}.
+]
+
+The constant
+
+[
+C_i=int_1^infty(Psi_i(z)-mu z)rac{dz}{z^2}
+]
+
+is convergent for fixed moduli. Subtracting the tail gives
+
+[
+S_i(y)=mu ylog y+C_i y+R_i(y),
+qquad
+R_i(y)=-yint_y^infty(Psi_i(z)-mu z)rac{dz}{z^2}.
+]
+
+The constants sum to
+
+[
+sum_i C_i=-1-gamma+c_{chi_d}.
+]
+
+The reason is that (sum_i S_i=S_1-S_{chi_d}): the ordinary smoothed von Mangoldt sum contributes the linear coefficient (-1-gamma), while the nonprincipal character sum contributes (-c_{chi_d}).
+
+Now return to the weighted table:
+
+[
+P_{u,t,j}=sum_i w_i S_i(a/w_i).
+]
+
+Substituting the decomposition above, the logarithmic terms become
+
+[
+mu asum_ilog(a/w_i)
+=alog a-alanglelog wangle,
+qquad
+langlelog wangle=rac{1}{2n}sum_ilog w_i.
+]
+
+The linear constants become (a(-1-gamma+c_{chi_d})). Consequently,
+
+[
+P_{u,t,j}-M_{u,t,j}=sum_i w_iR_i(a/w_i),
+]
+
+where
+
+[
+M_{u,t,j}
+=aleft(log a-1-gamma+c_{chi_d}
+-langlelog wangleight).
+]
+
+**This explains why the average logarithm of the cell weights is not decorative:** it is forced by the prime-density main term after rescaling each cell's cutoff from (a) to (a/w_i).
+
+Important qualification: this argument uses fixed-modulus prime number theorems. Their constants may depend on (q,d,N). The uniform estimates needed while those moduli vary with (x) are a separate obligation, handled later by Estimate C. Do not use the fixed-modulus (O_A(z/log^A z)) as though it were already uniform.
+
+## 9. The finite-group translation identity: how the table becomes one prime sum
+
+The second conceptual bridge is exact combinatorics on the finite group (H).
+
+For fixed (t) and a prime power (r), write (s=t[r]). For each (zin T_2), the condition (sin uT_2) determines exactly one translate:
+
+[
+u=sz^{-1}.
+]
+
+Therefore exactly (|T_2|) of the (n=|H|) translates select the column (s). With (delta=|T_2|/n) and row indicator (v(r)=1iffchi_q(r)=1),
+
+[
+rac1nsum_{uin H}
+mathbf{1}_{{v(r)=1, t[r]in uT_2}}
+=
+deltamathbf{1}_{{chi_q(r)=1}}
+=
+rac{delta}{2}(1+chi_q(r)).
+]
+
+Multiplying by (1-chi_d(r)) gives exactly the coefficient in the single smoothed prime sum
+
+[
+S_{q,d}(x)=sum_{rle x}Lambda(r)
+(1+chi_q(r))(1-chi_d(r))(x/r-1).
+]
+
+After multiplying by the common distinguished weight (b), the exact translation identity is
+
+[
+rac1nsum_usum_{i	ext{ distinguished at }u}
+bS_i(a/b)=rac{delta b}{2}S_{q,d}(a/b).
+]
+
+The same identity applies to the residuals after subtracting their common logarithmic and linear centering terms. This is the mechanism by which the many-cell table average is transformed back into one prime sum with quadratic-character twists.
+
+There are three separate claims here, and they must not be conflated:
+
+1. **Exact translation counting:** the finite-group identity above.
+2. **Approximation of distinguished weights by (b):** controlled by the small (Delta_i=w_i-b) bound.
+3. **Discarding nondistinguished cells:** requires the uniform Estimate C bound because their cutoffs are much larger.
+
+Only after both error estimates and the (a_t/bapprox x) adjustment does the exposition obtain
+
+[
+rac1nsum_{u,t,j}(P_{u,t,j}-M_{u,t,j})
+=BR_{q,d}(x)+O_arepsilon(B(1+log x)).
+]
+
+Then (M) yields (R_{q,d}leq E/B+O_arepsilon(1+log x)), the one-sided Estimate A. Estimates B and C control the three character twists; the identity
+(R_{q,d}=G+G_{chi_q}-G_{chi_d}-G_{chi_qchi_d})
+gives the RH criterion.
+
+**The source derivation is now mapped, but the exact formal Lean declarations for the cell-centering, translation identity and all uniformity steps still need extraction and review.** This is a conceptual reconstruction from Rubinstein's working guide, not a new Lean proof.
