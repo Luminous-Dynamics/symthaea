@@ -175,7 +175,7 @@ pub(crate) fn parse_features(bytes: &[u8]) -> Result<Vec<SecomSensorRowV1>, Seco
     Ok(rows)
 }
 
-pub(crate) pub fn parse_labels(bytes: &[u8]) -> Result<Vec<SecomLabelRowV1>, SecomRawDataError> {
+pub fn parse_labels(bytes: &[u8]) -> Result<Vec<SecomLabelRowV1>, SecomRawDataError> {
     let text = str::from_utf8(bytes)
         .map_err(|error| SecomRawDataError(format!("label_file: invalid UTF-8: {error}")))?;
     let mut rows = Vec::new();
