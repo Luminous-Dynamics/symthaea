@@ -295,7 +295,10 @@ pub(super) fn run_worker(
         let n = consumer.pop_slice(&mut scratch);
         if n > 0 {
             if let Err(error) = processor.push_audio(&scratch[..n]) {
-                tracing::error!(?error, "STT worker rejected an audio chunk; stopping this stream segment");
+                tracing::error!(
+                    ?error,
+                    "STT worker rejected an audio chunk; stopping this stream segment"
+                );
                 break;
             }
 
