@@ -8,10 +8,6 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use serde::Serialize;
-use symthaea_semiconductor::benchmark::{
-    SecomPreprocessorConfigV1, SecomFoldPreprocessorReportV1,
-    prepare_secom_stratified_fold_v1,
-};
 use symthaea_semiconductor::benchmark::secom_raw::{
     SecomRawExpectationsV1, audit_secom_raw_v1, parse_features, parse_labels,
 };
@@ -19,6 +15,9 @@ use symthaea_semiconductor::benchmark::split_manifest::{
     SplitManifestV1, validate_split_manifest_v1,
 };
 use symthaea_semiconductor::benchmark::stratified_repeat::StratifiedRepeatReportV1;
+use symthaea_semiconductor::benchmark::{
+    SecomFoldPreprocessorReportV1, SecomPreprocessorConfigV1, prepare_secom_stratified_fold_v1,
+};
 
 #[derive(Serialize)]
 struct FiveRepeatPreprocessingReportV1 {
@@ -78,7 +77,9 @@ fn run() -> Result<(), String> {
     let identity_report = validate_split_manifest_v1(&identity_manifest)
         .map_err(|error| format!("source identity manifest rejected input: {error}"))?;
     if repeats.source_identity_manifest_sha256 != identity_report.split_manifest_sha256 {
-        return Err("stratified repeat source identity digest does not match supplied manifest".into());
+        return Err(
+            "stratified repeat source identity digest does not match supplied manifest".into(),
+        );
     }
 
     let features = parse_features(&feature_bytes)
@@ -105,7 +106,9 @@ fn run() -> Result<(), String> {
         }
         let source_timestamp = label.observed_at.format("%Y-%m-%dT%H:%M:%S").to_string();
         if assignment.observed_at.as_deref() != Some(source_timestamp.as_str()) {
-            return Err(format!("source identity assignment {index} timestamp mismatch"));
+            return Err(format!(
+                "source identity assignment {index} timestamp mismatch"
+            ));
         }
         sample_ids.push(assignment.sample_id.clone());
     }
@@ -113,24 +116,22 @@ fn run() -> Result<(), String> {
     let config = SecomPreprocessorConfigV1::default();
     let mut reports = Vec::with_capacity(repeats.manifests.len());
     for manifest in &repeats.manifests {
-        let prepared = prepare_secom_stratified_fold_v1(
-            &sample_ids,
-            &features,
-            &labels,
-            manifest,
-            &config,
-        )
-        .map_err(|error| {
-            format!(
-                "repeat {} train-only preprocessing rejected input: {error}",
-                manifest.repeat_index
-            )
-        })?;
+        let prepared =
+            prepare_secom_stratified_fold_v1(&sample_ids, &features, &labels, manifest, &config)
+                .map_err(|error| {
+                    format!(
+                        "repeat {} train-only preprocessing rejected input: {error}",
+                        manifest.repeat_index
+                    )
+                })?;
         reports.push(prepared.report);
     }
 
     if reports.len() != 5 {
-        return Err(format!("expected five preprocessing repeats, observed {}", reports.len()));
+        return Err(format!(
+            "expected five preprocessing repeats, observed {}",
+            reports.len()
+        ));
     }
     let report = FiveRepeatPreprocessingReportV1 {
         schema: "luminous.semi-bench.secom-five-repeat-preprocessing-report.v1".into(),
