@@ -983,6 +983,8 @@ impl ConsolidationEvidencePackV1 {
                 let receipt = &event.receipts;
                 EvidenceDependencyRecordV1 {
                     event_id: event.event_id,
+                    action: event.action,
+                    scope: event.scope,
                     source_family: receipt.source_family,
                     source_root_digest: receipt.source_root_digest,
                     upstream_source_id: receipt.upstream_source_id.clone(),
@@ -1006,6 +1008,8 @@ impl ConsolidationEvidencePackV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvidenceDependencyRecordV1 {
     pub event_id: u32,
+    pub action: Action,
+    pub scope: Scope,
     pub source_family: u16,
     pub source_root_digest: SourceRootDigest,
     pub upstream_source_id: String,
@@ -1060,6 +1064,18 @@ impl EvidenceDependencySidecarV1 {
         hasher.update((records.len() as u64).to_be_bytes());
         for record in records {
             hasher.update(record.event_id.to_be_bytes());
+            hasher.update([match record.action { Action::A => 1, Action::B => 2 }]);
+            hasher.update([
+                match record.scope.regime {
+                    broca_mace_policy::Regime::Baseline => 1,
+                    broca_mace_policy::Regime::Shifted => 2,
+                },
+                match record.scope.objective {
+                    broca_mace_policy::Objective::Quality => 1,
+                    broca_mace_policy::Objective::Cost => 2,
+                    broca_mace_policy::Objective::Speed => 3,
+                },
+            ]);
             hasher.update(record.source_family.to_be_bytes());
             hasher.update(record.source_root_digest.as_bytes());
             Self::put_bytes(&mut hasher, record.upstream_source_id.as_bytes());
