@@ -76,6 +76,7 @@ pub struct SecomLogisticModelResultV1 {
     pub model_id: String,
     pub config: SecomLogisticModelConfigV1,
     pub nonzero_coefficient_count: usize,
+    pub coefficient_support_sha256: String,
     pub missing_features_without_observed_training_values: usize,
     pub model_sha256: String,
     pub held_out: BTreeMap<String, SecomLogisticHeldOutV1>,
@@ -592,6 +593,13 @@ fn evaluate_model(
             .iter()
             .filter(|weight| weight.abs() > 1.0e-12)
             .count(),
+        coefficient_support_sha256: sha256_hex(
+            &model
+                .weights
+                .iter()
+                .map(|weight| u8::from(weight.abs() > 1.0e-12))
+                .collect::<Vec<_>>(),
+        ),
         missing_features_without_observed_training_values: model
             .missing_features_without_observed_training_values,
         model_sha256,
