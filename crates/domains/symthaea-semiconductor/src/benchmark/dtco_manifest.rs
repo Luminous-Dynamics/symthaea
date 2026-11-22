@@ -488,6 +488,7 @@ mod tests {
     #[test]
     fn cyclic_parent_graph_is_rejected() {
         let mut manifest = known_answer();
+        manifest.runs[0].stage = "spice".to_string();
         manifest.runs[0].parent_run_ids = vec!["run-spice".to_string()];
         manifest.runs[0].input_artifact_sha256 = manifest.runs[1].output_artifact_sha256.clone();
         manifest.runs[1].parent_run_ids = vec!["run-analytical".to_string()];
