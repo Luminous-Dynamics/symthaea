@@ -1066,10 +1066,12 @@ mod tests {
                 .abs()
                 < 1e-9
         );
-        assert!(report
-            .qualification_findings
-            .iter()
-            .any(|finding| finding.contains("clock-alignment uncertainty")));
+        assert!(
+            report
+                .qualification_findings
+                .iter()
+                .any(|finding| finding.contains("clock-alignment uncertainty"))
+        );
     }
 
     #[test]
