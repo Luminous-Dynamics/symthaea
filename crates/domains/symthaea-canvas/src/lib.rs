@@ -120,12 +120,13 @@ pub use mycelial_junction_graph::{
 };
 pub use mycelial_reconstruction_calibration::{
     MAX_RECONSTRUCTION_CALIBRATION_BINS, MAX_RECONSTRUCTION_CALIBRATION_PREDICTIONS,
-    MYCELIAL_RECONSTRUCTION_CALIBRATION_SCHEMA_VERSION,
+    MYCELIAL_RECONSTRUCTION_CALIBRATION_SCHEMA_VERSION, JunctionCalibrationObservation,
     JunctionClassProbabilityPrediction, MycelialReconstructionCalibrationError,
     MycelialReconstructionCalibrationReport, ReconstructionCalibrationBin,
     ReconstructionCalibrationClass, ReconstructionCalibrationConfig,
     ReconstructionCalibrationCounts, ReconstructionClassCalibration,
-    ReconstructionSelectiveRiskPoint, ReconstructionTopLabelCalibration,
+    ReconstructionSelectiveRiskPoint, ReconstructionSelectiveRiskSummary,
+    ReconstructionTopLabelCalibration,
     evaluate_mycelial_reconstruction_calibration,
 };
 pub use mycelial_reconstruction_metrics::{
