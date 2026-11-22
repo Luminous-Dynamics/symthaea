@@ -10,22 +10,22 @@ use broca_mace_policy::{
 };
 
 #[derive(Clone, Copy, Debug)]
-struct Truth {
-    utility_a: f64,
-    utility_b: f64,
-    causal_action: Option<Action>,
-    invalid_a: bool,
+pub(crate) struct Truth {
+    pub(crate) utility_a: f64,
+    pub(crate) utility_b: f64,
+    pub(crate) causal_action: Option<Action>,
+    pub(crate) invalid_a: bool,
 }
 
 impl Truth {
-    fn utility(self, action: Action) -> f64 {
+    pub(crate) fn utility(self, action: Action) -> f64 {
         match action {
             Action::A => self.utility_a,
             Action::B => self.utility_b,
         }
     }
 
-    fn optimal_action(self) -> Action {
+    pub(crate) fn optimal_action(self) -> Action {
         if self.utility_a > self.utility_b {
             Action::A
         } else {
@@ -33,18 +33,18 @@ impl Truth {
         }
     }
 
-    fn optimal_utility(self) -> f64 {
+    pub(crate) fn optimal_utility(self) -> f64 {
         self.utility(self.optimal_action())
     }
 }
 
 #[derive(Clone, Debug)]
-struct Case {
-    cluster: u64,
-    family: &'static str,
-    memory: Vec<Experience>,
-    query: Query,
-    truth: Truth,
+pub(crate) struct Case {
+    pub(crate) cluster: u64,
+    pub(crate) family: &'static str,
+    pub(crate) memory: Vec<Experience>,
+    pub(crate) query: Query,
+    pub(crate) truth: Truth,
 }
 
 fn fixture_root_digest(seed: u32) -> broca_mace_policy::SourceRootDigest {
@@ -175,7 +175,7 @@ impl Rng {
     }
 }
 
-fn generated_worlds(clusters: u64) -> Vec<Case> {
+pub(crate) fn generated_worlds(clusters: u64) -> Vec<Case> {
     let mut cases = Vec::with_capacity(clusters as usize * 21);
     let baseline = Scope {
         regime: Regime::Baseline,
