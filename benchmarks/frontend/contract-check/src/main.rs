@@ -326,7 +326,10 @@ fn run_task(schema_path: &str, task_path: &str) -> Result<(), String> {
         "SFEB task valid: {task_id} (status={status}, required_regions={regions}, assertions={assertions})"
     );
     println!("Reference fixture digest: verified; local-only asset policy: verified.");
-    println!("Note: schema and fixture validity do not imply browser or agent verification.");
+    if task_id == "SFEB-L1-004" {
+        println!("Static reference semantics: landmark, heading, named regions, skip link, metric anchors and declared responsive rules verified.");
+    }
+    println!("Note: static reference checks do not verify an agent implementation, rendered browser behavior or human usability.");
     Ok(())
 }
 
