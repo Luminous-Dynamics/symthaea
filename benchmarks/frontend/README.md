@@ -303,3 +303,17 @@ Before comparing agents, qualify the evaluator itself. The seeded mutation campa
 qualification plan, not an executed result. Critical security and evidence-integrity
 mutants must be rejected; harmless controls must remain accepted. Do not publish SFEB
 leaderboard claims until the independent oracles pass this campaign on a pinned runner.
+
+## Validate the oracle-qualification plan
+
+The standalone Rust contract checker now has a `--mutations` mode:
+
+```bash
+cargo test --manifest-path benchmarks/frontend/contract-check/Cargo.toml
+cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --mutations
+```
+
+This validates the qualification campaign schema, unique IDs, expected dispositions,
+minimum case counts and non-weakenable 100% critical/security/evidence-integrity
+targets. It validates the plan only; it does not execute seeded mutants, run a browser,
+or certify oracle quality. These commands are authored but remain unexecuted here.
