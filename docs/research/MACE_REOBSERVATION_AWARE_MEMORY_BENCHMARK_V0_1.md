@@ -134,3 +134,8 @@ This mapping is an evaluation plan, not an assertion that a WorldMemArena adapte
 - The raw Session-A ingress → future-use calibration → source-profile receipt → representation-plan path has an authored evaluator integration test; it remains fixture-backed and unexecuted until a Rust runner is available.
 
 Next: connect the plan to receipt-qualified consolidation proposals, add environment-backed locators, and benchmark integrated Session-A learning → Session-B retrieval/re-observation → Session-C correction.
+
+
+### Conservative fixed-point cost accounting
+
+Expected success value is rounded conservatively: positive expected value is rounded down and negative expected value toward negative infinity. Expected failure loss is rounded up to the next micro-unit, while exact zero remains zero. This prevents fractional expected failure costs from disappearing and making an unreliable locator look artificially cheap. The re-observation module now contains **22 authored regression tests**, including sub-micro failure-risk and negative-value rounding controls. These are authored tests, not executed passes.
