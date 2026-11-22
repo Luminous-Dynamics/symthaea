@@ -897,9 +897,11 @@ mod tests {
         let signal_plus_nuisance = field.add_to(&clean_b).unwrap();
         for time in 0..128 {
             for roi in 0..6 {
-                assert_eq!(
-                    nuisance_only[time][roi] - clean_a[time][roi],
-                    signal_plus_nuisance[time][roi] - clean_b[time][roi]
+                let nuisance_only_delta = nuisance_only[time][roi] - clean_a[time][roi];
+                let combined_delta = signal_plus_nuisance[time][roi] - clean_b[time][roi];
+                assert!(
+                    (nuisance_only_delta - combined_delta).abs() < 1e-12,
+                    "matched nuisance deltas differ beyond floating-point tolerance"
                 );
             }
         }
