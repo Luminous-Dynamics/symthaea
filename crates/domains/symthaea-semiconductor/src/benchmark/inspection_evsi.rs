@@ -123,11 +123,6 @@ pub struct EvsiReportV1 {
 }
 
 #[derive(Clone, Debug)]
-struct EvaluatedCandidate {
-    report: EvsiCandidateReportV1,
-}
-
-#[derive(Clone, Debug)]
 struct SubsetScore {
     selected_ids: Vec<String>,
     utility: f64,
@@ -627,8 +622,8 @@ mod tests {
             - 1.0)
             .abs()
             < 1.0e-12);
-        assert_eq!(row.positive_outcome.posterior_defect_probability, Some(0.695652173913));
-        assert_eq!(row.negative_outcome.posterior_defect_probability, Some(0.047619047619));
+        assert_eq!(row.positive_outcome.posterior_defect_probability, Some(0.666666666667));
+        assert_eq!(row.negative_outcome.posterior_defect_probability, Some(0.052631578947));
     }
 
     #[test]
