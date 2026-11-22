@@ -35,6 +35,7 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_estimator_dose
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_common_mode_nuisance_sweep
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_nuisance
 cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_variance_calibration
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_counterfactual
 ```
 
 The first example outputs a JSON report conforming to `injection-recovery.schema.json`. The sweep example evaluates loading increments `[0.0, 0.10, 0.20, 0.30, 0.40]` with common random numbers and outputs `injection-recovery-sweep.schema.json`. It estimates:
@@ -185,3 +186,27 @@ cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_spatial_varian
 ```
 
 The report contract is `spatial-variance-calibration.schema.json`. This calibrates synthetic field magnitude; it does not establish an empirical artifact distribution, and it cannot identify a latent change from an observationally equivalent nuisance source.
+
+
+## Four-cell matched counterfactual experiment engine
+
+The `factorial_counterfactual` module accepts one clean matrix X, one predeclared target contribution S and one already-generated nuisance matrix A. It constructs all four cells:
+
+| Cell | Observation |
+|---|---|
+| `clean_null` | X |
+| `signal_only` | X + S |
+| `nuisance_only` | X + A |
+| `signal_plus_nuisance` | X + S + A |
+
+The same immutable A matrix is used in both nuisance-containing cells; the engine never calls the nuisance generator or redraws its innovations. It reports matched-nuisance and matched-signal residuals plus the additive interaction residual. These are numerical construction invariants, not claims that real measurement artifacts are additive.
+
+The report also records each cell's RMS, maximum absolute value and FNV-1a-64 diagnostic fingerprint. The fingerprints are convenient stable diagnostics, not cryptographic hashes; the workflow receipt provides the content-addressed evidence chain. Clean–nuisance variance and covariance are pooled within ROI and reported separately. A nominal component-variance fraction must never conceal the covariance contribution to the combined observation.
+
+Run the multi-family smoke fixture:
+
+```sh
+cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_factorial_counterfactual
+```
+
+The fixture applies the same target signal to three synthetic nuisance families: common-mode, graph-smooth low-rank and localized heat-kernel. The latter two are calibrated to a common component-variance target. This example is a software integration fixture, not a physical or biological simulation. The output contract is `factorial-counterfactual.schema.json`.
