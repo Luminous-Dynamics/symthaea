@@ -7,7 +7,10 @@ use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian
 const STEPS_TO_RECURRENCE: usize = 4096;
 const NYQUIST_GUARD_FRACTION: f64 = 0.9;
 
-fn target_mode_guardband_fraction(spectrum: &JointPhaseSpaceSpectrum, spatial_mode: usize) -> f64 {
+fn target_mode_guardband_energy(
+    spectrum: &JointPhaseSpaceSpectrum,
+    spatial_mode: usize,
+) -> (f64, f64) {
     let negative_x_mode = (spectrum.nx - spatial_mode) % spectrum.nx;
     let mut total = 0.0;
     let mut guardband = 0.0;
@@ -25,7 +28,7 @@ fn target_mode_guardband_fraction(spectrum: &JointPhaseSpaceSpectrum, spatial_mo
             }
         }
     }
-    guardband / total.max(f64::MIN_POSITIVE)
+    (total, guardband)
 }
 
 fn run_case(
@@ -51,6 +54,10 @@ fn run_case(
     let mut sponge_nyquist_fraction = 0.0;
     let mut periodic_guardband_fraction = 0.0;
     let mut sponge_guardband_fraction = 0.0;
+    let mut periodic_registered_mode_f_strophy = 0.0;
+    let mut sponge_registered_mode_f_strophy = 0.0;
+    let mut periodic_registered_guardband_f_strophy = 0.0;
+    let mut sponge_registered_guardband_f_strophy = 0.0;
     let mut periodic_nyquist_field_ratio = 0.0;
     let mut sponge_nyquist_field_ratio = 0.0;
 
@@ -82,10 +89,18 @@ fn run_case(
                 / periodic_spectrum.spectral_f_strophy.max(f64::MIN_POSITIVE);
             sponge_nyquist_fraction = sponge_spectrum.nyquist_f_strophy
                 / sponge_spectrum.spectral_f_strophy.max(f64::MIN_POSITIVE);
+            let (periodic_mode_total, periodic_mode_guardband) =
+                target_mode_guardband_energy(&periodic_spectrum, spatial_mode);
+            let (sponge_mode_total, sponge_mode_guardband) =
+                target_mode_guardband_energy(&sponge_spectrum, spatial_mode);
+            periodic_registered_mode_f_strophy = periodic_mode_total;
+            sponge_registered_mode_f_strophy = sponge_mode_total;
+            periodic_registered_guardband_f_strophy = periodic_mode_guardband;
+            sponge_registered_guardband_f_strophy = sponge_mode_guardband;
             periodic_guardband_fraction =
-                target_mode_guardband_fraction(&periodic_spectrum, spatial_mode);
+                periodic_mode_guardband / periodic_mode_total.max(f64::MIN_POSITIVE);
             sponge_guardband_fraction =
-                target_mode_guardband_fraction(&sponge_spectrum, spatial_mode);
+                sponge_mode_guardband / sponge_mode_total.max(f64::MIN_POSITIVE);
             periodic_nyquist_field_ratio = periodic
                 .electric_mode_coefficient(spatial_mode)?
                 .amplitude()
@@ -161,14 +176,14 @@ fn run_case(
     let wall_seconds = started.elapsed().as_secs_f64();
 
     println!(
-        "{label},{nx},{nv},{velocity_spacing:.8},{nyquist_time:.8},{recurrence_time:.8},{start_fraction:.8},{maximum_damping_rate:.8},{periodic_nyquist_fraction:.12e},{sponge_nyquist_fraction:.12e},{periodic_guardband_fraction:.12e},{sponge_guardband_fraction:.12e},{periodic_nyquist_field_ratio:.12e},{sponge_nyquist_field_ratio:.12e},{periodic_distribution_error:.12e},{sponge_distribution_error:.12e},{periodic_field_return_error:.12e},{sponge_field_return_error:.12e},{removed_casimir_fraction:.12e},{direct_casimir_drop_fraction:.12e},{casimir_accounting_error:.12e},{mass_relative_delta:.12e},{momentum_delta:.12e},{kinetic_energy_relative_delta:.12e},{field_energy_relative_delta:.12e},{minimum_f_before:.12e},{minimum_f_after:.12e},{removed_fluctuation_f_strophy:.12e},{final_f_strophy_fraction:.12e},{wall_seconds:.6}"
+        "{label},{nx},{nv},{velocity_spacing:.8},{nyquist_time:.8},{recurrence_time:.8},{start_fraction:.8},{maximum_damping_rate:.8},{periodic_nyquist_fraction:.12e},{sponge_nyquist_fraction:.12e},{periodic_guardband_fraction:.12e},{sponge_guardband_fraction:.12e},{periodic_registered_mode_f_strophy:.12e},{sponge_registered_mode_f_strophy:.12e},{periodic_registered_guardband_f_strophy:.12e},{sponge_registered_guardband_f_strophy:.12e},{periodic_nyquist_field_ratio:.12e},{sponge_nyquist_field_ratio:.12e},{periodic_distribution_error:.12e},{sponge_distribution_error:.12e},{periodic_field_return_error:.12e},{sponge_field_return_error:.12e},{removed_casimir_fraction:.12e},{direct_casimir_drop_fraction:.12e},{casimir_accounting_error:.12e},{mass_relative_delta:.12e},{momentum_delta:.12e},{kinetic_energy_relative_delta:.12e},{field_energy_relative_delta:.12e},{minimum_f_before:.12e},{minimum_f_after:.12e},{removed_fluctuation_f_strophy:.12e},{final_f_strophy_fraction:.12e},{wall_seconds:.6}"
     );
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!(
-        "case,nx,nv,dv,t_nyquist,t_recurrence,sponge_start_fraction,max_damping_rate,periodic_global_nyquist_fraction,sponge_global_nyquist_fraction,periodic_target_guardband_fraction,sponge_target_guardband_fraction,periodic_E_ratio_at_tN,sponge_E_ratio_at_tN,periodic_distribution_return_error,sponge_distribution_return_error,periodic_E_return_error,sponge_E_return_error,cumulative_removed_C2_fraction,direct_C2_drop_fraction,C2_accounting_error_fraction,mass_relative_delta,momentum_delta,kinetic_energy_relative_delta,field_energy_relative_delta,minimum_f_before,minimum_f_after,accumulated_sponge_f_strophy_loss,final_f_strophy_fraction,wall_seconds"
+        "case,nx,nv,dv,t_nyquist,t_recurrence,sponge_start_fraction,max_damping_rate,periodic_global_nyquist_fraction,sponge_global_nyquist_fraction,periodic_target_guardband_fraction,sponge_target_guardband_fraction,periodic_registered_mode_f_strophy,sponge_registered_mode_f_strophy,periodic_registered_guardband_f_strophy,sponge_registered_guardband_f_strophy,periodic_E_ratio_at_tN,sponge_E_ratio_at_tN,periodic_distribution_return_error,sponge_distribution_return_error,periodic_E_return_error,sponge_E_return_error,cumulative_removed_C2_fraction,direct_C2_drop_fraction,C2_accounting_error_fraction,mass_relative_delta,momentum_delta,kinetic_energy_relative_delta,field_energy_relative_delta,minimum_f_before,minimum_f_after,accumulated_sponge_f_strophy_loss,final_f_strophy_fraction,wall_seconds"
     );
 
     let common = VlasovPoissonConfig {
