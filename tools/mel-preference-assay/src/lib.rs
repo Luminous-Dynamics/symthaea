@@ -508,8 +508,8 @@ fn sha256_hex(input: &[u8]) -> String {
 
     let digest = Sha256::digest(input);
     let mut encoded = String::with_capacity(64);
-    for byte in digest {
-        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+    for byte in digest.iter() {
+        write!(&mut encoded, "{:02x}", *byte).expect("writing to String cannot fail");
     }
     encoded
 }
