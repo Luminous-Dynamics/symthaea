@@ -74,6 +74,7 @@ pub struct OnlinePredictionLedgerV1 {
     pub prediction_id: String,
     pub sample_id: String,
     pub subject_id: String,
+    pub target_measurand_id: String,
     pub score: f64,
     pub model_sha256: String,
     pub issued_at: String,
@@ -102,6 +103,7 @@ pub struct OnlineFeedbackLedgerV1 {
     pub positive: bool,
     pub target_measurand_id: String,
     pub class_semantics_ref: String,
+    pub class_semantics_sha256: String,
     pub revision: u64,
     pub supersedes_label_id: Option<String>,
     pub available_at: String,
@@ -138,6 +140,7 @@ pub struct OnlinePredictionInputV1 {
     pub prediction_id: String,
     pub sample_id: String,
     pub subject_id: String,
+    pub target_measurand_id: String,
     pub score: f64,
     pub issued_at: String,
     pub clock_domain_id: String,
@@ -167,6 +170,7 @@ pub struct OnlineMaturedFeedbackV1 {
     /// Versioned interpretation that maps the physical measurement to the
     /// benchmark's binary defect class.
     pub class_semantics_ref: String,
+    pub class_semantics_sha256: String,
     pub revision: u64,
     pub supersedes_label_id: Option<String>,
 }
@@ -419,12 +423,27 @@ pub fn initialize_online_conformal_v1(
             "subject/config alpha mismatch".into(),
         ));
     }
+    if !subject.prediction_samples.is_empty() {
+        return Err(OnlineConformalError(
+            "initial calibration subject must not contain prediction samples".into(),
+        ));
+    }
     let snapshot = verify_snapshot(graph, cutoff)?;
+    if subject.training_sample_ids.is_empty() {
+        return Err(OnlineConformalError(
+            "training_sample_ids: expected non-empty collection".into(),
+        ));
+    }
     let training_ids: BTreeSet<&str> = subject
         .training_sample_ids
         .iter()
         .map(String::as_str)
         .collect();
+    if training_ids.len() != subject.training_sample_ids.len() {
+        return Err(OnlineConformalError(
+            "training_sample_ids: duplicate identity".into(),
+        ));
+    }
     let mut calibration_samples = subject.calibration_samples.clone();
     calibration_samples.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
     let mut sample_ids = BTreeSet::new();
@@ -529,6 +548,7 @@ pub fn predict_online_conformal_v1(
     require_text(&input.prediction_id, "prediction_id")?;
     require_text(&input.sample_id, "sample_id")?;
     require_text(&input.subject_id, "subject_id")?;
+    require_text(&input.target_measurand_id, "target_measurand_id")?;
     if !input.score.is_finite() || !(0.0..=1.0).contains(&input.score) {
         return Err(OnlineConformalError(
             "prediction.score: expected finite value in [0, 1]".into(),
@@ -586,6 +606,7 @@ pub fn predict_online_conformal_v1(
         prediction_id: input.prediction_id.clone(),
         sample_id: input.sample_id.clone(),
         subject_id: input.subject_id.clone(),
+        target_measurand_id: input.target_measurand_id.clone(),
         score: input.score,
         model_sha256: state.model_sha256.clone(),
         issued_at: input.issued_at.clone(),
@@ -623,6 +644,11 @@ pub fn ingest_online_metrology_feedback_v1(
     require_text(&feedback.subject_id, "feedback.subject_id")?;
     require_text(&feedback.target_measurand_id, "feedback.target_measurand_id")?;
     require_text(&feedback.class_semantics_ref, "feedback.class_semantics_ref")?;
+    if !valid_sha256(&feedback.class_semantics_sha256) {
+        return Err(OnlineConformalError(
+            "feedback.class_semantics_sha256: expected lowercase SHA-256".into(),
+        ));
+    }
     if feedback.revision == 0 {
         return Err(OnlineConformalError(
             "feedback.revision: revisions start at one".into(),
@@ -720,6 +746,7 @@ pub fn ingest_online_metrology_feedback_v1(
         })?;
     if prediction.sample_id != feedback.sample_id
         || prediction.subject_id != feedback.subject_id
+        || prediction.target_measurand_id != feedback.target_measurand_id
         || prediction.model_sha256 != state.model_sha256
     {
         return Err(OnlineConformalError(
@@ -753,6 +780,7 @@ pub fn ingest_online_metrology_feedback_v1(
                 || previous_row.sample_id != feedback.sample_id
                 || previous_row.subject_id != feedback.subject_id
                 || previous_row.target_measurand_id != feedback.target_measurand_id
+                || previous_row.class_semantics_sha256 != feedback.class_semantics_sha256
                 || previous_row.revision >= feedback.revision
             {
                 return Err(OnlineConformalError(
@@ -822,6 +850,7 @@ pub fn ingest_online_metrology_feedback_v1(
         positive: feedback.positive,
         target_measurand_id: feedback.target_measurand_id.clone(),
         class_semantics_ref: feedback.class_semantics_ref.clone(),
+        class_semantics_sha256: feedback.class_semantics_sha256.clone(),
         revision: feedback.revision,
         supersedes_label_id: feedback.supersedes_label_id.clone(),
         available_at: graph_label.available_at.clone(),
@@ -1044,6 +1073,7 @@ mod tests {
                 prediction_id: "prediction-1".into(),
                 sample_id: "test-sample-1".into(),
                 subject_id: "wafer-100".into(),
+                target_measurand_id: "defect-rate".into(),
                 score: 0.9,
                 issued_at: "2026-11-22T10:05:00".into(),
                 clock_domain_id: "fab-local".into(),
@@ -1086,6 +1116,7 @@ mod tests {
                 positive: true,
                 target_measurand_id: "defect-rate".into(),
                 class_semantics_ref: "defect-threshold-v1".into(),
+                class_semantics_sha256: TRANSFORM_SHA.into(),
                 revision: 1,
                 supersedes_label_id: None,
             },
@@ -1208,6 +1239,7 @@ mod tests {
                     prediction_id: format!("prediction-{index}"),
                     sample_id: format!("sample-{index}"),
                     subject_id: format!("wafer-{index}"),
+                    target_measurand_id: "defect-rate".into(),
                     score: 0.01,
                     issued_at: format!("2026-11-22T10:{:02}:00", 5 + index),
                     clock_domain_id: "fab-local".into(),
@@ -1294,6 +1326,7 @@ mod tests {
                     positive: true,
                     target_measurand_id: "defect-rate".into(),
                     class_semantics_ref: "defect-threshold-v1".into(),
+                    class_semantics_sha256: TRANSFORM_SHA.into(),
                     revision: 1,
                     supersedes_label_id: None,
                 },
@@ -1307,6 +1340,7 @@ mod tests {
                 prediction_id: "prediction-after-drift".into(),
                 sample_id: "sample-after-drift".into(),
                 subject_id: "wafer-after-drift".into(),
+                target_measurand_id: "defect-rate".into(),
                 score: 0.9,
                 issued_at: "2026-11-22T10:40:00".into(),
                 clock_domain_id: "fab-local".into(),
