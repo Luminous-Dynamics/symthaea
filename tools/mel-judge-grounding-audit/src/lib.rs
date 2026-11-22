@@ -888,7 +888,7 @@ mod tests {
     #[test]
     fn invalid_digest_is_rejected() {
         let mut panel = value();
-        panel["cases"][0]["baseline"]["audio_a_sha256"] = serde_json::json!("not-a-digest");
+        panel["cases"][0]["candidate_a_audio_sha256"] = serde_json::json!("not-a-digest");
         let error = parse_and_audit(&panel.to_string()).expect_err("bad digest should fail");
         assert!(error.contains("64-character lowercase SHA-256 digest"));
     }
