@@ -158,7 +158,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn sample_ids_sha256(samples: &[RandomForestTrainingSampleV1]) -> String {
-    let ids: Vec<&str> = samples.iter().map(|sample| sample.sample_id.as_str()).collect();
+    let ids: Vec<&str> = samples
+        .iter()
+        .map(|sample| sample.sample_id.as_str())
+        .collect();
     sha256_hex(&serde_json::to_vec(&ids).expect("sample ID serialization is infallible"))
 }
 
@@ -293,8 +296,7 @@ impl TreeBuilder<'_> {
     }
 
     fn best_split(&mut self, row_indices: &[usize]) -> Option<CandidateSplit> {
-        let mut candidate_features: Vec<usize> =
-            (0..self.samples[0].features.len()).collect();
+        let mut candidate_features: Vec<usize> = (0..self.samples[0].features.len()).collect();
         shuffle(&mut candidate_features, &mut self.rng);
         candidate_features.truncate(self.resolved_mtry);
         candidate_features.sort_unstable();
@@ -355,8 +357,7 @@ impl TreeBuilder<'_> {
                 let right_weight = right_positive_weight + right_negative_weight;
                 let child_impurity = left_weight
                     * weighted_gini(left_positive_weight, left_negative_weight)
-                    + right_weight
-                        * weighted_gini(right_positive_weight, right_negative_weight);
+                    + right_weight * weighted_gini(right_positive_weight, right_negative_weight);
                 let gain = total_weight * parent_impurity - child_impurity;
                 if gain <= EPSILON {
                     continue;
@@ -444,8 +445,7 @@ pub fn fit_random_forest_v1(
 ) -> Result<RandomForestModelV1, RandomForestError> {
     let mut samples = training_samples.to_vec();
     samples.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
-    let (feature_count, positive_count, negative_count) =
-        validate_training_samples(&samples)?;
+    let (feature_count, positive_count, negative_count) = validate_training_samples(&samples)?;
     let resolved_mtry = validate_parameters(parameters, feature_count)?;
 
     let (positive_weight, negative_weight) = match &parameters.class_weighting {
@@ -511,10 +511,9 @@ pub fn fit_random_forest_v1(
         training_sample_ids_sha256: &model.training_sample_ids_sha256,
         trees: &model.trees,
     };
-    model.model_sha256 = sha256_hex(
-        &serde_json::to_vec(&material)
-            .map_err(|error| RandomForestError(format!("model digest serialization failed: {error}")))?,
-    );
+    model.model_sha256 = sha256_hex(&serde_json::to_vec(&material).map_err(|error| {
+        RandomForestError(format!("model digest serialization failed: {error}"))
+    })?);
     Ok(model)
 }
 
@@ -525,7 +524,12 @@ fn predict_tree(tree: &ForestTreeV1, features: &[f64]) -> Result<f64, RandomFore
             .nodes
             .get(node_index)
             .ok_or_else(|| RandomForestError("model tree contains invalid child index".into()))?;
-        match (node.feature_index, node.threshold, node.left_child, node.right_child) {
+        match (
+            node.feature_index,
+            node.threshold,
+            node.left_child,
+            node.right_child,
+        ) {
             (Some(feature), Some(threshold), Some(left), Some(right)) => {
                 let value = *features.get(feature).ok_or_else(|| {
                     RandomForestError("prediction row has insufficient feature count".into())
@@ -547,7 +551,9 @@ pub fn predict_random_forest_v1(
     samples: &[RandomForestInputSampleV1],
 ) -> Result<RandomForestPredictionReportV1, RandomForestError> {
     if model.schema != MODEL_SCHEMA_V1 || model.trees.is_empty() {
-        return Err(RandomForestError("model schema or tree collection invalid".into()));
+        return Err(RandomForestError(
+            "model schema or tree collection invalid".into(),
+        ));
     }
     if samples.is_empty() {
         return Err(RandomForestError(
@@ -598,10 +604,10 @@ pub fn predict_random_forest_v1(
         .iter()
         .map(|row| (row.sample_id.as_str(), row.positive, row.score))
         .collect();
-    let score_vector_sha256 = sha256_hex(
-        &serde_json::to_vec(&digest_material)
-            .map_err(|error| RandomForestError(format!("score digest serialization failed: {error}")))?,
-    );
+    let score_vector_sha256 =
+        sha256_hex(&serde_json::to_vec(&digest_material).map_err(|error| {
+            RandomForestError(format!("score digest serialization failed: {error}"))
+        })?);
     Ok(RandomForestPredictionReportV1 {
         schema: PREDICTION_SCHEMA_V1.into(),
         model_sha256: model.model_sha256.clone(),
@@ -623,10 +629,7 @@ pub fn score_random_forest_predictions_v1(
     }
     let subject = BinaryScoreSubjectV1 {
         schema: crate::benchmark::binary_metrics::INPUT_SCHEMA_V1.into(),
-        case_id: Some(format!(
-            "random-forest:{}",
-            prediction_report.model_sha256
-        )),
+        case_id: Some(format!("random-forest:{}", prediction_report.model_sha256)),
         decision_threshold,
         calibration_bins,
         recall_target: 0.95,
@@ -695,10 +698,12 @@ mod tests {
         let predictions_a = predict_random_forest_v1(&model_a, &input).unwrap();
         let predictions_b = predict_random_forest_v1(&model_b, &input).unwrap();
         assert_eq!(predictions_a, predictions_b);
-        assert!(predictions_a
-            .predictions
-            .iter()
-            .all(|row| row.score.is_finite() && (0.0..=1.0).contains(&row.score)));
+        assert!(
+            predictions_a
+                .predictions
+                .iter()
+                .all(|row| row.score.is_finite() && (0.0..=1.0).contains(&row.score))
+        );
     }
 
     #[test]
@@ -734,10 +739,12 @@ mod tests {
             .collect();
         input.reverse();
         let report = predict_random_forest_v1(&model, &input).unwrap();
-        assert!(report
-            .predictions
-            .windows(2)
-            .all(|pair| pair[0].sample_id < pair[1].sample_id));
+        assert!(
+            report
+                .predictions
+                .windows(2)
+                .all(|pair| pair[0].sample_id < pair[1].sample_id)
+        );
     }
 
     #[test]
@@ -799,7 +806,17 @@ mod tests {
             unweighted_model.training_sample_ids_sha256,
             balanced_model.training_sample_ids_sha256
         );
-        assert!(unweighted_model.trees.iter().all(|tree| !tree.nodes.is_empty()));
-        assert!(balanced_model.trees.iter().all(|tree| !tree.nodes.is_empty()));
+        assert!(
+            unweighted_model
+                .trees
+                .iter()
+                .all(|tree| !tree.nodes.is_empty())
+        );
+        assert!(
+            balanced_model
+                .trees
+                .iter()
+                .all(|tree| !tree.nodes.is_empty())
+        );
     }
 }
