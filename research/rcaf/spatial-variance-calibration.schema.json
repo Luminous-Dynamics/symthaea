@@ -22,7 +22,36 @@
       "const": "synthetic_fixture"
     },
     "geometry": {
-      "const": "synthetic_path_graph_8_roi"
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["representation", "source", "interpretation_scope", "roi_labels", "weighted_edges"],
+      "properties": {
+        "representation": { "const": "weighted_undirected_graph" },
+        "source": { "const": "synthetic_path_graph" },
+        "interpretation_scope": { "const": "synthetic_topology_only" },
+        "roi_labels": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "weighted_edges": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "string" },
+              { "type": "string" },
+              { "type": "number", "exclusiveMinimum": 0 }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
     },
     "time_points": {
       "const": 160
@@ -40,8 +69,13 @@
         "additionalProperties": false,
         "required": [
           "family_id",
+          "spatial_rank",
+          "diffusion_time",
+          "seed_roi_indices",
           "rng_seed",
           "initial_additive_dose",
+          "temporal_ar1",
+          "temporal_coherence",
           "target_component_variance_fraction",
           "realized_component_variance_fraction",
           "clean_component_variance",
@@ -58,6 +92,19 @@
               "heat_kernel_localized"
             ]
           },
+          "spatial_rank": { "type": "integer", "minimum": 1 },
+          "diffusion_time": { "type": "number", "exclusiveMinimum": 0 },
+          "seed_roi_indices": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "integer", "minimum": 0, "maximum": 7 }
+              }
+            ]
+          },
           "rng_seed": {
             "type": "string",
             "pattern": "^0x[0-9a-f]{16}$"
@@ -65,6 +112,14 @@
           "initial_additive_dose": {
             "type": "number",
             "minimum": 0
+          },
+          "temporal_ar1": {
+            "type": "number",
+            "exclusiveMinimum": -1,
+            "exclusiveMaximum": 1
+          },
+          "temporal_coherence": {
+            "const": 0
           },
           "target_component_variance_fraction": {
             "const": 0.1
