@@ -736,14 +736,8 @@ mod tests {
     fn held_out_label_changes_do_not_change_any_fitted_model_digest() {
         let changed_labels = String::from_utf8(LABELS.to_vec())
             .unwrap()
-            .replace(
-                "-1 \"19/07/2008 12:15:00\"",
-                "1 \"19/07/2008 12:15:00\"",
-            )
-            .replace(
-                "1 \"19/07/2008 12:20:00\"",
-                "-1 \"19/07/2008 12:20:00\"",
-            );
+            .replace("-1 \"19/07/2008 12:15:00\"", "1 \"19/07/2008 12:15:00\"")
+            .replace("1 \"19/07/2008 12:20:00\"", "-1 \"19/07/2008 12:20:00\"");
         let original = evaluate(FEATURES, LABELS);
         let changed = evaluate(FEATURES, changed_labels.as_bytes());
         for baseline in ["B2", "B3", "B4"] {
@@ -786,26 +780,26 @@ mod tests {
     fn sample_input_order_does_not_affect_fitted_model_digest() {
         let features = parse_features(FEATURES).expect("fixture features parse");
         let labels = parse_labels(LABELS).expect("fixture labels parse");
-        let split: SplitManifestV1 =
-            serde_json::from_str(SPLIT).expect("split fixture parses");
+        let split: SplitManifestV1 = serde_json::from_str(SPLIT).expect("split fixture parses");
 
-        let digest_for = |baseline_id: &str,
-                          policy: SecomImputationPolicyV1,
-                          uses_missingness_indicators: bool,
-                          features: &[SecomSensorRowV1],
-                          labels: &[SecomLabelRowV1],
-                          assignments: &[crate::benchmark::split_manifest::SplitAssignmentV1]| {
-            let model = fit_model_v1(
-                baseline_id,
-                policy,
-                uses_missingness_indicators,
-                features,
-                labels,
-                assignments,
-            )
-            .expect("training-only fit succeeds");
-            sha256_hex(&serde_json::to_vec(&model).expect("model serializes"))
-        };
+        let digest_for =
+            |baseline_id: &str,
+             policy: SecomImputationPolicyV1,
+             uses_missingness_indicators: bool,
+             features: &[SecomSensorRowV1],
+             labels: &[SecomLabelRowV1],
+             assignments: &[crate::benchmark::split_manifest::SplitAssignmentV1]| {
+                let model = fit_model_v1(
+                    baseline_id,
+                    policy,
+                    uses_missingness_indicators,
+                    features,
+                    labels,
+                    assignments,
+                )
+                .expect("training-only fit succeeds");
+                sha256_hex(&serde_json::to_vec(&model).expect("model serializes"))
+            };
 
         let configurations = [
             ("B2", SecomImputationPolicyV1::TrainingMedian, false),
@@ -839,7 +833,10 @@ mod tests {
                 &permuted_labels,
                 &permuted_assignments,
             );
-            assert_eq!(original, permuted, "{baseline_id} must be row-order invariant");
+            assert_eq!(
+                original, permuted,
+                "{baseline_id} must be row-order invariant"
+            );
         }
     }
 }
