@@ -14,7 +14,8 @@ failure, timeout, agent assertion or unrelated rejection is not a killed mutant.
 
 ## Execution report
 
-Schema: `qualification-report-v1.schema.json`
+Input schema: `qualification-report-v1.schema.json`  
+Output schema: `qualification-summary-v1.schema.json`
 
 The report contains all 30 case results:
 
@@ -48,9 +49,10 @@ cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- \
 ```
 
 The report's artifact root is resolved relative to the report file's directory.
-The command emits a JSON summary with per-category, per-severity and overall
-mutation kill rates and 95% Wilson intervals, positive-control false rejections,
-metamorphic equivalence and hard-gate decisions.
+The command emits a JSON summary, validates it against
+`qualification-summary-v1.schema.json`, and reports per-category, per-severity
+and overall mutation kill rates with 95% Wilson intervals, positive-control
+false rejections, metamorphic equivalence and hard-gate decisions.
 
 The adjudicator validates the campaign's raw-file SHA-256, campaign ID, full case
 coverage, paired fixture/environment identity, receipt identity and receipt
