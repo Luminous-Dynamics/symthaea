@@ -277,3 +277,73 @@ NeuroBench 2.4.0 supplies algorithm workloads such as few-shot class-incremental
 - NeuroBench 2.4.0: https://neurobench.readthedocs.io/en/2.4.0/readme.html
 
 The defensible competitive claim is not that Symthaea is more efficient or more intelligent today. It is that this programme is setting up a reproducible comparison of decision quality, temporal application cost, observation-compute interaction and non-fungible resources, while retaining official benchmark metrics where applicable.
+## 17. RoboDyna replication profile: paired episode identity, not just average async loss
+
+RoboDyna is the closest public embodied benchmark for this programme and should be promoted from a background citation to a first external execution target. Its NeurIPS 2026 workshop paper evaluates 20 conceptual dynamic-manipulation tasks across five capability categories plus 10 household tasks, with 3,500 expert demonstrations, held-out compositional difficulty, paired synchronous/asynchronous evaluation on identical seeds, progress score and human controls. The environment uses SAPIEN physics at 250 Hz and an action cadence of 15 simulation steps (60 ms). During asynchronous inference, measured forward-pass wall time is charged to simulated time while the scene continues evolving and the arm holds its last target. The reported mean inference charges are 109 ms for π0.5, 156 ms for X-VLA and 236 ms for FastWAM.
+
+- Paper: https://robodyna.github.io/robodyna/paper/robodyna_neurips2026_workshop.pdf
+- Project/code and Apache-2.0 license: https://github.com/robodyna/robodyna
+- Official project page: https://robodyna.github.io/robodyna/
+
+### 17.1 Exact native tracks and baselines
+
+Retain the official task categories and splits:
+
+| Capability | Tasks | Symthaea hypothesis to test (not an assumed advantage) |
+|---|---|---|
+| Trajectory prediction | Catch Ramp Ball; Catch Valley Ball; Stop Valley Ball; Save Goal | Does recurrent state improve prediction of where objects will be when actions actually arrive? |
+| Periodic pattern | Catch Marbles Trapdoors; Catch Cuboid; Drop Ball Hole; Whack Moles | Do multi-timescale HDC/LTC and event-time memory improve action timing in short opportunity windows? |
+| Dynamic avoidance | Put Cup Belt; Hit Target; Load Train; Place Block Belt | Does prediction improve decisions under independent object motion and collision? |
+| State transition | Cook Meat Timer; Pick Ripe Apple; Sort Apples Belt; Pack Fruits | Does the system recognize monotonic state changes and deadline loss while reasoning? |
+| Static to dynamic | Catch Shelf Marble; Dispense Gummy; Marble Shelf Maze; Play Billiard | Does action-conditioned prediction help when the robot creates the motion itself? |
+| Household | Boil Milk; Catch Cup; Catch Mouse Object Drop; Clean Table; Cook Food Timer; Make Soup; Measure Ingredient; Pour Beer; Stop Ball; Trap Bug | Does competence transfer to richer visual semantics and ordinary physical processes? |
+
+For faithful baseline reproduction, preserve π0.5, X-VLA and FastWAM, the official same-checkpoint training setup, action chunking, fixed evaluation seed file, step limits, hard var1+2 holdout and both protocols. The official study fine-tunes π0.5 and X-VLA at 30k gradient steps and FastWAM at 13k. Do not present a Symthaea action-layer extension as a direct VLA replacement unless sensor input, action domain, training data, task instruction, observation bandwidth and control authority are matched.
+
+The official project reports mean success (sync+async) of 0.18 for π0.5, 0.11 for X-VLA, and 0.06 for FastWAM overall; per-policy mean inference latency was 109/156/236 ms. These numbers are reported for the benchmark's own checkpoints, training data and simulator. They are comparators, not targets that can be lifted directly to a different architecture.
+
+### 17.2 The critical paired-outcome result
+
+RoboDyna's paper shows why a mean async penalty is insufficient. Moving from synchronous to asynchronous evaluation changes average success by at most 0.03, but seed-by-seed analysis finds that roughly one-third to one-half of each policy's successful rollouts are protocol-contingent: latency changes which episodes succeed more than it changes the total mean. In its Sort Apples Belt FastWAM example, success is 0.65 synchronous versus 0.17 asynchronous. The world-owned clock is especially consequential in monotonic state-transition tasks.
+
+The tournament must therefore report all of the following, not only mean_success_async minus mean_success_sync:
+
+- paired per-seed sync_success_to_async_failure, sync_failure_to_async_success, and unchanged outcomes;
+- task/category/hardness transition matrices;
+- paired progress-score deltas using the benchmark's official milestone/penalty definition;
+- decision/application-time regret and action age as explicitly labelled Symthaea extensions;
+- deadline misses, stale proposals, actual fallback behavior and recovery cost;
+- latency distributions by decision stage and charged policy latency;
+- full failure denominators, including timeouts and non-applications.
+
+Never claim “latency has a 2% effect” from a two-point average shift if 30–50% of previously successful episodes changed identity. The paired outcome identity is the primary causal datum.
+
+### 17.3 Reproduce first; extend second
+
+1. Freeze the upstream RoboDyna repository SHA, Apache-2.0 license, dataset/asset revision, SAPIEN/CuRobo/physics versions, GPU/driver, seed YAML, step-limit YAML, policy checkpoints and exact launcher arguments.
+2. Reproduce the official π0.5/X-VLA/FastWAM sync and async results before substituting Symthaea components. Check the 250-Hz physics clock, 60-ms action chunk, first-forward-pass warm-up exclusion and asynchronous latency charging.
+3. Validate the native success and progress-score implementation against its published finite examples and raw task outputs. Keep official metric code separate from Symthaea-specific outputs.
+4. Add a decision-layer extension only through a documented, candidate-visible interface. The candidate must not receive simulator hidden state, future trajectories, event IDs, evaluation seeds, progress labels, or the reference action oracle.
+5. Compare direct-fast/reflex, observation policy, HDC/LTC recurrent policy, world-model-assisted policy, and paired compute×observation arms on the same reset states and exogenous dynamics. A perception-input mismatch or privileged-state path must be marked NOT_COMPARABLE, not silently normalized.
+6. Evaluate both seen-dynamics compositions and held-out/unseen dynamics. RoboDyna's held-out var1+2 condition tests compositional generalization of seen factors; it is not the same as a new physical law or unseen dynamic mechanism.
+7. Publish paired episode outcomes, progress, decision regret, full resource vector and confidence intervals. Do not pool task categories if a gains-in-one/failures-in-another pattern would be hidden.
+
+### 17.4 Human baseline is a useful ceiling, not a model leaderboard
+
+On RoboDyna's human-evaluated slice (conceptual hard var1+2 plus household base), the paper reports 50.2% task success for teleoperation and 77.1% for scene-interactive control, versus 14% for the best policy under those same conditions. The difference between teleoperation and scene-interactive control itself demonstrates that action-interface cost is material. These results are human baselines on the specified slice, not comparable to the model paper's overall aggregate.
+
+Report the human slice separately; use it to expose interface and timing costs, not to make an unsupported AGI or human-equivalence claim.
+
+### 17.5 What would count as a Symthaea win?
+
+A credible first result is not “higher benchmark average” alone. It is a paired, held-out result showing at least one of:
+
+- fewer protocol-contingent success losses at matched or lower measured inference latency;
+- higher official progress score in near-zero-success categories without worsening hard safety/authority constraints;
+- lower application-time decision regret and fewer stale actions at the same sensor/compute budget;
+- a demonstrable positive compute×observation interaction on a preregistered task family, while also identifying null/negative interaction tasks;
+- lower measured energy or compute cost at a non-inferior paired regret/progress margin.
+
+Also publish at least one regime where the direct policy or VLA baseline is better. RoboDyna's own findings show that predictive world models can be worse than reactive policies on independently moving or periodic scenes, while providing a different capability on static-to-dynamic tasks. A useful cognitive architecture must detect when prediction helps and when it is a liability.
+
+Do not conflate official RoboDyna outcomes with Symthaea extensions. No result from this protocol presently establishes a RoboDyna score or superiority over its policies.
