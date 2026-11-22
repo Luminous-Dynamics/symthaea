@@ -952,6 +952,9 @@ impl TemporalMycelialCycleProfile {
             || self.snapshot_metrics.windows(2).any(|pair| {
                 pair[0].snapshot_id == pair[1].snapshot_id
             })
+            || self.snapshot_metrics.iter().fold(0usize, |total, snapshot| {
+                total.saturating_add(snapshot.edge_count)
+            }) > MAX_TEMPORAL_EDGE_WINDOW_OBSERVATIONS
             || self.edge_evidence_inventory.len()
                 > MAX_TEMPORAL_MYCELIAL_WINDOWS.saturating_mul(MAX_TEMPORAL_MYCELIAL_EDGES)
             || self.edge_evidence_inventory.iter().any(|edge| {
