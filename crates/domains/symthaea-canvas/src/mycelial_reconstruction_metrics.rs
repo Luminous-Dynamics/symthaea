@@ -577,12 +577,13 @@ pub fn match_junctions_hungarian(
         return Ok(Vec::new());
     }
 
-    // The unmatched penalty must dominate the *aggregate* possible distance
-    // change across every existing match when cardinality increases by one.
-    // With k <= min(prediction_count, truth_count), k*D is the largest possible
-    // distance penalty; 2*(min+1)*D is strictly larger. This makes match count
-    // the primary objective and total distance secondary.
-    let unmatched_cost = (prediction_count.min(truth_count) as f64 + 1.0) * maximum_distance;
+    // Normalize admissible distances by the maximum threshold. This keeps
+    // the assignment objective stable for tiny physical units and large
+    // coordinate scales without changing the minimum-distance ordering.
+    // An extra match reduces two unmatched penalties. 2*(min+1) dominates
+    // the largest possible aggregate change in admissible match costs, so
+    // cardinality is strictly primary and total distance is secondary.
+    let unmatched_cost = prediction_count.min(truth_count) as f64 + 1.0;
     // A forbidden real edge must cost more than assigning every real endpoint
     // to its own unmatched dummy. Therefore it can never appear in an optimum.
     let forbidden_cost = (matrix_size as f64 + 1.0) * unmatched_cost;
@@ -596,7 +597,7 @@ pub fn match_junctions_hungarian(
                 ground_truth.dimensionality,
             );
             costs[prediction_index][truth_index] = if distance <= maximum_distance {
-                distance
+                distance / maximum_distance
             } else {
                 forbidden_cost
             };
@@ -620,8 +621,8 @@ pub fn match_junctions_hungarian(
         if column >= truth_count {
             continue;
         }
-        let distance = costs[prediction_index][column];
-        if distance <= maximum_distance {
+        let normalized_distance = costs[prediction_index][column];
+        if normalized_distance <= 1.0 {
             matches.push(JunctionIdentityMatch {
                 predicted_junction_id: prediction_nodes[prediction_index].id.clone(),
                 ground_truth_junction_id: ground_truth_nodes[column].id.clone(),
@@ -1541,11 +1542,14 @@ fn point_distance(
     right: ReconstructionPoint3,
     dimensionality: ReconstructionDimensionality,
 ) -> f64 {
-    let mut squared = (left.x - right.x).powi(2) + (left.y - right.y).powi(2);
+    // hypot is internally scaled, avoiding underflow/overflow in squared
+    // coordinate differences, even at very small physical unit scales.
+    let planar = (left.x - right.x).hypot(left.y - right.y);
     if dimensionality == ReconstructionDimensionality::ThreeD {
-        squared += (left.z - right.z).powi(2);
+        planar.hypot(left.z - right.z)
+    } else {
+        planar
     }
-    squared.sqrt()
 }
 
 fn summarize_errors(mut errors: Vec<f64>) -> ReconstructionLocalizationError {
