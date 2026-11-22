@@ -10,7 +10,9 @@ pub mod providers;
 //! EvidenceVerifier must delegate to Mycelix source-ledger, calibration and
 //! outcome-reconciliation receipts. Agent-authored labels are not trust anchors.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+use sha2::{Digest, Sha256};
 
 use broca_mace_policy::{
     Action, CausalIdentificationV1, Experience, Scope, SemanticEstimandV1,
@@ -61,6 +63,16 @@ pub enum SourceTrustStatus {
     Unknown,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DependencyLineageStatusV1 {
+    /// The issuer attests that the supplied dependency list is complete.
+    Complete,
+    /// The issuer attests only the listed known dependencies; more may exist.
+    Partial,
+    /// Dependency ancestry was not established. Empty does not mean independent.
+    Unknown,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedLineage {
     pub source_family: u16,
@@ -74,6 +86,11 @@ pub struct VerifiedLineage {
     pub upstream_source_id: String,
     pub source_artifact_digest: String,
     pub transformation_digest: String,
+    /// Canonical upstream event IDs explicitly attested by this lineage receipt.
+    pub derived_from_event_ids: Vec<u32>,
+    pub dependency_lineage_status: DependencyLineageStatusV1,
+    /// Digest of the exact dependency manifest covered by the lineage receipt.
+    pub dependency_manifest_digest: Option<String>,
     pub issuer_id: String,
     pub receipt_digest: String,
 }
@@ -209,6 +226,11 @@ pub struct EvidenceReceiptBundle {
     pub event_occurred_at_ms: i64,
     pub authority_received_at_ms: i64,
     pub lineage_digest: String,
+    pub derived_from_event_ids: Vec<u32>,
+    pub dependency_lineage_status: DependencyLineageStatusV1,
+    pub dependency_manifest_digest: Option<String>,
+    /// Lifecycle state independently verified at this bitemporal snapshot.
+    pub lifecycle_status_as_known: SourceLifecycleStatus,
     pub source_family: u16,
     pub source_root_id: u32,
     pub source_root_digest: SourceRootDigest,
@@ -282,6 +304,7 @@ pub enum IngestReject {
     UnverifiedCausalAssessment,
     IncompleteSemanticEstimand,
     SemanticEstimandDigestMismatch,
+    InvalidDependencyLineage,
     UnverifiedOutcome,
     InvalidVerifiedOutcomeValue,
     OutcomeUnitMismatch,
@@ -350,9 +373,10 @@ pub fn ingest_as_known(
     if dispatch >= raw.outcome_observed_at_ms {
         return Err(IngestReject::DispatchNotBeforeOutcome);
     }
-    match verifier
+    let lifecycle_status_as_known = verifier
         .lifecycle_status_as_of(raw.event_id, query.known_at_ms)
-        .ok_or(IngestReject::RetractionStatusUnknown)?
+        .ok_or(IngestReject::RetractionStatusUnknown)?;
+    match lifecycle_status_as_known
     {
         SourceLifecycleStatus::Active => {}
         SourceLifecycleStatus::Retracted => {
@@ -391,6 +415,32 @@ pub fn ingest_as_known(
     }
     if !is_sha256_hex(&lineage.trust_policy_digest) {
         return Err(IngestReject::InvalidTrustPolicyDigest);
+    }
+    let mut canonical_dependencies = lineage.derived_from_event_ids.clone();
+    canonical_dependencies.sort_unstable();
+    canonical_dependencies.dedup();
+    if canonical_dependencies != lineage.derived_from_event_ids
+        || canonical_dependencies.iter().any(|id| *id == 0 || *id == raw.event_id)
+    {
+        return Err(IngestReject::InvalidDependencyLineage);
+    }
+    match lineage.dependency_lineage_status {
+        DependencyLineageStatusV1::Complete | DependencyLineageStatusV1::Partial => {
+            if !lineage
+                .dependency_manifest_digest
+                .as_deref()
+                .is_some_and(is_sha256_hex)
+            {
+                return Err(IngestReject::InvalidDependencyLineage);
+            }
+        }
+        DependencyLineageStatusV1::Unknown => {
+            if !lineage.derived_from_event_ids.is_empty()
+                || lineage.dependency_manifest_digest.is_some()
+            {
+                return Err(IngestReject::InvalidDependencyLineage);
+            }
+        }
     }
 
     let measurement = verifier
@@ -493,6 +543,10 @@ pub fn ingest_as_known(
             event_occurred_at_ms: event.occurred_at_ms,
             authority_received_at_ms: event.received_at_ms,
             lineage_digest: lineage.receipt_digest,
+            derived_from_event_ids: lineage.derived_from_event_ids,
+            dependency_lineage_status: lineage.dependency_lineage_status,
+            dependency_manifest_digest: lineage.dependency_manifest_digest,
+            lifecycle_status_as_known,
             source_family: lineage.source_family,
             source_root_id: lineage.source_root_id,
             source_root_digest: lineage.source_root_digest,
@@ -1331,6 +1385,9 @@ mod tests {
                 },
                 source_artifact_digest: "e".repeat(64),
                 transformation_digest: "f".repeat(64),
+                derived_from_event_ids: Vec::new(),
+                dependency_lineage_status: DependencyLineageStatusV1::Unknown,
+                dependency_manifest_digest: None,
                 issuer_id: "did:key:source-ledger".into(),
                 receipt_digest: "d".repeat(64),
             })
