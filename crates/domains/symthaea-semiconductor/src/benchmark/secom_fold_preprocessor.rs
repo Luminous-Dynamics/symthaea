@@ -171,7 +171,7 @@ fn median(values: &mut [f64]) -> f64 {
     values.sort_by(f64::total_cmp);
     let middle = values.len() / 2;
     if values.len().is_multiple_of(2) {
-        (values[middle - 1] + values[middle]) * 0.5
+        values[middle - 1] * 0.5 + values[middle] * 0.5
     } else {
         values[middle]
     }
@@ -567,6 +567,23 @@ mod tests {
         let _ = transform_secom_rows_v1(&fitted, &ordinary).unwrap();
         let _ = transform_secom_rows_v1(&fitted, &extreme).unwrap();
         assert_eq!(fitted.pipeline_sha256, fit_secom_preprocessor_v1(&training, &config()).unwrap().pipeline_sha256);
+    }
+
+    #[test]
+    fn changing_training_labels_does_not_change_preprocessor_fit() {
+        let training = vec![
+            row("a", false, &[Some(1.0), Some(4.0)]),
+            row("b", false, &[Some(2.0), None]),
+            row("c", true, &[Some(3.0), Some(6.0)]),
+            row("d", true, &[Some(4.0), Some(7.0)]),
+        ];
+        let mut changed_labels = training.clone();
+        for sample in &mut changed_labels {
+            sample.positive = !sample.positive;
+        }
+        let original = fit_secom_preprocessor_v1(&training, &config()).unwrap();
+        let changed = fit_secom_preprocessor_v1(&changed_labels, &config()).unwrap();
+        assert_eq!(original.pipeline_sha256, changed.pipeline_sha256);
     }
 
     #[test]
