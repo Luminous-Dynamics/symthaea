@@ -688,14 +688,12 @@ mod tests {
     #[test]
     fn fixed_response_fails_target_sensitivity() {
         let mut trial = positive_trial();
-        if let CausalArmV2 {
+        let CausalArmV2 {
             response_control,
             response_treatment,
             ..
-        } = &mut trial.partner_to_agent
-        {
-            *response_treatment = response_control.clone();
-        }
+        } = &mut trial.partner_to_agent;
+        *response_treatment = response_control.clone();
         seal_trial(&mut trial).unwrap();
         let report = validate_trial(&trial);
         assert!(!report.valid);
@@ -748,6 +746,24 @@ mod tests {
     }
 
     #[test]
+    fn articulation_any_change_relation_is_supported() {
+        let mut trial = positive_trial();
+        trial.target_feature = TargetFeatureV2::Articulation;
+        for arm in [&mut trial.partner_to_agent, &mut trial.agent_to_partner] {
+            arm.input_treatment.events[0].velocity = arm.input_control.events[0].velocity;
+            arm.response_treatment.events[0].velocity = arm.response_control.events[0].velocity;
+            arm.input_control.events[0].articulation = ArticulationV2::Detached;
+            arm.input_treatment.events[0].articulation = ArticulationV2::Legato;
+            arm.response_control.events[0].articulation = ArticulationV2::Staccato;
+            arm.response_treatment.events[0].articulation = ArticulationV2::Accent;
+            arm.expected_relation = ExpectedRelationV2::AnyChange;
+        }
+        seal_trial(&mut trial).unwrap();
+        let report = validate_trial(&trial);
+        assert!(report.valid, "{:?}", report.issues);
+    }
+
+    #[test]
     fn trial_digest_tampering_is_detected() {
         let mut trial = positive_trial();
         trial.partner_to_agent.response_treatment.events[0].velocity = 95;
@@ -778,6 +794,8 @@ mod tests {
         let mut trial = positive_trial();
         trial.target_feature = TargetFeatureV2::PhraseGesture;
         for arm in [&mut trial.partner_to_agent, &mut trial.agent_to_partner] {
+            arm.input_treatment.events[0].velocity = arm.input_control.events[0].velocity;
+            arm.response_treatment.events[0].velocity = arm.response_control.events[0].velocity;
             arm.input_control.events[0].phrase_gesture = PhraseGestureV2::Neutral;
             arm.input_treatment.events[0].phrase_gesture = PhraseGestureV2::Pickup;
             arm.response_control.events[0].phrase_gesture = PhraseGestureV2::Neutral;
