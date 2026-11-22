@@ -17,11 +17,11 @@ use std::time::Instant;
 
 use symthaea_canvas::{
     AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
-    JunctionClassProbabilityPrediction, JunctionIdentityMatch, MycelialAnnotationTriageConfig,
-    MycelialReviewOrderingPolicy, build_mycelial_annotation_triage,
-    MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH, MycelialReconstructionError,
-    ReconstructionCalibrationClass, ReconstructionCalibrationConfig, ReconstructionDimensionality,
-    ReconstructionEvaluationConfig, ReconstructionLengthUnit, ReconstructionPoint3,
+    JunctionClassProbabilityPrediction, JunctionIdentityMatch,
+    MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH, MycelialAnnotationTriageConfig,
+    MycelialReconstructionError, MycelialReviewOrderingPolicy, ReconstructionCalibrationClass,
+    ReconstructionCalibrationConfig, ReconstructionDimensionality, ReconstructionEvaluationConfig,
+    ReconstructionLengthUnit, ReconstructionPoint3, build_mycelial_annotation_triage,
     evaluate_mycelial_reconstruction, evaluate_mycelial_reconstruction_calibration,
     match_junctions_hungarian,
 };
@@ -263,11 +263,15 @@ fn evaluate_case(
     );
     println!(
         "selective_risk_oracle_aurc: {:?}",
-        calibration.selective_risk_summary.oracle_area_under_risk_coverage
+        calibration
+            .selective_risk_summary
+            .oracle_area_under_risk_coverage
     );
     println!(
         "selective_risk_excess_aurc: {:?}",
-        calibration.selective_risk_summary.excess_area_under_risk_coverage
+        calibration
+            .selective_risk_summary
+            .excess_area_under_risk_coverage
     );
     println!(
         "calibration_receipt_digest: {}",
@@ -289,9 +293,18 @@ fn evaluate_case(
         )?;
         triage.validate_against(prediction, &calibration)?;
         println!("triage_policy: {policy:?}");
-        println!("triage_uncertain_review_count: {}", triage.uncertain_review_count);
-        println!("triage_articulation_critical_count: {}", triage.articulation_critical_count);
-        println!("triage_anastomosis_sensitive_count: {}", triage.anastomosis_sensitive_count);
+        println!(
+            "triage_uncertain_review_count: {}",
+            triage.uncertain_review_count
+        );
+        println!(
+            "triage_articulation_critical_count: {}",
+            triage.articulation_critical_count
+        );
+        println!(
+            "triage_anastomosis_sensitive_count: {}",
+            triage.anastomosis_sensitive_count
+        );
         for item in triage.review_items.iter().take(5) {
             println!(
                 "triage_item: rank={} id={} class={:?} confidence={:.6} entropy={:.6} degree={} component_delta={} cycle_loss={} anastomosis_p={:.6} crossing_p={:.6}",
@@ -400,7 +413,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             &probabilities,
             ReconstructionCalibrationConfig::default(),
         )?;
-        black_box((score.canonical_digest_hex()?, calibration.canonical_digest_hex()?));
+        black_box((
+            score.canonical_digest_hex()?,
+            calibration.canonical_digest_hex()?,
+        ));
         durations_ns.push(started.elapsed().as_nanos());
     }
     durations_ns.sort_unstable();
