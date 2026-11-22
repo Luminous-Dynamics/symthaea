@@ -1368,6 +1368,70 @@ mod tests {
     }
 
     #[test]
+    fn unmatched_predictions_are_no_object_samples_and_missed_truth_stays_detection_fn() {
+        let (truth, mut prediction, _) = fixture();
+        prediction.junctions.retain(|junction| junction.id != "pC");
+        prediction.junctions.push(node(
+            "pExtra",
+            AnnotatedJunctionKind::Uncertain,
+            20.0,
+            20.0,
+        ));
+        prediction.segments.retain(|segment| {
+            segment.start_junction_id != "pC" && segment.end_junction_id != "pC"
+        });
+        let matches = match_junctions_hungarian(&truth, &prediction, 0.1).unwrap();
+        assert_eq!(matches.len(), 2);
+        let score = evaluate_mycelial_reconstruction(
+            &truth,
+            &prediction,
+            "hungarian-missed-and-extra-v1",
+            &matches,
+            ReconstructionEvaluationConfig {
+                maximum_junction_match_distance: 0.1,
+                ..ReconstructionEvaluationConfig::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(score.junction_detection.true_positive, 2);
+        assert_eq!(score.junction_detection.false_positive, 1);
+        assert_eq!(score.junction_detection.false_negative, 1);
+
+        let probabilities = vec![
+            probabilities("pA", ReconstructionCalibrationClass::Branch, 0.9),
+            probabilities("pB", ReconstructionCalibrationClass::Tip, 0.9),
+            probabilities("pExtra", ReconstructionCalibrationClass::NoObject, 0.9),
+        ];
+        let report = evaluate_mycelial_reconstruction_calibration(
+            &truth,
+            &prediction,
+            &score,
+            "no-object-calibration-v1",
+            &probabilities,
+            ReconstructionCalibrationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(report.counts.prediction_count, 3);
+        assert_eq!(report.counts.matched_prediction_count, 2);
+        assert_eq!(report.counts.unmatched_prediction_count, 1);
+        assert_eq!(
+            report
+                .observations
+                .iter()
+                .find(|observation| observation.predicted_junction_id == "pExtra")
+                .unwrap()
+                .target_class,
+            ReconstructionCalibrationClass::NoObject
+        );
+        // The missed truth junction is reflected in detection FN, not added
+        // as an invented probability sample.
+        assert_eq!(report.counts.prediction_count, prediction.junctions.len());
+        assert_eq!(report.counts.prediction_count, 3);
+        assert_eq!(score.junction_detection.false_negative, 1);
+        report.validate().unwrap();
+    }
+
+    #[test]
     fn invalid_probability_inventory_and_sum_fail_closed() {
         let (truth, prediction, score) = fixture();
         let mut values = vec![
