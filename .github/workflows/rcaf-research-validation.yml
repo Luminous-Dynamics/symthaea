@@ -481,6 +481,98 @@ jobs:
           print("PASS: 4 x 4 common-random-numbers dose-response with three RCAF estimators and connectivity-direction diagnostics")
           PY
 
+      - name: Run disjoint held-out null calibration
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_held_out_null_calibration -- "$RUNNER_TEMP/rcaf-held-out-null-calibration.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/held-out-null-calibration.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-held-out-null-calibration.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["source_status"] == "synthetic_held_out_null_calibration"
+          assert report["calibration_split_id"] != report["evaluation_split_id"]
+          assert report["calibration_replicates"] == 99
+          assert report["evaluation_replicates"] == 100
+          assert report["minimum_direction_cosine"] == 0.0
+          assert report["calibration_replicate_ids_fingerprint"] != report["evaluation_replicate_ids_fingerprint"]
+          expected_ids = [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          assert [item["estimator_id"] for item in report["estimators"]] == expected_ids
+          expected_thresholds = [0.95, 0.76, 0.57]
+          for item, expected_threshold in zip(report["estimators"], expected_thresholds):
+              assert abs(item["critical_value"] - expected_threshold) <= 1e-12
+              assert abs(item["minimum_resolvable_alpha"] - 0.01) <= 1e-12
+              assert abs(item["held_out_false_positive_rate"]["estimate"] - 0.05) <= 1e-12
+              for name in [
+                  "held_out_false_positive_rate",
+                  "signal_detection_rate",
+                  "directionally_correct_signal_rate",
+                  "wrong_direction_acceptance_rate",
+              ]:
+                  interval = item[name]
+                  assert interval["trials"] == 100
+                  assert 0 <= interval["successes"] <= 100
+                  assert interval["wilson_95_lower"] <= interval["estimate"] <= interval["wilson_95_upper"]
+              assert item["signal_detection_rate"]["successes"] > 0
+              assert item["directionally_correct_signal_rate"]["successes"] > 0
+              assert item["wrong_direction_acceptance_rate"]["successes"] > 0
+          print("PASS: disjoint calibration/evaluation splits, held-out null FPR, direction-aware power and Wilson intervals")
+          PY
+
+      - name: Run disjoint held-out estimator null calibration
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_held_out_null_calibration -- "$RUNNER_TEMP/rcaf-held-out-null-calibration.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/held-out-null-calibration.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-held-out-null-calibration.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["source_status"] == "synthetic_held_out_null_calibration"
+          assert report["calibration_split_id"] != report["evaluation_split_id"]
+          assert report["calibration_replicates"] == 99
+          assert report["evaluation_replicates"] == 100
+          assert report["minimum_direction_cosine"] == 0.0
+          assert report["calibration_replicate_ids_fingerprint"] != report["evaluation_replicate_ids_fingerprint"]
+          expected_ids = [
+              "absolute_weighted_jaccard",
+              "signed_shift_weighted_jaccard",
+              "normalized_mean_absolute_edge_error",
+          ]
+          assert [item["estimator_id"] for item in report["estimators"]] == expected_ids
+          expected_thresholds = [0.95, 0.76, 0.57]
+          for item, expected_threshold in zip(report["estimators"], expected_thresholds):
+              assert abs(item["critical_value"] - expected_threshold) <= 1e-12
+              assert abs(item["minimum_resolvable_alpha"] - 0.01) <= 1e-12
+              assert abs(item["held_out_false_positive_rate"]["estimate"] - 0.05) <= 1e-12
+              for name in [
+                  "held_out_false_positive_rate",
+                  "signal_detection_rate",
+                  "directionally_correct_signal_rate",
+                  "wrong_direction_acceptance_rate",
+              ]:
+                  interval = item[name]
+                  assert interval["trials"] == 100
+                  assert 0 <= interval["successes"] <= 100
+                  assert interval["wilson_95_lower"] <= interval["estimate"] <= interval["wilson_95_upper"]
+              assert item["signal_detection_rate"]["successes"] > 0
+              assert item["directionally_correct_signal_rate"]["successes"] > 0
+              assert item["wrong_direction_acceptance_rate"]["successes"] > 0
+          print("PASS: disjoint held-out calibration, null FPR, direction-aware signal outcomes and Wilson intervals")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -495,7 +587,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-spatial-nuisance.json" \
               "$RUNNER_TEMP/rcaf-spatial-variance-calibration.json" \
               "$RUNNER_TEMP/rcaf-factorial-counterfactual.json" \
-              "$RUNNER_TEMP/rcaf-factorial-dose-response.json"
+              "$RUNNER_TEMP/rcaf-factorial-dose-response.json" \
+              "$RUNNER_TEMP/rcaf-held-out-null-calibration.json"
           python - <<'PY'
           import json
           import os
@@ -510,7 +603,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 9
+          assert len(receipt["simulation_reports"]) == 10
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -529,6 +622,7 @@ jobs:
             ${{ runner.temp }}/rcaf-spatial-variance-calibration.json
             ${{ runner.temp }}/rcaf-factorial-counterfactual.json
             ${{ runner.temp }}/rcaf-factorial-dose-response.json
+            ${{ runner.temp }}/rcaf-held-out-null-calibration.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
