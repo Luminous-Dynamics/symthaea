@@ -34,16 +34,16 @@ The broca-mace-consolidation reobservation module:
 - does not execute tools or authorize source access;
 - emits a deterministic, digest-bound representation plan.
 
-The source-availability verifier is an interface. The checked-in tests use fixture receipts; production must bind availability and cost to Mycelix source profiles or Symtropy environment observations, with independent issuer verification.
+The source-availability verifier is an interface. The checked-in tests use fixture receipts; production must bind calibrated availability probability, failure consequence, latency, cost, locator scope and validity to Mycelix source profiles or Symtropy environment observations, with independent issuer verification.
 
 ## Decision rule
 
 For a predicted future-use value V:
 
 - Snapshot net value: V minus (snapshot tokens multiplied by token cost).
-- Locator net value: V minus re-observation cost, latency penalty and locator-token cost.
+- Locator net value: V × P(success) minus (1 − P(success)) × failure penalty, re-observation cost, latency penalty and locator-token cost.
 
-A locator is eligible only when it can return before the declared decision deadline, its independent receipt remains valid strictly beyond that deadline, and its calibrated success probability justifies the expected failure penalty. A receipt expiry equal to the deadline is expired because validity intervals are half-open. A current-state snapshot is eligible only when its verified validity interval covers the decision deadline. Stable facts may be retained as knowledge without a transient-state expiry, or represented by a cheaper verified locator. Learned rules, procedures and preferences are not replaced with a live-state locator merely because some source can be queried.
+A locator is eligible only when it can return before the declared decision deadline, its independent receipt remains valid strictly beyond that deadline, and its calibrated success probability justifies the expected failure penalty. Its expected net value is `V × P(success) − (1 − P(success)) × failure_penalty − query_cost − latency_cost − locator_context_cost`. A receipt expiry equal to the deadline is expired because validity intervals are half-open. The profile and decision must use the exact same `(valid_at, known_at)` snapshot; advancing knowledge time requires re-verification, so a later correction or revocation cannot be hidden by replaying an old availability receipt. A receipt expiry equal to the deadline is expired because validity intervals are half-open. A current-state snapshot is eligible only when its verified validity interval covers the decision deadline. Stable facts may be retained as knowledge without a transient-state expiry, or represented by a cheaper verified locator. Learned rules, procedures and preferences are not replaced with a live-state locator merely because some source can be queried.
 
 This is a per-item representation decision. A future global optimizer should jointly allocate context tokens, re-observation calls, latency and privacy budgets across a candidate set; it must preserve the exact salience selector as a matched baseline.
 
@@ -86,7 +86,7 @@ Do not combine governance failures with utility into one weighted score.
 
 ## Initial qualification targets
 
-- Zero locator use when the locator receipt is wrong-scope, expired or source-retracted.
+- Zero locator use when the locator receipt is wrong-scope, expired at or before the decision deadline, source-retracted or bound to an older knowledge snapshot.
 - Zero snapshot activation after its verified expiry.
 - At least 95% of high-value, non-reconstructible held-out rules retained under the declared budget.
 - At least 90% fewer snapshot tokens for a fixture where state is cheaply re-observable, without a downstream utility regression.
@@ -97,10 +97,11 @@ These are target thresholds, not current results. They should be recalibrated af
 
 ## Limitations and next steps
 
-- The module uses declared normalized costs and a declared decision deadline; real deployments need measured tool latency, API availability, energy/cost and failure distributions. Stable-fact retention and mutable-state caching deliberately have different validity rules.
+- The module uses verifier-declared availability probability, failure penalty, normalized costs and a decision deadline; real deployments need independently calibrated tool latency, API availability, energy/cost and failure distributions. Stable-fact retention and mutable-state caching deliberately have different validity rules.
 - Receipt authenticity is delegated to an injected verifier; fixture receipts do not establish production trust.
 - The current selector makes per-item representation choices; a joint token/call/latency optimizer remains future work.
 - The current module does not store or mutate persistent memory. It returns a plan for a governed consumer.
 - The benchmark must include live state and learned strategy in the same dependent-session task, otherwise re-observe can win trivially by repeatedly querying an oracle.
+- The raw Session-A ingress → future-use calibration → source-profile receipt → representation-plan path has an authored evaluator integration test; it remains fixture-backed and unexecuted until a Rust runner is available.
 
 Next: connect the plan to receipt-qualified consolidation proposals, add environment-backed locators, and benchmark integrated Session-A learning → Session-B retrieval/re-observation → Session-C correction.

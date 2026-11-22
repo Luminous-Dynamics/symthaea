@@ -13,11 +13,7 @@ use broca_mace_ingress::AsKnownQuery;
 use broca_mace_policy::Scope;
 use sha2::{Digest, Sha256};
 
-use crate::salience::{
-    verify_future_use_prediction, FutureUsePredictionV1,
-    SalienceCalibrationReceiptV1, SaliencePredictionVerifierV1,
-    VerifiedFutureUsePredictionV1,
-};
+use crate::salience::VerifiedFutureUsePredictionV1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MemoryObjectKindV1 {
@@ -669,7 +665,7 @@ mod tests {
     use super::*;
     use crate::salience::{
         verify_future_use_prediction, FutureUsePredictionV1,
-        SalienceCalibrationReceiptV1,
+        SalienceCalibrationReceiptV1, SaliencePredictionVerifierV1,
     };
     use broca_mace_policy::{Objective, Regime};
 
@@ -856,6 +852,25 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn decision_clock_must_match_the_bitemporal_knowledge_snapshot() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::CurrentState,
+            ReobservationAvailabilityV1::Unavailable,
+            Some(900),
+        ));
+        let mut stale_policy = policy();
+        stale_policy.decision_at_ms += 1;
+        assert_eq!(
+            plan_memory_representation(
+                &prediction(50_000, 1_000),
+                &profile,
+                stale_policy,
+            ),
+            Err(ReobservationReject::InvalidPolicyConfiguration)
+        );
     }
 
     #[test]
