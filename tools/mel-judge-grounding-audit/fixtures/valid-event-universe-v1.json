@@ -1,0 +1,172 @@
+{
+  "schema_version": "mel-event-universe-panel-v1",
+  "experiment_id": "mel-event-universe-synthetic-001",
+  "universe": {
+    "universe_id": "independent-opportunity-universe-001",
+    "universe_frozen_at_ns": 1000000000,
+    "labels_adjudicated_at_ns": 10000000000,
+    "task_family": "cadence-and-accompaniment-anticipation",
+    "canonical_time_map_id": "shared-muse-time-map",
+    "canonical_time_map_version": "1.0.0",
+    "canonical_time_map_kind": "performance_time",
+    "canonical_time_map_clock_domain_id": "muse-performance-time-v1",
+    "evaluator_clock_domain_id": "runner-monotonic-v1",
+    "time_alignment_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "time_alignment_valid_from_ns": 0,
+    "time_alignment_valid_until_ns": 6000000000,
+    "time_alignment_max_uncertainty_ns": 5000000,
+    "opportunity_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "label_protocol_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "adjudication_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "slots": [
+      {
+        "slot_id": "slot-kick",
+        "role": "kick",
+        "beat_index": 4,
+        "target_start_ns": 2000000000,
+        "target_end_ns": 2200000000,
+        "local_beat_period_ns": 500000000,
+        "alternatives": [
+          "kick_hit"
+        ],
+        "truth_status": "present",
+        "actual_alternative": "kick_hit"
+      },
+      {
+        "slot_id": "slot-snare",
+        "role": "snare",
+        "beat_index": 5,
+        "target_start_ns": 2500000000,
+        "target_end_ns": 2700000000,
+        "local_beat_period_ns": 500000000,
+        "alternatives": [
+          "snare_backbeat"
+        ],
+        "truth_status": "present",
+        "actual_alternative": "snare_backbeat"
+      },
+      {
+        "slot_id": "slot-bass",
+        "role": "bass",
+        "beat_index": 6,
+        "target_start_ns": 3000000000,
+        "target_end_ns": 3200000000,
+        "local_beat_period_ns": 500000000,
+        "alternatives": [
+          "bass_entry"
+        ],
+        "truth_status": "absent",
+        "actual_alternative": null
+      },
+      {
+        "slot_id": "slot-melody",
+        "role": "melody",
+        "beat_index": 7,
+        "target_start_ns": 3500000000,
+        "target_end_ns": 3700000000,
+        "local_beat_period_ns": 500000000,
+        "alternatives": [
+          "motif_a",
+          "motif_b"
+        ],
+        "truth_status": "ambiguous",
+        "actual_alternative": null
+      },
+      {
+        "slot_id": "slot-chord",
+        "role": "harmony",
+        "beat_index": 8,
+        "target_start_ns": 4000000000,
+        "target_end_ns": 4200000000,
+        "local_beat_period_ns": 500000000,
+        "alternatives": [
+          "dominant_resolution",
+          "plagal_resolution"
+        ],
+        "truth_status": "present",
+        "actual_alternative": "dominant_resolution"
+      },
+      {
+        "slot_id": "slot-rest",
+        "role": "rest",
+        "beat_index": 9,
+        "target_start_ns": 4500000000,
+        "target_end_ns": 4700000000,
+        "local_beat_period_ns": 500000000,
+        "alternatives": [
+          "rest_break"
+        ],
+        "truth_status": "absent",
+        "actual_alternative": null
+      }
+    ]
+  },
+  "candidate": {
+    "model_id": "synthetic-forecast-candidate",
+    "model_version": "0.0.1",
+    "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "forecast_payload_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "committed_at_ns": 1600000000,
+    "input_snapshot_available_at_ns": 1500000000,
+    "input_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "policy_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "policy": {
+    "presence_decision_threshold": 0.5
+  },
+  "predictions": [
+    {
+      "slot_id": "slot-kick",
+      "presence_probability": 0.9,
+      "alternative_probabilities": [
+        {
+          "alternative_id": "kick_hit",
+          "conditional_probability": 1
+        }
+      ]
+    },
+    {
+      "slot_id": "slot-bass",
+      "presence_probability": 0.7,
+      "alternative_probabilities": [
+        {
+          "alternative_id": "bass_entry",
+          "conditional_probability": 1
+        }
+      ]
+    },
+    {
+      "slot_id": "slot-chord",
+      "presence_probability": 0.8,
+      "alternative_probabilities": [
+        {
+          "alternative_id": "dominant_resolution",
+          "conditional_probability": 0.8
+        },
+        {
+          "alternative_id": "plagal_resolution",
+          "conditional_probability": 0.2
+        }
+      ]
+    },
+    {
+      "slot_id": "slot-rest",
+      "presence_probability": 0.1,
+      "alternative_probabilities": [
+        {
+          "alternative_id": "rest_break",
+          "conditional_probability": 1
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": [
+    "synthetic conformance fixture only; the opportunity universe, labels, predictions and receipt digests are invented",
+    "omitted predictions are scored as zero presence over the independently declared universe, not dropped",
+    "ambiguous slots are preserved and counted but excluded from proper scoring until independently adjudicated",
+    "categorical Brier and log loss are computed over none plus the mutually exclusive alternatives for each slot",
+    "reliability bins and ECE are descriptive; no population calibration confidence interval or clustered human-study inference is provided",
+    "receipt digests are shape-checked but not cryptographically authenticated",
+    "no live model, musician, audio device, runtime clock or physical loopback was measured"
+  ]
+}
