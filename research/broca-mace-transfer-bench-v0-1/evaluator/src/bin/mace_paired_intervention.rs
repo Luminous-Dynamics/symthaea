@@ -464,8 +464,16 @@ fn action_name(action: Option<Action>) -> &'static str {
     }
 }
 
+// The synthetic benchmark defines safe abstention as the zero-utility
+// outside option. This is an explicit evaluator convention, not Action::B.
+// Real deployments must supply a domain-specific abstention cost/value.
+const ABSTENTION_UTILITY: f64 = 0.0;
+
 fn action_utility(truth: stress::Truth, action: Option<Action>) -> f64 {
-    truth.utility(action.unwrap_or(Action::B))
+    match action {
+        Some(selected) => truth.utility(selected),
+        None => ABSTENTION_UTILITY,
+    }
 }
 
 fn pair_block_id(
@@ -1204,6 +1212,19 @@ mod tests {
             record["memory_snapshot_sha256"].as_str(),
             Some(experience_list_digest(task.memory).as_str())
         );
+    }
+
+    #[test]
+    fn abstention_uses_explicit_outside_option_not_action_b_payoff() {
+        let truth = stress::Truth {
+            utility_a: 0.20,
+            utility_b: 0.90,
+            causal_action: None,
+            invalid_a: false,
+        };
+        assert_eq!(action_utility(truth, None), ABSTENTION_UTILITY);
+        assert_eq!(action_utility(truth, Some(Action::B)), 0.90);
+        assert_ne!(action_utility(truth, None), action_utility(truth, Some(Action::B)));
     }
 
     #[test]
