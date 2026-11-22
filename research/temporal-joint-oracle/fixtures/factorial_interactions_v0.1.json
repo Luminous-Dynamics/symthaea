@@ -212,7 +212,7 @@
     ],
     "test_purpose": "prove_four_way_interaction_is_separate_from_all_proper_subsets"
   },
-  "tests_authored": 15,
+  "tests_authored": 16,
   "tests_executed": false,
   "benchmark_runs": false,
   "causal_claim_requires": "paired_randomized_interventions_or_a_controlled_replay_design_that_identifies_the_declared_factor_effects",
@@ -231,5 +231,45 @@
       4
     ],
     "term_by_term_comparison": true
+  },
+  "shapley_attribution": {
+    "method": "standard_shapley_value_from_harsanyi_dividends",
+    "common_denominator": 6,
+    "factor_order": [
+      10,
+      20,
+      30
+    ],
+    "exposure_benefit_scaled_numerators": {
+      "wrong_belief_us": [
+        71,
+        131,
+        170
+      ],
+      "abstention_us": [
+        12,
+        18,
+        24
+      ],
+      "missing_output_us": [
+        6,
+        12,
+        18
+      ]
+    },
+    "resource_cost_scaled_numerators": {
+      "persistent_bytes": [
+        23,
+        29,
+        20
+      ],
+      "energy_nj": [
+        87,
+        147,
+        174
+      ]
+    },
+    "efficiency_check": "sum_factor_numerators_equals_full_joint_effect_times_common_denominator",
+    "prior_art": "Shapley 1953, A Value for n-Person Games, DOI 10.1515/9781400881970-018"
   }
 }
