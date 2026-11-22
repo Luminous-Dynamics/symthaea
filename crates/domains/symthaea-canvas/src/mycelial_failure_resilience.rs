@@ -2717,6 +2717,39 @@ mod tests {
                 .all(|id| id != "edge-ab")
         );
         adaptive_plan.validate_against(&graph, &demand_pairs).unwrap();
+
+        let static_junction_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::DemandPathLoadJunctions,
+                seed: 0,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        let adaptive_junction_plan = build_mycelial_failure_attack_plan(
+            &graph,
+            &demand_pairs,
+            MycelialFailureAttackConfig {
+                strategy: MycelialFailureAttackStrategy::AdaptiveDemandPathLoadJunctions,
+                seed: 0,
+                maximum_failure_budget: 2,
+                spatial_seed_junction_id: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(static_junction_plan.ranked_entity_ids[0], "B");
+        assert_eq!(adaptive_junction_plan.ranked_entity_ids[0], "B");
+        assert_eq!(adaptive_junction_plan.ranked_entity_ids[1], "D");
+        assert_eq!(
+            adaptive_junction_plan.ranked_entity_ids_per_step[1][0],
+            "D"
+        );
+        adaptive_junction_plan
+            .validate_against(&graph, &demand_pairs)
+            .unwrap();
     }
 
     #[test]
