@@ -43,7 +43,7 @@
       "enum": [
         "no_memory",
         "full_scope_reference",
-        "event_id_key_value",
+        "event_id_ordered_control",
         "random_control",
         "static_hdc",
         "typed_content_hdc"
@@ -95,7 +95,12 @@
         "lineage_incomplete_event_count",
         "evidence_qualification",
         "token_cost",
-        "all_in_cost_accounting"
+        "all_in_cost_accounting",
+        "public_seed",
+        "source_revision",
+        "source_code_sha256",
+        "fixture_sha256",
+        "schema_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -196,6 +201,30 @@
         },
         "all_in_cost_accounting": {
           "const": "struct_and_index_payload_lower_bounds_only"
+        },
+        "public_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_revision": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -227,7 +256,13 @@
         "index_payload_bytes_lower_bound",
         "measured_index_and_selection_ns",
         "evidence_qualification",
-        "oracle_visibility"
+        "oracle_visibility",
+        "public_seed",
+        "source_revision",
+        "source_code_sha256",
+        "fixture_sha256",
+        "schema_sha256",
+        "world_cluster"
       ],
       "properties": {
         "schema_version": {
@@ -312,6 +347,35 @@
         },
         "oracle_visibility": {
           "const": "evaluator_only"
+        },
+        "public_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_revision": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "world_cluster": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       }
     }
