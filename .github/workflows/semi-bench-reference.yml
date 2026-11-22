@@ -128,3 +128,11 @@ jobs:
           diff -u \
             /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json \
             /tmp/semi-rust-dtco-lineage.json
+      - name: Reproduce Rust multi-fidelity acquisition report byte-for-byte
+        run: |
+          cargo run --manifest-path /tmp/semi-rust-work/crates/domains/symthaea-semiconductor/Cargo.toml --bin semi-mf-acquire -- \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.json \
+            > /tmp/semi-rust-mf-acquisition.json
+          diff -u \
+            /tmp/semi-rust-work/benchmarks/semi-bench-001/reference/fixtures/mf-acquisition-known-answer-v1.expected.json \
+            /tmp/semi-rust-mf-acquisition.json
