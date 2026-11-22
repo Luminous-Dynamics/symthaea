@@ -281,7 +281,7 @@ This creates a stronger claim than “HDC beats RAG”: MACE would demonstrate w
 6. Bound the candidate input digest to DecisionNeedV1 plus the post-intervention canonical evidence-set digest.
 7. Split candidate decision records from evaluator intervention manifests/scores. Candidate-facing pair identifiers are opaque and derived only from candidate-visible task/evidence digests, not evaluator scenario-family labels. The candidate stream does not receive intervention kinds, removed IDs or evaluator utilities.
 8. Added source-code and fixture digests to the evaluator run manifest and introduced `data/schemas/mace_counterfactual_evidence_v0_1.schema.json`.
-9. Added authored tests for duplicate IDs, root aliases, unknown identities, source-family closures, deterministic/truth-blind planning, coalition caps, matched controls, evidence-digest changes and abstention.
+9. Added 16 authored binary tests for duplicate IDs, root aliases, unknown identities, source-family closures, deterministic/truth-blind planning, coalition caps, matched controls, evidence-digest changes, candidate-contract rejection, opaque pair identifiers and abstention.
 
 ### Remaining qualification work
 
