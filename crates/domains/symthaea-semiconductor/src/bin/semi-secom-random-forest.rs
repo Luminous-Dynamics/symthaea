@@ -61,6 +61,7 @@ struct FiveRepeatRandomForestReportV1 {
     dataset_snapshot_sha256: String,
     source_identity_manifest_sha256: String,
     preprocessing_config: SecomPreprocessorConfigV1,
+    repeat_count: usize,
     forest_protocol: String,
     repeats: Vec<RandomForestFoldReportV1>,
     claim_limits: Vec<String>,
@@ -256,6 +257,7 @@ fn run() -> Result<(), String> {
         dataset_snapshot_sha256: identity_manifest.dataset_snapshot_sha256,
         source_identity_manifest_sha256: identity_report.split_manifest_sha256,
         preprocessing_config,
+        repeat_count: fold_reports.len(),
         forest_protocol:
             "200 bootstrap CART trees; gini; mtry=floor(sqrt(p)) sampled at each node; max_depth=12; min_leaf=4; CPU; raw unweighted leaf positive fractions averaged across trees; balanced variant applies inverse-frequency weights only to split impurity"
                 .into(),
