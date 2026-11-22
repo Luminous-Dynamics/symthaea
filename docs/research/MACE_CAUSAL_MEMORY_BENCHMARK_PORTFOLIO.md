@@ -525,3 +525,8 @@ The module now contains **23 authored unit tests**, including wrong-principal, w
 ### Joint representation allocation (MACE v0.17)
 
 MACE now enumerates alternative per-item representations and can allocate them jointly under shared token, observation-call, latency-work, monetary/compute-cost and expected-failure-loss budgets. The exact bounded branch-and-bound solver is compared with a greedy highest-individual-value baseline. The prototype is limited to 24 event groups / 2,000,000 nodes and fails closed on search exhaustion. It does not yet model parallel query scheduling, batching or privacy exposure as a resource.
+
+
+### Trust-boundary tightening
+
+Portfolio options are now admitted only when their representation-plan digest matches an option independently re-derived by `enumerate_memory_representation_options` from the same verified salience prediction, verified source profile and policy. A caller cannot mutate a plan's cost/disposition, recompute its digest, and present it as an eligible choice. The portfolio constructor still verifies the complete source/prediction/snapshot/authority binding before creating an option.

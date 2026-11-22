@@ -66,6 +66,8 @@ pub enum PortfolioReject {
     AuthorityScopeMismatch,
     InvalidPlanValue,
     InvalidRepresentationOption,
+    PlanNotAdmissible,
+    ReobservationProfileRejected,
     DuplicateOption,
     ConflictingEventIdentity(u32),
     InconsistentPortfolioScope,
@@ -102,7 +104,21 @@ impl MemoryPortfolioOptionV1 {
         plan: &ReobservationPlanV1,
         prediction: &VerifiedFutureUsePredictionV1,
         profile: &VerifiedReobservationProfileV1,
+        policy: crate::reobservation::ReobservationPolicyV1,
     ) -> Result<Self, PortfolioReject> {
+        let admissible = crate::reobservation::enumerate_memory_representation_options(
+            prediction,
+            profile,
+            policy,
+        )
+        .map_err(|_| PortfolioReject::ReobservationProfileRejected)?;
+        if !admissible
+            .iter()
+            .any(|candidate| candidate.plan_sha256 == plan.plan_sha256)
+        {
+            return Err(PortfolioReject::PlanNotAdmissible);
+        }
+
         let proposal = profile.proposal();
         let raw_prediction = prediction.prediction();
         let calibration = prediction.calibration_receipt();

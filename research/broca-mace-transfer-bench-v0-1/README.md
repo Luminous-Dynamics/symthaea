@@ -564,3 +564,8 @@ The re-observation module now enumerates individually valid alternatives for a s
 Two strategies are exposed: an exact deterministic branch-and-bound optimizer (up to 24 event groups and two million search nodes by default) and a greedy highest-individual-net-value baseline. The exact optimizer maximizes the sum of per-item net values already reduced by each option's own cost and expected failure loss, while separately enforcing aggregate resource/risk caps. It selects at most one representation per event. Ties prefer lower resource use, then canonical option digests. If the exact-search node limit is exceeded, the solver returns an error rather than publishing a partial or approximate plan.
 
 The portfolio result is a digest-bound proposal, not a persistence operation, source-access grant, or action authorization. All options must use the same authority, scope and bitemporal snapshot. This first implementation sums latency work conservatively; it does not yet model parallel scheduling, shared query batching, privacy-exposure budgets or dynamic replanning.
+
+
+### Trust-boundary tightening
+
+Portfolio options are now admitted only when their representation-plan digest matches an option independently re-derived by `enumerate_memory_representation_options` from the same verified salience prediction, verified source profile and policy. A caller cannot mutate a plan's cost/disposition, recompute its digest, and present it as an eligible choice. The portfolio constructor still verifies the complete source/prediction/snapshot/authority binding before creating an option.

@@ -183,3 +183,8 @@ The per-item re-observation policy now exposes all individually valid representa
 The exact bounded solver maximizes total per-item net value using deterministic branch-and-bound, with a 24-event-group and 2,000,000-node cap. It fails closed if the search budget is exhausted. A highest-individual-net-value greedy baseline is retained for matched comparison. The result is a digest-bound proposal, not a write or permission to query a source.
 
 The resource model deliberately sums latency work rather than claiming parallel wall-clock latency. Shared query batching, parallel scheduling, privacy-exposure budgets and dynamic replanning remain outside v0.17.
+
+
+### Trust-boundary tightening
+
+Portfolio options are now admitted only when their representation-plan digest matches an option independently re-derived by `enumerate_memory_representation_options` from the same verified salience prediction, verified source profile and policy. A caller cannot mutate a plan's cost/disposition, recompute its digest, and present it as an eligible choice. The portfolio constructor still verifies the complete source/prediction/snapshot/authority binding before creating an option.

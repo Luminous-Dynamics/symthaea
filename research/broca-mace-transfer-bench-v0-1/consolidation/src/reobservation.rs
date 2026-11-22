@@ -1280,6 +1280,108 @@ mod tests {
     }
 
     #[test]
+    fn verified_representation_options_are_jointly_allocated_under_shared_budgets() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::StableFact,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("portfolio-stable-fact-source"),
+            },
+            None,
+        ));
+        let forecast = prediction(50_000, 1_000);
+        let policy = policy();
+        let plans = enumerate_memory_representation_options(
+            &forecast,
+            &profile,
+            policy,
+        )
+        .unwrap();
+        assert_eq!(plans.len(), 2);
+
+        let options: Vec<_> = plans
+            .iter()
+            .map(|plan| {
+                crate::portfolio::MemoryPortfolioOptionV1::from_verified_plan(
+                    plan,
+                    &forecast,
+                    &profile,
+                    policy,
+                )
+                .expect("only independently re-derived options may enter the portfolio")
+            })
+            .collect();
+
+        let without_live_calls = crate::portfolio::optimize_memory_portfolio_exact(
+            &options,
+            crate::portfolio::MemoryPortfolioBudgetV1 {
+                context_tokens: 512,
+                reobservation_calls: 0,
+                latency_work_ms: 0,
+                estimated_cost_micros: 100_000,
+                expected_failure_loss_micros: 10_000,
+            },
+        )
+        .unwrap();
+        assert_eq!(without_live_calls.selected.len(), 1);
+        assert_eq!(
+            without_live_calls.selected[0].disposition,
+            ReobservationDispositionV1::PersistKnowledge
+        );
+
+        let context_constrained = crate::portfolio::optimize_memory_portfolio_exact(
+            &options,
+            crate::portfolio::MemoryPortfolioBudgetV1 {
+                context_tokens: 8,
+                reobservation_calls: 1,
+                latency_work_ms: 10_000,
+                estimated_cost_micros: 100_000,
+                expected_failure_loss_micros: 10_000,
+            },
+        )
+        .unwrap();
+        assert_eq!(context_constrained.selected.len(), 1);
+        assert_eq!(
+            context_constrained.selected[0].disposition,
+            ReobservationDispositionV1::StoreLocator
+        );
+    }
+
+    #[test]
+    fn portfolio_refuses_a_rehashed_but_non_enumerated_representation_plan() {
+        let profile = verified(proposal(
+            MemoryObjectKindV1::StableFact,
+            ReobservationAvailabilityV1::Available {
+                available_at_ms: 300,
+                locator_sha256: digest("portfolio-tamper-source"),
+            },
+            None,
+        ));
+        let forecast = prediction(50_000, 1_000);
+        let policy = policy();
+        let mut plans = enumerate_memory_representation_options(
+            &forecast,
+            &profile,
+            policy,
+        )
+        .unwrap();
+        let mut forged = plans.remove(0);
+        forged.estimated_cost_micros = forged.estimated_cost_micros.saturating_add(1);
+        forged.net_value_micros = forged.net_value_micros.saturating_sub(1);
+        forged.plan_sha256 = forged.canonical_digest();
+
+        assert_eq!(
+            crate::portfolio::MemoryPortfolioOptionV1::from_verified_plan(
+                &forged,
+                &forecast,
+                &profile,
+                policy,
+            ),
+            Err(crate::portfolio::PortfolioReject::PlanNotAdmissible)
+        );
+    }
+
+    #[test]
     fn principal_audience_and_purpose_must_match_the_memory_use_authority() {
         let proposal = proposal(
             MemoryObjectKindV1::Preference,
