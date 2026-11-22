@@ -858,9 +858,18 @@ mod tests {
     #[test]
     fn yoked_input_history_is_rejected() {
         let mut value = panel();
-        value["forecasts"][0]["input_history_sha256"] = serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
+        value["forecasts"][0]["input_history_sha256"] =
+            serde_json::json!("9999999999999999999999999999999999999999999999999999999999999999");
         let error = audit(&value).expect_err("yoked forecast must not appear contingent");
-        assert!(error.contains("yoked or mismatched"));
+        assert!(error.contains("does not match its snapshot"));
+    }
+
+    #[test]
+    fn forecast_cannot_cite_an_input_snapshot_from_the_future() {
+        let mut value = panel();
+        value["input_snapshots"][0]["available_at_ns"] = serde_json::json!(600_000_000_u64);
+        let error = audit(&value).expect_err("future input cannot support an earlier forecast");
+        assert!(error.contains("not available at commit time"));
     }
 
     #[test]
@@ -896,7 +905,16 @@ mod tests {
         second["forecast_id"] = serde_json::json!("forecast-2");
         second["revision"] = serde_json::json!(2);
         second["supersedes_forecast_id"] = serde_json::json!("forecast-001");
+        second["input_snapshot_id"] = serde_json::json!("snapshot-2");
+        second["input_history_sha256"] = serde_json::json!(
+            "9999999999999999999999999999999999999999999999999999999999999999"
+        );
         second["committed_at_ns"] = serde_json::json!(900_000_000_u64);
+        value["input_snapshots"].as_array_mut().unwrap().push(serde_json::json!({
+            "input_snapshot_id":"snapshot-2",
+            "available_at_ns":850_000_000_u64,
+            "input_history_sha256":"9999999999999999999999999999999999999999999999999999999999999999"
+        }));
         value["forecasts"].as_array_mut().unwrap().push(second);
         let report = audit(&value).expect("superseded realization remains reportable");
         assert!(!report.structurally_valid_anticipatory_trace);
