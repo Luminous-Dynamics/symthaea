@@ -831,6 +831,8 @@ fn run_mutations(schema_path: &str, campaign_path: &str) -> Result<(), String> {
 
 const DEFAULT_QUALIFICATION_REPORT_SCHEMA: &str =
     "benchmarks/frontend/qualification/qualification-report-v1.schema.json";
+const DEFAULT_QUALIFICATION_SUMMARY_SCHEMA: &str =
+    "benchmarks/frontend/qualification/qualification-summary-v1.schema.json";
 
 fn sha256_bytes(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
@@ -1457,6 +1459,19 @@ fn run_qualification_report(
         &campaign_sha,
         Path::new(report_path),
     )?;
+    let summary_schema = read_json(DEFAULT_QUALIFICATION_SUMMARY_SCHEMA)?;
+    let summary_validator = validator_for(&summary_schema)
+        .map_err(|error| format!("invalid qualification summary schema: {error}"))?;
+    let summary_errors: Vec<String> = summary_validator
+        .iter_errors(&summary)
+        .map(|error| format!("{}: {error}", error.instance_path()))
+        .collect();
+    if !summary_errors.is_empty() {
+        return Err(format!(
+            "qualification summary does not satisfy its schema:\\n{}",
+            summary_errors.join("\\n")
+        ));
+    }
     println!("{}", serde_json::to_string_pretty(&summary)
         .map_err(|error| format!("failed to serialize qualification summary: {error}"))?);
     if summary.get("status").and_then(Value::as_str) != Some("qualified") {
@@ -1870,6 +1885,15 @@ mod tests {
         campaign["acceptance_targets"]["positive_control_false_reject_rate_max"] =
             Value::from(0.01);
         assert!(validate_mutation_campaign(&schema, &campaign).is_err());
+    }
+
+    #[test]
+    fn qualification_summary_schema_is_valid() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../qualification/qualification-summary-v1.schema.json"
+        ))
+        .expect("qualification summary schema must be valid JSON");
+        validator_for(&schema).expect("qualification summary schema must compile");
     }
 
     #[test]
