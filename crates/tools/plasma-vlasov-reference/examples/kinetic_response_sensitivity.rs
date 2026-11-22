@@ -176,7 +176,7 @@ fn positivity_limited_epsilon(
     for ((pulse, control), delta) in pulse_base.iter().zip(control_base).zip(direction) {
         if delta.abs() > f64::MIN_POSITIVE {
             maximum_epsilon =
-                maximum_epsilon.min((pulse.min(control) - POSITIVITY_FLOOR) / delta.abs());
+                maximum_epsilon.min((pulse.min(*control) - POSITIVITY_FLOOR) / delta.abs());
         }
     }
     let epsilon = REQUESTED_EPSILON.min(0.25 * maximum_epsilon);
