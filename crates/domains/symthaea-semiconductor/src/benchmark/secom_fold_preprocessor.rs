@@ -144,7 +144,9 @@ pub struct SecomFoldPreprocessorError(pub String);
 
 fn require_text(value: &str, field: &str) -> Result<(), SecomFoldPreprocessorError> {
     if value.trim().is_empty() {
-        Err(SecomFoldPreprocessorError(format!("{field}: expected non-empty string")))
+        Err(SecomFoldPreprocessorError(format!(
+            "{field}: expected non-empty string"
+        )))
     } else {
         Ok(())
     }
@@ -154,13 +156,17 @@ fn finite(value: f64, field: &str) -> Result<(), SecomFoldPreprocessorError> {
     if value.is_finite() {
         Ok(())
     } else {
-        Err(SecomFoldPreprocessorError(format!("{field}: expected finite number")))
+        Err(SecomFoldPreprocessorError(format!(
+            "{field}: expected finite number"
+        )))
     }
 }
 
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -190,10 +196,35 @@ fn distinct_count(values: &[f64]) -> usize {
 }
 
 fn inverse_standard_normal(p: f64) -> f64 {
-    const A: [f64; 6] = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924];
-    const B: [f64; 5] = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857];
-    const C: [f64; 6] = [-0.00778489400243029, -0.322396458041136, -2.40075827716184, -2.54973253934373, 4.37466414146497, 2.93816398269878];
-    const D: [f64; 4] = [0.00778469570904146, 0.32246712907004, 2.445134137143, 3.75440866190742];
+    const A: [f64; 6] = [
+        -39.6968302866538,
+        220.946098424521,
+        -275.928510446969,
+        138.357751867269,
+        -30.6647980661472,
+        2.50662827745924,
+    ];
+    const B: [f64; 5] = [
+        -54.4760987982241,
+        161.585836858041,
+        -155.698979859887,
+        66.8013118877197,
+        -13.2806815528857,
+    ];
+    const C: [f64; 6] = [
+        -0.00778489400243029,
+        -0.322396458041136,
+        -2.40075827716184,
+        -2.54973253934373,
+        4.37466414146497,
+        2.93816398269878,
+    ];
+    const D: [f64; 4] = [
+        0.00778469570904146,
+        0.32246712907004,
+        2.445134137143,
+        3.75440866190742,
+    ];
     let p = p.clamp(1.0e-15, 1.0 - 1.0e-15);
     if p < 0.02425 {
         let q = (-2.0 * p.ln()).sqrt();
@@ -224,16 +255,25 @@ fn quantile_value(reference: &[f64], value: f64, output: &QuantileOutputV1) -> f
 
 fn validate_config(config: &SecomPreprocessorConfigV1) -> Result<(), SecomFoldPreprocessorError> {
     if config.schema != CONFIG_SCHEMA_V1 {
-        return Err(SecomFoldPreprocessorError("unsupported preprocessor config schema".into()));
+        return Err(SecomFoldPreprocessorError(
+            "unsupported preprocessor config schema".into(),
+        ));
     }
     if !config.maximum_training_missing_fraction.is_finite()
         || !(0.0..=1.0).contains(&config.maximum_training_missing_fraction)
     {
-        return Err(SecomFoldPreprocessorError("missingness threshold must be in [0,1]".into()));
+        return Err(SecomFoldPreprocessorError(
+            "missingness threshold must be in [0,1]".into(),
+        ));
     }
-    finite(config.minimum_training_variance, "minimum_training_variance")?;
+    finite(
+        config.minimum_training_variance,
+        "minimum_training_variance",
+    )?;
     if config.minimum_training_variance < 0.0 || config.minimum_distinct_training_values < 2 {
-        return Err(SecomFoldPreprocessorError("invalid near-zero variance settings".into()));
+        return Err(SecomFoldPreprocessorError(
+            "invalid near-zero variance settings".into(),
+        ));
     }
     require_text(&config.quantile_tie_policy, "quantile_tie_policy")?;
     Ok(())
@@ -251,7 +291,9 @@ pub fn fit_secom_preprocessor_v1(
 ) -> Result<FittedSecomPreprocessorV1, SecomFoldPreprocessorError> {
     validate_config(config)?;
     if training_rows.is_empty() || training_rows[0].values.is_empty() {
-        return Err(SecomFoldPreprocessorError("training rows/features must be non-empty".into()));
+        return Err(SecomFoldPreprocessorError(
+            "training rows/features must be non-empty".into(),
+        ));
     }
     let feature_count = training_rows[0].values.len();
     let mut rows = training_rows.to_vec();
@@ -260,13 +302,20 @@ pub fn fit_secom_preprocessor_v1(
     for (ri, row) in rows.iter().enumerate() {
         require_text(&row.sample_id, &format!("training_rows[{ri}].sample_id"))?;
         if !ids.insert(row.sample_id.as_str()) {
-            return Err(SecomFoldPreprocessorError(format!("duplicate training sample ID {}", row.sample_id)));
+            return Err(SecomFoldPreprocessorError(format!(
+                "duplicate training sample ID {}",
+                row.sample_id
+            )));
         }
         if row.values.len() != feature_count {
-            return Err(SecomFoldPreprocessorError(format!("training row {ri} feature dimension mismatch")));
+            return Err(SecomFoldPreprocessorError(format!(
+                "training row {ri} feature dimension mismatch"
+            )));
         }
         for (fi, value) in row.values.iter().enumerate() {
-            if let Some(value) = value { finite(*value, &format!("training_rows[{ri}].values[{fi}]"))?; }
+            if let Some(value) = value {
+                finite(*value, &format!("training_rows[{ri}].values[{fi}]"))?;
+            }
         }
     }
 
@@ -299,11 +348,16 @@ pub fn fit_secom_preprocessor_v1(
         }
         let mut observed_for_median = observed;
         let feature_median = median(&mut observed_for_median);
-        let imputed: Vec<f64> = rows.iter().map(|r| r.values[fi].unwrap_or(feature_median)).collect();
+        let imputed: Vec<f64> = rows
+            .iter()
+            .map(|r| r.values[fi].unwrap_or(feature_median))
+            .collect();
         let variance = population_variance(&imputed);
         let distinct = distinct_count(&imputed);
         finite(variance, &format!("feature {fi} training variance"))?;
-        if variance <= config.minimum_training_variance || distinct < config.minimum_distinct_training_values {
+        if variance <= config.minimum_training_variance
+            || distinct < config.minimum_distinct_training_values
+        {
             dropped.push(SecomDroppedFeatureV1 {
                 feature_index: fi,
                 feature_id: format!("secom-anonymous-column-{fi:04}"),
@@ -360,13 +414,20 @@ pub fn transform_secom_rows_v1(
     for (ri, row) in ordered.iter().enumerate() {
         require_text(&row.sample_id, &format!("rows[{ri}].sample_id"))?;
         if !ids.insert(row.sample_id.as_str()) {
-            return Err(SecomFoldPreprocessorError(format!("duplicate transform sample ID {}", row.sample_id)));
+            return Err(SecomFoldPreprocessorError(format!(
+                "duplicate transform sample ID {}",
+                row.sample_id
+            )));
         }
         if row.values.len() != fitted.input_feature_count {
-            return Err(SecomFoldPreprocessorError(format!("transform row {ri} feature dimension mismatch")));
+            return Err(SecomFoldPreprocessorError(format!(
+                "transform row {ri} feature dimension mismatch"
+            )));
         }
         for (fi, value) in row.values.iter().enumerate() {
-            if let Some(value) = value { finite(*value, &format!("rows[{ri}].values[{fi}]"))?; }
+            if let Some(value) = value {
+                finite(*value, &format!("rows[{ri}].values[{fi}]"))?;
+            }
         }
         let mut a = Vec::with_capacity(fitted.retained_features.len());
         let mut mask = Vec::with_capacity(fitted.retained_features.len());
@@ -399,11 +460,21 @@ pub fn transform_secom_rows_v1(
     Ok(output)
 }
 
-fn digest_matrix(rows: &[SecomTransformedSampleV1], use_b: bool) -> Result<String, SecomFoldPreprocessorError> {
-    let payload: Vec<(&str, &[f64])> = rows.iter().map(|row| {
-        let values = if use_b { row.feature_set_b.as_deref().unwrap_or(&row.feature_set_a) } else { &row.feature_set_a };
-        (row.sample_id.as_str(), values)
-    }).collect();
+fn digest_matrix(
+    rows: &[SecomTransformedSampleV1],
+    use_b: bool,
+) -> Result<String, SecomFoldPreprocessorError> {
+    let payload: Vec<(&str, &[f64])> = rows
+        .iter()
+        .map(|row| {
+            let values = if use_b {
+                row.feature_set_b.as_deref().unwrap_or(&row.feature_set_a)
+            } else {
+                &row.feature_set_a
+            };
+            (row.sample_id.as_str(), values)
+        })
+        .collect();
     let bytes = serde_json::to_vec(&payload)
         .map_err(|e| SecomFoldPreprocessorError(format!("matrix serialization failed: {e}")))?;
     Ok(sha256_hex(&bytes))
@@ -416,21 +487,29 @@ pub fn prepare_secom_stratified_fold_v1(
     manifest: &StratifiedRepeatManifestV1,
     config: &SecomPreprocessorConfigV1,
 ) -> Result<PreparedSecomFoldV1, SecomFoldPreprocessorError> {
-    if manifest.schema != MANIFEST_SCHEMA_V1 || !valid_sha256(&manifest.dataset_snapshot_sha256)
+    if manifest.schema != MANIFEST_SCHEMA_V1
+        || !valid_sha256(&manifest.dataset_snapshot_sha256)
         || !valid_sha256(&manifest.source_identity_manifest_sha256)
     {
-        return Err(SecomFoldPreprocessorError("invalid stratified manifest schema/digest".into()));
+        return Err(SecomFoldPreprocessorError(
+            "invalid stratified manifest schema/digest".into(),
+        ));
     }
-    if sample_ids.len() != features.len() || features.len() != labels.len()
+    if sample_ids.len() != features.len()
+        || features.len() != labels.len()
         || manifest.assignments.len() != sample_ids.len()
     {
-        return Err(SecomFoldPreprocessorError("source rows and manifest assignments differ in length".into()));
+        return Err(SecomFoldPreprocessorError(
+            "source rows and manifest assignments differ in length".into(),
+        ));
     }
     let mut index_by_id = BTreeMap::new();
     for (index, id) in sample_ids.iter().enumerate() {
         require_text(id, &format!("sample_ids[{index}]"))?;
         if index_by_id.insert(id.as_str(), index).is_some() {
-            return Err(SecomFoldPreprocessorError(format!("duplicate source sample ID {id}")));
+            return Err(SecomFoldPreprocessorError(format!(
+                "duplicate source sample ID {id}"
+            )));
         }
     }
 
@@ -439,13 +518,24 @@ pub fn prepare_secom_stratified_fold_v1(
     let mut test_rows = Vec::new();
     for assignment in &manifest.assignments {
         if !assigned.insert(assignment.sample_id.as_str()) {
-            return Err(SecomFoldPreprocessorError(format!("duplicate manifest sample ID {}", assignment.sample_id)));
+            return Err(SecomFoldPreprocessorError(format!(
+                "duplicate manifest sample ID {}",
+                assignment.sample_id
+            )));
         }
-        let index = *index_by_id.get(assignment.sample_id.as_str()).ok_or_else(|| {
-            SecomFoldPreprocessorError(format!("manifest sample {} missing from source", assignment.sample_id))
-        })?;
+        let index = *index_by_id
+            .get(assignment.sample_id.as_str())
+            .ok_or_else(|| {
+                SecomFoldPreprocessorError(format!(
+                    "manifest sample {} missing from source",
+                    assignment.sample_id
+                ))
+            })?;
         if assignment.positive != (labels[index].label == 1) {
-            return Err(SecomFoldPreprocessorError(format!("source label mismatch for {}", assignment.sample_id)));
+            return Err(SecomFoldPreprocessorError(format!(
+                "source label mismatch for {}",
+                assignment.sample_id
+            )));
         }
         let row = SecomPreprocessingRowV1 {
             sample_id: assignment.sample_id.clone(),
@@ -455,11 +545,18 @@ pub fn prepare_secom_stratified_fold_v1(
         match assignment.partition.as_str() {
             "train" => training_rows.push(row),
             "test" => test_rows.push(row),
-            _ => return Err(SecomFoldPreprocessorError(format!("invalid partition for {}", assignment.sample_id))),
+            _ => {
+                return Err(SecomFoldPreprocessorError(format!(
+                    "invalid partition for {}",
+                    assignment.sample_id
+                )));
+            }
         }
     }
     if assigned.len() != index_by_id.len() || training_rows.is_empty() || test_rows.is_empty() {
-        return Err(SecomFoldPreprocessorError("manifest must cover all rows and have train/test partitions".into()));
+        return Err(SecomFoldPreprocessorError(
+            "manifest must cover all rows and have train/test partitions".into(),
+        ));
     }
 
     let fitted = fit_secom_preprocessor_v1(&training_rows, config)?;
@@ -469,16 +566,30 @@ pub fn prepare_secom_stratified_fold_v1(
     let test_failures = test.iter().filter(|r| r.positive).count();
     let train_ids: Vec<&str> = training.iter().map(|r| r.sample_id.as_str()).collect();
     let test_ids: Vec<&str> = test.iter().map(|r| r.sample_id.as_str()).collect();
-    let training_ids_sha = sha256_hex(&serde_json::to_vec(&train_ids).expect("sample ID list serializes"));
-    let test_ids_sha = sha256_hex(&serde_json::to_vec(&test_ids).expect("sample ID list serializes"));
-    let missing_dropped = fitted.dropped_features.iter().filter(|r| {
-        r.reason == "training_missing_fraction_exceeds_threshold" || r.reason == "no_observed_training_values"
-    }).count();
-    let variance_dropped = fitted.dropped_features.iter().filter(|r| r.reason == "training_near_zero_variance").count();
+    let training_ids_sha =
+        sha256_hex(&serde_json::to_vec(&train_ids).expect("sample ID list serializes"));
+    let test_ids_sha =
+        sha256_hex(&serde_json::to_vec(&test_ids).expect("sample ID list serializes"));
+    let missing_dropped = fitted
+        .dropped_features
+        .iter()
+        .filter(|r| {
+            r.reason == "training_missing_fraction_exceeds_threshold"
+                || r.reason == "no_observed_training_values"
+        })
+        .count();
+    let variance_dropped = fitted
+        .dropped_features
+        .iter()
+        .filter(|r| r.reason == "training_near_zero_variance")
+        .count();
     let train_a = digest_matrix(&training, false)?;
     let test_a = digest_matrix(&test, false)?;
     let (train_b, test_b) = if fitted.config.emit_missingness_indicator_ablation {
-        (Some(digest_matrix(&training, true)?), Some(digest_matrix(&test, true)?))
+        (
+            Some(digest_matrix(&training, true)?),
+            Some(digest_matrix(&test, true)?),
+        )
     } else {
         (None, None)
     };
@@ -515,7 +626,12 @@ pub fn prepare_secom_stratified_fold_v1(
             does_not_establish_sensor_semantics_or_fab_transfer: true,
         },
     };
-    Ok(PreparedSecomFoldV1 { fitted_preprocessor: fitted, training, test, report })
+    Ok(PreparedSecomFoldV1 {
+        fitted_preprocessor: fitted,
+        training,
+        test,
+        report,
+    })
 }
 
 #[cfg(test)]
@@ -523,7 +639,11 @@ mod tests {
     use super::*;
 
     fn row(id: &str, positive: bool, values: &[Option<f64>]) -> SecomPreprocessingRowV1 {
-        SecomPreprocessingRowV1 { sample_id: id.into(), positive, values: values.to_vec() }
+        SecomPreprocessingRowV1 {
+            sample_id: id.into(),
+            positive,
+            values: values.to_vec(),
+        }
     }
 
     fn config() -> SecomPreprocessorConfigV1 {
@@ -566,7 +686,12 @@ mod tests {
         let extreme = vec![row("test", false, &[Some(1.0e100), Some(-1.0e100)])];
         let _ = transform_secom_rows_v1(&fitted, &ordinary).unwrap();
         let _ = transform_secom_rows_v1(&fitted, &extreme).unwrap();
-        assert_eq!(fitted.pipeline_sha256, fit_secom_preprocessor_v1(&training, &config()).unwrap().pipeline_sha256);
+        assert_eq!(
+            fitted.pipeline_sha256,
+            fit_secom_preprocessor_v1(&training, &config())
+                .unwrap()
+                .pipeline_sha256
+        );
     }
 
     #[test]
@@ -651,10 +776,14 @@ mod tests {
             row("c", true, &[Some(3.0)]),
             row("d", true, &[Some(4.0)]),
         ];
-        let fitted = fit_secom_preprocessor_v1(&training, &SecomPreprocessorConfigV1 {
-            quantile_output: QuantileOutputV1::NormalScore,
-            ..config()
-        }).unwrap();
+        let fitted = fit_secom_preprocessor_v1(
+            &training,
+            &SecomPreprocessorConfigV1 {
+                quantile_output: QuantileOutputV1::NormalScore,
+                ..config()
+            },
+        )
+        .unwrap();
         let test = vec![row("test", false, &[Some(1.0e12)])];
         let transformed = transform_secom_rows_v1(&fitted, &test).unwrap();
         assert!(transformed[0].feature_set_a[0].is_finite());
@@ -681,7 +810,10 @@ mod tests {
     fn duplicate_ids_and_invalid_dimensions_reject() {
         let duplicate = vec![row("a", false, &[Some(1.0)]), row("a", true, &[Some(2.0)])];
         assert!(fit_secom_preprocessor_v1(&duplicate, &config()).is_err());
-        let mismatched = vec![row("a", false, &[Some(1.0)]), row("b", true, &[Some(2.0), Some(3.0)])];
+        let mismatched = vec![
+            row("a", false, &[Some(1.0)]),
+            row("b", true, &[Some(2.0), Some(3.0)]),
+        ];
         assert!(fit_secom_preprocessor_v1(&mismatched, &config()).is_err());
     }
 }
