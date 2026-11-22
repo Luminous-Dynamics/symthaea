@@ -50,7 +50,9 @@
         "source_root_pair",
         "matched_random",
         "no_memory",
-        "reference"
+        "reference",
+        "unknown_root",
+        "unknown_family"
       ]
     },
     "intervention": {
