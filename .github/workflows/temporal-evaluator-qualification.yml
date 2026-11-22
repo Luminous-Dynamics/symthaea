@@ -2,7 +2,7 @@ name: Temporal Evaluator Qualification
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
     branches:
       - "main"
       - "research/decision-regret-observation-voi-20261122"
