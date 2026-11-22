@@ -1123,6 +1123,64 @@ impl EvidenceDependencySidecarV1 {
         &self.canonical_digest
     }
 
+    /// Serialize the immutable sidecar using its versioned interchange schema.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        let records: Vec<serde_json::Value> = self
+            .records
+            .iter()
+            .map(|record| {
+                let lifecycle = match record.lifecycle_status_as_known {
+                    SourceLifecycleStatus::Active => serde_json::json!({"status": "active"}),
+                    SourceLifecycleStatus::Retracted => serde_json::json!({"status": "retracted"}),
+                    SourceLifecycleStatus::Superseded { successor_event_id } => {
+                        serde_json::json!({
+                            "status": "superseded",
+                            "successor_event_id": successor_event_id
+                        })
+                    }
+                };
+                let dependency_status = match record.dependency_lineage_status {
+                    DependencyLineageStatusV1::Complete => "complete",
+                    DependencyLineageStatusV1::Partial => "partial",
+                    DependencyLineageStatusV1::Unknown => "unknown",
+                };
+                serde_json::json!({
+                    "event_id": record.event_id,
+                    "action": match record.action { Action::A => "A", Action::B => "B" },
+                    "scope": {
+                        "regime": match record.scope.regime {
+                            broca_mace_policy::Regime::Baseline => "baseline",
+                            broca_mace_policy::Regime::Shifted => "shifted"
+                        },
+                        "objective": match record.scope.objective {
+                            broca_mace_policy::Objective::Quality => "quality",
+                            broca_mace_policy::Objective::Cost => "cost",
+                            broca_mace_policy::Objective::Speed => "speed"
+                        }
+                    },
+                    "source_family": record.source_family,
+                    "source_root_digest": record.source_root_digest.to_hex(),
+                    "upstream_source_id": record.upstream_source_id,
+                    "source_artifact_digest": record.source_artifact_digest,
+                    "transformation_digest": record.transformation_digest,
+                    "lineage_receipt_digest": record.lineage_receipt_digest,
+                    "raw_event_receipt_digest": record.raw_event_receipt_digest,
+                    "dependency_manifest_digest": record.dependency_manifest_digest,
+                    "dependency_lineage_status": dependency_status,
+                    "derived_from_event_ids": record.derived_from_event_ids,
+                    "lifecycle_status_as_known": lifecycle
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "schema_version": "mace_evidence_dependency_sidecar_v1",
+            "valid_at_ms": self.as_known.valid_at_ms,
+            "known_at_ms": self.as_known.known_at_ms,
+            "records": records,
+            "canonical_sha256": self.canonical_digest
+        })
+    }
+
     /// Recheck ordering, event/dependency identity and the sidecar commitment.
     pub fn verify_integrity(&self) -> bool {
         let mut prior_event_id = None;
