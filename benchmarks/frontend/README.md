@@ -133,18 +133,22 @@ fixture digest was independently confirmed with `sha256sum`.
 
 The versioned starter corpus is in
 `knowledge/leptos-0.8/patterns-v0.json`, with schema
-`knowledge/leptos-0.8/pattern-v1.schema.json`. It currently records eight
+`knowledge/leptos-0.8/pattern-v1.schema.json`. It currently records seventeen
 source-grounded patterns for Leptos 0.8 CSR and exact Git blob SHA-1 provenance
 for every example:
 
-- function components and view composition;
-- `RwSignal` local state;
-- tracked reads versus `get_untracked()`;
-- Effects and external side effects;
-- client-side async work with `spawn_local`;
-- keyed list rendering with `For`;
-- typed `NodeRef`;
-- the HTTP/WebSocket service boundary.
+- component composition, `RwSignal`, tracked/untracked reads and Effects;
+- client-side async work, keyed `For` collections and typed `NodeRef`;
+- HTTP/WebSocket service boundaries;
+- Router / Routes / Route composition and active links;
+- typed shared context, derived `Memo` state and programmatic navigation;
+- pure reducers, epoch-safe browser event adapters and persistent DOM resources;
+- fail-closed authorization and asynchronous initialization states.
+
+The current checked-in `Cargo.lock` resolves Leptos to 0.8.20. Although
+upstream has since published stable 0.8.23 (with 0.9.0-rc1 still prerelease),
+SFEB's baseline remains pinned to the lockfile version. A 0.8.23 upgrade is
+a separate compatibility experiment, not a silent benchmark dependency change.
 
 Patterns have explicit promotion states:
 `source_observed_not_compiled`,
@@ -167,7 +171,7 @@ Rust toolchain is unavailable in this environment.
 The first Leptos 0.8 retrieval pilot is defined in
 `knowledge/leptos-0.8/retrieval-queries-v0.json`:
 
-- 16 positive queries paraphrase the eight source-grounded patterns.
+- 34 positive queries cover the seventeen source-grounded patterns (two paraphrases each).
 - Eight hard negatives represent concepts not yet covered by the corpus.
 - The gold answers are exact versioned pattern IDs.
 - The public query set is development data, not a hidden holdout.
