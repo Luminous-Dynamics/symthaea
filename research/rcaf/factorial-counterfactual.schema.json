@@ -20,12 +20,13 @@
     "source_status": { "const": "synthetic_fixture" },
     "time_points": { "const": 96 },
     "roi_count": { "const": 8 },
-    "experiment_count": { "const": 3 },
+    "experiment_count": { "const": 4 },
     "nuisance_families": {
       "const": [
         "common_mode",
         "graph_smooth_low_rank",
-        "heat_kernel_localized"
+        "heat_kernel_localized",
+        "motion_transient"
       ]
     },
     "experiments": {
@@ -63,7 +64,8 @@
             "enum": [
               "common_mode",
               "graph_smooth_low_rank",
-              "heat_kernel_localized"
+              "heat_kernel_localized",
+              "motion_transient"
             ]
           },
           "nuisance_instance_id": { "type": "string", "minLength": 1 },
