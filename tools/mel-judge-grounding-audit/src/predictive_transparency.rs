@@ -188,7 +188,7 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         }
     }
 
-    let series = validate_series(&mut series_members, &forecast_ids)?;
+    let series_summaries = validate_series(&mut series_members, &forecast_ids)?;
     let latest_by_series: BTreeMap<&str, &ForecastV1> = series_members
         .iter()
         .filter_map(|(series_id, members)| {
@@ -518,19 +518,6 @@ fn audit_panel(panel: &ForecastPanelV1) -> Result<ForecastAuditReport, String> {
         .filter(|finding| finding.within_onset_tolerance == Some(true))
         .count();
     let onset_observed_count = matched_count;
-    let series_summaries = series_members
-        .iter()
-        .filter_map(|(series_id, members)| {
-            let latest = members.iter().max_by_key(|forecast| forecast.revision)?;
-            Some(ForecastSeriesSummary {
-                commitment_series_id: (*series_id).to_owned(),
-                revision_count: members.len(),
-                latest_forecast_id: latest.forecast_id.clone(),
-                has_supersession_chain: members.len() > 1,
-            })
-        })
-        .collect();
-
     let structurally_valid = findings.is_empty();
     Ok(ForecastAuditReport {
         schema_version: "mel-musical-forecast-report-v1".to_owned(),
