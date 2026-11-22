@@ -896,11 +896,8 @@ pub fn evaluate_mycelial_reconstruction(
             ground_truth_topology.cycle_rank,
         ),
     };
-    let (component_attributions, component_error_summary) = component_attribution(
-        ground_truth,
-        prediction,
-        &normalized_matches,
-    );
+    let (component_attributions, component_error_summary) =
+        component_attribution(ground_truth, prediction, &normalized_matches);
 
     let localization_error = summarize_errors(localization_errors);
     let junction_kind_macro_f1 = if macro_f1_values.is_empty() {
@@ -1085,15 +1082,22 @@ impl MycelialReconstructionScore {
                 || length_is_empty != self.segment_length_error.p95_absolute_error.is_none())
             || !length_values_valid
             || self.topology_delta != expected_topology_delta
-            || summarize_component_attributions(&self.component_attributions)
-                .as_ref() != Some(&self.component_error_summary)
-            || self.component_error_summary.matched_junction_count
-                != self.identity_matches.len()
-            || self.component_error_summary.matched_prediction_component_count
-                + self.component_error_summary.unmatched_prediction_component_count
+            || summarize_component_attributions(&self.component_attributions).as_ref()
+                != Some(&self.component_error_summary)
+            || self.component_error_summary.matched_junction_count != self.identity_matches.len()
+            || self
+                .component_error_summary
+                .matched_prediction_component_count
+                + self
+                    .component_error_summary
+                    .unmatched_prediction_component_count
                 != self.prediction_topology.connected_components
-            || self.component_error_summary.matched_ground_truth_component_count
-                + self.component_error_summary.unmatched_ground_truth_component_count
+            || self
+                .component_error_summary
+                .matched_ground_truth_component_count
+                + self
+                    .component_error_summary
+                    .unmatched_ground_truth_component_count
                 != self.ground_truth_topology.connected_components
         {
             return Err(MycelialReconstructionError::InvalidGraph(
@@ -1144,18 +1148,25 @@ impl MycelialReconstructionScore {
         hash_topology(&mut hasher, &self.prediction_topology);
         for value in [
             self.component_error_summary.matched_junction_count,
-            self.component_error_summary.matched_prediction_component_count,
-            self.component_error_summary.matched_ground_truth_component_count,
+            self.component_error_summary
+                .matched_prediction_component_count,
+            self.component_error_summary
+                .matched_ground_truth_component_count,
             self.component_error_summary.false_merge_count,
             self.component_error_summary.false_split_count,
-            self.component_error_summary.unmatched_prediction_component_count,
-            self.component_error_summary.unmatched_ground_truth_component_count,
+            self.component_error_summary
+                .unmatched_prediction_component_count,
+            self.component_error_summary
+                .unmatched_ground_truth_component_count,
         ] {
             hasher.update(&(value as u64).to_le_bytes());
         }
         for attribution in &self.component_attributions {
             hash_optional_string(&mut hasher, attribution.predicted_component_id.as_deref());
-            hash_optional_string(&mut hasher, attribution.ground_truth_component_id.as_deref());
+            hash_optional_string(
+                &mut hasher,
+                attribution.ground_truth_component_id.as_deref(),
+            );
             hasher.update(&(attribution.matched_junction_count as u64).to_le_bytes());
         }
         hash_error_summary(&mut hasher, &self.localization_error);
@@ -1302,9 +1313,7 @@ fn topology_summary(graph: &AnnotatedMycelialSkeleton) -> ReconstructionTopology
     }
 }
 
-fn component_membership(
-    graph: &AnnotatedMycelialSkeleton,
-) -> BTreeMap<String, String> {
+fn component_membership(graph: &AnnotatedMycelialSkeleton) -> BTreeMap<String, String> {
     let mut adjacency = BTreeMap::<String, Vec<String>>::new();
     for junction in &graph.junctions {
         adjacency.insert(junction.id.clone(), Vec::new());
@@ -1341,7 +1350,11 @@ fn component_membership(
                 }
             }
         }
-        let representative = members.iter().min().cloned().unwrap_or_else(|| start.clone());
+        let representative = members
+            .iter()
+            .min()
+            .cloned()
+            .unwrap_or_else(|| start.clone());
         for member in members {
             membership.insert(member, representative.clone());
         }
@@ -1371,8 +1384,7 @@ fn component_attribution(
         }
     }
 
-    let all_prediction_components: BTreeSet<_> =
-        prediction_membership.values().cloned().collect();
+    let all_prediction_components: BTreeSet<_> = prediction_membership.values().cloned().collect();
     let all_truth_components: BTreeSet<_> = truth_membership.values().cloned().collect();
     let mut truth_by_prediction = BTreeMap::<String, BTreeSet<String>>::new();
     let mut prediction_by_truth = BTreeMap::<String, BTreeSet<String>>::new();
@@ -2286,11 +2298,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            score.component_error_summary.unmatched_prediction_component_count,
+            score
+                .component_error_summary
+                .unmatched_prediction_component_count,
             1
         );
         assert_eq!(
-            score.component_error_summary.unmatched_ground_truth_component_count,
+            score
+                .component_error_summary
+                .unmatched_ground_truth_component_count,
             0
         );
         assert_eq!(score.component_error_summary.false_merge_count, 0);
