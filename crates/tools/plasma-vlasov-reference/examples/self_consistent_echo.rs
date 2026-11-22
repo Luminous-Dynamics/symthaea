@@ -10,6 +10,7 @@ use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian
 
 const FIRST_MODE: usize = 1;
 const SECOND_MODE: usize = 2;
+const WRONG_SECOND_MODE: usize = 3;
 const FIRST_TIME: f64 = 0.0;
 const SECOND_TIME: f64 = 2.0;
 const FINAL_TIME: f64 = 12.0;
@@ -161,6 +162,7 @@ fn run_resolution(
     config: VlasovPoissonConfig,
     dt: f64,
     sample_every: usize,
+    impulse_amplitude: f64,
 ) -> Result<(), Box<dyn Error>> {
     let wall_clock_start = Instant::now();
     let pulse_pair = EchoPulsePair {
@@ -170,10 +172,19 @@ fn run_resolution(
         second_time: SECOND_TIME,
     };
     let prediction = plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(pulse_pair)?;
+    let wrong_pulse_pair = EchoPulsePair {
+        first_mode: FIRST_MODE as i32,
+        second_mode: WRONG_SECOND_MODE as i32,
+        first_time: FIRST_TIME,
+        second_time: SECOND_TIME,
+    };
+    let wrong_prediction =
+        plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(wrong_pulse_pair)?;
 
     let initial = maxwellian_perturbation(config, INITIAL_AMPLITUDE, FIRST_MODE, THERMAL_SPEED)?;
     let mut pulsed = VlasovPoisson1d1v::new(config, initial.clone())?;
-    let mut no_second_pulse = VlasovPoisson1d1v::new(config, initial)?;
+    let mut no_second_pulse = VlasovPoisson1d1v::new(config, initial.clone())?;
+    let mut wrong_mode = VlasovPoisson1d1v::new(config, initial)?;
     let initial_casimir = pulsed.quadratic_casimir_budget()?.total_casimir;
     let initial_spectrum = pulsed.joint_phase_space_spectrum()?;
     let mut pulse_flux_baseline_x = low_x_f_strophy(&initial_spectrum, FLUX_X_MODE_CUTOFF);
@@ -195,7 +206,14 @@ fn run_resolution(
     let second_kick: Vec<f64> = (0..config.nx)
         .map(|ix| {
             let phase = TAU * SECOND_MODE as f64 * config.x(ix) / config.domain_length;
-            IMPULSE_AMPLITUDE * phase.sin()
+            impulse_amplitude * phase.sin()
+        })
+        .collect();
+    let wrong_second_kick: Vec<f64> = (0..config.nx)
+        .map(|ix| {
+            let phase =
+                TAU * WRONG_SECOND_MODE as f64 * config.x(ix) / config.domain_length;
+            impulse_amplitude * phase.sin()
         })
         .collect();
 
@@ -212,7 +230,12 @@ fn run_resolution(
 
     let echo_window_start = prediction.echo_time - 1.5;
     let echo_window_end = prediction.echo_time + 7.5;
+    let wrong_echo_window_start = wrong_prediction.echo_time - 1.5;
+    let wrong_echo_window_end = wrong_prediction.echo_time + 7.5;
     let mut echo_trace = Vec::new();
+    let mut wrong_echo_trace = Vec::new();
+    let mut wrong_mode_off_target_peak = 0.0_f64;
+    let mut wrong_mode_off_target_peak_time = FIRST_TIME;
 
     for step in 0..=total_steps {
         if step == pulse_step {
@@ -220,6 +243,7 @@ fn run_resolution(
             // Every other interval is advanced with the self-consistent Vlasov-
             // Poisson Strang-split step operator.
             pulsed.apply_velocity_impulse(&second_kick)?;
+            wrong_mode.apply_velocity_impulse(&wrong_second_kick)?;
         }
 
         if step % sample_every == 0 || step == pulse_step || step == total_steps {
@@ -229,6 +253,20 @@ fn run_resolution(
                 no_second_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
             let delta_real = pulse_echo.real - control_echo.real;
             let delta_imaginary = pulse_echo.imaginary - control_echo.imaginary;
+            let wrong_echo = wrong_mode.electric_mode_coefficient(wrong_prediction.echo_mode as usize)?;
+            let wrong_control_echo =
+                no_second_pulse.electric_mode_coefficient(wrong_prediction.echo_mode as usize)?;
+            let wrong_delta_real = wrong_echo.real - wrong_control_echo.real;
+            let wrong_delta_imaginary = wrong_echo.imaginary - wrong_control_echo.imaginary;
+            let wrong_off_target = wrong_mode.electric_mode_coefficient(prediction.echo_mode as usize)?;
+            let wrong_off_target_control =
+                no_second_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
+            let wrong_off_target_amplitude = (wrong_off_target.real - wrong_off_target_control.real)
+                .hypot(wrong_off_target.imaginary - wrong_off_target_control.imaginary);
+            if wrong_off_target_amplitude > wrong_mode_off_target_peak {
+                wrong_mode_off_target_peak = wrong_off_target_amplitude;
+                wrong_mode_off_target_peak_time = time;
+            }
             let pulse_second = pulsed.electric_mode_coefficient(SECOND_MODE)?;
             let control_second = no_second_pulse.electric_mode_coefficient(SECOND_MODE)?;
             let pulse_diagnostics = pulsed.diagnostics()?;
@@ -279,6 +317,25 @@ fn run_resolution(
             if (echo_window_start..=echo_window_end).contains(&time) {
                 echo_trace.push(EchoTraceSample::new(time, delta_real, delta_imaginary));
             }
+            if (wrong_echo_window_start..=wrong_echo_window_end).contains(&time) {
+                wrong_echo_trace.push(EchoTraceSample::new(
+                    time,
+                    wrong_delta_real,
+                    wrong_delta_imaginary,
+                ));
+            }
+            println!(
+                "# negative_control,{label},{step},{time:.8},{},{},{impulse_amplitude:.8},{:.12e},{:.12e},{:.12e},{:.8},{},{:.12e},{:.8},{:.12e}",
+                WRONG_SECOND_MODE,
+                wrong_prediction.echo_mode,
+                wrong_delta_real.hypot(wrong_delta_imaginary),
+                wrong_echo.phase(),
+                wrong_echo.amplitude(),
+                wrong_prediction.echo_time,
+                wrong_mode_off_target_peak,
+                wrong_mode_off_target_peak_time,
+                wrong_off_target_amplitude,
+            );
         }
 
         let cascade_every = sample_every.saturating_mul(10).max(1);
@@ -459,6 +516,7 @@ fn run_resolution(
         if step < total_steps {
             pulsed.step(dt)?;
             no_second_pulse.step(dt)?;
+            wrong_mode.step(dt)?;
         }
     }
 
@@ -473,8 +531,19 @@ fn run_resolution(
         },
     )?;
 
+    let wrong_measurement = measure_echo_trace(
+        wrong_prediction,
+        EchoModeTrace {
+            spatial_mode: wrong_prediction.echo_mode,
+            samples: &wrong_echo_trace,
+        },
+        EchoMeasurementConfig {
+            minimum_peak_amplitude: ECHO_SIGNAL_FLOOR,
+        },
+    )?;
+
     println!(
-        "# summary,{label},{},{},{dt:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_phase={:.12e},detected={},fwhm={},wall_seconds={:.6}",
+        "# summary,{label},{},{},{dt:.8},{impulse_amplitude:.8},echo_mode={},predicted_echo_time={:.8},sampled_peak_time={:.8},peak_amplitude={:.12e},peak_phase={:.12e},detected={},fwhm={},wall_seconds={:.6}",
         config.nx,
         config.nv,
         prediction.echo_mode,
@@ -488,6 +557,18 @@ fn run_resolution(
             .map(|width| format!("{width:.8}"))
             .unwrap_or_else(|| "unbracketed".to_string()),
         wall_clock_start.elapsed().as_secs_f64(),
+    );
+    println!(
+        "# negative_summary,{label},{impulse_amplitude:.8},wrong_pulse_mode={},predicted_echo_mode={},predicted_rephasing_time={:.8},sampled_wrong_mode_peak_time={:.8},wrong_mode_peak_amplitude={:.12e},wrong_mode_peak_phase={:.12e},wrong_mode_detected={},off_target_original_mode_peak={:.12e},off_target_peak_time={:.8}",
+        WRONG_SECOND_MODE,
+        wrong_prediction.echo_mode,
+        wrong_prediction.echo_time,
+        wrong_measurement.sampled_peak_time,
+        wrong_measurement.peak_amplitude,
+        wrong_measurement.peak_phase_radians,
+        wrong_measurement.detected,
+        wrong_mode_off_target_peak,
+        wrong_mode_off_target_peak_time,
     );
 
     Ok(())
@@ -539,7 +620,15 @@ mod tests {
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!(
-        "run,nx,nv,dt,step,time,pulse_echo_real,pulse_echo_imag,pulse_echo_amplitude,control_echo_real,control_echo_imag,control_echo_amplitude,delta_echo_real,delta_echo_imag,delta_echo_amplitude,pulse_second_real,pulse_second_imag,pulse_second_amplitude,control_second_real,control_second_imag,control_second_amplitude,pulse_mass,pulse_momentum,pulse_kinetic_energy,pulse_field_energy,pulse_total_energy,pulse_poisson_residual,pulse_minimum_f,pulse_velocity_boundary_ratio,pulse_x_high_tail_fraction,pulse_v_high_tail_fraction,pulse_x_nyquist_fraction,pulse_v_nyquist_fraction,control_mass,control_momentum,control_total_energy,control_field_energy,control_poisson_residual,control_minimum_f,control_velocity_boundary_ratio,diagnostic_time"
+        "run,nx,nv,dt,impulse_amplitude,step,time,pulse_echo_real,pulse_echo_imag,pulse_echo_amplitude,control_echo_real,control_echo_imag,control_echo_amplitude,delta_echo_real,delta_echo_imag,delta_echo_amplitude,pulse_second_real,pulse_second_imag,pulse_second_amplitude,control_second_real,control_second_imag,control_second_amplitude,pulse_mass,pulse_momentum,pulse_kinetic_energy,pulse_field_energy,pulse_total_energy,pulse_poisson_residual,pulse_minimum_f,pulse_velocity_boundary_ratio,pulse_x_high_tail_fraction,pulse_v_high_tail_fraction,pulse_x_nyquist_fraction,pulse_v_nyquist_fraction,control_mass,control_momentum,control_total_energy,control_field_energy,control_poisson_residual,control_minimum_f,control_velocity_boundary_ratio,diagnostic_time"
+    );
+
+    println!(
+        "# negative_control_columns,run,step,time,wrong_pulse_mode,predicted_echo_mode,impulse_amplitude,complex_response_amplitude,complex_response_phase,wrong_echo_mode_amplitude,wrong_echo_rephasing_time,off_target_original_mode_peak,off_target_peak_time,instantaneous_off_target_amplitude"
+    );
+
+    println!(
+        "# negative_summary_columns,run,impulse_amplitude,wrong_pulse_mode,predicted_echo_mode,predicted_rephasing_time,sampled_peak_time,peak_amplitude,peak_phase,detected,off_target_peak,off_target_peak_time"
     );
 
     println!(
@@ -568,10 +657,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // One-factor-at-a-time refinements isolate spatial grid, velocity grid and
     // timestep effects. The combined fine case checks their interaction.
     // All configurations emit at the same 0.02 physical-time cadence.
-    run_resolution("base", common(64, 256), 0.01, 2)?;
-    run_resolution("x_refined", common(128, 256), 0.01, 2)?;
-    run_resolution("v_refined", common(64, 512), 0.01, 2)?;
-    run_resolution("dt_refined", common(64, 256), 0.005, 4)?;
-    run_resolution("joint_refined", common(128, 512), 0.005, 4)?;
+    run_resolution("base_amp_0p025", common(64, 256), 0.01, 2, 0.025)?;
+    run_resolution("base", common(64, 256), 0.01, 2, 0.05)?;
+    run_resolution("base_amp_0p10", common(64, 256), 0.01, 2, 0.10)?;
+    run_resolution("x_refined", common(128, 256), 0.01, 2, 0.05)?;
+    run_resolution("v_refined", common(64, 512), 0.01, 2, 0.05)?;
+    run_resolution("dt_refined", common(64, 256), 0.005, 4, 0.05)?;
+    run_resolution("joint_refined", common(128, 512), 0.005, 4, 0.05)?;
     Ok(())
 }
