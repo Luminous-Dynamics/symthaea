@@ -131,8 +131,10 @@
       "known_related_declaration": {
         "name": "Set.countable_iUnion",
         "source_path": "Mathlib/Data/Set/Countable.lean",
-        "line_start": 205,
-        "line_end": 211
+        "blob_sha": "a7c1f764cf241df422807b7e6490e5552979e26d",
+        "line_start": 212,
+        "line_end": 216,
+        "permalink": "https://github.com/leanprover-community/mathlib4/blob/6ebcce37335bcb6bca64596e5d57bb3035648030/Mathlib/Data/Set/Countable.lean#L212-L216"
       },
       "explanation_gaps": [
         "The exact simp theorem set and proof term expansion have not been extracted; do not claim that the two explicit simp arguments are the complete dependency closure.",
