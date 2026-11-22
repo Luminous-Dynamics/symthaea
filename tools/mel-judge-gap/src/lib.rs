@@ -67,6 +67,7 @@ pub struct PairV1 {
     pub pair_id: String,
     pub item_a_id: String,
     pub item_b_id: String,
+    pub reference_gap_standard_error_logit: f64,
     pub presentations: Vec<PresentationV1>,
 }
 
@@ -175,11 +176,8 @@ pub fn qualify(input: &QualificationV1) -> Result<QualificationReport, String> {
         if item.item_id.trim().is_empty() {
             return Err("item_id must not be empty".to_owned());
         }
-        if !item.reference_strength_logit.is_finite()
-            || !item.standard_error_logit.is_finite()
-            || item.standard_error_logit < 0.0
-        {
-            return Err(format!("invalid human reference strength or standard error for {}", item.item_id));
+        if !item.reference_strength_logit.is_finite() {
+            return Err(format!("invalid human reference strength for {}", item.item_id));
         }
         if item_indices.insert(item.item_id.clone(), index).is_some() {
             return Err(format!("duplicate item_id: {}", item.item_id));
@@ -297,8 +295,13 @@ pub fn qualify(input: &QualificationV1) -> Result<QualificationReport, String> {
         let item_a = &input.items[item_a_index];
         let item_b = &input.items[item_b_index];
         let gap = (item_a.reference_strength_logit - item_b.reference_strength_logit).abs();
-        let uncertainty_margin = input.reference.confidence_z
-            * (item_a.standard_error_logit.powi(2) + item_b.standard_error_logit.powi(2)).sqrt();
+        if !pair.reference_gap_standard_error_logit.is_finite()
+            || pair.reference_gap_standard_error_logit < 0.0
+        {
+            return Err(format!("pair {} has an invalid reference gap standard error", pair.pair_id));
+        }
+        let uncertainty_margin =
+            input.reference.confidence_z * pair.reference_gap_standard_error_logit;
         let gold_directional = gap - uncertainty_margin > input.reference.minimum_directional_gap;
         let gold_winner_index = if gold_directional {
             Some(if item_a.reference_strength_logit > item_b.reference_strength_logit {
@@ -812,8 +815,7 @@ mod tests {
     #[test]
     fn uncertain_human_reference_pair_is_not_called_directional() {
         let mut input = fixture();
-        let item = input.items.iter_mut().find(|item| item.item_id == "item-a").unwrap();
-        item.standard_error_logit = 10.0;
+        input.pairs[0].reference_gap_standard_error_logit = 100.0;
         let report = qualify(&input).expect("wide reference uncertainty should remain reportable");
         assert!(report.gold_directional_pair_count < report.pair_count);
         let near = report.gap_bins.iter().find(|bin| bin.name == "near").unwrap();
