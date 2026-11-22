@@ -6,52 +6,71 @@ on:
       - "tools/mel-agency-trace/**"
       - "docs/research/MEL_AGENCY_TRANSACTION_TRACE_V1_2026-11-22.md"
       - ".github/workflows/mel-agency-transaction-trace.yml"
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   agency-trace-reference:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out exact pull request head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - name: Verify exact head
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: true
+      - name: Verify event head
+        id: event-head
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha }}"
           test "$actual" = "$expected"
-          echo "MEL_AGENCY_TRACE_REVISION=$actual" >> "$GITHUB_ENV"
+          echo "triggered_revision=$actual" >> "$GITHUB_OUTPUT"
       - name: Install pinned Rust
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Format isolated reference crate
-        run: cargo +1.96.0 fmt --manifest-path tools/mel-agency-trace/Cargo.toml
-      - name: Verify normalized formatting
+      - name: Normalize formatting and generate dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 fmt --manifest-path tools/mel-agency-trace/Cargo.toml
+          cargo +1.96.0 generate-lockfile --manifest-path tools/mel-agency-trace/Cargo.toml
+      - name: Commit formatting and lockfile, then verify remote head
+        id: tested-head
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          TRIGGERED_REVISION: ${{ steps.event-head.outputs.triggered_revision }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add -- \
+            tools/mel-agency-trace/src/lib.rs \
+            tools/mel-agency-trace/src/main.rs \
+            tools/mel-agency-trace/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "style(muse): normalize agency trace and pin dependencies"
+            git push origin "HEAD:refs/heads/${{ PR_HEAD_REF }}"
+          fi
+          tested="$(git rev-parse HEAD)"
+          remote="$(git ls-remote origin "refs/heads/${{ PR_HEAD_REF }}" | awk '{print $1}')"
+          test -n "$remote"
+          test "$tested" = "$remote"
+          echo "tested_revision=$tested" >> "$GITHUB_OUTPUT"
+          echo "MEL_AGENCY_TRACE_TRIGGERED_REVISION=$TRIGGERED_REVISION" >> "$GITHUB_ENV"
+          echo "MEL_AGENCY_TRACE_TESTED_REVISION=$tested" >> "$GITHUB_ENV"
+      - name: Verify committed formatting
         run: cargo +1.96.0 fmt --check --manifest-path tools/mel-agency-trace/Cargo.toml
-      - name: Snapshot rustfmt-normalized sources
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mel-agency-rustfmt-snapshot
-          path: |
-            tools/mel-agency-trace/src/lib.rs
-            tools/mel-agency-trace/src/main.rs
-          if-no-files-found: error
-          retention-days: 7
-      - name: Generate isolated dependency lock
-        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-agency-trace/Cargo.toml
-      - name: Run lifecycle and adversarial tests
+      - name: Run lifecycle and adversarial tests against committed head
         run: cargo +1.96.0 test --locked --manifest-path tools/mel-agency-trace/Cargo.toml
-      - name: Run warnings-denied Clippy
+      - name: Run warnings-denied Clippy against committed head
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-agency-trace/Cargo.toml -- -D warnings
       - name: Parse schema and fixtures
         shell: bash
@@ -68,7 +87,7 @@ jobs:
           cargo +1.96.0 run --locked --quiet --manifest-path tools/mel-agency-trace/Cargo.toml -- tools/mel-agency-trace/fixtures/suggest-only-v1.json > "$RUNNER_TEMP/suggest-only-report.json"
           python -m json.tool "$RUNNER_TEMP/apply-undo-report.json" > /dev/null
           python -m json.tool "$RUNNER_TEMP/suggest-only-report.json" > /dev/null
-      - name: Record source and dependency identities
+      - name: Record source, dependency and revision identities
         shell: bash
         run: |
           set -euo pipefail
@@ -78,11 +97,12 @@ jobs:
           cp "$RUNNER_TEMP/suggest-only-report.json" "$RUNNER_TEMP/mel-agency-trace-evidence/"
           sha256sum tools/mel-agency-trace/src/lib.rs > "$RUNNER_TEMP/mel-agency-trace-evidence/source.sha256"
           sha256sum tools/mel-agency-trace/Cargo.lock > "$RUNNER_TEMP/mel-agency-trace-evidence/lock.sha256"
-          printf 'tested_revision=%s\n' "$MEL_AGENCY_TRACE_REVISION" > "$RUNNER_TEMP/mel-agency-trace-evidence/revision.txt"
-      - name: Upload exact-head evidence
+          printf 'triggered_revision=%s\n' "$MEL_AGENCY_TRACE_TRIGGERED_REVISION" > "$RUNNER_TEMP/mel-agency-trace-evidence/triggered_revision.txt"
+          printf 'tested_revision=%s\n' "$MEL_AGENCY_TRACE_TESTED_REVISION" > "$RUNNER_TEMP/mel-agency-trace-evidence/tested_revision.txt"
+      - name: Upload exact committed-head evidence
         uses: actions/upload-artifact@v4
         with:
-          name: mel-agency-trace-${{ github.event.pull_request.head.sha || github.sha }}
+          name: mel-agency-trace-${{ steps.tested-head.outputs.tested_revision }}
           path: ${{ runner.temp }}/mel-agency-trace-evidence/
           if-no-files-found: error
           retention-days: 90
