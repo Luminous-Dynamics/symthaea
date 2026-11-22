@@ -132,7 +132,7 @@
   "fixture_exposure": "public_pilot",
   "reference_fixture": {
     "path": "benchmarks/frontend/fixtures/search-filter-explorer",
-    "sha256": "19719b76e0ea57c29b802bdfe9952613af13b805f949f54443f65d1c3014f853",
+    "sha256": "7938566d80b98ff65223e85acc17ae9cc304e9a83d1f3d0b941a98cada45115b",
     "purpose": "Original HTML/CSS reference plus synthetic dataset and deterministic local model; digest is SHA-256 of reference.html + NUL + style.css."
   },
   "required_regions": [
