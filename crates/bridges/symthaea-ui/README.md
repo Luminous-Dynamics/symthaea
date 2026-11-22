@@ -39,9 +39,11 @@ and narrow-screen layout adjustments are defined in `style.css`.
 Telemetry connection state is tied to the browser WebSocket reaching
 `OPEN`, rather than merely constructing a WebSocket object. Failed handshakes
 are bounded to 10 seconds. Ended streams retry sequentially with deterministic
-backoff (1, 2, 4, 8, 16, then 30 seconds). The current gateway field is read
-again for each retry, so a changed endpoint is used on the next attempt; an
-already-open stream is not forcibly replaced while it remains alive.
+backoff (1, 2, 4, 8, 16, then 30 seconds). A stream stable for at least one
+minute resets accumulated failure backoff; short-lived connections continue
+the exponential sequence. The current gateway field is read again for each
+retry, so a changed endpoint is used on the next attempt; an already-open
+stream is not forcibly replaced while it remains alive.
 
 These are source-level changes; a browser-based accessibility and responsive
 acceptance run is still required before claiming that the rendered interface
