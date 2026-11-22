@@ -104,6 +104,7 @@ pub enum MycelialFailureResilienceError {
     TooManySegments(usize),
     TooManyDemandPairs(usize),
     TooManyDemandSources(usize),
+    DemandWeightLimitExceeded(u128),
     TooManyScenarios(usize),
     InvalidDemand(String),
     DuplicateDemandId(String),
@@ -135,6 +136,9 @@ impl fmt::Display for MycelialFailureResilienceError {
             }
             Self::TooManyDemandSources(count) => {
                 write!(f, "distinct demand-source count {count} exceeds {MAX_FAILURE_DEMAND_SOURCES}")
+            }
+            Self::DemandWeightLimitExceeded(total) => {
+                write!(f, "total demand weight {total} exceeds exact f64 integer bound {MAX_FAILURE_TOTAL_DEMAND_WEIGHT}")
             }
             Self::TooManyScenarios(count) => {
                 write!(f, "failure-scenario count {count} exceeds {MAX_FAILURE_SCENARIOS}")
@@ -294,8 +298,8 @@ fn validate_demands(
         ));
     }
     if total_weight > MAX_FAILURE_TOTAL_DEMAND_WEIGHT {
-        return Err(MycelialFailureResilienceError::InvalidProfile(
-            "total demand weight exceeds the exact f64 accumulation bound",
+        return Err(MycelialFailureResilienceError::DemandWeightLimitExceeded(
+            total_weight,
         ));
     }
     Ok(())
@@ -635,6 +639,8 @@ impl MycelialFailureResilienceProfile {
             || !valid_digest(&self.source_graph_digest)
             || !valid_digest(&self.demand_digest)
             || self.demands.len() > MAX_FAILURE_DEMAND_PAIRS
+            || self.demands.iter().map(|demand| u128::from(demand.weight)).sum::<u128>()
+                > MAX_FAILURE_TOTAL_DEMAND_WEIGHT
             || self.demands.windows(2).any(|pair| pair[0].id >= pair[1].id)
             || self.demands.iter().any(|demand| {
                 !valid_id(&demand.id)
