@@ -580,7 +580,9 @@ fn validate_estimates<'a>(
         previous_time = Some(estimate.observed_at_ns);
         if previous_time_by_segment
             .get(estimate.segment_id.as_str())
-            .is_some_and(|time| estimate.observed_at_ns - *time < panel.policy.minimum_estimate_spacing_ns)
+            .is_some_and(|time| {
+                estimate.observed_at_ns - *time < panel.policy.minimum_estimate_spacing_ns
+            })
         {
             return Err(format!(
                 "tempo estimate {} violates minimum spacing",
