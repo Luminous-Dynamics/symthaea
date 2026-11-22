@@ -8,6 +8,8 @@ on:
       - "docs/research/MATH_PROOF_COMPREHENSION_*.json"
       - "docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.*"
       - "docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.*"
+      - "docs/research/RH_PROOF_GRAPH_BASELINE_V1.*"
+      - "docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.*"
       - ".github/workflows/math-proof-comprehension-pilot.yml"
   workflow_dispatch:
 
@@ -20,13 +22,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out exact pull-request head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Install stable Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca
         with:
           components: rustfmt
 
@@ -60,6 +62,9 @@ jobs:
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.json
             docs/research/MATHLIB_PROOF_COMPREHENSION_PILOT_V1.schema.json
             docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.json
+            docs/research/RH_PROOF_GRAPH_BASELINE_V1.json
+            docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json
+            docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.schema.json
           )
           for file in "${files[@]}"; do
             jq -e . "$file" >/dev/null
@@ -80,4 +85,16 @@ jobs:
             and .finite_oracle.unique_extension_mutated == false' \
             docs/research/ETH_REDUCTION_COMPREHENSION_TOY_V1.json >/dev/null
 
+          jq -e '.upstream.revision == "70fbb2fc21fed8de3c02d9f6df0b6067bf22e879"
+            and .upstream.dataset_version == "0.2.1"
+            and .upstream.license == "CC0-1.0"' \
+            docs/research/RH_PROOF_GRAPH_BASELINE_V1.json >/dev/null
+
+          jq -e '.source_identity.revision == "40e56bab026552e089d7afcfeff08d2defb9c005"
+            and (.proof_bridge | any(.declarations | index("each_unit_bound_statement")))
+            and (.proof_bridge | any(.declarations | index("Deduction.ch_top")))
+            and (.explicit_non_used_or_ambiguous | any(.declaration == "MeanBoundSecondForm"))' \
+            docs/research/RH_MAIN_INEQUALITY_M_MAP_V1.json >/dev/null
+
+          echo "RH_PROOF_GRAPH_AND_M_MAP_FIXTURES_PASS"
           echo "MATH_PROOF_COMPREHENSION_PILOT_FIXTURES_PASS"
