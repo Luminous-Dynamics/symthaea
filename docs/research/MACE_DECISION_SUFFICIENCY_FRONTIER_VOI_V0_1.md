@@ -55,7 +55,7 @@ The second quantity isolates degradation caused by compression relative to the d
 A representation is epsilon-decision-sufficient only when both of the following hold:
 
 1. Every hard admission, authority, scope, provenance, independence, and lifecycle constraint passes.
-2. The preregistered regret criterion is met, for example (G_y(S)leqepsilon), together with an absolute-regret ceiling.
+2. The preregistered regret criterion is met, for example `G_y(S) <= epsilon`, together with an absolute-regret ceiling.
 
 For a population of tasks, report at least:
 
@@ -175,7 +175,7 @@ For a candidate query or observation q, define expected value of sample informat
 EVSI(q) = R(b) - E_{o ~ P(o | b, q)}[R(b | o)].
 ```
 
-Here (b) is the candidate-visible belief state, (o) is a possible observation, and (R(b)) is minimum expected decision risk under the declared policy and action set.
+Here b is the candidate-visible belief state, o is a possible observation, and R(b) is minimum expected decision risk under the declared policy and action set.
 
 Net value must account for acquisition, delay, privacy, safety, and operational costs. If those costs are not legitimately convertible to the same utility unit, report a vector of expected risk reduction and costs rather than inventing an exchange rate.
 
