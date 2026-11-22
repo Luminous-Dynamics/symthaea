@@ -1,0 +1,48 @@
+{
+  "schema": "luminous.semi-bench.dtco-lineage-manifest.v1",
+  "design_id": "synthetic-inverter-design-v1",
+  "candidate_id": "candidate-0001",
+  "design_input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "pdk_or_process_profile_id": "open-pdk-profile-synthetic-v1",
+  "flow_profile_id": "openroad-ngspice-flow-synthetic-v1",
+  "constraints_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "runs": [
+    {
+      "run_id": "run-analytical",
+      "stage": "analytical",
+      "evidence_kind": "analytical_estimate",
+      "parent_run_ids": [],
+      "input_artifact_sha256": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+      "output_artifact_sha256": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+      "tool_name": "analytic-reference",
+      "tool_version": "1",
+      "configuration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "run_id": "run-spice",
+      "stage": "spice",
+      "evidence_kind": "tool_simulation",
+      "parent_run_ids": ["run-analytical"],
+      "input_artifact_sha256": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+      "output_artifact_sha256": ["eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"],
+      "tool_name": "ngspice",
+      "tool_version": "synthetic-1",
+      "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "model_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "run_id": "run-measurement",
+      "stage": "physical_measurement",
+      "evidence_kind": "physical_measurement",
+      "parent_run_ids": ["run-spice"],
+      "input_artifact_sha256": ["eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"],
+      "output_artifact_sha256": ["2222222222222222222222222222222222222222222222222222222222222222"],
+      "tool_name": "bench-reference-fixture",
+      "tool_version": "synthetic-1",
+      "configuration_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "instrument_ref": "instrument-reference-001",
+      "calibration_ref": "calibration-reference-001",
+      "uncertainty_artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ]
+}
