@@ -265,6 +265,7 @@ jobs:
           jsonschema.validate(report, schema)
           assert report["nuisance_then_filter_nuisance_leakage"] > 0.0
           assert report["order_difference_ratio"] > 0.0
+          assert report["projection_operator_commutator_ratio"] > 0.0
           assert report["joint_nuisance_leakage"] < 1e-10
           assert report["joint_filter_leakage"] < 1e-10
           print("PASS: RCAF projection-order re-entry and joint-projection reference challenge")
