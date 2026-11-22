@@ -389,11 +389,11 @@ fn validate_matrix(
         return Err(FactorialExperimentError::EmptyMatrix);
     }
     let width = matrix[0].len();
-    if matrix.len() < 3 || width < 2 {
-        return Err(FactorialExperimentError::InsufficientMatrixShape);
-    }
     if matrix.iter().any(|row| row.len() != width) {
         return Err(FactorialExperimentError::RaggedMatrix(name));
+    }
+    if matrix.len() < 3 || width < 2 {
+        return Err(FactorialExperimentError::InsufficientMatrixShape);
     }
     if matrix.iter().flatten().any(|value| !value.is_finite()) {
         return Err(FactorialExperimentError::NonFiniteInput(name));
@@ -667,7 +667,7 @@ mod tests {
                 &full.iter().map(|_| vec![0.0]).collect::<Vec<_>>(),
                 &metadata()
             ),
-            Err(FactorialExperimentError::DimensionMismatch(_))
+            Err(FactorialExperimentError::InsufficientMatrixShape)
         ));
     }
 
@@ -680,7 +680,7 @@ mod tests {
             run_factorial_counterfactual_experiment(&clean, &signal[..31], &nuisance, &metadata()),
             Err(FactorialExperimentError::DimensionMismatch(_))
         ));
-        let ragged = vec![vec![0.0, 1.0], vec![0.0]];
+        let ragged = vec![vec![0.0, 1.0], vec![0.0], vec![1.0, 0.0]];
         assert!(matches!(
             run_factorial_counterfactual_experiment(&clean, &signal, &ragged, &metadata()),
             Err(FactorialExperimentError::RaggedMatrix(_))
