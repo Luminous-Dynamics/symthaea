@@ -720,8 +720,8 @@ mod tests {
     fn changing_held_out_labels_does_not_change_fitted_models() {
         let changed = String::from_utf8(LABELS.to_vec())
             .unwrap()
-            .replace("-1 \\"19/07/2008 12:15:00\\"", "1 \\"19/07/2008 12:15:00\\"")
-            .replace("1 \\"19/07/2008 12:20:00\\"", "-1 \\"19/07/2008 12:20:00\\"");
+            .replace("-1 \"19/07/2008 12:15:00\"", "1 \"19/07/2008 12:15:00\"")
+            .replace("1 \"19/07/2008 12:20:00\"", "-1 \"19/07/2008 12:20:00\"");
         let original = evaluate(FEATURES, LABELS);
         let modified = evaluate(FEATURES, changed.as_bytes());
         for key in ["B5", "B5-balanced"] {
