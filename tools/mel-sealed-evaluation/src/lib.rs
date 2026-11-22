@@ -424,7 +424,8 @@ pub fn evaluate(
 
         if let Some(probability_a) = predicted.probability_a {
             let human_probability_a = logistic(gap);
-            reference_probability_squared_error_sum += (probability_a - human_probability_a).powi(2);
+            reference_probability_squared_error_sum +=
+                (probability_a - human_probability_a).powi(2);
             reference_probability_pair_count += 1;
         }
     }
@@ -809,8 +810,8 @@ fn is_canonical_utc_timestamp(value: &str) -> bool {
     let minute = value[14..16].parse::<u32>().unwrap_or(99);
     let second = value[17..19].parse::<u32>().unwrap_or(99);
 
-    let leap_year = year.is_multiple_of(4)
-        && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    let leap_year =
+        year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
     let maximum_day = match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
