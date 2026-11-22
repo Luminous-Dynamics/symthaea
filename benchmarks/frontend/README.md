@@ -178,6 +178,26 @@ Every run must record at least:
 
 Changing any of these creates a distinct benchmark environment. Do not pool results from different environments without an explicit compatibility analysis.
 
+## Fixture exposure and benchmark integrity
+
+Every task declares `fixture_exposure`:
+
+- `public_pilot`: task and reference source are public. Useful for developing
+  the runner and comparing iterative improvements, but never a hidden holdout.
+- `controller_only`: fixture source is outside the agent workspace; the
+  evaluator mounts it into the controller and provides only the allowed
+  screenshots/brief to the agent.
+- `hidden_holdout`: task, fixture, reference captures and detailed oracle
+  remain withheld until an evaluation run. Hidden tasks must not be committed
+  to a public repository.
+
+The service-dashboard task is explicitly `public_pilot`: its HTML/CSS fixture
+is checked into this public branch. It must not be counted as blind performance
+or anti-contamination evidence. Future holdouts require separate private
+storage, sparse or isolated agent workspaces, and blocked external fixture
+retrieval. Public-pilot and hidden-holdout scores must always be reported
+separately.
+
 ## Scoring
 
 Publish the quality vector and the hard-gate outcomes per task. Report repeated trials, confidence intervals, cost and wall time. A failed required journey, critical accessibility blocker, security violation, missing receipt or omitted task is a failure regardless of visual score.
