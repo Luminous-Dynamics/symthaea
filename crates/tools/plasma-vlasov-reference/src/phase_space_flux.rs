@@ -29,7 +29,10 @@ impl fmt::Display for PhaseSpaceFluxError {
                 "velocity-mode cutoff {cutoff} must be below Nyquist mode {nyquist}"
             ),
             Self::NonFiniteTransfer => {
-                write!(formatter, "phase-space transfer calculation produced a non-finite value")
+                write!(
+                    formatter,
+                    "phase-space transfer calculation produced a non-finite value"
+                )
             }
         }
     }
@@ -80,11 +83,7 @@ pub struct PhaseSpaceTransferRates {
 }
 
 impl PhaseSpaceTransferRates {
-    pub fn mode_rate(
-        &self,
-        x_mode_index: usize,
-        velocity_mode_index: usize,
-    ) -> Option<f64> {
+    pub fn mode_rate(&self, x_mode_index: usize, velocity_mode_index: usize) -> Option<f64> {
         if x_mode_index >= self.nx || velocity_mode_index >= self.nv {
             return None;
         }
@@ -140,8 +139,8 @@ impl VlasovPoisson1d1v {
             let acceleration = config.charge_to_mass * self.electric_field[ix];
             for iv in 0..nv {
                 let index = ix * nv + iv;
-                rhs[index] = -config.velocity(iv) * derivative_x[index]
-                    - acceleration * derivative_v[index];
+                rhs[index] =
+                    -config.velocity(iv) * derivative_x[index] - acceleration * derivative_v[index];
             }
         }
 
@@ -171,8 +170,8 @@ impl VlasovPoisson1d1v {
 
                 total_casimir_rate =
                     (2.0 * value * value_rate).mul_add(dx * dv, total_casimir_rate);
-                real_space_f_strophy_rate =
-                    (2.0 * fluctuation * fluctuation_rate).mul_add(dx * dv, real_space_f_strophy_rate);
+                real_space_f_strophy_rate = (2.0 * fluctuation * fluctuation_rate)
+                    .mul_add(dx * dv, real_space_f_strophy_rate);
             }
         }
         for iv in 0..nv {
@@ -225,9 +224,8 @@ impl VlasovPoisson1d1v {
             for sv in 0..nv {
                 let f_mode = velocity_line_f[sv];
                 let rhs_mode = velocity_line_rhs[sv];
-                let rate = 2.0
-                    * normalization
-                    * f_mode.re.mul_add(rhs_mode.re, f_mode.im * rhs_mode.im);
+                let rate =
+                    2.0 * normalization * f_mode.re.mul_add(rhs_mode.re, f_mode.im * rhs_mode.im);
                 if !f_mode.re.is_finite()
                     || !f_mode.im.is_finite()
                     || !rhs_mode.re.is_finite()
@@ -318,10 +316,7 @@ impl VlasovPoisson1d1v {
     }
 }
 
-fn spectral_derivative_x(
-    distribution: &[f64],
-    config: VlasovPoissonConfig,
-) -> Vec<f64> {
+fn spectral_derivative_x(distribution: &[f64], config: VlasovPoissonConfig) -> Vec<f64> {
     let mut derivative = vec![0.0; config.nx * config.nv];
     let mut line = vec![Complex::ZERO; config.nx];
 
@@ -334,8 +329,7 @@ fn spectral_derivative_x(
             let wave_number = if mode == config.nx / 2 {
                 0.0
             } else {
-                signed_mode(mode, config.nx) as f64 * std::f64::consts::TAU
-                    / config.domain_length
+                signed_mode(mode, config.nx) as f64 * std::f64::consts::TAU / config.domain_length
             };
             *coefficient = coefficient.mul_i(wave_number);
         }
@@ -348,10 +342,7 @@ fn spectral_derivative_x(
     derivative
 }
 
-fn spectral_derivative_v(
-    distribution: &[f64],
-    config: VlasovPoissonConfig,
-) -> Vec<f64> {
+fn spectral_derivative_v(distribution: &[f64], config: VlasovPoissonConfig) -> Vec<f64> {
     let mut derivative = vec![0.0; config.nx * config.nv];
     let velocity_length = config.velocity_max - config.velocity_min;
     let mut line = vec![Complex::ZERO; config.nv];
@@ -365,8 +356,7 @@ fn spectral_derivative_v(
             let velocity_wave_number = if mode == config.nv / 2 {
                 0.0
             } else {
-                signed_mode(mode, config.nv) as f64 * std::f64::consts::TAU
-                    / velocity_length
+                signed_mode(mode, config.nv) as f64 * std::f64::consts::TAU / velocity_length
             };
             *coefficient = coefficient.mul_i(velocity_wave_number);
         }
@@ -403,10 +393,7 @@ mod tests {
         VlasovPoisson1d1v::new(config, distribution).unwrap()
     }
 
-    fn low_velocity_f_strophy(
-        solver: &VlasovPoisson1d1v,
-        cutoff: usize,
-    ) -> f64 {
+    fn low_velocity_f_strophy(solver: &VlasovPoisson1d1v, cutoff: usize) -> f64 {
         let spectrum = solver.joint_phase_space_spectrum().unwrap();
         spectrum
             .by_velocity_mode
