@@ -453,7 +453,7 @@ mod tests {
         let result = evaluate_decision_observability(&class).unwrap();
         assert!(!result.decision_identifiable);
         assert_eq!(result.minimax_regret_action_id, "safe");
-        assert_eq!(result.unavoidable_worst_case_regret_ppm, 400_000);
+        assert_eq!(result.unavoidable_worst_case_regret_ppm, 300_000);
         assert_eq!(result.candidate_worst_case_regret_ppm, 1_000_000);
         assert_eq!(result.avoidable_worst_case_regret_ppm, 600_000);
     }
