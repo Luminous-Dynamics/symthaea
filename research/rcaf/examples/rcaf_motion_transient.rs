@@ -71,7 +71,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 seed_roi_index: 6,
             },
         ],
-        seed: 0x5243_4146_4D4F_5431,
     };
     let field = generate_motion_transient_field(&graph, &config)?;
 
@@ -153,7 +152,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             "  \"broad_loading\": {:.12},\n",
             "  \"localized_loading\": {:.12},\n",
             "  \"spatial_decay_length\": {:.12},\n",
-            "  \"rng_seed\": \"0x{:016x}\",\n",
             "  \"event_train_rule\": \"amplitude_exp_negative_elapsed_over_decay_samples\",\n",
             "  \"broad_events\": [{broad_events}],\n",
             "  \"localized_events\": [{localized_events}],\n",
@@ -173,7 +171,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         config.broad_loading,
         config.localized_loading,
         config.spatial_decay_length,
-        config.seed,
         field_rms(&field.values),
         max_abs(&field.values),
     );
