@@ -296,3 +296,80 @@ The exact-counting programme is an ETH-adjacent research programme. A determinis
 - worst-case asymptotic bound.
 
 For practical SAT performance, compare against the pinned 2026 competition winners and specialist solvers using official per-instance data. For exact counting, compare against the matching Model Counting Competition track and specialized counters. Do not compare #SAT results to SAT solved counts or approximate counters to exact counters.
+
+
+## 12. Current frontier correction and benchmark strategy (2026-11-22)
+
+### 12.1 RH verification versus Clay prize status
+
+The Lean and Mathlib communities' joint statement (2026-11-21) says they have full confidence in Alpöge's proof, certifies the statement and proof in their formal-verification scope, and describes the multiple independent checks. Andrew Sutherland's MIT verification page was updated 2026-11-22 16:20 UTC. It records compilation, axiom inspection, module-by-module replay, acceptance by nanoda and con-leche, acceptance by lean4lean, and theorem comparisons by con-leche / con-ron. At that update, the full `lake comparator` run and one full Lean-kernel replay of the exported proof were still in progress.
+
+Separately, the Clay Mathematics Institute still labels the Riemann Hypothesis **Unsolved** on its official problem page. This is not a contradiction in the evidence: formal proof checking and the Clay prize procedure are different questions. The 2018 Clay rules require publication in a qualifying outlet, at least two years after publication, and general acceptance in the global mathematics community before the Institute considers a prize. Do not describe the prize as awarded or the Clay status as changed.
+
+The GRH claim covered by the Lean development is for Dirichlet L-functions. Do not silently expand it to every generalized Riemann hypothesis for all L-function families.
+
+Sources:
+- Lean / Mathlib community statement: https://leanprover-community.github.io/blog/posts/riemann-hypothesis/
+- MIT verification ledger (status is time-stamped and may change): https://math.mit.edu/~drew/grh/
+- Official Clay RH status: https://www.claymath.org/millennium/riemann-hypothesis/
+- Official Clay prize rules: https://www.claymath.org/millennium-problems/rules/
+- Rubinstein working explanation and declared gap at inequality (M): https://www.math.uwaterloo.ca/~mrubinst/alpoge_claude_grh/
+
+Our programme should therefore record five separate fields: formal statement identity, checker outcomes, independent mathematical reconstruction, community acceptance, and Clay prize status.
+
+### 12.2 Industry benchmark snapshot
+
+Do not compare these scores as if they measured the same task.
+
+| System / benchmark | Current published reference | Research lesson for Symthaea |
+|---|---|---|
+| FormalMATH | 5,560 semantically validated Lean statements; DeepSeek-Prover-V2 671B reports 28.31% Pass@32 | Statement-supplied proof generation remains difficult; report domain strata and false-proof controls |
+| EasyProver / Aegis | 669/672 PutnamBench; 1,054/2,000 sampled implementation-derived specifications proved within 30 minutes | Easy contest sets are near saturation; implementation-derived and mutation-sensitive tasks are more discriminative |
+| VeriSoftBench | 500 tasks / 23 repositories; reported best 41% with curated dependency context and 35% with full repository context | Dependency curation matters; graph extraction and context selection are measurable engineering targets |
+| LeanLean | 64 repositories, up to 174k lines; Opus 5 reports 48.3% average compression within 12 hours | Whole-repository proof restructuring is now a benchmarked capability; compression must be evaluated alongside compute and proof readability |
+| TheoremBench | Nearly 100 classical theorems, with main and supporting-subtheorem tasks | Measure coverage across the proof structure, not just final-theorem pass/fail |
+| Formal Conjectures | The May 2026 paper snapshot reports 2,615 statements; the live public site currently advertises a larger evolving collection | Pin immutable snapshots and preserve source-lineage / contamination metadata |
+
+These results are taken from the benchmark papers or live benchmark pages and have different models, budgets, splits and protocols:
+- https://aclanthology.org/2026.findings-emnlp.579/
+- https://arxiv.org/abs/2610.38174
+- https://utopia-group.github.io/VeriSoftBench/
+- https://www.sri.inf.ethz.ch/publications/rognvaldsson2026leanlean
+- https://arxiv.org/abs/2606.09450
+- https://arxiv.org/abs/2605.13171
+- Live Formal Conjectures collection: https://google-deepmind.github.io/formal-conjectures/
+
+### 12.3 Additional paradigm shifts to test
+
+**Minimum Sufficient Explanation (MSE) frontier.** Instead of asking only whether an explanation is correct, search for the smallest source-linked proof/concept subgraph and explanation that still lets a reader pass a preregistered comprehension and transfer test. Report the Pareto frontier of explanation tokens, dependency coverage, expert faithfulness and human transfer. Do not equate shortest explanation with best explanation.
+
+**Proof-to-human-to-Lean round trip.** A reader learns from a proof explanation, writes a paraphrased theorem or proof sketch, and a separate system formalizes it. Lean checks whether the resulting statement is equivalent to the source statement and whether the proof is valid. This gives a measurable bridge from comprehension to formalizable knowledge.
+
+**Counterfactual proof understanding.** Change one assumption, quantifier, endpoint or dependency. Ask the system to predict what fails and provide a minimal counterexample or a corrected theorem. Score truth of the diagnosis, not whether the original proof happens to stop compiling.
+
+**Mechanism transfer.** Hold out entire theorem families. Ask whether a method learned from one proof (for example, implication-based redundancy, finite case analysis, interpolation, low-rank factorization, or witness reconstruction) helps with a different family. This is the strongest evidence that the model acquired reusable mathematical knowledge rather than memorized a proof.
+
+**Explanation evidence accounting.** Each mathematical sentence is linked to a Lean declaration, an elaborated dependency, a formal derivation, a counterexample or an explicit interpretation label. An explanation cannot silently promote a conjecture, analogy or intuition into a proved fact.
+
+### 12.4 Experimental design improvements
+
+- Freeze benchmark source snapshots, model and Lean versions, prompts, tools, token budgets, wall-clock budgets and random seeds.
+- Separate public development tasks, sealed family-level test tasks and prospective future tasks.
+- Use two independent human annotators and an adjudication log. Do not treat model agreement as ground truth.
+- Preregister the human study and run a power analysis before confirmatory claims. Use a small pilot only to estimate feasibility and variance.
+- Report participant background, pre-test scores, post-test scores, transfer accuracy, time-to-correct-understanding, confidence calibration and attrition.
+- Report compute and money alongside quality: CPU/GPU time, memory, tokens, tool calls, Lean compile time and expert-review minutes.
+- Preserve all failures: wrong statements, false explanations, unsupported analogies, timeouts, non-compiles, abstentions and reviewer disagreements.
+- Run HDC/CfC ablations at identical retrieval corpus, context size and compute budget. If there is no robust gain, remove these components from the proof-comprehension path.
+
+### 12.5 Refined target ladder
+
+In addition to the existing goals, evaluate:
+- **MSE-1:** at least 95% of formal explanation claims trace to exact declarations or explicitly labelled interpretation sources.
+- **MSE-2:** reduce explanation token budget by at least 25% at matched human comprehension and transfer—not by shortening text alone.
+- **Round-trip-1:** at least 90% statement-equivalence accuracy on controlled paraphrases, with zero acceptance of weakened or altered statements.
+- **Counterfactual-1:** at least 90% correct disposition on held-out assumption-removal mutations; exact minimal counterexample required when the modified proposition is false.
+- **Transfer-1:** at least 10 percentage-point improvement on theorem-family holdouts with no increase in false-fact rate.
+- **Efficiency-1:** publish quality–compute–human-time Pareto curves, not a single aggregate score.
+
+All thresholds are prospective. First measure reproducible baselines and confirm task difficulty. A hard gate failure cannot be averaged away.
