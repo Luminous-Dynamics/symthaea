@@ -27,7 +27,7 @@
     </header>
 
     <div class="workspace">
-      <aside class="sidebar" data-sfeb-id="dashboard.sidebar">
+      <aside class="sidebar" aria-label="Workspace" data-sfeb-id="dashboard.sidebar">
         <p class="eyebrow">WORKSPACE</p>
         <nav aria-label="Workspace navigation">
           <a class="selected" href="#overview"><span aria-hidden="true">⌂</span> Overview</a>
@@ -42,27 +42,27 @@
       </aside>
 
       <main id="main-content" class="main-content" data-sfeb-id="dashboard.main">
-        <section id="overview" class="page-heading" data-sfeb-id="dashboard.heading">
+        <section id="overview" class="page-heading" aria-labelledby="dashboard-title" data-sfeb-id="dashboard.heading">
           <div>
             <p class="eyebrow">MONDAY, 22 NOVEMBER</p>
-            <h1>Service overview</h1>
+            <h1 id="dashboard-title">Service overview</h1>
             <p class="muted">A clear view of the work happening across your field team.</p>
           </div>
           <a class="primary-link" href="#new-work-order">＋ <span>Create work order</span></a>
         </section>
 
         <section class="metric-grid" aria-label="Operational summary" data-sfeb-id="dashboard.metrics">
-          <article class="metric-card">
+          <article class="metric-card" data-sfeb-id="dashboard.metric-card.active">
             <div class="metric-top"><span>Active work orders</span><span class="metric-icon green" aria-hidden="true">▤</span></div>
             <strong class="metric-value">24</strong>
             <p><span class="trend up">↑ 12%</span> <span class="muted">from last week</span></p>
           </article>
-          <article class="metric-card">
+          <article class="metric-card" data-sfeb-id="dashboard.metric-card.scheduled">
             <div class="metric-top"><span>Scheduled today</span><span class="metric-icon gold" aria-hidden="true">◷</span></div>
             <strong class="metric-value">08</strong>
             <p><span class="trend neutral">On track</span> <span class="muted">for today's plan</span></p>
           </article>
-          <article class="metric-card">
+          <article class="metric-card" data-sfeb-id="dashboard.metric-card.team">
             <div class="metric-top"><span>Technicians online</span><span class="metric-icon blue" aria-hidden="true">◉</span></div>
             <strong class="metric-value">12<span class="metric-total"> / 14</span></strong>
             <p><span class="trend up">86%</span> <span class="muted">team availability</span></p>
@@ -70,9 +70,9 @@
         </section>
 
         <div class="content-grid">
-          <section id="activity" class="panel activity-panel" data-sfeb-id="dashboard.activity">
+          <section id="activity" class="panel activity-panel" aria-labelledby="activity-title" data-sfeb-id="dashboard.activity">
             <div class="panel-heading">
-              <div><p class="eyebrow">LIVE WORK</p><h2>Recent activity</h2></div>
+              <div><p class="eyebrow">LIVE WORK</p><h2 id="activity-title">Recent activity</h2></div>
               <a href="#all-activity" class="subtle-link">View all <span aria-hidden="true">→</span></a>
             </div>
             <ol class="activity-list">
@@ -83,9 +83,9 @@
             </ol>
           </section>
 
-          <section id="schedule" class="panel schedule-panel" data-sfeb-id="dashboard.schedule">
+          <section id="schedule" class="panel schedule-panel" aria-labelledby="schedule-title" data-sfeb-id="dashboard.schedule">
             <div class="panel-heading">
-              <div><p class="eyebrow">UP NEXT</p><h2>Today's schedule</h2></div>
+              <div><p class="eyebrow">UP NEXT</p><h2 id="schedule-title">Today's schedule</h2></div>
               <span class="date-chip">22 Nov</span>
             </div>
             <ol class="schedule-list">
