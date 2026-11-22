@@ -42,6 +42,7 @@ fn run_case(
     let mut sponge = VlasovPoisson1d1v::new(config, initial.clone())?;
     let initial_field = periodic.electric_mode_coefficient(spatial_mode)?;
     let initial_budget = sponge.quadratic_casimir_budget()?;
+    let initial_diagnostics = sponge.diagnostics()?;
     let initial_casimir = initial_budget.total_casimir;
     let dt = horizon.discrete_recurrence_time / STEPS_TO_RECURRENCE as f64;
     let mut removed_total_casimir = 0.0;
@@ -127,6 +128,7 @@ fn run_case(
         .hypot(sponge_final_field.imaginary - initial_field.imaginary)
         / initial_field.amplitude().max(f64::MIN_POSITIVE);
     let final_budget = sponge.quadratic_casimir_budget()?;
+    let final_diagnostics = sponge.diagnostics()?;
     let direct_casimir_drop = initial_casimir - final_budget.total_casimir;
     let casimir_accounting_error = (removed_total_casimir - direct_casimir_drop).abs()
         / initial_casimir.max(f64::MIN_POSITIVE);
@@ -134,6 +136,17 @@ fn run_case(
     let direct_casimir_drop_fraction = direct_casimir_drop / initial_casimir.max(f64::MIN_POSITIVE);
     let final_f_strophy_fraction = final_budget.fluctuation_f_strophy
         / initial_budget.fluctuation_f_strophy.max(f64::MIN_POSITIVE);
+    let mass_relative_delta = (final_diagnostics.total_mass - initial_diagnostics.total_mass)
+        / initial_diagnostics.total_mass.abs().max(f64::MIN_POSITIVE);
+    let momentum_delta = final_diagnostics.momentum - initial_diagnostics.momentum;
+    let kinetic_energy_relative_delta =
+        (final_diagnostics.kinetic_energy - initial_diagnostics.kinetic_energy)
+            / initial_diagnostics.kinetic_energy.abs().max(f64::MIN_POSITIVE);
+    let field_energy_relative_delta =
+        (final_diagnostics.field_energy - initial_diagnostics.field_energy)
+            / initial_diagnostics.field_energy.abs().max(f64::MIN_POSITIVE);
+    let minimum_f_before = initial_diagnostics.minimum_distribution;
+    let minimum_f_after = final_diagnostics.minimum_distribution;
     let nx = config.nx;
     let nv = config.nv;
     let velocity_spacing = horizon.velocity_spacing;
@@ -142,14 +155,14 @@ fn run_case(
     let wall_seconds = started.elapsed().as_secs_f64();
 
     println!(
-        "{label},{nx},{nv},{velocity_spacing:.8},{nyquist_time:.8},{recurrence_time:.8},{start_fraction:.8},{maximum_damping_rate:.8},{periodic_nyquist_fraction:.12e},{sponge_nyquist_fraction:.12e},{periodic_guardband_fraction:.12e},{sponge_guardband_fraction:.12e},{periodic_nyquist_field_ratio:.12e},{sponge_nyquist_field_ratio:.12e},{periodic_distribution_error:.12e},{sponge_distribution_error:.12e},{periodic_field_return_error:.12e},{sponge_field_return_error:.12e},{removed_casimir_fraction:.12e},{direct_casimir_drop_fraction:.12e},{casimir_accounting_error:.12e},{removed_fluctuation_f_strophy:.12e},{final_f_strophy_fraction:.12e},{wall_seconds:.6}"
+        "{label},{nx},{nv},{velocity_spacing:.8},{nyquist_time:.8},{recurrence_time:.8},{start_fraction:.8},{maximum_damping_rate:.8},{periodic_nyquist_fraction:.12e},{sponge_nyquist_fraction:.12e},{periodic_guardband_fraction:.12e},{sponge_guardband_fraction:.12e},{periodic_nyquist_field_ratio:.12e},{sponge_nyquist_field_ratio:.12e},{periodic_distribution_error:.12e},{sponge_distribution_error:.12e},{periodic_field_return_error:.12e},{sponge_field_return_error:.12e},{removed_casimir_fraction:.12e},{direct_casimir_drop_fraction:.12e},{casimir_accounting_error:.12e},{mass_relative_delta:.12e},{momentum_delta:.12e},{kinetic_energy_relative_delta:.12e},{field_energy_relative_delta:.12e},{minimum_f_before:.12e},{minimum_f_after:.12e},{removed_fluctuation_f_strophy:.12e},{final_f_strophy_fraction:.12e},{wall_seconds:.6}"
     );
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!(
-        "case,nx,nv,dv,t_nyquist,t_recurrence,sponge_start_fraction,max_damping_rate,periodic_global_nyquist_fraction,sponge_global_nyquist_fraction,periodic_target_guardband_fraction,sponge_target_guardband_fraction,periodic_E_ratio_at_tN,sponge_E_ratio_at_tN,periodic_distribution_return_error,sponge_distribution_return_error,periodic_E_return_error,sponge_E_return_error,cumulative_removed_C2_fraction,direct_C2_drop_fraction,C2_accounting_error_fraction,accumulated_sponge_f_strophy_loss,final_f_strophy_fraction,wall_seconds"
+        "case,nx,nv,dv,t_nyquist,t_recurrence,sponge_start_fraction,max_damping_rate,periodic_global_nyquist_fraction,sponge_global_nyquist_fraction,periodic_target_guardband_fraction,sponge_target_guardband_fraction,periodic_E_ratio_at_tN,sponge_E_ratio_at_tN,periodic_distribution_return_error,sponge_distribution_return_error,periodic_E_return_error,sponge_E_return_error,cumulative_removed_C2_fraction,direct_C2_drop_fraction,C2_accounting_error_fraction,mass_relative_delta,momentum_delta,kinetic_energy_relative_delta,field_energy_relative_delta,minimum_f_before,minimum_f_after,accumulated_sponge_f_strophy_loss,final_f_strophy_fraction,wall_seconds"
     );
 
     let common = VlasovPoissonConfig {
