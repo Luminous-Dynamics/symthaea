@@ -75,6 +75,7 @@ struct InterventionManifest {
     matched_random_count: usize,
     unmatched_random_target_count: usize,
     dependency_sidecar_sha256: Option<String>,
+    dependency_sidecar_ingress_verified: Option<bool>,
     lineage_incomplete_event_count: usize,
     unresolved_parent_reference_count: usize,
     manifest_sha256: String,
@@ -174,6 +175,12 @@ impl EvidenceDependencyIndex {
             .map(ReceiptDependencyProjection::sidecar_sha256)
     }
 
+    fn dependency_sidecar_ingress_verified(&self) -> Option<bool> {
+        self.receipt_dependencies
+            .as_ref()
+            .map(ReceiptDependencyProjection::ingress_receipts_verified)
+    }
+
     fn receipt_lineage_complete(&self, ids: &[u32]) -> Option<bool> {
         self.receipt_dependencies
             .as_ref()
@@ -217,7 +224,11 @@ impl EvidenceDependencyIndex {
         }
         match self.dependency_sidecar_sha256() {
             Some(digest) => {
-                hasher.update(b"receipt-sidecar:verified:v1\\0");
+                if self.dependency_sidecar_ingress_verified() == Some(true) {
+                    hasher.update(b"receipt-sidecar:ingress-verified:v1\\0");
+                } else {
+                    hasher.update(b"receipt-sidecar:integrity-only-untrusted:v1\\0");
+                }
                 hasher.update(digest.as_bytes());
             }
             None => {
@@ -647,6 +658,7 @@ fn build_manifest_with_sidecar(
         matched_random_count,
         unmatched_random_target_count,
         dependency_sidecar_sha256: index.dependency_sidecar_sha256().map(str::to_owned),
+        dependency_sidecar_ingress_verified: index.dependency_sidecar_ingress_verified(),
         lineage_incomplete_event_count: index.lineage_incomplete_event_count,
         unresolved_parent_reference_count: index.unresolved_parent_reference_count,
         manifest_sha256,
@@ -738,6 +750,7 @@ struct CandidateObservation {
     unknown_root_event_count: usize,
     unknown_family_event_count: usize,
     dependency_sidecar_sha256: Option<String>,
+    dependency_sidecar_ingress_verified: Option<bool>,
     lineage_incomplete_event_count: usize,
     unresolved_parent_reference_count: usize,
     latency_ns: u64,
@@ -937,6 +950,7 @@ fn run_candidate_with_sidecar(
         unknown_root_event_count: evidence_index.unknown_root_event_count(),
         unknown_family_event_count: evidence_index.unknown_family_event_count(),
         dependency_sidecar_sha256: evidence_index.dependency_sidecar_sha256().map(str::to_owned),
+        dependency_sidecar_ingress_verified: evidence_index.dependency_sidecar_ingress_verified(),
         lineage_incomplete_event_count: evidence_index.lineage_incomplete_event_count,
         unresolved_parent_reference_count: evidence_index.unresolved_parent_reference_count,
         latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
@@ -1109,6 +1123,11 @@ fn run() -> Result<(), String> {
             case.decision_need,
             &manifest.baseline_evidence_sha256,
         );
+        let manifest_evidence_index = match dependency_sidecar.as_ref() {
+            Some(sidecar) => EvidenceDependencyIndex::build_with_sidecar(&case.memory, sidecar),
+            None => EvidenceDependencyIndex::build(&case.memory),
+        }
+        .map_err(|error| format!("manifest evidence index failed: {error:?}"))?;
         evaluator_records.push(json!({
             "schema_version": SCHEMA_VERSION,
             "record_type": "intervention_manifest",
@@ -1124,6 +1143,7 @@ fn run() -> Result<(), String> {
             "matched_random_count": manifest.matched_random_count,
             "unmatched_random_target_count": manifest.unmatched_random_target_count,
             "dependency_sidecar_sha256": manifest.dependency_sidecar_sha256,
+            "dependency_sidecar_ingress_verified": manifest.dependency_sidecar_ingress_verified,
             "lineage_incomplete_event_count": manifest.lineage_incomplete_event_count,
             "unresolved_parent_reference_count": manifest.unresolved_parent_reference_count,
             "source_code_sha256": source_code_sha256,
@@ -1131,7 +1151,7 @@ fn run() -> Result<(), String> {
             "schema_sha256": schema_sha256,
             "dependency_sidecar_schema_sha256": dependency_sidecar_schema_sha256,
             "source_revision": source_revision,
-            "known_root_count": support_index.known_root_count(),
+            "known_root_count": manifest_evidence_index.known_root_count(),
             "candidate_validity": "diagnostic_only"
         }));
 
@@ -1167,6 +1187,7 @@ fn run() -> Result<(), String> {
                 "unknown_root_event_count": baseline.unknown_root_event_count,
                 "unknown_family_event_count": baseline.unknown_family_event_count,
                 "dependency_sidecar_sha256": baseline.dependency_sidecar_sha256,
+                "dependency_sidecar_ingress_verified": baseline.dependency_sidecar_ingress_verified,
                 "lineage_incomplete_event_count": baseline.lineage_incomplete_event_count,
                 "unresolved_parent_reference_count": baseline.unresolved_parent_reference_count,
                 "index_bytes": baseline.index_bytes,
@@ -1192,6 +1213,7 @@ fn run() -> Result<(), String> {
                 "target_key": baseline.mode.name(),
                 "retrieved_event_ids": baseline.retrieved_event_ids,
                 "dependency_sidecar_sha256": baseline.dependency_sidecar_sha256,
+                "dependency_sidecar_ingress_verified": baseline.dependency_sidecar_ingress_verified,
                 "lineage_incomplete_event_count": baseline.lineage_incomplete_event_count,
                 "unresolved_parent_reference_count": baseline.unresolved_parent_reference_count,
                 "index_bytes": baseline.index_bytes,
@@ -1271,7 +1293,8 @@ fn run() -> Result<(), String> {
                     "unknown_root_event_count": candidate.unknown_root_event_count,
                     "unknown_family_event_count": candidate.unknown_family_event_count,
                     "dependency_sidecar_sha256": candidate.dependency_sidecar_sha256,
-                    "lineage_incomplete_event_count": candidate.lineage_incomplete_event_count,
+                "dependency_sidecar_ingress_verified": candidate.dependency_sidecar_ingress_verified,
+                "lineage_incomplete_event_count": candidate.lineage_incomplete_event_count,
                     "unresolved_parent_reference_count": candidate.unresolved_parent_reference_count,
                     "index_bytes": candidate.index_bytes,
                     "latency_ns": candidate.latency_ns
@@ -1298,6 +1321,7 @@ fn run() -> Result<(), String> {
                     "matched_to": intervention.matched_to,
                     "retrieved_event_ids": candidate.retrieved_event_ids,
                     "dependency_sidecar_sha256": candidate.dependency_sidecar_sha256,
+                    "dependency_sidecar_ingress_verified": candidate.dependency_sidecar_ingress_verified,
                     "lineage_incomplete_event_count": candidate.lineage_incomplete_event_count,
                     "unresolved_parent_reference_count": candidate.unresolved_parent_reference_count,
                     "index_bytes": candidate.index_bytes,
