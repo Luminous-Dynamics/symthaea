@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_counterfactual_evidence_v0_1.schema.json",
+  "title": "MACE Counterfactual Evidence Sufficiency v0.1",
+  "description": "Separate candidate-visible decision observations and evaluator-only counterfactual intervention manifests/scores. Candidate records MUST NOT contain intervention labels, outcome utilities or hidden truth.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/intervention_manifest"
+    },
+    {
+      "$ref": "#/$defs/candidate_decision"
+    },
+    {
+      "$ref": "#/$defs/evaluator_score"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "event_ids": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "uniqueItems": true
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "action_a",
+        "action_b",
+        "abstain"
+      ]
+    },
+    "intervention_kind": {
+      "type": "string",
+      "enum": [
+        "event",
+        "source_root",
+        "source_family",
+        "source_root_pair",
+        "matched_random",
+        "no_memory",
+        "reference",
+        "unknown_root",
+        "unknown_family"
+      ]
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "kind",
+        "target_key",
+        "removed_event_ids",
+        "matched_to"
+      ],
+      "properties": {
+        "intervention_id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "$ref": "#/$defs/intervention_kind"
+        },
+        "target_key": {
+          "$ref": "#/$defs/id"
+        },
+        "removed_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "matched_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        }
+      }
+    },
+    "intervention_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "pair_block_id",
+        "manifest_sha256",
+        "baseline_evidence_sha256",
+        "public_seed",
+        "intervention_count",
+        "interventions",
+        "known_root_count",
+        "candidate_validity",
+        "max_root_pairs",
+        "root_pair_count",
+        "matched_random_count",
+        "unmatched_random_target_count",
+        "source_code_sha256",
+        "fixture_sha256",
+        "source_revision",
+        "schema_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_counterfactual_evidence_v0_1"
+        },
+        "record_type": {
+          "const": "intervention_manifest"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "pair_block_id": {
+          "$ref": "#/$defs/id"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "baseline_evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "public_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "intervention_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/intervention"
+          },
+          "uniqueItems": true
+        },
+        "known_root_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_validity": {
+          "const": "diagnostic_only"
+        },
+        "max_root_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "root_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matched_random_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmatched_random_target_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "candidate_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "pair_block_id",
+        "candidate_observation_id",
+        "candidate_input_sha256",
+        "decision_need_sha256",
+        "candidate_evidence_sha256",
+        "decision",
+        "decision_support_event_ids",
+        "support_event_count",
+        "support_known_root_count",
+        "support_known_family_count",
+        "support_unresolved_count",
+        "available_event_count",
+        "available_experience_struct_bytes",
+        "available_known_root_count",
+        "available_known_family_count",
+        "unknown_root_event_count",
+        "unknown_family_event_count",
+        "latency_ns",
+        "method",
+        "retrieved_event_ids",
+        "index_bytes"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_counterfactual_evidence_v0_1"
+        },
+        "record_type": {
+          "const": "candidate_decision"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "pair_block_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_observation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_need_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "intervention_id": {
+          "$ref": "#/$defs/id"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "decision_support_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "support_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "support_known_root_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "support_known_family_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "support_unresolved_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_known_root_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_known_family_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_root_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_family_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_experience_struct_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "retrieved_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retrieval_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evaluator_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "run_id",
+        "pair_block_id",
+        "candidate_observation_id",
+        "candidate_input_sha256",
+        "intervention_id",
+        "intervention_kind",
+        "target_key",
+        "removed_event_ids",
+        "removed_event_count",
+        "removed_experience_struct_bytes",
+        "decision",
+        "full_evidence_decision",
+        "decision_agrees_with_full",
+        "decision_changed",
+        "utility",
+        "regret",
+        "full_evidence_regret",
+        "regret_gap_vs_full_evidence",
+        "decision_is_optimal",
+        "abstained",
+        "evaluation_validity",
+        "invalidity_reason",
+        "method",
+        "retrieved_event_ids",
+        "index_bytes",
+        "regret_gap_vs_full_method"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_counterfactual_evidence_v0_1"
+        },
+        "record_type": {
+          "const": "evaluator_score"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "pair_block_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_observation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "intervention_id": {
+          "$ref": "#/$defs/id"
+        },
+        "intervention_kind": {
+          "$ref": "#/$defs/intervention_kind"
+        },
+        "target_key": {
+          "$ref": "#/$defs/id"
+        },
+        "matched_to": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "removed_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "removed_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "full_evidence_decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "decision_agrees_with_full": {
+          "type": "boolean"
+        },
+        "decision_changed": {
+          "type": "boolean"
+        },
+        "utility": {
+          "type": "number"
+        },
+        "regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "full_evidence_regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "regret_gap_vs_full_evidence": {
+          "type": "number"
+        },
+        "decision_is_optimal": {
+          "type": "boolean"
+        },
+        "abstained": {
+          "type": "boolean"
+        },
+        "evaluation_validity": {
+          "const": "diagnostic_only"
+        },
+        "invalidity_reason": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "removed_experience_struct_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "retrieved_event_ids": {
+          "$ref": "#/$defs/event_ids"
+        },
+        "index_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "regret_gap_vs_full_method": {
+          "type": "number"
+        },
+        "retrieval_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "exact_scope_scan",
+        "event_id_key_value_topk",
+        "static_hdc",
+        "hdc_ltc_zero_input",
+        "typed_content_hdc"
+      ]
+    }
+  }
+}
