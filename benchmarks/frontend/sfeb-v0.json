@@ -282,6 +282,38 @@
         "review_record"
       ],
       "status": "specification_only"
+    },
+    {
+      "id": "SFEB-L1-004",
+      "level": 1,
+      "category": "brief_to_leptos_dashboard",
+      "title": "Reconstruct a responsive service operations dashboard in Leptos",
+      "target_surface": "new_fixture_application",
+      "task_definition": "benchmarks/frontend/tasks/sfeb-l1-service-dashboard-v1.json",
+      "reference_fixture": "benchmarks/frontend/fixtures/service-dashboard/",
+      "inputs": [
+        "structured_product_brief",
+        "five_reference_viewports",
+        "screenshot_rendered_from_fixture_pending"
+      ],
+      "acceptance_criteria": [
+        "The Leptos 0.8 CSR implementation preserves the required information hierarchy and eight named semantic regions.",
+        "Three operational metric cards remain individually identifiable for layout analysis.",
+        "No horizontal page overflow across fixed and swept viewport widths.",
+        "Keyboard-only navigation and skip-to-main-content work.",
+        "No external network resources are loaded.",
+        "Visual hierarchy is judged independently from semantic and functional assertions."
+      ],
+      "required_evidence": [
+        "content_addressed_reference_fixture",
+        "fixed_viewport_screenshots",
+        "swept_viewport_layout_report",
+        "accessibility_tree",
+        "keyboard_action_trace",
+        "network_and_console_log",
+        "human_visual_review"
+      ],
+      "status": "specification_only"
     }
   ],
   "evaluation_protocol": {
@@ -383,5 +415,6 @@
     "acceptance_journey_count": 6,
     "browser_verified_journeys": 0,
     "important_rule": "source_observed and browser_verified are distinct evidence states; an implementation contract cannot promote itself to browser_verified."
-  }
+  },
+  "task_oracle_schema": "benchmarks/frontend/task-oracle-v1.schema.json"
 }
