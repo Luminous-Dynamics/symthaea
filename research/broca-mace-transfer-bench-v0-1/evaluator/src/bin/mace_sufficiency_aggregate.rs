@@ -660,8 +660,10 @@ mod tests {
             (2, PointMetrics { utility: 0.6, absolute_regret: 0.4, ..PointMetrics::default() }),
         ]);
         let (utility, regret) = paired_cluster_deltas(&treatment, &baseline).unwrap();
-        assert_eq!(utility, vec![0.3, 0.1]);
-        assert_eq!(regret, vec![-0.3, -0.1]);
+        assert!((utility[0] - 0.3).abs() < 1e-12);
+        assert!((utility[1] - 0.1).abs() < 1e-12);
+        assert!((regret[0] + 0.3).abs() < 1e-12);
+        assert!((regret[1] + 0.1).abs() < 1e-12);
 
         let unmatched = BTreeMap::from([(
             1,
