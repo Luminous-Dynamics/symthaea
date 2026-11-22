@@ -4,7 +4,7 @@
   "status": "source_observed",
   "source": {
     "repository": "Luminous-Dynamics/symthaea",
-    "commit": "9f036e4f0c427830c18a931e9203107231c5cce1",
+    "commit": "fa4e726d542b40d7ec8cd22e8275c237f1de5915",
     "paths": [
       "crates/bridges/symthaea-ui/src/app.rs",
       "crates/bridges/symthaea-ui/src/api.rs",
@@ -462,7 +462,8 @@
         "oracle": [
           "Only one stream attempt is active at a time.",
           "Retry delays follow 1, 2, 4, 8, 16, then 30 seconds.",
-          "The current gateway value is used on the next attempt."
+          "The current gateway value is used on the next attempt.",
+          "A connection lasting at least 60 seconds resets accumulated retry backoff; shorter sessions preserve the failure sequence."
         ],
         "status": "source_observed"
       },
@@ -503,6 +504,7 @@
   "notes": [
     "The contract is derived from source code at source.commit and must not be interpreted as proof of browser behavior.",
     "Changing the gateway endpoint while a WebSocket is already open does not forcibly replace that live connection; the new value is read by the next retry attempt.",
-    "No SFEB browser fixture, screenshot baseline or independent acceptance run is included in this contract."
+    "No SFEB browser fixture, screenshot baseline or independent acceptance run is included in this contract.",
+    "Telemetry retry backoff is reset only after a connection remains open for at least 60 seconds; this avoids resetting after a rapidly flapping socket."
   ]
 }
