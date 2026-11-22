@@ -492,3 +492,104 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_base() -> Vec<f64> {
+        maxwellian_perturbation(config(), FIRST_PERTURBATION, FIRST_MODE, 1.0).unwrap()
+    }
+
+    fn assert_direction_moments(direction: &[f64], config: VlasovPoissonConfig) {
+        for ix in 0..config.nx {
+            let start = ix * config.nv;
+            let end = start + config.nv;
+            let mut moments = [0.0; 3];
+            let mut scales = [0.0; 3];
+            let velocity_scale = config
+                .velocity_min
+                .abs()
+                .max(config.velocity_max.abs())
+                .max(1.0);
+            for (iv, value) in direction[start..end].iter().copied().enumerate() {
+                let u = config.velocity(iv) / velocity_scale;
+                let weighted = value * config.dv();
+                moments[0] += weighted;
+                moments[1] = u.mul_add(weighted, moments[1]);
+                moments[2] = (u * u).mul_add(weighted, moments[2]);
+                let absolute = value.abs() * config.dv();
+                scales[0] += absolute;
+                scales[1] += absolute * u.abs();
+                scales[2] += absolute * u * u;
+            }
+            for moment in 0..3 {
+                assert!(
+                    moments[moment].abs() / scales[moment].max(f64::MIN_POSITIVE) < 1.0e-11,
+                    "x row {ix}, moment {moment}, residual {}",
+                    moments[moment]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn moment_neutral_s_and_quadrature_directions_preserve_each_row_moments() {
+        let config = config();
+        let base = test_base();
+        for phase in VELOCITY_PHASES {
+            let (direction, relative_residual) =
+                moment_neutral_direction(&base, config, FIRST_MODE, 32, phase).unwrap();
+            assert!(relative_residual <= 1.0e-11);
+            assert_direction_moments(&direction, config);
+        }
+    }
+
+    #[test]
+    fn positivity_limiter_bounds_both_symmetric_and_control_perturbations() {
+        let pulse = test_base();
+        let mut control = pulse.clone();
+        for (index, value) in control.iter_mut().enumerate() {
+            *value *= 1.0 + 1.0e-3 * (index as f64 * 0.017).sin();
+        }
+        let (direction, _) =
+            moment_neutral_direction(&pulse, config(), FIRST_MODE, 48, 0.0).unwrap();
+        let epsilon = positivity_limited_epsilon(&pulse, &control, &direction).unwrap();
+        assert!(epsilon > 0.0);
+        for (base, delta) in pulse.iter().zip(&direction) {
+            assert!(base + epsilon * delta >= POSITIVITY_FLOOR);
+            assert!(base - epsilon * delta >= POSITIVITY_FLOOR);
+        }
+        for (base, delta) in control.iter().zip(&direction) {
+            assert!(base + epsilon * delta >= POSITIVITY_FLOOR);
+            assert!(base - epsilon * delta >= POSITIVITY_FLOOR);
+        }
+    }
+
+    #[test]
+    fn zero_direction_has_zero_future_response_susceptibility() {
+        let config = config();
+        let base = test_base();
+        let direction = vec![0.0; base.len()];
+        let (target, off_target) =
+            central_difference_trace(config, &base, &direction, 1.0e-3, 6, 2).unwrap();
+        assert!(!target.is_empty());
+        assert_eq!(target.len(), off_target.len());
+        assert!(
+            target
+                .iter()
+                .chain(&off_target)
+                .all(|(_, real, imaginary)| *real == 0.0 && *imaginary == 0.0)
+        );
+    }
+
+    #[test]
+    fn intervention_trace_subtraction_is_complex_and_time_aligned() {
+        let pulse = vec![(0.0, 2.0, 1.0), (1.0, 4.0, 3.0)];
+        let control = vec![(0.0, 0.5, -1.0), (1.0, 1.0, 1.5)];
+        let difference = subtract_traces(&pulse, &control);
+        assert_eq!(difference, vec![(0.0, 1.5, 2.0), (1.0, 3.0, 1.5)]);
+    }
+}
+
