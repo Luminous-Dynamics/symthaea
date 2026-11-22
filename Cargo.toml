@@ -23,6 +23,9 @@ exclude = [
     # Orphaned directory containing only an empty examples/unused.rs; the root
     # package is already a workspace member. Restore only if a real crate is added.
     "crates/core/symthaea",
+    # Test-only orphan directory with no Cargo.toml. Keep the parity test visible
+    # in source control, but do not let the workspace glob treat it as a package.
+    "crates/core/symthaea-iit",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
