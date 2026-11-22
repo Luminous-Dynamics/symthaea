@@ -118,3 +118,13 @@ cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- \
 
 The command prints a JSON summary. It returns a non-zero exit code when the
 report is structurally invalid or when any qualification hard gate fails.
+
+
+## Reference fixture self-audit
+
+Before executing the browser campaign, `contract-check --task` now also checks
+the static reference markup/CSS subset described in the benchmark README. It
+rejects a missing required heading, changed responsive metric breakpoint,
+missing skip-link focus treatment, missing named regions, wrong metric-card
+count and external CSS asset imports. These are source-fixture consistency
+checks only; they do not establish the behavior of a generated app in Chromium.
