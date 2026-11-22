@@ -252,4 +252,67 @@ mod tests {
         assert_eq!(decode_state_url("?state=%7B%7D&admin=true").unwrap_err(),
             "state_url_must_contain_only_state_parameter");
     }
+
+    #[test]
+    fn seeded_generated_queries_preserve_pagination_filter_and_url_properties() {
+        fn next(seed: &mut u64) -> u64 {
+            *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            *seed
+        }
+
+        let assets = assets();
+        let terms = ["", "sensor", "pump", "DEV", "battery", "pressure", "thermal", "no-match", "FIELD", "SEN-"];
+        let categories = [None, Some("Devices"), Some("Inspection"), Some("Power"), Some("Safety"), Some("Sensors")];
+        let sorts = ["name_asc", "price_asc", "price_desc", "stock_asc"];
+        let mut seed = 20_261_122_u64;
+
+        for _ in 0..2_048 {
+            let a = next(&mut seed) % 350_001;
+            let b = next(&mut seed) % 350_001;
+            let (minimum, maximum) = if a <= b { (a, b) } else { (b, a) };
+            let term = terms[(next(&mut seed) as usize) % terms.len()];
+            let category = categories[(next(&mut seed) as usize) % categories.len()].map(str::to_string);
+            let available_only = next(&mut seed) % 2 == 1;
+            let min_price_cents = if next(&mut seed) % 4 == 0 { Some(minimum) } else { None };
+            let max_price_cents = if next(&mut seed) % 4 == 0 { Some(maximum) } else { None };
+            let sort = sorts[(next(&mut seed) as usize) % sorts.len()].to_string();
+            let page_size = (next(&mut seed) % 7 + 1) as u32;
+            let page = (next(&mut seed) % 6 + 1) as u32;
+            let query = QueryState {
+                q: term.to_string(), category, available_only,
+                min_price_cents, max_price_cents, sort, page, page_size,
+            };
+
+            let page_result = evaluate(&assets, &query).expect("generated query must be valid");
+            assert_eq!(page_result.asset_ids.iter().collect::<BTreeSet<_>>().len(), page_result.asset_ids.len());
+            assert_eq!(page_result.page_count,
+                (page_result.total_matches + page_result.page_size as usize - 1) / page_result.page_size as usize);
+
+            let mut concatenated = Vec::new();
+            for current_page in 1..=page_result.page_count {
+                let page = evaluate(&assets, &QueryState { page: current_page as u32, ..query.clone() })
+                    .expect("page query must be valid");
+                concatenated.extend(page.asset_ids);
+            }
+            let full = evaluate(&assets, &QueryState { page: 1, page_size: 50, ..query.clone() })
+                .expect("full result query must be valid");
+            assert_eq!(concatenated, full.asset_ids);
+            assert_eq!(concatenated.iter().collect::<BTreeSet<_>>().len(), concatenated.len());
+
+            let encoded = encode_state_url(&query).expect("query state URL encodes");
+            assert_eq!(decode_state_url(&encoded).expect("query state URL decodes"), query);
+
+            if query.category.is_some() {
+                let base = evaluate(&assets, &QueryState {
+                    page: 1, page_size: 50, available_only: false, ..query.clone()
+                }).expect("unfiltered category state");
+                let filtered = evaluate(&assets, &QueryState {
+                    page: 1, page_size: 50, available_only: true, ..query.clone()
+                }).expect("available-only category state");
+                let base_ids: BTreeSet<_> = base.asset_ids.into_iter().collect();
+                assert!(filtered.asset_ids.iter().all(|id| base_ids.contains(id)));
+            }
+        }
+    }
+
 }
