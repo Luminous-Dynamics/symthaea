@@ -1,0 +1,182 @@
+{
+  "schema_version": "mel-musical-timing-panel-v2",
+  "session_id": "synthetic-tempo-adaptation-session-001",
+  "case_id": "tempo-step-120-to-150-bpm-001",
+  "track": "midi",
+  "clock_domain_id": "synthetic-clock-001",
+  "instrument_scope": "kick-snare-bass",
+  "reference_time_map_id": "shared-muse-time-map",
+  "reference_time_map_version": "1.0.0",
+  "reference_time_map_kind": "performance_time",
+  "reference_time_map_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "onset_capture_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "clock_calibration_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "policy": {
+    "maximum_relative_period_error": 0.05,
+    "required_consecutive_stable_estimates": 5,
+    "minimum_estimate_spacing_ns": 10000000
+  },
+  "target_events": [
+    {
+      "event_id": "kick-1",
+      "instrument_id": "kick",
+      "beat_index": 0,
+      "subdivision_index": 0,
+      "subdivision_count": 1,
+      "expected_onset_ns": 0,
+      "local_beat_period_ns": 500000000,
+      "outcome": "observed",
+      "observed_onset_ns": 10000000,
+      "capture_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "event_id": "snare-2",
+      "instrument_id": "snare",
+      "beat_index": 1,
+      "subdivision_index": 0,
+      "subdivision_count": 1,
+      "expected_onset_ns": 500000000,
+      "local_beat_period_ns": 500000000,
+      "outcome": "observed",
+      "observed_onset_ns": 520000000,
+      "capture_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "event_id": "kick-5",
+      "instrument_id": "kick",
+      "beat_index": 4,
+      "subdivision_index": 0,
+      "subdivision_count": 1,
+      "expected_onset_ns": 2000000000,
+      "local_beat_period_ns": 400000000,
+      "outcome": "observed",
+      "observed_onset_ns": 2020000000,
+      "capture_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "event_id": "bass-6",
+      "instrument_id": "bass",
+      "beat_index": 5,
+      "subdivision_index": 1,
+      "subdivision_count": 2,
+      "expected_onset_ns": 2600000000,
+      "local_beat_period_ns": 400000000,
+      "outcome": "observed",
+      "observed_onset_ns": 2620000000,
+      "capture_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "tempo_changes": [
+    {
+      "change_id": "change-1",
+      "change_observed_ns": 0,
+      "reference_beat_period_ns": 500000000
+    },
+    {
+      "change_id": "change-2",
+      "change_observed_ns": 2000000000,
+      "reference_beat_period_ns": 400000000
+    }
+  ],
+  "tempo_estimates": [
+    {
+      "estimate_id": "e1-1",
+      "change_id": "change-1",
+      "observed_at_ns": 0,
+      "evidence_window_end_ns": 0,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-2",
+      "change_id": "change-1",
+      "observed_at_ns": 80000000,
+      "evidence_window_end_ns": 80000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-3",
+      "change_id": "change-1",
+      "observed_at_ns": 160000000,
+      "evidence_window_end_ns": 160000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-4",
+      "change_id": "change-1",
+      "observed_at_ns": 240000000,
+      "evidence_window_end_ns": 240000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-5",
+      "change_id": "change-1",
+      "observed_at_ns": 320000000,
+      "evidence_window_end_ns": 320000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e2-1",
+      "change_id": "change-2",
+      "observed_at_ns": 2080000000,
+      "evidence_window_end_ns": 2080000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-2",
+      "change_id": "change-2",
+      "observed_at_ns": 2160000000,
+      "evidence_window_end_ns": 2160000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-3",
+      "change_id": "change-2",
+      "observed_at_ns": 2240000000,
+      "evidence_window_end_ns": 2240000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-4",
+      "change_id": "change-2",
+      "observed_at_ns": 2320000000,
+      "evidence_window_end_ns": 2320000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-5",
+      "change_id": "change-2",
+      "observed_at_ns": 2400000000,
+      "evidence_window_end_ns": 2400000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "extra_onsets": [],
+  "claim_ceiling": [
+    "synthetic conformance fixture only; expected onset values are precomputed placeholders from a mocked canonical-map receipt",
+    "the evaluator consumes expected_onset_ns and local_beat_period_ns; it does not implement beat-to-time conversion",
+    "no music model, musician, MIDI device or audio loopback was measured",
+    "receipt hashes are shape-checked but not cryptographically authenticated",
+    "the phase drift slope is descriptive only and has no inferential confidence interval",
+    "performance claims require musician/composition-held-out sessions and independent loopback capture"
+  ]
+}
