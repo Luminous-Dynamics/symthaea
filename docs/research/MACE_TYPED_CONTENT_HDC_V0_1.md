@@ -78,7 +78,7 @@ Frequencies are generated from a deterministic normal stream and phases from a d
 
 Role vectors and value vectors are unit normalized before binding. The complete candidate and query vectors are bundled and normalized. This makes each declared feature contribute on a comparable vector-norm basis.
 
-The profile digest binds:
+The profile digest v1.1 binds the exact scope/action prefilter policy as well as:
 - dimension;
 - base seed;
 - numeric-kernel version;
@@ -122,6 +122,8 @@ The index returns:
 - elapsed query time;
 - vector/ID/digest payload lower-bound bytes.
 
+Regime/objective and action are also retained as exact index partition keys and used as **hard prefilters** before vector ranking. A high-similarity candidate from another regime, objective or action cannot occupy a top-k slot and crowd out an applicable candidate. This is recorded in the typed profile version/digest. The current payload lower bound includes these exact partition keys.
+
 It does not return canonical Experience records or authorization.
 
 Build rejects:
@@ -146,12 +148,13 @@ An invalid or unresolved ID must fail closed. Similarity cannot override a MACE 
 
 ## 7. Authored metamorphic tests
 
-The module adds tests for:
+The module now contains nine authored tests for:
 - ranking invariance under event-ID permutation when content is preserved;
 - ranking changes when utility content changes but event IDs remain fixed;
 - changed ranking when the target action/scope query changes;
+- wrong-scope/wrong-action high-similarity distractors are removed by exact prefiltering before ranking;
 - higher similarity for numeric values near the target than for distant values under the frozen kernel;
-- profile digest sensitivity to dimension, seed and bandwidth;
+- profile digest sensitivity to dimension, seed, bandwidth and exact-filter policy;
 - duplicate-ID and non-finite input rejection;
 - query-time estimand/evidence-quality cues while preserving candidate-only authority;
 - the paired-runner typed arm uses the MACE qualification profile and emits a typed retrieval-profile digest.
