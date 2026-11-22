@@ -770,11 +770,626 @@ fn run_mutations(schema_path: &str, campaign_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+
+const DEFAULT_QUALIFICATION_REPORT_SCHEMA: &str =
+    "benchmarks/frontend/qualification/qualification-report-v1.schema.json";
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
+}
+
+fn is_hex_digest(value: &str, lengths: &[usize]) -> bool {
+    lengths.contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn wilson_interval(successes: usize, trials: usize) -> Value {
+    if trials == 0 {
+        return Value::Null;
+    }
+    let z = 1.959_963_984_540_054_f64;
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let margin = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+    serde_json::json!({
+        "lower_95": (center - margin).max(0.0),
+        "upper_95": (center + margin).min(1.0)
+    })
+}
+
+fn rate_summary(successes: usize, trials: usize) -> Value {
+    serde_json::json!({
+        "successes": successes,
+        "trials": trials,
+        "rate": if trials == 0 { Value::Null } else { serde_json::json!(successes as f64 / trials as f64) },
+        "wilson_95": wilson_interval(successes, trials)
+    })
+}
+
+fn string_set(value: &Value, key: &str) -> Result<BTreeSet<String>, String> {
+    let values = value
+        .get(key)
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{key} must be an array"))?;
+    let mut set = BTreeSet::new();
+    for entry in values {
+        let item = entry
+            .as_str()
+            .ok_or_else(|| format!("{key} entries must be strings"))?;
+        if !set.insert(item.to_string()) {
+            return Err(format!("{key} contains a duplicate value: {item}"));
+        }
+    }
+    Ok(set)
+}
+
+fn contains_all(required: &[Value], actual: &BTreeSet<String>) -> bool {
+    required
+        .iter()
+        .filter_map(Value::as_str)
+        .all(|value| actual.contains(value))
+}
+
+fn expected_oracle_fired(expected: &[Value], observed: &BTreeSet<String>) -> bool {
+    expected
+        .iter()
+        .filter_map(Value::as_str)
+        .any(|value| observed.contains(value))
+}
+
+fn read_beneath(root: &Path, relative_path: &str) -> Result<Vec<u8>, String> {
+    validate_relative_repo_path(relative_path)?;
+    let candidate = root.join(relative_path);
+    let canonical = candidate.canonicalize().map_err(|error| {
+        format!("failed to resolve evidence artifact {}: {error}", candidate.display())
+    })?;
+    if !canonical.starts_with(root) {
+        return Err(format!(
+            "evidence artifact escapes its artifact root: {relative_path}"
+        ));
+    }
+    fs::read(&canonical).map_err(|error| {
+        format!("failed to read evidence artifact {}: {error}", canonical.display())
+    })
+}
+
+fn validate_evidence_run(
+    run: &Value,
+    report_root: &Path,
+    artifact_root: &Path,
+    case_id: &str,
+    phase: &str,
+    task_id: &str,
+    fixture_id: &str,
+    expected_environment_sha: &str,
+) -> Result<(), String> {
+    let run_id = run
+        .get("run_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{case_id} {phase}: run_id is required"))?;
+    let source_commit = run
+        .get("source_commit")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{case_id} {phase}: source_commit is required"))?;
+    let environment_sha = run
+        .get("environment_manifest_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{case_id} {phase}: environment digest is required"))?;
+    let expected_receipt_sha = run
+        .get("evidence_receipt_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{case_id} {phase}: receipt digest is required"))?;
+    let receipt_path = run
+        .get("evidence_receipt_path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{case_id} {phase}: receipt path is required"))?;
+
+    if !is_hex_digest(source_commit, &[40, 64])
+        || !is_hex_digest(environment_sha, &[64])
+        || !is_hex_digest(expected_receipt_sha, &[64])
+    {
+        return Err(format!("{case_id} {phase}: malformed source or evidence digest"));
+    }
+    if environment_sha != expected_environment_sha {
+        return Err(format!("{case_id} {phase}: environment manifest does not match report"));
+    }
+
+    let receipt_bytes = read_beneath(artifact_root, receipt_path)?;
+    let actual_receipt_sha = sha256_bytes(&receipt_bytes);
+    if actual_receipt_sha != expected_receipt_sha.to_ascii_lowercase() {
+        return Err(format!("{case_id} {phase}: evidence receipt SHA-256 mismatch"));
+    }
+    let receipt: Value = serde_json::from_slice(&receipt_bytes)
+        .map_err(|error| format!("{case_id} {phase}: receipt JSON is invalid: {error}"))?;
+
+    for (field, expected) in [
+        ("schema", "sfeb-frontend-evidence/v1"),
+        ("run_id", run_id),
+        ("task_id", task_id),
+        ("fixture_id", fixture_id),
+        ("source_commit", source_commit),
+        ("environment_manifest_sha256", environment_sha),
+    ] {
+        let actual = receipt.get(field).and_then(Value::as_str).unwrap_or_default();
+        if actual != expected {
+            return Err(format!(
+                "{case_id} {phase}: receipt field {field} does not match the report"
+            ));
+        }
+    }
+
+    let receipt_artifacts = receipt
+        .get("artifacts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{case_id} {phase}: receipt.artifacts must be an array"))?;
+    let reported_artifacts = run
+        .get("artifacts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{case_id} {phase}: run.artifacts must be an array"))?;
+    if receipt_artifacts.len() != 3 || reported_artifacts.len() != 3 {
+        return Err(format!("{case_id} {phase}: exactly three evidence artifacts are required"));
+    }
+
+    let mut seen = BTreeSet::new();
+    for expected_kind in ["screenshot", "accessibility", "layout"] {
+        let reported = reported_artifacts
+            .iter()
+            .find(|item| item.get("kind").and_then(Value::as_str) == Some(expected_kind))
+            .ok_or_else(|| format!("{case_id} {phase}: missing {expected_kind} artifact path"))?;
+        let receipt_item = receipt_artifacts
+            .iter()
+            .find(|item| item.get("kind").and_then(Value::as_str) == Some(expected_kind))
+            .ok_or_else(|| format!("{case_id} {phase}: receipt missing {expected_kind} digest"))?;
+
+        if !seen.insert(expected_kind) {
+            return Err(format!("{case_id} {phase}: duplicate {expected_kind} artifact"));
+        }
+        let relative_path = reported
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("{case_id} {phase}: {expected_kind} path is missing"))?;
+        let expected_sha = reported
+            .get("sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("{case_id} {phase}: {expected_kind} SHA is missing"))?;
+        let expected_length = reported
+            .get("byte_length")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| format!("{case_id} {phase}: {expected_kind} byte_length is missing"))?;
+        if !is_hex_digest(expected_sha, &[64]) {
+            return Err(format!("{case_id} {phase}: malformed {expected_kind} digest"));
+        }
+
+        let bytes = read_beneath(artifact_root, relative_path)?;
+        if bytes.len() as u64 != expected_length || sha256_bytes(&bytes) != expected_sha.to_ascii_lowercase() {
+            return Err(format!("{case_id} {phase}: {expected_kind} artifact bytes do not match report digest"));
+        }
+        let receipt_sha = receipt_item
+            .get("sha256")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let receipt_length = receipt_item
+            .get("byte_length")
+            .and_then(Value::as_u64)
+            .unwrap_or_default();
+        if receipt_sha != expected_sha.to_ascii_lowercase() || receipt_length != expected_length {
+            return Err(format!("{case_id} {phase}: {expected_kind} does not match receipt metadata"));
+        }
+        let media_type = receipt_item
+            .get("media_type")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let required_media = match expected_kind {
+            "screenshot" => "image/png",
+            _ => "application/json",
+        };
+        if media_type != required_media {
+            return Err(format!("{case_id} {phase}: unexpected media type for {expected_kind}"));
+        }
+
+        match expected_kind {
+            "screenshot" => {
+                if bytes.len() < 24
+                    || !bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+                    || bytes.get(12..16) != Some(&b"IHDR"[..])
+                {
+                    return Err(format!("{case_id} {phase}: screenshot is not a valid PNG header"));
+                }
+                let png_width = u32::from_be_bytes(bytes[16..20].try_into().expect("fixed PNG width slice"));
+                let png_height = u32::from_be_bytes(bytes[20..24].try_into().expect("fixed PNG height slice"));
+                let viewport = receipt.get("viewport").ok_or_else(|| {
+                    format!("{case_id} {phase}: receipt viewport is missing")
+                })?;
+                let css_width = viewport.get("width").and_then(Value::as_u64).unwrap_or_default() as f64;
+                let css_height = viewport.get("height").and_then(Value::as_u64).unwrap_or_default() as f64;
+                let scale = viewport
+                    .get("device_scale_factor")
+                    .and_then(Value::as_f64)
+                    .ok_or_else(|| format!("{case_id} {phase}: invalid viewport scale factor"))?;
+                if !scale.is_finite()
+                    || (png_width as f64 - (css_width * scale).round()).abs() > f64::EPSILON
+                    || (png_height as f64 - (css_height * scale).round()).abs() > f64::EPSILON
+                {
+                    return Err(format!("{case_id} {phase}: PNG dimensions do not match receipt viewport"));
+                }
+            }
+            "accessibility" => {
+                serde_json::from_slice::<Value>(&bytes).map_err(|error| {
+                    format!("{case_id} {phase}: accessibility artifact JSON is invalid: {error}")
+                })?;
+            }
+            "layout" => {
+                let layout: Value = serde_json::from_slice(&bytes).map_err(|error| {
+                    format!("{case_id} {phase}: layout artifact JSON is invalid: {error}")
+                })?;
+                let observed_viewport = layout.get("viewport").ok_or_else(|| {
+                    format!("{case_id} {phase}: layout viewport is missing")
+                })?;
+                let receipt_viewport = receipt.get("viewport").ok_or_else(|| {
+                    format!("{case_id} {phase}: receipt viewport is missing")
+                })?;
+                for key in ["width", "height", "device_scale_factor"] {
+                    if observed_viewport.get(key) != receipt_viewport.get(key) {
+                        return Err(format!(
+                            "{case_id} {phase}: layout and receipt viewport disagree on {key}"
+                        ));
+                    }
+                }
+            }
+            _ => unreachable!("artifact kind is restricted above"),
+        }
+    }
+
+    let _ = report_root;
+    Ok(())
+}
+
+fn mutation_killed(candidate: &Value, expected_oracles: &[Value]) -> bool {
+    candidate.get("disposition").and_then(Value::as_str) == Some("rejected")
+        && string_set(candidate, "observed_oracle_ids")
+            .is_ok_and(|observed| expected_oracle_fired(expected_oracles, &observed))
+}
+
+fn equivalence_passes(baseline: &Value, candidate: &Value, required: &[Value]) -> bool {
+    let baseline_accepted = baseline.get("disposition").and_then(Value::as_str) == Some("accepted");
+    let candidate_accepted = candidate.get("disposition").and_then(Value::as_str) == Some("accepted");
+    let same_semantic_outcome = baseline.get("semantic_outcome_sha256")
+        == candidate.get("semantic_outcome_sha256");
+    let verified = string_set(candidate, "verified_invariants").unwrap_or_default();
+    baseline_accepted && candidate_accepted && same_semantic_outcome && contains_all(required, &verified)
+}
+
+fn validate_qualification_report(
+    campaign: &Value,
+    report: &Value,
+    campaign_sha: &str,
+    report_path: &Path,
+) -> Result<Value, String> {
+    let campaign_id = campaign.get("campaign_id").and_then(Value::as_str)
+        .ok_or_else(|| "campaign_id is missing from campaign".to_string())?;
+    if report.get("campaign_id").and_then(Value::as_str) != Some(campaign_id) {
+        return Err("qualification report campaign_id does not match campaign".to_string());
+    }
+    if report.get("campaign_sha256").and_then(Value::as_str)
+        != Some(campaign_sha)
+    {
+        return Err("qualification report does not bind the exact campaign file SHA-256".to_string());
+    }
+
+    let baseline_commit = report.get("baseline_source_commit").and_then(Value::as_str)
+        .ok_or_else(|| "baseline_source_commit is required".to_string())?;
+    let environment_sha = report.get("environment_manifest_sha256").and_then(Value::as_str)
+        .ok_or_else(|| "environment_manifest_sha256 is required".to_string())?;
+    if !is_hex_digest(baseline_commit, &[40, 64]) || !is_hex_digest(environment_sha, &[64]) {
+        return Err("report has malformed baseline source or environment digest".to_string());
+    }
+
+    let report_dir = report_path.parent().unwrap_or_else(|| Path::new("."))
+        .canonicalize().map_err(|error| format!("cannot resolve report directory: {error}"))?;
+    let artifact_root_relative = report.get("artifact_root").and_then(Value::as_str)
+        .ok_or_else(|| "artifact_root is required".to_string())?;
+    validate_relative_repo_path(artifact_root_relative)?;
+    let artifact_root_candidate = report_dir.join(artifact_root_relative);
+    let artifact_root = artifact_root_candidate.canonicalize()
+        .map_err(|error| format!("cannot resolve artifact_root: {error}"))?;
+    if !artifact_root.starts_with(&report_dir) {
+        return Err("artifact_root escapes the report directory".to_string());
+    }
+
+    let cases = report.get("case_results").and_then(Value::as_array)
+        .ok_or_else(|| "case_results must be an array".to_string())?;
+    let mut case_map = BTreeMap::<String, &Value>::new();
+    for case in cases {
+        let id = case.get("case_id").and_then(Value::as_str)
+            .ok_or_else(|| "every case result needs case_id".to_string())?;
+        if case_map.insert(id.to_string(), case).is_some() {
+            return Err(format!("duplicate qualification case result: {id}"));
+        }
+    }
+
+    let mut mutation_total = 0usize;
+    let mut mutation_kills = 0usize;
+    let mut critical_total = 0usize;
+    let mut critical_kills = 0usize;
+    let mut high_total = 0usize;
+    let mut high_kills = 0usize;
+    let mut category_counts = BTreeMap::<String, (usize, usize)>::new();
+    let mut security_total = 0usize;
+    let mut security_kills = 0usize;
+    let mut evidence_total = 0usize;
+    let mut evidence_kills = 0usize;
+    let mut positive_total = 0usize;
+    let mut positive_false_rejects = 0usize;
+    let mut positive_passes = 0usize;
+    let mut metamorphic_total = 0usize;
+    let mut metamorphic_passes = 0usize;
+    let mut adjudicated_cases = Vec::new();
+    let mut run_ids = BTreeSet::new();
+
+    let mutations = campaign.get("mutations").and_then(Value::as_array)
+        .ok_or_else(|| "campaign.mutations is missing".to_string())?;
+    for definition in mutations {
+        let id = definition.get("id").and_then(Value::as_str).unwrap_or_default();
+        let case = case_map.remove(id).ok_or_else(|| format!("missing mutation result {id}"))?;
+        if case.get("case_kind").and_then(Value::as_str) != Some("mutation") {
+            return Err(format!("case {id} has the wrong case_kind"));
+        }
+        let task_id = case.get("task_id").and_then(Value::as_str).unwrap_or_default();
+        let fixture_id = case.get("fixture_id").and_then(Value::as_str).unwrap_or_default();
+        let baseline = case.get("baseline").ok_or_else(|| format!("{id}: baseline run missing"))?;
+        let candidate = case.get("candidate").ok_or_else(|| format!("{id}: candidate run missing"))?;
+        let baseline_run_id = baseline.get("run_id").and_then(Value::as_str).unwrap_or_default();
+        let candidate_run_id = candidate.get("run_id").and_then(Value::as_str).unwrap_or_default();
+        if baseline_run_id == candidate_run_id || !run_ids.insert(baseline_run_id.to_string())
+            || !run_ids.insert(candidate_run_id.to_string())
+        {
+            return Err(format!("{id}: run IDs must be globally unique and baseline/candidate distinct"));
+        }
+        if baseline.get("disposition").and_then(Value::as_str) != Some("accepted") {
+            return Err(format!("{id}: baseline control must be accepted before mutation"));
+        }
+        for run in [baseline, candidate] {
+            if run.get("fixture_sha256") != baseline.get("fixture_sha256")
+                || run.get("environment_manifest_sha256") != baseline.get("environment_manifest_sha256")
+                || run.get("environment_manifest_sha256").and_then(Value::as_str) != Some(environment_sha)
+            {
+                return Err(format!("{id}: paired runs must use identical fixture and environment digests"));
+            }
+            if run.get("fixture_sha256").and_then(Value::as_str)
+                .is_none_or(|value| !is_hex_digest(value, &[64]))
+            {
+                return Err(format!("{id}: malformed fixture digest"));
+            }
+            validate_evidence_run(run, &report_dir, &artifact_root, id,
+                if std::ptr::eq(run, baseline) { "baseline" } else { "candidate" },
+                task_id, fixture_id, environment_sha)?;
+        }
+        if baseline.get("source_commit").and_then(Value::as_str) != Some(baseline_commit) {
+            return Err(format!("{id}: baseline source commit does not match report"));
+        }
+
+        let expected = definition.get("expected_oracles").and_then(Value::as_array)
+            .ok_or_else(|| format!("{id}: expected_oracles missing"))?;
+        let killed = mutation_killed(candidate, expected);
+        mutation_total += 1;
+        if killed { mutation_kills += 1; }
+        let category = definition.get("category").and_then(Value::as_str).unwrap_or("unknown");
+        let severity = definition.get("severity").and_then(Value::as_str).unwrap_or("unknown");
+        let category_count = category_counts.entry(category.to_string()).or_insert((0, 0));
+        category_count.1 += 1;
+        if killed { category_count.0 += 1; }
+        if severity == "critical" {
+            critical_total += 1;
+            if killed { critical_kills += 1; }
+        }
+        if severity == "high" {
+            high_total += 1;
+            if killed { high_kills += 1; }
+        }
+        if category == "security" {
+            security_total += 1;
+            if killed { security_kills += 1; }
+        }
+        if category == "evidence_integrity" {
+            evidence_total += 1;
+            if killed { evidence_kills += 1; }
+        }
+        adjudicated_cases.push(serde_json::json!({
+            "case_id": id, "kind": "mutation", "expected": "reject",
+            "observed": candidate.get("disposition"), "killed": killed
+        }));
+    }
+
+    let positives = campaign.get("positive_controls").and_then(Value::as_array)
+        .ok_or_else(|| "campaign.positive_controls is missing".to_string())?;
+    for definition in positives {
+        let id = definition.get("id").and_then(Value::as_str).unwrap_or_default();
+        let case = case_map.remove(id).ok_or_else(|| format!("missing positive-control result {id}"))?;
+        if case.get("case_kind").and_then(Value::as_str) != Some("positive_control") {
+            return Err(format!("case {id} has the wrong case_kind"));
+        }
+        let task_id = case.get("task_id").and_then(Value::as_str).unwrap_or_default();
+        let fixture_id = case.get("fixture_id").and_then(Value::as_str).unwrap_or_default();
+        let baseline = case.get("baseline").ok_or_else(|| format!("{id}: baseline run missing"))?;
+        let candidate = case.get("candidate").ok_or_else(|| format!("{id}: candidate run missing"))?;
+        for run in [baseline, candidate] {
+            let run_id = run.get("run_id").and_then(Value::as_str).unwrap_or_default();
+            if !run_ids.insert(run_id.to_string()) {
+                return Err(format!("{id}: duplicate run ID"));
+            }
+            if run.get("fixture_sha256") != baseline.get("fixture_sha256")
+                || run.get("environment_manifest_sha256") != baseline.get("environment_manifest_sha256")
+                || run.get("environment_manifest_sha256").and_then(Value::as_str) != Some(environment_sha)
+            {
+                return Err(format!("{id}: paired runs must use identical fixture and environment digests"));
+            }
+            validate_evidence_run(run, &report_dir, &artifact_root, id, "positive",
+                task_id, fixture_id, environment_sha)?;
+        }
+        if baseline.get("disposition").and_then(Value::as_str) != Some("accepted") {
+            return Err(format!("{id}: positive-control baseline must be accepted"));
+        }
+        positive_total += 1;
+        let candidate_disposition = candidate.get("disposition").and_then(Value::as_str);
+        if candidate_disposition == Some("rejected") {
+            positive_false_rejects += 1;
+        }
+        let invariants = definition.get("invariants").and_then(Value::as_array)
+            .ok_or_else(|| format!("{id}: positive-control invariants missing"))?;
+        let passed = equivalence_passes(baseline, candidate, invariants);
+        if passed { positive_passes += 1; }
+        adjudicated_cases.push(serde_json::json!({
+            "case_id": id, "kind": "positive_control", "expected": "accept",
+            "observed": candidate.get("disposition"), "passed": passed
+        }));
+    }
+
+    let relations = campaign.get("metamorphic_relations").and_then(Value::as_array)
+        .ok_or_else(|| "campaign.metamorphic_relations is missing".to_string())?;
+    for definition in relations {
+        let id = definition.get("id").and_then(Value::as_str).unwrap_or_default();
+        let case = case_map.remove(id).ok_or_else(|| format!("missing metamorphic result {id}"))?;
+        if case.get("case_kind").and_then(Value::as_str) != Some("metamorphic") {
+            return Err(format!("case {id} has the wrong case_kind"));
+        }
+        let task_id = case.get("task_id").and_then(Value::as_str).unwrap_or_default();
+        let fixture_id = case.get("fixture_id").and_then(Value::as_str).unwrap_or_default();
+        let baseline = case.get("baseline").ok_or_else(|| format!("{id}: baseline run missing"))?;
+        let candidate = case.get("candidate").ok_or_else(|| format!("{id}: candidate run missing"))?;
+        for run in [baseline, candidate] {
+            let run_id = run.get("run_id").and_then(Value::as_str).unwrap_or_default();
+            if !run_ids.insert(run_id.to_string()) {
+                return Err(format!("{id}: duplicate run ID"));
+            }
+            if run.get("fixture_sha256") != baseline.get("fixture_sha256")
+                || run.get("environment_manifest_sha256") != baseline.get("environment_manifest_sha256")
+                || run.get("environment_manifest_sha256").and_then(Value::as_str) != Some(environment_sha)
+            {
+                return Err(format!("{id}: paired runs must use identical fixture and environment digests"));
+            }
+            validate_evidence_run(run, &report_dir, &artifact_root, id, "metamorphic",
+                task_id, fixture_id, environment_sha)?;
+        }
+        let required_oracle = definition.get("oracle").and_then(Value::as_str)
+            .ok_or_else(|| format!("{id}: metamorphic oracle is missing"))?;
+        let required = vec![Value::String(required_oracle.to_string())];
+        let passed = equivalence_passes(baseline, candidate, &required);
+        metamorphic_total += 1;
+        if passed { metamorphic_passes += 1; }
+        adjudicated_cases.push(serde_json::json!({
+            "case_id": id, "kind": "metamorphic", "expected": "equivalent",
+            "observed": candidate.get("disposition"), "passed": passed
+        }));
+    }
+
+    if !case_map.is_empty() {
+        return Err(format!("qualification report contains unknown cases: {}", case_map.keys().cloned().collect::<Vec<_>>().join(", ")));
+    }
+    let expected_total = mutations.len() + positives.len() + relations.len();
+    if run_ids.len() != expected_total * 2 {
+        return Err("qualification report does not contain two unique runs for every case".to_string());
+    }
+
+    let mut categories = serde_json::Map::new();
+    for (name, (successes, trials)) in category_counts {
+        categories.insert(name, rate_summary(successes, trials));
+    }
+    let overall_rate = mutation_kills as f64 / mutation_total.max(1) as f64;
+    let high_rate = high_kills as f64 / high_total.max(1) as f64;
+    let critical_rate = critical_kills as f64 / critical_total.max(1) as f64;
+    let security_rate = security_kills as f64 / security_total.max(1) as f64;
+    let evidence_rate = evidence_kills as f64 / evidence_total.max(1) as f64;
+    let false_reject_rate = positive_false_rejects as f64 / positive_total.max(1) as f64;
+    let qualified = critical_total > 0
+        && security_total > 0
+        && evidence_total > 0
+        && critical_rate >= 1.0
+        && security_rate >= 1.0
+        && evidence_rate >= 1.0
+        && high_rate >= 0.95
+        && overall_rate >= 0.90
+        && positive_false_rejects == 0
+        && positive_passes == positive_total
+        && metamorphic_passes == metamorphic_total;
+
+    Ok(serde_json::json!({
+        "schema": "sfeb-qualification-summary-v1",
+        "report_id": report.get("report_id"),
+        "campaign_id": campaign_id,
+        "campaign_sha256": campaign_sha,
+        "status": if qualified { "qualified" } else { "not_qualified" },
+        "mutation_kill_rates": {
+            "overall": rate_summary(mutation_kills, mutation_total),
+            "critical": rate_summary(critical_kills, critical_total),
+            "high_severity": rate_summary(high_kills, high_total),
+            "security": rate_summary(security_kills, security_total),
+            "evidence_integrity": rate_summary(evidence_kills, evidence_total),
+            "by_category": Value::Object(categories)
+        },
+        "positive_controls": {
+            "false_rejections": positive_false_rejects,
+            "false_reject_rate": rate_summary(positive_total - positive_false_rejects, positive_total),
+            "accepted_with_all_invariants": rate_summary(positive_passes, positive_total)
+        },
+        "metamorphic_relations": rate_summary(metamorphic_passes, metamorphic_total),
+        "case_results": adjudicated_cases,
+        "important_limitations": [
+            "Wilson intervals quantify binomial uncertainty for this finite campaign; they do not estimate all real-world UI defects.",
+            "This adjudicator verifies report, receipt and artifact integrity; it does not execute the browser, mutate source, or independently establish that each oracle is semantically adequate.",
+            "A qualified result applies only to the exact campaign SHA-256, baseline revision, runner revision and environment manifest."
+        ]
+    }))
+}
+
+fn run_qualification_report(
+    report_schema_path: &str,
+    campaign_path: &str,
+    report_path: &str,
+) -> Result<(), String> {
+    let campaign_schema = read_json(DEFAULT_MUTATION_SCHEMA)?;
+    let campaign_bytes = fs::read(campaign_path)
+        .map_err(|error| format!("failed to read campaign {campaign_path}: {error}"))?;
+    let campaign: Value = serde_json::from_slice(&campaign_bytes)
+        .map_err(|error| format!("failed to parse campaign {campaign_path}: {error}"))?;
+    validate_mutation_campaign(&campaign_schema, &campaign)?;
+    let campaign_sha = sha256_bytes(&campaign_bytes);
+
+    let report_schema = read_json(report_schema_path)?;
+    let report = read_json(report_path)?;
+    let validator = validator_for(&report_schema)
+        .map_err(|error| format!("invalid qualification report schema: {error}"))?;
+    let errors: Vec<String> = validator
+        .iter_errors(&report)
+        .map(|error| format!("{}: {error}", error.instance_path()))
+        .collect();
+    if !errors.is_empty() {
+        return Err(format!(
+            "qualification report does not satisfy its schema:\n{}",
+            errors.join("\n")
+        ));
+    }
+
+    let summary = validate_qualification_report(
+        &campaign,
+        &report,
+        &campaign_sha,
+        Path::new(report_path),
+    )?;
+    println!("{}", serde_json::to_string_pretty(&summary)
+        .map_err(|error| format!("failed to serialize qualification summary: {error}"))?);
+    if summary.get("status").and_then(Value::as_str) != Some("qualified") {
+        return Err("qualification report is valid but the campaign did not meet its quality gates".to_string());
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus. --mutations validates the oracle-qualification campaign definition only; it does not execute the campaign."
+            "Usage:\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- [CONTRACT_SCHEMA [CONTRACT_JSON [APP_SOURCE.rs]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --task [TASK_SCHEMA [TASK_JSON]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --patterns [PATTERN_SCHEMA [CORPUS_JSON [REPOSITORY_ROOT]]]\n  cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval [RETRIEVAL_SCHEMA [QUERY_SET_JSON [PATTERN_CORPUS_JSON]]]\n\nThe default mode validates the Leptos interface contract and exact source anchors. --task validates the task schema, required fixture regions and canonical fixture digest. --patterns validates the Leptos knowledge schema and exact Git blob provenance for every source example. --retrieval validates positive/hard-negative queries and their gold IDs against the versioned pattern corpus. --mutations validates the oracle-qualification campaign definition only; it does not execute the campaign. --qualification-report validates the complete paired execution report, receipts and artifact bytes, then computes Wilson intervals and hard-gate qualification."
         );
         return Ok(());
     }
@@ -814,6 +1429,16 @@ fn run() -> Result<(), String> {
         return run_mutations(
             args.get(1).map(String::as_str).unwrap_or(DEFAULT_MUTATION_SCHEMA),
             args.get(2).map(String::as_str).unwrap_or(DEFAULT_MUTATION_CAMPAIGN),
+        );
+    }
+    if args.first().is_some_and(|arg| arg == "--qualification-report") {
+        if args.len() > 4 {
+            return Err("--qualification-report accepts report schema, campaign JSON and report JSON paths".to_string());
+        }
+        return run_qualification_report(
+            args.get(1).map(String::as_str).unwrap_or(DEFAULT_QUALIFICATION_REPORT_SCHEMA),
+            args.get(2).map(String::as_str).unwrap_or(DEFAULT_MUTATION_CAMPAIGN),
+            args.get(3).map(String::as_str).unwrap_or("qualification-report.json"),
         );
     }
     if args.len() > 3 {
@@ -1115,6 +1740,79 @@ mod tests {
         campaign["acceptance_targets"]["positive_control_false_reject_rate_max"] =
             Value::from(0.01);
         assert!(validate_mutation_campaign(&schema, &campaign).is_err());
+    }
+
+    #[test]
+    fn wilson_interval_is_bounded_and_nonzero_for_small_perfect_samples() {
+        let interval = wilson_interval(5, 5);
+        assert!(interval["lower_95"].as_f64().unwrap() > 0.0);
+        assert_eq!(interval["upper_95"], 1.0);
+        assert_eq!(wilson_interval(0, 0), Value::Null);
+    }
+
+    #[test]
+    fn mutation_is_killed_only_by_an_expected_oracle() {
+        let candidate = serde_json::json!({
+            "disposition": "rejected",
+            "observed_oracle_ids": ["layout.overflow"]
+        });
+        assert!(mutation_killed(
+            &candidate,
+            &[Value::String("layout.overflow".into()), Value::String("keyboard.route".into())]
+        ));
+        assert!(!mutation_killed(
+            &candidate,
+            &[Value::String("receipt.integrity".into())]
+        ));
+        let accepted = serde_json::json!({
+            "disposition": "accepted",
+            "observed_oracle_ids": ["layout.overflow"]
+        });
+        assert!(!mutation_killed(
+            &accepted,
+            &[Value::String("layout.overflow".into())]
+        ));
+    }
+
+    #[test]
+    fn positive_and_metamorphic_controls_require_semantic_equivalence() {
+        let baseline = serde_json::json!({
+            "disposition": "accepted",
+            "semantic_outcome_sha256": "a".repeat(64)
+        });
+        let candidate = serde_json::json!({
+            "disposition": "accepted",
+            "semantic_outcome_sha256": "a".repeat(64),
+            "verified_invariants": ["keyboard.journey", "accessible.name"]
+        });
+        assert!(equivalence_passes(
+            &baseline,
+            &candidate,
+            &[Value::String("keyboard.journey".into())]
+        ));
+        assert!(!equivalence_passes(
+            &baseline,
+            &candidate,
+            &[Value::String("missing.invariant".into())]
+        ));
+        let changed = serde_json::json!({
+            "disposition": "accepted",
+            "semantic_outcome_sha256": "b".repeat(64),
+            "verified_invariants": ["keyboard.journey"]
+        });
+        assert!(!equivalence_passes(
+            &baseline,
+            &changed,
+            &[Value::String("keyboard.journey".into())]
+        ));
+    }
+
+    #[test]
+    fn evidence_path_validation_rejects_traversal_and_absolute_paths() {
+        assert!(validate_relative_repo_path("../outside.json").is_err());
+        assert!(validate_relative_repo_path("/tmp/outside.json").is_err());
+        assert!(validate_relative_repo_path("artifacts/../outside.json").is_err());
+        assert!(validate_relative_repo_path("artifacts/receipt.json").is_ok());
     }
 
     #[test]
