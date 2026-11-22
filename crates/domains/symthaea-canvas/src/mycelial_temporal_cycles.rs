@@ -14,7 +14,7 @@
 //! accepts only observed/accepted edge evidence; candidate contacts are not a
 //! supported edge kind.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 
@@ -26,7 +26,6 @@ pub const MAX_TEMPORAL_MYCELIAL_WINDOWS: usize = 4_096;
 pub const MAX_TEMPORAL_MYCELIAL_NODES: usize = 128;
 pub const MAX_TEMPORAL_MYCELIAL_EDGES: usize = 512;
 pub const MAX_TEMPORAL_CYCLES_PER_WINDOW: usize = 2_048;
-pub const MAX_TEMPORAL_CYCLE_ID_BYTES: usize = 128;
 const MAX_TEMPORAL_NODE_ID_BYTES: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
