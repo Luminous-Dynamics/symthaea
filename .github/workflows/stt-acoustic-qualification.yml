@@ -64,6 +64,46 @@ jobs:
       - name: Check formatting
         run: cargo fmt --manifest-path Cargo.toml -p symthaea-stt -p symthaea -- --check
 
+      - name: Reconcile tracked Cargo.lock without weakening qualification
+        id: lockfile
+        shell: bash
+        run: |
+          set +e
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.tracked"
+          cargo metadata --manifest-path Cargo.toml --format-version 1 \
+            > "$RUNNER_TEMP/cargo-metadata.json" \
+            2> "$RUNNER_TEMP/cargo-metadata.stderr"
+          metadata_status=$?
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.resolved"
+          diff -u "$RUNNER_TEMP/Cargo.lock.tracked" "$RUNNER_TEMP/Cargo.lock.resolved" \
+            > "$RUNNER_TEMP/Cargo.lock.diff"
+          diff_status=$?
+          echo "metadata_status=$metadata_status"
+          echo "lockfile_diff_status=$diff_status"
+          if [ "$metadata_status" -ne 0 ]; then
+            cat "$RUNNER_TEMP/cargo-metadata.stderr"
+            echo "::error::Cargo metadata could not resolve the workspace"
+            exit 1
+          fi
+          if [ "$diff_status" -ne 0 ]; then
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+            echo "::error::Tracked Cargo.lock is stale; commit the reviewed resolver output before qualification"
+            exit 1
+          fi
+
+      - name: Upload Cargo.lock reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stt-cargo-lockfile-reconciliation
+          path: |
+            ${{ runner.temp }}/Cargo.lock.tracked
+            ${{ runner.temp }}/Cargo.lock.resolved
+            ${{ runner.temp }}/Cargo.lock.diff
+            ${{ runner.temp }}/cargo-metadata.stderr
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Run STT unit tests, including live/offline parity and metadata negatives
         run: cargo test --manifest-path Cargo.toml -p symthaea-stt --lib --locked
 
