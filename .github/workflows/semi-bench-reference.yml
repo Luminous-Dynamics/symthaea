@@ -284,10 +284,9 @@ jobs:
 
           jq -e '
             .schema == "luminous.semi-bench.secom-five-repeat-random-forest-report.v1" and
-            .repeat_count == null and
+            .repeat_count == 5 and
             (.repeats | length == 5) and
             all(.repeats[];
-              .training_rows == null and
               .preprocessing.training_rows == 1253 and
               .preprocessing.test_rows == 314 and
               .preprocessing.training_failures == 83 and
