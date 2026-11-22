@@ -144,9 +144,9 @@ impl TranscriptionEngine {
                 "prototype artifact has no encoder metadata; legacy artifacts require migration",
             )
         })?;
-        metadata.validate().map_err(|error| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, error)
-        })?;
+        metadata
+            .validate()
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
         self.prototype_representation = if metadata == &raw_expected {
             Some(PrototypeRepresentation::DirectMelFrameV1)
         } else if metadata == &temporal_expected {
@@ -177,9 +177,7 @@ impl TranscriptionEngine {
 
         // Project audio through the representation declared by the loaded model.
         let hvs = match self.prototype_representation {
-            Some(PrototypeRepresentation::DirectMelFrameV1) => {
-                self.projector.project_raw(audio)
-            }
+            Some(PrototypeRepresentation::DirectMelFrameV1) => self.projector.project_raw(audio),
             Some(PrototypeRepresentation::DirectMelTemporalWindow7V1) => {
                 self.projector.project(audio)
             }
