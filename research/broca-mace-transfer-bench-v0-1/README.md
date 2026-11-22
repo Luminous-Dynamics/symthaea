@@ -621,3 +621,18 @@ The source-level canonicality checks now verify more than a recalculable digest:
 - mutation controls rehash tampered values and require semantic validation to reject them.
 
 This is internal consistency and semantic validation, **not** authenticity. A public digest is not a signature; production plans still require the appropriate Mycelix-signed receipt and policy/authority validation at use. The portfolio module now has **13 authored tests** by source count (not execution status).
+
+
+## Portfolio interaction benchmark v0.1
+
+A new evaluator binary, `mace_portfolio_interactions`, implements the first held-out diagnostic requested by [#13184 — portfolio-level marginal utility](https://github.com/Luminous-Dynamics/symthaea/issues/13184). It compares exact additive selection with a conservative pairwise-interaction selector fitted on historical pair observations and an evaluator-only oracle over complete selected sets.
+
+The generator includes redundant, complementary, independent and conflicting item pairs, plus noisy relation labels and a shifted-regime negative control. Training, calibration and held-out task-family/source-root clusters are disjoint. The pairwise selector uses the calibrated lower bound of each interaction interval and abstains on unknown pair relations or an unsupported regime; it does not silently assume a missing interaction is zero. Both selectors obey the same token budget and one-representation-per-event constraint.
+
+Run:
+```bash
+cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_portfolio_interactions
+cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_portfolio_interactions
+```
+
+The current implementation is a synthetic pairwise diagnostic, not the production portfolio optimiser. Its relation labels and training observations are generated fixtures; calibration radii are empirical envelopes, not statistical confidence intervals. The test suite is authored but has not been executed in this environment.
