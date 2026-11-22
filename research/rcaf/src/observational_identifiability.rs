@@ -65,14 +65,26 @@ pub enum ObservationalIdentifiabilityError {
 impl fmt::Display for ObservationalIdentifiabilityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyObservations => write!(f, "observations must contain at least one time point and ROI"),
+            Self::EmptyObservations => write!(
+                f,
+                "observations must contain at least one time point and ROI"
+            ),
             Self::InvalidObservationShape => write!(f, "observations must be rectangular"),
-            Self::DimensionMismatch => write!(f, "counterfactual observations or component dimensions differ"),
+            Self::DimensionMismatch => write!(
+                f,
+                "counterfactual observations or component dimensions differ"
+            ),
             Self::InvalidResolutionTolerance => {
-                write!(f, "observation-resolution tolerance must be finite and non-negative")
+                write!(
+                    f,
+                    "observation-resolution tolerance must be finite and non-negative"
+                )
             }
             Self::NonFiniteInput => write!(f, "observations and component inputs must be finite"),
-            Self::NonFiniteOutput => write!(f, "generated counterfactual observations must remain finite"),
+            Self::NonFiniteOutput => write!(
+                f,
+                "generated counterfactual observations must remain finite"
+            ),
             Self::InvalidComponentAmplitude => write!(f, "component amplitude must be finite"),
         }
     }
@@ -163,14 +175,12 @@ pub fn assess_observational_identifiability(
         }
     }
 
-    let root_mean_square_difference =
-        (sum_squared_difference / compared_values as f64).sqrt();
+    let root_mean_square_difference = (sum_squared_difference / compared_values as f64).sqrt();
     if !root_mean_square_difference.is_finite() {
         return Err(ObservationalIdentifiabilityError::NonFiniteInput);
     }
 
-    let observationally_equivalent_at_resolution =
-        max_absolute_difference <= resolution_tolerance;
+    let observationally_equivalent_at_resolution = max_absolute_difference <= resolution_tolerance;
     let disposition = if observationally_equivalent_at_resolution {
         ObservationalDisposition::NotIdentifiableAbstain
     } else {
@@ -223,7 +233,11 @@ fn validate_observation_matrix(
     if observations.iter().any(|row| row.len() != roi_count) {
         return Err(ObservationalIdentifiabilityError::InvalidObservationShape);
     }
-    if observations.iter().flatten().any(|value| !value.is_finite()) {
+    if observations
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
         return Err(ObservationalIdentifiabilityError::NonFiniteInput);
     }
     Ok((observations.len(), roi_count))
@@ -241,9 +255,7 @@ fn add_separable_component(
         .map(|(row, &temporal_value)| {
             row.iter()
                 .zip(spatial_loading.iter())
-                .map(|(&clean, &spatial_value)| {
-                    clean + amplitude * temporal_value * spatial_value
-                })
+                .map(|(&clean, &spatial_value)| clean + amplitude * temporal_value * spatial_value)
                 .collect()
         })
         .collect()
@@ -339,12 +351,7 @@ mod tests {
         let mut invalid_temporal = temporal.clone();
         invalid_temporal[0] = f64::NAN;
         assert!(matches!(
-            construct_observationally_equivalent_pair(
-                &clean,
-                &spatial,
-                &invalid_temporal,
-                1.0
-            ),
+            construct_observationally_equivalent_pair(&clean, &spatial, &invalid_temporal, 1.0),
             Err(ObservationalIdentifiabilityError::NonFiniteInput)
         ));
         assert!(matches!(
@@ -359,12 +366,7 @@ mod tests {
         let spatial = [2.0, 2.0, 2.0, 2.0];
         let temporal = vec![2.0; 12];
         assert!(matches!(
-            construct_observationally_equivalent_pair(
-                &clean,
-                &spatial,
-                &temporal,
-                f64::MAX
-            ),
+            construct_observationally_equivalent_pair(&clean, &spatial, &temporal, f64::MAX),
             Err(ObservationalIdentifiabilityError::NonFiniteOutput)
         ));
     }
