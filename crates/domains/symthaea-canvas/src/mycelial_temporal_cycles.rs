@@ -460,7 +460,7 @@ impl TemporalMycelialSequence {
         for snapshot in &self.snapshots {
             validate_snapshot(snapshot)?;
             if observation_scope_id
-                .is_some_and(|previous| previous != snapshot.observation_scope_id)
+                .is_some_and(|previous| previous != snapshot.observation_scope_id.as_str())
             {
                 return Err(MycelialTemporalCycleError::ObservationScopeMismatch {
                     previous: observation_scope_id.unwrap_or_default().to_string(),
@@ -1607,6 +1607,93 @@ mod tests {
             build_temporal_mycelial_cycle_profile(&sequence, cycle_config()).unwrap();
         assert_eq!(profile.cycles.len(), 2);
         assert!(!profile.cycles.iter().any(|cycle| cycle.persistent));
+    }
+
+    fn brute_force_simple_cycle_count(snapshot: &TemporalMycelialSnapshot) -> usize {
+        assert!(snapshot.edges.len() < usize::BITS as usize);
+        let mut count = 0usize;
+        for mask in 1usize..(1usize << snapshot.edges.len()) {
+            if mask.count_ones() < 2 {
+                continue;
+            }
+            let mut adjacency = BTreeMap::<&str, Vec<&str>>::new();
+            let mut degrees = BTreeMap::<&str, usize>::new();
+            for (index, edge) in snapshot.edges.iter().enumerate() {
+                if mask & (1usize << index) == 0 {
+                    continue;
+                }
+                adjacency
+                    .entry(edge.source_node_id.as_str())
+                    .or_default()
+                    .push(edge.target_node_id.as_str());
+                adjacency
+                    .entry(edge.target_node_id.as_str())
+                    .or_default()
+                    .push(edge.source_node_id.as_str());
+                *degrees.entry(edge.source_node_id.as_str()).or_default() += 1;
+                *degrees.entry(edge.target_node_id.as_str()).or_default() += 1;
+            }
+            if degrees.values().any(|degree| *degree != 2) {
+                continue;
+            }
+            let Some(start) = adjacency.keys().next().copied() else {
+                continue;
+            };
+            let mut visited = BTreeSet::from([start]);
+            let mut stack = vec![start];
+            while let Some(current) = stack.pop() {
+                if let Some(neighbours) = adjacency.get(current) {
+                    for neighbour in neighbours {
+                        if visited.insert(*neighbour) {
+                            stack.push(neighbour);
+                        }
+                    }
+                }
+            }
+            if visited.len() == adjacency.len() {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    #[test]
+    fn simple_cycle_enumerator_matches_exhaustive_edge_subset_oracle() {
+        let mut input = snapshot(
+            "square-with-diagonal",
+            0,
+            10,
+            TemporalWindowCoverage::CompleteWithinDeclaredScope,
+            vec![
+                edge("e-ab", "A", "B"),
+                edge("e-bc", "B", "C"),
+                edge("e-cd", "C", "D"),
+                edge("e-da", "D", "A"),
+                edge("e-ac", "A", "C"),
+            ],
+        );
+        input.node_ids.push("D".to_string());
+        input.node_ids.sort_unstable();
+        let cycles = enumerate_snapshot_cycles(&input).unwrap();
+        assert_eq!(cycles.len(), 3);
+        assert_eq!(cycles.len(), brute_force_simple_cycle_count(&input));
+        assert_eq!(snapshot_topology(&input), (1, 2));
+    }
+
+    #[test]
+    fn parallel_hypha_segments_form_a_two_edge_multigraph_cycle() {
+        let mut input = snapshot(
+            "parallel-segments",
+            0,
+            10,
+            TemporalWindowCoverage::CompleteWithinDeclaredScope,
+            vec![edge("parallel-1", "A", "B"), edge("parallel-2", "A", "B")],
+        );
+        input.node_ids = vec!["A".to_string(), "B".to_string()];
+        let cycles = enumerate_snapshot_cycles(&input).unwrap();
+        assert_eq!(cycles.len(), 1);
+        assert_eq!(cycles[0].edge_ids, vec!["parallel-1", "parallel-2"]);
+        assert_eq!(cycles[0].node_ids, vec!["A", "B"]);
     }
 
     #[test]
