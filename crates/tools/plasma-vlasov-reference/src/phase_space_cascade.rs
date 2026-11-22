@@ -319,6 +319,49 @@ mod tests {
     }
 
     #[test]
+    fn nyquist_bins_are_reported_separately_from_directional_sectors() {
+        let config = config();
+        let mut distribution = maxwellian_perturbation(config, 0.0, 1, 1.0).unwrap();
+        for ix in 0..config.nx {
+            for iv in 0..config.nv {
+                let spatial_nyquist = if ix % 2 == 0 { 1.0 } else { -1.0 };
+                let velocity_nyquist = if iv % 2 == 0 { 1.0 } else { -1.0 };
+                distribution[ix * config.nv + iv] *=
+                    (1.0 + 0.02 * spatial_nyquist) * (1.0 + 0.03 * velocity_nyquist);
+            }
+        }
+
+        let solver = VlasovPoisson1d1v::new(config, distribution).unwrap();
+        let spectrum = solver.joint_phase_space_spectrum().unwrap();
+        assert!(spectrum.nyquist_f_strophy > 0.0);
+        let accounted = spectrum.phase_mixing_f_strophy
+            + spectrum.phase_unmixing_f_strophy
+            + spectrum.zero_axis_f_strophy
+            + spectrum.nyquist_f_strophy;
+        assert!(
+            (accounted - spectrum.spectral_f_strophy).abs()
+                <= 1.0e-12 * spectrum.spectral_f_strophy.max(1.0)
+        );
+    }
+
+    #[test]
+    fn full_self_consistent_collisionless_steps_preserve_quadratic_casimir() {
+        let mut solver = initial_solver();
+        let initial = solver.quadratic_casimir_budget().unwrap();
+        for _ in 0..100 {
+            solver.step(0.01).unwrap();
+        }
+        let final_budget = solver.quadratic_casimir_budget().unwrap();
+        let relative_drift =
+            (final_budget.total_casimir - initial.total_casimir).abs()
+                / initial.total_casimir.max(f64::MIN_POSITIVE);
+        assert!(
+            relative_drift < 1.0e-11,
+            "full-step quadratic Casimir relative drift = {relative_drift:e}"
+        );
+    }
+
+    #[test]
     fn collisionless_quadratic_casimir_is_preserved_by_unitary_subflows() {
         let mut solver = initial_solver();
         let initial = solver.quadratic_casimir_budget().unwrap();
