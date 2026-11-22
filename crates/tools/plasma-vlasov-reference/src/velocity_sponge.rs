@@ -53,7 +53,10 @@ impl fmt::Display for VelocityFourierSpongeError {
                 write!(formatter, "positivity floor must be finite and nonnegative")
             }
             Self::MomentProjectionSingular => {
-                write!(formatter, "discrete velocity-moment Gram matrix is singular")
+                write!(
+                    formatter,
+                    "discrete velocity-moment Gram matrix is singular"
+                )
             }
             Self::PositivityFloorViolation { minimum, floor } => write!(
                 formatter,
@@ -445,9 +448,8 @@ impl VlasovPoisson1d1v {
 
             for (iv, value) in candidate_row.iter_mut().enumerate() {
                 let velocity = config.velocity(iv);
-                let delta = correction[0]
-                    + correction[1] * velocity
-                    + correction[2] * velocity * velocity;
+                let delta =
+                    correction[0] + correction[1] * velocity + correction[2] * velocity * velocity;
                 *value += delta;
                 correction_l2_squared =
                     (delta * delta).mul_add(config.dx() * config.dv(), correction_l2_squared);
@@ -522,18 +524,19 @@ impl VlasovPoisson1d1v {
             fft(&mut before_line, false);
             fft(&mut after_line, false);
             for mode in 0..config.nv {
-                let before_power = before_line[mode]
-                    .re
-                    .mul_add(before_line[mode].re, before_line[mode].im * before_line[mode].im);
-                let after_power = after_line[mode]
-                    .re
-                    .mul_add(after_line[mode].re, after_line[mode].im * after_line[mode].im);
+                let before_power = before_line[mode].re.mul_add(
+                    before_line[mode].re,
+                    before_line[mode].im * before_line[mode].im,
+                );
+                let after_power = after_line[mode].re.mul_add(
+                    after_line[mode].re,
+                    after_line[mode].im * after_line[mode].im,
+                );
                 spectral_removed_casimir += (before_power - after_power) * spectral_weight;
             }
         }
 
-        let removed_total_casimir =
-            report.casimir_before.total_casimir - after.total_casimir;
+        let removed_total_casimir = report.casimir_before.total_casimir - after.total_casimir;
         let removed_spatial_mean_casimir =
             report.casimir_before.spatial_mean_casimir - after.spatial_mean_casimir;
         let removed_fluctuation_f_strophy =
@@ -751,8 +754,7 @@ mod tests {
         let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
         let time_before = solver.time();
 
-        let result =
-            solver.apply_moment_constrained_velocity_fourier_sponge(0.5, 0.5, 2.0, 2, 2.0);
+        let result = solver.apply_moment_constrained_velocity_fourier_sponge(0.5, 0.5, 2.0, 2, 2.0);
         assert!(matches!(
             result,
             Err(VelocityFourierSpongeError::PositivityFloorViolation { .. })
@@ -768,9 +770,7 @@ mod tests {
         let mut solver = VlasovPoisson1d1v::new(config, initial.clone()).unwrap();
         for floor in [f64::NAN, f64::INFINITY, -1.0] {
             assert_eq!(
-                solver.apply_moment_constrained_velocity_fourier_sponge(
-                    0.5, 0.5, 2.0, 2, floor
-                ),
+                solver.apply_moment_constrained_velocity_fourier_sponge(0.5, 0.5, 2.0, 2, floor),
                 Err(VelocityFourierSpongeError::InvalidPositivityFloor)
             );
             assert_eq!(solver.distribution(), initial.as_slice());
