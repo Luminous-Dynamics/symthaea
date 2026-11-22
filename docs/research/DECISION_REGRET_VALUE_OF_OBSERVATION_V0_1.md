@@ -98,7 +98,7 @@ The input is evaluator-only and binds:
 - one positive PPM prior for every world, summing exactly to 1,000,000;
 - a nonzero commitment digest identifying the prior/probability evidence artifact;
 - conditional outcome likelihoods for every world, each summing exactly to 1,000,000 PPM;
-- the decision deadline and result availability timestamps;
+- the decision deadline and candidate-visible result availability timestamps (after acquisition, transport, queueing and preprocessing);
 - a SHA-256 digest of the complete candidate-visible transcript after each delivered result is appended.
 
 Identical candidate-visible transcripts must have identical digests, including availability time and status. Late results are not allowed to reveal their future content to the candidate. They collapse to the no-result-by-deadline class. A delivered missing/error status can be represented as a normal candidate-visible transcript with its own digest.
@@ -106,6 +106,8 @@ Identical candidate-visible transcripts must have identical digests, including a
 Duplicate latent rows that produce the same candidate-visible transcript are combined by checked integer addition. Unknown world IDs, incomplete probability mass, out-of-range probabilities, empty delivered transcript digests and arithmetic overflow are rejected.
 
 The prior commitment is provenance binding only; it does not prove calibration. Expected-value claims must consume the existing independently qualified calibration owner (#11367). A candidate's own prior or likelihood prediction must not be treated as evaluator ground truth.
+
+Availability time means the instant the complete observation is actually accessible to the candidate policy, not the sensor event time or the first byte arrival. This keeps transport and preprocessing delay inside the decision deadline.
 
 ## 5. Output
 
@@ -124,7 +126,7 @@ All per-outcome actions, likelihoods, hidden-world identities, priors and losses
 
 ## 6. Controls
 
-Ten Rust unit tests are authored for:
+Eleven Rust unit tests are authored for:
 1. perfect observation eliminating decision-relevant ambiguity;
 2. noisy full-support observation with positive expected but zero robust value;
 3. decision-irrelevant latent differences;
