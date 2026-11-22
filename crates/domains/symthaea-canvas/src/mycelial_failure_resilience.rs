@@ -49,8 +49,18 @@ pub struct MycelialFailureScenario {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelialDemandPairOutcome {
+    pub demand_id: String,
+    pub direct_distance_model_units: Option<f64>,
+    pub network_path_length_model_units: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MycelialFailureMetrics {
     pub scenario_id: String,
+    pub failed_segment_ids: Vec<String>,
+    pub failed_junction_ids: Vec<String>,
+    pub demand_pair_outcomes: Vec<MycelialDemandPairOutcome>,
     pub failed_segment_count: usize,
     pub failed_junction_count: usize,
     pub remaining_junction_count: usize,
@@ -76,6 +86,8 @@ pub struct MycelialFailureResilienceProfile {
     pub schema_version: u16,
     pub source_graph_digest: String,
     pub demand_digest: String,
+    /// Complete sorted demand-pair inventory used to derive all scenario weights.
+    pub demands: Vec<MycelialDemandPair>,
     pub baseline: MycelialFailureMetrics,
     /// Sorted by scenario ID for canonical receipts.
     pub scenarios: Vec<MycelialFailureMetrics>,
@@ -96,6 +108,11 @@ pub enum MycelialFailureResilienceError {
     UnknownDemandJunction(String),
     InvalidScenario(String),
     DuplicateScenarioId(String),
+    PathShorterThanEuclideanDistance {
+        demand_id: String,
+        direct_distance: f64,
+        network_path_length: f64,
+    },
     UnknownFailedSegment(String),
     UnknownFailedJunction(String),
     InvalidProfile(&'static str),
@@ -127,6 +144,14 @@ impl fmt::Display for MycelialFailureResilienceError {
             }
             Self::InvalidScenario(id) => write!(f, "invalid failure scenario {id}"),
             Self::DuplicateScenarioId(id) => write!(f, "duplicate failure scenario ID {id}"),
+            Self::PathShorterThanEuclideanDistance {
+                demand_id,
+                direct_distance,
+                network_path_length,
+            } => write!(
+                f,
+                "demand {demand_id} has network path length {network_path_length:.6} below Euclidean distance {direct_distance:.6}"
+            ),
             Self::UnknownFailedSegment(id) => write!(f, "failure references unknown segment {id}"),
             Self::UnknownFailedJunction(id) => write!(f, "failure references unknown junction {id}"),
             Self::InvalidProfile(reason) => write!(f, "invalid failure-resilience profile: {reason}"),
