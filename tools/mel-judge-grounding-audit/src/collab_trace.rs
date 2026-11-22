@@ -118,6 +118,7 @@ pub struct TraceAuditReport {
     pub output_count: usize,
     pub response_decisions_without_output: usize,
     pub late_output_count: usize,
+    pub active_decision_during_rest_count: usize,
     pub false_interruption_count: usize,
     pub rest_windows_without_wait_or_yield: usize,
     pub loopback_audible_latency_sample_count: usize,
@@ -149,7 +150,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
     let mut event_ids = BTreeSet::new();
     let mut input_chunks = BTreeMap::<u64, (u64, u64)>::new();
     let mut decisions = BTreeMap::<String, DecisionRecord>::new();
-    let mut output_sequences = BTreeSet::new();
+    let mut previous_output_sequence = 0u64;
     let mut emission_latencies = Vec::new();
     let mut audible_latencies = Vec::new();
     let mut qualification_findings = Vec::new();
@@ -164,6 +165,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
     let mut yield_count = 0usize;
     let mut output_count = 0usize;
     let mut late_output_count = 0usize;
+    let mut active_decision_during_rest_count = 0usize;
     let mut false_interruption_count = 0usize;
 
     for event in &trace.events {
@@ -244,7 +246,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
                 if matches!(decision.state, DecisionState::Respond | DecisionState::Continue)
                     && is_inside_rest(event.monotonic_ns, &trace.rest_windows)
                 {
-                    false_interruption_count += 1;
+                    active_decision_during_rest_count += 1;
                     qualification_findings.push(format!(
                         "active decision {} occurred inside a protected rest window",
                         event.event_id
@@ -262,7 +264,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
                     trace.loopback_measurement.as_ref(),
                     &mut decisions,
                     &input_chunks,
-                    &mut output_sequences,
+                    &mut previous_output_sequence,
                 )?;
                 let decision = decisions
                     .get_mut(&output.decision_event_id)
@@ -284,10 +286,10 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
                     ));
                 }
                 let rest_time = match trace.track {
-                    TrackKind::Midi => output.first_emitted_ns,
-                    TrackKind::RenderedAudio => output.first_audible_onset_ns.unwrap_or(output.first_emitted_ns),
+                    TrackKind::Midi => Some(output.first_emitted_ns),
+                    TrackKind::RenderedAudio => output.first_audible_onset_ns,
                 };
-                if is_inside_rest(rest_time, &trace.rest_windows) {
+                if rest_time.is_some_and(|time| is_inside_rest(time, &trace.rest_windows)) {
                     false_interruption_count += 1;
                     qualification_findings.push(format!(
                         "output {} interrupted a protected rest window",
@@ -370,6 +372,7 @@ fn audit_trace(trace: &InteractionTraceV1) -> Result<TraceAuditReport, String> {
         output_count,
         response_decisions_without_output,
         late_output_count,
+        active_decision_during_rest_count,
         false_interruption_count,
         rest_windows_without_wait_or_yield,
         loopback_audible_latency_sample_count: audible_latencies.len(),
@@ -484,16 +487,18 @@ fn validate_output(
     loopback: Option<&LoopbackMeasurementV1>,
     decisions: &mut BTreeMap<String, DecisionRecord>,
     inputs: &BTreeMap<u64, (u64, u64)>,
-    output_sequences: &mut BTreeSet<u64>,
+    previous_output_sequence: &mut u64,
 ) -> Result<(), String> {
     require_text(&output.decision_event_id, "output decision_event_id")?;
     require_digest(&output.output_sha256, "output digest")?;
-    if output.output_sequence == 0 || !output_sequences.insert(output.output_sequence) {
+    if output.output_sequence != *previous_output_sequence + 1 {
         return Err(format!(
-            "output_sequence must be unique and non-zero: {}",
+            "output_sequence must be contiguous: expected {}, received {}",
+            *previous_output_sequence + 1,
             output.output_sequence
         ));
     }
+    *previous_output_sequence = output.output_sequence;
     let decision = decisions
         .get(&output.decision_event_id)
         .ok_or_else(|| "output references a decision that does not precede it".to_owned())?;
@@ -631,7 +636,7 @@ mod tests {
         value["events"][4]["decision"]["deadline_ns"] = serde_json::json!(280);
         let report = audit(&value).expect("trace structure is still parseable");
         assert!(!report.qualified_for_declared_trace_contract);
-        assert!(report.false_interruption_count > 0);
+        assert!(report.active_decision_during_rest_count > 0);
     }
 
     #[test]
