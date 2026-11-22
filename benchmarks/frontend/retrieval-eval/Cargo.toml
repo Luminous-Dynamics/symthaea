@@ -1,0 +1,16 @@
+[package]
+name = "sfeb-retrieval-eval"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+description = "Offline lexical, BM25, TF-IDF and HDC evaluator for SFEB Leptos patterns"
+
+# Standalone research utility. Not a member of the Symthaea workspace and does
+# not add dependencies to any production crate.
+[workspace]
+
+[dependencies]
+anyhow = "1.0"
+blake3 = "1.5"
+serde_json = "1.0"
