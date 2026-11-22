@@ -5,9 +5,7 @@ use std::time::Instant;
 use plasma_vlasov_reference::echo_analysis::{
     EchoMeasurementConfig, EchoModeTrace, EchoPulsePair, EchoTraceSample, measure_echo_trace,
 };
-use plasma_vlasov_reference::{
-    VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation,
-};
+use plasma_vlasov_reference::{VlasovPoisson1d1v, VlasovPoissonConfig, maxwellian_perturbation};
 
 const NX: usize = 64;
 const NV: usize = 256;
@@ -35,17 +33,15 @@ fn run_case(
         permittivity: 1.0,
         background_density: 1.0,
     };
-    let prediction = plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(
-        EchoPulsePair {
+    let prediction =
+        plasma_vlasov_reference::echo_analysis::predict_two_pulse_echo(EchoPulsePair {
             first_mode: FIRST_MODE as i32,
             second_mode: SECOND_MODE as i32,
             first_time: 0.0,
             second_time: SECOND_PULSE_TIME,
-        },
-    )?;
+        })?;
 
-    let initial =
-        maxwellian_perturbation(config, 1.0e-3, FIRST_MODE, 1.0)?;
+    let initial = maxwellian_perturbation(config, 1.0e-3, FIRST_MODE, 1.0)?;
     let mut baseline_pulse = VlasovPoisson1d1v::new(config, initial.clone())?;
     let mut baseline_control = VlasovPoisson1d1v::new(config, initial.clone())?;
     let mut sponge_pulse = VlasovPoisson1d1v::new(config, initial.clone())?;
@@ -83,10 +79,14 @@ fn run_case(
 
         if step % 2 == 0 || step == pulse_step || step == total_steps {
             let time = baseline_pulse.time();
-            let base_pulse = baseline_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
-            let base_control = baseline_control.electric_mode_coefficient(prediction.echo_mode as usize)?;
-            let sponge_pulse_mode = sponge_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
-            let sponge_control_mode = sponge_control.electric_mode_coefficient(prediction.echo_mode as usize)?;
+            let base_pulse =
+                baseline_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
+            let base_control =
+                baseline_control.electric_mode_coefficient(prediction.echo_mode as usize)?;
+            let sponge_pulse_mode =
+                sponge_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
+            let sponge_control_mode =
+                sponge_control.electric_mode_coefficient(prediction.echo_mode as usize)?;
 
             baseline_trace.push(EchoTraceSample::new(
                 time,
@@ -107,20 +107,18 @@ fn run_case(
             // Symmetric operator composition: sponge(dt/2), self-consistent
             // Vlasov-Poisson Strang step, sponge(dt/2). The sponge remains an
             // explicitly dissipative model with full loss accounting.
-            let first_pulse_half =
-                sponge_pulse.apply_velocity_fourier_sponge(
-                    DT * 0.5,
-                    start_fraction,
-                    maximum_damping_rate,
-                    2,
-                )?;
-            let first_control_half =
-                sponge_control.apply_velocity_fourier_sponge(
-                    DT * 0.5,
-                    start_fraction,
-                    maximum_damping_rate,
-                    2,
-                )?;
+            let first_pulse_half = sponge_pulse.apply_velocity_fourier_sponge(
+                DT * 0.5,
+                start_fraction,
+                maximum_damping_rate,
+                2,
+            )?;
+            let first_control_half = sponge_control.apply_velocity_fourier_sponge(
+                DT * 0.5,
+                start_fraction,
+                maximum_damping_rate,
+                2,
+            )?;
             pulse_removed_c2 += first_pulse_half.removed_total_casimir;
             pulse_removed_f_strophy += first_pulse_half.removed_fluctuation_f_strophy;
             control_removed_c2 += first_control_half.removed_total_casimir;
@@ -129,20 +127,18 @@ fn run_case(
             sponge_pulse.step(DT)?;
             sponge_control.step(DT)?;
 
-            let second_pulse_half =
-                sponge_pulse.apply_velocity_fourier_sponge(
-                    DT * 0.5,
-                    start_fraction,
-                    maximum_damping_rate,
-                    2,
-                )?;
-            let second_control_half =
-                sponge_control.apply_velocity_fourier_sponge(
-                    DT * 0.5,
-                    start_fraction,
-                    maximum_damping_rate,
-                    2,
-                )?;
+            let second_pulse_half = sponge_pulse.apply_velocity_fourier_sponge(
+                DT * 0.5,
+                start_fraction,
+                maximum_damping_rate,
+                2,
+            )?;
+            let second_control_half = sponge_control.apply_velocity_fourier_sponge(
+                DT * 0.5,
+                start_fraction,
+                maximum_damping_rate,
+                2,
+            )?;
             pulse_removed_c2 += second_pulse_half.removed_total_casimir;
             pulse_removed_f_strophy += second_pulse_half.removed_fluctuation_f_strophy;
             control_removed_c2 += second_control_half.removed_total_casimir;
@@ -175,33 +171,35 @@ fn run_case(
     let final_control_budget = sponge_control.quadratic_casimir_budget()?;
     let final_diagnostics = sponge_pulse.diagnostics()?;
     let direct_c2_drop = initial_budget.total_casimir - final_budget.total_casimir;
-    let direct_control_c2_drop =
-        initial_budget.total_casimir - final_control_budget.total_casimir;
+    let direct_control_c2_drop = initial_budget.total_casimir - final_control_budget.total_casimir;
     let cumulative_c2_fraction =
         pulse_removed_c2 / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
-    let direct_c2_fraction =
-        direct_c2_drop / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
-    let c2_accounting_error =
-        (pulse_removed_c2 - direct_c2_drop).abs()
-            / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
+    let direct_c2_fraction = direct_c2_drop / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
+    let c2_accounting_error = (pulse_removed_c2 - direct_c2_drop).abs()
+        / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
     let response_ratio = sponge_measurement.peak_amplitude
         / baseline_measurement.peak_amplitude.max(f64::MIN_POSITIVE);
     let mass_relative_delta = (final_diagnostics.total_mass - initial_diagnostics.total_mass)
         / initial_diagnostics.total_mass.abs().max(f64::MIN_POSITIVE);
-    let kinetic_energy_relative_delta =
-        (final_diagnostics.kinetic_energy - initial_diagnostics.kinetic_energy)
-            / initial_diagnostics.kinetic_energy.abs().max(f64::MIN_POSITIVE);
-    let field_energy_relative_delta =
-        (final_diagnostics.field_energy - initial_diagnostics.field_energy)
-            / initial_diagnostics.field_energy.abs().max(f64::MIN_POSITIVE);
+    let kinetic_energy_relative_delta = (final_diagnostics.kinetic_energy
+        - initial_diagnostics.kinetic_energy)
+        / initial_diagnostics
+            .kinetic_energy
+            .abs()
+            .max(f64::MIN_POSITIVE);
+    let field_energy_relative_delta = (final_diagnostics.field_energy
+        - initial_diagnostics.field_energy)
+        / initial_diagnostics
+            .field_energy
+            .abs()
+            .max(f64::MIN_POSITIVE);
 
     let control_cumulative_c2_fraction =
         control_removed_c2 / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
     let control_direct_c2_drop_fraction =
         direct_control_c2_drop / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
-    let control_c2_accounting_error =
-        (control_removed_c2 - direct_control_c2_drop).abs()
-            / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
+    let control_c2_accounting_error = (control_removed_c2 - direct_control_c2_drop).abs()
+        / initial_budget.total_casimir.max(f64::MIN_POSITIVE);
     let echo_mode = prediction.echo_mode;
     let predicted_rephase_time = prediction.echo_time;
     let baseline_peak_amplitude = baseline_measurement.peak_amplitude;
