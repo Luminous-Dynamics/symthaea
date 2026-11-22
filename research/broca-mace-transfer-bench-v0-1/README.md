@@ -38,7 +38,8 @@ This is a representation-level prototype only. The current MACE Query exposes sc
 
 ## Paired memory-to-decision intervention runner
 
-A separate executable now schedules the six initial intervention arms over the existing generated MACE worlds: true empty memory, exact-scope scan, deterministic key-value retrieval, static HDC, HDC-LTC, and a same-cluster sibling-task structural placebo. It writes candidate decisions, evaluator-only synthetic scores, and cluster-bootstrap summaries to separate JSONL streams.
+A separate executable now schedules seven paired intervention arms over the existing generated MACE worlds: true empty memory, exact-scope scan, deterministic key-value retrieval, static event-ID HDC, HDC-LTC, typed-content query-conditioned HDC, and a same-cluster sibling-task structural placebo. It writes candidate decisions, evaluator-only synthetic scores, and cluster-bootstrap summaries to separate JSONL streams.
+The typed-content arm builds vectors from candidate-visible Experience fields and queries with the actual MACE scope/action plus the categorical causal-transfer qualification profile. Numeric overlap and balance limits remain exact post-retrieval MACE checks; richer outcome/horizon/estimand query requirements await the candidate-visible DecisionNeed contract in #13222. Typed profile digests are emitted in candidate records.
 
 ~~~~bash
 MACE_SOURCE_REVISION="$(git rev-parse HEAD)" \
