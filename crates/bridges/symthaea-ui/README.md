@@ -37,7 +37,9 @@ name. Keyboard focus indicators, a reduced-motion rule for the telemetry orb,
 and narrow-screen layout adjustments are defined in `style.css`.
 
 Telemetry connection state is tied to the browser WebSocket reaching
-`OPEN`, rather than merely constructing a WebSocket object. Failed handshakes
+`OPEN`, rather than merely constructing a WebSocket object. The live label
+distinguishes `disconnected`, `connecting`, `connected` and `reconnecting`.
+The text state is exposed through a polite status region. Failed handshakes
 are bounded to 10 seconds. Ended streams retry sequentially with deterministic
 backoff (1, 2, 4, 8, 16, then 30 seconds). A stream stable for at least one
 minute resets accumulated failure backoff; short-lived connections continue
