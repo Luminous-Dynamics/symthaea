@@ -150,11 +150,9 @@ fn integrate_quadratic_flux_triplet(
     let first_interval = middle_time - start_time;
     let second_interval = end_time - middle_time;
     let span = first_interval + second_interval;
-    let start_weight = span * (2.0 * first_interval - second_interval)
-        / (6.0 * first_interval);
+    let start_weight = span * (2.0 * first_interval - second_interval) / (6.0 * first_interval);
     let middle_weight = span.powi(3) / (6.0 * first_interval * second_interval);
-    let end_weight = span * (2.0 * second_interval - first_interval)
-        / (6.0 * second_interval);
+    let end_weight = span * (2.0 * second_interval - first_interval) / (6.0 * second_interval);
     start_weight * start_rate + middle_weight * middle_rate + end_weight * end_rate
 }
 
@@ -335,9 +333,7 @@ fn run_resolution(
                 control_cumulative_flux_v = 0.0;
                 flux_pair_start = Some(current_flux_sample);
                 flux_pair_middle = None;
-            } else if let (Some(start), Some(middle)) =
-                (flux_pair_start, flux_pair_middle)
-            {
+            } else if let (Some(start), Some(middle)) = (flux_pair_start, flux_pair_middle) {
                 pulse_cumulative_flux_x += integrate_quadratic_flux_triplet(
                     start.0,
                     middle.0,
