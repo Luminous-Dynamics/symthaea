@@ -250,6 +250,26 @@ jobs:
           print("PASS: matched-input estimator-by-effect-size surface")
           PY
 
+      - name: Run preprocessing projection-order composition challenge
+        run: |
+          cargo run --manifest-path research/rcaf/Cargo.toml --example rcaf_projection_order -- "$RUNNER_TEMP/rcaf-projection-order.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path("research/rcaf/projection-order.schema.json").read_text())
+          report = json.loads(Path(os.environ["RUNNER_TEMP"] + "/rcaf-projection-order.json").read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.validate(report, schema)
+          assert report["nuisance_then_filter_nuisance_leakage"] > 0.0
+          assert report["order_difference_ratio"] > 0.0
+          assert report["joint_nuisance_leakage"] < 1e-10
+          assert report["joint_filter_leakage"] < 1e-10
+          print("PASS: RCAF projection-order re-entry and joint-projection reference challenge")
+          PY
+
       - name: Build content-addressed simulation execution receipt
         run: |
           python research/rcaf/tools/build_execution_receipt.py \
@@ -260,7 +280,8 @@ jobs:
               "$RUNNER_TEMP/rcaf-injection-sweep.json" \
               "$RUNNER_TEMP/rcaf-estimator-tournament.json" \
               "$RUNNER_TEMP/rcaf-estimator-dose-surface.json" \
-              "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json"
+              "$RUNNER_TEMP/rcaf-common-mode-nuisance-sweep.json" \
+              "$RUNNER_TEMP/rcaf-projection-order.json"
           python - <<'PY'
           import json
           import os
@@ -275,7 +296,7 @@ jobs:
           checked_out_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           assert receipt["source_commit"] == checked_out_head
           assert receipt["workflow"]["event_sha"] == os.environ["GITHUB_SHA"]
-          assert len(receipt["simulation_reports"]) == 5
+          assert len(receipt["simulation_reports"]) == 6
           assert len(receipt["source_files"]) > 0
           print("PASS: content-addressed RCAF execution receipt")
           PY
@@ -290,6 +311,7 @@ jobs:
             ${{ runner.temp }}/rcaf-estimator-tournament.json
             ${{ runner.temp }}/rcaf-estimator-dose-surface.json
             ${{ runner.temp }}/rcaf-common-mode-nuisance-sweep.json
+            ${{ runner.temp }}/rcaf-projection-order.json
             ${{ runner.temp }}/rcaf-execution-receipt.json
           if-no-files-found: error
           retention-days: 30
