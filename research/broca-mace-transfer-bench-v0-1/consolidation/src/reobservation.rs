@@ -322,6 +322,8 @@ impl ReobservationPlanV1 {
     pub fn canonical_digest(&self) -> String {
         let fields = [
             self.event_id.to_string(),
+            self.as_known.valid_at_ms.to_string(),
+            self.as_known.known_at_ms.to_string(),
             self.evidence_sha256.clone(),
             self.prediction_sha256.clone(),
             self.profile_sha256.clone(),
@@ -379,7 +381,9 @@ fn usable_locator(
 
 fn expected_success_value(value_micros: i64, success_probability_bps: u16) -> i64 {
     let product = i128::from(value_micros) * i128::from(success_probability_bps);
-    (product / 10_000).clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
+    let expected = (product / 10_000)
+        .clamp(i128::from(i64::MIN), i128::from(i64::MAX));
+    i64::try_from(expected).unwrap_or(i64::MAX)
 }
 
 fn expected_failure_loss(
@@ -536,7 +540,7 @@ pub fn plan_memory_representation(
                 net = locator_net;
             } else if snapshot_net > policy.minimum_net_value_micros {
                 disposition = ReobservationDispositionV1::CacheSnapshot;
-                reason = match proposal.availability {
+                reason = match &proposal.availability {
                     ReobservationAvailabilityV1::Available { .. } => {
                         ReobservationReasonV1::ReobservationTooSlowOrExpensive
                     }
@@ -768,7 +772,7 @@ mod tests {
         availability: ReobservationAvailabilityV1,
         snapshot_valid_until_ms: Option<i64>,
     ) -> ReobservationProposalV1 {
-        let (latency, cost) = match availability {
+        let (latency, cost) = match &availability {
             ReobservationAvailabilityV1::Available { .. } => (20, 5_000),
             ReobservationAvailabilityV1::Unavailable => (0, 0),
         };
@@ -1179,7 +1183,7 @@ mod tests {
             as_known(),
             &FixtureVerifier {
                 corrupt_receipt: false,
-                valid_for_ms: 300,
+                valid_for_ms: 200,
             },
         )
         .unwrap();
