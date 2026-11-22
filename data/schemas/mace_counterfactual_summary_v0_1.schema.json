@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_counterfactual_summary_v0_1.schema.json",
+  "title": "MACE Counterfactual Cluster Summary v0.1",
+  "description": "Offline cluster-level reduction of evaluator-only counterfactual MACE score records. Bootstrap resampling is over independent world clusters after within-task and within-cluster aggregation.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/method_summary"
+    },
+    {
+      "$ref": "#/$defs/paired_contrast"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "exact_scope_scan",
+        "event_id_key_value_topk",
+        "static_hdc",
+        "hdc_ltc_zero_input",
+        "typed_content_hdc"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "reference",
+        "event",
+        "source_root",
+        "source_family",
+        "unknown_root",
+        "unknown_family",
+        "source_root_pair",
+        "matched_random",
+        "no_memory"
+      ]
+    },
+    "ci": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "method_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "method",
+        "intervention_kind",
+        "independent_world_cluster_count",
+        "resampling_unit",
+        "bootstrap_replicates",
+        "evaluation_validity",
+        "input_run_id",
+        "input_manifest_set_sha256",
+        "input_source_code_sha256",
+        "input_fixture_sha256",
+        "input_schema_sha256",
+        "input_source_revision",
+        "aggregation_code_sha256",
+        "bootstrap_seed",
+        "input_manifest_count",
+        "task_block_count",
+        "intervention_row_count",
+        "mean_utility",
+        "mean_regret",
+        "mean_regret_gap_vs_full_evidence",
+        "mean_regret_gap_vs_full_method",
+        "regret_gap_vs_full_evidence_cluster_bootstrap_95pct_ci",
+        "regret_gap_vs_full_method_cluster_bootstrap_95pct_ci",
+        "mean_decision_agreement_with_full",
+        "mean_decision_changed",
+        "mean_decision_optimal",
+        "mean_abstained",
+        "task_block_aggregation"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_counterfactual_summary_v0_1"
+        },
+        "record_type": {
+          "const": "counterfactual_method_summary"
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "intervention_kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "independent_world_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "task_block_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "intervention_row_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mean_utility": {
+          "type": "number"
+        },
+        "mean_regret": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mean_regret_gap_vs_full_evidence": {
+          "type": "number"
+        },
+        "mean_regret_gap_vs_full_method": {
+          "type": "number"
+        },
+        "regret_gap_vs_full_evidence_cluster_bootstrap_95pct_ci": {
+          "$ref": "#/$defs/ci"
+        },
+        "regret_gap_vs_full_method_cluster_bootstrap_95pct_ci": {
+          "$ref": "#/$defs/ci"
+        },
+        "mean_decision_agreement_with_full": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_decision_changed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_decision_optimal": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_abstained": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "resampling_unit": {
+          "const": "independent_world_cluster"
+        },
+        "task_block_aggregation": {
+          "const": "mean_within_cluster_before_bootstrap"
+        },
+        "bootstrap_replicates": {
+          "const": 2000
+        },
+        "evaluation_validity": {
+          "const": "diagnostic_only"
+        },
+        "input_run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "input_manifest_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "aggregation_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_manifest_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "paired_contrast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "method",
+        "intervention_kind",
+        "independent_world_cluster_count",
+        "resampling_unit",
+        "bootstrap_replicates",
+        "evaluation_validity",
+        "input_run_id",
+        "input_manifest_set_sha256",
+        "input_source_code_sha256",
+        "input_fixture_sha256",
+        "input_schema_sha256",
+        "input_source_revision",
+        "aggregation_code_sha256",
+        "bootstrap_seed",
+        "input_manifest_count",
+        "baseline_method",
+        "paired_task_block_count",
+        "mean_utility_delta_vs_exact_scope",
+        "mean_regret_delta_vs_exact_scope",
+        "utility_delta_cluster_bootstrap_95pct_ci",
+        "regret_delta_cluster_bootstrap_95pct_ci",
+        "paired_task_block_aggregation"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_counterfactual_summary_v0_1"
+        },
+        "record_type": {
+          "const": "counterfactual_paired_method_contrast"
+        },
+        "baseline_method": {
+          "const": "exact_scope_scan"
+        },
+        "method": {
+          "$ref": "#/$defs/method"
+        },
+        "intervention_kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "independent_world_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "paired_task_block_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mean_utility_delta_vs_exact_scope": {
+          "type": "number"
+        },
+        "mean_regret_delta_vs_exact_scope": {
+          "type": "number"
+        },
+        "utility_delta_cluster_bootstrap_95pct_ci": {
+          "$ref": "#/$defs/ci"
+        },
+        "regret_delta_cluster_bootstrap_95pct_ci": {
+          "$ref": "#/$defs/ci"
+        },
+        "resampling_unit": {
+          "const": "independent_world_cluster"
+        },
+        "paired_task_block_aggregation": {
+          "const": "mean_within_cluster_before_bootstrap"
+        },
+        "bootstrap_replicates": {
+          "const": 2000
+        },
+        "evaluation_validity": {
+          "const": "diagnostic_only"
+        },
+        "input_run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "input_manifest_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_source_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "aggregation_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_manifest_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
