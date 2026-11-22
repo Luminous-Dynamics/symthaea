@@ -238,10 +238,17 @@ impl fmt::Display for WeightedCovariateShiftError {
                 write!(f, "minimum direction cosine must be finite and in [-1, 1]")
             }
             Self::InvalidMinimumEffectiveSampleSize => {
-                write!(f, "minimum effective sample size must be finite and positive")
+                write!(
+                    f,
+                    "minimum effective sample size must be finite and positive"
+                )
             }
-            Self::EmptyCalibrationSet => write!(f, "at least one weighted calibration replicate is required"),
-            Self::EmptyEvaluationSet => write!(f, "at least one weighted evaluation replicate is required"),
+            Self::EmptyCalibrationSet => {
+                write!(f, "at least one weighted calibration replicate is required")
+            }
+            Self::EmptyEvaluationSet => {
+                write!(f, "at least one weighted evaluation replicate is required")
+            }
             Self::InvalidIdentifier(field) => {
                 write!(f, "{field} must be a non-empty stable ASCII identifier")
             }
@@ -249,25 +256,42 @@ impl fmt::Display for WeightedCovariateShiftError {
                 write!(f, "replicate identifiers must be unique within {split}")
             }
             Self::CalibrationEvaluationOverlap => {
-                write!(f, "calibration and evaluation replicate identifiers must be disjoint")
+                write!(
+                    f,
+                    "calibration and evaluation replicate identifiers must be disjoint"
+                )
             }
             Self::RatioEstimationSplitOverlap => {
                 write!(f, "ratio-estimation split must be disjoint from calibration and evaluation splits")
             }
-            Self::InvalidRatioEstimatorId => write!(f, "estimated density ratio requires a non-empty estimator id"),
+            Self::InvalidRatioEstimatorId => write!(
+                f,
+                "estimated density ratio requires a non-empty estimator id"
+            ),
             Self::InvalidImportanceWeight { replicate_id } => {
-                write!(f, "replicate {replicate_id} has a non-finite or negative importance weight")
+                write!(
+                    f,
+                    "replicate {replicate_id} has a non-finite or negative importance weight"
+                )
             }
             Self::NonPositiveEvaluationWeight { replicate_id } => {
                 write!(f, "evaluation replicate {replicate_id} must have a strictly positive target density-ratio weight")
             }
             Self::InvalidStatistic { replicate_id } => {
-                write!(f, "replicate {replicate_id} contains a non-finite or negative statistic")
+                write!(
+                    f,
+                    "replicate {replicate_id} contains a non-finite or negative statistic"
+                )
             }
             Self::InvalidDirectionCosine { replicate_id } => {
-                write!(f, "replicate {replicate_id} has a direction cosine outside [-1, 1]")
+                write!(
+                    f,
+                    "replicate {replicate_id} has a direction cosine outside [-1, 1]"
+                )
             }
-            Self::NonFiniteWeightMoments => write!(f, "importance-weight moments are non-finite or degenerate"),
+            Self::NonFiniteWeightMoments => {
+                write!(f, "importance-weight moments are non-finite or degenerate")
+            }
         }
     }
 }
@@ -300,7 +324,9 @@ pub fn evaluate_weighted_covariate_shift(
     for item in calibration {
         validate_id(&item.replicate_id, "calibration_split_id")?;
         if !calibration_ids.insert(item.replicate_id.as_str()) {
-            return Err(WeightedCovariateShiftError::DuplicateReplicateId("calibration"));
+            return Err(WeightedCovariateShiftError::DuplicateReplicateId(
+                "calibration",
+            ));
         }
         validate_statistics(&item.replicate_id, &item.statistics)?;
         validate_weight(&item.replicate_id, item.importance_weight)?;
@@ -310,7 +336,9 @@ pub fn evaluate_weighted_covariate_shift(
     for item in evaluation {
         validate_id(&item.replicate_id, "evaluation_split_id")?;
         if !evaluation_ids.insert(item.replicate_id.as_str()) {
-            return Err(WeightedCovariateShiftError::DuplicateReplicateId("evaluation"));
+            return Err(WeightedCovariateShiftError::DuplicateReplicateId(
+                "evaluation",
+            ));
         }
         if calibration_ids.contains(item.replicate_id.as_str()) {
             return Err(WeightedCovariateShiftError::CalibrationEvaluationOverlap);
@@ -337,29 +365,29 @@ pub fn evaluate_weighted_covariate_shift(
         .map(|item| item.importance_weight)
         .collect::<Vec<_>>();
     let diagnostics = calculate_weight_diagnostics(&weights, evaluation)?;
-    let (ratio_provenance, ratio_estimator_id, ratio_estimation_split_id, cross_fitted, exact_ratio) =
-        match &config.ratio_provenance {
-            RatioProvenance::KnownDensityRatio => (
-                "known_density_ratio",
-                None,
-                None,
-                None,
-                true,
-            ),
-            RatioProvenance::EstimatedDensityRatio {
-                estimator_id,
-                estimation_split_id,
-                cross_fitted,
-            } => (
-                "estimated_density_ratio",
-                Some(estimator_id.clone()),
-                Some(estimation_split_id.clone()),
-                Some(*cross_fitted),
-                false,
-            ),
-        };
-    let finite_sample_guarantee_applicable =
-        exact_ratio && config.source_support_attested && config.conditional_score_invariance_attested;
+    let (
+        ratio_provenance,
+        ratio_estimator_id,
+        ratio_estimation_split_id,
+        cross_fitted,
+        exact_ratio,
+    ) = match &config.ratio_provenance {
+        RatioProvenance::KnownDensityRatio => ("known_density_ratio", None, None, None, true),
+        RatioProvenance::EstimatedDensityRatio {
+            estimator_id,
+            estimation_split_id,
+            cross_fitted,
+        } => (
+            "estimated_density_ratio",
+            Some(estimator_id.clone()),
+            Some(estimation_split_id.clone()),
+            Some(*cross_fitted),
+            false,
+        ),
+    };
+    let finite_sample_guarantee_applicable = exact_ratio
+        && config.source_support_attested
+        && config.conditional_score_invariance_attested;
     let validity_status = if finite_sample_guarantee_applicable {
         "known_ratio_under_attested_covariate_shift"
     } else if exact_ratio {
@@ -407,11 +435,8 @@ pub fn evaluate_weighted_covariate_shift(
                     )
                 })
                 .collect::<Vec<_>>();
-            let critical_value = weighted_upper_threshold(
-                &scores,
-                item.importance_weight,
-                config.alpha,
-            );
+            let critical_value =
+                weighted_upper_threshold(&scores, item.importance_weight, config.alpha);
             let Some(critical_value) = critical_value else {
                 abstentions.push(WeightedEvaluationAbstention {
                     replicate_id: item.replicate_id.clone(),
@@ -482,7 +507,9 @@ pub fn evaluate_weighted_covariate_shift(
     })
 }
 
-fn validate_config(config: &WeightedCovariateShiftConfig) -> Result<(), WeightedCovariateShiftError> {
+fn validate_config(
+    config: &WeightedCovariateShiftConfig,
+) -> Result<(), WeightedCovariateShiftError> {
     validate_id(&config.calibration_split_id, "calibration_split_id")?;
     validate_id(&config.evaluation_split_id, "evaluation_split_id")?;
     if config.calibration_split_id == config.evaluation_split_id {
@@ -522,7 +549,10 @@ fn validate_statistics(
     replicate_id: &str,
     values: &[f64; 3],
 ) -> Result<(), WeightedCovariateShiftError> {
-    if values.iter().any(|value| !value.is_finite() || *value < 0.0) {
+    if values
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0)
+    {
         return Err(WeightedCovariateShiftError::InvalidStatistic {
             replicate_id: replicate_id.to_string(),
         });
@@ -530,10 +560,7 @@ fn validate_statistics(
     Ok(())
 }
 
-fn validate_weight(
-    replicate_id: &str,
-    weight: f64,
-) -> Result<(), WeightedCovariateShiftError> {
+fn validate_weight(replicate_id: &str, weight: f64) -> Result<(), WeightedCovariateShiftError> {
     if !weight.is_finite() || weight < 0.0 {
         return Err(WeightedCovariateShiftError::InvalidImportanceWeight {
             replicate_id: replicate_id.to_string(),
@@ -567,9 +594,7 @@ fn calculate_weight_diagnostics(
         (sample_count * squared_sum / (weight_sum * weight_sum) - 1.0).max(0.0);
     let shares = evaluation
         .iter()
-        .map(|item| {
-            item.importance_weight / (weight_sum + item.importance_weight)
-        })
+        .map(|item| item.importance_weight / (weight_sum + item.importance_weight))
         .collect::<Vec<_>>();
     if [
         effective_sample_size,
@@ -609,9 +634,9 @@ pub fn weighted_upper_threshold(
         || test_weight <= 0.0
         || !alpha.is_finite()
         || !(0.0..1.0).contains(&alpha)
-        || calibration_scores_and_weights.iter().any(|(score, weight)| {
-            !score.is_finite() || !weight.is_finite() || *weight < 0.0
-        })
+        || calibration_scores_and_weights
+            .iter()
+            .any(|(score, weight)| !score.is_finite() || !weight.is_finite() || *weight < 0.0)
     {
         return None;
     }
@@ -743,11 +768,13 @@ mod tests {
             .iter()
             .zip(weights.iter())
             .enumerate()
-            .map(|(index, (score, weight))| WeightedNullCalibrationObservation {
-                replicate_id: format!("cal-{index:03}"),
-                statistics: [*score, *score * 0.8, *score * 0.6],
-                importance_weight: *weight,
-            })
+            .map(
+                |(index, (score, weight))| WeightedNullCalibrationObservation {
+                    replicate_id: format!("cal-{index:03}"),
+                    statistics: [*score, *score * 0.8, *score * 0.6],
+                    importance_weight: *weight,
+                },
+            )
             .collect()
     }
 
@@ -780,7 +807,9 @@ mod tests {
 
     #[test]
     fn equal_weights_recover_the_unweighted_finite_sample_threshold() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         let weights = vec![1.0; 99];
         let report = evaluate_weighted_covariate_shift(
             &calibration(&scores, &weights),
@@ -799,7 +828,9 @@ mod tests {
 
     #[test]
     fn high_test_weight_places_too_much_mass_at_infinity_and_abstains() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         let report = evaluate_weighted_covariate_shift(
             &calibration(&scores, &vec![1.0; 99]),
             &evaluation(&[20.0]),
@@ -811,12 +842,17 @@ mod tests {
             report.abstentions[0].reason,
             "test_point_mass_exceeds_alpha"
         );
-        assert!(report.estimators.iter().all(|item| item.finite_threshold_count == 0));
+        assert!(report
+            .estimators
+            .iter()
+            .all(|item| item.finite_threshold_count == 0));
     }
 
     #[test]
     fn estimated_density_ratios_are_explicitly_not_exact_finite_sample_guarantees() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         let mut config = known_config();
         config.ratio_provenance = RatioProvenance::EstimatedDensityRatio {
             estimator_id: "logistic-ratio-v1".to_string(),
@@ -831,7 +867,10 @@ mod tests {
         .unwrap();
         assert!(!report.finite_sample_guarantee_applicable);
         assert_eq!(report.validity_status, "estimated_ratio_diagnostic_only");
-        assert_eq!(report.ratio_estimation_split_id.as_deref(), Some("ratio-fit-v1"));
+        assert_eq!(
+            report.ratio_estimation_split_id.as_deref(),
+            Some("ratio-fit-v1")
+        );
     }
 
     #[test]
@@ -873,7 +912,9 @@ mod tests {
 
     #[test]
     fn support_and_conditional_invariance_must_be_attested() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         for config in [
             WeightedCovariateShiftConfig {
                 source_support_attested: false,
@@ -898,7 +939,9 @@ mod tests {
 
     #[test]
     fn distinct_test_weights_produce_test_point_specific_thresholds() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         let report = evaluate_weighted_covariate_shift(
             &calibration(&scores, &vec![1.0; 99]),
             &evaluation(&[1.0, 2.0]),
@@ -911,7 +954,10 @@ mod tests {
             estimator.minimum_finite_threshold.unwrap()
                 < estimator.maximum_finite_threshold.unwrap()
         );
-        assert!(report.estimators.iter().all(|item| item.finite_threshold_count == 2));
+        assert!(report
+            .estimators
+            .iter()
+            .all(|item| item.finite_threshold_count == 2));
     }
 
     #[test]
@@ -929,7 +975,9 @@ mod tests {
             estimation_split_id: config.calibration_split_id.clone(),
             cross_fitted: false,
         };
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         assert!(matches!(
             evaluate_weighted_covariate_shift(
                 &calibration(&scores, &vec![1.0; 99]),
@@ -942,7 +990,9 @@ mod tests {
 
     #[test]
     fn invalid_weights_statistics_and_ids_fail_closed() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         let mut bad_weight = calibration(&scores, &vec![1.0; 99]);
         bad_weight[0].importance_weight = f64::NAN;
         assert!(matches!(
@@ -963,7 +1013,9 @@ mod tests {
 
     #[test]
     fn zero_weight_evaluation_point_is_rejected_as_outside_target_support() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         assert!(matches!(
             evaluate_weighted_covariate_shift(
                 &calibration(&scores, &vec![1.0; 99]),
@@ -976,7 +1028,9 @@ mod tests {
 
     #[test]
     fn zero_weight_source_rows_are_allowed_but_all_zero_weights_fail() {
-        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        let scores = (1..=99)
+            .map(|value| value as f64 / 100.0)
+            .collect::<Vec<_>>();
         let mut weights = vec![1.0; 99];
         weights[0] = 0.0;
         let report = evaluate_weighted_covariate_shift(
