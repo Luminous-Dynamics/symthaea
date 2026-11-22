@@ -2,7 +2,7 @@
   "benchmark_id": "SFEB",
   "title": "Symthaea Frontend Engineering Benchmark",
   "version": "0.1.0",
-  "as_of": "2026-11-21",
+  "as_of": "2026-11-22",
   "status": "specification_only",
   "baseline": {
     "repository": "Luminous-Dynamics/symthaea",
@@ -10,7 +10,7 @@
     "framework_family": "Leptos 0.8",
     "lockfile_resolution_required": true
   },
-  "important_notice": "This file is a task inventory, not an executable benchmark. Reference assets, deterministic fixtures, independent oracles, runner, and evaluator are not yet present. Do not report task scores until those exist and are run.",
+  "important_notice": "SFEB remains a staged benchmark, not a completed end-to-end evaluation. A public-pilot dashboard fixture, interface/task contracts, a standalone contract/provenance validator, a retrieval evaluator, and a CDP evidence-capture library primitive are checked in. Their source-level presence does not imply compilation, execution, browser verification, independent-oracle qualification, or benchmark scores. The full isolated browser runner and task-level result pipeline remain pending.",
   "scoring": {
     "report_vector": [
       "visual_fidelity",
@@ -61,7 +61,8 @@
         "traceability_matrix",
         "human_review"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L1-001",
@@ -85,7 +86,8 @@
         "dom_snapshot",
         "visual_report"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L1-002",
@@ -109,7 +111,8 @@
         "overflow_report",
         "interaction_replay"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L1-003",
@@ -133,7 +136,8 @@
         "build_report",
         "regression_report"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L2-001",
@@ -157,7 +161,8 @@
         "keyboard_trace",
         "accessibility_report"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L2-002",
@@ -180,7 +185,8 @@
         "state_assertions",
         "console_report"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L2-003",
@@ -204,7 +210,8 @@
         "reduced_motion_capture",
         "manual_review"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L2-004",
@@ -229,7 +236,8 @@
         "before_after_screenshots",
         "regression_report"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L3-001",
@@ -255,7 +263,8 @@
         "browser_screenshots",
         "regression_report"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L4-001",
@@ -281,7 +290,8 @@
         "full_regression_report",
         "review_record"
       ],
-      "status": "specification_only"
+      "status": "specification_only",
+      "fixture_exposure": "public_pilot"
     },
     {
       "id": "SFEB-L1-004",
@@ -443,7 +453,7 @@
       "query_count": 42,
       "positives": 34,
       "hard_negatives": 8,
-      "status": "specification_only",
+      "status": "evaluator_authored_not_executed",
       "validator_command": "cargo run --manifest-path benchmarks/frontend/contract-check/Cargo.toml -- --retrieval",
       "baselines": [
         "keyword_exact",
@@ -463,7 +473,8 @@
         "latency_p50_p95",
         "memory_bytes",
         "cost_per_1000_queries"
-      ]
+      ],
+      "note": "The 42-query set is public-pilot development data; no retrieval scores have been measured and it is not a blind holdout."
     },
     "source_commit": "808998bb903202e813b5bd275fe4a395bcff528e",
     "source_anchor_count": 17,
@@ -503,5 +514,22 @@
     "excluded_prerelease": "0.9.0-rc1",
     "verification_gates": 7,
     "policy": "Keep benchmark runs pinned to Cargo.lock 0.8.20 until the separate 0.8.23 compatibility experiment passes all gates and is deliberately adopted."
+  },
+  "benchmark_qualification": {
+    "status": "campaign_designed_not_executed",
+    "campaign_path": "benchmarks/frontend/qualification/mutation-campaign-v1.json",
+    "schema_path": "benchmarks/frontend/qualification/mutation-campaign-v1.schema.json",
+    "mutation_count": 20,
+    "positive_control_count": 5,
+    "metamorphic_relation_count": 5,
+    "key_rule": "Qualify the evaluator with seeded failures and semantics-preserving controls before using its scores for model comparisons.",
+    "qualification_targets": {
+      "critical_mutation_kill_rate_min": 1,
+      "security_mutation_kill_rate_min": 1,
+      "evidence_integrity_mutation_kill_rate_min": 1,
+      "high_severity_mutation_kill_rate_min": 0.95,
+      "overall_mutation_kill_rate_min": 0.9,
+      "positive_control_false_reject_rate_max": 0
+    }
   }
 }
