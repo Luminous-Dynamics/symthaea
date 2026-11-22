@@ -5,6 +5,7 @@
 //! chi-square divergence proxy and test-point mass. Estimated ratios are explicitly diagnostic:
 //! they do not inherit the exact finite-sample guarantee of known likelihood ratios.
 
+use crate::estimator_response::FactorialEstimatorResponseReport;
 use crate::held_out_null_calibration::{ProportionInterval, ESTIMATOR_IDS};
 use std::collections::HashSet;
 use std::fmt;
@@ -226,6 +227,8 @@ pub enum WeightedCovariateShiftError {
     InvalidImportanceWeight { replicate_id: String },
     NonPositiveEvaluationWeight { replicate_id: String },
     InvalidStatistic { replicate_id: String },
+    InvalidEstimatorResponse { replicate_id: String },
+    UndefinedSignalDirection { replicate_id: String },
     InvalidDirectionCosine { replicate_id: String },
     NonFiniteWeightMoments,
 }
@@ -297,6 +300,96 @@ impl fmt::Display for WeightedCovariateShiftError {
 }
 
 impl std::error::Error for WeightedCovariateShiftError {}
+
+/// Convert a nuisance-only RCAF estimator response into one weighted calibration record.
+///
+/// The nuisance-only displacement from each estimator is used in the canonical ESTIMATOR_IDS
+/// order. This adapter pins the score definition to the existing estimator-response module.
+pub fn null_observation_from_estimator_response(
+    replicate_id: &str,
+    importance_weight: f64,
+    response: &FactorialEstimatorResponseReport,
+) -> Result<WeightedNullCalibrationObservation, WeightedCovariateShiftError> {
+    if response.estimators.len() != ESTIMATOR_IDS.len()
+        || response
+            .estimators
+            .iter()
+            .zip(ESTIMATOR_IDS.iter())
+            .any(|(item, expected)| item.estimator_id != *expected)
+    {
+        return Err(WeightedCovariateShiftError::InvalidEstimatorResponse {
+            replicate_id: replicate_id.to_string(),
+        });
+    }
+    let statistics = [
+        response.estimators[0].nuisance_only_distance,
+        response.estimators[1].nuisance_only_distance,
+        response.estimators[2].nuisance_only_distance,
+    ];
+    validate_statistics(replicate_id, &statistics)?;
+    validate_weight(replicate_id, importance_weight)?;
+    Ok(WeightedNullCalibrationObservation {
+        replicate_id: replicate_id.to_string(),
+        statistics,
+        importance_weight,
+    })
+}
+
+/// Convert a signal-plus-nuisance RCAF response into one weighted evaluation record.
+///
+/// The held-out signal statistic is clean-to-combined connectivity displacement. The matched
+/// nuisance-only displacement remains the null statistic. The connectivity directional cosine
+/// must be defined; zero-signal cells are not signal-evaluation observations.
+pub fn evaluation_observation_from_estimator_response(
+    replicate_id: &str,
+    importance_weight: f64,
+    response: &FactorialEstimatorResponseReport,
+) -> Result<WeightedHeldOutEvaluationObservation, WeightedCovariateShiftError> {
+    if response.estimators.len() != ESTIMATOR_IDS.len()
+        || response
+            .estimators
+            .iter()
+            .zip(ESTIMATOR_IDS.iter())
+            .any(|(item, expected)| item.estimator_id != *expected)
+    {
+        return Err(WeightedCovariateShiftError::InvalidEstimatorResponse {
+            replicate_id: replicate_id.to_string(),
+        });
+    }
+    let signal_directional_cosine = response
+        .connectivity_direction
+        .signal_directional_cosine
+        .ok_or_else(|| WeightedCovariateShiftError::UndefinedSignalDirection {
+            replicate_id: replicate_id.to_string(),
+        })?;
+    let null_statistics = [
+        response.estimators[0].nuisance_only_distance,
+        response.estimators[1].nuisance_only_distance,
+        response.estimators[2].nuisance_only_distance,
+    ];
+    let signal_statistics = [
+        1.0 - response.estimators[0].clean_to_combined_similarity,
+        1.0 - response.estimators[1].clean_to_combined_similarity,
+        1.0 - response.estimators[2].clean_to_combined_similarity,
+    ];
+    validate_statistics(replicate_id, &null_statistics)?;
+    validate_statistics(replicate_id, &signal_statistics)?;
+    validate_weight(replicate_id, importance_weight)?;
+    if !signal_directional_cosine.is_finite()
+        || !(-1.0..=1.0).contains(&signal_directional_cosine)
+    {
+        return Err(WeightedCovariateShiftError::InvalidDirectionCosine {
+            replicate_id: replicate_id.to_string(),
+        });
+    }
+    Ok(WeightedHeldOutEvaluationObservation {
+        replicate_id: replicate_id.to_string(),
+        null_statistics,
+        signal_statistics,
+        signal_directional_cosine,
+        importance_weight,
+    })
+}
 
 /// Compute test-point-specific weighted upper-tail thresholds and evaluate held-out outcomes.
 ///
@@ -803,6 +896,97 @@ mod tests {
             source_support_attested: true,
             conditional_score_invariance_attested: true,
         }
+    }
+
+    fn estimator_response(direction: Option<f64>) -> FactorialEstimatorResponseReport {
+        use crate::estimator_response::{
+            ConnectivityDirectionReport, EstimatorResponseSummary,
+        };
+        FactorialEstimatorResponseReport {
+            schema_version: "rcaf.factorial-estimator-response/0.1.0",
+            experiment_id: "weighted-adapter-fixture".to_string(),
+            signal_id: "target-signal".to_string(),
+            nuisance_family_id: "motion_transient".to_string(),
+            nuisance_instance_id: "transient-01".to_string(),
+            time_points: 64,
+            roi_count: 6,
+            connectivity_estimator: "pearson_sample_correlation_v1",
+            estimators: ESTIMATOR_IDS
+                .iter()
+                .enumerate()
+                .map(|(index, estimator_id)| EstimatorResponseSummary {
+                    estimator_id,
+                    clean_to_signal_similarity: 0.90,
+                    clean_to_nuisance_similarity: 0.80,
+                    signal_to_combined_similarity: 0.85,
+                    clean_to_combined_similarity: 0.75,
+                    clean_signal_distance: 0.10,
+                    nuisance_only_distance: 0.20 + index as f64 * 0.01,
+                    combined_signal_residual_distance: 0.15,
+                    nuisance_to_signal_distance_ratio: Some(2.0),
+                    signal_retention_fraction: Some(0.5),
+                })
+                .collect(),
+            connectivity_direction: ConnectivityDirectionReport {
+                signal_projection_gain: direction.map(|_| 0.8),
+                signal_directional_cosine: direction,
+                signal_change_residual_fraction: direction.map(|_| 0.4),
+                clean_signal_change_norm: 0.2,
+                combined_signal_change_norm: 0.18,
+            },
+        }
+    }
+
+    #[test]
+    fn estimator_response_adapters_preserve_the_pinned_score_definitions() {
+        let response = estimator_response(Some(0.9));
+        let null =
+            null_observation_from_estimator_response("cal-adapter-01", 1.25, &response).unwrap();
+        let evaluation = evaluation_observation_from_estimator_response(
+            "eval-adapter-01",
+            1.5,
+            &response,
+        )
+        .unwrap();
+        assert!(
+            null.statistics
+                .iter()
+                .zip([0.20, 0.21, 0.22])
+                .all(|(actual, expected)| (actual - expected).abs() < 1e-12)
+        );
+        assert!(
+            evaluation
+                .null_statistics
+                .iter()
+                .zip([0.20, 0.21, 0.22])
+                .all(|(actual, expected)| (actual - expected).abs() < 1e-12)
+        );
+        assert!(
+            evaluation
+                .signal_statistics
+                .iter()
+                .all(|actual| (*actual - 0.25).abs() < 1e-12)
+        );
+        assert_eq!(evaluation.importance_weight, 1.5);
+        assert_eq!(evaluation.signal_directional_cosine, 0.9);
+    }
+
+    #[test]
+    fn estimator_response_adapters_reject_missing_ordered_or_undefined_inputs() {
+        let mut reordered = estimator_response(Some(0.8));
+        reordered.estimators.swap(0, 1);
+        assert!(matches!(
+            null_observation_from_estimator_response("reordered", 1.0, &reordered),
+            Err(WeightedCovariateShiftError::InvalidEstimatorResponse { .. })
+        ));
+        assert!(matches!(
+            evaluation_observation_from_estimator_response(
+                "undefined-direction",
+                1.0,
+                &estimator_response(None)
+            ),
+            Err(WeightedCovariateShiftError::UndefinedSignalDirection { .. })
+        ));
     }
 
     #[test]
