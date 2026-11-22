@@ -124,7 +124,7 @@
   },
   "reference_fixture": {
     "path": "benchmarks/frontend/fixtures/service-dashboard/",
-    "sha256": "171f292603f159866224dbbe748141198b8f81f845e9c012d78c7486b1004c67",
+    "sha256": "2752de3110ba1e53cf403daf2976b62cf45f46fac8823acee5c0865bf41f692a",
     "purpose": "Original static HTML/CSS reference fixture. The digest is SHA-256 over UTF-8 bytes of reference.html, one NUL byte, then UTF-8 bytes of style.css. Do not expose fixture source to the evaluated agent when the benchmark is run in screenshot-conditioned mode."
   },
   "required_regions": [
