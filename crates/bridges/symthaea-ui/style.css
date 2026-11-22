@@ -85,6 +85,22 @@ body {
     background: #55505f;
 }
 
+.dot-connecting {
+    background: #d4a847;
+    box-shadow: 0 0 6px rgba(212, 168, 71, 0.55);
+}
+
+.dot-retrying {
+    background: #c27a48;
+    box-shadow: 0 0 6px rgba(194, 122, 72, 0.4);
+}
+
+.telemetry-state {
+    color: #9b9aa7;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
 .vitals {
     display: flex;
     flex-direction: column;
