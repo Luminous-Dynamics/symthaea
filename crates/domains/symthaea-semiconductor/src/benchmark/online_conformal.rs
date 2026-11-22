@@ -727,13 +727,6 @@ pub fn ingest_online_metrology_feedback_v1(
     require_text(&feedback.prediction_id, "feedback.prediction_id")?;
     require_text(&feedback.sample_id, "feedback.sample_id")?;
     require_text(&feedback.subject_id, "feedback.subject_id")?;
-    require_text(&feedback.target_measurand_id, "feedback.target_measurand_id")?;
-    require_text(&feedback.class_semantics_ref, "feedback.class_semantics_ref")?;
-    if !valid_sha256(&feedback.class_semantics_sha256) {
-        return Err(OnlineConformalError(
-            "feedback.class_semantics_sha256: expected lowercase SHA-256".into(),
-        ));
-    }
     if feedback.revision == 0 {
         return Err(OnlineConformalError(
             "feedback.revision: revisions start at one".into(),
@@ -783,7 +776,7 @@ pub fn ingest_online_metrology_feedback_v1(
         .ok_or_else(|| OnlineConformalError("feedback label does not exist in graph".into()))?;
     if !matches!(&graph_label.status, MetrologyLabelStatusV1::Validated)
         || graph_label.subject_id != feedback.subject_id
-        || graph_label.measurand_id != feedback.target_measurand_id
+        || graph_label.measurand_id != state.binary_semantics.target_measurand_id
         || graph_label.revision != feedback.revision
         || graph_label.supersedes_label_id != feedback.supersedes_label_id
         || graph_label.measurement_clock_domain_id != state.clock_domain_id
@@ -796,6 +789,60 @@ pub fn ingest_online_metrology_feedback_v1(
         ));
     }
     require_text(&graph_label.authority_ref, "graph_label.authority_ref")?;
+    let classification = classify_validated_metrology_label_v1(
+        graph,
+        &feedback.label_id,
+        &state.binary_semantics,
+    )
+    .map_err(|error| {
+        OnlineConformalError(format!("metrology class derivation rejected: {error}"))
+    })?;
+    if classification.subject_id != feedback.subject_id
+        || classification.target_measurand_id != state.binary_semantics.target_measurand_id
+    {
+        return Err(OnlineConformalError(
+            "derived metrology class does not match feedback subject/target".into(),
+        ));
+    }
+
+    // Treat graph snapshots as append-only within a calibration epoch: previous
+    // outcomes must remain present and retain their validated identities/classes.
+    for prior in &state.feedback_ledger {
+        let prior_label = graph
+            .metrology_labels
+            .iter()
+            .find(|label| label.label_id == prior.label_id)
+            .ok_or_else(|| {
+                OnlineConformalError(format!(
+                    "new graph snapshot removed previously ingested label {}",
+                    prior.label_id
+                ))
+            })?;
+        let prior_class = classify_validated_metrology_label_v1(
+            graph,
+            &prior.label_id,
+            &state.binary_semantics,
+        )
+        .map_err(|error| {
+            OnlineConformalError(format!(
+                "previously ingested label {} no longer validates: {error}",
+                prior.label_id
+            ))
+        })?;
+        if prior_label.subject_id != prior.subject_id
+            || prior_label.measurand_id != prior.target_measurand_id
+            || prior_label.revision != prior.revision
+            || prior_label.supersedes_label_id != prior.supersedes_label_id
+            || prior_class.derived_positive != prior.positive
+            || prior.class_semantics_sha256 != state.binary_semantics.semantics_sha256
+        {
+            return Err(OnlineConformalError(format!(
+                "new graph snapshot rewrites previously ingested label {}",
+                prior.label_id
+            )));
+        }
+    }
+
     let available_at = timestamp_micros(
         &graph_label.available_at,
         &graph_label.availability_clock_basis,
@@ -864,8 +911,8 @@ pub fn ingest_online_metrology_feedback_v1(
             if previous_row.prediction_id != feedback.prediction_id
                 || previous_row.sample_id != feedback.sample_id
                 || previous_row.subject_id != feedback.subject_id
-                || previous_row.target_measurand_id != feedback.target_measurand_id
-                || previous_row.class_semantics_sha256 != feedback.class_semantics_sha256
+                || previous_row.target_measurand_id != state.binary_semantics.target_measurand_id
+                || previous_row.class_semantics_sha256 != state.binary_semantics.semantics_sha256
                 || previous_row.revision >= feedback.revision
             {
                 return Err(OnlineConformalError(
@@ -880,7 +927,8 @@ pub fn ingest_online_metrology_feedback_v1(
         }
     }
 
-    let covered = if feedback.positive {
+    let derived_positive = classification.derived_positive;
+    let covered = if derived_positive {
         prediction.prediction_set.positive_in_set
     } else {
         prediction.prediction_set.negative_in_set
@@ -890,8 +938,8 @@ pub fn ingest_online_metrology_feedback_v1(
         label_id: feedback.label_id.clone(),
         sample_id: feedback.sample_id.clone(),
         prediction_id: Some(feedback.prediction_id.clone()),
-        positive: feedback.positive,
-        nonconformity: if feedback.positive {
+        positive: derived_positive,
+        nonconformity: if derived_positive {
             1.0 - prediction.score
         } else {
             prediction.score
@@ -917,7 +965,7 @@ pub fn ingest_online_metrology_feedback_v1(
     state.coverage_history.push(OnlineCoverageObservationV1 {
         prediction_id: feedback.prediction_id.clone(),
         label_id: feedback.label_id.clone(),
-        positive: feedback.positive,
+        positive: derived_positive,
         covered,
         ingested_at: cutoff.cutoff_time.clone(),
         sequence: next_sequence,
@@ -932,10 +980,10 @@ pub fn ingest_online_metrology_feedback_v1(
         prediction_id: feedback.prediction_id.clone(),
         sample_id: feedback.sample_id.clone(),
         subject_id: feedback.subject_id.clone(),
-        positive: feedback.positive,
-        target_measurand_id: feedback.target_measurand_id.clone(),
-        class_semantics_ref: feedback.class_semantics_ref.clone(),
-        class_semantics_sha256: feedback.class_semantics_sha256.clone(),
+        positive: derived_positive,
+        target_measurand_id: state.binary_semantics.target_measurand_id.clone(),
+        class_semantics_ref: state.binary_semantics.semantics_id.clone(),
+        class_semantics_sha256: state.binary_semantics.semantics_sha256.clone(),
         revision: feedback.revision,
         supersedes_label_id: feedback.supersedes_label_id.clone(),
         available_at: graph_label.available_at.clone(),
@@ -981,6 +1029,9 @@ pub fn ingest_online_metrology_feedback_v1(
         state_sha256: state.state_sha256.clone(),
         label_id: feedback.label_id.clone(),
         prediction_id: feedback.prediction_id.clone(),
+        derived_positive,
+        target_measurand_id: state.binary_semantics.target_measurand_id.clone(),
+        class_semantics_sha256: state.binary_semantics.semantics_sha256.clone(),
         replaced_label_id: previous_label_id,
         residual_window_positive: residual_positive,
         residual_window_negative: residual_negative,
