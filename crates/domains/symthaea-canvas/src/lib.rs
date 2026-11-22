@@ -107,14 +107,14 @@ pub use mycelial_reference_networks::{
 };
 pub use mycelial_reconstruction_metrics::{
     AnnotatedHyphaSegment, AnnotatedJunction, AnnotatedJunctionKind, AnnotatedMycelialSkeleton,
-    JunctionIdentityMatch, JunctionKindScore, MAX_RECONSTRUCTION_ID_BYTES,
-    MAX_RECONSTRUCTION_JUNCTIONS, MAX_RECONSTRUCTION_SEGMENTS,
+    JunctionIdentityMatch, JunctionKindScore, MAX_AUTOMATIC_MATCH_JUNCTIONS_PER_GRAPH,
+    MAX_RECONSTRUCTION_ID_BYTES, MAX_RECONSTRUCTION_JUNCTIONS, MAX_RECONSTRUCTION_SEGMENTS,
     MycelialReconstructionError, MycelialReconstructionScore,
     MYCELIAL_RECONSTRUCTION_SCHEMA_VERSION, MYCELIAL_RECONSTRUCTION_SCORE_SCHEMA_VERSION,
     ReconstructionCounts, ReconstructionDimensionality, ReconstructionEvaluationConfig,
     ReconstructionLengthError, ReconstructionLengthUnit, ReconstructionLocalizationError,
     ReconstructionPoint3, ReconstructionTopologyDelta, ReconstructionTopologySummary,
-    evaluate_mycelial_reconstruction,
+    evaluate_mycelial_reconstruction, match_junctions_hungarian,
 };
 pub use mycelial_mesh::{
     FilamentMeshRange, MAX_MYCELIAL_FILAMENTS, MAX_TUBE_MESH_VERTICES, MycelialTubeMesh,
