@@ -1,0 +1,74 @@
+{
+  "schema_version": "mel-audio-transform-qualification-v1",
+  "experiment_id": "mel-audio-transform-synthetic-control-2026-11-22",
+  "frozen_at_utc": "2026-11-22T17:30:00Z",
+  "task": {
+    "task_id": "arrangement-pair-preference-v1",
+    "task_dimension": "arrangement_preference",
+    "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "rubric_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "policy": {
+    "confidence_level": 0.95,
+    "minimum_listeners": 20,
+    "minimum_items": 30,
+    "equivalence_margin": 0.25
+  },
+  "source": {
+    "asset_id": "synthetic-source",
+    "sha256": "d77a5074879583da901b18e6360ecd6fddedc3390fade1a66f6ee87326e332b7",
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "duration_frames": 132300,
+    "encoding": "synthetic-placeholder-not-audio"
+  },
+  "variant": {
+    "asset_id": "synthetic-variant",
+    "sha256": "a055b1dec21517feec34c799028cf930bfe5661bdf8b40ada773c2412f55bd0f",
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "duration_frames": 132300,
+    "encoding": "synthetic-placeholder-not-audio"
+  },
+  "transformation": {
+    "family": "synthetic-reencode-control",
+    "algorithm": "fixture-only byte substitution",
+    "implementation_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "parameters_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "intended_preserved_dimensions": [
+      "arrangement_preference",
+      "melodic_contour"
+    ],
+    "may_alter_dimensions": [
+      "metadata",
+      "container_bytes"
+    ]
+  },
+  "rights": {
+    "purpose": "music-judge-qualification",
+    "rights_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "consent_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+  },
+  "equivalence": {
+    "outcome": "equivalent",
+    "method": "paired_cluster_bootstrap",
+    "panel_protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "cohort_commitment_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "analysis_plan_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "independence_attestation_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "listener_count": 24,
+    "item_count": 40,
+    "confidence_level": 0.95,
+    "mean_difference": 0.01,
+    "confidence_interval_lower": -0.08,
+    "confidence_interval_upper": 0.1,
+    "equivalence_margin": 0.25
+  },
+  "claim_ceiling": [
+    "synthetic fixture only; the byte fixtures are not playable audio",
+    "digest recomputation verifies supplied file bytes but does not decode or validate audio metadata",
+    "receipt digests are structurally validated and are not cryptographically authenticated by this tool",
+    "panel equivalence is represented by a supplied synthetic receipt, not a completed human study",
+    "eligibility is limited to the declared task dimension and does not imply general transform safety"
+  ]
+}
