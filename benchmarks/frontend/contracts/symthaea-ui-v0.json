@@ -55,7 +55,7 @@
       "tag": "header",
       "purpose": "Application identity, gateway selection and daemon status.",
       "source_anchor": "symthaea-ui.header",
-      "semantic_role": "banner",
+      "semantic_role": null,
       "accessible_name": null,
       "conditional": false
     },
@@ -505,6 +505,7 @@
     "The contract is derived from source code at source.commit and must not be interpreted as proof of browser behavior.",
     "Changing the gateway endpoint while a WebSocket is already open does not forcibly replace that live connection; the new value is read by the next retry attempt.",
     "No SFEB browser fixture, screenshot baseline or independent acceptance run is included in this contract.",
-    "Telemetry retry backoff is reset only after a connection remains open for at least 60 seconds; this avoids resetting after a rapidly flapping socket."
+    "Telemetry retry backoff is reset only after a connection remains open for at least 60 seconds; this avoids resetting after a rapidly flapping socket.",
+    "The header element is nested inside the page's main landmark; it is a header section but does not create the document banner landmark implied by a top-level header."
   ]
 }
