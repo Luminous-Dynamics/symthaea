@@ -27,8 +27,8 @@ struct EchoRidgeMetrics {
     negative_s_fraction: f64,
     zero_s_fraction: f64,
     nyquist_s_fraction: f64,
-    signed_s_centroid: f64,
-    dominant_signed_s: isize,
+    signed_velocity_mode_index_centroid: f64,
+    dominant_signed_velocity_mode_index: isize,
 }
 
 fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> EchoRidgeMetrics {
@@ -44,8 +44,8 @@ fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> 
             negative_s_fraction: 0.0,
             zero_s_fraction: 0.0,
             nyquist_s_fraction: 0.0,
-            signed_s_centroid: 0.0,
-            dominant_signed_s: isize::MIN,
+            signed_velocity_mode_index_centroid: 0.0,
+            dominant_signed_velocity_mode_index: isize::MIN,
         };
     }
 
@@ -57,7 +57,7 @@ fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> 
     let mut signed_s_moment = 0.0;
     let mut non_nyquist_total = 0.0;
     let mut dominant_energy = -1.0_f64;
-    let mut dominant_signed_s = isize::MIN;
+    let mut dominant_signed_velocity_mode_index = isize::MIN;
 
     for velocity_index in 0..spectrum.nv {
         let energy = spectrum
@@ -68,7 +68,7 @@ fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> 
             nyquist_s += energy;
             if energy > dominant_energy {
                 dominant_energy = energy;
-                dominant_signed_s = isize::MIN;
+                dominant_signed_velocity_mode_index = isize::MIN;
             }
             continue;
         }
@@ -80,7 +80,7 @@ fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> 
         signed_s_moment += signed_s as f64 * energy;
         if energy > dominant_energy {
             dominant_energy = energy;
-            dominant_signed_s = signed_s;
+            dominant_signed_velocity_mode_index = signed_s;
         }
         if signed_s > 0 {
             positive_s += energy;
@@ -98,12 +98,12 @@ fn echo_mode_ridge(spectrum: &JointPhaseSpaceSpectrum, signed_x_mode: isize) -> 
         negative_s_fraction: negative_s / denominator,
         zero_s_fraction: zero_s / denominator,
         nyquist_s_fraction: nyquist_s / denominator,
-        signed_s_centroid: if non_nyquist_total > 0.0 {
+        signed_velocity_mode_index_centroid: if non_nyquist_total > 0.0 {
             signed_s_moment / non_nyquist_total
         } else {
             0.0
         },
-        dominant_signed_s,
+        dominant_signed_velocity_mode_index,
     }
 }
 
@@ -367,22 +367,22 @@ fn run_resolution(
                 pulse_ridge.negative_s_fraction,
                 pulse_ridge.zero_s_fraction,
                 pulse_ridge.nyquist_s_fraction,
-                pulse_ridge.signed_s_centroid,
-                pulse_ridge.dominant_signed_s,
+                pulse_ridge.signed_velocity_mode_index_centroid,
+                pulse_ridge.dominant_signed_velocity_mode_index,
                 control_ridge.total,
                 control_ridge.positive_s_fraction,
                 control_ridge.negative_s_fraction,
                 control_ridge.zero_s_fraction,
                 control_ridge.nyquist_s_fraction,
-                control_ridge.signed_s_centroid,
-                control_ridge.dominant_signed_s,
+                control_ridge.signed_velocity_mode_index_centroid,
+                control_ridge.dominant_signed_velocity_mode_index,
                 response_ridge.total,
                 response_ridge.positive_s_fraction,
                 response_ridge.negative_s_fraction,
                 response_ridge.zero_s_fraction,
                 response_ridge.nyquist_s_fraction,
-                response_ridge.signed_s_centroid,
-                response_ridge.dominant_signed_s,
+                response_ridge.signed_velocity_mode_index_centroid,
+                response_ridge.dominant_signed_velocity_mode_index,
             );
 
             println!(
@@ -460,7 +460,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     println!(
-        "# ridge_columns,run,step,time,mode,pulse_k_mode_f_strophy,pulse_positive_s_fraction,pulse_negative_s_fraction,pulse_zero_s_fraction,pulse_nyquist_s_fraction,pulse_signed_s_centroid,pulse_dominant_signed_s,control_k_mode_f_strophy,control_positive_s_fraction,control_negative_s_fraction,control_zero_s_fraction,control_nyquist_s_fraction,control_signed_s_centroid,control_dominant_signed_s,response_k_mode_f_strophy,response_positive_s_fraction,response_negative_s_fraction,response_zero_s_fraction,response_nyquist_s_fraction,response_signed_s_centroid,response_dominant_signed_s"
+        "# ridge_columns,run,step,time,mode,pulse_k_mode_f_strophy,pulse_positive_s_fraction,pulse_negative_s_fraction,pulse_zero_s_fraction,pulse_nyquist_s_fraction,pulse_signed_velocity_mode_index_centroid,pulse_dominant_signed_velocity_mode_index,control_k_mode_f_strophy,control_positive_s_fraction,control_negative_s_fraction,control_zero_s_fraction,control_nyquist_s_fraction,control_signed_velocity_mode_index_centroid,control_dominant_signed_velocity_mode_index,response_k_mode_f_strophy,response_positive_s_fraction,response_negative_s_fraction,response_zero_s_fraction,response_nyquist_s_fraction,response_signed_velocity_mode_index_centroid,response_dominant_signed_velocity_mode_index"
     );
 
     println!(
