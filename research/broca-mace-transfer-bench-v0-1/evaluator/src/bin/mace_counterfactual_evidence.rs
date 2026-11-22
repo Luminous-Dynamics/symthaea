@@ -1679,8 +1679,18 @@ mod tests {
             Some(&sidecar),
         )
         .unwrap();
+        let imported_candidate = run_candidate_with_sidecar(
+            CandidateMode::ExactScopeScan,
+            Query { scope: sidecar_scope() },
+            need,
+            &memory,
+            Some(&imported),
+        )
+        .unwrap();
         assert_ne!(without_sidecar.input_sha256, with_sidecar.input_sha256);
+        assert_ne!(with_sidecar.input_sha256, imported_candidate.input_sha256);
         assert_eq!(with_sidecar.lineage_incomplete_event_count, 0);
+        assert_eq!(imported_candidate.lineage_incomplete_event_count, 2);
 
         // Remove only the parent. The child's receipt still declares that
         // parent, so the reduced candidate pool must mark the lineage unknown.
