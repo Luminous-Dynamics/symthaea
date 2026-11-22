@@ -344,12 +344,17 @@ pub fn build_mycelial_contact_filtration(
 
     candidate_observations.sort_by_key(|value| value.fusion_candidate_id);
     measured_candidates.sort_by(|left, right| {
-        left.1
-            .total_cmp(&right.1)
+        quantize(left.1)
+            .cmp(&quantize(right.1))
             .then_with(|| left.0.fusion.source_filament_id.cmp(&right.0.fusion.source_filament_id))
             .then_with(|| left.0.fusion.target_filament_id.cmp(&right.0.fusion.target_filament_id))
             .then_with(|| left.0.fusion.kind.cmp(&right.0.fusion.kind))
-            .then_with(|| left.0.fusion.target_t.total_cmp(&right.0.fusion.target_t))
+            .then_with(|| {
+                let left_target = (f64::from(left.0.fusion.target_t) * 1_000_000.0).round() as u32;
+                let right_target =
+                    (f64::from(right.0.fusion.target_t) * 1_000_000.0).round() as u32;
+                left_target.cmp(&right_target)
+            })
             .then_with(|| left.0.fusion.id.cmp(&right.0.fusion.id))
     });
 
@@ -579,6 +584,27 @@ impl MycelialContactFiltration {
         {
             return Err(MycelialContactFiltrationError::InvalidFiltration(
                 "candidate admission orders are missing, duplicated or non-contiguous",
+            ));
+        }
+        let mut expected_admission_order: Vec<_> = self
+            .candidate_observations
+            .iter()
+            .filter(|candidate| candidate.admitted_within_maximum_tolerance)
+            .collect();
+        expected_admission_order.sort_by(|left, right| {
+            left.contact_distance_microunits
+                .cmp(&right.contact_distance_microunits)
+                .then_with(|| left.source_filament_id.cmp(&right.source_filament_id))
+                .then_with(|| left.target_filament_id.cmp(&right.target_filament_id))
+                .then_with(|| left.kind.cmp(&right.kind))
+                .then_with(|| left.target_parameter_micros.cmp(&right.target_parameter_micros))
+                .then_with(|| left.fusion_candidate_id.cmp(&right.fusion_candidate_id))
+        });
+        if expected_admission_order.iter().enumerate().any(|(index, candidate)| {
+            candidate.admission_order != Some(index as u32)
+        }) {
+            return Err(MycelialContactFiltrationError::InvalidFiltration(
+                "candidate admission order does not match deterministic threshold/tie ordering",
             ));
         }
         if observed_admitted != self.metrics.candidate_count_in_filtration
