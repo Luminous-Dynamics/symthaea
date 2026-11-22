@@ -296,6 +296,16 @@ pub fn run_factorial_counterfactual_experiment(
         summarize_cell("nuisance_only", &nuisance_only),
         summarize_cell("signal_plus_nuisance", &signal_plus_nuisance),
     ];
+    let signal_component_rms = rms(signal_component);
+    let nuisance_component_rms = rms(nuisance_component);
+    if !signal_component_rms.is_finite()
+        || !nuisance_component_rms.is_finite()
+        || cells.iter().any(|cell| {
+            !cell.rms.is_finite() || !cell.max_absolute_value.is_finite()
+        })
+    {
+        return Err(FactorialExperimentError::NonFiniteMoment);
+    }
     let report = FactorialCounterfactualReport {
         schema_version: "rcaf.factorial-counterfactual/0.1.0",
         experiment_id: metadata.experiment_id.clone(),
@@ -311,8 +321,8 @@ pub fn run_factorial_counterfactual_experiment(
         nuisance_component_variance: nuisance_variance,
         clean_nuisance_covariance,
         combined_observed_variance: combined_observed_variance.max(0.0),
-        signal_component_rms: rms(signal_component),
-        nuisance_component_rms: rms(nuisance_component),
+        signal_component_rms,
+        nuisance_component_rms,
         cells,
         invariants,
     };
@@ -473,6 +483,12 @@ fn summarize_cell(cell_id: &'static str, matrix: &[Vec<f64>]) -> FactorialCellSu
 
 fn matrix_fingerprint(matrix: &[Vec<f64>]) -> String {
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for dimension in [matrix.len(), matrix.first().map_or(0, Vec::len)] {
+        for byte in (dimension as u64).to_le_bytes() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
     for row in matrix {
         for value in row {
             for byte in value.to_bits().to_le_bytes() {
@@ -638,6 +654,24 @@ mod tests {
             ),
             Err(FactorialExperimentError::NonFiniteOutput(_))
         ));
+    }
+
+    #[test]
+    fn finite_inputs_with_overflowing_cell_rms_fail_closed() {
+        let clean = clean();
+        let mut huge_signal = signal();
+        for row in &mut huge_signal {
+            for value in row {
+                *value = 1e200;
+            }
+        }
+        let result = run_factorial_counterfactual_experiment(
+            &clean,
+            &huge_signal,
+            &nuisance(),
+            &metadata(),
+        );
+        assert!(matches!(result, Err(FactorialExperimentError::NonFiniteMoment)));
     }
 
     #[test]
