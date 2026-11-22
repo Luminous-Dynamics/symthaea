@@ -9,7 +9,8 @@
   "onset_capture_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "policy": {
     "maximum_relative_period_error": 0.05,
-    "required_consecutive_stable_estimates": 5
+    "required_consecutive_stable_estimates": 5,
+    "minimum_estimate_spacing_ns": 10000000
   },
   "tempo_segments": [
     {
