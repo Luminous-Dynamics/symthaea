@@ -11,12 +11,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use thiserror::Error;
 
-pub const OBSERVATION_FRAME_SCHEMA_V1: &str =
-    "luminous.semi-bench.sensor-observation-frame.v1";
-pub const OBSERVATION_REPORT_SCHEMA_V1: &str =
-    "luminous.semi-bench.sensor-observation-report.v1";
-pub const CORRESPONDENCE_SCHEMA_V1: &str =
-    "luminous.semi-bench.sensor-correspondence-manifest.v1";
+pub const OBSERVATION_FRAME_SCHEMA_V1: &str = "luminous.semi-bench.sensor-observation-frame.v1";
+pub const OBSERVATION_REPORT_SCHEMA_V1: &str = "luminous.semi-bench.sensor-observation-report.v1";
+pub const CORRESPONDENCE_SCHEMA_V1: &str = "luminous.semi-bench.sensor-correspondence-manifest.v1";
 pub const CORRESPONDENCE_REPORT_SCHEMA_V1: &str =
     "luminous.semi-bench.sensor-correspondence-report.v1";
 
@@ -36,11 +33,21 @@ pub enum SensorObservationStateV1 {
         uncertainty: MeasurementUncertaintyV1,
     },
     /// A source value exists but units and uncertainty semantics are unknown.
-    ObservedUnqualified { value: f64 },
-    NotInstalled { evidence_ref: String },
-    NotScheduled { evidence_ref: String },
-    CommunicationLoss { evidence_ref: String },
-    InvalidReading { evidence_ref: String },
+    ObservedUnqualified {
+        value: f64,
+    },
+    NotInstalled {
+        evidence_ref: String,
+    },
+    NotScheduled {
+        evidence_ref: String,
+    },
+    CommunicationLoss {
+        evidence_ref: String,
+    },
+    InvalidReading {
+        evidence_ref: String,
+    },
     Censored {
         lower_bound: Option<f64>,
         upper_bound: Option<f64>,
@@ -397,11 +404,9 @@ pub fn adapt_secom_row_to_observation_frame_v1(
     let sensor_ids: Vec<String> = (0..feature_values.len())
         .map(|index| format!("secom-anonymous-column-{index:04}"))
         .collect();
-    let sensor_schema_sha256 = sha256_hex(
-        &serde_json::to_vec(&sensor_ids).map_err(|error| {
-            SensorObservationError(format!("sensor schema serialization failed: {error}"))
-        })?,
-    );
+    let sensor_schema_sha256 = sha256_hex(&serde_json::to_vec(&sensor_ids).map_err(|error| {
+        SensorObservationError(format!("sensor schema serialization failed: {error}"))
+    })?);
     let observations = sensor_ids
         .into_iter()
         .zip(feature_values)
@@ -480,7 +485,10 @@ pub fn validate_sensor_correspondence_manifest_v1(
                         "correspondences[{index}].source_sensor_id: required for matched status"
                     ))
                 })?;
-                require_text(source_id, &format!("correspondences[{index}].source_sensor_id"))?;
+                require_text(
+                    source_id,
+                    &format!("correspondences[{index}].source_sensor_id"),
+                )?;
                 if !source_ids.insert(source_id) {
                     return Err(SensorObservationError(format!(
                         "correspondences[{index}].source_sensor_id: duplicate source sensor mapping"
@@ -625,8 +633,8 @@ mod tests {
 
     #[test]
     fn qualified_observation_requires_unit_and_uncertainty() {
-        let report = validate_sensor_observation_frame_v1(&frame(
-            SensorObservationStateV1::Observed {
+        let report =
+            validate_sensor_observation_frame_v1(&frame(SensorObservationStateV1::Observed {
                 value: 1.5,
                 unit: "kPa".into(),
                 uncertainty: MeasurementUncertaintyV1 {
@@ -634,11 +642,14 @@ mod tests {
                     coverage_probability: Some(0.95),
                     method_ref: "instrument-uncertainty-report-3".into(),
                 },
-            },
-        ))
-        .expect("qualified observation validates");
+            }))
+            .expect("qualified observation validates");
         assert_eq!(report.state_counts.observed, 1);
-        assert!(report.claim_limits.observed_unqualified_is_not_a_calibrated_measurement);
+        assert!(
+            report
+                .claim_limits
+                .observed_unqualified_is_not_a_calibrated_measurement
+        );
     }
 
     #[test]
@@ -654,8 +665,8 @@ mod tests {
             SHA_C,
         )
         .expect("SECOM adapter succeeds");
-        let report = validate_sensor_observation_frame_v1(&adapted)
-            .expect("adapted frame validates");
+        let report =
+            validate_sensor_observation_frame_v1(&adapted).expect("adapted frame validates");
         assert_eq!(report.state_counts.observed_unqualified, 2);
         assert_eq!(report.state_counts.unknown_missing_reason, 1);
         assert_eq!(report.state_counts.communication_loss, 0);
