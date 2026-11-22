@@ -320,7 +320,7 @@ fn fit_model_v1(
         }
     }
 
-    let mut normalization_scales = vec![1.0; feature_count];
+    let mut normalization_scales = vec![0.0; feature_count];
     for row in &imputed_training {
         for feature_index in 0..feature_count {
             let delta = row[feature_index] - normalization_means[feature_index];
@@ -328,8 +328,12 @@ fn fit_model_v1(
         }
     }
     for feature_index in 0..feature_count {
-        let variance = (normalization_scales[feature_index] - 1.0)
-            / training_indices.len() as f64;
+        let variance = normalization_scales[feature_index] / training_indices.len() as f64;
+        if !variance.is_finite() {
+            return Err(SecomTabularBaselineError(format!(
+                "feature {feature_index}: non-finite normalization variance"
+            )));
+        }
         let scale = variance.max(0.0).sqrt();
         normalization_scales[feature_index] = if scale > 1.0e-12 { scale } else { 1.0 };
     }
@@ -354,6 +358,11 @@ fn fit_model_v1(
     for feature_index in 0..feature_count {
         for class_index in 0..2 {
             class_means[feature_index][class_index] /= class_counts[class_index] as f64;
+            if !class_means[feature_index][class_index].is_finite() {
+                return Err(SecomTabularBaselineError(format!(
+                    "feature {feature_index}: non-finite class mean"
+                )));
+            }
         }
     }
 
