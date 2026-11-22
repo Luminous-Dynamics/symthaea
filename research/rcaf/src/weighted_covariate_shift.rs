@@ -907,7 +907,10 @@ mod tests {
         .unwrap();
         let estimator = &report.estimators[0];
         assert_eq!(estimator.finite_threshold_count, 2);
-        assert!(estimator.minimum_finite_threshold.unwrap() <= estimator.maximum_finite_threshold.unwrap());
+        assert!(
+            estimator.minimum_finite_threshold.unwrap()
+                < estimator.maximum_finite_threshold.unwrap()
+        );
         assert!(report.estimators.iter().all(|item| item.finite_threshold_count == 2));
     }
 
@@ -955,6 +958,19 @@ mod tests {
                 &known_config()
             ),
             Err(WeightedCovariateShiftError::InvalidStatistic { .. })
+        ));
+    }
+
+    #[test]
+    fn zero_weight_evaluation_point_is_rejected_as_outside_target_support() {
+        let scores = (1..=99).map(|value| value as f64 / 100.0).collect::<Vec<_>>();
+        assert!(matches!(
+            evaluate_weighted_covariate_shift(
+                &calibration(&scores, &vec![1.0; 99]),
+                &evaluation(&[0.0]),
+                &known_config(),
+            ),
+            Err(WeightedCovariateShiftError::NonPositiveEvaluationWeight { .. })
         ));
     }
 
