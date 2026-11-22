@@ -1,0 +1,173 @@
+{
+  "schema_version": "mel-musical-timing-panel-v1",
+  "session_id": "synthetic-tempo-adaptation-session-001",
+  "case_id": "tempo-step-120-to-150-bpm-001",
+  "track": "midi",
+  "clock_domain_id": "synthetic-clock-001",
+  "instrument_scope": "kick-snare-bass",
+  "reference_grid_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "onset_capture_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "policy": {
+    "maximum_relative_period_error": 0.05,
+    "required_consecutive_stable_estimates": 5
+  },
+  "tempo_segments": [
+    {
+      "segment_id": "tempo-1",
+      "start_beat_index": 0,
+      "phase_zero_ns": 0,
+      "change_observed_ns": 0,
+      "beat_period_ns": 500000000
+    },
+    {
+      "segment_id": "tempo-2",
+      "start_beat_index": 4,
+      "phase_zero_ns": 2000000000,
+      "change_observed_ns": 2000000000,
+      "beat_period_ns": 400000000
+    }
+  ],
+  "target_events": [
+    {
+      "event_id": "kick-1",
+      "instrument_id": "kick",
+      "segment_id": "tempo-1",
+      "beat_index": 0,
+      "subdivision_index": 0,
+      "subdivision_count": 1,
+      "outcome": "observed",
+      "observed_onset_ns": 10000000,
+      "capture_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "event_id": "snare-2",
+      "instrument_id": "snare",
+      "segment_id": "tempo-1",
+      "beat_index": 1,
+      "subdivision_index": 0,
+      "subdivision_count": 1,
+      "outcome": "observed",
+      "observed_onset_ns": 520000000,
+      "capture_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "event_id": "kick-5",
+      "instrument_id": "kick",
+      "segment_id": "tempo-2",
+      "beat_index": 4,
+      "subdivision_index": 0,
+      "subdivision_count": 1,
+      "outcome": "observed",
+      "observed_onset_ns": 2020000000,
+      "capture_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "event_id": "bass-6",
+      "instrument_id": "bass",
+      "segment_id": "tempo-2",
+      "beat_index": 5,
+      "subdivision_index": 1,
+      "subdivision_count": 2,
+      "outcome": "missed",
+      "observed_onset_ns": null,
+      "capture_receipt_sha256": null
+    }
+  ],
+  "tempo_estimates": [
+    {
+      "estimate_id": "e1-1",
+      "segment_id": "tempo-1",
+      "observed_at_ns": 0,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-2",
+      "segment_id": "tempo-1",
+      "observed_at_ns": 80000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-3",
+      "segment_id": "tempo-1",
+      "observed_at_ns": 160000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-4",
+      "segment_id": "tempo-1",
+      "observed_at_ns": 240000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e1-5",
+      "segment_id": "tempo-1",
+      "observed_at_ns": 320000000,
+      "estimated_period_ns": 500000000,
+      "confidence": 0.95,
+      "provenance_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "estimate_id": "e2-1",
+      "segment_id": "tempo-2",
+      "observed_at_ns": 2080000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-2",
+      "segment_id": "tempo-2",
+      "observed_at_ns": 2160000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-3",
+      "segment_id": "tempo-2",
+      "observed_at_ns": 2240000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-4",
+      "segment_id": "tempo-2",
+      "observed_at_ns": 2320000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "estimate_id": "e2-5",
+      "segment_id": "tempo-2",
+      "observed_at_ns": 2400000000,
+      "estimated_period_ns": 400000000,
+      "confidence": 0.95,
+      "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "extra_onsets": [
+    {
+      "event_id": "extra-hihat-1",
+      "instrument_id": "hi_hat",
+      "observed_onset_ns": 2250000000,
+      "capture_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "claim_ceiling": [
+    "synthetic conformance fixture only; timestamps, onset events and receipt digests are invented",
+    "no music model, musician, MIDI device or audio loopback was measured",
+    "receipt hashes are shape-checked but not cryptographically authenticated",
+    "the phase drift slope is descriptive only and has no inferential confidence interval",
+    "performance claims require musician/composition-held-out sessions and independent loopback capture"
+  ]
+}
