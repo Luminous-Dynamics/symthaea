@@ -624,51 +624,130 @@ impl MycelialFailureResilienceProfile {
         if self.schema_version != MYCELIAL_FAILURE_PROFILE_SCHEMA_VERSION
             || !valid_digest(&self.source_graph_digest)
             || !valid_digest(&self.demand_digest)
+            || self.demands.len() > MAX_FAILURE_DEMAND_PAIRS
+            || self.demands.windows(2).any(|pair| pair[0].id >= pair[1].id)
+            || self.demands.iter().any(|demand| {
+                !valid_id(&demand.id)
+                    || !valid_id(&demand.source_junction_id)
+                    || !valid_id(&demand.target_junction_id)
+                    || demand.source_junction_id == demand.target_junction_id
+                    || demand.weight == 0
+            })
+            || self.demand_digest != canonical_demand_digest(&self.demands)
             || self.baseline.scenario_id != "baseline"
+            || !self.baseline.failed_segment_ids.is_empty()
+            || !self.baseline.failed_junction_ids.is_empty()
             || self.baseline.failed_segment_count != 0
             || self.baseline.failed_junction_count != 0
+            || self.scenarios.len() > MAX_FAILURE_SCENARIOS
             || self.scenarios.windows(2).any(|pair| {
                 pair[0].scenario_id >= pair[1].scenario_id
             })
         {
             return Err(MycelialFailureResilienceError::InvalidProfile(
-                "invalid version, digest, baseline or scenario order",
+                "invalid version, digest, demand inventory, baseline or scenario order",
             ));
         }
+
+        let mut source_ids = BTreeSet::new();
+        for demand in &self.demands {
+            source_ids.insert(demand.source_junction_id.as_str());
+        }
+        if source_ids.len() > MAX_FAILURE_DEMAND_SOURCES {
+            return Err(MycelialFailureResilienceError::InvalidProfile(
+                "demand source count exceeds profile limit",
+            ));
+        }
+
         for metric in std::iter::once(&self.baseline).chain(self.scenarios.iter()) {
             if !valid_id(&metric.scenario_id)
+                || metric.demand_pair_count != self.demands.len()
+                || metric.demand_pair_outcomes.len() != self.demands.len()
+                || metric.demand_pair_outcomes.iter().zip(&self.demands).any(
+                    |(outcome, demand)| outcome.demand_id != demand.id,
+                )
+                || metric.failed_segment_ids.iter().any(|id| !valid_id(id))
+                || metric.failed_junction_ids.iter().any(|id| !valid_id(id))
+                || metric.failed_segment_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                || metric.failed_junction_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                || metric.failed_segment_count != metric.failed_segment_ids.len()
+                || metric.failed_junction_count != metric.failed_junction_ids.len()
                 || metric.reachable_demand_pair_count + metric.unreachable_demand_pair_count
                     != metric.demand_pair_count
                 || metric.reachable_demand_weight + metric.unreachable_demand_weight
                     != metric.total_demand_weight
+                || metric.total_demand_weight
+                    != self.demands.iter().map(|demand| u128::from(demand.weight)).sum::<u128>()
                 || metric.remaining_junction_count > MAX_FAILURE_JUNCTIONS
                 || metric.remaining_segment_count > MAX_FAILURE_SEGMENTS
                 || metric.cycle_rank
                     != metric.remaining_segment_count
                         .saturating_add(metric.connected_components)
                         .saturating_sub(metric.remaining_junction_count)
-                || metric.weighted_reachability.is_some_and(|value| {
-                    !value.is_finite() || !(0.0..=1.0).contains(&value)
-                })
-                || metric.weighted_mean_directness.is_some_and(|value| {
-                    !value.is_finite() || !(0.0..=1.0 + 1.0e-8).contains(&value)
-                })
-                || metric.weighted_mean_network_path_length.is_some_and(|value| {
-                    !value.is_finite() || value <= 0.0
-                })
-                || (metric.total_demand_weight == 0) != metric.weighted_reachability.is_none()
-                || (metric.reachable_demand_weight == 0)
-                    != (metric.weighted_mean_directness.is_none()
-                        && metric.weighted_mean_network_path_length.is_none())
-                || (metric.reachable_demand_weight > 0
-                    && (metric.weighted_mean_directness.is_none()
-                        || metric.weighted_mean_network_path_length.is_none()))
+                || metric.length_unit != self.baseline.length_unit
             {
                 return Err(MycelialFailureResilienceError::InvalidProfile(
-                    "scenario metric totals, bounds or optional values are inconsistent",
+                    "scenario identity, bounds or demand totals are inconsistent",
+                ));
+            }
+
+            let mut reachable_count = 0usize;
+            let mut reachable_weight = 0u128;
+            let mut weighted_directness_sum = 0.0f64;
+            let mut weighted_path_length_sum = 0.0f64;
+            for (outcome, demand) in metric.demand_pair_outcomes.iter().zip(&self.demands) {
+                match (
+                    outcome.direct_distance_model_units,
+                    outcome.network_path_length_model_units,
+                ) {
+                    (Some(direct_distance), Some(path_length)) => {
+                        if !direct_distance.is_finite()
+                            || direct_distance < 0.0
+                            || !path_length.is_finite()
+                            || path_length <= 0.0
+                            || direct_distance > path_length + 1.0e-5
+                        {
+                            return Err(MycelialFailureResilienceError::InvalidProfile(
+                                "reachable demand outcome has invalid geometric path values",
+                            ));
+                        }
+                        reachable_count += 1;
+                        reachable_weight += u128::from(demand.weight);
+                        weighted_directness_sum +=
+                            (direct_distance / path_length) * f64::from(demand.weight);
+                        weighted_path_length_sum +=
+                            path_length * f64::from(demand.weight);
+                    }
+                    (None, None) => {}
+                    _ => {
+                        return Err(MycelialFailureResilienceError::InvalidProfile(
+                            "demand outcome must report both path values or neither",
+                        ));
+                    }
+                }
+            }
+            let unreachable_count = metric.demand_pair_count - reachable_count;
+            let unreachable_weight = metric.total_demand_weight - reachable_weight;
+            let expected_reachability = (metric.total_demand_weight > 0)
+                .then_some(reachable_weight as f64 / metric.total_demand_weight as f64);
+            let expected_directness = (reachable_weight > 0)
+                .then_some(weighted_directness_sum / reachable_weight as f64);
+            let expected_path_length = (reachable_weight > 0)
+                .then_some(weighted_path_length_sum / reachable_weight as f64);
+            if metric.reachable_demand_pair_count != reachable_count
+                || metric.unreachable_demand_pair_count != unreachable_count
+                || metric.reachable_demand_weight != reachable_weight
+                || metric.unreachable_demand_weight != unreachable_weight
+                || metric.weighted_reachability != expected_reachability
+                || metric.weighted_mean_directness != expected_directness
+                || metric.weighted_mean_network_path_length != expected_path_length
+            {
+                return Err(MycelialFailureResilienceError::InvalidProfile(
+                    "scenario aggregates disagree with per-demand outcome receipts",
                 ));
             }
         }
+
         let expected_worst_reachability = self
             .scenarios
             .iter()
