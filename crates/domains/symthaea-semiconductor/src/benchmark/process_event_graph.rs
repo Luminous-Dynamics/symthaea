@@ -404,7 +404,7 @@ fn validate_label(
         )));
     }
 
-    match label.status {
+    match &label.status {
         MetrologyLabelStatusV1::Validated => {
             if label.value.is_none() || label.standard_uncertainty.is_none() {
                 return Err(ProcessEventGraphError(format!(
@@ -508,7 +508,7 @@ pub fn validate_process_event_graph_v1(
                 "{prefix}: edge endpoint does not resolve to an event"
             )));
         }
-        if matches!(edge.edge_kind, ProcessEdgeKindV1::Precedes) {
+        if matches!(&edge.edge_kind, ProcessEdgeKindV1::Precedes) {
             let source = event_by_id[edge.source_event_id.as_str()];
             let target = event_by_id[edge.target_event_id.as_str()];
             if source.event_clock_domain_id == target.event_clock_domain_id
@@ -680,7 +680,7 @@ pub fn build_information_cutoff_snapshot_v1(
         )?;
         if available_at > cutoff_micros {
             not_yet_available_label_ids.push(label.label_id.clone());
-        } else if matches!(label.status, MetrologyLabelStatusV1::Validated) {
+        } else if matches!(&label.status, MetrologyLabelStatusV1::Validated) {
             matured_validated_label_ids.push(label.label_id.clone());
         } else {
             non_trainable_label_ids.push(label.label_id.clone());
@@ -766,7 +766,7 @@ mod tests {
         revision: u64,
         supersedes: Option<&str>,
     ) -> MetrologyLabelV1 {
-        let validated = matches!(status, MetrologyLabelStatusV1::Validated);
+        let validated = matches!(&status, MetrologyLabelStatusV1::Validated);
         MetrologyLabelV1 {
             label_id: id.into(),
             measurement_event_id: "met-17".into(),
