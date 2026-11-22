@@ -81,12 +81,19 @@ impl EvidenceDependencyIndex {
             nodes.keys().map(|id| (*id, BTreeSet::new())).collect();
         let mut lifecycle_neighbors: BTreeMap<u32, BTreeSet<u32>> =
             nodes.keys().map(|id| (*id, BTreeSet::new())).collect();
+        let mut cycle_successors: BTreeMap<u32, BTreeSet<u32>> =
+            nodes.keys().map(|id| (*id, BTreeSet::new())).collect();
         let mut indegree: BTreeMap<u32, usize> =
             nodes.keys().map(|id| (*id, 0_usize)).collect();
 
         for node in nodes.values() {
             let mut unique_dependencies = BTreeSet::new();
-            for predecessor in node.derived_from.iter().chain(node.supersedes.iter()) {
+
+            // A derived view is invalidated when its source is knocked out.
+            // Supersession is intentionally not folded into this edge type:
+            // a newer correction can remain valid when an old version is
+            // excluded from an ordinary event/source knockout.
+            for predecessor in &node.derived_from {
                 if *predecessor == node.event_id {
                     return Err(format!("event {} depends on itself", node.event_id));
                 }
@@ -106,12 +113,33 @@ impl EvidenceDependencyIndex {
                     .get_mut(predecessor)
                     .expect("all nodes have dependent sets")
                     .insert(node.event_id);
+                cycle_successors
+                    .get_mut(predecessor)
+                    .expect("all nodes have cycle-successor sets")
+                    .insert(node.event_id);
                 *indegree
                     .get_mut(&node.event_id)
                     .expect("all nodes have indegree entries") += 1;
             }
 
+            // Supersession participates in cycle validation and lifecycle
+            // closure, but not ordinary derived-view dependency closure.
             for predecessor in &node.supersedes {
+                if *predecessor == node.event_id {
+                    return Err(format!("event {} supersedes itself", node.event_id));
+                }
+                if !nodes.contains_key(predecessor) {
+                    return Err(format!(
+                        "event {} supersedes missing predecessor {predecessor}",
+                        node.event_id
+                    ));
+                }
+                if !unique_dependencies.insert(*predecessor) {
+                    return Err(format!(
+                        "event {} repeats dependency {predecessor}",
+                        node.event_id
+                    ));
+                }
                 lifecycle_neighbors
                     .get_mut(&node.event_id)
                     .expect("all nodes have lifecycle sets")
@@ -120,11 +148,19 @@ impl EvidenceDependencyIndex {
                     .get_mut(predecessor)
                     .expect("all nodes have lifecycle sets")
                     .insert(node.event_id);
+                cycle_successors
+                    .get_mut(predecessor)
+                    .expect("all nodes have cycle-successor sets")
+                    .insert(node.event_id);
+                *indegree
+                    .get_mut(&node.event_id)
+                    .expect("all nodes have indegree entries") += 1;
             }
         }
 
-        // Reject cyclic derivation/supersession graphs. A closure over a cycle
-        // is finite, but the cycle makes chronology and invalidation ambiguous.
+        // Reject cycles across both derivation and supersession relations.
+        // Their closure semantics remain distinct even though both need a
+        // valid chronology/ancestry graph.
         let mut ready: BTreeSet<u32> = indegree
             .iter()
             .filter_map(|(id, degree)| (*degree == 0).then_some(*id))
@@ -132,7 +168,7 @@ impl EvidenceDependencyIndex {
         let mut visited = 0_usize;
         while let Some(id) = ready.pop_first() {
             visited += 1;
-            if let Some(children) = dependents.get(&id) {
+            if let Some(children) = cycle_successors.get(&id) {
                 for child in children {
                     let degree = indegree
                         .get_mut(child)
@@ -145,7 +181,7 @@ impl EvidenceDependencyIndex {
             }
         }
         if visited != nodes.len() {
-            return Err("dependency graph contains a cycle".to_string());
+            return Err("dependency/supersession graph contains a cycle".to_string());
         }
 
         Ok(Self {
@@ -253,7 +289,8 @@ impl EvidenceDependencyIndex {
             return Err(format!("unknown event identity: {event_id}"));
         }
         let mut lineage = BTreeSet::new();
-        let mut queue = VecDeque::from([event_id]);
+        let mut queue = VecDeque::new();
+        queue.push_back(event_id);
         while let Some(id) = queue.pop_front() {
             if !lineage.insert(id) {
                 continue;
@@ -1007,6 +1044,7 @@ mod tests {
             node(4, 4, root(4), Action::B),
         ])
         .unwrap();
+        assert_eq!(index.event_closure(1).unwrap(), BTreeSet::from([1]));
         assert_eq!(
             index.lifecycle_closure(1).unwrap(),
             BTreeSet::from([1, 2, 3])
@@ -1014,6 +1052,22 @@ mod tests {
         assert_eq!(
             index.lifecycle_closure(2).unwrap(),
             BTreeSet::from([1, 2, 3])
+        );
+    }
+
+    #[test]
+    fn event_knockout_preserves_superseding_replacement() {
+        let mut replacement = node(2, 2, root(2), Action::A);
+        replacement.supersedes.push(1);
+        let index = EvidenceDependencyIndex::new(vec![
+            node(1, 1, root(1), Action::A),
+            replacement,
+        ])
+        .unwrap();
+        assert_eq!(index.event_closure(1).unwrap(), BTreeSet::from([1]));
+        assert_eq!(
+            index.lifecycle_closure(1).unwrap(),
+            BTreeSet::from([1, 2])
         );
     }
 
