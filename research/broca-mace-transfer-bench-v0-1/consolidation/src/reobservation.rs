@@ -254,6 +254,8 @@ pub fn verify_reobservation_profile(
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReobservationPolicyV1 {
+    /// Exact bitemporal snapshot used by this decision.
+    pub as_known: AsKnownQuery,
     pub decision_at_ms: i64,
     pub decision_deadline_ms: i64,
     pub context_budget_tokens: u32,
@@ -267,6 +269,7 @@ pub struct ReobservationPolicyV1 {
 impl ReobservationPolicyV1 {
     pub fn is_valid(self) -> bool {
         self.decision_at_ms >= 0
+            && self.decision_at_ms == self.as_known.known_at_ms
             && self.decision_deadline_ms >= self.decision_at_ms
             && self.context_budget_tokens > 0
             && self.context_budget_tokens <= 16_384
@@ -385,9 +388,8 @@ fn expected_failure_loss(
     success_probability_bps: u16,
 ) -> i64 {
     let failure_probability_bps = 10_000_u32.saturating_sub(u32::from(success_probability_bps));
-    i64::from(
-        failure_probability_bps.saturating_mul(failure_penalty_micros) / 10_000,
-    )
+    ((u64::from(failure_probability_bps) * u64::from(failure_penalty_micros))
+        / 10_000) as i64
 }
 
 pub fn plan_memory_representation(
@@ -407,7 +409,8 @@ pub fn plan_memory_representation(
     {
         return Err(ReobservationReject::PredictionMismatch);
     }
-    if raw_prediction.predicted_at_ms > proposal.as_known.known_at_ms
+    if proposal.as_known != policy.as_known
+        || raw_prediction.predicted_at_ms > proposal.as_known.known_at_ms
         || profile.receipt().verified_at_ms > proposal.as_known.known_at_ms
     {
         return Err(ReobservationReject::SnapshotMismatch);
@@ -754,7 +757,7 @@ mod tests {
     fn as_known() -> AsKnownQuery {
         AsKnownQuery {
             valid_at_ms: 100,
-            known_at_ms: 200,
+            known_at_ms: 300,
         }
     }
 
@@ -828,6 +831,7 @@ mod tests {
 
     fn policy() -> ReobservationPolicyV1 {
         ReobservationPolicyV1 {
+            as_known: as_known(),
             decision_at_ms: 300,
             decision_deadline_ms: 500,
             context_budget_tokens: 512,
@@ -852,6 +856,44 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn a_reobservation_profile_cannot_be_reused_after_knowledge_time_advances() {
+        let old_snapshot = AsKnownQuery {
+            valid_at_ms: 100,
+            known_at_ms: 200,
+        };
+        let old_proposal = ReobservationProposalV1 {
+            as_known: old_snapshot,
+            ..proposal(
+                MemoryObjectKindV1::CurrentState,
+                ReobservationAvailabilityV1::Available {
+                    available_at_ms: 200,
+                    locator_sha256: digest("mutable-source"),
+                },
+                Some(900),
+            )
+        };
+        let old_profile = verify_reobservation_profile(
+            old_proposal,
+            scope(),
+            old_snapshot,
+            &FixtureVerifier {
+                corrupt_receipt: false,
+                valid_for_ms: 10_000,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            plan_memory_representation(
+                &prediction(50_000, 1_000),
+                &old_profile,
+                policy(),
+            ),
+            Err(ReobservationReject::SnapshotMismatch)
+        );
     }
 
     #[test]
