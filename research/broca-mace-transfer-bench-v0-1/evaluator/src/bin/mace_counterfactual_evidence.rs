@@ -1538,6 +1538,9 @@ mod tests {
         assert_eq!(index.lineage_incomplete_event_count, 0);
         assert_eq!(index.unresolved_parent_reference_count, 0);
         assert_eq!(index.dependent_closure(&[42]), vec![42, 43]);
+        let projection = index.receipt_dependencies.as_ref().unwrap();
+        assert!(projection.all_lineage_complete(&[42, 43]));
+        assert!(projection.depends_on_any(43, &BTreeSet::from([42])));
 
         let manifest = build_manifest_with_sidecar(&memory, Some(&sidecar), 1234, 8)
             .expect("manifest should use receipt-backed dependency closure");
@@ -1598,6 +1601,10 @@ mod tests {
         .unwrap();
         assert_eq!(reduced.lineage_incomplete_event_count, 1);
         assert_eq!(reduced.unresolved_parent_reference_count, 1);
+        let reduced_projection =
+            ReceiptDependencyProjection::build(&reduced_memory, &reduced_sidecar).unwrap();
+        assert!(!reduced_projection.all_lineage_complete(&[43]));
+        assert!(reduced_projection.depends_on_any(43, &BTreeSet::from([42])));
     }
 
     #[test]
