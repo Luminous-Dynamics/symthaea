@@ -34,32 +34,62 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: .
-      - name: Check formatting
+      - name: Check formatting on exact replayed source files
         run: |
-          cargo fmt --package symthaea-manufacturing-process \
-            --package symthaea-manufacturing-contracts -- --check
-      - name: Test exact replayed public crates
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-manufacturing-process/src/lib.rs \
+            crates/domains/symthaea-manufacturing-contracts/src/lib.rs \
+            crates/domains/symthaea-manufacturing-contracts/src/capability.rs \
+            crates/domains/symthaea-manufacturing-contracts/src/recipe.rs \
+            crates/domains/symthaea-manufacturing-contracts/src/state.rs \
+            crates/domains/symthaea-manufacturing-contracts/src/plan.rs \
+            crates/domains/symthaea-manufacturing-contracts/tests/public_composition.rs
+      - name: Prepare isolated validation workspace
         run: |
-          cargo test -p symthaea-manufacturing-process \
+          set -euo pipefail
+          validation_root="$RUNNER_TEMP/mfg-proc-007r-workspace"
+          mkdir -p "$validation_root"
+          cp -R crates/domains/symthaea-manufacturing-process "$validation_root/"
+          cp -R crates/domains/symthaea-manufacturing-contracts "$validation_root/"
+          cp Cargo.lock "$validation_root/Cargo.lock"
+          cat > "$validation_root/Cargo.toml" <<'EOF'
+          [workspace]
+          resolver = "2"
+          members = [
+              "symthaea-manufacturing-process",
+              "symthaea-manufacturing-contracts",
+          ]
+
+          [workspace.package]
+          edition = "2024"
+
+          [workspace.dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          thiserror = "1.0"
+          blake3 = "1.5"
+          EOF
+          echo "MFG_PROC_007R_VALIDATION_ROOT=$validation_root" >> "$GITHUB_ENV"
+      - name: Test exact replayed public crates in isolated workspace
+        run: |
+          cargo test --manifest-path "$MFG_PROC_007R_VALIDATION_ROOT/Cargo.toml" \
+            -p symthaea-manufacturing-process \
             -p symthaea-manufacturing-contracts
       - name: Strict Clippy on exact replayed public crates
         run: |
-          cargo clippy -p symthaea-manufacturing-process \
+          cargo clippy --manifest-path "$MFG_PROC_007R_VALIDATION_ROOT/Cargo.toml" \
+            -p symthaea-manufacturing-process \
             -p symthaea-manufacturing-contracts --all-targets -- -D warnings
-      - name: Capture lockfile delta for deterministic review
+      - name: Capture generated lockfile for deterministic review
         if: always()
         run: |
-          git diff --binary -- Cargo.lock > mfg-proc-007r-cargo-lock.patch
-          git diff --name-only -- Cargo.lock > mfg-proc-007r-cargo-lock-files.txt
+          if [ -f "$MFG_PROC_007R_VALIDATION_ROOT/Cargo.lock" ]; then
+            cp "$MFG_PROC_007R_VALIDATION_ROOT/Cargo.lock" mfg-proc-007r-Cargo.lock
+          fi
       - name: Upload generated lockfile delta
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mfg-proc-007r-cargo-lock-delta
-          path: |
-            mfg-proc-007r-cargo-lock.patch
-            mfg-proc-007r-cargo-lock-files.txt
+          path: mfg-proc-007r-Cargo.lock
           if-no-files-found: warn
