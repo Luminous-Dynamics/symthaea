@@ -697,10 +697,10 @@
       "auroc_implementation": "O(n log n) descending tie-group rank accumulation; exact half-credit for ties",
       "large_tied_case_rows": 40000,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988500047",
-      "tested_commit": "ab51ea5cc44076eb07cc863a3419b6940ef5fdee",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
+      "tested_commit": "6d0e67c991525b8d4308cde03f99f5e4d97ec6d6",
       "claim_ceiling": "frozen metric contract parity and evaluator implementation only; no predictive or manufacturing claim",
-      "total_rust_unit_tests": 32
+      "total_rust_unit_tests": 35
     },
     "rust_split_manifest_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/split_manifest.rs",
@@ -738,17 +738,25 @@
     },
     "rust_dtco_lineage_validator": {
       "implementation": "crates/domains/symthaea-semiconductor/src/benchmark/dtco_manifest.rs",
+      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-dtco-lineage.rs",
       "tests": "inline-unit-tests",
       "input_fixture": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.json",
       "expected_output": "benchmarks/semi-bench-001/reference/fixtures/dtco-lineage-known-answer-v1.expected.json",
-      "test_count": 8,
+      "test_count": 11,
+      "enforced_rules": [
+        "parent-output-child-input-digest-binding",
+        "acyclic-graph",
+        "monotonic-fidelity-direction",
+        "root-design-digest-binding",
+        "constraint-digest-consumption",
+        "model-and-prediction-uncertainty-digests",
+        "physical-measurement-instrument-calibration-uncertainty"
+      ],
+      "fixture_unique_artifacts": 7,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44988794403",
-      "total_rust_unit_tests": 32,
-      "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy",
-      "cli": "crates/domains/symthaea-semiconductor/src/bin/semi-dtco-lineage.rs",
-      "cli_report_byte_for_byte": true,
-      "rust_tests": 32
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
+      "total_rust_unit_tests": 35,
+      "claim_ceiling": "lineage-integrity-only; does not validate physics or model accuracy"
     }
   },
   "reproducibility_artifacts": [
