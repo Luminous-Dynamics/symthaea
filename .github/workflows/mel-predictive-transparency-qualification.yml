@@ -55,7 +55,7 @@ jobs:
             --bin mel-musical-forecast-audit -- audit \
             tools/mel-judge-grounding-audit/fixtures/valid-musical-forecast-v1.json \
             "$RUNNER_TEMP/mel-musical-forecast-report.json"
-          jq -e '.forecast_count == 1 and .displayed_before_target_count == 1 and .matched_forecast_event_count == 1 and .role_match_rate == 1 and .beat_index_match_rate == 1 and .conditional_presence_brier_score <= 0.003 and .within_onset_tolerance_rate == 1 and .structurally_valid_anticipatory_trace == true' \
+          jq -e '.forecast_count == 1 and .reference_time_map_clock_domain_id == "muse-performance-time-v1" and .displayed_before_target_count == 1 and .matched_forecast_event_count == 1 and .role_match_rate == 1 and .beat_index_match_rate == 1 and .conditional_presence_brier_score <= 0.003 and .within_onset_tolerance_rate == 1 and .structurally_valid_anticipatory_trace == true' \
             "$RUNNER_TEMP/mel-musical-forecast-report.json" > /dev/null
       - name: Assemble exact-head reproducibility evidence
         if: always()
