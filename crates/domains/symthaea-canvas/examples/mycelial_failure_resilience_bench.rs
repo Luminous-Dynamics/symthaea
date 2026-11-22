@@ -334,6 +334,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     run_attack_family(
         &graph,
         &demands,
+        MycelialFailureAttackStrategy::BetweennessJunctions,
+        0,
+        None,
+    )?;
+    run_attack_family(
+        &graph,
+        &demands,
         MycelialFailureAttackStrategy::AdaptiveHighestDegreeJunctions,
         0,
         None,
