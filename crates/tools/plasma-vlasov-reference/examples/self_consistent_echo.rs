@@ -211,8 +211,7 @@ fn run_resolution(
         .collect();
     let wrong_second_kick: Vec<f64> = (0..config.nx)
         .map(|ix| {
-            let phase =
-                TAU * WRONG_SECOND_MODE as f64 * config.x(ix) / config.domain_length;
+            let phase = TAU * WRONG_SECOND_MODE as f64 * config.x(ix) / config.domain_length;
             impulse_amplitude * phase.sin()
         })
         .collect();
@@ -253,15 +252,18 @@ fn run_resolution(
                 no_second_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
             let delta_real = pulse_echo.real - control_echo.real;
             let delta_imaginary = pulse_echo.imaginary - control_echo.imaginary;
-            let wrong_echo = wrong_mode.electric_mode_coefficient(wrong_prediction.echo_mode as usize)?;
+            let wrong_echo =
+                wrong_mode.electric_mode_coefficient(wrong_prediction.echo_mode as usize)?;
             let wrong_control_echo =
                 no_second_pulse.electric_mode_coefficient(wrong_prediction.echo_mode as usize)?;
             let wrong_delta_real = wrong_echo.real - wrong_control_echo.real;
             let wrong_delta_imaginary = wrong_echo.imaginary - wrong_control_echo.imaginary;
-            let wrong_off_target = wrong_mode.electric_mode_coefficient(prediction.echo_mode as usize)?;
+            let wrong_off_target =
+                wrong_mode.electric_mode_coefficient(prediction.echo_mode as usize)?;
             let wrong_off_target_control =
                 no_second_pulse.electric_mode_coefficient(prediction.echo_mode as usize)?;
-            let wrong_off_target_amplitude = (wrong_off_target.real - wrong_off_target_control.real)
+            let wrong_off_target_amplitude = (wrong_off_target.real
+                - wrong_off_target_control.real)
                 .hypot(wrong_off_target.imaginary - wrong_off_target_control.imaginary);
             if wrong_off_target_amplitude > wrong_mode_off_target_peak {
                 wrong_mode_off_target_peak = wrong_off_target_amplitude;
