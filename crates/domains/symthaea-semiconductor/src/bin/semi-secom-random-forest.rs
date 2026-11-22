@@ -11,12 +11,6 @@ use std::time::Instant;
 
 use serde::Serialize;
 use sha2::Digest;
-use symthaea_semiconductor::benchmark::{
-    ForestClassWeightingV1, RandomForestInputSampleV1, RandomForestParametersV1,
-    RandomForestPredictionReportV1, RandomForestTrainingSampleV1, fit_random_forest_v1,
-    predict_random_forest_v1, prepare_secom_stratified_fold_v1,
-    score_random_forest_predictions_v1,
-};
 use symthaea_semiconductor::benchmark::random_forest::RandomForestModelV1;
 use symthaea_semiconductor::benchmark::secom_fold_preprocessor::{
     SecomFoldPreprocessorReportV1, SecomPreprocessorConfigV1,
@@ -26,6 +20,11 @@ use symthaea_semiconductor::benchmark::secom_raw::{
 };
 use symthaea_semiconductor::benchmark::split_manifest::{
     SplitManifestV1, validate_split_manifest_v1,
+};
+use symthaea_semiconductor::benchmark::{
+    ForestClassWeightingV1, RandomForestInputSampleV1, RandomForestParametersV1,
+    RandomForestPredictionReportV1, RandomForestTrainingSampleV1, fit_random_forest_v1,
+    predict_random_forest_v1, prepare_secom_stratified_fold_v1, score_random_forest_predictions_v1,
 };
 use symthaea_semiconductor::benchmark::stratified_repeat::StratifiedRepeatReportV1;
 
@@ -110,20 +109,24 @@ fn run() -> Result<(), String> {
     let identity_report = validate_split_manifest_v1(&identity_manifest)
         .map_err(|error| format!("source identity manifest rejected input: {error}"))?;
     if repeats.source_identity_manifest_sha256 != identity_report.split_manifest_sha256 {
-        return Err("stratified manifest does not bind the supplied source identity manifest".into());
+        return Err(
+            "stratified manifest does not bind the supplied source identity manifest".into(),
+        );
     }
     if identity_manifest.split_scheme != "forward_time"
         || identity_manifest.time_basis.as_deref() != Some("source_local_naive")
         || identity_manifest.clock_domain_id.as_deref()
             != Some(expectations.clock_domain_id.as_str())
     {
-        return Err("source identity manifest does not bind expected source-local chronology".into());
+        return Err(
+            "source identity manifest does not bind expected source-local chronology".into(),
+        );
     }
 
     let features = parse_features(&feature_bytes)
         .map_err(|error| format!("SECOM feature parse failed: {error}"))?;
-    let labels = parse_labels(&label_bytes)
-        .map_err(|error| format!("SECOM label parse failed: {error}"))?;
+    let labels =
+        parse_labels(&label_bytes).map_err(|error| format!("SECOM label parse failed: {error}"))?;
     if features.len() != raw_report.rows
         || labels.len() != raw_report.rows
         || identity_manifest.assignments.len() != raw_report.rows
@@ -144,7 +147,9 @@ fn run() -> Result<(), String> {
         }
         let source_time = label.observed_at.format("%Y-%m-%dT%H:%M:%S").to_string();
         if assignment.observed_at.as_deref() != Some(source_time.as_str()) {
-            return Err(format!("source identity assignment {index} timestamp mismatch"));
+            return Err(format!(
+                "source identity assignment {index} timestamp mismatch"
+            ));
         }
         sample_ids.push(assignment.sample_id.clone());
     }
@@ -199,9 +204,12 @@ fn run() -> Result<(), String> {
                 class_weighting,
             };
             let fit_start = Instant::now();
-            let model: RandomForestModelV1 = fit_random_forest_v1(&training, &parameters)
-                .map_err(|error| {
-                    format!("repeat {} {model_id} fit failed: {error}", manifest.repeat_index)
+            let model: RandomForestModelV1 =
+                fit_random_forest_v1(&training, &parameters).map_err(|error| {
+                    format!(
+                        "repeat {} {model_id} fit failed: {error}",
+                        manifest.repeat_index
+                    )
                 })?;
             let fit_milliseconds = fit_start.elapsed().as_millis() as u64;
 
@@ -213,10 +221,14 @@ fn run() -> Result<(), String> {
                 )
             })?;
             let prediction_milliseconds = prediction_start.elapsed().as_millis() as u64;
-            let metrics = score_random_forest_predictions_v1(&prediction_report, 0.5, 10)
-                .map_err(|error| {
-                    format!("repeat {} {model_id} metrics failed: {error}", manifest.repeat_index)
-                })?;
+            let metrics = score_random_forest_predictions_v1(&prediction_report, 0.5, 10).map_err(
+                |error| {
+                    format!(
+                        "repeat {} {model_id} metrics failed: {error}",
+                        manifest.repeat_index
+                    )
+                },
+            )?;
 
             arms.push(RandomForestArmReportV1 {
                 model_id: model_id.into(),
@@ -246,7 +258,10 @@ fn run() -> Result<(), String> {
     }
 
     if fold_reports.len() != 5 {
-        return Err(format!("expected five folds, observed {}", fold_reports.len()));
+        return Err(format!(
+            "expected five folds, observed {}",
+            fold_reports.len()
+        ));
     }
 
     let report = FiveRepeatRandomForestReportV1 {
