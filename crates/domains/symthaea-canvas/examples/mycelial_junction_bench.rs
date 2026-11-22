@@ -15,7 +15,8 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use symthaea_canvas::{
-    EmbodimentSnapshot, MycelialJunctionGraphConfig, MycelialNetworkConfig, PresenceMode,
+    EmbodimentSnapshot, MycelialContactFiltrationConfig, MycelialJunctionGraphConfig,
+    MycelialNetworkConfig, PresenceMode, build_mycelial_contact_filtration,
     build_mycelial_junction_hypha_graph, build_mycelial_model, detect_anastomosis_candidates,
 };
 
@@ -41,6 +42,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fusion_config = MycelialNetworkConfig::default();
 
     let candidates = detect_anastomosis_candidates(&model, fusion_config)?;
+    let filtration_started = Instant::now();
+    let contact_filtration = build_mycelial_contact_filtration(
+        &model,
+        &candidates,
+        MycelialContactFiltrationConfig {
+            maximum_contact_tolerance_model_units: fusion_config.max_fusion_distance,
+        },
+    )?;
+    let contact_filtration_elapsed_ns = filtration_started.elapsed().as_nanos();
+    let contact_filtration_digest = contact_filtration.canonical_digest_hex()?;
     let root_ids: Vec<_> = model
         .filaments
         .iter()
@@ -86,6 +97,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!("accepted_anastomoses: 0");
     println!("anastomosis_candidates_proposed: {}", candidates.len());
+    println!(
+        "candidate_contacts_admitted_by_tolerance: {}",
+        contact_filtration.metrics.candidate_count_in_filtration
+    );
+    println!(
+        "candidate_contacts_above_tolerance: {}",
+        contact_filtration.metrics.candidate_count_above_maximum
+    );
+    println!(
+        "candidate_component_merges: {}",
+        contact_filtration.metrics.component_merge_count
+    );
+    println!(
+        "candidate_cycle_births_right_censored: {}",
+        contact_filtration.metrics.cycle_birth_count
+    );
+    println!(
+        "contact_filtration_threshold_snapshots: {}",
+        contact_filtration.snapshots.len()
+    );
+    println!(
+        "contact_filtration_time_ns: {contact_filtration_elapsed_ns}"
+    );
+    println!("contact_filtration_digest: {contact_filtration_digest}");
     println!("junctions: {}", metrics.junction_count);
     println!("hypha_segments: {}", metrics.hypha_segment_count);
     println!("connected_components: {}", metrics.connected_components);
