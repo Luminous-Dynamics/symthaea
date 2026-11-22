@@ -1,0 +1,245 @@
+{
+  "schema": "luminous.airroad.mimo_finite_knot_nonidentifiability.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_analytical_reference",
+  "measured_angular_frequencies_rad_s": [
+    {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    {
+      "numerator": "2",
+      "denominator": "1"
+    },
+    {
+      "numerator": "4",
+      "denominator": "1"
+    }
+  ],
+  "off_grid_validation_frequency_rad_s": {
+    "numerator": "3",
+    "denominator": "1"
+  },
+  "model_a": {
+    "id": "constant-diagonal-model",
+    "Z_ohm": [
+      [
+        {
+          "real": {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "real": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "real": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "real": {
+            "numerator": "3",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ]
+    ],
+    "pole_set": [],
+    "proper": true,
+    "real_rational": true
+  },
+  "model_b": {
+    "id": "hidden-crossport-model",
+    "base_Z_ohm": [
+      [
+        {
+          "real": {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "real": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "real": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "real": {
+            "numerator": "3",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ]
+    ],
+    "delta_expression": "1000*(s^2+1)*(s^2+4)*(s^2+16)/(s+5)^7",
+    "delta_matrix_position": {
+      "row": 0,
+      "column": 1,
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-b"
+    },
+    "numerator_degree": 6,
+    "denominator_degree": 7,
+    "pole_set": [
+      {
+        "real": {
+          "numerator": "-5",
+          "denominator": "1"
+        },
+        "multiplicity": 7
+      }
+    ],
+    "proper": true,
+    "real_rational": true
+  },
+  "expected": {
+    "training_responses_equal_at_all_knots": true,
+    "measured_knot_crossport_delta": [
+      {
+        "frequency_rad_s": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "delta": {
+          "real": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      },
+      {
+        "frequency_rad_s": {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        "delta": {
+          "real": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      },
+      {
+        "frequency_rad_s": {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        "delta": {
+          "real": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "imag": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      }
+    ],
+    "off_grid_delta_at_3": {
+      "real": {
+        "numerator": "-51419200000",
+        "denominator": "52523350144"
+      },
+      "imag": {
+        "numerator": "38391360000",
+        "denominator": "52523350144"
+      }
+    },
+    "off_grid_delta_nonzero": true,
+    "model_b_poles_stable": true,
+    "continuous_domain_claim_from_knots_only": "NOT_ESTABLISHED"
+  },
+  "negative_controls": [
+    {
+      "id": "knot-only-training-fit-promoted-to-continuous",
+      "expected": "reject_promotion"
+    },
+    {
+      "id": "diagonal-only-matrix-comparison",
+      "expected": "misses-hidden-crossport"
+    },
+    {
+      "id": "off-grid-validation-observation",
+      "expected": "distinguishes-models"
+    },
+    {
+      "id": "model_b_claimed-improper",
+      "expected": "reject"
+    },
+    {
+      "id": "model_b-rhp-pole-declaration",
+      "expected": "reject"
+    },
+    {
+      "id": "frequency-unit-mismatch",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "model-b-mislabels-passivity",
+      "expected": "reject_claim_class"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact rational non-identifiability counterexample.",
+    "Both models are proper, real-rational and have no right-half-plane poles.",
+    "No physical converter, measured response, passivity or robustness result is claimed."
+  ]
+}

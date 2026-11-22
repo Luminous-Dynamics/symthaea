@@ -1,0 +1,41 @@
+name: AIRROAD MIMO Finite Knot Nonidentifiability Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_MODEL_IDENTIFICATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-finite-knot-nonidentifiability-v0.1.json"
+      - "tools/airroad-mimo-model-id-qualifier/verify_finite_knot_nonidentifiability.py"
+      - ".github/workflows/airroad-mimo-model-id-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-model-id-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_MODEL_IDENTIFICATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-finite-knot-nonidentifiability-v0.1.json"
+      - "tools/airroad-mimo-model-id-qualifier/verify_finite_knot_nonidentifiability.py"
+      - ".github/workflows/airroad-mimo-model-id-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-model-id-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute exact non-identifiability oracle
+        run: |
+          python3 -m py_compile tools/airroad-mimo-model-id-qualifier/verify_finite_knot_nonidentifiability.py
+          python3 tools/airroad-mimo-model-id-qualifier/verify_finite_knot_nonidentifiability.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-mimo-finite-knot-nonidentifiability-v0.1.json > /dev/null
