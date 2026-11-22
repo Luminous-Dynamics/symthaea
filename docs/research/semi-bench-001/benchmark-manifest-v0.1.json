@@ -1367,9 +1367,9 @@
     },
     "hosted_ci": {
       "workflow": "SEMI-BENCH-001 Reference Oracle",
-      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
-      "run_id": 44989349728,
-      "tested_commit": "6d0e67c991525b8d4308cde03f99f5e4d97ec6d6",
+      "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
+      "run_id": 44989451987,
+      "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
       "conclusion": "success",
       "python_reference_tests": 46,
       "rust_unit_tests": 35,
@@ -1388,7 +1388,7 @@
         "SECOM-raw-integrity-audit",
         "DTCO-lineage"
       ],
-      "note": "Hosted GitHub Actions verified the full Python reference suite and Rust crate suite on the current executable head. Rust checks are run in an isolated temporary Cargo workspace because the root Cargo workspace references a missing member on main."
+      "note": "Hosted GitHub Actions verified the full Python reference suite and Rust crate suite on the latest clean-base PR head. Rust checks run in a temporary isolated Cargo workspace because the repository root workspace references a missing member on main."
     },
     "inspection_decision_policy": {
       "implementation": "benchmarks/semi-bench-001/reference/python/semi_inspection_decision_reference.py",
@@ -1585,9 +1585,10 @@
         "simulations-cannot-assert-physical-measurement"
       ],
       "unique_artifact_count_in_fixture": 7,
+      "cli_report_byte_for_byte": true,
       "hosted_ci_status": "success",
-      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989349728",
-      "tested_commit": "6d0e67c991525b8d4308cde03f99f5e4d97ec6d6",
+      "hosted_ci_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987",
+      "tested_commit": "382649c720935cbf1e84689501f967f9b9867f56",
       "claim_ceiling": "evidence-lineage integrity only; no validation of device physics, model predictive accuracy, PDK qualification or fabricated silicon"
     }
   },
@@ -1660,7 +1661,9 @@
     "trust_aware_llm_bo_2026": "https://doi.org/10.1016/j.vlsi.2026.102782",
     "semiconductor_equipment_multifidelity_2026": "https://doi.org/10.1007/s11081-025-10059-0",
     "transformer_multicircuit_bo_2026": "https://doi.org/10.1016/j.vlsi.2026.102809",
-    "robustness_aware_cim_dtco_2026": "https://doi.org/10.1109/ACCESS.2026.3703077"
+    "robustness_aware_cim_dtco_2026": "https://doi.org/10.1109/ACCESS.2026.3703077",
+    "rust_semiconductor_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/13126",
+    "current_hosted_ci": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/44989451987"
   },
   "industry_frontier_reviews": [
     "docs/research/semi-bench-001/2026-real-data-and-upstream-frontier.md",
