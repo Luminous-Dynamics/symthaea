@@ -17,10 +17,9 @@ use std::time::Instant;
 use symthaea_canvas::{
     JunctionKind, JunctionLengthUnit, MAX_FAILURE_TOTAL_DEMAND_WEIGHT,
     MYCELIAL_JUNCTION_GRAPH_SCHEMA_VERSION, MYCELIAL_MODEL_VERSION, MycelialDemandPair,
-    MycelialFailureAttackConfig, MycelialFailureAttackStrategy,
-    MycelialFailureDeliveryConfig, MycelialHyphaSegment, MycelialJunction,
-    MycelialJunctionHyphaGraph, PARAMETER_SCALE, SpatialPoint3,
-    build_mycelial_failure_attack_plan, build_mycelial_failure_delivery_profile,
+    MycelialFailureAttackConfig, MycelialFailureAttackStrategy, MycelialFailureDeliveryConfig,
+    MycelialHyphaSegment, MycelialJunction, MycelialJunctionHyphaGraph, PARAMETER_SCALE,
+    SpatialPoint3, build_mycelial_failure_attack_plan, build_mycelial_failure_delivery_profile,
     build_single_failure_resilience_profile, evaluate_mycelial_failure_attack_plan,
 };
 
