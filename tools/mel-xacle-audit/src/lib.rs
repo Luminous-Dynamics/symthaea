@@ -266,10 +266,12 @@ pub fn validate_submission_csv(
     let _aligned = align_predictions(&metadata.items, &predictions.items)?;
 
     let minimum_prediction = predictions
+        .items
         .iter()
         .map(|prediction| prediction.score)
         .fold(f64::INFINITY, f64::min);
     let maximum_prediction = predictions
+        .items
         .iter()
         .map(|prediction| prediction.score)
         .fold(f64::NEG_INFINITY, f64::max);
@@ -863,7 +865,7 @@ impl SplitMix64 {
 mod tests {
     use super::*;
 
-    const METADATA: &str = "wave_file_name,text,average_score,model_id,model_name\n\
+    const METADATA: &str = "wave_file_name,text,average_semantic_alignement_score,model_id,model_name\n\
 a0.wav,prompt 0,0,m1,Generator One\n\
 a1.wav,prompt 1,1,m1,Generator One\n\
 a2.wav,prompt 2,2,m1,Generator One\n\
@@ -877,7 +879,7 @@ b3.wav,prompt 9,9,m2,Generator Two\n\
 b4.wav,prompt 10,10,m2,Generator Two\n\
 b5.wav,prompt 11,9,m2,Generator Two\n";
 
-    const BASELINE: &str = "wave_file_name,pred_score\n\
+    const BASELINE: &str = "wav_file_name,pred_score\n\
 a0.wav,0\n\
 a1.wav,1\n\
 a2.wav,2\n\
@@ -891,7 +893,7 @@ b3.wav,9\n\
 b4.wav,10\n\
 b5.wav,8\n";
 
-    const CANDIDATE: &str = "wave_file_name,pred_score\n\
+    const CANDIDATE: &str = "wav_file_name,pred_score\n\
 a0.wav,0\n\
 a1.wav,1\n\
 a2.wav,2\n\
@@ -940,6 +942,35 @@ b5.wav,9\n";
     }
 
     #[test]
+    fn baseline_preprocessed_metadata_dialect_is_accepted_and_reported() {
+        let metadata = b"wav_file_name,text,average_score\na.wav,calm piano,6.0\nb.wav,bright jazz,8.0\n";
+        let predictions = b"wav_file_name,pred_score\nb.wav,8.0\na.wav,6.0\n";
+        let report = score_csv(metadata, predictions, "baseline-dialect", 0, 9)
+            .expect("baseline's preprocessed CSV dialect should be accepted");
+        assert_eq!(report.metadata_id_column, "wav_file_name");
+        assert_eq!(report.target_score_column, "average_score");
+        assert_eq!(report.prediction_id_column, "wav_file_name");
+        assert_eq!(report.metrics.count, 2);
+        assert_eq!(report.metrics.srcc, Some(1.0));
+    }
+
+    #[test]
+    fn ambiguous_identifier_aliases_are_rejected() {
+        let metadata = b"wave_file_name,wav_file_name,average_score\na.wav,a.wav,6.0\n";
+        let error = parse_metadata(metadata, true)
+            .expect_err("both identifier aliases must be rejected as ambiguous");
+        assert!(error.contains("multiple columns for metadata item ID"));
+    }
+
+    #[test]
+    fn ambiguous_target_aliases_are_rejected() {
+        let metadata = b"wave_file_name,average_score,average_semantic_alignement_score\na.wav,6.0,6.0\n";
+        let error = parse_metadata(metadata, true)
+            .expect_err("both target aliases must be rejected as ambiguous");
+        assert!(error.contains("multiple columns for target score"));
+    }
+
+    #[test]
     fn duplicate_metadata_ids_are_rejected() {
         let duplicate = b"wave_file_name,average_score\na.wav,1\na.wav,2\n";
         assert!(
@@ -951,7 +982,7 @@ b5.wav,9\n";
 
     #[test]
     fn duplicate_prediction_ids_are_rejected() {
-        let duplicate = b"wave_file_name,pred_score\na.wav,1\na.wav,2\n";
+        let duplicate = b"wav_file_name,pred_score\na.wav,1\na.wav,2\n";
         assert!(
             parse_predictions(duplicate)
                 .expect_err("duplicate prediction ID must fail")
@@ -961,7 +992,7 @@ b5.wav,9\n";
 
     #[test]
     fn missing_or_extra_prediction_ids_are_rejected() {
-        let missing = b"wave_file_name,pred_score\na0.wav,1\n";
+        let missing = b"wav_file_name,pred_score\na0.wav,1\n";
         assert!(
             score_csv(METADATA.as_bytes(), missing, "x", 0, 42)
                 .expect_err("coverage mismatch must fail")
@@ -979,7 +1010,7 @@ b5.wav,9\n";
     #[test]
     fn non_finite_and_out_of_range_scores_are_rejected() {
         for score in ["NaN", "inf", "-0.1", "10.1"] {
-            let csv = format!("wave_file_name,pred_score\na0.wav,{score}\n");
+            let csv = format!("wav_file_name,pred_score\na0.wav,{score}\n");
             let error =
                 parse_predictions(csv.as_bytes()).expect_err("invalid output should be rejected");
             assert!(error.contains("finite and in [0, 10]"));
@@ -997,7 +1028,7 @@ b5.wav,9\n";
     #[test]
     fn blind_submission_validation_does_not_require_labels() {
         let evaluation = b"wave_file_name,text\nx0.wav,ambient piano\nx1.wav,fast jazz\n";
-        let predictions = b"wave_file_name,pred_score\nx1.wav,8.2\nx0.wav,6.4\n";
+        let predictions = b"wav_file_name,pred_score\nx1.wav,8.2\nx0.wav,6.4\n";
         let report = validate_submission_csv(evaluation, predictions, "test-system")
             .expect("blind submission should validate regardless of row order");
         assert_eq!(report.expected_item_count, 2);
@@ -1008,7 +1039,7 @@ b5.wav,9\n";
     #[test]
     fn blind_submission_rejects_missing_rows() {
         let evaluation = b"wave_file_name,text\nx0.wav,ambient piano\nx1.wav,fast jazz\n";
-        let predictions = b"wave_file_name,pred_score\nx0.wav,6.4\n";
+        let predictions = b"wav_file_name,pred_score\nx0.wav,6.4\n";
         assert!(
             validate_submission_csv(evaluation, predictions, "system")
                 .expect_err("missing row must fail")
