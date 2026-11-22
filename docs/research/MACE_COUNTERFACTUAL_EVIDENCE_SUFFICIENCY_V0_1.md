@@ -785,7 +785,7 @@ It performs the comparison in the correct hierarchy:
 6. bootstrap 2,000 replicates by resampling independent world-cluster deltas, not individual scenario rows or budget points;
 7. calculate the aggregate mean-cost/mean-regret Pareto frontier across arm/budget points.
 
-Output includes mean utility/regret, epsilon-sufficiency rate by regret alone, oracle-optimal and full-scope-agreement rates, lower-bound resource metrics, paired mean utility/regret deltas vs no-memory, cluster-bootstrap 95% percentile intervals, resampling unit, provenance hashes and frontier membership.
+Output includes mean utility/regret, epsilon-sufficiency rate by regret alone, oracle-optimal and full-scope-agreement rates, lower-bound resource metrics, paired mean utility/regret deltas vs no-memory, cluster-bootstrap 95% percentile intervals, worst-family regret increase and worst-family utility decrease (with family labels), resampling unit, provenance hashes and frontier membership.
 
 The reducer labels fewer-than-10-cluster results descriptive-only. It also labels the comparisons exploratory because no multiplicity correction or preregistered primary arm has yet been applied. The confidence intervals are not presented as confirmatory significance claims.
 
@@ -804,5 +804,5 @@ The aggregate schema is \`mace_sufficiency_aggregate_v0_1\`. The reducer binds t
 
 ### Tests authored
 
-Five reducer tests cover equal-weight within-cluster aggregation, deterministic cluster bootstrap, paired world-cluster matching/regret-delta direction, multi-dimensional Pareto dominance and canonical source revision validation. They have not been run in this environment.
+Six reducer tests cover equal-weight within-cluster aggregation, deterministic cluster bootstrap, paired world-cluster matching/regret-delta direction, worst-family harm visibility, multi-dimensional Pareto dominance and canonical source revision validation. They have not been run in this environment.
 
